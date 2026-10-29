@@ -19,8 +19,22 @@ fn captured() -> String {
     .unwrap()
 }
 
+/// The rows as `vouchers` reads them when the call asks for GST details.
 fn parse(xml: &str) -> Vec<Value> {
-    parse_agent_rows(xml, COMPANY_GUID).expect("the read still succeeds")
+    parse_agent_rows_reading_gst(xml, COMPANY_GUID, GstDetailsShown::Shown)
+        .expect("the read still succeeds")
+}
+
+/// A row with both GST keys taken off every entry.
+fn without_gst(mut row: Value) -> Value {
+    if let Some(entries) = row["amounts"].as_array_mut() {
+        for entry in entries {
+            let entry = entry.as_object_mut().unwrap();
+            entry.remove("gst_details");
+            entry.remove("gst_details_unreadable");
+        }
+    }
+    row
 }
 
 fn entries(rows: &[Value]) -> Vec<&Value> {
@@ -286,4 +300,118 @@ fn an_absent_or_empty_taxability_is_reported_as_such() {
             .expect("a taxed entry");
         assert_eq!(entry["gst_details"]["taxability"], json!({"state": state}));
     }
+}
+
+/// Every read that does not ask for GST details parses exactly the rows it did before: no entry
+/// carries either key, and the rows equal the asked-for rows with both keys taken off. So held
+/// windows, their byte count and the parse records are unchanged without the argument.
+#[test]
+fn a_read_that_does_not_ask_parses_no_gst_details() {
+    let xml = captured();
+    let plain = parse_agent_rows(&xml, COMPANY_GUID).unwrap();
+    let withheld =
+        parse_agent_rows_reading_gst(&xml, COMPANY_GUID, GstDetailsShown::Withheld).unwrap();
+    assert_eq!(plain, withheld);
+    let text = serde_json::to_string(&plain).unwrap();
+    assert!(!text.contains("gst_details"));
+    let asked = parse(&xml);
+    assert!(serde_json::to_string(&asked)
+        .unwrap()
+        .contains("\"gst_details\""));
+    assert_eq!(
+        asked.into_iter().map(without_gst).collect::<Vec<_>>(),
+        plain
+    );
+}
+
+/// A taxed entry's rate rows keep each head's valuation type and per-unit rate as sent.
+#[test]
+fn each_rate_row_keeps_its_valuation_type_and_per_unit_rate() {
+    let rows = parse(&captured());
+    let taxed = entries(&rows)
+        .into_iter()
+        .find(|entry| !value_rates(entry).is_empty())
+        .cloned()
+        .expect("a taxed entry");
+    let first = &taxed["gst_details"]["rates"][0];
+    assert_eq!(
+        first["duty_head"],
+        json!({"state": "value", "value": "CGST"})
+    );
+    assert_eq!(
+        first["valuation_type"],
+        json!({"state": "value", "value": "Based on Value"})
+    );
+    assert_eq!(first["per_unit_rate"], json!({"kind": "zero"}));
+}
+
+/// A register row and a register side item never carry GST details, read or not.
+#[test]
+fn a_register_row_never_carries_gst_details() {
+    let rows = parse(&captured());
+    let taxed = entries(&rows)
+        .into_iter()
+        .find(|entry| !value_rates(entry).is_empty())
+        .cloned()
+        .expect("a taxed entry");
+    assert!(taxed.get("gst_details").is_some());
+    let mut unreadable = taxed.clone();
+    unreadable.as_object_mut().unwrap().insert(
+        "gst_details_unreadable".into(),
+        json!("gst_details_rates_too_many"),
+    );
+    let row = super::super::register::mark_register_row(
+        json!({"taxable_entries": [taxed.clone()], "other_entries": [unreadable.clone()]}),
+    );
+    let item = super::super::register::mark_register_side_item(
+        json!({"unplaced_ledgers": [taxed, unreadable]}),
+    );
+    for entry in [
+        &row["taxable_entries"][0],
+        &row["other_entries"][0],
+        &item["unplaced_ledgers"][0],
+        &item["unplaced_ledgers"][1],
+    ] {
+        assert!(
+            entry.get("gst_details").is_none() && entry.get("gst_details_unreadable").is_none(),
+            "{entry}"
+        );
+    }
+}
+
+/// `vouchers`' page shows the details only when the call asked for them.
+#[test]
+fn a_vouchers_page_shows_gst_details_only_when_asked() {
+    use super::super::{Posting, Redaction, Server, Settings, TallyEndpointConfig};
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let rows = parse(&captured());
+    let page = |gst| {
+        serde_json::to_string(&super::super::vouchers::page_items(
+            &server,
+            &rows,
+            (0, rows.len()),
+            (
+                BankAllocationsShown::Withheld,
+                GoodsLinesShown::Withheld,
+                gst,
+            ),
+        ))
+        .unwrap()
+    };
+    assert!(!page(GstDetailsShown::Withheld).contains("gst_details"));
+    assert!(page(GstDetailsShown::Shown).contains("\"gst_details\""));
 }

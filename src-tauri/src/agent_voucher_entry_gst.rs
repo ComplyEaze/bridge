@@ -1,5 +1,6 @@
 //! GST details of one voucher ledger entry (#2027): its rate per duty head, read from
-//! `ALLLEDGERENTRIES.LIST/RATEDETAILS.LIST` (`GSTRATEDUTYHEAD`, `GSTRATE`), its taxability
+//! `ALLLEDGERENTRIES.LIST/RATEDETAILS.LIST` (`GSTRATEDUTYHEAD`, `GSTRATEVALUATIONTYPE`, `GSTRATE`,
+//! `GSTRATEPERUNIT`), its taxability
 //! (`GSTOVRDNTAXABILITY`) and its type of supply (`GSTOVRDNTYPEOFSUPPLY`).
 //!
 //! The vouchers read already asks for these (`ALLLEDGERENTRIES.*`), and captured answers to it
@@ -7,8 +8,12 @@
 //! `agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml`, 48 sales and purchase
 //! entries each carry three non-zero rates, a taxability and a type of supply, and the party and
 //! tax entries carry an empty rate list. Taxability and type of supply are each absent, empty or a
-//! value (trimmed); a duty head likewise; a rate is absent, empty, zero or a value with its text
-//! as sent ([`GstRate`], the same reading as a ledger's own rates), and those are never merged. A
+//! value (trimmed); a duty head and its valuation type likewise; a rate and a per-unit rate are
+//! each absent, empty, zero or a value with its text as sent ([`GstRate`], the same reading as a
+//! ledger's own rates), and those are never merged. A zero is what Tally sent: on an entry whose
+//! ledger sets no rate Tally sends `0` too (a captured Purchase with tax charged carries five), so a
+//! zero is not a zero-rated supply, and a valuation type of `Not Applicable` says the head does
+//! not apply. On an item invoice the rates sit with the goods line, not on the entry. A
 //! rate list with no children is not listed. A rate list nested deeper than the entry (inside a
 //! goods line, say) belongs to that line and is not read here.
 //!
@@ -31,7 +36,14 @@ const ENTRY_FIELDS: [(&str, &str); 2] = [
 ];
 
 const DUTY_HEAD: &str = "GSTRATEDUTYHEAD";
+const VALUATION_TYPE: &str = "GSTRATEVALUATIONTYPE";
 const RATE: &str = "GSTRATE";
+const PER_UNIT_RATE: &str = "GSTRATEPERUNIT";
+
+/// Whether a rate row's child is one this collector reads.
+fn rate_field(tag: &str) -> bool {
+    matches!(tag, DUTY_HEAD | VALUATION_TYPE | RATE | PER_UNIT_RATE)
+}
 
 /// Why an entry's GST details could not be read. The text is the wire value of
 /// `gst_details_unreadable`.
@@ -43,7 +55,7 @@ pub(in crate::agent) enum EntryGstProblem {
     TextUndecodable,
     /// An element inside a field that is read.
     ShapeUnrecognised,
-    /// A rate that is not digits with an optional single `.` fraction.
+    /// A rate or per-unit rate that is not digits with an optional single `.` fraction.
     RateNotDecimal,
     /// Two rate rows naming the same duty head.
     DutyHeadRepeated,
@@ -83,8 +95,23 @@ pub(in crate::agent) struct EntryGstCollector {
 #[derive(Default)]
 struct OpenRate {
     duty_head: Option<String>,
+    valuation_type: Option<String>,
     rate: Option<String>,
+    per_unit_rate: Option<String>,
     any_child: bool,
+}
+
+impl OpenRate {
+    /// The slot a read child fills, if it is one.
+    fn slot(&mut self, tag: &str) -> Option<&mut Option<String>> {
+        match tag {
+            DUTY_HEAD => Some(&mut self.duty_head),
+            VALUATION_TYPE => Some(&mut self.valuation_type),
+            RATE => Some(&mut self.rate),
+            PER_UNIT_RATE => Some(&mut self.per_unit_rate),
+            _ => None,
+        }
+    }
 }
 
 fn entry_field(tag: &str) -> Option<&'static str> {
@@ -116,7 +143,7 @@ impl EntryGstCollector {
     pub(in crate::agent) fn undecodable(&mut self, tail: &[String]) {
         let inside = match tail {
             [field] => entry_field(field).is_some(),
-            [list, _] => list == RATE_LIST,
+            [list, field] => list == RATE_LIST && rate_field(field),
             _ => false,
         };
         if inside {
@@ -143,7 +170,7 @@ impl EntryGstCollector {
             [field] if entry_field(field).is_some() => {
                 self.note(EntryGstProblem::ShapeUnrecognised)
             }
-            [list, field] if list == RATE_LIST && (field == DUTY_HEAD || field == RATE) => {
+            [list, field] if list == RATE_LIST && rate_field(field) => {
                 self.note(EntryGstProblem::ShapeUnrecognised)
             }
             [list] if list == RATE_LIST => {
@@ -151,10 +178,8 @@ impl EntryGstCollector {
                     return;
                 };
                 open.any_child = true;
-                let slot = match tag {
-                    DUTY_HEAD => &mut open.duty_head,
-                    RATE => &mut open.rate,
-                    _ => return,
+                let Some(slot) = open.slot(tag) else {
+                    return;
                 };
                 if slot.replace(String::new()).is_some() {
                     self.note(EntryGstProblem::FieldDuplicated);
@@ -173,15 +198,12 @@ impl EntryGstCollector {
                 }
             }
             [list, field] if list == RATE_LIST && field == tag => {
-                let Some(open) = self.open.as_mut() else {
-                    return;
-                };
-                let slot = match tag {
-                    DUTY_HEAD => &mut open.duty_head,
-                    RATE => &mut open.rate,
-                    _ => return,
-                };
-                if let Some(value) = slot.as_mut() {
+                if let Some(value) = self
+                    .open
+                    .as_mut()
+                    .and_then(|open| open.slot(tag))
+                    .and_then(Option::as_mut)
+                {
                     value.push_str(text);
                 }
             }
@@ -201,9 +223,12 @@ impl EntryGstCollector {
         if !open.any_child {
             return;
         }
-        let rate: GstRate = match classify_gst_rate(open.rate) {
-            Ok(rate) => rate,
-            Err(_) => {
+        let (rate, per_unit_rate): (GstRate, GstRate) = match (
+            classify_gst_rate(open.rate),
+            classify_gst_rate(open.per_unit_rate),
+        ) {
+            (Ok(rate), Ok(per_unit_rate)) => (rate, per_unit_rate),
+            _ => {
                 self.note(EntryGstProblem::RateNotDecimal);
                 return;
             }
@@ -222,7 +247,9 @@ impl EntryGstCollector {
         }
         self.rates.push(json!({
             "duty_head": field_state(open.duty_head.as_ref()),
+            "valuation_type": field_state(open.valuation_type.as_ref()),
             "rate": rate,
+            "per_unit_rate": per_unit_rate,
         }));
     }
 

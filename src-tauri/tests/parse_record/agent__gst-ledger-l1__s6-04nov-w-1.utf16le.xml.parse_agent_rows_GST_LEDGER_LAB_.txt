@@ -8,77 +8,12 @@ Ok([
             Object {
                 "amount": String("-20000.00"),
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [
-                        Object {
-                            "duty_head": Object {
-                                "state": String("value"),
-                                "value": String("CGST"),
-                            },
-                            "rate": Object {
-                                "kind": String("zero"),
-                            },
-                        },
-                        Object {
-                            "duty_head": Object {
-                                "state": String("value"),
-                                "value": String("SGST/UTGST"),
-                            },
-                            "rate": Object {
-                                "kind": String("zero"),
-                            },
-                        },
-                        Object {
-                            "duty_head": Object {
-                                "state": String("value"),
-                                "value": String("IGST"),
-                            },
-                            "rate": Object {
-                                "kind": String("zero"),
-                            },
-                        },
-                        Object {
-                            "duty_head": Object {
-                                "state": String("value"),
-                                "value": String("Cess"),
-                            },
-                            "rate": Object {
-                                "kind": String("zero"),
-                            },
-                        },
-                        Object {
-                            "duty_head": Object {
-                                "state": String("value"),
-                                "value": String("State Cess"),
-                            },
-                            "rate": Object {
-                                "kind": String("zero"),
-                            },
-                        },
-                    ],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("value"),
-                        "value": String("Services"),
-                    },
-                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("GS1 Professional Fees"),
             },
             Object {
                 "amount": String("-3600.00"),
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input IGST"),
             },
@@ -95,15 +30,6 @@ Ok([
                         },
                     },
                 ],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("SYN GS1 Supplier"),
             },

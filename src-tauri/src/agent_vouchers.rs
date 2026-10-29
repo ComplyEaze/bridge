@@ -25,6 +25,10 @@ pub(super) struct VoucherPageKey {
     /// A summary (#1230) is its own question: a listing and a summary never replace each other's
     /// held window, so pages of one cannot be served from a read that belongs to the other.
     summary: Option<SummaryGroup>,
+    /// Whether the window was read with each entry's GST details (#2027): a window read without
+    /// them cannot serve a page that asks for them, and one read with them is not held for a call
+    /// that does not, so the bytes held without the argument are unchanged.
+    gst_details: GstDetailsShown,
 }
 
 impl VoucherPageKey {
@@ -44,7 +48,14 @@ impl VoucherPageKey {
             selector: selector.cloned(),
             search: search.cloned(),
             summary: None,
+            gst_details: GstDetailsShown::Withheld,
         }
+    }
+
+    /// The same question asked with or without each entry's GST details.
+    pub(super) fn with_gst_details(mut self, gst: GstDetailsShown) -> Self {
+        self.gst_details = gst;
+        self
     }
 
     /// The same question asked as a summary by `group`.
@@ -564,6 +575,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 search.as_ref(),
             )
             .with_summary(summary_group)
+            .with_gst_details(shown.2)
         });
         let mut earlier_snapshot = None;
         if let Some(key) = &page_key {
@@ -658,7 +670,15 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             VoucherReadShape::EntryWildcard
         };
         let read = server
-            .read_entry_window_rows(&identity, &company.name, &from, &to, shape, composites)
+            .read_entry_window_rows(
+                &identity,
+                &company.name,
+                &from,
+                &to,
+                shape,
+                composites,
+                shown.2,
+            )
             .await?;
         accumulate_evidence(&mut accumulated, read.all_evidence());
         // What each request of the window read cost (#595); the empty-window
@@ -1229,7 +1249,8 @@ impl Server {
     }
 
     /// The `vouchers` window in either entry-wildcard shape, parsed under
-    /// `composites` (#674).
+    /// `composites` (#674), with each entry's GST details when `gst` shows them (#2027).
+    #[allow(clippy::too_many_arguments)]
     pub(super) async fn read_entry_window_rows(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -1238,8 +1259,9 @@ impl Server {
         to: &TallyDate,
         shape: VoucherReadShape,
         composites: VoucherComposites,
+        gst: GstDetailsShown,
     ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
-        read_entry_window_rows_with(
+        read_entry_window_rows_reading_gst(
             &AgentReader(self),
             identity,
             company,
@@ -1247,6 +1269,7 @@ impl Server {
             to,
             shape,
             composites,
+            gst,
         )
         .await
     }
@@ -1294,6 +1317,32 @@ pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
     shape: VoucherReadShape,
     composites: VoucherComposites,
 ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
+    read_entry_window_rows_reading_gst(
+        reader,
+        identity,
+        company,
+        from,
+        to,
+        shape,
+        composites,
+        GstDetailsShown::Withheld,
+    )
+    .await
+}
+
+/// [`read_entry_window_rows_with`], reading each entry's GST details only when `gst` shows them
+/// (#2027): only `vouchers` called with `include_gst_details` asks.
+#[allow(clippy::too_many_arguments)]
+async fn read_entry_window_rows_reading_gst<R: WindowReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    composites: VoucherComposites,
+    gst: GstDetailsShown,
+) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
     read_voucher_window_with(
         reader,
         identity,
@@ -1305,10 +1354,12 @@ pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
         WindowReadLimits::for_shape(shape).counting_small_books(),
         |xml| match composites {
             VoucherComposites::Withhold => {
-                parse_agent_rows_withholding(xml, identity.company_guid())
+                parse_agent_rows_withholding_reading_gst(xml, identity.company_guid(), gst)
             }
-            VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
-                .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
+            VoucherComposites::Refuse => {
+                parse_agent_rows_reading_gst(xml, identity.company_guid(), gst)
+                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect())
+            }
         },
     )
     .await

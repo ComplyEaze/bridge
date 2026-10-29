@@ -140,6 +140,7 @@ pub(super) fn parse_import_verification_rows(
         true,
         company_guid,
         CompositePolicy::Refuse,
+        GstDetailsShown::Withheld,
     )?)
 }
 
@@ -154,6 +155,24 @@ pub(super) fn parse_agent_rows_with_accounting_state(
         false,
         company_guid,
         CompositePolicy::Refuse,
+        GstDetailsShown::Withheld,
+    )?)
+}
+
+/// [`parse_agent_rows`], reading each entry's GST details (#2027) only when `gst` asks for them,
+/// so that every read that does not ask holds and returns exactly what it did before.
+pub(super) fn parse_agent_rows_reading_gst(
+    xml: &str,
+    company_guid: &str,
+    gst: GstDetailsShown,
+) -> Result<Vec<Value>, String> {
+    refused_composites(parse_voucher_rows(
+        xml,
+        false,
+        false,
+        company_guid,
+        CompositePolicy::Refuse,
+        gst,
     )?)
 }
 
@@ -162,22 +181,38 @@ pub(super) fn parse_agent_rows_with_accounting_state(
 /// instead of failing the window. Every other check still applies to it, and
 /// any other bad amount still fails the window. Nothing that sums, matches or
 /// verifies amounts reads through here.
+#[cfg(test)]
 pub(super) fn parse_agent_rows_withholding(
     xml: &str,
     company_guid: &str,
 ) -> Result<Vec<VoucherRow>, String> {
-    Ok(
-        parse_voucher_rows(xml, false, false, company_guid, CompositePolicy::Withhold)?
-            .into_iter()
-            .map(|(row, withheld)| {
-                if withheld {
-                    VoucherRow::Withheld(WithheldVoucher::from_parsed(row))
-                } else {
-                    VoucherRow::Read(row)
-                }
-            })
-            .collect(),
-    )
+    parse_agent_rows_withholding_reading_gst(xml, company_guid, GstDetailsShown::Withheld)
+}
+
+/// The `vouchers` rows, withheld as `parse_agent_rows_withholding` withholds them, with each
+/// entry's GST details read only when `gst` shows them (#2027).
+pub(super) fn parse_agent_rows_withholding_reading_gst(
+    xml: &str,
+    company_guid: &str,
+    gst: GstDetailsShown,
+) -> Result<Vec<VoucherRow>, String> {
+    Ok(parse_voucher_rows(
+        xml,
+        false,
+        false,
+        company_guid,
+        CompositePolicy::Withhold,
+        gst,
+    )?
+    .into_iter()
+    .map(|(row, withheld)| {
+        if withheld {
+            VoucherRow::Withheld(WithheldVoucher::from_parsed(row))
+        } else {
+            VoucherRow::Read(row)
+        }
+    })
+    .collect())
 }
 
 /// What an amount that is not a plain decimal does to its voucher.
@@ -315,7 +350,11 @@ fn parse_voucher_rows(
     include_effective_date: bool,
     company_guid: &str,
     composites: CompositePolicy,
+    gst_details: GstDetailsShown,
 ) -> Result<Vec<(Value, bool)>, String> {
+    // An entry's GST details are read only for a call that shows them (#2027): a read that does
+    // not ask holds, sizes and returns exactly the rows it did before.
+    let read_gst = gst_details == GstDetailsShown::Shown;
     // Tally's collection XML varies by release; use a deliberately conservative
     // extractor and never infer a missing field. Malformed rows fail before
     // optional selectors can hide them as an apparently complete empty result.
@@ -398,7 +437,7 @@ fn parse_voucher_rows(
                 current_tag = tag;
             }
             Ok(quick_xml::events::Event::Text(text)) => {
-                if let Some(tail) = scope.entry_tail() {
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
                     match decoded_agent_text(text.clone()) {
                         Ok(value) => gst.text(tail, &current_tag, &value),
                         Err(_) => gst.undecodable(tail),
@@ -441,7 +480,7 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::CData(text)) => {
                 let value = text.to_string();
-                if let Some(tail) = scope.entry_tail() {
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
                     gst.text(tail, &current_tag, &value);
                 }
                 if scope.in_cost_centres() {
@@ -465,7 +504,7 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::GeneralRef(reference)) => {
-                if let Some(tail) = scope.entry_tail() {
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
                     match decoded_agent_reference(reference.clone()) {
                         Ok(value) => gst.text(tail, &current_tag, &value),
                         Err(_) => gst.undecodable(tail),
@@ -691,6 +730,7 @@ fn parse_voucher_rows(
                         // The same for the entry's GST details (#2027): its rates, taxability and
                         // type of supply as Tally sent them, withheld unless `vouchers` asks.
                         match gst.finish() {
+                            _ if !read_gst => {}
                             Ok(None) => {}
                             Ok(Some(details)) => parsed_entry["gst_details"] = details,
                             Err(problem) => {

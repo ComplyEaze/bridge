@@ -30,15 +30,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("TLab Bank A"),
             },
@@ -67,15 +58,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("TLab Bank B"),
             },
@@ -121,15 +103,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("TLab Bank A"),
             },
@@ -159,15 +132,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("TLab Bank B"),
             },
@@ -212,15 +176,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("TLab Bank B"),
             },
@@ -249,15 +204,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("TLab Bank A"),
             },
@@ -302,15 +248,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("TLab Bank A"),
             },
@@ -339,15 +276,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("TLab Bank B"),
             },
@@ -393,15 +321,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("TLab Bank A"),
             },
@@ -431,15 +350,6 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
-                "gst_details": Object {
-                    "rates": Array [],
-                    "taxability": Object {
-                        "state": String("empty"),
-                    },
-                    "type_of_supply": Object {
-                        "state": String("empty"),
-                    },
-                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("TLab Bank B"),
             },

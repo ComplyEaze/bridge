@@ -24,6 +24,10 @@ pub const STOCK_QUERY_ITEM_NAME_MAX_CHARS: usize = 60;
 /// The batch Tally reports for stock not kept in a named batch.
 const DEFAULT_BATCH: &str = "Primary Batch";
 
+/// The character the sanitiser writes for a forbidden numeric reference, such as Tally's `&#4;`
+/// prefix (crate docs): a value holding it is not text Tally meant as a name or quantity.
+const TALLY_SANITIZED_MARKER: char = '\u{fffd}';
+
 /// Why a Stock Query name could not be sent, or an answer could not be read. No variant
 /// carries data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,14 +41,19 @@ pub enum StockQueryError {
     TallyReportedFailure,
     /// An element outside the captured set.
     UnknownElement,
-    /// A last-purchase or last-sale group without its six elements in their order.
+    /// A last-purchase or last-sale group without its six elements in their order, or a kind
+    /// of group appearing again after the other kind.
     PartialGroup,
     /// A godown, batch and quantity triple cut short, out of order, or followed by a group.
     PartialLine,
-    /// A godown or batch name that is empty or past the assumed name bound.
+    /// A godown or batch name that is empty, has space at either end, holds the sanitiser's
+    /// marker, or is past the assumed name bound.
     NameInvalid,
-    /// A quantity that is empty or not `<number> <unit>`: never read as zero.
+    /// A quantity that is empty, holds the sanitiser's marker, or is not `<number> <unit>`:
+    /// never read as zero.
     QuantityUnparseable,
+    /// A second line for a godown and batch already read.
+    LineRepeated,
 }
 
 impl StockQueryError {
@@ -59,6 +68,7 @@ impl StockQueryError {
             Self::PartialLine => "stock_query_partial_line",
             Self::NameInvalid => "stock_query_name_invalid",
             Self::QuantityUnparseable => "stock_query_quantity_unparseable",
+            Self::LineRepeated => "stock_query_line_repeated",
         }
     }
 }
@@ -169,8 +179,11 @@ fn captured(name: &[u8]) -> bool {
 
 /// Parses a Stock Query answer. The captured order is: any last-purchase and last-sale groups,
 /// six elements each, which are checked and skipped (they are not returned); then one triple per
-/// godown and batch. No capture holds both kinds of group, so they are read in either order. An element outside that set, a group or triple cut short, a group after a
-/// line, an empty or unreadable quantity, and an empty or over-long name refuse the whole answer.
+/// godown and batch. No capture holds both kinds of group, so either kind may come first, but
+/// the kinds do not interleave. Each of these refuses the whole answer: an element outside that
+/// set, in another case or with an attribute; a comment or declaration; a group or triple cut
+/// short; a group after a line; an empty or unreadable quantity; a name that is empty, padded,
+/// marked by the sanitiser or over-long; and a godown and batch read twice.
 pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError> {
     let sanitized = sanitize_invalid_numeric_references(xml);
     let mut reader = Reader::from_str(&sanitized);
@@ -185,7 +198,10 @@ pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError>
             .map_err(|_| StockQueryError::Malformed)?
         {
             Event::Start(element) => {
-                let name = upper(element.name());
+                if element.attributes().next().is_some() {
+                    return Err(StockQueryError::Malformed);
+                }
+                let name = element.name().as_ref().as_bytes().to_vec();
                 if !root_seen {
                     if name.as_slice() != b"ENVELOPE" {
                         return Err(StockQueryError::Malformed);
@@ -196,7 +212,8 @@ pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError>
                 if root_closed {
                     return Err(StockQueryError::Malformed);
                 }
-                refuse_error_element(&name).map_err(|_| StockQueryError::TallyReportedFailure)?;
+                refuse_error_element(&upper(element.name()))
+                    .map_err(|_| StockQueryError::TallyReportedFailure)?;
                 let text = read_text(&mut reader, element.name()).map_err(|error| match error {
                     NativeMastersError::TallyReportedFailure => {
                         StockQueryError::TallyReportedFailure
@@ -206,18 +223,20 @@ pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError>
                 fields.push((name, text));
             }
             Event::Empty(element) if root_seen && !root_closed => {
-                let name = upper(element.name());
-                refuse_error_element(&name).map_err(|_| StockQueryError::TallyReportedFailure)?;
-                fields.push((name, String::new()));
+                refuse_error_element(&upper(element.name()))
+                    .map_err(|_| StockQueryError::TallyReportedFailure)?;
+                if element.attributes().next().is_some() {
+                    return Err(StockQueryError::Malformed);
+                }
+                fields.push((element.name().as_ref().as_bytes().to_vec(), String::new()));
             }
             Event::End(element)
-                if root_seen && !root_closed && upper(element.name()).as_slice() == b"ENVELOPE" =>
+                if root_seen && !root_closed && element.name().as_ref() == "ENVELOPE" =>
             {
                 root_closed = true;
             }
             Event::Text(text) if text.as_ref().as_bytes().iter().all(u8::is_ascii_whitespace) => {}
             Event::Eof => break,
-            Event::Decl(_) | Event::Comment(_) => {}
             _ => return Err(StockQueryError::Malformed),
         }
     }
@@ -229,6 +248,8 @@ pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError>
 
 fn read_fields(fields: &[(Vec<u8>, String)]) -> Result<StockQueryAnswer, StockQueryError> {
     let mut at = 0;
+    // The kinds of group read so far, in order: a kind may not come back after the other.
+    let mut kinds = Vec::<&[&[u8]; 6]>::new();
     while let Some((name, _)) = fields.get(at) {
         let group = if name.as_slice() == PURCHASE_GROUP[0] {
             &PURCHASE_GROUP
@@ -237,19 +258,36 @@ fn read_fields(fields: &[(Vec<u8>, String)]) -> Result<StockQueryAnswer, StockQu
         } else {
             break;
         };
+        if kinds.last() != Some(&group) {
+            if kinds.contains(&group) {
+                return Err(StockQueryError::PartialGroup);
+            }
+            kinds.push(group);
+        }
         expect(fields, at, group, StockQueryError::PartialGroup)?;
         at += group.len();
     }
     let mut lines = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     while at < fields.len() {
         expect(fields, at, &LINE, StockQueryError::PartialLine)?;
+        let godown = line_name(&fields[at].1)?;
+        let batch = line_name(&fields[at + 1].1)?;
+        if !seen.insert((godown.clone(), batch.clone())) {
+            return Err(StockQueryError::LineRepeated);
+        }
+        let amount = &fields[at + 2].1;
+        if amount.contains(TALLY_SANITIZED_MARKER) {
+            return Err(StockQueryError::QuantityUnparseable);
+        }
         lines.push(StockQueryLine {
-            godown: line_name(&fields[at].1)?,
-            batch: match line_name(&fields[at + 1].1)?.as_str() {
-                DEFAULT_BATCH => StockQueryBatch::Default,
-                named => StockQueryBatch::Named(named.to_string()),
+            godown,
+            batch: if batch == DEFAULT_BATCH {
+                StockQueryBatch::Default
+            } else {
+                StockQueryBatch::Named(batch)
             },
-            quantity: quantity(Some(fields[at + 2].1.clone()))
+            quantity: quantity(Some(amount.clone()))
                 .ok()
                 .flatten()
                 .ok_or(StockQueryError::QuantityUnparseable)?,
@@ -281,9 +319,10 @@ fn expect(
     Ok(())
 }
 
-/// A godown or batch name as Tally sent it: not trimmed, never empty, within the name bound.
+/// A godown or batch name as Tally sent it: never empty, with no space at either end and no
+/// sanitiser's marker (a forbidden reference such as `&#4;` was in it), within the name bound.
 fn line_name(text: &str) -> Result<String, StockQueryError> {
-    if text.trim().is_empty() {
+    if text.trim().is_empty() || text.trim() != text || text.contains(TALLY_SANITIZED_MARKER) {
         return Err(StockQueryError::NameInvalid);
     }
     within_name_bound(text).map_err(|_| StockQueryError::NameInvalid)?;

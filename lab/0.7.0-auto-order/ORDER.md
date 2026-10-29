@@ -103,3 +103,12 @@ None of these 0.7.0 sheets toggles a setting only to isolate a variable. Rows 7 
 - L1 = `Discount Allowed` (Indirect Expenses), L2 = `Capital A/c` (Capital Account), as that answer names them; neither is a party, bank or cash ledger.
 - The date for steps 2.1 and 2.2: 15 June 2025. At step 0 the lab reads `vouchers` for that day; if a Journal is already on it, the lab uses the next day with none and records which.
 - Not established: whether L1 or L2 is bill-wise (the build refuses a bill-wise ledger it did not approve, which would show at step 2.1, a STOP).
+
+**Row 22, second sitting (added 29 Oct 2026): overrides the Row 22 note above where they differ.**
+- The sheet is `lab/1709-settle-row` at 8fdb4e8dc26e9f71bcefeb59e624af8e5dee66f6 (its parent is the first sitting's head bc6b5ea8). It restores the whole book from the kept BK0 at the end, answers Tally's numbering prompt Yes and records its effect, and reads the marks through the `vouchers` snapshot.
+- The date for steps 2.1 and 2.2: 22 June 2025 (15 to 21 June already hold Journals). Step 0.5 checks that no voucher is dated 22 to 30 June.
+- L1 and L2 are as above. Their bill-wise flags are read on the ledger screens at step 0.4; either one bill-wise = STOP.
+- The build is the one above, unchanged; the lab re-hashed it on 29 Oct 2026 and it matched. No new download is needed.
+- The data folder is the new empty folder the sheet names, not the first sitting's.
+- The go-ahead: the owner's standing word of 28 Oct 2026 that the lab PC has full authority for its rows (restarting Tally, posting on, answering Bridge's windows), and the go-ahead recorded above for #2150's build.
+- The answers go to a NEW branch `lab/1709-settle-row-2-answers`, made from the sheet head, in the folder `lab/1709-settle-row-2-answers/`. The first sitting's `lab/1709-settle-row-answers` is not touched.

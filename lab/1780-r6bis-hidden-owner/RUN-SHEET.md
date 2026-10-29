@@ -23,9 +23,9 @@ WRITES to the book: NONE. Every box is answered **No, by mouse**. Posting is swi
 - **The run coordinator** gives the go-ahead and any STOP ruling.
 
 ## Build and inputs (hash before the first step and at the end; a different hash = STOP; `SHA256.txt` lists every file of this folder with its size)
-- **BUILD-R6B:** the `unsigned-bundle-smoke-windows-latest` artifact of the CI run on `fix/1780-hidden-topmost-owner` at the head the run coordinator names.
-  - The run's conclusion must be success.
-  - Record the run id, the artifact id and its GitHub digest.
+- **BUILD-R6B:** the `unsigned-bundle-smoke-windows-latest` artifact of CI run 40963534404, on `fix/1780-hidden-topmost-owner` at 4c2496556a5748e0156aa07565ab177d2276d1eb (pull request #2193; its head 3da42340 adds only an acknowledgement file).
+  - The run's conclusion is success. Both Windows unit tests of the owner passed in it: `the_box_s_owner_is_a_hidden_topmost_tool_window_until_it_is_dropped` and `the_hook_does_not_measure_the_box_s_owner`.
+  - Artifact id 12936669352, 57,273,051 bytes, GitHub digest `sha256:a27cda6fbf044ed6186d38adc47305c4b8cf16b7ca09a69d7389f2497ce20f8a`. Record each again as fetched.
   - EXPECT:
     - the zip's sha256 equals the digest;
     - `bridge_mcp.exe` and `pdfium.dll` match `mcpb-smoke.json`'s hashes.

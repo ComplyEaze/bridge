@@ -1,0 +1,46 @@
+2026-10-29T17:05:24.987Z stdio_write_completed None
+2026-10-29T17:05:24.908Z response_prepared ledger_masters
+2026-10-29T17:05:23.593Z stdio_write_completed None
+2026-10-29T17:05:23.524Z response_prepared outstandings
+ trail keys ['failed', 'last', 'omitted', 'sent']
+ sent 48 failed 0 omitted 16
+2026-10-29T17:03:32.536Z stdio_write_completed None
+2026-10-29T17:03:32.496Z response_prepared ledger_masters
+2026-10-29T17:03:30.769Z stdio_write_completed None
+2026-10-29T17:03:30.722Z response_prepared list_companies
+last type list 32
+| seq | kind | request_bytes | response_bytes | held_ms | outcome |
+|---|---|---|---|---|---|
+| 17 | status | None | 51 | 0 | answered |
+| 18 | post | 2524 | 4012 | 6 | answered |
+| 19 | status | None | 51 | 0 | answered |
+| 20 | post | 2524 | 4012 | 4 | answered |
+| 21 | post | 2524 | 4012 | 6 | answered |
+| 22 | post | 1100 | 3854 | 3 | answered |
+| 23 | status | None | 51 | 0 | answered |
+| 24 | post | 1100 | 3854 | 5 | answered |
+| 25 | status | None | 51 | 0 | answered |
+| 26 | post | 770 | 13679490 | 34880 | answered |
+| 27 | status | None | 51 | 1 | answered |
+| 28 | post | 770 | 13679490 | 30081 | answered |
+| 29 | status | None | 51 | 0 | answered |
+| 30 | post | 1072 | 54280 | 19 | answered |
+| 31 | status | None | 51 | 0 | answered |
+| 32 | post | 1072 | 54280 | 14 | answered |
+| 33 | status | None | 51 | 2 | answered |
+| 34 | post | 764 | 46 | 2264 | answered |
+| 35 | status | None | 51 | 0 | answered |
+| 36 | post | 764 | 46 | 3447 | answered |
+| 37 | status | None | 51 | 0 | answered |
+| 38 | post | 1290 | 155514 | 77 | answered |
+| 39 | status | None | 51 | 1 | answered |
+| 40 | post | 1290 | 155514 | 48 | answered |
+| 41 | status | None | 51 | 0 | answered |
+| 42 | post | 1100 | 3854 | 5 | answered |
+| 43 | status | None | 51 | 0 | answered |
+| 44 | post | 1100 | 3854 | 4 | answered |
+| 45 | status | None | 51 | 1 | answered |
+| 46 | post | 2524 | 4012 | 7 | answered |
+| 47 | status | None | 51 | 1 | answered |
+| 48 | post | 2524 | 4012 | 7 | answered |
+sample keys ['held_ms', 'kind', 'outcome', 'response_bytes', 'seq']

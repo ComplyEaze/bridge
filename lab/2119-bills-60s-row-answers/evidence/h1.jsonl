@@ -1,0 +1,20 @@
+{"time":"2026-10-29T17:00:18.571Z","event":"started","pid":22488}
+{"time":"2026-10-29T17:00:19.825Z","event":"received","message":{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{"listChanged":true},"extensions":{"io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}}},"clientInfo":{"name":"local-agent-mode-sleep","version":"1.0.0"}},"jsonrpc":"2.0","id":0}}
+{"time":"2026-10-29T17:00:19.926Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/initialized"}}
+{"time":"2026-10-29T17:00:19.933Z","event":"received","message":{"method":"tools/list","jsonrpc":"2.0","id":1}}
+{"time":"2026-10-29T17:00:20.204Z","event":"started","pid":23280}
+{"time":"2026-10-29T17:00:20.213Z","event":"received","message":{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"extensions":{"io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}}},"clientInfo":{"name":"<client>","version":"0.1.0"}},"jsonrpc":"2.0","id":0}}
+{"time":"2026-10-29T17:00:20.361Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/initialized"}}
+{"time":"2026-10-29T17:00:20.374Z","event":"received","message":{"method":"tools/list","params":{},"jsonrpc":"2.0","id":1}}
+{"time":"2026-10-29T17:00:31.443Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/roots/list_changed"}}
+{"time":"2026-10-29T17:09:21.849Z","event":"received","message":{"method":"tools/call","params":{"name":"sleep","arguments":{"seconds":130}},"jsonrpc":"2.0","id":2}}
+{"time":"2026-10-29T17:10:21.907Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"SdkError: Request timed out"}}}
+{"time":"2026-10-29T17:10:21.919Z","event":"cancelled","id":2,"elapsed":60.05682500000007,"reason":"SdkError: Request timed out"}
+{"time":"2026-10-29T17:10:38.234Z","event":"stdin_closed","running":0}
+{"time":"2026-10-29T17:10:38.638Z","event":"started","pid":9684}
+{"time":"2026-10-29T17:10:38.659Z","event":"received","message":{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{"listChanged":true},"extensions":{"io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}}},"clientInfo":{"name":"local-agent-mode-sleep","version":"1.0.0"}},"jsonrpc":"2.0","id":0}}
+{"time":"2026-10-29T17:10:38.669Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/initialized"}}
+{"time":"2026-10-29T17:10:38.677Z","event":"received","message":{"method":"tools/list","jsonrpc":"2.0","id":1}}
+{"time":"2026-10-29T17:10:38.687Z","event":"received","message":{"method":"tools/call","params":{"name":"sleep","arguments":{"seconds":90}},"jsonrpc":"2.0","id":2}}
+{"time":"2026-10-29T17:11:38.699Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"SdkError: Request timed out"}}}
+{"time":"2026-10-29T17:11:38.706Z","event":"cancelled","id":2,"elapsed":60.010390400000006,"reason":"SdkError: Request timed out"}

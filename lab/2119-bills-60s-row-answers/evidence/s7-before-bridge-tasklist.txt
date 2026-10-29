@@ -1,0 +1,4 @@
+command: tasklist /FI "IMAGENAME eq bridge_mcp.exe" /FO CSV /NH
+time: 2026-10-29T17:18:14.302Z
+"bridge_mcp.exe","26244","Console","5","8,704 K"
+"bridge_mcp.exe","14120","Console","5","9,508 K"

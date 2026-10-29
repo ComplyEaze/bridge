@@ -1,0 +1,11 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed (product names are written as the desktop client and the Code tab CLI):
+evidence/H1-cause.txt: original 2257 B sha256 5bc3859de024dba70d0b1d4f5ccdd3d1469074c39f31cccf9a3d86e81105bc36; 1 x -> <desktop config file>; 1 x -> the sheet; 4 x -> the desktop client; 4 x -> the Code tab CLI; 1 x -> <desktop package 4.29.0.0 x64>; 1 x -> <code-tab cli folder>; 5 x -> <desktop client>
+evidence/c10-netstat.txt: original 10972 B sha256 054db96787dfe372734b1fc9ce122ac1eb3943bd47841f7e60006d80b021ce8c; only the port-9001 LISTENING lines kept
+evidence/h1.jsonl: original 3076 B sha256 68f9c734924bd6dd2e554596e7e8758fd88134e4fe27c66a1ebf35524425dd0d; 1 x -> "<client>"
+evidence/s0-netstat.txt: original 12334 B sha256 20c5eb2941ca1e02366bcc95db6de7e9dfb5de21225c75d933f03a4228394f08; only the port-9001 LISTENING lines kept
+evidence/s7-d-check.txt: original 289 B sha256 5b1c60d157f6bddd95ad820f01e180840a9cfd28b156757377e89c2dae7c48e0; 2 x -> <lab folder>
+RESULTS.md: original 5036 B sha256 e91b70abcc8445692a8e26b600c77478cf2f5d04f1b5c5282f5d3765527e0480; 1 x -> The operator cannot be given screen control of the desktop client; 1 x -> the desktop client; 2 x -> the Code tab CLI
+notes.txt: original 8397 B sha256 fd56290baa000b4b42dc42b704d90d61f89ca1c528864e69366cb9a036296fbf; 1 x -> <user profile>; 1 x -> The operator cannot be granted screen control of the desktop client; 1 x -> the Code tab CLI
+scripts/s1p1.py: original 4826 B sha256 d648a37abfad33568cea1cb5a55c95a7aa1f26c15d0ddb243943f407d458f938; 1 x -> <lab folder>; 3 x -> stop
+scripts/call.py: original 1214 B sha256 bca584dac316659447c144a758af87db654ea41f909d1d132b1a0c58d3bc1b81; 1 x -> <lab folder>
+scripts/step0.ps1: original 2385 B sha256 719031d33e8ad44486dfa234733e6315c6e0bc0131644fb973d19889880c35c2; 2 x -> <lab folder>

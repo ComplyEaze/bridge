@@ -1,0 +1,6 @@
+2026-10-29T17:06:27.155Z step 4 wait 120 s start
+2026-10-29T17:06:58.339Z capture s4-wait-30 exit 0
+2026-10-29T17:07:28.264Z capture s4-wait-60 exit 0
+2026-10-29T17:07:58.266Z capture s4-wait-90 exit 0
+2026-10-29T17:08:28.390Z capture s4-wait-120 exit 0
+2026-10-29T17:08:28.505Z step 4 GET /status exit 0 printed 200 51 in 0.125 s

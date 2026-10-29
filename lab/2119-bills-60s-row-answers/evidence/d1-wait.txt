@@ -1,0 +1,8 @@
+2026-10-29T17:13:27.091Z D1 rule 5 wait: 180 s from the error, a capture every 30 s
+2026-10-29T17:13:58.216Z capture d1-wait-30 exit 0
+2026-10-29T17:14:28.343Z capture d1-wait-60 exit 0
+2026-10-29T17:14:58.494Z capture d1-wait-90 exit 0
+2026-10-29T17:15:28.204Z capture d1-wait-120 exit 0
+2026-10-29T17:15:58.388Z capture d1-wait-150 exit 0
+2026-10-29T17:16:28.277Z capture d1-wait-180 exit 0
+2026-10-29T17:16:28.356Z D1 GET /status exit 0 printed 200 51 in 0.079 s

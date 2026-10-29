@@ -1,0 +1,18 @@
+2026-10-29T17:04:06.466Z S1 queued 003-s1-outstandings.json (outstandings company_guid, as_of 20260331)
+2026-10-29T17:04:16.788Z capture p1-t8 exit 0
+2026-10-29T17:04:16.811Z B client started pid 8952
+2026-10-29T17:04:16.816Z B tally_status queued 000-p1-tally-status.json at S1+10.36 s
+2026-10-29T17:04:28.916Z capture s1-t20 exit 0
+2026-10-29T17:04:29.336Z P1 B answered: round_trip 9.873 s, sent 2026-10-29T17:04:17Z, isError True, error {"code": "tally_endpoint_busy", "endpoint": "http://127.0.0.1:9001", "message": "ComplyEaze Bridge refused this operation.", "remediation": "Another ComplyEaze Bridge window or AI client was talking to this Tally for the whole bounded wait, so nothing was sent. Call again after retry_after_s seconds; the same request is safe to repeat.", "retry_after_s": 5}
+2026-10-29T17:04:29.660Z B client exited 0
+2026-10-29T17:04:48.947Z capture s1-t40 exit 0
+2026-10-29T17:05:21.728Z capture s1-t70 exit 0
+2026-10-29T17:05:23.828Z S1 answer file seen at S1+77.36 s; S2 queued 004-s2-marks.json at once
+2026-10-29T17:05:23.836Z S1: round_trip 76.875 s, sent 2026-10-29T17:04:06Z, isError False, truncated True, error null
+2026-10-29T17:05:23.840Z S1 result.open_bills_total = 29900
+2026-10-29T17:05:23.842Z S1 result.receivable = null
+2026-10-29T17:05:23.843Z S1 result.payable = null
+2026-10-29T17:05:23.844Z S1 result.as_of = "20260331"
+2026-10-29T17:05:23.845Z S1 result.state = "complete"
+2026-10-29T17:05:23.846Z S1 result keys: ageing_basis, ageing_buckets, as_of, limit, next_offset, offset, open_bills, open_bills_shown, open_bills_total, state, top_parties, top_parties_ranked_by, totals, unallocated
+2026-10-29T17:05:25.362Z S2: round_trip 0.809 s, isError False, error null, snapshot {"master_alter_id": 328, "voucher_alter_id": 29900, "reused": false}

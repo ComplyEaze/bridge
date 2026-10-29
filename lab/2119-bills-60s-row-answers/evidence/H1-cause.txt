@@ -1,0 +1,19 @@
+H1-cause: what cut the two sleep calls at 60 s (read 29 Oct 2026, ~17:20 UTC, from the session that made them; reads only, nothing changed)
+
+1. The calling session
+   - the desktop client 4.29.0.0 (MSIX package <desktop package 4.29.0.0 x64>), main process <path>\<desktop client>.
+   - The Code tab session's process: <path>\<code-tab cli folder>\2.1.309\<build>\<desktop client>, "2.1.309 (the Code tab CLI)" (its own --version), started by Desktop's main process with the SDK stream flags (--output-format, --input-format, --permission-prompt-tool, --resume, --setting-sources, --settings, among others; no --mcp-config).
+
+2. How the session loaded the sleep and bridge-2119-60s servers
+   - Neither is a the Code tab CLI MCP server: `<desktop client> mcp get sleep` and `<desktop client> mcp get bridge-2119-60s` (with the session's own 2.1.309 binary) both answer "No MCP server named ...".
+   - Both come only from the desktop client's configuration (<path>\<desktop client>\<desktop config file>), whose two entries are exactly the sheet's: bridge-2119-60s {command, env} and sleep {command, args}. Neither entry has a `timeout` field; the file holds no "timeout" anywhere.
+   - Desktop runs both servers itself (process D and the sleep node.exe are children of Desktop's main process, not of the Code session) and serves them to the Code session through the SDK. The cancellation reason the sleep server received, "SdkError: Request timed out", names that SDK path.
+   - the Code tab CLI's own settings files: no MCP timeout setting. The user-level state file holds other timeouts (http, connect, stream-idle, agent), none for MCP tool calls.
+
+3. Environment of the session (names and values; *TIMEOUT* and MCP* only)
+   - API_TIMEOUT_MS=900000
+   - MCP_CONNECTION_NONBLOCKING=true
+   - MCP_SERVER_CONNECTION_BATCH_SIZE=8
+   - MCP_TOOL_TIMEOUT: not set. No other *TIMEOUT* variable.
+
+Reading: no per-server `timeout` was configured by the lab, and no MCP tool-timeout variable is set. The 60 s cut is the default request timeout of the path by which the desktop client 4.29.0.0 serves its configured MCP servers to a Code tab session (the Code tab CLI 2.1.309), on Windows. That is a host default for this path, not the lab's configuration; the Chat tab's path was not measured (computer use cannot drive the desktop client's own window).

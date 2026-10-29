@@ -1,0 +1,4 @@
+H1 call sent at about 2026-10-29T17:09:21.569Z
+H1 result seen at about 2026-10-29T17:10:24.983Z
+H1b (90 s) call sent at about 2026-10-29T17:10:37.922Z
+H1b result seen at about 2026-10-29T17:11:41.278Z

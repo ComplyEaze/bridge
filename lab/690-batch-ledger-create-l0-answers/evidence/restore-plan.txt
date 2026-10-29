@@ -1,0 +1,3 @@
+restore-plan (690 L0 step 6), 2026-10-29T18:11:58Z
+Source: <lab folder>\bk0, TDBK1800_100092.001, 23,613 B, sha256 0385db092fbf3e48f5197b7863b0abca8d006ebdd5fe6f7e8e3b207417099dd8 (re-hashed now: 0385db092fbf3e48f5197b7863b0abca8d006ebdd5fe6f7e8e3b207417099dd8)
+Company: BRIDGE LEDGERBOX CI LAB, 100092. Restore Data Path: Tally's data folder. Prompts: Accept ? = Yes; folder 100092 exists = Replace.

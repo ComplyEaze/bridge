@@ -1,0 +1,2 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed (product names are written as the desktop client and the Code tab CLI):
+scripts/l0.py: original 3478 B sha256 a0e9b64987e05f9db24305d7baf1ef39c25a52282188e1a7db8e766627963e37; 1 x -> <lab folder>; 1 x -> stop

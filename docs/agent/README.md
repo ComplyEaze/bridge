@@ -1953,7 +1953,7 @@ list and the group list (see below).
   question a held window answers. `voucher_types` counts (`included`, `in_scope`)
   are taken before the search, so with a search they do not add up to `total`.
 
-**Summaries.** `summarise_by` (`ledger`, `month`, `voucher_type`, `group` or `primary_group`) replaces
+**Summaries.** `summarise_by` (`ledger`, `month`, `voucher_type`, `group`, `primary_group` or `cost_centre`) replaces
 `items` with `buckets`, over the same window, selectors and search. `offset` and
 `limit` page the buckets; a later page comes from the held window as a later page
 of vouchers does. A summary holds its own window (the grouping is part of the
@@ -1983,7 +1983,8 @@ each other.
   keeps them apart and pages without a repeat. To list the vouchers of a month
   bucket, narrow `from` and `to` to that month.
 - `totals` is the debit and credit the buckets add up to, `vouchers_summarised`
-  the vouchers behind them. `excluded_from_buckets` counts the vouchers left out
+  the vouchers behind them (for `cost_centre`, `totals` counts each allocated entry once and
+  `vouchers_summarised` also counts vouchers with no allocation; see below). `excluded_from_buckets` counts the vouchers left out
   the way `ledger_movement` leaves them out: cancelled, optional, and vouchers with
   no accounting entry (a Stock Journal). They are counted, not hidden. Post-dated
   vouchers are summed: `post_dated_included` counts those Tally flagged Yes and
@@ -2080,6 +2081,32 @@ each other.
     call itself, with a group snapshot derived from the live one for the end-to-end tests. Not
     measured: a large book, a group renamed or moved while a window is read, a held later page, the
     drift refusals.
+
+- **`cost_centre`** (#1231) adds the entries' cost-centre allocations (`cost_centre_allocations`, protocol
+  reference §8.2g) by category and centre:
+  - A bucket is one cost centre under one cost category: `group` is the centre and `category` the
+    category, both masked when parties are masked, as the masters tool masks them. A centre named
+    under two categories has two buckets. Each allocation adds to the side its own amount's sign
+    gives, as an entry's does. `members` lists the ledgers whose allocations fall in the bucket,
+    as for a group bucket. With `ledger`, only that ledger's entries are counted
+    (`entries_counted` is `selected_ledger`).
+  - Each category allocates the whole entry: in the capture, one entry was allocated in full under
+    two categories. So the categories overlap, and buckets of different categories are not added up.
+    `category_totals` gives each category's `entries`, `debit`, `credit` and `net`. `totals` counts
+    each allocated entry once. `entries_unallocated` holds the counted entries that carry no
+    allocation; with `totals` they are every counted entry.
+  - An empty summary says that nothing in the window was allocated, not that the company's Cost
+    Centres setting is off: allocations were read on a book with the setting at No, so the summary
+    neither reads nor refuses on the setting, and sends no request beyond the window's.
+  - An entry whose allocations could not be read whole refuses the summary as
+    `summary_cost_centre_unreadable`, with the entry's own reason as `cause`. An entry where one
+    category's allocations do not add up to the entry's amount refuses it as
+    `summary_cost_centre_allocation_mismatch`; no capture shows one. Another grouping of the same
+    window is not refused.
+  - Measured on one synthetic book with Cost Centres on (TallyPrime 7.2 Silver, 27 October 2026), on
+    the saved raw answers of two vouchers keyed on Tally's screen: a Payment allocated to two
+    centres of one category, and a Journal entry allocated in full under two categories. The built
+    tool's summary has not been run against a live Tally.
 
 A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
 

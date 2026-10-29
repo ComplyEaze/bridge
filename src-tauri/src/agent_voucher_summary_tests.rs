@@ -355,7 +355,7 @@ fn a_page_of_buckets_respects_offset_limit_and_the_byte_budget() {
 }
 
 #[test]
-fn only_the_five_named_groupings_are_accepted() {
+fn only_the_six_named_groupings_are_accepted() {
     assert_eq!(SummaryGroup::from_args(&json!({})).unwrap(), None);
     for (name, group) in [
         ("ledger", SummaryGroup::Ledger),
@@ -363,13 +363,23 @@ fn only_the_five_named_groupings_are_accepted() {
         ("voucher_type", SummaryGroup::VoucherType),
         ("group", SummaryGroup::Group),
         ("primary_group", SummaryGroup::PrimaryGroup),
+        ("cost_centre", SummaryGroup::CostCentre),
     ] {
         assert_eq!(
             SummaryGroup::from_args(&json!({"summarise_by": name})).unwrap(),
             Some(group)
         );
     }
-    for bad in ["groups", "Group", "Month", "", "type", "primary"] {
+    for bad in [
+        "groups",
+        "Group",
+        "Month",
+        "",
+        "type",
+        "primary",
+        "cost_centres",
+        "Cost Centre",
+    ] {
         assert_eq!(
             SummaryGroup::from_args(&json!({"summarise_by": bad}))
                 .expect_err("refused")
@@ -1579,4 +1589,368 @@ fn members_of_equal_movement_keep_the_order_they_first_appear_in_never_by_name()
         .map(|m| m["ledger"].as_str().unwrap())
         .collect();
     assert_eq!(order, ["Cash", "Zed", "Alpha", "Mid"]);
+}
+
+// -- #1231: summarise_by cost_centre ---------------------------------------------------------
+// The rows are the two keyed captures of BRIDGE COST KEY LAB (TallyPrime 7.2, Cost Centres on),
+// parsed by the production parser: a Payment whose expense entry is allocated to two centres of
+// one category, and a Journal whose expense entry is allocated in full under two categories. Each
+// voucher's other entry, on the bank, carries no allocation. Variants change those rows and are
+// derived rows, not live captures.
+
+const COST_KEY_COMPANY_GUID: &str = "ddf3a557-704c-4f61-ae8d-46a3380062a1";
+
+fn utf16(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+fn cost_key_rows() -> Vec<Value> {
+    let mut rows = parse_agent_rows(
+        &utf16(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml"
+        )),
+        COST_KEY_COMPANY_GUID,
+    )
+    .unwrap();
+    rows.extend(
+        parse_agent_rows(
+            &utf16(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml"
+            )),
+            COST_KEY_COMPANY_GUID,
+        )
+        .unwrap(),
+    );
+    rows
+}
+
+/// `summarise` keeps a centre, a category and a member ledger as party-name markers; the tool turns
+/// them into names (`presented`), and these tests read the names.
+fn by_centre(rows: &[Value], ledger: Option<&str>) -> Result<Summary, String> {
+    summarise(rows, &request(SummaryGroup::CostCentre, ledger))
+}
+
+/// The entry of `rows[voucher]` that carries allocations.
+fn allocated_entry(rows: &mut [Value], voucher: usize) -> &mut Value {
+    rows[voucher]["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry.get("cost_centre_allocations").is_some())
+        .expect("the capture allocates one entry")
+}
+
+#[test]
+fn the_keyed_captures_carry_the_allocations_the_summary_reads() {
+    let rows = cost_key_rows();
+    assert_eq!(rows.len(), 2);
+    let shapes = rows
+        .iter()
+        .map(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|entry| {
+                    entry["cost_centre_allocations"]
+                        .as_array()
+                        .map_or(0, Vec::len)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    // Each voucher: the expense entry allocated (two rows each), the bank entry not.
+    assert_eq!(shapes, [vec![2, 0], vec![2, 0]]);
+    assert!(!json!(rows)
+        .to_string()
+        .contains("cost_centre_allocations_unreadable"));
+}
+
+#[test]
+fn a_cost_centre_bucket_is_one_centre_under_one_category_with_the_allocations_in_it() {
+    let summary = by_centre(&cost_key_rows(), None).unwrap();
+    let shown = presented(&summary)
+        .iter()
+        .map(|bucket| {
+            (
+                bucket["category"].as_str().unwrap().to_string(),
+                bucket["group"].as_str().unwrap().to_string(),
+                cents(bucket["debit"].as_str().unwrap()),
+                cents(bucket["credit"].as_str().unwrap()),
+                bucket["vouchers"].as_u64().unwrap(),
+            )
+        })
+        .collect::<Vec<_>>();
+    // The larger movement first; the two of equal movement in the order the window met them.
+    assert_eq!(
+        shown,
+        [
+            (
+                "Primary Cost Category".into(),
+                "CK North".into(),
+                -60_000,
+                0,
+                1
+            ),
+            (
+                "Primary Cost Category".into(),
+                "CK South".into(),
+                -50_000,
+                0,
+                1
+            ),
+            ("CK Region".into(), "CK Retail".into(), -50_000, 0, 1),
+            (
+                "Primary Cost Category".into(),
+                "CK North East".into(),
+                -40_000,
+                0,
+                1
+            ),
+        ]
+    );
+    for bucket in &presented(&summary) {
+        assert_eq!(bucket["members"][0]["ledger"], "CK Expense", "{bucket}");
+        assert_eq!(bucket["members_total"], 1);
+        assert_eq!(bucket["voucher_refs_complete"], true);
+    }
+    assert_eq!(summary.vouchers_summarised, 2);
+    assert_eq!(summary.entries_counted, "all_entries");
+}
+
+#[test]
+fn bucket_figures_equal_an_independent_sum_of_the_listed_allocations() {
+    let rows = cost_key_rows();
+    let summary = by_centre(&rows, None).unwrap();
+    let mut expected: BTreeMap<(String, String), i64> = BTreeMap::new();
+    for entry in rows
+        .iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+    {
+        for allocation in entry["cost_centre_allocations"]
+            .as_array()
+            .into_iter()
+            .flatten()
+        {
+            *expected
+                .entry((
+                    allocation["category"].as_str().unwrap().to_string(),
+                    allocation["cost_centre"].as_str().unwrap().to_string(),
+                ))
+                .or_default() += cents(allocation["amount"].as_str().unwrap());
+        }
+    }
+    let got = presented(&summary)
+        .iter()
+        .map(|bucket| {
+            (
+                (
+                    bucket["category"].as_str().unwrap().to_string(),
+                    bucket["group"].as_str().unwrap().to_string(),
+                ),
+                cents(bucket["net"].as_str().unwrap()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(got, expected);
+}
+
+#[test]
+fn categories_overlap_so_each_has_its_own_total_and_the_totals_count_an_entry_once() {
+    let summary = by_centre(&cost_key_rows(), None).unwrap();
+    let categories = summary
+        .category_totals
+        .iter()
+        .map(|row| redact_value(row.clone(), Redaction::None))
+        .map(|row| {
+            (
+                row["category"].as_str().unwrap().to_string(),
+                row["entries"].as_u64().unwrap(),
+                cents(row["debit"].as_str().unwrap()),
+                cents(row["credit"].as_str().unwrap()),
+            )
+        })
+        .collect::<Vec<_>>();
+    // The Journal's expense entry is held in full by both categories.
+    assert_eq!(
+        categories,
+        [
+            ("Primary Cost Category".into(), 2, -150_000, 0),
+            ("CK Region".into(), 1, -50_000, 0),
+        ]
+    );
+    // Both expense entries once, not once per category.
+    assert_eq!(cents(summary.totals["debit"].as_str().unwrap()), -150_000);
+    assert_eq!(cents(summary.totals["credit"].as_str().unwrap()), 0);
+    // The bank entries carry no allocation; with the totals they are every entry, which balance.
+    let unallocated = &summary.entries_unallocated;
+    assert_eq!(unallocated["entries"], 2);
+    assert_eq!(cents(unallocated["debit"].as_str().unwrap()), 0);
+    assert_eq!(cents(unallocated["credit"].as_str().unwrap()), 150_000);
+}
+
+#[test]
+fn a_narrowed_window_adds_only_the_selected_ledgers_allocations() {
+    let rows = cost_key_rows();
+    let bank = by_centre(&rows, Some("CK Bank")).unwrap();
+    assert!(bank.buckets.is_empty());
+    assert_eq!(bank.entries_counted, "selected_ledger");
+    assert_eq!(bank.entries_unallocated["entries"], 2);
+    assert_eq!(cents(bank.totals["debit"].as_str().unwrap()), 0);
+    let expense = by_centre(&rows, Some("CK Expense")).unwrap();
+    assert_eq!(expense.buckets.len(), 4);
+    assert_eq!(expense.entries_unallocated["entries"], 0);
+}
+
+#[test]
+fn a_centre_named_under_two_categories_has_two_buckets() {
+    let mut rows = cost_key_rows();
+    let entry = allocated_entry(&mut rows, 1);
+    // The Journal's second category's centre takes the first category's centre's name.
+    entry["cost_centre_allocations"][1]["cost_centre"] = json!("CK South");
+    let summary = by_centre(&rows, None).unwrap();
+    let south = presented(&summary)
+        .into_iter()
+        .filter(|bucket| bucket["group"] == "CK South")
+        .map(|bucket| bucket["category"].as_str().unwrap().to_string())
+        .collect::<Vec<_>>();
+    assert_eq!(south, ["Primary Cost Category", "CK Region"]);
+}
+
+#[test]
+fn an_allocation_takes_its_side_from_its_own_amount() {
+    let mut rows = cost_key_rows();
+    let entry = allocated_entry(&mut rows, 0);
+    // Still the entry's whole amount, as one centre over and one back.
+    entry["cost_centre_allocations"][0]["amount"] = json!("-1200.00");
+    entry["cost_centre_allocations"][1]["amount"] = json!("200.00");
+    let summary = by_centre(&rows, None).unwrap();
+    let north_east = presented(&summary)
+        .into_iter()
+        .find(|bucket| bucket["group"] == "CK North East")
+        .unwrap();
+    assert_eq!(cents(north_east["debit"].as_str().unwrap()), 0);
+    assert_eq!(cents(north_east["credit"].as_str().unwrap()), 20_000);
+}
+
+#[test]
+fn a_category_that_does_not_add_up_to_its_entry_refuses_the_summary() {
+    for amount in ["-300.00", "-500.00", "400.00"] {
+        let mut rows = cost_key_rows();
+        allocated_entry(&mut rows, 0)["cost_centre_allocations"][1]["amount"] = json!(amount);
+        assert_eq!(
+            by_centre(&rows, None).err().as_deref(),
+            Some("summary_cost_centre_allocation_mismatch"),
+            "{amount}"
+        );
+    }
+    // The second category of the Journal alone short of its entry.
+    let mut rows = cost_key_rows();
+    allocated_entry(&mut rows, 1)["cost_centre_allocations"][1]["amount"] = json!("-499.99");
+    assert_eq!(
+        by_centre(&rows, None).err().as_deref(),
+        Some("summary_cost_centre_allocation_mismatch")
+    );
+}
+
+#[test]
+fn an_entry_whose_allocations_could_not_be_read_refuses_the_summary_with_its_reason() {
+    let mut rows = cost_key_rows();
+    let entry = allocated_entry(&mut rows, 1);
+    entry
+        .as_object_mut()
+        .unwrap()
+        .remove("cost_centre_allocations");
+    entry["cost_centre_allocations_unreadable"] = json!("cost_category_repeated");
+    let code = by_centre(&rows, None).err().unwrap();
+    assert_eq!(
+        code,
+        "summary_cost_centre_unreadable:cost_category_repeated"
+    );
+    let failure = super::super::vouchers::summary_failure(code);
+    assert_eq!(failure.code, "summary_cost_centre_unreadable");
+    assert_eq!(failure.cause, Some("cost_category_repeated"));
+    let unknown = super::super::vouchers::summary_failure(
+        "summary_cost_centre_unreadable:not a reason".to_string(),
+    );
+    assert_eq!(unknown.cause, Some("unknown"));
+    // Another grouping does not read the allocations, so it is not refused.
+    assert!(summarise(&rows, &request(SummaryGroup::Ledger, None)).is_ok());
+}
+
+#[test]
+fn a_window_with_no_allocation_has_no_buckets_and_every_entry_unallocated() {
+    let summary = by_centre(&captured_rows(), None).unwrap();
+    assert!(summary.buckets.is_empty());
+    assert!(summary.category_totals.is_empty());
+    assert_eq!(summary.vouchers_summarised, 3);
+    assert_eq!(summary.entries_unallocated["entries"], 6);
+    assert_eq!(summary.totals, json!({"debit": "0", "credit": "0"}));
+}
+
+#[test]
+fn centre_and_category_names_are_masked_under_mask_parties() {
+    let summary = by_centre(&cost_key_rows(), None).unwrap();
+    let masked = redact_value(summary.buckets[0].clone(), Redaction::MaskParties);
+    assert_ne!(masked["group"], "CK North");
+    assert_ne!(masked["category"], "Primary Cost Category");
+    assert_ne!(masked["members"][0]["ledger"], "CK Expense");
+    let totals = redact_value(json!(summary.category_totals), Redaction::MaskParties);
+    assert!(
+        !totals.to_string().contains("Primary Cost Category"),
+        "{totals}"
+    );
+    let plain = redact_value(summary.buckets[0].clone(), Redaction::None);
+    assert_eq!(plain["group"], "CK North");
+    assert_eq!(plain["category"], "Primary Cost Category");
+}
+
+#[test]
+fn a_voucher_counts_once_in_a_centre_however_many_of_its_entries_are_allocated_there() {
+    let mut rows = cost_key_rows();
+    // The Payment's expense entry split into two equal entries, each allocated to the same two
+    // centres: the voucher still balances and still counts once in each centre.
+    let entries = rows[0]["amounts"].as_array_mut().unwrap();
+    let at = entries
+        .iter()
+        .position(|entry| entry.get("cost_centre_allocations").is_some())
+        .unwrap();
+    entries[at]["amount"] = json!("-500.00");
+    entries[at]["cost_centre_allocations"][0]["amount"] = json!("-300.00");
+    entries[at]["cost_centre_allocations"][1]["amount"] = json!("-200.00");
+    let half = entries[at].clone();
+    entries.insert(at + 1, half);
+    let summary = by_centre(&rows, None).unwrap();
+    let north = presented(&summary)
+        .into_iter()
+        .find(|bucket| bucket["group"] == "CK North")
+        .unwrap();
+    assert_eq!(north["vouchers"], 1);
+    assert_eq!(cents(north["debit"].as_str().unwrap()), -60_000);
+    assert_eq!(north["voucher_refs"].as_array().unwrap().len(), 1);
+    let primary = redact_value(summary.category_totals[0].clone(), Redaction::None);
+    assert_eq!(primary["category"], "Primary Cost Category");
+    assert_eq!(primary["entries"], 3);
+}
+
+#[test]
+fn a_zero_allocation_adds_nothing_and_does_not_refuse() {
+    let mut rows = cost_key_rows();
+    let entry = allocated_entry(&mut rows, 0);
+    entry["cost_centre_allocations"][1]["amount"] = json!("-0.00");
+    entry["cost_centre_allocations"][0]["amount"] = json!("-1000.00");
+    let summary = by_centre(&rows, None).unwrap();
+    let north_east = presented(&summary)
+        .into_iter()
+        .find(|bucket| bucket["group"] == "CK North East")
+        .unwrap();
+    assert_eq!(cents(north_east["debit"].as_str().unwrap()), 0);
+    assert_eq!(cents(north_east["credit"].as_str().unwrap()), 0);
+    assert_eq!(north_east["vouchers"], 1);
 }

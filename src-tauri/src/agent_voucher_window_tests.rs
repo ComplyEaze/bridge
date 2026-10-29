@@ -6373,7 +6373,14 @@ fn the_vouchers_schema_lists_the_groupings_and_the_search_criteria() {
         }
         validate_tool_arguments("vouchers", &args)
     };
-    for grouping in ["ledger", "month", "voucher_type", "group", "primary_group"] {
+    for grouping in [
+        "ledger",
+        "month",
+        "voucher_type",
+        "group",
+        "primary_group",
+        "cost_centre",
+    ] {
         assert_eq!(call(json!({"summarise_by": grouping})), Ok(()));
     }
     assert!(call(json!({"summarise_by": "groups"})).is_err());
@@ -6402,6 +6409,31 @@ async fn a_narration_search_is_refused_where_narrations_are_withheld() {
     let response = one.call(json!({"narration_contains": "WR2-N3"})).await;
     assert_eq!(refusal_of(&response)["code"], "search_narration_redacted");
     assert_eq!(one.requests(), 4);
+}
+
+/// #1231: a cost-centre summary of a window with no allocation answers with no buckets, the
+/// categories' totals empty and every entry unallocated, and its basis says that this does not
+/// mean the Cost Centres setting is off. Only this grouping carries those two fields.
+#[tokio::test]
+async fn a_cost_centre_summary_of_a_window_with_no_allocation_says_so_in_its_fields() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one.call(json!({"summarise_by": "cost_centre"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["summarised_by"], "cost_centre");
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["buckets"], json!([]));
+    assert_eq!(result["category_totals"], json!([]));
+    assert_eq!(result["entries_unallocated"]["entries"], 6);
+    assert_eq!(result["vouchers_summarised"], 3);
+    let basis = result["basis"].as_str().unwrap();
+    assert!(basis.contains("not that the company's Cost Centres setting is off"));
+    assert!(basis.contains("memorandum"));
+    let ledger = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let ledger = ledger.call(json!({"summarise_by": "ledger"})).await;
+    let ledger = result_of(&ledger);
+    assert!(ledger.get("category_totals").is_none(), "{ledger}");
+    assert!(ledger.get("entries_unallocated").is_none(), "{ledger}");
 }
 
 #[tokio::test]

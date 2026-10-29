@@ -740,11 +740,22 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
   be decoded, an allocation list at a depth the reader does not take, or an empty container, which is reported as
   present and not observed, never as no allocations) is not shown in part: the entry carries `cost_centre_allocations_unreadable`
   with a reason and the rest of the response is unchanged. An empty amount is never read as zero.
-- **Not shown.** Several categories on one entry; a centre with a parent; quantities; a foreign-currency amount; an
-  allocation on a book whose Cost Centres setting is Yes; an item invoice (its sales or purchase ledger's entry carries
+- **Second read, 27 Oct 2026: TallyPrime 7.2 Silver, synthetic company `BRIDGE COST KEY LAB` (Cost Centres setting
+  Yes), two reads of one day each, of vouchers keyed on Tally's screen.** Request and response retained with sha256 in
+  `tests/fixtures/VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md`. The shape is the one above.
+  - A Payment's expense entry holds one category with two centres, one of them under the other in the cost-centre
+    masters: an allocation names only the centre, not its parent.
+  - A Journal's expense entry holds two `CATEGORYALLOCATIONS.LIST`, one per category, and **each category's centres add
+    up to the whole entry's amount**. A category is a separate view of the same amount, not a share of it.
+  - The bank entry of each voucher carries no `CATEGORYALLOCATIONS.LIST`.
+  - The `vouchers` tool returned each allocation as sent. Its `summarise_by: cost_centre` relies on this: it refuses
+    (`summary_cost_centre_allocation_mismatch`) an entry where one category's centres do not add up to the entry, a
+    shape not observed.
+- **Not shown.** Quantities; a foreign-currency amount; an item invoice (its sales or purchase ledger's entry carries
   the goods line, §12a.13, and no captured item invoice carries allocations; one beside the goods line is read, one inside it
-  is flagged `cost_centre_allocation_shape_unrecognised`, by test only); a read of a different voucher type; another release or book;
-  that the allocations of an entry always add up to its amount (the tool does not check this).
+  is flagged `cost_centre_allocation_shape_unrecognised`, by test only); voucher types other than Journal and Payment;
+  another release or book; an entry whose allocations under one category do not add up to its amount (the vouchers read
+  does not check this; the summary refuses it).
 
 ### 8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**
 

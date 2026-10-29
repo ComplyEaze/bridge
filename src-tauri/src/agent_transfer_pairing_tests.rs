@@ -2058,6 +2058,8 @@ mod whole_day {
     }
 
     type Exchange = (&'static [u8], &'static [u8]);
+    /// An exchange whose answer may be a scripted refusal (`None`).
+    type Scripted = (&'static [u8], Option<&'static [u8]>);
 
     fn utf16(bytes: &[u8]) -> String {
         assert_eq!(bytes.len() % 2, 0, "a UTF-16 capture has an even length");
@@ -2075,7 +2077,7 @@ mod whole_day {
     /// Serves the lab's answers in order, each only to the request the lab sent
     /// for it. A request past the last, or a refusal scripted in place of an
     /// answer (`None`), is how a read fails.
-    struct Captured(Mutex<Vec<(&'static [u8], Option<&'static [u8]>)>>);
+    struct Captured(Mutex<Vec<Scripted>>);
 
     impl Captured {
         fn of(exchanges: Vec<Exchange>) -> Self {

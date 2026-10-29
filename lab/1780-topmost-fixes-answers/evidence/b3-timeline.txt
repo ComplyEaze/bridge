@@ -1,0 +1,8 @@
+﻿B3 Tally title clicked 2026-10-29T08:23:29.191Z at logical (330,14) = screen tool (313,13)
+B3 probe start 2026-10-29T08:23:29.860Z end 2026-10-29T08:23:30.717Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,12
+B3 Tally IsZoomed True
+B4 screens 1; logical 1536 x 864; physical 1920 x 1080; screen tool frame 1456 x 819
+B3b control-forms start 2026-10-29T08:23:30.829Z: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-forms.ps1 -Seconds 20
+B3b trace start 2026-10-29T08:23:34.012Z: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Tally probe control" -Out <lab folder>\evidence\trace-b3b.txt -Seconds 10
+B3b trace ended 2026-10-29T08:23:46.160Z exit 0
+B3b control-forms ended 2026-10-29T08:23:52.423Z exit 0

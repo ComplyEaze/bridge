@@ -1,0 +1,15 @@
+﻿G-i variant=i; Tally window 13379766; runner pid 29844
+G-i trace pre-armed 2026-10-29T08:31:43.139Z pid 23304: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-g-i.txt -Seconds 100
+G-i Tally title clicked (Tally in front) 2026-10-29T08:31:45.234Z
+G-i started 2026-10-29T08:31:46.180Z: explorer.exe "<lab folder>\cmd\g-i.cmd" (explorer pid 13200); the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -ControlScript <lab folder>\requests\control-box-fixes.ps1 -ControlVariant i -Stdio tokio -Out <lab folder>\evidence\g-i.txt -TimeoutSeconds 60
+G-i Tally title clicked ONCE 2026-10-29T08:31:50.313Z (4.15 s after the start)
+G-i-T0 2026-10-29T08:31:57.917Z from: SPAWN 2026-10-29T08:31:57.917Z child_pid=25440
+G-i spawn-parent pid 25028 image powershell.exe, its parent pid 26764 image cmd.exe
+G-i-T0+8 sheet probe 2026-10-29T08:32:05.924Z to 2026-10-29T08:32:07.025Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:32:07.155Z to 2026-10-29T08:32:08.477Z : 1,1,0,25440,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15
+G-i-T0+11 sheet probe 2026-10-29T08:32:08.943Z to 2026-10-29T08:32:10.272Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:32:10.286Z to 2026-10-29T08:32:11.804Z : 1,1,0,25440,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15
+G-i-T0+11 shot 2026-10-29T08:32:12.138Z
+G-i box 21176576 rect 563,362,990,521
+G-i T0+20 2026-10-29T08:32:17.937Z: z box 1, Tally 4
+G-i No clicked 2026-10-29T08:32:18.090Z at T0+20.18 s, logical (848,492)
+G-i spawn file: SPAWN 2026-10-29T08:31:57.762Z parent_pid=25028 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant i -DelaySeconds 0 -Out "<lab folder>\evidence\g-i.control.txt" || SPAWN 2026-10-29T08:31:57.917Z child_pid=25440 || SPAWN 2026-10-29T08:32:18.416Z pid=25440 exit_code=0 stdout_bytes_read=0 elapsed_s=20.6
+G-i control file: variant=i owner_created=True asked=2026-10-29T08:31:59.376Z answered=2026-10-29T08:32:18.006Z answer=7

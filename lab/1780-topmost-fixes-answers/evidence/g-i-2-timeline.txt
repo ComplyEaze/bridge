@@ -1,0 +1,15 @@
+﻿G-i-2 variant=i; Tally window 13379766; runner pid 18228
+G-i-2 trace pre-armed 2026-10-29T08:32:34.568Z pid 18680: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-g-i-2.txt -Seconds 100
+G-i-2 Tally title clicked (Tally in front) 2026-10-29T08:32:36.654Z
+G-i-2 started 2026-10-29T08:32:37.644Z: explorer.exe "<lab folder>\cmd\g-i-2.cmd" (explorer pid 10980); the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -ControlScript <lab folder>\requests\control-box-fixes.ps1 -ControlVariant i -Stdio tokio -Out <lab folder>\evidence\g-i-2.txt -TimeoutSeconds 60
+G-i-2 Tally title clicked ONCE 2026-10-29T08:32:41.882Z (4.25 s after the start)
+G-i-2-T0 2026-10-29T08:32:49.517Z from: SPAWN 2026-10-29T08:32:49.517Z child_pid=20308
+G-i-2 spawn-parent pid 11188 image powershell.exe, its parent pid 13028 image cmd.exe
+G-i-2-T0+8 sheet probe 2026-10-29T08:32:57.541Z to 2026-10-29T08:32:59.050Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:32:59.066Z to 2026-10-29T08:33:00.741Z : 1,1,0,20308,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15
+G-i-2-T0+11 sheet probe 2026-10-29T08:33:00.803Z to 2026-10-29T08:33:02.510Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:33:02.629Z to 2026-10-29T08:33:04.163Z : 1,1,0,20308,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15
+G-i-2-T0+11 shot 2026-10-29T08:33:04.444Z
+G-i-2 box 14359334 rect 563,362,990,521
+G-i-2 T0+20 2026-10-29T08:33:09.529Z: z box 1, Tally 4
+G-i-2 No clicked 2026-10-29T08:33:09.582Z at T0+20.08 s, logical (848,492)
+G-i-2 spawn file: SPAWN 2026-10-29T08:32:49.333Z parent_pid=11188 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant i -DelaySeconds 0 -Out "<lab folder>\evidence\g-i-2.control.txt" || SPAWN 2026-10-29T08:32:49.517Z child_pid=20308 || SPAWN 2026-10-29T08:33:09.964Z pid=20308 exit_code=0 stdout_bytes_read=0 elapsed_s=20.5
+G-i-2 control file: variant=i owner_created=True asked=2026-10-29T08:32:51.344Z answered=2026-10-29T08:33:09.596Z answer=7

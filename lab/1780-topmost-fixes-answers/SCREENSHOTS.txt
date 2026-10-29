@@ -1,0 +1,8 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC: whole-screen captures show other windows.
+g-g-t0p11-screen.png 117926 B e9a993a1e5a29eb1261a73faa9cfe277ad70b4d86e9c551351e4f5c8e3eb5ce3
+g-h-2-t0p11-screen.png 155305 B 0b76c2c1129d006e61522a5b9bc1403d27ab02a1fca9541ee56a346d450eff20
+g-h-t0p11-screen.png 153591 B 9baa49ef72d76d9946712f99244da45e2506bb4ea28a8862ba3cd5b97632fa0d
+g-i-2-t0p11-screen.png 152263 B 66d1d63135d885ee16a5e6b7c5db8f155b7fa91211d2cd5c140864448ab9cf8e
+g-i-t0p11-screen.png 141524 B 0f7191f2262d01eac76505cb9d5585444626c660136671633d4b230231be4e4c
+g1d-1-t0p11-screen.png 133203 B 96c0e5b8b4a68b48c979f5888a8e3960ea3f9d736cdfe344608cfbd1d4e7eb6b
+g1d-2-t0p11-screen.png 140368 B 8f11bb1ee7a6bb59d57af497bec925894d64c98163b8e539bf96318708381fa2

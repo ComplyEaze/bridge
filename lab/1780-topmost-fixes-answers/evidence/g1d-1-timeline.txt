@@ -1,0 +1,14 @@
+﻿G1d-1 variant=c; Tally window 13379766; runner pid 14252
+G1d-1 trace pre-armed 2026-10-29T08:24:14.352Z pid 15168: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-g1d-1.txt -Seconds 100
+G1d-1 Tally title clicked (Tally in front) 2026-10-29T08:24:16.456Z
+G1d-1 started 2026-10-29T08:24:17.424Z: explorer.exe "<lab folder>\cmd\g1d-1.cmd" (explorer pid 10576); the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -ControlScript <lab folder>\requests\control-box-fixes.ps1 -ControlVariant c -Stdio tokio -Out <lab folder>\evidence\g1d-1.txt -TimeoutSeconds 60
+G1d-1 Tally title clicked ONCE 2026-10-29T08:24:21.504Z (4.09 s after the start)
+G1d-1-T0 2026-10-29T08:24:29.847Z from: SPAWN 2026-10-29T08:24:29.847Z child_pid=7216
+G1d-1 spawn-parent pid 13240 image powershell.exe, its parent pid 12764 image cmd.exe
+G1d-1-T0+8 sheet probe 2026-10-29T08:24:37.865Z to 2026-10-29T08:24:38.879Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:24:38.896Z to 2026-10-29T08:24:40.344Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,7216,Lab topmost control | visible_titled_windows,15
+G1d-1-T0+11 sheet probe 2026-10-29T08:24:40.872Z to 2026-10-29T08:24:42.379Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:24:42.392Z to 2026-10-29T08:24:43.729Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,7216,Lab topmost control | visible_titled_windows,15
+G1d-1-T0+11 shot 2026-10-29T08:24:44.077Z
+G1d-1 box 39594394 rect 573,362,978,521
+G1d-1 T0+20 2026-10-29T08:24:49.877Z: z box 4, Tally 3
+G1d-1 the box is below Tally; waiting for <lab folder>\cmd\g1d-1-taskbar.txt 2026-10-29T08:24:49.894Z
+G1d-1 no taskbar position given in 30 s: nothing clicked

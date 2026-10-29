@@ -1,0 +1,1 @@
+﻿variant=c owner_created=False asked=2026-10-29T08:27:44.587Z answered=2026-10-29T08:28:33.203Z answer=7

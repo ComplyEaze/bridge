@@ -1,0 +1,17 @@
+﻿G1d-2 variant=c; Tally window 13379766; runner pid 15404
+G1d-2 trace pre-armed 2026-10-29T08:27:28.554Z pid 19784: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-g1d-2.txt -Seconds 100
+G1d-2 Tally title clicked (Tally in front) 2026-10-29T08:27:30.622Z
+G1d-2 started 2026-10-29T08:27:31.607Z: explorer.exe "<lab folder>\cmd\g1d-2.cmd" (explorer pid 14444); the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -ControlScript <lab folder>\requests\control-box-fixes.ps1 -ControlVariant c -Stdio tokio -Out <lab folder>\evidence\g1d-2.txt -TimeoutSeconds 60
+G1d-2 Tally title clicked ONCE 2026-10-29T08:27:35.705Z (4.1 s after the start)
+G1d-2-T0 2026-10-29T08:27:42.988Z from: SPAWN 2026-10-29T08:27:42.988Z child_pid=14352
+G1d-2 spawn-parent pid 16508 image powershell.exe, its parent pid 14460 image cmd.exe
+G1d-2-T0+8 sheet probe 2026-10-29T08:27:51.026Z to 2026-10-29T08:27:52.132Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:27:52.178Z to 2026-10-29T08:27:53.511Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,14352,Lab topmost control | visible_titled_windows,15
+G1d-2-T0+11 sheet probe 2026-10-29T08:27:53.992Z to 2026-10-29T08:27:55.310Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:27:55.323Z to 2026-10-29T08:27:56.722Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,14352,Lab topmost control | visible_titled_windows,15
+G1d-2-T0+11 shot 2026-10-29T08:27:57.025Z
+G1d-2 box 5056562 rect 573,362,978,521
+G1d-2 T0+20 2026-10-29T08:28:03.004Z: z box 4, Tally 3
+G1d-2 the box was below Tally: lifted by SetWindowPos(HWND_TOP) 2026-10-29T08:28:03.487Z: returned True (error 183); exstyle 0x00010101 -> 0x00010101; z box 4, Tally 3
+G1d-2 No not clicked (box 4, Tally 3)
+G1d-2 Tally minimised by ShowWindow(SW_MINIMIZE) 2026-10-29T08:28:32.067Z to uncover the box (deviation)
+G1d-2 No clicked 2026-10-29T08:28:33.156Z at logical (834,492)
+G1d-2 Tally restored by ShowWindow(SW_RESTORE) 2026-10-29T08:28:34.291Z

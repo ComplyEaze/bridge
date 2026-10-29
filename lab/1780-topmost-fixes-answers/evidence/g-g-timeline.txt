@@ -1,0 +1,18 @@
+﻿G-g variant=g; Tally window 13379766; runner pid 20308
+G-g trace pre-armed 2026-10-29T08:29:17.782Z pid 1604: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-g-g.txt -Seconds 100
+G-g Tally title clicked (Tally in front) 2026-10-29T08:29:19.862Z
+G-g started 2026-10-29T08:29:20.849Z: explorer.exe "<lab folder>\cmd\g-g.cmd" (explorer pid 3472); the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -ControlScript <lab folder>\requests\control-box-fixes.ps1 -ControlVariant g -Stdio tokio -Out <lab folder>\evidence\g-g.txt -TimeoutSeconds 60
+G-g Tally title clicked ONCE 2026-10-29T08:29:25.028Z (4.19 s after the start)
+G-g-T0 2026-10-29T08:29:32.137Z from: SPAWN 2026-10-29T08:29:32.137Z child_pid=27332
+G-g spawn-parent pid 27472 image powershell.exe, its parent pid 6372 image cmd.exe
+G-g-T0+8 sheet probe 2026-10-29T08:29:40.176Z to 2026-10-29T08:29:41.678Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:29:41.792Z to 2026-10-29T08:29:43.320Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,27332,Lab topmost control | visible_titled_windows,15
+G-g-T0+11 sheet probe 2026-10-29T08:29:43.380Z to 2026-10-29T08:29:45.253Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T08:29:45.267Z to 2026-10-29T08:29:47.496Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,27332,Lab topmost control | visible_titled_windows,15
+G-g-T0+11 shot 2026-10-29T08:29:47.845Z
+G-g box 24256554 rect 572,362,980,521
+G-g T0+20 2026-10-29T08:29:52.151Z: z box 4, Tally 3
+G-g the box was below Tally: Tally minimised by ShowWindow(SW_MINIMIZE) 2026-10-29T08:29:52.820Z; box exstyle 0x00010101; z box 3
+G-g No clicked 2026-10-29T08:29:52.868Z at T0+20.73 s, logical (836,492)
+G-g Tally restored by ShowWindow(SW_RESTORE) 2026-10-29T08:29:54.006Z
+G-g spawn file: SPAWN 2026-10-29T08:29:31.985Z parent_pid=27472 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant g -DelaySeconds 0 -Out "<lab folder>\evidence\g-g.control.txt" || SPAWN 2026-10-29T08:29:32.137Z child_pid=27332 || SPAWN 2026-10-29T08:29:53.077Z pid=27332 exit_code=0 stdout_bytes_read=0 elapsed_s=21
+G-g control file: variant=g owner_created=False asked=2026-10-29T08:29:33.775Z answered=2026-10-29T08:29:52.907Z answer=7
+G-g reassert: 2026-10-29T08:29:33.890Z reassert: box seen exstyle=0x10101 || 2026-10-29T08:29:33.899Z reassert 1: SetWindowPos=True GetLastError=0 exstyle=0x10101 topmost=0 || 2026-10-29T08:29:34.120Z reassert 2: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0 || 2026-10-29T08:29:34.330Z reassert 3: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0 || 2026-10-29T08:29:34.547Z reassert 4: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0 || 2026-10-29T08:29:34.764Z reassert 5: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0

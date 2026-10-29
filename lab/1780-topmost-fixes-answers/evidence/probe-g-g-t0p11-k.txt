@@ -1,0 +1,3 @@
+﻿3,0,1,13992,TallyPrime:9001
+4,0,0,27332,Lab topmost control
+visible_titled_windows,15

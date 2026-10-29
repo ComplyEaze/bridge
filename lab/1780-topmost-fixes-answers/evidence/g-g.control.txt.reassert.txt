@@ -1,0 +1,6 @@
+2026-10-29T08:29:33.890Z reassert: box seen exstyle=0x10101
+2026-10-29T08:29:33.899Z reassert 1: SetWindowPos=True GetLastError=0 exstyle=0x10101 topmost=0
+2026-10-29T08:29:34.120Z reassert 2: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0
+2026-10-29T08:29:34.330Z reassert 3: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0
+2026-10-29T08:29:34.547Z reassert 4: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0
+2026-10-29T08:29:34.764Z reassert 5: SetWindowPos=True GetLastError=183 exstyle=0x10101 topmost=0

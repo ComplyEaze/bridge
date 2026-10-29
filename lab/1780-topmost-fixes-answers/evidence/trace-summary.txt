@@ -1,0 +1,102 @@
+## trace-b3b.txt
+- FIRST 2026-10-29T08:23:36.061Z box_pid=14052; first block 2026-10-29T08:23:36.164Z; blocks 1
+- PROC path=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=19220
+- PROC command_line="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-forms.ps1 -Seconds 20 
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x462018 class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 thread=6372 owner=0 exstyle=0x00050108
+- windows of its process at the first block (2026-10-29T08:23:36.164Z): 0x462018 WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=1 | 0xb60d62 GDI+ vis=0 top=0 | 0x76284e WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=0 | 0xd28b2 .NET-BroadcastEventWindow.4.0.0.0.f5a312.0 vis=0 top=0 | 0x2712a3c ConsoleWindowClass vis=1 top=0 | 0xaf269c IME vis=0 top=0 | 0x11027c0 MSCTFIME vis=0 top=0 | 0x1ea1b66 IME vis=0 top=0
+- windows of its process at the last block (2026-10-29T08:23:36.164Z): 0x462018 WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=1 | 0xb60d62 GDI+ vis=0 top=0 | 0x76284e WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=0 | 0xd28b2 .NET-BroadcastEventWindow.4.0.0.0.f5a312.0 vis=0 top=0 | 0x2712a3c ConsoleWindowClass vis=1 top=0 | 0xaf269c IME vis=0 top=0 | 0x11027c0 MSCTFIME vis=0 top=0 | 0x1ea1b66 IME vis=0 top=0
+- fg_pid None -> 12432 at 2026-10-29T08:23:36.164Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-g1d-1.txt
+- FIRST 2026-10-29T08:24:31.763Z box_pid=7216; first block 2026-10-29T08:24:31.851Z; blocks 2
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=13240
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g1d-1.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x25c299a class=#32770 thread=9748 owner=0 exstyle=0x00010101
+- windows of its process at the first block (2026-10-29T08:24:31.851Z): 0x25c299a #32770 vis=1 top=0 | 0x1a126ca MSCTFIME vis=0 top=1 | 0x2b264e IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T08:25:29.885Z): 
+- fg_pid None -> 13992 at 2026-10-29T08:24:31.851Z
+- box topmost values seen: ['0']; reading 0
+
+## trace-g1d-2.txt
+- FIRST 2026-10-29T08:27:44.686Z box_pid=14352; first block 2026-10-29T08:27:44.756Z; blocks 4
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=16508
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g1d-2.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x4d2832 class=#32770 thread=24500 owner=0 exstyle=0x00010101
+- windows of its process at the first block (2026-10-29T08:27:44.756Z): 0x4d2832 #32770 vis=1 top=0 | 0xda2978 MSCTFIME vis=0 top=1 | 0x79284e IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T08:28:34.174Z): 
+- fg_pid None -> 13992 at 2026-10-29T08:27:44.756Z
+- fg_pid 13992 -> 14460 at 2026-10-29T08:28:33.277Z
+- fg_pid 14460 -> 19784 at 2026-10-29T08:28:33.658Z
+- fg_pid 19784 -> 13992 at 2026-10-29T08:28:34.174Z
+- box topmost values seen: ['0']; reading 0
+
+## trace-g-g.txt
+- FIRST 2026-10-29T08:29:33.908Z box_pid=27332; first block 2026-10-29T08:29:33.972Z; blocks 5
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=27472
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant g -DelaySeconds 0 -Out "<lab folder>\evidence\g-g.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x172202a class=#32770 thread=10572 owner=0 exstyle=0x00010101
+- windows of its process at the first block (2026-10-29T08:29:33.972Z): 0x172202a #32770 vis=1 top=0 | 0x4a2c30 MSCTFIME vis=0 top=1 | 0x202cb8 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T08:29:53.858Z): 
+- fg_pid None -> 13992 at 2026-10-29T08:29:33.972Z
+- fg_pid 13992 -> 27332 at 2026-10-29T08:29:52.220Z
+- fg_pid 27332 -> 6372 at 2026-10-29T08:29:52.924Z
+- fg_pid 6372 -> 1604 at 2026-10-29T08:29:53.204Z
+- fg_pid 1604 -> 13992 at 2026-10-29T08:29:53.858Z
+- box topmost values seen: ['0']; reading 0
+
+## trace-g-h.txt
+- FIRST 2026-10-29T08:30:31.916Z box_pid=9860; first block 2026-10-29T08:30:32.000Z; blocks 3
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=22716
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant h -DelaySeconds 0 -Out "<lab folder>\evidence\g-h.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x25228bc class=#32770 thread=10488 owner=0 exstyle=0x00010108
+- windows of its process at the first block (2026-10-29T08:30:32.000Z): 0x25228bc #32770 vis=1 top=1 | 0x173202a MSCTFIME vis=0 top=1 | 0x265299a IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T08:30:50.313Z): 
+- fg_pid None -> 13992 at 2026-10-29T08:30:32.000Z
+- fg_pid 13992 -> 0 at 2026-10-29T08:30:50.187Z
+- fg_pid 0 -> 13992 at 2026-10-29T08:30:50.313Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-g-h-2.txt
+- FIRST 2026-10-29T08:31:22.229Z box_pid=8460; first block 2026-10-29T08:31:22.278Z; blocks 4
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=14900
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant h -DelaySeconds 0 -Out "<lab folder>\evidence\g-h-2.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0xa21b64 class=#32770 thread=16524 owner=0 exstyle=0x00010108
+- windows of its process at the first block (2026-10-29T08:31:22.278Z): 0xa21b64 #32770 vis=1 top=1 | 0xdc212c MSCTFIME vis=0 top=1 | 0x1a926ca IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T08:31:43.295Z): 
+- fg_pid None -> 13992 at 2026-10-29T08:31:22.278Z
+- fg_pid 13992 -> 0 at 2026-10-29T08:31:40.703Z
+- fg_pid 0 -> 13992 at 2026-10-29T08:31:40.810Z
+- fg_pid 13992 -> 23304 at 2026-10-29T08:31:43.295Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-g-i.txt
+- FIRST 2026-10-29T08:31:59.518Z box_pid=25440; first block 2026-10-29T08:31:59.574Z; blocks 2
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=25028
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant i -DelaySeconds 0 -Out "<lab folder>\evidence\g-i.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x1432100 class=#32770 thread=14756 owner=0x502018 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T08:31:59.574Z): 0x1432100 #32770 vis=1 top=1 | 0x502018 Static vis=0 top=1 | 0x1d829de MSCTFIME vis=0 top=1 | 0xaf2042 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T08:32:18.170Z): 
+- fg_pid None -> 13992 at 2026-10-29T08:31:59.574Z
+- fg_pid 13992 -> 22180 at 2026-10-29T08:32:18.170Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-g-i-2.txt
+- FIRST 2026-10-29T08:32:51.445Z box_pid=20308; first block 2026-10-29T08:32:51.498Z; blocks 2
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=11188
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant i -DelaySeconds 0 -Out "<lab folder>\evidence\g-i-2.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0xdb1b26 class=#32770 thread=24572 owner=0x1fa1b66 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T08:32:51.498Z): 0xdb1b26 #32770 vis=1 top=1 | 0x1fa1b66 Static vis=0 top=1 | 0x1ab26ca MSCTFIME vis=0 top=1 | 0x27b29a4 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T08:33:09.795Z): 
+- fg_pid None -> 13992 at 2026-10-29T08:32:51.498Z
+- fg_pid 13992 -> 22180 at 2026-10-29T08:33:09.795Z
+- box topmost values seen: ['1']; reading 1
+

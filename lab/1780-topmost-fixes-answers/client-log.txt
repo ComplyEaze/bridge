@@ -1,0 +1,1 @@
+No Bridge client ran in this row (control box only; no bridge_mcp.exe started, nothing sent to Tally).

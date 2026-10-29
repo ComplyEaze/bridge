@@ -1,0 +1,32 @@
+﻿START 2026-10-29T08:30:17.814Z title_part=Lab topmost control interval_ms=50 seconds=100
+FIRST 2026-10-29T08:30:31.916Z box_pid=9860
+T 2026-10-29T08:30:32.000Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=9860 windows=3
+W 2026-10-29T08:30:32.000Z hwnd=0x25228bc class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=10488 owner=0 title=Lab topmost control
+W 2026-10-29T08:30:32.000Z hwnd=0x173202a class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=10488 owner=0x265299a owner_class=IME owner_pid=9860 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T08:30:32.000Z hwnd=0x265299a class=IME visible=0 exstyle=0x00000008 topmost=1 thread=10488 owner=0x25228bc owner_class=#32770 owner_pid=9860 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=22716
+PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant h -DelaySeconds 0 -Out "<lab folder>\evidence\g-h.control.txt"
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+H 2026-10-29T08:30:33.509Z unchanged
+H 2026-10-29T08:30:34.501Z unchanged
+H 2026-10-29T08:30:35.514Z unchanged
+H 2026-10-29T08:30:36.515Z unchanged
+H 2026-10-29T08:30:37.565Z unchanged
+H 2026-10-29T08:30:38.582Z unchanged
+H 2026-10-29T08:30:39.616Z unchanged
+H 2026-10-29T08:30:40.653Z unchanged
+H 2026-10-29T08:30:41.659Z unchanged
+H 2026-10-29T08:30:42.680Z unchanged
+H 2026-10-29T08:30:43.734Z unchanged
+H 2026-10-29T08:30:44.777Z unchanged
+H 2026-10-29T08:30:45.822Z unchanged
+H 2026-10-29T08:30:46.865Z unchanged
+H 2026-10-29T08:30:47.886Z unchanged
+H 2026-10-29T08:30:48.924Z unchanged
+H 2026-10-29T08:30:49.943Z unchanged
+T 2026-10-29T08:30:50.187Z fg_hwnd=0x0 fg_pid=0 box_pid=9860 windows=0
+T 2026-10-29T08:30:50.313Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=9860 windows=0
+H 2026-10-29T08:30:51.396Z unchanged
+H 2026-10-29T08:30:52.460Z unchanged
+GONE 2026-10-29T08:30:53.227Z
+END 2026-10-29T08:30:53.235Z

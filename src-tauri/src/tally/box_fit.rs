@@ -135,8 +135,9 @@ pub(crate) fn guarded(show: impl FnOnce(windows_sys::Win32::Foundation::HWND) ->
     let front = windows_hook::Front::start();
     // A box owned by a topmost window stays above Tally where its own topmost
     // flag was seen not to be kept (#1780). Made after the hook, on this
-    // thread, never shown and never activated, so the fit check measures only
-    // the box; destroyed once the box has returned.
+    // thread, and never shown; the hook does not measure it if Windows
+    // activates it as the box closes, so the fit check measures only the box.
+    // Destroyed once the box has returned.
     let owner = windows_hook::TopmostOwner::create();
     let result = show(
         owner
@@ -157,6 +158,7 @@ pub(crate) fn guarded(show: impl FnOnce(windows_sys::Win32::Foundation::HWND) ->
 #[cfg(windows)]
 mod windows_hook {
     use super::{Rect, Seen};
+    use std::cell::Cell;
     use std::ffi::c_void;
     use std::io::Write;
     use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -236,7 +238,9 @@ mod windows_hook {
     /// background process is often refused the foreground, and a box nobody
     /// sees is a box nobody answers. It never takes the foreground back after
     /// that single attempt, so a person who moves to another window is not
-    /// pulled away from it. It stops when dropped.
+    /// pulled away from it. It stops when dropped. A box with an owner has no
+    /// taskbar button (#1780), so the flash then reaches only its title bar,
+    /// and the box's place on top is what shows it.
     pub(super) struct Front {
         stop: Arc<AtomicBool>,
         worker: Option<std::thread::JoinHandle<()>>,
@@ -271,6 +275,14 @@ mod windows_hook {
     /// tool window and the box an owned one, so neither has a taskbar button.
     pub(super) struct TopmostOwner(HWND);
 
+    thread_local! {
+        /// The owner this thread made, or null. The hook, which runs on the
+        /// same thread, does not measure it: Windows may activate a box's
+        /// owner as the box closes, and the owner's empty rectangle would read
+        /// as a box that did not fit, refusing an answer already given.
+        static OWNER: Cell<HWND> = const { Cell::new(std::ptr::null_mut()) };
+    }
+
     impl TopmostOwner {
         /// A new owner, or `None` if Windows refuses to make one.
         pub(super) fn create() -> Option<Self> {
@@ -294,7 +306,11 @@ mod windows_hook {
                     std::ptr::null(),
                 )
             };
-            (!window.is_null()).then_some(Self(window))
+            if window.is_null() {
+                return None;
+            }
+            OWNER.with(|owner| owner.set(window));
+            Some(Self(window))
         }
 
         /// The owner's handle, for `MessageBoxW`.
@@ -310,6 +326,7 @@ mod windows_hook {
             unsafe {
                 DestroyWindow(self.0);
             }
+            OWNER.with(|owner| owner.set(std::ptr::null_mut()));
         }
     }
 
@@ -525,9 +542,10 @@ mod windows_hook {
     }
 
     /// The hook procedure: when the box is about to be activated, measure it;
-    /// if it does not fit, post it a Cancel and remember that it did not.
+    /// if it does not fit, post it a Cancel and remember that it did not. The
+    /// box's owner is not the box and is not measured.
     unsafe extern "system" fn on_activate(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        if code == HCBT_ACTIVATE as i32 {
+        if code == HCBT_ACTIVATE as i32 && wparam as HWND != OWNER.with(Cell::get) {
             let window = wparam as HWND;
             let fitted = fits(window);
             remember(seen().after(fitted));
@@ -690,5 +708,55 @@ mod tests {
         drop(owner);
         // SAFETY: as above; a destroyed handle only reads as no window.
         assert_eq!(unsafe { IsWindow(window) }, 0);
+    }
+
+    /// The hook does not measure the box's owner (#1780), which Windows may
+    /// activate as the box closes. The control, a hidden window that is not
+    /// the owner, is measured and, being empty, does not fit: so the
+    /// activation reached the hook. No box is shown.
+    #[cfg(windows)]
+    #[test]
+    fn the_hook_does_not_measure_the_box_s_owner() {
+        use windows_sys::Win32::Foundation::HWND;
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, WS_POPUP,
+        };
+        // Declared here, as `windows_hook` declares its kernel32 calls, so that
+        // the test needs no further `windows-sys` feature.
+        #[link(name = "user32")]
+        unsafe extern "system" {
+            fn SetActiveWindow(window: HWND) -> HWND;
+        }
+        let hook = super::windows_hook::install().expect("the hook");
+        let owner = super::windows_hook::TopmostOwner::create().expect("an owner window");
+        // SAFETY: a handle this thread just made.
+        unsafe { SetActiveWindow(owner.handle()) };
+        assert_eq!(super::windows_hook::seen(), Seen::Nothing);
+        let class: Vec<u16> = "Static".encode_utf16().chain(Some(0)).collect();
+        // SAFETY: as in `TopmostOwner::create`.
+        let control = unsafe {
+            CreateWindowExW(
+                0,
+                class.as_ptr(),
+                std::ptr::null(),
+                WS_POPUP,
+                0,
+                0,
+                0,
+                0,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null(),
+            )
+        };
+        assert!(!control.is_null());
+        // SAFETY: as above.
+        unsafe { SetActiveWindow(control) };
+        assert_eq!(super::windows_hook::seen(), Seen::DoesNotFit);
+        // SAFETY: the control's handle, destroyed once, here.
+        unsafe { DestroyWindow(control) };
+        drop(owner);
+        drop(hook);
     }
 }

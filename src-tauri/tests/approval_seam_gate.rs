@@ -1530,8 +1530,9 @@ pub(crate) fn guarded(show: impl FnOnce(windows_sys::Win32::Foundation::HWND) ->
     let front = windows_hook::Front::start();
     // A box owned by a topmost window stays above Tally where its own topmost
     // flag was seen not to be kept (#1780). Made after the hook, on this
-    // thread, never shown and never activated, so the fit check measures only
-    // the box; destroyed once the box has returned.
+    // thread, and never shown; the hook does not measure it if Windows
+    // activates it as the box closes, so the fit check measures only the box.
+    // Destroyed once the box has returned.
     let owner = windows_hook::TopmostOwner::create();
     let result = show(
         owner
@@ -1555,6 +1556,7 @@ pub(crate) fn guarded(show: impl FnOnce(windows_sys::Win32::Foundation::HWND) ->
 const BOX_FIT_HOOK: &str = r#"#[cfg(windows)]
 mod windows_hook {
     use super::{Rect, Seen};
+    use std::cell::Cell;
     use std::ffi::c_void;
     use std::io::Write;
     use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -1634,7 +1636,9 @@ mod windows_hook {
     /// background process is often refused the foreground, and a box nobody
     /// sees is a box nobody answers. It never takes the foreground back after
     /// that single attempt, so a person who moves to another window is not
-    /// pulled away from it. It stops when dropped.
+    /// pulled away from it. It stops when dropped. A box with an owner has no
+    /// taskbar button (#1780), so the flash then reaches only its title bar,
+    /// and the box's place on top is what shows it.
     pub(super) struct Front {
         stop: Arc<AtomicBool>,
         worker: Option<std::thread::JoinHandle<()>>,
@@ -1669,6 +1673,14 @@ mod windows_hook {
     /// tool window and the box an owned one, so neither has a taskbar button.
     pub(super) struct TopmostOwner(HWND);
 
+    thread_local! {
+        /// The owner this thread made, or null. The hook, which runs on the
+        /// same thread, does not measure it: Windows may activate a box's
+        /// owner as the box closes, and the owner's empty rectangle would read
+        /// as a box that did not fit, refusing an answer already given.
+        static OWNER: Cell<HWND> = const { Cell::new(std::ptr::null_mut()) };
+    }
+
     impl TopmostOwner {
         /// A new owner, or `None` if Windows refuses to make one.
         pub(super) fn create() -> Option<Self> {
@@ -1692,7 +1704,11 @@ mod windows_hook {
                     std::ptr::null(),
                 )
             };
-            (!window.is_null()).then_some(Self(window))
+            if window.is_null() {
+                return None;
+            }
+            OWNER.with(|owner| owner.set(window));
+            Some(Self(window))
         }
 
         /// The owner's handle, for `MessageBoxW`.
@@ -1708,6 +1724,7 @@ mod windows_hook {
             unsafe {
                 DestroyWindow(self.0);
             }
+            OWNER.with(|owner| owner.set(std::ptr::null_mut()));
         }
     }
 
@@ -1923,9 +1940,10 @@ mod windows_hook {
     }
 
     /// The hook procedure: when the box is about to be activated, measure it;
-    /// if it does not fit, post it a Cancel and remember that it did not.
+    /// if it does not fit, post it a Cancel and remember that it did not. The
+    /// box's owner is not the box and is not measured.
     unsafe extern "system" fn on_activate(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        if code == HCBT_ACTIVATE as i32 {
+        if code == HCBT_ACTIVATE as i32 && wparam as HWND != OWNER.with(Cell::get) {
             let window = wparam as HWND;
             let fitted = fits(window);
             remember(seen().after(fitted));
@@ -1944,16 +1962,17 @@ mod windows_hook {
 }"#;
 
 /// Every `cfg` in box_fit.rs: the inner attribute, the two Windows items, the
-/// test module and its one Windows-only test (the box's owner). The last entry
+/// test module and its two Windows-only tests (the box's owner, and the hook
+/// leaving it unmeasured). The last entry
 /// counts the bare text `cfg`.
 const BOX_FIT_CFG_CENSUS: [(&str, usize); 4] = [
     (
         "#![cfg_attr(all(not(windows), not(test)), allow(dead_code))]",
         1,
     ),
-    ("#[cfg(windows)]", 3),
+    ("#[cfg(windows)]", 4),
     ("#[cfg(test)]", 1),
-    ("cfg", 5),
+    ("cfg", 6),
 ];
 
 fn box_fit_problems(source: &str) -> Vec<String> {
@@ -2003,6 +2022,10 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
         source.replacen("rect.is_wholly_inside(work));", "true);", 1),
         source.replacen("if !fitted {", "if false {", 1),
         source.replacen("remember(seen().after(fitted));", "remember(Seen::Fits);", 1),
+        // The hook measures the box's hidden owner again, so an owner Windows
+        // activates as the box closes refuses the answer just given (#1780).
+        source.replacen(" && wparam as HWND != OWNER.with(Cell::get) {", " {", 1),
+        source.replacen("            OWNER.with(|owner| owner.set(window));\n", "", 1),
         source.replacen("let fitted = measured.is_some_and(", "let fitted = measured.is_none() || measured.is_some_and(", 1),
         source.replacen("== 0 {\n            return None;", "== 0 {\n            return Some((Rect { left: 0, top: 0, right: 1, bottom: 1 }, Rect { left: 0, top: 0, right: 2, bottom: 2 }));", 1),
         // The guard made non-Windows beside a Windows twin that approves.

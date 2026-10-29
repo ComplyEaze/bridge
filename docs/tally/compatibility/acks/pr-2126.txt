@@ -1,0 +1,6 @@
+src-tauri/crates/bridge-tally-protocol/src/native_cash_flow.rs
+src-tauri/crates/bridge-tally-protocol/src/native_funds_flow.rs
+src-tauri/crates/bridge-tally-protocol/src/native_negative_stock.rs
+src-tauri/crates/bridge-tally-protocol/src/native_statement_reports.rs
+src-tauri/crates/bridge-tally-protocol/src/native_stock_summary.rs
+reviewer: lamemustafa

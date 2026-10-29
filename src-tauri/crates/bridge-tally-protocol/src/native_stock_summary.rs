@@ -24,7 +24,7 @@ use crate::native_masters::{
     MASTERS_ASSUMED_ALIASES, MASTERS_ASSUMED_NAME_CHARS, MASTERS_RESPONSE_BUDGET_BYTES,
 };
 use crate::native_outstandings::NativeLedgerSnapshotPeriod;
-use crate::native_statement_reports::render_built_in_report_request;
+use crate::native_statement_reports::{render_built_in_report_request, BuiltInReport};
 use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::outstandings_shared::COMPANY_EXTENT_V2_FETCH;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
@@ -86,7 +86,7 @@ pub fn render_native_stock_summary_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
-    render_built_in_report_request("Stock Summary", company, period)
+    render_built_in_report_request(BuiltInReport::StockSummary, company, period)
 }
 
 /// The date a stock summary is read as of. Only a 31 March is constructible,

@@ -101,14 +101,15 @@ Runs only if `#2150` reads `in`, and only from a build holding #2150's forward c
 
 ```
 R3 NOTE
-THE COMPANY:   <to fill: a synthetic book with exactly ONE Currency master; its GUID and number>
-L1, L2:        <to fill: two ledgers that take a balanced Journal, neither bill-wise, cash nor bank>
-THE LOCK:      <to fill: the period locked on Tally's screen, its first day; its last day is THE DATE>
-THE DATE:      <to fill>
-MARKS WINDOW:  <to fill: the vouchers window of every MARKS read>
-C2 RAW MARKS:  <to fill: the request file, its sha256, and the GET /status command>
+THE COMPANY:   BRIDGE ABANDON LAB, number 100096, GUID 5f4825c4-5d89-47fa-9872-6397cca3a591, books from 1 April 2025, a single currency, TallyPrime 7.2 Silver (lab/1713-abandoned-ledger-create-answers, RESULTS.md); left on the lab PC as its backup BKE left it. The one Currency master is counted on Tally's list of Currencies at step 0.3, as the sheet says.
+BOOK SIZE:     48,000 Journals, dated 1 April 2025 to 31 March 2026 (about 131 a day), between L1 and L2, plus seven Suspense probe ledgers; a read of the whole book took 187 s. This row reads day windows only and sends no whole-book read; a read that is refused for its size is a STOP, recorded as such.
+L1, L2:        L1 = Lab Bulk Expense (Indirect Expenses), L2 = Lab Bulk Income (Indirect Incomes), each created with bill-wise No (the sheet's request files); neither is cash or bank. Their bill-wise flags are read on the ledger screens at step 0.3, as the sheet says. THE TYPE (Journal) numbering, Automatic with Retain, is not on record (the Journals were imported without numbers): lab confirms at step 0.4.
+THE LOCK:      ending on THE DATE, 30 April 2026. Its first day is 1 April 2026 if Tally's lock control takes a range, else the books' start (1 April 2025) for an "up to" date; which one the screen offers is not on record: lab confirms at step 2.1 and records it. THE DATE lies after every Journal of the book (all are dated 1 April 2025 to 31 March 2026).
+THE DATE:      30 April 2026 (20260430): inside the books, before the lab PC's own date, and, by the Journals' dates, holding no voucher; step 0.5 checks that.
+MARKS WINDOW:  30 March 2026 to 31 March 2026 (two days of Journals, about 260 vouchers, not THE DATE).
+C2 RAW MARKS:  lab confirms at step 0: the MARKS request file the lab's C2 step 0 uses, with THE COMPANY's name, its sha256 recorded at step 0.1, and GET /status by curl.exe as C2 c says.
 PART 2:        not available: no captured whole-refusal answer (the lab found no 7 Oct 2026 data folder holding one). R3 rests on Part 1; if Part 1 gives no whole refusal, the settle dialog stays covered by tests only, as #2150 says.
-GO-AHEAD:      <to fill>
+GO-AHEAD:      <to fill by the run coordinator at the sitting>
 ```
 
 ## R4: the Bills report limit on the dense book (BLOCKING if #2158 is in the build)

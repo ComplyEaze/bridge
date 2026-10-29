@@ -1,0 +1,3 @@
+Day Book for 15-Oct-25 (capture daybook-20251015.png): one voucher.
+15-Oct-25 | Customer | Sales | Vch No. 2 | Outwards Qty not shown in this view
+The item quantity on the voucher was not read on the screen: the Day Book shows its amount only, and opening the voucher would open its Alter screen, which this row does not do.

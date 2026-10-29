@@ -1,0 +1,5 @@
+t1: STOCKITEM rows 1
+  NAME='Lab Gadget' PARENT='Primary' CLOSINGBALANCE='17 Nos' CLOSINGVALUE='-2040.00'
+t2: lines 1
+  DSPDISPNAME='Lab Gadget' DSPCLQTY='17 Nos' DSPCLAMTA='-2040.00'
+t2 DSPCLAMTA equals t1 CLOSINGVALUE (exact decimals): yes

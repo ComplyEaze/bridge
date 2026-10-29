@@ -1,0 +1,1 @@
+No ComplyEaze Bridge client ran in this row: every read was sent by curl under LAB-COMMON C3 (send-log.txt).

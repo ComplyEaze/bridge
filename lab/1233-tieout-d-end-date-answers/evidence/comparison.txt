@@ -1,0 +1,4 @@
+Comparison at 1-Apr-25 to 15-Oct-25 (number and unit):
+t1 CLOSINGBALANCE | t2 DSPCLQTY | transcription 1 | transcription 2 | EXPECT
+17 Nos | 17 Nos | 17 Nos | 17 Nos | 17 Nos (includes the 15 Oct sale; 22 Nos would mean the source left out the voucher dated on its end date)
+All four equal: yes.

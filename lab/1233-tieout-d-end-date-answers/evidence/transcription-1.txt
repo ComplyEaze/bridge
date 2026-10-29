@@ -1,0 +1,3 @@
+Transcription 1, Stock Summary, period 1-Apr-25 to 15-Oct-25 (capture t-1.png). Line | quantity (pushed copy: quantity column only; the rate and value columns are in the copy kept on the lab PC)
+Lab Gadget | 17 Nos
+Grand Total | 17 Nos

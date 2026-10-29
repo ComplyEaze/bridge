@@ -387,6 +387,18 @@ impl Judgement {
     ) -> Self {
         Self::read(state, vec![guid], checks, reasons, name_absent_in_read_book)
     }
+
+    /// The same for a batch, naming `guids` in batch order.
+    #[cfg(test)]
+    pub(super) fn for_test_batch(
+        state: MasterVerdictState,
+        guids: Vec<Option<String>>,
+        checks: Checks,
+        reasons: Vec<&'static str>,
+        name_absent_in_read_book: bool,
+    ) -> Self {
+        Self::read(state, guids, checks, reasons, name_absent_in_read_book)
+    }
 }
 
 /// Where the item name stands in the paired index.

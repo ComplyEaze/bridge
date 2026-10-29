@@ -1361,6 +1361,54 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         false,
     );
     row(
+        "reconcile, batch partly present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![Some(NEW_GUID.to_string()), None],
+                Checks::none(),
+                vec!["counters_unavailable"],
+                false,
+            ),
+            r,
+        ),
+        verify::NEXT_PARTLY_PRESENT,
+        false,
+        true,
+    );
+    row(
+        "reconcile, batch all present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![Some(NEW_GUID.to_string()), Some(NEW_GUID.to_string())],
+                Checks::none(),
+                vec!["counters_unavailable"],
+                false,
+            ),
+            r,
+        ),
+        verify::NEXT_PRESENT_NOT_VERIFIED,
+        false,
+        false,
+    );
+    row(
+        "just posted, batch partly present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![None, Some(NEW_GUID.to_string())],
+                Checks::none(),
+                vec!["ledger_absent_after_post"],
+                false,
+            ),
+            p,
+        ),
+        verify::NEXT_PARTLY_PRESENT,
+        false,
+        true,
+    );
+    row(
         "just posted, present",
         judged(&judgement(ReconciliationRequired, true, false, false), p),
         verify::NEXT_PRESENT_NOT_VERIFIED,

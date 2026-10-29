@@ -1052,8 +1052,8 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }"#;
 
-/// The one-ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
-/// item only, with its own title, its own positive button, and the same
+/// The ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
+/// ledger or a batch, with its own title, its own positive button, and the same
 /// Escape/default-No behaviour.
 const MASTERS_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {

@@ -50,6 +50,9 @@ pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back thi
 pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, and the outcome of this batch is not settled (see the reasons). ComplyEaze Bridge cannot settle it now: a create it sent may still be waiting in Tally. While the batch stays open, ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for, and will not create it again. Calling post_ledger_creates with this batch_id again sends nothing: it reads the book back, shows whether a ledger of this name now exists, and judges one that has appeared. Never post this batch again.";
 /// A ledger of this name is in the book and the read-back could not verify it.
 pub(super) const NEXT_PRESENT_NOT_VERIFIED: &str = "A ledger of this name is in the book, but ComplyEaze Bridge could not verify that it is the one this batch sent (see the checks and reasons). There is nothing to create: compare the ledger in Tally with this batch by eye. Never post this batch again.";
+/// Some of a batch's ledgers are in the book and some are not, and the
+/// read-back could not verify the batch: there is something left to settle.
+pub(super) const NEXT_PARTLY_PRESENT: &str = "Some of this batch's ledgers are in the book and some are not (verification.guids gives a GUID for each one found, in the order sent), and ComplyEaze Bridge could not verify the batch (see the checks and reasons). Check the ledgers in Tally against the reasons given, then call post_ledger_creates with this batch_id again to read it back (it sends nothing). Do not create the ledger in Tally by hand meanwhile, for any of this batch's names. Never post this batch again.";
 /// The book was not compared: the batch's company is not loaded, was renamed,
 /// or the set of loaded companies is not the one the create was recorded under.
 pub(super) const NEXT_LOAD_SAME_COMPANIES: &str = "The book could not be compared with the one the create was recorded under: the batch's company is not loaded in Tally, was renamed, or the set of loaded companies has changed. Load the same companies, under the same names, then call post_ledger_creates with this batch_id again: it reads the book back and sends nothing. Do not create the ledger in Tally by hand meanwhile. Never post this batch again.";
@@ -102,10 +105,13 @@ pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'stati
         NEXT_LOAD_SAME_COMPANIES
     } else if moment == Moment::Reconcile && judgement.name_absent_in_read_book() {
         NEXT_ABSENT_NOT_SETTLED
-    } else if judgement.guids().iter().any(Option::is_some) {
-        // A ledger of a name is in the book: one ledger's GUID, or any of a
-        // batch's (a batch names no single GUID).
+    } else if !judgement.guids().is_empty() && judgement.guids().iter().all(Option::is_some) {
+        // Every name is in the book: one ledger's GUID, or each of a batch's
+        // (a batch names no single GUID).
         NEXT_PRESENT_NOT_VERIFIED
+    } else if judgement.guids().iter().any(Option::is_some) {
+        // Only some of a batch's names are in the book.
+        NEXT_PARTLY_PRESENT
     } else {
         NEXT_RECONCILE
     }

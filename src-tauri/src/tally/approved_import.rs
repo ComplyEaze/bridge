@@ -2550,9 +2550,10 @@ async fn confirm_review_with(
     }
 }
 
-/// The one-ledger dialog: its own subprocess mode, title, button and token,
+/// The ledger dialog: its own subprocess mode, title, button and token,
 /// answered exactly as the post dialog is, by the token for this call's nonce
-/// and a clean exit together. Always asked about one item. Like the other
+/// and a clean exit together. Asked about one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`, its title and button saying how many. Like the other
 /// dialogs, its first lines say what each answer does (#1780).
 async fn confirm_masters_dialog(preview: MastersPrompt<'_>) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
@@ -3060,8 +3061,9 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }
 
-/// The one-ledger dialog. It is shown for one item only: a count other than
-/// one is not the parent's shape and shows nothing.
+/// The ledger dialog, for one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`: a larger count has no title or button and shows
+/// nothing.
 #[cfg(not(windows))]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     let Some((title, button)) = masters_words(count) else {

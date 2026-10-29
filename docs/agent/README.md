@@ -2900,8 +2900,8 @@ what was recorded for a batch already settled.
 in place of `ledger` (never both). They must all be of one kind and side, so
 under one parent group, and no two of their names may differ only in case,
 spaces or symbols; otherwise nothing is saved and the call is refused
-`master_batch_mixed_parents`, `master_batch_names_may_be_one_master` or
-`master_batch_too_large`. One dialog lists every ledger, two lines each, and
+`master_batch_mixed_parents` or `master_batch_names_may_be_one_master` (a list
+of more than 10 is refused `argument_invalid:ledgers`). One dialog lists every ledger, two lines each, and
 one approval sends them to Tally together, in one request. The batch is judged
 as one: `posted_verified` needs every ledger new and as sent, Tally's counters
 to show one create per ledger and nothing altered, and the company's master
@@ -2986,7 +2986,10 @@ and a declined or timed-out answer's `next_step` says that the next call with th
 same `batch_id` opens a new dialog. `master_review_too_large` from
 `post_ledger_creates` says the dialog's text was over its limit or, on Windows,
 where the dialog is measured against the screen as the post's is, that it did not
-fit the screen whole; nothing was sent. In an answer,
+fit the screen whole; nothing was sent, and its `next_step` says to try a
+larger screen, then a new batch with fewer ledgers or shorter names. A batch
+read back with only some of its ledgers in the book, and not verified, says so
+in its `next_step`. In an answer,
 `verification.verdict_written` is true when this call appended the verdict (an
 open verdict already on file in the same words is not appended again);
 `verification.verdict_record_error` is the code of why the verdict was not

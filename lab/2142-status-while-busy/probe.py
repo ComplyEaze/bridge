@@ -21,7 +21,7 @@
 #
 # Exit 0: the block ended as designed. Exit 2: a STOP, whose reason is the log's last line. A STOP is:
 # a whole read that did not answer 200 with bytes; a cut read that ended with neither exit 28 (cut) nor
-# exit 0 (answered); a probe that did not answer as above; a probe without an answer in 600 s (that
+# exit 0 (answered), or that exited 0 without 200 and bytes; a probe that did not answer as above; a probe without an answer in 600 s (that
 # curl is left running); the operator's stop file `STOP-<block>` in the out folder (checked before each
 # probe); 200 probes; 900 s in all, checked before each probe. On a STOP no more probes are sent, the
 # read curl is never killed, and if it is still running the helper waits up to 600 s for it to end on

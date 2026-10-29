@@ -2058,18 +2058,22 @@ fn the_items_and_totals_serialize_in_the_shape_the_tool_returns() {
 }
 
 #[test]
-fn only_a_31_march_is_an_as_of_that_can_be_constructed() {
-    // The financial-year end is the one date measured for stock, in any year.
-    for date in ["20260331", "20250331"] {
+fn only_a_months_last_day_is_an_as_of_that_can_be_constructed() {
+    // A month's last day, the shape of every period end measured for stock, in any
+    // year and month: 31 and 30 days, and February's end by the calendar.
+    for date in [
+        "20260331", "20250331", "20250531", "20250831", "20250930", "20261231", "20260228",
+        "20240229",
+    ] {
         let date = TallyDate::parse(date).unwrap();
         assert_eq!(StockSummaryAsOf::new(date.clone()).unwrap().date(), &date);
     }
-    // Every other date is the typed refusal: another month's 31st and the
-    // first two days the boundary rule of other reads admits included; and a
-    // 31 March look-alike in another month or on another day.
+    // Every other date is the typed refusal: the first two days the boundary rule
+    // of other reads admits included, a 30th of a 31-day month, a 28 February of a
+    // leap year, and a day whose next day cannot be formed.
     for date in [
-        "20260731", "20260401", "20260402", "20260101", "20260301", "20260330", "20261231",
-        "20260930",
+        "20260401", "20260402", "20260101", "20260301", "20260330", "20240228", "20250915",
+        "20251015", "20250910", "20250920", "99991231",
     ] {
         assert_eq!(
             StockSummaryAsOf::new(TallyDate::parse(date).unwrap()),
@@ -2356,7 +2360,7 @@ fn no_quantity_of_the_eleven_item_capture_agrees_because_its_report_lists_only_g
         match (&item.closing.quantity, &item.closing.agreement) {
             (NativeQuantityRead::Empty, NativeQuantityAgreement::NoneSent) => {}
             (NativeQuantityRead::Read(own), NativeQuantityAgreement::InsideStockGroup(figure)) => {
-                assert_eq!(figure.quantity(), own, "{}", item.name);
+                assert_eq!(&figure.0, own, "{}", item.name);
             }
             other => panic!("{}: {other:?}", item.name),
         }
@@ -2475,7 +2479,7 @@ fn nested_state(items: &[NativeStockItem], name: &str) -> (&'static str, Option<
         .agreement;
     let figure = match agreement {
         NativeQuantityAgreement::Agreed(quantity) => Some(quantity),
-        NativeQuantityAgreement::InsideStockGroup(figure) => Some(figure.quantity()),
+        NativeQuantityAgreement::InsideStockGroup(figure) => Some(&figure.0),
         _ => None,
     };
     (
@@ -2553,6 +2557,9 @@ fn a_parent_that_may_be_the_root_without_its_marker_returns_no_quantity() {
         " PRIMARY ",
         "&#4; Lab Group One",
         "Lab &#4; Group One",
+        // A replacement character Tally sent as text, which the decoder keeps apart from the
+        // marker: still not plainly a group's name.
+        "Lab \u{fffd} Group One",
     ] {
         let edited = replaced(
             &nested_items(),
@@ -2613,4 +2620,176 @@ fn the_nested_books_requests_are_the_builders_bytes_for_that_company() {
     for (rendered, kept) in sent_and_kept {
         assert_eq!(sent(&rendered), kept);
     }
+}
+
+// Period ends inside the year, as TallyPrime 7.2 answered them (§12a.13): one item under
+// the root on `BRIDGE TIEOUT D` at 30 September and 31 May 2025, and the nested book at 31
+// August and 30 September 2025, either side of the Stock Journal of 15 September.
+const TIEOUT_D_COMPANY: &str = "6a9518b2-a88c-417c-a700-40243f9d9119";
+const TIEOUT_D_LAB: &str = "BRIDGE TIEOUT D";
+
+/// The gate over one sitting's flags, item rows and plain report; the read must match.
+fn matched(company: &str, flags: &[u8], items: &[u8], report: &[u8]) -> Vec<NativeStockItem> {
+    let count = parse_company_inventory_flags(&utf16le(flags), company)
+        .unwrap()
+        .item_count;
+    let rows = parse_native_stock_items(&utf16le(items), company)
+        .unwrap()
+        .rows;
+    match gate_stock_summary(rows, count, &report_of(&utf16le(report)).unwrap()).unwrap() {
+        NativeStockGate::ValueTotalMatched { items, .. } => items,
+        other => panic!("the capture matches its report: {other:?}"),
+    }
+}
+
+#[test]
+fn a_month_end_inside_the_year_returns_the_quantity_at_that_date() {
+    let flags =
+        include_bytes!("../tests/fixtures/company_inventory_flags_tieout_d_live.utf16le.xml");
+    for (items, report, quantity) in [
+        (
+            &include_bytes!("../tests/fixtures/stock_items_tieout_d_to_20250930_live.utf16le.xml")
+                [..],
+            &include_bytes!(
+                "../tests/fixtures/stock_summary_report_tieout_d_to_20250930_live.utf16le.xml"
+            )[..],
+            "22",
+        ),
+        (
+            &include_bytes!("../tests/fixtures/stock_items_tieout_d_to_20250531_live.utf16le.xml")
+                [..],
+            &include_bytes!(
+                "../tests/fixtures/stock_summary_report_tieout_d_to_20250531_live.utf16le.xml"
+            )[..],
+            "20",
+        ),
+    ] {
+        let items = matched(TIEOUT_D_COMPANY, flags, items, report);
+        assert_eq!(
+            nested_state(&items, "Lab Gadget"),
+            ("agreed", Some((quantity.to_string(), "Nos".to_string())))
+        );
+    }
+    // On the nested book, the two items the Stock Journal moved differ between the two
+    // dates; every other item does not.
+    let flags = include_bytes!(
+        "../tests/fixtures/company_inventory_flags_nested_lab_as_of_live.utf16le.xml"
+    );
+    for (items, report, pin, washer) in [
+        (
+            &include_bytes!(
+                "../tests/fixtures/stock_items_nested_lab_to_20250831_live.utf16le.xml"
+            )[..],
+            &include_bytes!(
+                "../tests/fixtures/stock_summary_report_nested_lab_to_20250831_live.utf16le.xml"
+            )[..],
+            "40",
+            "30",
+        ),
+        (
+            &include_bytes!(
+                "../tests/fixtures/stock_items_nested_lab_to_20250930_live.utf16le.xml"
+            )[..],
+            &include_bytes!(
+                "../tests/fixtures/stock_summary_report_nested_lab_to_20250930_live.utf16le.xml"
+            )[..],
+            "35",
+            "35",
+        ),
+    ] {
+        let items = matched(NESTED_COMPANY, flags, items, report);
+        let nested = |amount: &str| {
+            (
+                "inside_stock_group",
+                Some((amount.to_string(), "Nos".to_string())),
+            )
+        };
+        assert_eq!(nested_state(&items, "Lab Depth3 Pin"), nested(pin));
+        assert_eq!(nested_state(&items, "Lab Depth2 Washer"), nested(washer));
+        assert_eq!(nested_state(&items, "Lab Depth1 Nut"), nested("20"));
+        assert_eq!(
+            nested_state(&items, "Lab Root Bolt"),
+            ("agreed", Some(("10".to_string(), "Nos".to_string())))
+        );
+    }
+}
+
+#[test]
+fn the_month_end_requests_are_the_builders_bytes_for_each_book_and_date() {
+    let rendered = |company: &str, to: &str| {
+        let period = NativeLedgerSnapshotPeriod::new(
+            DateBoundaryProfile::ModeAgnostic,
+            TallyDate::parse("20250401").unwrap(),
+            TallyDate::parse(to).unwrap(),
+        )
+        .unwrap();
+        let name = ValidatedCompanyName::new(company).unwrap();
+        let range = ValidatedDateRange::new("20250401", to).unwrap();
+        (
+            sent(
+                &ReadOnlyProfile::AuditStockItemsV1 {
+                    company: &name,
+                    period: &range,
+                }
+                .render(),
+            ),
+            sent(&render_native_stock_summary_request(company, &period)),
+        )
+    };
+    let kept: [(&str, &str, &[u8], &[u8]); 4] = [
+        (
+            TIEOUT_D_LAB,
+            "20250930",
+            include_bytes!(
+                "../tests/fixtures/stock_items_tieout_d_to_20250930_request.utf16le.xml"
+            ),
+            include_bytes!(
+                "../tests/fixtures/stock_summary_report_tieout_d_to_20250930_request.utf16le.xml"
+            ),
+        ),
+        (
+            TIEOUT_D_LAB,
+            "20250531",
+            include_bytes!(
+                "../tests/fixtures/stock_items_tieout_d_to_20250531_request.utf16le.xml"
+            ),
+            include_bytes!(
+                "../tests/fixtures/stock_summary_report_tieout_d_to_20250531_request.utf16le.xml"
+            ),
+        ),
+        (
+            NESTED_LAB,
+            "20250831",
+            include_bytes!(
+                "../tests/fixtures/stock_items_nested_lab_to_20250831_request.utf16le.xml"
+            ),
+            include_bytes!(
+                "../tests/fixtures/stock_summary_report_nested_lab_to_20250831_request.utf16le.xml"
+            ),
+        ),
+        (
+            NESTED_LAB,
+            "20250930",
+            include_bytes!(
+                "../tests/fixtures/stock_items_nested_lab_to_20250930_request.utf16le.xml"
+            ),
+            include_bytes!(
+                "../tests/fixtures/stock_summary_report_nested_lab_to_20250930_request.utf16le.xml"
+            ),
+        ),
+    ];
+    for (company, to, items, report) in kept {
+        assert_eq!(
+            rendered(company, to),
+            (items.to_vec(), report.to_vec()),
+            "{company} {to}"
+        );
+    }
+    assert_eq!(
+        sent(&render_company_inventory_flags_request(
+            TIEOUT_D_LAB,
+            &company_guid(TIEOUT_D_COMPANY)
+        )),
+        include_bytes!("../tests/fixtures/company_inventory_flags_tieout_d_request.utf16le.xml")
+    );
 }

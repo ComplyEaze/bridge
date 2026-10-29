@@ -369,6 +369,20 @@ fn the_period_is_the_financial_year_containing_as_of_or_the_books_start_if_later
         admitted("20260331", "20240401", "20260331"),
         pair("20250401", "20260331")
     );
+    // A month end inside the year reads from that year's 1 April, January and
+    // February from the 1 April of the calendar year before.
+    assert_eq!(
+        admitted("20250930", "20240401", "20260930"),
+        pair("20250401", "20250930")
+    );
+    assert_eq!(
+        admitted("20260131", "20240401", "20260930"),
+        pair("20250401", "20260131")
+    );
+    assert_eq!(
+        admitted("20260228", "20240401", "20260930"),
+        pair("20250401", "20260228")
+    );
     // Before the books, and after today, refuse.
     assert!(matches!(
         period(

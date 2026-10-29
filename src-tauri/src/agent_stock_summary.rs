@@ -25,7 +25,7 @@ const VERIFICATION: &str = "stable_paired_sources_with_company_mode_and_extent_g
 const NOT_ATOMIC: &str =
     "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only";
 
-const ONE_PERIOD_MEASURED: &str = "Only the period ending 31 March 2026 has been measured: a 31 March of another year is admitted, sharing the request shape but not the measurement";
+const PERIOD_ENDS_MEASURED: &str = "`as_of` is a month's last day. Measured on TallyPrime 7.2 at 31 May, 31 August and 30 September 2025 on two synthetic books (one item under the root; groups three deep) and at 31 March 2026: the items and Tally's Stock Summary each follow `as_of`, including one Sales voucher dated on it, and not the company's own current period. The period starts on 1 April: a company whose financial year starts in another month is read from 1 April all the same. Not measured: February's end, several vouchers or a Stock Journal or purchase dated on `as_of`, TallyPrime 7.1 at a date other than 31 March, a year after the company's current period, and a book that starts mid-year";
 
 /// The rows read and Tally's own stock item count differ. The numbers travel
 /// in the refusal's `counts`.
@@ -216,7 +216,7 @@ impl Server {
                             "limitations": [
                                 NOT_ATOMIC,
                                 "Tally's own stock item count is 0 and the stock item list is empty. The Stock Summary came back empty, which agrees with them and by itself is not told apart from a report Tally did not render. Nothing else was checked",
-                                ONE_PERIOD_MEASURED,
+                                PERIOD_ENDS_MEASURED,
                             ],
                         }),
                     ),
@@ -422,7 +422,7 @@ fn stock_frame(
             "Values keep the sign Tally sends, as in the trial balance: a negative value is a debit, which is stock held, and Tally's own Stock Summary screen shows it as a positive value; a positive value is what that screen shows as negative, `(-)`. Measured on one synthetic company on licensed TallyPrime 7.1 Silver against Tally's own screen. `value_sum` adds the values with those signs, so stock held gives a negative sum (`totals.value_sum_signs` says so)",
             "`totals`, `tie_out` and `item_count_cross_check` cover the whole book, whatever `items` filters",
             "Item names, parents and base units come from one source and are not checked against another",
-            ONE_PERIOD_MEASURED,
+            PERIOD_ENDS_MEASURED,
             "A company split by year, whose sibling companies share its GUID, is refused (`company_flags_not_one_row`)",
             "Small books only: a book whose master-alteration mark is over the admitted size is refused before any item is read",
             "Under mask_parties an item's `name` and `parent` are masked, because stock-item and stock-group names are text a person types, which can carry a customer's or supplier's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is not masked, and `guid` is not masked",

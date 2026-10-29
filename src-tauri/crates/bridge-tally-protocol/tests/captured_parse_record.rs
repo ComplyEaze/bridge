@@ -1601,6 +1601,66 @@ const ROWS: &[Row] = &[
         parser: "parse_company_inventory_flags",
         parse: |_, text| typed(parse_company_inventory_flags(text, NESTED_STOCK_GUID)),
     },
+    Row {
+        fixture: "tests/fixtures/stock_items_nested_lab_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_nested_lab_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_nested_lab_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_nested_lab_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_nested_lab_as_of_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_tieout_d_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, TIEOUT_D_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_tieout_d_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_tieout_d_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, TIEOUT_D_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_tieout_d_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_tieout_d_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, TIEOUT_D_GUID)),
+    },
     // Currency reads: src/native_outstandings/wire_currency_tests.rs,
     // wire_company_currency_tests.rs; the app's replays for the rest, read as production reads a
     // currency answer (parse_company_currency and the master list).

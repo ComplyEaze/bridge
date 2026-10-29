@@ -19,11 +19,14 @@
 # read has ended and 3 probes in a row sent after its end answered in under 1.000 s; at rest, after
 # 10 probes.
 #
-# Exit 0: the block ended as designed. Exit 2: a STOP, whose reason is the log's last line, which also
-# says whether the read curl is still running (it is never killed). A STOP is: a whole read that did not
-# answer 200 with bytes; a probe that did not answer as above; a probe without an answer in 600 s (that
-# curl is left running); 200 probes; 900 s in all. A cut read that answered whole is logged as a result
-# (`read_answered_before_cut`), not a STOP.
+# Exit 0: the block ended as designed. Exit 2: a STOP, whose reason is the log's last line. A STOP is:
+# a whole read that did not answer 200 with bytes; a cut read that ended with neither exit 28 (cut) nor
+# exit 0 (answered); a probe that did not answer as above; a probe without an answer in 600 s (that
+# curl is left running); the operator's stop file `STOP-<block>` in the out folder (checked before each
+# probe); 200 probes; 900 s in all, checked before each probe. On a STOP no more probes are sent, the
+# read curl is never killed, and if it is still running the helper waits up to 600 s for it to end on
+# its own so its result is logged. A cut read that answered whole is logged as a result
+# (`read_answered_before_cut`), not a STOP. Any other exit code (a Python error exits 1) is a STOP too.
 import argparse
 import datetime
 import hashlib
@@ -85,25 +88,35 @@ def main():
     read_ended = threading.Event()
 
     def reap(process, sent_t):
-        out, err = process.communicate()
-        fields = out.strip().split()
-        total = float(fields[2]) if len(fields) > 2 else None
-        record('read_ended', exit=process.returncode, printed=out.strip(), stderr=err.strip(),
-               read_end_t=round(sent_t + total, 3) if total is not None else None)
-        if args.cut_after is None:
-            whole = (process.returncode == 0 and len(fields) > 1 and fields[0] == '200'
-                     and fields[1] != '0')
-            read_state['failed'] = not whole
-        elif process.returncode != CURL_TIMEOUT_EXIT:
-            record('read_answered_before_cut' if process.returncode == 0 else 'read_ended_otherwise',
-                   exit=process.returncode)
-        read_state['ended'] = True
-        read_ended.set()
+        try:
+            out, err = process.communicate()
+            fields = out.strip().split()
+            total = float(fields[2]) if len(fields) > 2 else None
+            record('read_ended', exit=process.returncode, printed=out.strip(), stderr=err.strip(),
+                   read_end_t=round(sent_t + total, 3) if total is not None else None)
+            if args.cut_after is None:
+                whole = (process.returncode == 0 and len(fields) > 1 and fields[0] == '200'
+                         and fields[1] != '0')
+                read_state['failed'] = not whole
+            elif process.returncode == 0:
+                record('read_answered_before_cut', exit=0)
+            elif process.returncode != CURL_TIMEOUT_EXIT:
+                read_state['failed'] = True
+        except Exception as error:  # the helper must not go on probing blind
+            read_state['failed'] = True
+            record('reaper_error', error=repr(error))
+        finally:
+            read_state['ended'] = True
+            read_ended.set()
 
     def stop(reason, **fields):
-        running = read is not None and read.poll() is None
+        running = read is not None and not read_ended.is_set()
         record('stop', reason=reason, read_still_running=running,
                read_pid=read.pid if read is not None else None, **fields)
+        if running:
+            # Never killed: wait for it to end on its own, so its result is logged.
+            read_ended.wait(PROBE_WAIT_SECONDS)
+            record('stop_wait_ended', read_ended=read_ended.is_set())
         return 2
 
     if args.read:
@@ -130,6 +143,8 @@ def main():
         if read_state['ended'] and quick_after_read >= QUICK_IN_A_ROW:
             record('end', reason='quick_in_a_row_after_read')
             return 0
+        if os.path.exists(os.path.join(args.out, f'STOP-{args.block}')):
+            return stop('operator_stop')
         if probes >= MAX_PROBES or time.monotonic() - start > MAX_BLOCK_SECONDS:
             return stop('probe_or_time_cap')
         after_read = read_state['ended'] if read is not None else None

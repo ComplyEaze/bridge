@@ -31,6 +31,12 @@ Nothing else is changed. No voucher is posted. No ComplyEaze Bridge write tool i
 ## Build and inputs (hash before the first step and at the end; a different hash = STOP; `SHA256.txt` lists every file of this folder with its size)
 - **BUILD-2188:** the `unsigned-bundle-smoke-windows-latest` artifact of a CI run started by hand on #2188's branch (`gh workflow run ci.yml --ref fix/2074-mailing-by-count`). A draft pull request's own run builds no bundle.
   - The run's head SHA must equal the head the run coordinator names. Download it within the artifact's 7 days.
+  - **This row's build:**
+    - the run: Bridge CI run 40954366305 (started by hand), at #2188's head 8f7c7adfbad294f33c97566edde7a08a4bd7a3d5;
+    - the artifact: `unsigned-bundle-smoke-windows-latest`, id 12933752645, 57,274,511 bytes;
+    - its GitHub digest: `sha256:b575f2cfc1a21094eac6f6b018a51dc242fef38eac0c31e5753fc8e5bf08332a`.
+
+    Before the download, check that the run's conclusion is success. If it is anything else, STOP and ask the run coordinator.
   - Record the run id, the artifact id and its GitHub digest. EXPECT the zip's sha256 to equal the digest.
   - **The server:** the `.mcpb`'s `bridge_mcp.exe`, extracted whole. EXPECT its sha256 to equal `mcpb-smoke.json`'s `binary_sha256`.
   - **The desktop app (D1):** installed from the bundle's Windows installer. Record the installer's file name, size and sha256, and accept the unsigned-installer warning. The app's version reads as the release's, so the build is identified by the installer's sha256 and the run's head, not by the version.

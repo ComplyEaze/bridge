@@ -2608,32 +2608,41 @@ fn saved_captured_batch(server: &Server) -> Value {
 }
 
 fn saved_captured_line(server: &Server) -> ImportLedgerLine {
-    saved_line_as(
-        server,
-        "bridge-6c79872c-aab6-4be5-a181-18182c8148be",
-        "BRIDGE_MCP_LIVE_20260906_A1",
-    )
+    saved_captured_line_edited(server, |_| {})
 }
 
 /// The captured batch saved under `batch_id`, its one voucher's transaction id
 /// `txn_id`: the same voucher content, another row.
 fn saved_line_as(server: &Server, batch_id: &str, txn_id: &str) -> ImportLedgerLine {
+    saved_captured_line_edited(server, |line| {
+        line.batch_id = batch_id.to_string();
+        line.txn_ids = vec![txn_id.to_string()];
+        line.vouchers[0].bridge_txn_id = txn_id.to_string();
+    })
+}
+
+/// The captured batch, with `edit` applied before it is rendered and saved.
+fn saved_captured_line_edited(
+    server: &Server,
+    edit: impl FnOnce(&mut ImportLedgerLine),
+) -> ImportLedgerLine {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
-        "batch_id":batch_id, "identity_scheme":"batch_v1",
+        "batch_id":"bridge-6c79872c-aab6-4be5-a181-18182c8148be", "identity_scheme":"batch_v1",
         "company_guid":GUID,
         "endpoint_origin":origin,
         "company":{"name":"WR2 Unicode Lab","guid":GUID,"company_number":"100004","books_from":"20260401"},
-        "txn_ids":[txn_id],"date_from":"20260907","date_to":"20260907",
+        "txn_ids":["BRIDGE_MCP_LIVE_20260906_A1"],"date_from":"20260907","date_to":"20260907",
         "sha256":"", "built_at":"2026-09-06T21:40:26.641Z", "status":"built", "on_account_approved":[],
         "pre_import_mark":{"kind":"company_high_water","value":8,"master_value":7},
-        "vouchers":[{"bridge_txn_id":txn_id,"date":"20260907",
+        "vouchers":[{"bridge_txn_id":"BRIDGE_MCP_LIVE_20260906_A1","date":"20260907",
             "voucher_type":"Journal","narration":"Bridge MCP batch namespace qualification",
             "reference":null,"voucher_number":null,
             "entries":[{"ledger":"Bridge Nested Debtor WR4","amount":"12.61","side":"Dr"},
                 {"ledger":"Cash","amount":"12.61","side":"Cr"}]}]
     }))
     .unwrap();
+    edit(&mut line);
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
     line.sha256 = sha256_hex(rendered.as_bytes());
     bind_to_captured_catalogue(&mut line);
@@ -8085,8 +8094,11 @@ async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
 /// before, one create, 11 after), then a restore puts the book back at 10, and
 /// a second batch B, of the same company at the same address, is posted with
 /// no verification between. B's aim reads 10, below the floor 11 that A had
-/// proved. Returns B's response and the journal's records.
-async fn post_after_a_restore(fail_the_record: bool) -> (Value, Vec<Value>, usize) {
+/// proved. Returns B's response, the journal's records, how many import
+/// requests B's simulator saw, A's batch id, and B's approval lapse note.
+async fn post_after_a_restore(
+    fail_the_record: bool,
+) -> (Value, Vec<Value>, usize, String, Option<Value>) {
     // A: the whole native post, read back.
     let mut plans = before_approval();
     plans.extend(after_approval(xml(created_one())));
@@ -8096,6 +8108,7 @@ async fn post_after_a_restore(fail_the_record: bool) -> (Value, Vec<Value>, usiz
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let first = saved_captured_batch(&server);
+    let first_batch = first["batch_id"].as_str().unwrap().to_string();
     let posted = SCRIPTED_APPROVAL
         .scope(
             ScriptedApproval::approving(),
@@ -8163,7 +8176,8 @@ async fn post_after_a_restore(fail_the_record: bool) -> (Value, Vec<Value>, usiz
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
         .collect::<Vec<_>>();
     assert!(records.len() > records_before);
-    (response, records, posts)
+    let lapse = later.post_approvals.lapse_note(&second.batch_id);
+    (response, records, posts, first_batch, lapse)
 }
 
 /// The record is written before B's dispatch intent, on A (the batch it
@@ -8171,8 +8185,9 @@ async fn post_after_a_restore(fail_the_record: bool) -> (Value, Vec<Value>, usiz
 /// count from before that read; B is sent, and its answer names A as covered.
 #[tokio::test]
 async fn a_restore_the_posts_aim_reads_is_recorded_before_its_intent() {
-    let (response, records, posts) = post_after_a_restore(false).await;
-    let first_batch = "bridge-6c79872c-aab6-4be5-a181-18182c8148be";
+    let (response, records, posts, first_batch, lapse) = post_after_a_restore(false).await;
+    // The approval was spent on the send: nothing lapsed.
+    assert!(lapse.is_none(), "{lapse:?}");
     let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
     assert_eq!(posts, 1, "B was sent once: {response}");
     let seen = records
@@ -8207,7 +8222,14 @@ async fn a_restore_the_posts_aim_reads_is_recorded_before_its_intent() {
 /// refusal: nothing is recorded for B and nothing is sent.
 #[tokio::test]
 async fn a_restore_the_post_cannot_record_refuses_it_with_nothing_sent() {
-    let (response, records, posts) = post_after_a_restore(true).await;
+    let (response, records, posts, _, lapse) = post_after_a_restore(true).await;
+    // Refused before the approval was spent: it lapsed unspent, so the next
+    // call asks the person again.
+    assert_eq!(
+        lapse.as_ref().map(|note| note["reason"].clone()),
+        Some(json!("post_refused_before_intent")),
+        "{lapse:?}"
+    );
     let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
     assert_eq!(posts, 0, "nothing was sent: {response}");
     assert_eq!(response["isError"], json!(true), "{response}");

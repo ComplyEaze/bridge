@@ -1333,6 +1333,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              copy of it in a folder of your own on this computer, then delete the original: moving \
              it keeps who can read it. Then run the parse again.",
         ),
+        "statement_csv_account_line_unmeasured" => Some(
+            "The CSV was read and its shape is the layout measured, but whether this bank's \
+             export prints an account number is not established, so nothing binds the file to an \
+             account and ComplyEaze Bridge proposed nothing. This tool cannot propose from a \
+             CSV yet. Where controls_source was this_file, the figures to check against are the \
+             file's own: derived, not independent. Nothing was sent to Tally.",
+        ),
         "empty_book_first_import" => Some(
             "This company has never held a voucher, so Tally reports no voucher high-water \
              mark and ComplyEaze Bridge has no \"before\" to attribute an import against, so it \
@@ -3003,7 +3010,10 @@ impl Server {
         if let Some(code) = self.terms.refusal() {
             return Err(code.to_string().into());
         }
-        if matches!(name, "build_import_xml" | "parse_bank_statement") {
+        if matches!(
+            name,
+            "build_import_xml" | "parse_bank_statement" | "parse_bank_statement_csv"
+        ) {
             self.import_enabled()?;
         }
         if matches!(name, "post_import" | "acknowledge_post_review")
@@ -3073,6 +3083,7 @@ impl Server {
                 self.import_enabled()?;
                 self.parse_bank_statement(args).await
             }
+            "parse_bank_statement_csv" => self.parse_bank_statement_csv(args).await,
             "post_import" => self.post_import(args).await,
             "post_ledger_creates" => self.post_ledger_creates(args).await,
             "prepare_ledger_creates" => self.prepare_ledger_creates(args).await,

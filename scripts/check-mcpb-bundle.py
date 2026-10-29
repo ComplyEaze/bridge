@@ -57,6 +57,7 @@ DEFAULT_TOOLS = {
 IMPORT_TOOLS = {
     "build_import_xml",
     "parse_bank_statement",
+    "parse_bank_statement_csv",
 }
 POSTING_TOOLS = {
     "acknowledge_post_review",

@@ -1806,10 +1806,13 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// per-cost-centre summary of #1231 (about +150 in every list) and the settlement
 /// text of #1709 (about +260 in the three lists with posting on). Every budget was
 /// raised by 1,000 bytes once, for both.
-/// On 29 Oct 2026 `parse_bank_statement_csv` (#1320) added about 2,000 bytes to every
-/// list (its description, its two-field schema and its annotations). With it the lists
-/// measured 204,552, 230,055, 232,553 and 237,526 bytes, so each budget was raised to
-/// that measure plus at least 500 bytes, rounded up to a thousand.
+/// On 29 Oct 2026 `parse_bank_statement_csv` (#1320) added 2,040 bytes to every list: its
+/// entry is 2,039 bytes (name 26, description 1,261, input schema 608, annotations 90 and 54
+/// of JSON keys and punctuation) and a comma is 1. Master measured 202,506, 228,009, 230,507
+/// and 235,480 bytes, so with it the lists measure 204,546, 230,049, 232,547 and 237,520.
+/// Each budget went up by those 2,040 bytes and by the rise of its margin to the next
+/// thousand: 3,000, 2,000, 3,000 and 3,000 (margins 494, 991, 493 and 520 before; 1,454,
+/// 951, 1,453 and 1,480 after).
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [206_000, 231_000, 234_000, 239_000];

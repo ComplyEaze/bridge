@@ -1333,9 +1333,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              copy of it in a folder of your own on this computer, then delete the original: moving \
              it keeps who can read it. Then run the parse again.",
         ),
-        "statement_no_account_number_line" => Some(
-            "The CSV was read and its shape is the layout measured, but nothing in it binds it to \
-             an account, so ComplyEaze Bridge proposed nothing. This tool cannot propose from a \
+        "statement_csv_account_line_unmeasured" => Some(
+            "The CSV was read and its shape is the layout measured, but whether this bank's \
+             export prints an account number is not established, so nothing binds the file to an \
+             account and ComplyEaze Bridge proposed nothing. This tool cannot propose from a \
              CSV yet. Where controls_source was this_file, the figures to check against are the \
              file's own: derived, not independent. Nothing was sent to Tally.",
         ),

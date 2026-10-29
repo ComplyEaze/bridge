@@ -1140,8 +1140,11 @@ csv_refusals! {
 
 /// A file that reads is still refused: whether the real export prints an
 /// account number is not established, so nothing can bind the file to an
-/// account and nothing is proposed (#1320).
-pub(super) const NO_ACCOUNT_NUMBER_LINE: &str = "statement_no_account_number_line";
+/// account and nothing is proposed (#1320). This is the CSV shell's own code,
+/// not the PDF tool's `statement_no_account_number_line`: that one says a
+/// statement prints no account line, this one says the line was never looked
+/// for.
+pub(super) const CSV_ACCOUNT_LINE_UNMEASURED: &str = "statement_csv_account_line_unmeasured";
 const CSV_REFUSAL_UNMAPPED: &str = "statement_csv_refusal_unmapped";
 /// The cause of a refusal under `controls_source` `this_file`: the figures to
 /// check against are the file's own, derived, not independent.
@@ -1158,7 +1161,7 @@ pub(super) fn input_schema_csv() -> Value {
     })
 }
 
-pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export (UTF-8, LF line ends, every field double-quoted), and check its shape: the header line, the Sl. No. run, the dates, the amounts, the direction cells and the Closing Balance line, which must equal the last row's balance. Any other file is refused, never guessed: the error code is statement_<category>, with :row_N when a row is at fault (one of fifteen shape categories, such as layout_unknown or closing_balance_differs). controls_source (prior_statement, bank_ledger_in_tally or this_file) says where the figures to check against come from; this_file is derived, not independent, because a chain that starts and ends on the file's own balances always agrees, so a truncated export would pass. This tool proposes nothing yet: whether the export prints an account number is not established, so a file that reads is refused as statement_no_account_number_line (with this_file the refusal's cause is controls_this_file_derived_not_independent). No row value is returned.";
+pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export (UTF-8, LF line ends, every field double-quoted), and check its shape: the header line, the Sl. No. run, the dates, the amounts, the direction cells, and that the Closing Balance line equals the last row's balance. Any other file is refused, never guessed: the error code is statement_<category>, with :row_N where a row is at fault (one of fifteen shape categories, such as layout_unknown or closing_balance_differs). controls_source (prior_statement, bank_ledger_in_tally or this_file) says where the opening and closing figures to check against come from. this_file means the file's own first and last balance, which cannot show that rows are missing: it is not an independent control, and the refusal's cause says so (controls_this_file_derived_not_independent). This tool proposes nothing yet: whether the export prints an account number is not established, so a file that reads is refused as statement_csv_account_line_unmeasured. No row value is returned.";
 
 /// The admitted arguments of `parse_bank_statement_csv`.
 struct CsvRequest {
@@ -1186,10 +1189,17 @@ fn csv_failure(refusal: &Refusal) -> ToolFailure {
     code.into()
 }
 
+/// The statement's bytes, read to the edge reader's own size bound and no
+/// further: one more byte is `statement_file_too_large`, as the reader's own
+/// bound would give.
+fn read_csv_file(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
+    read_statement(path, csv_edge::MAX_FILE_BYTES)
+}
+
 /// Every run ends in a refusal until the account line exists, so the result is
 /// the failure itself, not a `Result` with a success nothing can build.
 fn run_csv(request: &CsvRequest) -> ToolFailure {
-    let bytes = match read_statement(&request.statement_path, csv_edge::MAX_FILE_BYTES) {
+    let bytes = match read_csv_file(&request.statement_path) {
         Ok(bytes) => bytes,
         Err(code) => return code.into(),
     };
@@ -1197,7 +1207,7 @@ fn run_csv(request: &CsvRequest) -> ToolFailure {
         Err(refusal) => csv_failure(&refusal),
         Ok(_) => ToolFailure {
             cause: request.controls_source.independence_cause(),
-            ..NO_ACCOUNT_NUMBER_LINE.to_string().into()
+            ..CSV_ACCOUNT_LINE_UNMEASURED.to_string().into()
         },
     }
 }

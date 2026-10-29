@@ -2730,12 +2730,12 @@ Takes `statement_path` (a local file, under the path rules of `parse_bank_statem
 (`prior_statement`, `bank_ledger_in_tally` or `this_file`), and reads the file with the CSV edge reader of the
 `bridge-bank-statement` crate, which accepts one private bank's export layout and nothing else. A file the reader
 refuses is refused with its category as the error code, `statement_<category>` and `:row_N` where a row is at fault; there
-are fifteen categories, each its own code. A file that reads is still refused, as `statement_no_account_number_line`:
+are fifteen categories, each its own code. A file that reads is still refused, as `statement_csv_account_line_unmeasured` (not the PDF tool's `statement_no_account_number_line`, which says a statement prints no account line):
 whether that export prints an account number is not established, so nothing binds a file to an account and nothing is
 proposed. With `controls_source` `this_file` the refusal's `cause` is `controls_this_file_derived_not_independent` and its next step says "derived, not independent": the
-file's first and last balance close any chain of its own, so a truncated export would pass. `controls_source` is
-checked before the file is opened and ComplyEaze Bridge cannot verify the claim. The tool writes no file and returns no
-row value. Part of #1320; the account line and the proposals follow once the export's account line is measured.
+file's own first and last balance cannot show that rows are missing, so they are not an independent control. `controls_source` is
+checked before the file is opened and ComplyEaze Bridge cannot verify the claim. The tool writes nothing to Tally or beside the statement
+(like every read tool it adds receipt lines to the local log) and returns no row value. Part of #1320; the account line and the proposals follow once the export's account line is measured.
 
 ### Statement tie-out (`statement_tie_out`)
 

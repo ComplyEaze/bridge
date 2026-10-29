@@ -267,7 +267,7 @@ async fn controls_source_is_required_and_only_the_three_values_are_admitted() {
         );
     }
     // Refused before the file is looked at: the path does not exist.
-    let absent = never_opened_csv();
+    let absent = absent_in(directory.path());
     let response = call(
         directory.path(),
         json!({"statement_path": absent, "controls_source": "someone_said_so"}),
@@ -315,7 +315,8 @@ fn controls_source_parse_admits_exactly_the_three_values_and_nothing_else() {
     ] {
         assert_eq!(ControlsSource::parse(wrong), None, "{wrong:?}");
     }
-    let path = never_opened_csv();
+    let directory = tempfile::tempdir().unwrap();
+    let path = absent_in(directory.path());
     for wrong in ["prior", "THIS_FILE", "someone_said_so"] {
         let refused =
             CsvRequest::from_args(&json!({"statement_path": path, "controls_source": wrong}))
@@ -339,15 +340,17 @@ fn controls_source_parse_admits_exactly_the_three_values_and_nothing_else() {
     }
 }
 
-fn never_opened_csv() -> String {
-    std::env::temp_dir()
-        .join("bridge-never-opened-statement.csv")
-        .to_string_lossy()
-        .into_owned()
+/// A path in the test's own directory where no file exists.
+fn absent_in(directory: &Path) -> String {
+    directory
+        .join("absent-statement.csv")
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 #[tokio::test]
-async fn a_file_that_reads_is_refused_for_want_of_an_account_line_and_this_file_is_labelled() {
+async fn a_file_that_reads_is_refused_for_an_unmeasured_account_line_and_this_file_is_labelled() {
     let directory = tempfile::tempdir().unwrap();
     let path = written(directory.path(), "statement.csv", &good());
     for (source, label) in [
@@ -363,7 +366,11 @@ async fn a_file_that_reads_is_refused_for_want_of_an_account_line_and_this_file_
             json!({"statement_path": path, "controls_source": source}),
         )
         .await;
-        assert_eq!(code_of(&response), Some(NO_ACCOUNT_NUMBER_LINE), "{source}");
+        assert_eq!(
+            code_of(&response),
+            Some(CSV_ACCOUNT_LINE_UNMEASURED),
+            "{source}"
+        );
         assert_eq!(error_of(&response)["cause"].as_str(), label, "{source}");
         assert!(
             error_of(&response)["remediation"].is_string(),
@@ -384,14 +391,86 @@ async fn a_small_response_budget_drops_the_cause_and_keeps_the_code() {
     let small = server_with_budget(directory.path(), true, REMEDIATION_MIN_RESPONSE_BUDGET - 1)
         .call_tool("parse_bank_statement_csv", args.clone())
         .await;
-    assert_eq!(code_of(&small), Some(NO_ACCOUNT_NUMBER_LINE));
+    assert_eq!(code_of(&small), Some(CSV_ACCOUNT_LINE_UNMEASURED));
     assert!(error_of(&small).get("cause").is_none(), "{small}");
     assert!(error_of(&small).get("remediation").is_none(), "{small}");
     let roomy = server_with_budget(directory.path(), true, REMEDIATION_MIN_RESPONSE_BUDGET)
         .call_tool("parse_bank_statement_csv", args)
         .await;
-    assert_eq!(code_of(&roomy), Some(NO_ACCOUNT_NUMBER_LINE));
+    assert_eq!(code_of(&roomy), Some(CSV_ACCOUNT_LINE_UNMEASURED));
     assert_eq!(error_of(&roomy)["cause"].as_str(), Some(THIS_FILE_CAUSE));
+}
+
+/// The bound is the edge reader's: exactly that many bytes reach the reader
+/// (and are refused for their content), one more is too large. The reader's
+/// own bound is 32 MiB (`MAX_PDF_BYTES`), so a file read to that bound instead
+/// would come back whole and these two assertions would swap.
+#[test]
+fn the_file_is_read_to_the_edge_readers_bound_and_no_further() {
+    let directory = tempfile::tempdir().unwrap();
+    let bound = csv_edge::MAX_FILE_BYTES;
+    let at_bound = LocalDiskPath::parse(&written(directory.path(), "at.csv", &vec![b'x'; bound]))
+        .expect("an absolute local path");
+    let past_bound = LocalDiskPath::parse(&written(
+        directory.path(),
+        "past.csv",
+        &vec![b'x'; bound + 1],
+    ))
+    .expect("an absolute local path");
+    assert_eq!(read_csv_file(&at_bound).map(|bytes| bytes.len()), Ok(bound));
+    assert_eq!(
+        read_csv_file(&past_bound),
+        Err("statement_file_too_large".to_string())
+    );
+}
+
+/// Through the tool: a file of exactly the bound is judged on its content, and
+/// one byte more is refused for its size, each under its own typed code.
+#[tokio::test]
+async fn a_file_at_the_bound_is_read_and_one_byte_more_is_too_large() {
+    let directory = tempfile::tempdir().unwrap();
+    let bound = csv_edge::MAX_FILE_BYTES;
+    for (size, expected) in [
+        (bound, "statement_layout_unknown"),
+        (bound + 1, "statement_file_too_large"),
+    ] {
+        let path = written(directory.path(), "sized.csv", &vec![b'x'; size]);
+        let response = call(
+            directory.path(),
+            json!({"statement_path": path, "controls_source": "prior_statement"}),
+        )
+        .await;
+        assert_eq!(code_of(&response), Some(expected), "{size} bytes");
+    }
+}
+
+/// The CSV shell's code is its own: the PDF tool returns
+/// `statement_no_account_number_line`, whose next step must not mention CSV or
+/// `controls_source`, and the CSV code's next step is the new one.
+#[tokio::test]
+async fn the_csv_code_has_its_own_next_step_and_the_pdf_codes_has_none_of_it() {
+    const PDF_CODE: &str = "statement_no_account_number_line";
+    for forbidden in ["CSV", "controls_source"] {
+        assert!(
+            !refusal_remediation(PDF_CODE).is_some_and(|text| text.contains(forbidden)),
+            "{forbidden}"
+        );
+    }
+    // As master has it: no next step of its own for the PDF code.
+    assert_eq!(refusal_remediation(PDF_CODE), None);
+    let csv = refusal_remediation(CSV_ACCOUNT_LINE_UNMEASURED).expect("a next step");
+    assert!(csv.contains("CSV") && csv.contains("controls_source"));
+    // Through the response the PDF tool gives for the PDF code.
+    let directory = tempfile::tempdir().unwrap();
+    let response = server(directory.path(), true).finish_tool_response(
+        "parse_bank_statement",
+        &json!({}),
+        Utc::now(),
+        Err(ToolFailure::from(PDF_CODE.to_string())),
+    );
+    let error = &response.value["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], PDF_CODE);
+    assert!(error.get("remediation").is_none(), "{error}");
 }
 
 #[tokio::test]
@@ -439,7 +518,7 @@ async fn the_path_rules_are_the_pdf_tools_and_unknown_arguments_are_refused() {
     let response = call(
         directory.path(),
         json!({
-            "statement_path": never_opened_csv(),
+            "statement_path": absent_in(directory.path()),
             "controls_source": "this_file",
             "account_label": "Synthetic CA xx4321"
         }),

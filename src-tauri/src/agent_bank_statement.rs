@@ -35,6 +35,7 @@ use crate::local_files::local_disk_path::LocalDiskPath;
 use bridge_bank_statement::bank::Bank;
 use bridge_bank_statement::bank::BankReference;
 use bridge_bank_statement::cash::{CashAnswer, CashAnswerRow, CashAnswers, CashMovement};
+use bridge_bank_statement::csv_edge;
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::money::Controls;
@@ -320,10 +321,10 @@ fn read_password(path: &LocalDiskPath) -> Result<Zeroizing<String>, String> {
     Ok(Zeroizing::new(text.to_string()))
 }
 
-fn read_statement(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
+fn read_statement(path: &LocalDiskPath, limit: usize) -> Result<Vec<u8>, String> {
     let file = local_file::open_local_file(path.as_path(), false)
         .map_err(|_| "statement_file_unreadable".to_string())?;
-    let limit = MAX_PDF_BYTES as u64;
+    let limit = limit as u64;
     let mut bytes = Vec::new();
     file.take(limit + 1)
         .read_to_end(&mut bytes)
@@ -359,7 +360,7 @@ fn pdfium_library() -> Result<PathBuf, String> {
 
 fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Value, String> {
     // Everything that can be refused without the PDF was refused already.
-    let bytes = read_statement(&request.statement_path)?;
+    let bytes = read_statement(&request.statement_path, MAX_PDF_BYTES)?;
     let text = {
         let password = read_password(&request.password_file)?;
         let engine = pdf::engine(&pdfium_library()?).map_err(|refusal| refused(&refusal))?;
@@ -1066,6 +1067,167 @@ pub(super) fn resolve_import_arguments(
     })
 }
 
+/// Where the opening and closing figures a CSV statement is checked against
+/// come from (#1320). The caller says; nothing here can verify it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ControlsSource {
+    PriorStatement,
+    BankLedgerInTally,
+    ThisFile,
+}
+
+impl ControlsSource {
+    fn parse(text: &str) -> Option<Self> {
+        match text {
+            "prior_statement" => Some(Self::PriorStatement),
+            "bank_ledger_in_tally" => Some(Self::BankLedgerInTally),
+            "this_file" => Some(Self::ThisFile),
+            _ => None,
+        }
+    }
+
+    /// Only the file's own first and last balance is not an independent
+    /// control: a chain that starts and ends on them always agrees with itself,
+    /// so a truncated export would pass. The cause is a code, like every
+    /// `ToolFailure` cause, and is data-free.
+    fn independence_cause(self) -> Option<&'static str> {
+        (self == Self::ThisFile).then_some(THIS_FILE_CAUSE)
+    }
+}
+
+macro_rules! csv_refusals {
+    ($($variant:ident = $category:literal),+ $(,)?) => {
+        /// The refusal categories of `csv_edge::read_statement`, one variant
+        /// each. The crate exports no list of its categories, so nothing fails
+        /// to compile or test when it adds one: a category outside this list is
+        /// refused at run time as unmapped, never forwarded. The fixtures in
+        /// the tests catch a variant that is dead or renamed.
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub(super) enum CsvRefusal { $($variant),+ }
+
+        impl CsvRefusal {
+            #[cfg(test)]
+            pub(super) const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            pub(super) fn category(self) -> &'static str {
+                match self { $(Self::$variant => $category),+ }
+            }
+
+            fn from_category(category: &str) -> Option<Self> {
+                match category { $($category => Some(Self::$variant),)+ _ => None }
+            }
+        }
+    };
+}
+
+csv_refusals! {
+    FileTooLarge = "file_too_large",
+    EncodingUnsupported = "encoding_unsupported",
+    LayoutUnknown = "layout_unknown",
+    MalformedRow = "malformed_row",
+    SerialBroken = "serial_broken",
+    UnparseableDate = "unparseable_date",
+    DateOrderBroken = "date_order_broken",
+    MalformedAmount = "malformed_amount",
+    MalformedBalance = "malformed_balance",
+    DirectionUnknown = "direction_unknown",
+    ClosingBalanceUnreadable = "closing_balance_unreadable",
+    ClosingBalanceDiffers = "closing_balance_differs",
+    TrailerMissing = "trailer_missing",
+    TrailerUnexpected = "trailer_unexpected",
+    EmptyStatement = "empty_statement",
+}
+
+/// A file that reads is still refused: whether the real export prints an
+/// account number is not established, so nothing can bind the file to an
+/// account and nothing is proposed (#1320). This is the CSV shell's own code,
+/// not the PDF tool's `statement_no_account_number_line`: that one says a
+/// statement prints no account line, this one says the line was never looked
+/// for.
+pub(super) const CSV_ACCOUNT_LINE_UNMEASURED: &str = "statement_csv_account_line_unmeasured";
+const CSV_REFUSAL_UNMAPPED: &str = "statement_csv_refusal_unmapped";
+/// The cause of a refusal under `controls_source` `this_file`: the figures to
+/// check against are the file's own, derived, not independent.
+const THIS_FILE_CAUSE: &str = "controls_this_file_derived_not_independent";
+
+pub(super) fn input_schema_csv() -> Value {
+    json!({
+        "type":"object", "additionalProperties":false,
+        "required":["statement_path","controls_source"],
+        "properties":{
+            "statement_path":{"type":"string","minLength":1,"maxLength":MAX_PATH_CHARS,"pattern":r"\S","description":"The path of the CSV bank statement on this computer."},
+            "controls_source":{"type":"string","enum":["prior_statement","bank_ledger_in_tally","this_file"],"description":"Where the opening and closing figures to check the file against come from: the previous statement, the bank ledger in Tally, or this file itself. A Tally ledger built from these same statements counts as this_file. Not verified here."}
+        }
+    })
+}
+
+pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export (UTF-8, LF line ends, every field double-quoted), and check its shape: the header line, the Sl. No. run, the dates, the amounts, the direction cells, and that the Closing Balance line equals the last row's balance. Any other file is refused, never guessed: the error code is statement_<category>, with :row_N where a row is at fault (one of fifteen shape categories, such as layout_unknown or closing_balance_differs). controls_source (prior_statement, bank_ledger_in_tally or this_file) says where the opening and closing figures to check against come from. this_file means the file's own first and last balance, which cannot show that rows are missing: it is not an independent control, and the refusal's cause says so (controls_this_file_derived_not_independent). This tool proposes nothing yet: whether the export prints an account number is not established, so a file that reads is refused as statement_csv_account_line_unmeasured. No row value is returned.";
+
+/// The admitted arguments of `parse_bank_statement_csv`.
+struct CsvRequest {
+    statement_path: LocalDiskPath,
+    controls_source: ControlsSource,
+}
+
+impl CsvRequest {
+    fn from_args(args: &Value) -> Result<Self, String> {
+        let controls_source = ControlsSource::parse(required_string(args, "controls_source")?)
+            .ok_or_else(|| "argument_invalid:controls_source".to_string())?;
+        Ok(Self {
+            statement_path: local_disk_path(args, "statement_path")?,
+            controls_source,
+        })
+    }
+}
+
+fn csv_failure(refusal: &Refusal) -> ToolFailure {
+    let code = match (CsvRefusal::from_category(refusal.category), refusal.row) {
+        (None, _) => CSV_REFUSAL_UNMAPPED.to_string(),
+        (Some(kind), Some(row)) => format!("statement_{}:row_{row}", kind.category()),
+        (Some(kind), None) => format!("statement_{}", kind.category()),
+    };
+    code.into()
+}
+
+/// The statement's bytes, read to the edge reader's own size bound and no
+/// further: one more byte is `statement_file_too_large`, as the reader's own
+/// bound would give.
+fn read_csv_file(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
+    read_statement(path, csv_edge::MAX_FILE_BYTES)
+}
+
+/// Every run ends in a refusal until the account line exists, so the result is
+/// the failure itself, not a `Result` with a success nothing can build.
+fn run_csv(request: &CsvRequest) -> ToolFailure {
+    let bytes = match read_csv_file(&request.statement_path) {
+        Ok(bytes) => bytes,
+        Err(code) => return code.into(),
+    };
+    match csv_edge::read_statement(&bytes) {
+        Err(refusal) => csv_failure(&refusal),
+        Ok(_) => ToolFailure {
+            cause: request.controls_source.independence_cause(),
+            ..CSV_ACCOUNT_LINE_UNMEASURED.to_string().into()
+        },
+    }
+}
+
+impl Server {
+    pub(super) async fn parse_bank_statement_csv(
+        &self,
+        args: &Value,
+    ) -> Result<ToolOutcome, ToolFailure> {
+        let request = CsvRequest::from_args(args)?;
+        Err(tokio::task::spawn_blocking(move || run_csv(&request))
+            .await
+            .unwrap_or_else(|_| "statement_task_failed".to_string().into()))
+    }
+}
+
 #[cfg(test)]
 #[path = "agent_bank_statement_tests.rs"]
 pub(super) mod tests;
+
+#[cfg(test)]
+#[path = "agent_bank_statement_csv_tests.rs"]
+mod csv_tests;

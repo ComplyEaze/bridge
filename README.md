@@ -64,7 +64,7 @@ update itself, so look for a newer version on the
 
 "You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.7.0 file against TallyPrime (the program inside the published Windows x64 0.6.1 file (checked against its `.sha256` file) had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 27 October 2026, started directly by our test client rather than installed in Claude Desktop; it reported version 0.6.1, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted); the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
-**Its tools.** In name order; release 0.7.0 installs 33 of them, 32 offered by default (`audit_test_run` appears only when its setting is on). None of them changes your TallyPrime books; with posting on, two more appear, and with posting and master writes both on, two more again that create one ledger, described below the table. Every call adds a receipt line,
+**Its tools.** In name order; release 0.7.0 installs 34 of them, 33 offered by default (`audit_test_run` appears only when its setting is on). None of them changes your TallyPrime books; with posting on, two more appear, and with posting and master writes both on, two more again that create one ledger, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -88,6 +88,7 @@ with no figures, to a log on this computer.
 | `negative_stock` | Tally’s own Negative Stock list for a window, each item with its quantity, rate and value as Tally prints them, compared with no other report; being listed is not a finding, and an empty answer is not one either | Nothing |
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
 | `parse_bank_statement` | Reads a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
+| `parse_bank_statement_csv` | Reads a bank's own CSV statement export in the one layout measured, and refuses every file with a named reason; it proposes no vouchers yet | Nothing |
 | `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is read only when Tally’s own closing stock closes every gap) | Nothing |
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |

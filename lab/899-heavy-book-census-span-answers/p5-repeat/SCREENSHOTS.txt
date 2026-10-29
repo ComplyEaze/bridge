@@ -1,0 +1,8 @@
+Captures of this sitting, by name, size and sha256. They stay on the lab PC (whole-window captures show THE BOOK) until step 9.
+c10-tally.png 72674 B ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf
+m0-after.png 49622 B ab8d2416c84e0bafdaca45207edec2eeb0c3fa076192091990387809f55f817f
+m1-after.png 48576 B cd3c492535f81ba732ae06f4d323dc2f7fcda57e4dcd746584aed3c2dbd17494
+p0-tally.png 72674 B ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf
+p1-tally.png 37047 B 01c0401e945b27ede5048d441d73b765a2a5445fc33f2341a6e1df7ed0de2017
+pause-path-restored.png 72685 B 867e9f17cc2d057121a4c914a3d9a6feabdb9b7d4b1c214834c929b9a9e266dc
+s1-after.png 48576 B cd3c492535f81ba732ae06f4d323dc2f7fcda57e4dcd746584aed3c2dbd17494

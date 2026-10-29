@@ -1,0 +1,7 @@
+m0 request_bytes=1026 start=2026-10-29T12:49:47.346Z end=2026-10-29T12:49:48.883Z curl_exit=0 printed='200 3458 1026 0.002963 0.008653 0.018069' content_length=3458 bytes=3458 sha256=a4fc75b3d5287a7f1417f8e01d9d586956ddac3ebb5ed3275a82856762ab748b
+m0 GET /status 2026-10-29T12:49:51.629Z exit 0 printed 200 51
+s1 request_bytes=1588 start=2026-10-29T12:50:20.011Z end=2026-10-29T12:53:33.065Z curl_exit=0 printed='200 139664 1588 0.004783 192.769979 192.771602' content_length=139664 bytes=139664 sha256=40dd377132559bc402f1ed980adcdab8c4d17ce0a267a20b2b9d045a24a73023
+s1 GET /status 2026-10-29T12:53:34.415Z exit 0 printed 200 51
+s1 width 250 census_read exit 0: census ok bytes 139664 rows 39 rows_missing_a_field 0 rows_outside_span 0 repeated_guids 0 min_alterid_offset 208 max_alterid_offset 250
+m1 request_bytes=1026 start=2026-10-29T12:53:50.969Z end=2026-10-29T12:53:51.118Z curl_exit=0 printed='200 3458 1026 0.001400 0.003151 0.004614' content_length=3458 bytes=3458 sha256=a4fc75b3d5287a7f1417f8e01d9d586956ddac3ebb5ed3275a82856762ab748b
+m1 GET /status 2026-10-29T12:53:52.322Z exit 0 printed 200 51

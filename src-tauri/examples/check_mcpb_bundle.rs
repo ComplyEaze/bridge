@@ -119,6 +119,7 @@ fn os_error(error: std::io::Error) -> Failure {
         match error.kind() {
             std::io::ErrorKind::NotFound => "FileNotFoundError",
             std::io::ErrorKind::PermissionDenied => "PermissionError",
+            std::io::ErrorKind::BrokenPipe => "BrokenPipeError",
             _ => "OSError",
         }
         .to_string(),
@@ -716,6 +717,7 @@ pub fn run_bounded(
     let exceeded = Arc::new(AtomicBool::new(false));
     let reader = |stream: Box<dyn Read + Send>| {
         let exceeded = Arc::clone(&exceeded);
+        let (sender, receiver) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let mut collected = Vec::new();
             let _ = stream
@@ -724,14 +726,18 @@ pub fn run_bounded(
             if collected.len() > MAX_OUTPUT_BYTES {
                 exceeded.store(true, Ordering::SeqCst);
             }
-            collected
-        })
+            let _ = sender.send(collected);
+        });
+        receiver
     };
     let stdout = reader(Box::new(process.stdout.take().expect("piped stdout")));
     let stderr = reader(Box::new(process.stderr.take().expect("piped stderr")));
-    if let Some(mut stdin) = process.stdin.take() {
-        let _ = stdin.write_all(payload);
-    }
+    // Dropped at the end of the statement, which closes the server's stdin. Python raises a write error
+    // (a server that closed its stdin early gives BrokenPipeError) once the process has ended.
+    let written = process
+        .stdin
+        .take()
+        .map_or(Ok(()), |mut stdin| stdin.write_all(payload));
     let deadline = Instant::now() + timeout;
     let status = loop {
         if exceeded.load(Ordering::SeqCst) {
@@ -747,14 +753,20 @@ pub fn run_bounded(
             None => std::thread::sleep(Duration::from_millis(10)),
         }
     };
-    let output = stdout.join().unwrap_or_default();
-    let diagnostics = stderr.join().unwrap_or_default();
+    written.map_err(os_error)?;
+    // Each reader is waited for one second, as Python's join(timeout=1): a stream still held open (by a
+    // process the server started) leaves its output unread, which Python reports as a KeyError.
+    let output = stdout.recv_timeout(Duration::from_secs(1)).ok();
+    let diagnostics = stderr.recv_timeout(Duration::from_secs(1)).ok();
     require(!exceeded.load(Ordering::SeqCst), "server_output_limit")?;
     require(
         status.success(),
         &format!("server_exit_failed:{}", exit_code(status)),
     )?;
-    Ok((output, diagnostics))
+    match (output, diagnostics) {
+        (Some(output), Some(diagnostics)) => Ok((output, diagnostics)),
+        _ => Err(Failure("KeyError".to_string())),
+    }
 }
 
 /// Python's `returncode`: the exit code, or minus the signal that ended the process.
@@ -1184,6 +1196,24 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
     })
 }
 
+/// The report as Python's `json.dumps(result, indent=2) + "\n"` prints it: every character outside ASCII
+/// escaped as `\uxxxx` (a UTF-16 pair above the first plane), which in JSON can only stand in a string.
+pub fn report_text(report: &Report) -> Checked<String> {
+    let pretty = serde_json::to_string_pretty(report).map_err(json_error)?;
+    let mut text = String::with_capacity(pretty.len() + 1);
+    for character in pretty.chars() {
+        if character.is_ascii() {
+            text.push(character);
+        } else {
+            for unit in character.encode_utf16(&mut [0; 2]) {
+                text.push_str(&format!("\\u{unit:04x}"));
+            }
+        }
+    }
+    text.push('\n');
+    Ok(text)
+}
+
 /// The repository this example was built from: `src-tauri/..`.
 fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1217,8 +1247,7 @@ fn run(arguments: &[String]) -> i32 {
         return 2;
     };
     let result = smoke(&archive, &repository()).and_then(|report| {
-        let mut text = serde_json::to_string_pretty(&report).map_err(json_error)?;
-        text.push('\n');
+        let mut text = report_text(&report)?;
         // Python writes the report in text mode, which ends each line with the host's line ending.
         if cfg!(windows) {
             text = text.replace('\n', "\r\n");

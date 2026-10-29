@@ -798,8 +798,136 @@ fn the_report_has_the_python_fields_in_the_python_order_and_layout() {
         a = "a".repeat(64),
         b = "b".repeat(64),
     );
-    assert_eq!(serde_json::to_string_pretty(&report).unwrap(), python);
+    assert_eq!(checker::report_text(&report).unwrap(), python + "\n");
     assert_eq!(checker::ARCHIVE_MEMBERS, 9);
+    // json.dumps escapes every character outside ASCII, a pair of escapes above the first plane.
+    let report = checker::Report {
+        server_version: "0.6.1-\u{e9}\u{1f600}".to_string(),
+        ..report
+    };
+    assert!(checker::report_text(&report)
+        .unwrap()
+        .contains("\"server_version\": \"0.6.1-\\u00e9\\ud83d\\ude00\","));
+}
+
+#[test]
+fn the_entry_point_must_be_a_string_under_bin() {
+    for entry in [json!(7), json!("lib/bridge_mcp")] {
+        let mut bundle = Bundle::valid();
+        bundle.manifest["server"]["entry_point"] = entry.clone();
+        let (result, _root) = unpack(&bundle, LIMITS);
+        assert_eq!(result, Err(failure("invalid_entry_point")), "{entry}");
+    }
+}
+
+#[test]
+fn the_launch_command_platform_and_legal_files_must_match() {
+    if !host_bundles_pdfium() {
+        return;
+    }
+    let other_command = |bundle: &mut Bundle| {
+        bundle.manifest["server"]["mcp_config"]["command"] = json!("${__dirname}/bin/other");
+    };
+    let arguments =
+        |bundle: &mut Bundle| bundle.manifest["server"]["mcp_config"]["args"] = json!(["--x"]);
+    let overrides = |bundle: &mut Bundle| {
+        bundle.manifest["server"]["mcp_config"]["platform_overrides"] = json!({"win32": {}});
+    };
+    let not_binary = |bundle: &mut Bundle| bundle.manifest["server"]["type"] = json!("node");
+    let platform =
+        |bundle: &mut Bundle| bundle.manifest["compatibility"]["platforms"] = json!(["linux"]);
+    let licence = |bundle: &mut Bundle| bundle.entry("LICENSE").bytes = b"another licence".to_vec();
+    let cases: [(&Change, &str); 6] = [
+        (&other_command, "launch_command_does_not_match_binary"),
+        (&arguments, "launch_command_does_not_match_binary"),
+        (&overrides, "launch_command_does_not_match_binary"),
+        (&not_binary, "launch_command_does_not_match_binary"),
+        (&platform, "archive_platform_mismatch"),
+        (&licence, "legal_resource_bytes_differ"),
+    ];
+    for (change, code) in cases {
+        let mut bundle = Bundle::valid();
+        change(&mut bundle);
+        let (result, _root) = unpack(&bundle, LIMITS);
+        assert_eq!(result, Err(failure(code)), "{code}");
+    }
+    // Empty arguments and overrides are allowed, as Python's `not config.get(...)`.
+    let mut bundle = Bundle::valid();
+    bundle.manifest["server"]["mcp_config"]["args"] = json!([]);
+    bundle.manifest["server"]["mcp_config"]["platform_overrides"] = json!({});
+    let (result, _root) = unpack(&bundle, LIMITS);
+    assert!(
+        !matches!(result, Err(Failure(ref code)) if code == "launch_command_does_not_match_binary")
+    );
+}
+
+#[test]
+fn the_tax_audit_setting_and_every_mapping_must_resolve() {
+    for (field, value) in [("default", json!(true)), ("type", json!("string"))] {
+        let mut broken = committed_manifest();
+        broken["user_config"]["enable_tax_audit_2026_10"][field] = value.clone();
+        assert_eq!(
+            checker::resolve_environment(&broken),
+            Err(failure("tax_audit_setting_must_be_boolean_and_off")),
+            "{field} {value}"
+        );
+    }
+    let mut broken = committed_manifest();
+    broken["server"]["mcp_config"]["env"]["BRIDGE_AGENT_ENABLE_TAX_AUDIT"] = json!("true");
+    assert_eq!(
+        checker::resolve_environment(&broken),
+        Err(failure("tax_audit_environment_mapping_mismatch"))
+    );
+    let mut broken = committed_manifest();
+    broken["server"]["mcp_config"]["env"]["BRIDGE_AGENT_REDACTION"] =
+        json!("${user_config.missing}");
+    assert_eq!(
+        checker::resolve_environment(&broken),
+        Err(failure("unresolved_environment_mapping"))
+    );
+}
+
+#[test]
+fn a_schema_receipt_must_be_prepared_for_this_response() {
+    let response = b"{}\n";
+    let digest = hex_sha256(response);
+    let prepared = json!({"record_type": "response_prepared", "tool": "voucher_schema", "receipt_id": "r",
+        "bytes_prepared": response.len(), "response_sha256": digest});
+    let completed = json!({"record_type": "stdio_write_completed", "receipt_id": "r",
+        "bytes_written": response.len(), "response_sha256": digest});
+    for (key, value) in [
+        ("tool", json!("vouchers")),
+        ("receipt_id", json!("")),
+        ("bytes_prepared", json!(1)),
+    ] {
+        let mut changed = prepared.clone();
+        changed[key] = value;
+        let raw = [
+            serde_json::to_vec(&changed).unwrap(),
+            b"\n".to_vec(),
+            serde_json::to_vec(&completed).unwrap(),
+        ]
+        .concat();
+        assert_eq!(
+            checker::validate_schema_receipts(&raw, response),
+            Err(failure("schema_egress_preparation_invalid")),
+            "{key}"
+        );
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn a_server_that_closes_its_input_early_is_a_broken_pipe() {
+    // More than a pipe holds, so the write is still waiting when the server closes its input.
+    let command = shell("exec 0<&-; sleep 1", "");
+    let result = checker::run_bounded(
+        &command,
+        &vec![b'x'; 1024 * 1024],
+        &host_environment(),
+        Duration::from_secs(60),
+    );
+    assert_eq!(result.map(|_| ()), Err(failure("BrokenPipeError")));
 }
 
 /// Scratch-folder removal: the folder holds the bundle's server binary, which Windows can keep locked for

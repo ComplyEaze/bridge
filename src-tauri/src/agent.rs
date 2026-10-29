@@ -1271,13 +1271,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // Only `derive_statements` raises it, under `profit_and_loss` and `balance_sheet`.
         "statement_trial_balance_row_inconsistent" => Some(
             "No statement figure was returned: ComplyEaze Bridge derives the statements only from \
-             Trial Balance rows that add up, and the row in `ledger` does not. Its opening plus the \
-             window's debit and credit differs from its closing by `gap`. On the lab's books such a \
-             row was a Closing Stock ledger whose closing balance was keyed in Tally: Tally keeps \
-             the opening in that ledger's closing and shows the keyed figure only as a debit. \
-             trial_balance returns the row as Tally sends it. Tell the user which ledger and the \
-             gap. The book did not change during the read, so retrying gives the same refusal. Do \
-             not retry.",
+             Trial Balance rows that add up, and the row in `ledger` does not. One of its amounts \
+             is empty, taken as zero for this check, and its opening plus the window's debit and \
+             credit then differs from its closing by `gap` (trial_balance shows the same row with \
+             `movements_differ_by`). On the lab's books such a row was a Closing Stock ledger whose \
+             closing balance was keyed in Tally: Tally keeps the opening in that ledger's closing \
+             and shows the change from it only as a debit. Tell the user which ledger and the gap. \
+             No change to the book was seen during the read, so retrying gives the same refusal. \
+             Do not retry.",
         ),
         "voucher_mark_contradiction" => Some(
             "Tally gave this company's voucher mark earlier in this check and then twice without it, \

@@ -764,7 +764,7 @@ fn wa1_payment_requests() -> Vec<Option<&'static str>> {
             'S' => None,
             'E' => Some("9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8"),
             'H' => Some("0930288f6eb531926d018cc4762288084831b8fad16a554e48fafbd694e245c2"),
-            'C' => Some("bad372eab88eed8009e302e573309d34aba6edf3fdb2da8a6b4bc2b1330ec7eb"),
+            'C' => Some("1d4b71cc24fe52cebb805ddf6f12442b0ae2717d381da01317e2631b5af9f748"),
             _ => Some("a29a7448361733300968450db07bbbbc0754fd8eac8901decc1fc94510bc6955"),
         })
         .collect()
@@ -1228,16 +1228,25 @@ fn d3_readback_of([extent, high_water, census, readback]: [&[u8]; 4]) -> Vec<Sce
         .collect()
 }
 
-/// The sha256 of each request that capture carried, in the same order; `None`
-/// for the status probe.
-fn d3_batch_requests() -> Vec<Option<&'static str>> {
+/// The census the 50-voucher batch's capture recorded at the mark 1,469, sent
+/// unspanned; no capture of its spanned request exists yet (#2145).
+const D3_BATCH_CENSUS: &str = "5a9690e84fef530985b2444a0bc66cd5784a4467571da04e31559c72c6ba11f1";
+
+/// The same day's census as the cancelled-voucher capture's call sends it now,
+/// spanned to its mark, (0, 1685]: the request the lab sent for #2145.
+const D3_CANCELLED_CENSUS: &str =
+    "74972264fcbc7171d14f24cc5ba403890c029ceec99429818c08b6b83a66d303";
+
+/// The sha256 of each request that capture carried, in the same order, with
+/// `census` for its census; `None` for the status probe.
+fn d3_batch_requests(census: &'static str) -> Vec<Option<&'static str>> {
     "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
         .chars()
         .map(|step| match step {
             'S' => None,
             'E' => Some("9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8"),
             'H' => Some("0930288f6eb531926d018cc4762288084831b8fad16a554e48fafbd694e245c2"),
-            'C' => Some("5a9690e84fef530985b2444a0bc66cd5784a4467571da04e31559c72c6ba11f1"),
+            'C' => Some(census),
             _ => Some("c25ed5f689596b2620c58f417af74217985fbbe54a12f2c317fd537f901ed85f"),
         })
         .collect()
@@ -1373,9 +1382,9 @@ async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
     // Every request Bridge sent is the one the capture answered.
     let requests = sent(simulator);
     let expected = [
-        d3_batch_requests(),
-        d3_batch_requests(),
-        d3_batch_requests(),
+        d3_batch_requests(D3_BATCH_CENSUS),
+        d3_batch_requests(D3_BATCH_CENSUS),
+        d3_batch_requests(D3_BATCH_CENSUS),
     ]
     .concat();
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
@@ -1459,7 +1468,7 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
 
     // Every request Bridge sent is the one the capture answered.
     let requests = sent(simulator);
-    let expected = d3_batch_requests();
+    let expected = d3_batch_requests(D3_CANCELLED_CENSUS);
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
     for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
         match expected {
@@ -1511,7 +1520,7 @@ fn l1_requests() -> Vec<Option<&'static str>> {
             'S' => None,
             'E' => Some("9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8"),
             'H' => Some("0930288f6eb531926d018cc4762288084831b8fad16a554e48fafbd694e245c2"),
-            'C' => Some("e58e009cb88cb483f89723370fcf89fb0de3aff7db29d1bccb41757826c3dc86"),
+            'C' => Some("094cb59c452fbcbebb4d9655fe4e86fa78290fd636a0fe9a9a8994b5a21b641b"),
             _ => Some("0fe49c89693f59aa011a488f86c2beb97b8f24a87cf32c2aa448e4c51f205418"),
         })
         .collect()
@@ -1822,7 +1831,7 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
         "{verified}"
     );
     let requests = sent(simulator);
-    let expected = d3_batch_requests();
+    let expected = d3_batch_requests(D3_CANCELLED_CENSUS);
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
     for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
         match expected {

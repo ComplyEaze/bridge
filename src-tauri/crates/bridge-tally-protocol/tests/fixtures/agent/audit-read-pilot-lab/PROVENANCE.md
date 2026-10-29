@@ -11,6 +11,11 @@ synthetic. Read-only: nothing was written to Tally.
   rendered by the audit read's own functions at the time and sent by curl, not by Bridge's transport.
 - Item 697-S1, 21 Oct 2026: the census of the same window. Evidence branch `lab/697-s1-1605-s1-answers` at `ba4e119e9b5d`
   (`lab-evidence/697-s1-census/`; `MANIFEST.txt` lists the hashes).
+- #2145, the census spanned to the voucher mark: `pilot-lab-audit-census-spanned.request.utf16le.xml` is the census
+  request 697-S1 sent with ` AND $AlterID &gt; 0 AND $AlterID &lt;= 68` added to its formula and nothing else changed, the
+  request the audit read sends since the census is always spanned. Its bytes are the run sheet's request
+  `requests/p-audit_c2_spanned_0_68.request.utf16le.xml` on `lab/2145-spanned-census-captures` at `6a968f01`, and the test
+  checks that the read renders them byte for byte.
 - The same book in both sittings: the company list and the marks answers of 697-S1 are byte-identical to 697-S0A's
   (`0cb23618…` and `8a0c4268…`). Those two answers are already committed as `../pilot-lab/pilot-lab-company-extent.utf16le.xml`
   and `../gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml` (the same bytes), so they are not repeated here.
@@ -40,3 +45,4 @@ book starts 1 April 2026, outside the tax-audit rules' year); other releases, ed
 | `pilot-lab-audit-vouchers.utf16le.xml` | 2,568,786 | `4085c787ad2737467891388fe674167af19f2ade786bbac539a425aae6ab6c7e` | 697-S0A `answers/7.xml` | every voucher of 20260401-20270331 in one request, entry wildcard: 41 VOUCHER rows, each with a GUID |
 | `pilot-lab-audit-census.request.utf16le.xml` | 1,436 | `685b646740a4f7751d44089bd99d248f4334da714d16e946d35d47f485a501ce` | 697-S1 `c02-census-fy2026-27.xml` | the request, UTF-16LE with a BOM |
 | `pilot-lab-audit-census.utf16le.xml` | 102,580 | `11c0077ba4a02cf6b076e56364b00928f20390db68257a65ffd25efc35e03f55` | 697-S1 `answers/4.xml` | the census of the same window: 41 VOUCHER rows with DATE, ALTERID 2..68 and GUID |
+| `pilot-lab-audit-census-spanned.request.utf16le.xml` | 1,520 | `1125182a51310f09ea6d3c4a08dd4e0d411d13f1fc34f01b89be4ea86f729e4e` | #2145 run sheet `p-audit_c2_spanned_0_68` | the census request spanned to (0, 68], UTF-16LE with a BOM |

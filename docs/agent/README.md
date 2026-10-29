@@ -140,7 +140,12 @@ settled for good, a post Tally rejected in part or whole among them;
 `not_settled_reviewed_not_attributed` counts the native posts matched by content
 only, their binding refused or no answer from Tally recorded, that a person
 recorded checking in Tally (`acknowledge_post_review` with `doubt` set to
-`content_only`), still not settled and never verified; none of these overlaps
+`content_only`), still not settled and never verified; `not_settled_restored`
+counts the native posts a recorded restore covers (bridge#1050), not settled
+whatever their latest status reads; they never read `posted_verified` again,
+so they stay there, and in no other count, until a later change records that
+their vouchers are back: check them in Tally;
+none of these overlaps
 `not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`;
 `settled_by_person` counts the native posts Tally answered as creating none of their vouchers that a person
 settled (`acknowledge_post_review` with `doubt` set to `not_created`), which are in none of the `not_settled`
@@ -3390,7 +3395,8 @@ changes (a changed book alters the vouchers' statuses, never the refusal), `ackn
 doubt only beside vouchers that read back verified, and an amendment of it is unavailable
 (`import_amend_natively_posted`, as for any natively posted batch). The summary of such a post says that it cannot
 be closed or amended; its vouchers are checked in Tally. Its rows stay refused in any other batch
-(`import_txn_already_posted`), and `local_data_report` counts it as `not_settled_binding_refused`.
+(`import_txn_already_posted`), and `local_data_report` counts it as `not_settled_binding_refused` (or as
+`not_settled_restored` once a recorded restore covers it).
 After the person has checked its vouchers in Tally, `acknowledge_post_review` with `doubt` set to `content_only`
 records that they did (bridge#1039), in the same review dialog. The same holds for a native post with no answer
 from Tally recorded (`post_span_binding` state `not_bound`, code `binding_response_not_recorded`), which never
@@ -3398,7 +3404,8 @@ binds either. It is admitted only while the journal holds that state and a fresh
 binding refused as `span_identity_reused`, a book read as rolled back, a binding not yet settled or a batch that
 reads `posted_verified`. The record, in the import journal, changes nothing in Tally and no status or verdict; it
 binds no voucher, lifts no invoice stop and releases no row. `verify_import` reports it as `content_review`, with
-its own `next_step`, and `local_data_report` counts the batch as `not_settled_reviewed_not_attributed` instead.
+its own `next_step`, and `local_data_report` counts the batch as `not_settled_reviewed_not_attributed` instead (a
+recorded restore voids the review, and the batch then counts as `not_settled_restored`).
 A later `posted_verified` of the batch, a later answer from Tally with an outcome, or a recorded rollback of the
 book voids it. A build older than this record refuses the whole import journal once one is written, as for a
 stop release: do not downgrade after recording one. Any other batch is refused before any read
@@ -3457,7 +3464,8 @@ only beside vouchers that read back verified; with `doubt` set to `content_only`
 it records that the person checked them, which settles nothing (bridge#1039). Its `post_span_binding.summary` says when the book holds,
 for each voucher it sent or for some, a voucher with the same date, voucher type
 and ledger entries that is neither cancelled nor optional, and that ComplyEaze
-Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`,
+Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`
+(under `not_settled_restored` once a recorded restore covers it),
 or under `not_settled_reviewed_not_attributed` once a person has recorded checking it.
 `voucher_presence` cannot identify a native post's
 vouchers, because they carry no marker: one edited or re-dated in Tally can read

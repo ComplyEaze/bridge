@@ -288,6 +288,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_no_response: 1,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
             no_dispatch_never_verified: 0
         })
@@ -302,6 +303,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
             no_dispatch_never_verified: 1
         })
@@ -321,6 +323,7 @@ fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 0,
+        unsettled_restored: 0,
         settled_by_person: 0,
         no_dispatch_never_verified: 0,
     });
@@ -880,14 +883,40 @@ fn a_reviewed_batch_is_its_own_class_of_unsettled_batch() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 1,
+        unsettled_restored: 0,
         settled_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
     assert_eq!(journal["not_settled"], 4);
     assert_eq!(journal["not_settled_reviewed_not_attributed"], 1);
+    assert_eq!(journal["not_settled_restored"], 0);
     assert_eq!(journal["not_settled_binding_refused"], 1);
     assert_eq!(journal["not_settled_not_verified"], 1);
+}
+
+/// Native posts a recorded restore covers are reported in their own count,
+/// and `not_settled_not_verified` holds only what no other count does (#1050).
+#[test]
+fn restored_posts_are_their_own_class_of_unsettled_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 6,
+        sent_or_found: 6,
+        unsettled: 5,
+        unsettled_no_response: 1,
+        unsettled_binding_refused: 0,
+        unsettled_reviewed: 0,
+        unsettled_restored: 2,
+        settled_by_person: 0,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 5);
+    assert_eq!(journal["not_settled_restored"], 2);
+    assert_eq!(journal["not_settled_no_response"], 1);
+    assert_eq!(journal["not_settled_not_verified"], 2);
 }
 
 /// A batch a person settled after Tally answered that its post created none
@@ -903,6 +932,7 @@ fn a_settled_batch_is_reported_outside_not_settled() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 0,
+        unsettled_restored: 0,
         settled_by_person: 2,
         no_dispatch_never_verified: 0,
     });

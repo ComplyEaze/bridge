@@ -778,17 +778,26 @@ pub(super) struct Settlement {
     /// Batches with a dispatch intent that are not settled: no recorded
     /// response, or a response but the latest status is not `posted_verified`.
     pub(super) unsettled: usize,
-    /// Of `unsettled`, the batches with no recorded response.
+    /// Of `unsettled`, the batches with no recorded response, other than those
+    /// a recorded restore covers (in `unsettled_restored`).
     pub(super) unsettled_no_response: usize,
     /// Of `unsettled`, the batches with a response whose binding to their own
     /// vouchers was refused: matched by content only, they stay unsettled for
-    /// good (#1039).
+    /// good (#1039). Those a recorded restore covers count in
+    /// `unsettled_restored` instead.
     pub(super) unsettled_binding_refused: usize,
     /// Of `unsettled`, the batches a person recorded checking in Tally while
     /// they were matched by content only, with the review standing (#1039).
     /// They count in no other part of `unsettled`: still unsettled, never
     /// verified, and their rows stay held.
     pub(super) unsettled_reviewed: usize,
+    /// Of `unsettled`, the native posts a recorded restore covers (#1050):
+    /// whatever their latest status, their vouchers may be gone from the book.
+    /// A covered post never reads `posted_verified` again, so it stays here
+    /// until a later change records that its vouchers are back. They count in
+    /// no other part of `unsettled`: one with no response, a refused binding, a
+    /// review or a settlement counts here alone (a restore voids the last two).
+    pub(super) unsettled_restored: usize,
     /// Batches with a dispatch intent that a person settled after Tally
     /// answered that their post created none of their vouchers, with the
     /// settlement standing (#1709). They are not in `unsettled`, and their
@@ -813,6 +822,27 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
         /// A readback found the batch posted at some point.
         found: bool,
         binding_refused: bool,
+    }
+    /// A dispatched batch's verification as the journal stands, its recorded
+    /// restores counted (#1050). `Verified` is built only here, and never for
+    /// a batch a rollback record covers, whatever its latest status reads. The
+    /// counts below ask it, not the raw status, whether a batch is settled.
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Standing {
+        Verified,
+        Restored,
+        Open,
+    }
+    impl Standing {
+        fn of(progress: &Progress, covered: bool) -> Self {
+            if covered {
+                Self::Restored
+            } else if progress.responded && progress.verified {
+                Self::Verified
+            } else {
+                Self::Open
+            }
+        }
     }
     let mut batches: BTreeMap<String, Progress> = BTreeMap::new();
     let mut reviews = ContentReviews::default();
@@ -860,18 +890,29 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
         .values()
         .filter(|progress| progress.dispatched || progress.found)
         .count();
-    let open = batches
-        .iter()
-        .filter(|(_, progress)| progress.dispatched && !(progress.responded && progress.verified));
-    // A batch a person settled leaves `unsettled` and every part of it.
+    let standing =
+        |batch_id: &String, progress: &Progress| Standing::of(progress, covered.contains(batch_id));
+    let open = batches.iter().filter(|(batch_id, progress)| {
+        progress.dispatched && standing(batch_id, progress) != Standing::Verified
+    });
+    // A batch a person settled leaves `unsettled` and every part of it. A
+    // recorded restore voids the settlement, so no restored batch is among them.
     let unsettled = open
         .clone()
         .filter(|(batch_id, _)| !settled.contains(*batch_id));
+    // A restored batch counts in its own bucket and in no other part of
+    // `unsettled` (a restore voids a review too).
+    let restored = unsettled
+        .clone()
+        .filter(|(batch_id, progress)| standing(batch_id, progress) == Standing::Restored)
+        .count();
     // A batch a person reviewed counts in its own bucket and in no other
     // part of `unsettled`.
     let unreviewed = unsettled
         .clone()
-        .filter(|(batch_id, _)| !reviewed.contains_key(*batch_id))
+        .filter(|(batch_id, progress)| {
+            !reviewed.contains_key(*batch_id) && standing(batch_id, progress) != Standing::Restored
+        })
         .map(|(_, progress)| progress);
     Ok(Settlement {
         batches: batches.len(),
@@ -885,7 +926,8 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
             .clone()
             .filter(|progress| progress.responded && progress.binding_refused)
             .count(),
-        unsettled_reviewed: unsettled.clone().count() - unreviewed.count(),
+        unsettled_reviewed: unsettled.clone().count() - unreviewed.count() - restored,
+        unsettled_restored: restored,
         settled_by_person: open.count() - unsettled.clone().count(),
         unsettled: unsettled.count(),
     })
@@ -995,9 +1037,10 @@ pub(super) fn unsettled_invoice_twin(
     }
     let mut holds_a_twin = BTreeSet::new();
     let mut sent = BTreeSet::new();
-    // A batch is settled when its LATEST status is `posted_verified`, as
-    // `settlement` takes it: a dispatch intent after a hand import's
-    // verification makes it unverified again.
+    // A batch is settled when its LATEST status is `posted_verified`: a
+    // dispatch intent after a hand import's verification makes it unverified
+    // again. Unlike `settlement`, this does not yet count a recorded restore's
+    // cover (#1050): that waits for a ruling on the invoice readers.
     let mut verified = BTreeSet::new();
     scan_records(reader, |record, _| match record {
         Record::Batch(other) if other.batch_id != batch.batch_id => {
@@ -1064,7 +1107,8 @@ pub(super) enum NumberControl {
 
 /// The control the journal offers for an invoice number read of this
 /// company (`NumberControl`). A batch is verified while its latest status is
-/// `posted_verified`, as `settlement` takes it; a dispatch intent makes it
+/// `posted_verified` (unlike `settlement`, a recorded restore's cover is not
+/// counted yet, #1050: that waits for a ruling); a dispatch intent makes it
 /// sent. A person's release makes it neither until it next reads verified:
 /// whatever the read at the release saw, it did not show that the number read
 /// works on this Tally. An invoice whose number or date cannot be read is not a

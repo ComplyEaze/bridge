@@ -2010,6 +2010,36 @@
       "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
       "sha256": "263c3c19338afe0ed8184398bc472882b9243a66dbc96a10938b16b964e320ac",
       "size": 9880
+    },
+    {
+      "blob": "480c969f2d1b8ef9a4f89ed4a8e6a366026ca18c",
+      "capture_id": "native/currency_masters_forex_72.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-forex-currency-reads-answers at 85d7d37257e9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_forex_72.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "f5a1414a195194ff4f8b46f4c65cae0e0f7567143c71c6a2c465532334b3439a",
+      "size": 3796
+    },
+    {
+      "blob": "55fd5abd2b22bce97ff76ac3acc27b413f5eb0ec",
+      "capture_id": "native/currency_masters_originalname_forex_72.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-forex-currency-reads-answers at 85d7d37257e9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "3f0bfbcbb3bc0def49de13a7ac918e5d20d6a1d6885aa0e17635eb5af694aaf0",
+      "size": 4000
+    },
+    {
+      "blob": "7e6e6ee1371b6c660c553d0f93a624dc249dc4ff",
+      "capture_id": "native/company_base_currency_forex_72.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-forex-currency-reads-answers at 85d7d37257e9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "52c33f519c9e5ee390d44ef30223ad46f8b3bbbe2c71e02a5c995e0672043df3",
+      "size": 3434
     }
   ]
 }

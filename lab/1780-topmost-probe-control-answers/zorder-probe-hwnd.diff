@@ -1,0 +1,12 @@
+1c1
+< # zorder-probe.ps1 - lists the visible top-level windows from the top of the stacking order down.
+---
+> # zorder-probe-hwnd.ps1 (lab deviation, 29 Oct: a copy of zorder-probe.ps1 that also prints each window's HWND) - lists the visible top-level windows from the top of the stacking order down.
+4c4
+< #   position,topmost,foreground,pid,title
+---
+> #   position,topmost,foreground,pid,hwnd,title
+36c36
+<                 lines.Add(position + "," + topmost + "," + foreground + "," + pid + "," + title);
+---
+>                 lines.Add(position + "," + topmost + "," + foreground + "," + pid + "," + h.ToInt64() + "," + title);

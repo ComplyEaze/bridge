@@ -1,0 +1,5 @@
+zorder-probe-hwnd.ps1 start 2026-10-29T04:29:48.040Z end 2026-10-29T04:29:49.756Z
+1,1,0,23604,8790150,Tally probe control TOPMOST
+4,0,1,23604,10758756,Tally probe control PLAIN
+5,0,0,13992,13379766,TallyPrime:9001
+visible_titled_windows,14

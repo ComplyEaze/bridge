@@ -1,0 +1,6 @@
+independent read 2026-10-29T04:29:50.280Z:
+8790150 pid 23604 class 'WindowsForms10.Window.8.app.0.f5a312_r38_ad1' title 'Tally probe control TOPMOST' exstyle 0x00050108 &0x8=1
+10758756 pid 23604 class 'WindowsForms10.Window.8.app.0.f5a312_r38_ad1' title 'Tally probe control PLAIN' exstyle 0x00050100 &0x8=0
+13379766 pid 13992 class 'Ganeshji' title 'TallyPrime:9001' exstyle 0x00000000 &0x8=0
+C2's box handle (logged by c2-run.ps1): 
+8595832 not a window

@@ -1,0 +1,2 @@
+Pushed copies that differ from the files kept on the lab PC: each substitution, with the original's bytes and sha256.
+control-forms.ps1: original 1710 B sha256 d14e9f9dcc3089301b843dec6fb626a511f39a3e0564fc442b28421f080c241c; 1 x the lab folder -> <lab folder>

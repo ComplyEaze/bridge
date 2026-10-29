@@ -680,9 +680,9 @@ closing value shows a closing stock of zero; a Summary that lists no item at all
 ends. A ratio on Tally's item-level Stock Summary values is not shown here; if one is wanted, both \
 opening and closing stock must be taken on that same basis."
             .to_string(),
-        "Closing stock is the client's own manually-entered Stock-in-Hand ledger value (accounts \
-not integrated with inventory), not an independently counted or valued physical stock figure; the \
-books cannot show whether it was actually verified."
+        "Closing stock is the Stock-in-Hand ledger balance the client recorded in the books \
+(accounts not integrated with inventory), not an independently counted or valued physical stock \
+figure; the books cannot show whether it was actually verified."
             .to_string(),
         ]
     };

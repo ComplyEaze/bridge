@@ -9,7 +9,9 @@
 #
 # Variants (each includes the one before it; the order is the order of box_fit::guarded):
 #   c  the flags only.
-#   d  c, after SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, i.e. -4) on this process.
+#   d  c, after SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, i.e. -4) on this process. The thread's
+#      awareness is read and written to -Out before the call (dpi_before_awareness, dpi_before_is_per_monitor_v2): a host that
+#      is already aware makes the call return False (dpi_set=False) and change nothing.
 #   e  d, after a WH_CBT hook on this thread that does what box_fit.rs on_activate does: on HCBT_ACTIVATE it measures the
 #      window's rectangle against the work area of the monitor nearest to it and, for a box not wholly inside it, posts
 #      WM_COMMAND IDCANCEL to the box. Every measurement is written, with a UTC stamp, to <Out>.fits.txt.
@@ -38,6 +40,7 @@ public static class PBox {
     [DllImport("user32.dll")] static extern bool SetProcessDpiAwarenessContext(IntPtr value);
     [DllImport("user32.dll")] static extern IntPtr GetThreadDpiAwarenessContext();
     [DllImport("user32.dll")] static extern bool AreDpiAwarenessContextsEqual(IntPtr a, IntPtr b);
+    [DllImport("user32.dll")] static extern int GetAwarenessFromDpiAwarenessContext(IntPtr value);
     [DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int idHook, HookProc proc, IntPtr module, uint threadId);
     [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hook);
     [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
@@ -64,11 +67,16 @@ public static class PBox {
     static void Line(string path, string text) { File.AppendAllText(path, text + "\r\n"); }
 
     // box_fit.rs make_dpi_aware: per-monitor v2, then checked.
+    // The awareness is read BEFORE the call, so the lab sees whether this host was already aware (its manifest may make it so,
+    // and then the call returns False and changes nothing). DPI_AWARENESS: -1 invalid, 0 unaware, 1 system aware, 2 per-monitor aware.
     public static string Dpi() {
         IntPtr v2 = new IntPtr(-4);
+        IntPtr before = GetThreadDpiAwarenessContext();
+        int beforeAwareness = GetAwarenessFromDpiAwarenessContext(before);
+        bool beforeIsV2 = AreDpiAwarenessContextsEqual(before, v2);
         bool set = SetProcessDpiAwarenessContext(v2);
         bool same = AreDpiAwarenessContextsEqual(GetThreadDpiAwarenessContext(), v2);
-        return "dpi_set=" + set + " thread_is_per_monitor_v2=" + same;
+        return "dpi_before_awareness=" + beforeAwareness + " dpi_before_is_per_monitor_v2=" + beforeIsV2 + " dpi_set=" + set + " thread_is_per_monitor_v2=" + same;
     }
 
     // box_fit.rs measure() and fits(): the window's rectangle against the work area of the monitor nearest to it.

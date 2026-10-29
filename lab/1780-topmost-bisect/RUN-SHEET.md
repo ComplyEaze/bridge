@@ -63,7 +63,7 @@ Bridge is not involved and no launch is running. Run **K1c, then K1d, then K1e, 
 6. **If the box is below Tally** after that click: click its taskbar button ONCE (record the stamp and both frames' coordinates). Probe at once and again 1.5 s later; note whether the box is still a window. For K1e and K1f read `control-k1x.txt.fits.txt` at once (the `HCBT_ACTIVATE` and `box-fit` lines carry UTC stamps) and record every line.
 7. **If the box is still there**, answer **No** by mouse (through its taskbar button if Tally covers it; record that). EXPECT `answer=7` in `control-k1x.txt`. If the box vanished after the taskbar click, `control-k1x.txt` should hold `answer=2` (Cancel): record it and the `.fits.txt` lines whole.
 8. Record from the trace: `FIRST`, the box's `hwnd`, `class`, `exstyle`, `topmost` in the first block and in every later block, and the extended style of the box in each (a change of `topmost` with its stamp).
-9. Each variant's `control-k1x.txt` line also records the DPI and hook results (`dpi_set`, `thread_is_per_monitor_v2`, `hook_installed`, `front_started`): a variant whose feature did not take effect (`dpi_set=False`, `hook_installed=False`) is recorded and read as "not tested", and the ladder goes on.
+9. Each variant's `control-k1x.txt` line also records the DPI and hook results: `dpi_before_awareness` and `dpi_before_is_per_monitor_v2` (the thread's awareness read BEFORE the call, 0 unaware, 1 system, 2 per-monitor), `dpi_set`, `thread_is_per_monitor_v2`, `hook_installed`, `front_started`. A variant whose feature did not take effect (`dpi_set=False`, `hook_installed=False`) is recorded and read as "not tested", and the ladder goes on. Hidden Windows PowerShell 5.1 may already be DPI-aware by its manifest, so `dpi_set=False` with `dpi_before_is_per_monitor_v2=True` is a case to expect, not a fault.
 
 ## Part H: the dialog child by hand (T4 ii, and E5 or E6)
 No Bridge server and no request to Tally. The child only shows a box; it prints its token to stdout only after a Yes, which is never clicked, and no parent exists to read one.
@@ -96,7 +96,8 @@ No Bridge server and no request to Tally. The child only shows a box; it prints 
 | reading | meaning |
 |---|---|
 | K1c reads 0 (or Tally covers the box after the click) | **E1**: the flag set the approval box asks for does not give a topmost box. Bisect the flags next (YESNOCANCEL, DEFBUTTON2, ICONWARNING one at a time). |
-| K1c reads 1, K1d reads 0 | **E2**: the DPI call. |
+| K1c reads 1, K1d reads 0 | **E2**: the DPI call, if `dpi_set=True` and `dpi_before_is_per_monitor_v2=False`. |
+| K1d records `dpi_set=False` (the hidden host was already aware: `dpi_before_is_per_monitor_v2=True` or `dpi_before_awareness` 2) | **E2 is not separated by K1d**: the call changed nothing. A later H1 reading 0 then reads **E2 or E5**, and K1e and K1f go on from a K1d that tested nothing new. |
 | K1d reads 1, K1e reads 0 | **E3**: the hook (read its `.fits.txt` for what it measured). |
 | K1e reads 1, K1f reads 0 | **E4**: the helper thread's `raise`. |
 | K1c to K1f all read 1, H1 reads 0 | **E5**: the dialog child's own code or exe, outside the features above. |

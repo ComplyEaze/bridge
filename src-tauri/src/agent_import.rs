@@ -86,6 +86,8 @@ mod post;
 pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
 #[path = "agent_import_content_review.rs"]
 mod content_review;
+#[path = "agent_import_settle.rs"]
+mod settle;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
@@ -2414,6 +2416,15 @@ impl Server {
             if dispatched {
                 if let Ok(Some(reviewed)) = self.import_content_review(&line.batch_id) {
                     proof["content_review"] = content_review::report(reviewed);
+                }
+            }
+            // A person's standing settlement of this batch after Tally answered
+            // that its post created none of its vouchers (#1709), on the same
+            // rule. It changes no verdict, only the binding's summary line.
+            if dispatched && self.import_person_settlement(&line.batch_id) == Ok(true) {
+                proof["person_settlement"] = settle::report();
+                if proof["post_span_binding"].is_object() {
+                    proof["post_span_binding"]["summary"] = json!(settle::SUMMARY);
                 }
             }
             *observed_rows = Some(observed.rows.clone());

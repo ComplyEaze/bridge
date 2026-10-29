@@ -114,6 +114,7 @@ pub fn run_journal_confirmation_child_from_args(
         Some("--confirm-review") => agent::run_review_confirmation,
         Some("--confirm-masters") => agent::run_masters_confirmation,
         Some("--confirm-release") => agent::run_release_confirmation,
+        Some("--confirm-settle") => agent::run_settle_confirmation,
         _ => return None,
     };
     if args.next().is_some() {

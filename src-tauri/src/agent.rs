@@ -3197,7 +3197,24 @@ impl Server {
             reason_code: None,
         };
         Ok(ToolOutcome {
-            payload: json!({"result": {"records": tail.records, "order": "newest_first"}}),
+            payload: {
+                let mut result = json!({"records": tail.records, "order": "newest_first"});
+                if !tail.torn.is_empty() {
+                    result["torn_records"] = json!(tail
+                        .torn
+                        .iter()
+                        .map(|torn| json!({
+                            "offset": torn.offset,
+                            "bytes": torn.bytes,
+                            "sha256": torn.sha256,
+                        }))
+                        .collect::<Vec<_>>());
+                }
+                if let Some(bytes) = tail.unrepaired_tail_bytes {
+                    result["unrepaired_tail_bytes"] = json!(bytes);
+                }
+                json!({ "result": result })
+            },
             evidence,
             company_guid: None,
             truncated: tail.truncated,

@@ -5,3 +5,5 @@ evidence/transcription-1.txt: original 185 B sha256 9f57d03278aefcb364b06da37d7c
 evidence/transcription-2.txt: original 252 B sha256 1f48c2cfdd62486c566489732c385c2128ae39894c24e4faf196f449ba987086; rate and value columns dropped
 scripts/send.ps1: original 3089 B sha256 2f3a92a3a44ff676340da8df60e1b9c20ba18293afc07bc1a469c99975fbf401; 3 x -> <lab folder>; 1 x -> <capture helper>
 scripts/parse.py: original 1968 B sha256 b485faa877be27deaaba1dd84588ad3c6fb3515b988e3987fb56918685171482; 1 x -> <lab folder>
+evidence/stock-item-vouchers-1.txt: original 686 B sha256 336df8615ac28d4a96c35cfe0ebd650a5d033aa7557289634a8d82ee5f12e9de; value columns dropped (the capture shows only the inwards and outwards values; the closing columns and the totals were read on the screen, quantities only)
+evidence/stock-item-vouchers-2.txt: original 687 B sha256 e8acb547000583bc0708e7477860da545b8be613011bf76611d17a223cb9af6e; value columns dropped (the capture shows only the inwards and outwards values; the closing columns and the totals were read on the screen, quantities only)

@@ -287,6 +287,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled: 1,
             unsettled_no_response: 1,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -299,6 +300,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled: 0,
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
             no_dispatch_never_verified: 1
         })
     );
@@ -316,6 +318,7 @@ fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
         unsettled: 3,
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
+        unsettled_reviewed: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -859,4 +862,26 @@ fn a_stage_left_beside_a_sidecar_is_counted_with_the_journal() {
     let report = build(root, &[]);
     assert_eq!(*class(&report, "journal"), Class { files: 1, bytes: 3 });
     assert_eq!(*class(&report, "other"), Class { files: 0, bytes: 0 });
+}
+
+/// A batch a person reviewed while it was matched by content only is counted
+/// in its own class, and in no other class of unsettled batch (#1039).
+#[test]
+fn a_reviewed_batch_is_its_own_class_of_unsettled_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 5,
+        sent_or_found: 5,
+        unsettled: 4,
+        unsettled_no_response: 1,
+        unsettled_binding_refused: 1,
+        unsettled_reviewed: 1,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 4);
+    assert_eq!(journal["not_settled_reviewed_not_attributed"], 1);
+    assert_eq!(journal["not_settled_binding_refused"], 1);
+    assert_eq!(journal["not_settled_not_verified"], 1);
 }

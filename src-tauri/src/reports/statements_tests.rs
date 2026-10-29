@@ -430,7 +430,10 @@ fn a_row_whose_columns_do_not_add_up_is_refused() {
             InventoryFlags::NotRead
         )
         .unwrap_err(),
-        StatementsError::RowInconsistent
+        StatementsError::RowInconsistent(RowGap {
+            ledger: "Ageing Customer A".to_string(),
+            gap: "-0.01".to_string(),
+        })
     );
 }
 
@@ -449,7 +452,10 @@ fn a_closing_that_no_movement_explains_is_refused_even_with_empty_columns() {
             InventoryFlags::NotRead
         )
         .unwrap_err(),
-        StatementsError::RowInconsistent
+        StatementsError::RowInconsistent(RowGap {
+            ledger: "Ageing Sales".to_string(),
+            gap: "4027.00".to_string(),
+        })
     );
 }
 

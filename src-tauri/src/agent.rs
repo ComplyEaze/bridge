@@ -815,6 +815,9 @@ struct ReadDetail {
     unplaced_ledger: Option<String>,
     /// What a party detail's refusal says about the read by the party's ledger (#1356).
     window_scope: Option<ScopeReport>,
+    /// The first Trial Balance row that does not add up, for a statement refusal (#692). Its
+    /// ledger is shown as a party name, so `mask_parties` masks it.
+    inconsistent_row: Option<crate::reports::statements::RowGap>,
 }
 
 /// See [`ReadDetail::window_scope`]: whether the refusal is that of the read by the party's ledger
@@ -850,6 +853,29 @@ impl ToolFailure {
     #[cfg(test)]
     fn planned_reads(&self) -> Option<&PlannedReads> {
         self.read_detail.as_ref()?.planned_reads.as_ref()
+    }
+
+    /// The row a statement derivation refused on (#692), read from `error`
+    /// before [`Self::from_runtime`] takes it.
+    fn inconsistent_row(error: &anyhow::Error) -> Option<crate::reports::statements::RowGap> {
+        match error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<crate::reports::statements::StatementsError>())
+        {
+            Some(crate::reports::statements::StatementsError::RowInconsistent(row)) => {
+                Some(row.clone())
+            }
+            _ => None,
+        }
+    }
+
+    fn with_inconsistent_row(mut self, row: Option<crate::reports::statements::RowGap>) -> Self {
+        if let Some(row) = row {
+            self.read_detail
+                .get_or_insert_with(Box::default)
+                .inconsistent_row = Some(row);
+        }
+        self
     }
 
     fn with_planned_reads(mut self, reads: PlannedReads) -> Self {
@@ -1242,6 +1268,18 @@ const MOVEMENT_CATALOGUE_TOO_LARGE: &str = "movement_catalogue_too_large";
 /// voucher another way (#1709).
 fn refusal_remediation(code: &str) -> Option<&'static str> {
     match code {
+        // Only `derive_statements` raises it, under `profit_and_loss` and `balance_sheet`.
+        "statement_trial_balance_row_inconsistent" => Some(
+            "No statement figure was returned: ComplyEaze Bridge derives the statements only from \
+             Trial Balance rows that add up, and the row in `ledger` does not. One of its amounts \
+             is empty, taken as zero for this check, and its opening plus the window's debit and \
+             credit then differs from its closing by `gap` (trial_balance shows the same row with \
+             `movements_differ_by`). On the lab's books such a row was a Closing Stock ledger whose \
+             closing balance was keyed in Tally: Tally keeps the opening in that ledger's closing \
+             and shows the change from it only as a debit. Tell the user which ledger and the gap. \
+             No change to the book was seen during the read, so retrying gives the same refusal. \
+             Do not retry.",
+        ),
         "voucher_mark_contradiction" => Some(
             "Tally gave this company's voucher mark earlier in this check and then twice without it, \
              so this check recorded nothing and did not settle the post. Run the same call again \
@@ -2720,18 +2758,31 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads, bill_row, unplaced_ledger, window_scope) =
-                    read_detail
-                        .map(|detail| {
-                            (
-                                detail.incomplete_read,
-                                detail.planned_reads,
-                                detail.bill_row,
-                                detail.unplaced_ledger,
-                                detail.window_scope,
-                            )
-                        })
-                        .unwrap_or_default();
+                let (
+                    incomplete_read,
+                    planned_reads,
+                    bill_row,
+                    unplaced_ledger,
+                    window_scope,
+                    inconsistent_row,
+                ) = read_detail
+                    .map(|detail| {
+                        (
+                            detail.incomplete_read,
+                            detail.planned_reads,
+                            detail.bill_row,
+                            detail.unplaced_ledger,
+                            detail.window_scope,
+                            detail.inconsistent_row,
+                        )
+                    })
+                    .unwrap_or_default();
+                if let Some(row) = inconsistent_row {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["ledger"] = party_name_value(row.ledger);
+                        error["gap"] = json!(row.gap);
+                    }
+                }
                 if let Some(ledger) = unplaced_ledger {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["ledger"] = party_name_value(ledger);
@@ -3100,7 +3151,7 @@ impl Server {
             reason_code: None,
         };
         Ok(ToolOutcome {
-            payload: json!({"result": {"records": tail.records}}),
+            payload: json!({"result": {"records": tail.records, "order": "newest_first"}}),
             evidence,
             company_guid: None,
             truncated: tail.truncated,

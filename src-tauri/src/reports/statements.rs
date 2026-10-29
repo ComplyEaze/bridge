@@ -438,14 +438,15 @@ struct Evaluated {
     unmet: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum StatementsError {
     #[error("statement_arithmetic_overflow")]
     Arithmetic,
     /// A row where opening plus the window's debit and credit, an empty amount
-    /// taken as zero for this check alone, is not its closing.
+    /// taken as zero for this check alone, is not its closing: the first such
+    /// row, in Tally's order.
     #[error("statement_trial_balance_row_inconsistent")]
-    RowInconsistent,
+    RowInconsistent(RowGap),
     /// Two ledgers at the Tally root, where only Profit & Loss A/c can sit.
     #[error("statement_root_ledger_repeated")]
     RootLedgerRepeated,
@@ -457,11 +458,19 @@ pub enum StatementsError {
     GateNotAProfitAndLoss,
 }
 
+/// The ledger of a Trial Balance row that does not add up, and its gap:
+/// `closing - (opening + debit + credit)` exactly, in Tally's sign.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowGap {
+    pub ledger: String,
+    pub gap: String,
+}
+
 impl StatementsError {
-    pub fn code(self) -> &'static str {
+    pub fn code(&self) -> &'static str {
         match self {
             Self::Arithmetic => "statement_arithmetic_overflow",
-            Self::RowInconsistent => "statement_trial_balance_row_inconsistent",
+            Self::RowInconsistent(_) => "statement_trial_balance_row_inconsistent",
             Self::RootLedgerRepeated => "statement_root_ledger_repeated",
             Self::GateNotABalanceSheet => "statement_gate_not_a_balance_sheet",
             Self::GateNotAProfitAndLoss => "statement_gate_not_a_profit_and_loss",
@@ -922,7 +931,10 @@ fn present_nonzero(amount: &NativeTrialBalanceAmount) -> bool {
 fn check_row_identity(row: &NativeTrialBalanceRow) -> Result<(), StatementsError> {
     match row.movements() {
         NativeTrialBalanceMovements::Tie => Ok(()),
-        NativeTrialBalanceMovements::Differ(_) => Err(StatementsError::RowInconsistent),
+        NativeTrialBalanceMovements::Differ(gap) => Err(StatementsError::RowInconsistent(RowGap {
+            ledger: row.name.clone(),
+            gap,
+        })),
     }
 }
 

@@ -313,13 +313,18 @@ impl TallyRuntime {
         let Some(ExtraSources::Statement(sources)) = sources else {
             return Err(anyhow::anyhow!("statement_sources_not_read"));
         };
+        // A refused derivation keeps the evidence of every read already made
+        // (the Trial Balance, the group tree and Tally's statements).
         let derived = crate::reports::statements::derive_statements(
             &sources.trial_balance,
             &sources.groups,
             &sources.balance_sheet,
             sources.profit_and_loss.as_ref(),
             sources.inventory,
-        )?;
+        )
+        .map_err(|error| {
+            with_read_evidence(anyhow::Error::new(error), trial_balance.evidence.clone())
+        })?;
         Ok(StatementsRead {
             trial_balance,
             derived,

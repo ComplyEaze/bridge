@@ -35,8 +35,10 @@ impl Server {
             .fetch_statements(self.tally_config(), &identity, period, kind)
             .await
             .map_err(|error| {
+                let row = ToolFailure::inconsistent_row(&error);
                 ToolFailure::from_runtime(&format!("{tool}_read_failed"), error)
                     .with_prior_evidence(prior.clone())
+                    .with_inconsistent_row(row)
             })?;
         let trial_balance = read.trial_balance;
         let evidence = combine_evidence(prior, evidence_from_runtime_read(trial_balance.evidence));

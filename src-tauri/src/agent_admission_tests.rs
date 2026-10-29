@@ -1092,8 +1092,18 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         ),
         (
             "post_import",
-            "No review can be recorded for a batch whose post_span_binding is refused: acknowledge_post_review refuses it",
-            "a refused binding is checked in Tally, never sent to a review that refuses it",
+            "No doubt review can be recorded for a batch whose post_span_binding is refused",
+            "a refused binding is checked in Tally, never sent to a doubt review that refuses it",
+        ),
+        (
+            "post_import",
+            "acknowledge_post_review doubt content_only, unless span_identity_reused; it settles nothing) and does not rebuild it",
+            "the record of that check settles nothing, and the batch is never rebuilt",
+        ),
+        (
+            "acknowledge_post_review",
+            "It changes nothing in Tally, no status or verdict, and lifts no stop or row hold",
+            "a content review never settles a batch or lets its rows be posted",
         ),
         (
             "local_data_report",

@@ -501,9 +501,11 @@ pub(super) fn to_json(
             "not_settled": settlement.unsettled,
             "not_settled_no_response": settlement.unsettled_no_response,
             "not_settled_binding_refused": settlement.unsettled_binding_refused,
+            "not_settled_reviewed_not_attributed": settlement.unsettled_reviewed,
             "not_settled_not_verified": settlement.unsettled
                 - settlement.unsettled_no_response
-                - settlement.unsettled_binding_refused,
+                - settlement.unsettled_binding_refused
+                - settlement.unsettled_reviewed,
             "no_dispatch_never_verified": settlement.no_dispatch_never_verified,
         }),
     };

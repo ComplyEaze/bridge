@@ -299,3 +299,92 @@ fn a_workbook_whose_rows_add_up_has_no_gap_line_or_column() {
         "no eighth column"
     );
 }
+
+/// Each element named `name` in the worksheet, with its attributes.
+fn worksheet_elements(bytes: &[u8], name: &str) -> Vec<BTreeMap<String, String>> {
+    let xml = worksheet_xml(bytes);
+    let mut reader = Reader::from_str(&xml);
+    let mut elements = Vec::new();
+    loop {
+        match reader.read_event().unwrap() {
+            Event::Start(tag) | Event::Empty(tag) if tag.name().as_ref() == name => {
+                elements.push(
+                    tag.attributes()
+                        .map(|attribute| {
+                            let attribute = attribute.unwrap();
+                            (
+                                attribute.key.as_ref().to_string(),
+                                attribute.value.into_owned(),
+                            )
+                        })
+                        .collect(),
+                );
+            }
+            Event::Eof => break,
+            _ => {}
+        }
+    }
+    elements
+}
+
+/// Whether some `<col>` range covers the 1-based `column` with the amount columns' width.
+fn has_amount_width(bytes: &[u8], column: u32) -> bool {
+    worksheet_elements(bytes, "col").iter().any(|col| {
+        let bound = |key: &str| col[key].parse::<u32>().unwrap();
+        (bound("min")..=bound("max")).contains(&column)
+            && col["width"].parse::<f64>().unwrap().floor() == 22.0
+    })
+}
+
+/// The filter and the amount widths reach column H only when a ledger does not add up: on each
+/// stock capture the filter spans A to H over the header and every ledger row, and H has the
+/// amount width; on the known-lab capture they stop at G.
+#[test]
+fn the_filter_and_amount_widths_reach_the_gap_column_only_when_it_is_written() {
+    for ((report, _), bytes) in crate::reports::trial_balance::tests::stock_ledger_captures()
+        .into_iter()
+        .zip(stock_ledger_workbooks())
+    {
+        // Nine lines, the limitation, the gap line and a blank row sit above the header.
+        let filter = worksheet_elements(&bytes, "autoFilter");
+        assert_eq!(filter.len(), 1);
+        assert_eq!(filter[0]["ref"], format!("A13:H{}", 13 + report.rows.len()));
+        assert!(has_amount_width(&bytes, 7));
+        assert!(has_amount_width(&bytes, 8));
+    }
+    let bytes = render_trial_balance_xlsx(&captured_read()).unwrap();
+    assert_eq!(
+        worksheet_elements(&bytes, "autoFilter")[0]["ref"],
+        "A12:G18"
+    );
+    assert!(has_amount_width(&bytes, 7));
+    assert!(!has_amount_width(&bytes, 8));
+}
+
+/// The gap line's row is tall enough for its text at the limitation row's calibration (45
+/// characters, 15 points a line).
+#[test]
+fn the_gap_line_row_holds_every_line_of_its_text() {
+    let lines = crate::reports::trial_balance::MOVEMENTS_DIFFER_LIMITATION
+        .replace("{count}", "1")
+        .chars()
+        .count()
+        .div_ceil(45);
+    for bytes in stock_ledger_workbooks() {
+        // The gap line is the eleventh row: nine lines and the limitation above it.
+        let rows = worksheet_elements(&bytes, "row");
+        let row = rows.iter().find(|row| row["r"] == "11").unwrap();
+        let height: f64 = row["ht"].parse().unwrap();
+        assert!(height >= (lines * 15) as f64, "{height} for {lines} lines");
+    }
+}
+
+#[test]
+fn a_wrapped_row_height_covers_its_lines_with_one_to_spare_up_to_excels_limit() {
+    assert_eq!(wrapped_row_height(0), 15);
+    assert_eq!(wrapped_row_height(45), 30);
+    assert_eq!(wrapped_row_height(46), 45);
+    assert_eq!(wrapped_row_height(271), 120);
+    assert_eq!(wrapped_row_height(1_215), 409);
+    assert_eq!(wrapped_row_height(usize::MAX), 409);
+}

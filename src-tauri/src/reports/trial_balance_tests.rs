@@ -472,3 +472,31 @@ fn a_report_whose_rows_add_up_is_serialized_as_before() {
     );
     assert_eq!(movements_differ_limitation(&report.rows), None);
 }
+
+/// As above for the opening-year capture, which the removed derive wrote as 2,182 bytes with the
+/// SHA-256 below (recorded on the #2132 branch before the derive was removed). Its company GUID is
+/// read from the capture: every row's GUID starts with it.
+#[test]
+fn the_opening_year_rows_are_serialized_as_before() {
+    use sha2::Digest;
+    let xml = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_opening_year.xml"
+    );
+    let guid = r#"<GUID TYPE="String">"#;
+    let start = xml.find(guid).unwrap() + guid.len();
+    let report = parse_native_trial_balance(xml, &xml[start..start + 36]).unwrap();
+    let mut ours = Vec::new();
+    serialize_report_with_movements(&report, &mut serde_json::Serializer::new(&mut ours)).unwrap();
+    let hex: String = sha2::Sha256::digest(&ours)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        (ours.len(), hex.as_str()),
+        (
+            2_182,
+            "b0ca99eec868fc9dd6bd512ce9b2b7ed6b8f8e9bf4d255b1c9ea18b821be6889"
+        )
+    );
+    assert_eq!(movements_differ_limitation(&report.rows), None);
+}

@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/stock-query/w-03-stock-query-gauge-test-50l-f1.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "12",
+                ),
+                unit: "Nos",
+            },
+        },
+    ],
+))

@@ -1,8 +1,11 @@
 use super::*;
+use crate::native_stock_summary::{parse_native_stock_items, NativeQuantityRead};
 use crate::outstandings_shared::DateBoundaryProfile;
+use crate::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName, ValidatedDateRange};
 use bridge_tally_primitives::TallyDate;
 
 const LAB: &str = "BRIDGE SHAPE LAB";
+const LAB_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 
 /// The committed captures of #2018 on BRIDGE SHAPE LAB (`tests/fixtures/stock-query/PROVENANCE.md`).
 fn capture(name: &str) -> Vec<u8> {
@@ -87,6 +90,60 @@ fn every_captured_request_is_the_builders_bytes() {
         (
             "r-15-stock-query-unknown-item",
             "Bridge Probe Item",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "w-02-stock-query-kit-co-item-f1",
+            "Kit & Co Item",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "w-03-stock-query-gauge-test-50l-f1",
+            "Gauge (Test) 50L",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "w-05-stock-query-owner-s-item-f2",
+            "Owner's Item",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "w-07-stock-query-quote-q-item-f2",
+            "Quote \"Q\" Item",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "w-08-stock-query-alt-unit-item-f1",
+            "Alt Unit Item",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "w-09-stock-query-mix-5-set-large-f1",
+            "Mix 5% / Set, Large",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "w-10-stock-query-dash-item-7-f1",
+            "Dash-Item 7",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "alt-a-04-stock-query-alt-unit-probe-a",
+            "Alt Unit Probe A",
+            "20250401",
+            "20260331",
+        ),
+        (
+            "alt-a-05-stock-query-alt-unit-probe-b",
+            "Alt Unit Probe B",
             "20250401",
             "20260331",
         ),
@@ -195,6 +252,25 @@ fn every_captured_answer_reads_as_its_lines() {
         lines("r-14-stock-query-cleaning-kit-a-to-20250401"),
         [line("Main Location", None, "25 Nos")]
     );
+    for (name, quantity) in [
+        ("w-02-stock-query-kit-co-item-f1", "11 Nos"),
+        ("w-03-stock-query-gauge-test-50l-f1", "12 Nos"),
+        ("w-04-stock-query-owner-s-item-f1", "13 Nos"),
+        ("w-05-stock-query-owner-s-item-f2", "13 Nos"),
+        ("w-06-stock-query-quote-q-item-f1", "14 Nos"),
+        ("w-07-stock-query-quote-q-item-f2", "14 Nos"),
+        ("w-08-stock-query-alt-unit-item-f1", "30 Nos"),
+        ("w-09-stock-query-mix-5-set-large-f1", "16 Nos"),
+        ("w-10-stock-query-dash-item-7-f1", "17 Nos"),
+        ("alt-a-04-stock-query-alt-unit-probe-a", "30 Nos"),
+        ("alt-a-05-stock-query-alt-unit-probe-b", "36 Nos"),
+    ] {
+        assert_eq!(
+            lines(name),
+            [line("Main Location", None, quantity)],
+            "{name}"
+        );
+    }
 }
 
 /// The empty answer, for an unknown item and for the bare request alike, is no lines, not zero.
@@ -293,8 +369,8 @@ fn a_damaged_answer_refuses_under_its_own_code() {
     }
 }
 
-/// The name alphabet is the captured one: letters, digits and single inner spaces, at most 60
-/// characters. Everything else is refused before any request.
+/// The name alphabet is the captured one: letters, digits, the measured punctuation and single
+/// inner spaces, at most 60 characters. Everything else is refused before any request.
 #[test]
 fn an_item_name_outside_the_captured_alphabet_is_refused() {
     for admitted in [
@@ -302,6 +378,12 @@ fn an_item_name_outside_the_captured_alphabet_is_refused() {
         "Carton Box Small",
         "A",
         &"x".repeat(60),
+        "Kit & Co Item",
+        "Gauge (Test) 50L",
+        "Owner's Item",
+        "Quote \"Q\" Item",
+        "Mix 5% / Set, Large",
+        "Dash-Item 7",
     ] {
         assert_eq!(
             MeasuredItemName::new(admitted).map(|name| name.as_str().to_string()),
@@ -313,14 +395,17 @@ fn an_item_name_outside_the_captured_alphabet_is_refused() {
         " Leading",
         "Trailing ",
         "Two  Spaces",
-        "Kit & Co Item",
-        "Owner's Item",
-        "Mix 5% / Set, Large",
-        "Dash-Item 7",
         "Dot.Item",
-        "(Paren",
-        "Paren)",
-        "Quote\"Q",
+        "Semi;colon",
+        "Colon:",
+        "Hash#",
+        "Plus+",
+        "Star*",
+        "At@",
+        "Back\\slash",
+        "Equals=",
+        "[Bracket]",
+        "{Brace}",
         "Less<",
         "More>",
         "Under_score",
@@ -565,4 +650,161 @@ fn unmeasured_shapes_refuse_and_either_group_order_reads() {
     assert!(
         matches!(parse_stock_query(&soda), Ok(StockQueryAnswer::Lines(lines)) if lines.len() == 2)
     );
+}
+
+/// The captured requests that name an item, by file. Each name is read back from the request as
+/// sent, its entities decoded once.
+const NAMED_REQUESTS: [&str; 20] = [
+    "r-4-stock-query-stockitemname",
+    "r-01-stock-query-carton-box-small",
+    "r-02-stock-query-caustic-soda-flakes",
+    "r-03-stock-query-cleaning-kit-a",
+    "r-09-stock-query-soda-ash-light",
+    "r-11-stock-query-zero-stock-item",
+    "r-12-stock-query-hcl-to-20250401",
+    "r-14-stock-query-cleaning-kit-a-to-20250401",
+    "r-15-stock-query-unknown-item",
+    "w-02-stock-query-kit-co-item-f1",
+    "w-03-stock-query-gauge-test-50l-f1",
+    "w-04-stock-query-owner-s-item-f1",
+    "w-05-stock-query-owner-s-item-f2",
+    "w-06-stock-query-quote-q-item-f1",
+    "w-07-stock-query-quote-q-item-f2",
+    "w-08-stock-query-alt-unit-item-f1",
+    "w-09-stock-query-mix-5-set-large-f1",
+    "w-10-stock-query-dash-item-7-f1",
+    "alt-a-04-stock-query-alt-unit-probe-a",
+    "alt-a-05-stock-query-alt-unit-probe-b",
+];
+
+fn captured_item_name(file: &str) -> String {
+    let bytes = capture(&format!("{file}.request.utf16le.xml"));
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+        .collect();
+    let text = String::from_utf16(&units).expect("UTF-16LE");
+    let (_, rest) = text.split_once("<STOCKITEMNAME>").expect(file);
+    let (name, _) = rest.split_once("</STOCKITEMNAME>").expect(file);
+    quick_xml::escape::unescape(name).expect(file).into_owned()
+}
+
+/// Every character the alphabet admits beyond letters, digits and the space is in a captured name,
+/// and every such character in a captured name is admitted: the alphabet is exactly the measured
+/// one. For each, a capture holding it is the builder's bytes (the first test).
+#[test]
+fn the_admitted_punctuation_is_exactly_the_captured_punctuation() {
+    let names: Vec<String> = NAMED_REQUESTS
+        .iter()
+        .map(|file| captured_item_name(file))
+        .collect();
+    let captured: std::collections::BTreeSet<char> = names
+        .iter()
+        .flat_map(|name| name.chars())
+        .filter(|c| !c.is_ascii_alphanumeric() && *c != ' ')
+        .collect();
+    let admitted: std::collections::BTreeSet<char> =
+        STOCK_QUERY_MEASURED_PUNCTUATION.into_iter().collect();
+    assert_eq!(captured, admitted);
+    for name in &names {
+        assert!(MeasuredItemName::new(name).is_ok(), "{name:?}");
+    }
+}
+
+/// `'` and `"` were sent raw (`f1`) and escaped (`f2`); Tally answered both byte for byte alike.
+/// The builder escapes once, so it sends the `f2` form and not the raw one.
+#[test]
+fn a_quote_raw_or_escaped_selects_the_same_item() {
+    for (raw, escaped, item) in [
+        (
+            "w-04-stock-query-owner-s-item-f1",
+            "w-05-stock-query-owner-s-item-f2",
+            "Owner's Item",
+        ),
+        (
+            "w-06-stock-query-quote-q-item-f1",
+            "w-07-stock-query-quote-q-item-f2",
+            "Quote \"Q\" Item",
+        ),
+    ] {
+        assert_eq!(
+            capture(&format!("{raw}.answer.utf16le.xml")),
+            capture(&format!("{escaped}.answer.utf16le.xml"))
+        );
+        let rendered = crate::encode_tally_xml_request_utf16le(&render_stock_query_request(
+            LAB,
+            &MeasuredItemName::new(item).unwrap(),
+            &period("20250401", "20260331"),
+        ));
+        assert_eq!(rendered, capture(&format!("{escaped}.request.utf16le.xml")));
+        assert_ne!(rendered, capture(&format!("{raw}.request.utf16le.xml")));
+    }
+}
+
+/// The stock-item collection requests of the same sittings are the stock read's own builder
+/// (`AuditStockItemsV1`), byte for byte.
+#[test]
+fn the_collection_requests_are_the_stock_reads_bytes() {
+    let company = ValidatedCompanyName::new(LAB).unwrap();
+    for (file, to) in [
+        ("a-01-items-to-20250401", "20250401"),
+        ("a-02-items-to-20250501", "20250501"),
+        ("a-03-items-to-20260331", "20260331"),
+        ("w-01-items-to-20260331", "20260331"),
+    ] {
+        let range = ValidatedDateRange::new("20250401", to).unwrap();
+        let rendered = ReadOnlyProfile::AuditStockItemsV1 {
+            company: &company,
+            period: &range,
+        }
+        .render();
+        assert_eq!(
+            crate::encode_tally_xml_request_utf16le(&rendered),
+            capture(&format!("{file}.request.utf16le.xml")),
+            "{file}"
+        );
+    }
+}
+
+/// In the same sitting, each item's one Stock Query line equals the stock-item collection's
+/// closing quantity for it. An item with an alternate unit is the exception: Stock Query writes
+/// its base unit only, and the collection's compound closing is not read as a quantity.
+#[test]
+fn each_line_meets_the_same_sittings_collection_closing() {
+    let closing = |file: &str, item: &str| {
+        parse_native_stock_items(&answer(file), LAB_GUID)
+            .expect(file)
+            .rows
+            .into_iter()
+            .find(|row| row.name == item)
+            .unwrap_or_else(|| panic!("{item} in {file}"))
+            .closing
+            .quantity
+    };
+    for (query, item) in [
+        ("w-02-stock-query-kit-co-item-f1", "Kit & Co Item"),
+        ("w-03-stock-query-gauge-test-50l-f1", "Gauge (Test) 50L"),
+        ("w-05-stock-query-owner-s-item-f2", "Owner's Item"),
+        ("w-07-stock-query-quote-q-item-f2", "Quote \"Q\" Item"),
+        ("w-08-stock-query-alt-unit-item-f1", "Alt Unit Item"),
+        ("w-09-stock-query-mix-5-set-large-f1", "Mix 5% / Set, Large"),
+        ("w-10-stock-query-dash-item-7-f1", "Dash-Item 7"),
+    ] {
+        let Ok(StockQueryAnswer::Lines(lines)) = parse_stock_query(&answer(query)) else {
+            panic!("{query}");
+        };
+        assert_eq!(lines.len(), 1, "{query}");
+        assert_eq!(
+            closing("w-01-items-to-20260331", item),
+            NativeQuantityRead::Read(lines[0].quantity.clone()),
+            "{query}"
+        );
+    }
+    for item in ["Alt Unit Probe A", "Alt Unit Probe B"] {
+        assert_eq!(
+            closing("alt-a-01-items-fy-s4", item),
+            NativeQuantityRead::Unread,
+            "{item}"
+        );
+    }
 }

@@ -529,6 +529,103 @@ const ROWS: &[Row] = &[
         parser: "parse_stock_query",
         parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
     },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-02-stock-query-kit-co-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-03-stock-query-gauge-test-50l-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-04-stock-query-owner-s-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-05-stock-query-owner-s-item-f2.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-06-stock-query-quote-q-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-07-stock-query-quote-q-item-f2.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-08-stock-query-alt-unit-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-09-stock-query-mix-5-set-large-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-10-stock-query-dash-item-7-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-04-stock-query-alt-unit-probe-a.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-05-stock-query-alt-unit-probe-b.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    // The stock-item collection beside those Stock Query answers, same sittings (#2018)
+    Row {
+        fixture: "tests/fixtures/stock-query/a-01-items-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/a-02-items-to-20250501.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/a-03-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-01-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-01-items-fy-s4.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
     // tests/simulator_corpus.rs, src/agent_tests.rs (an empty collection's export status)
     Row {
         fixture: "tests/fixtures/agent/native-bank-allocation-status.utf16le.xml",

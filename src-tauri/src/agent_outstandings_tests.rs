@@ -1817,6 +1817,33 @@ async fn a_withdrawn_call_sends_nothing_after_the_bills_post_in_flight() {
     );
 }
 
+/// A call withdrawn while the status check between the two Receivable posts is in flight (#778,
+/// #2119): the check runs to its end, and the pair's second post, which goes by the Bills report's
+/// own transport, is not sent.
+#[tokio::test]
+async fn a_withdrawn_call_sends_no_bills_post_after_the_check_in_flight() {
+    let between = |posts: AgeingBillsPosts| posts.receivable() + 1;
+    let (response, sent) = ageing_outstandings_holding(
+        between,
+        bridge_tally_transport::DEFAULT_REQUEST_TIMEOUT,
+        None,
+        true,
+    )
+    .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "request_cancelled", "{response}");
+    let (_, posts) = ageing_plans(
+        None,
+        ageing_ledgers_with_currency("Ageing Customer A"),
+        &json!({}),
+    );
+    assert_eq!(
+        sent,
+        between(posts) + 1,
+        "the second Receivable post was not sent: {response}"
+    );
+}
+
 /// The next step for a party ledger row without its line (#1356) says that only a bill trail can
 /// be narrowed by a reference: the unadjusted detail has no narrower read.
 #[test]

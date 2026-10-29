@@ -1700,13 +1700,9 @@ async fn a_bills_post_held_past_the_ordinary_limit_is_answered() {
         AgeingBillsPosts::receivable_second,
         AgeingBillsPosts::payable,
     ] {
-        let (response, _) = ageing_outstandings_holding(
-            held,
-            std::time::Duration::from_millis(300),
-            None,
-            false,
-        )
-        .await;
+        let (response, _) =
+            ageing_outstandings_holding(held, std::time::Duration::from_millis(300), None, false)
+                .await;
         assert_eq!(response["isError"], false, "{response}");
         assert!(
             response["structuredContent"]["result"]["error"].is_null(),
@@ -1746,8 +1742,7 @@ async fn a_bills_post_waits_for_the_wire_on_the_calls_shared_budget() {
     let sent = simulator.received();
     simulator.cancel();
     assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"],
-        "tally_endpoint_busy",
+        response["structuredContent"]["result"]["error"]["code"], "tally_endpoint_busy",
         "{response}"
     );
     assert_eq!(sent, busy, "the Receivable post was not sent: {response}");

@@ -1963,9 +1963,9 @@ async fn a_bills_report_body_shorter_than_its_declared_length_is_truncated() {
 
     let plan = ScenarioPlan::new(Fixture::ExportStatusOne).with_encoding(WireEncoding::Utf16Le);
     let whole = plan.response_bytes().len();
-    let simulator = SequenceSimulator::spawn(vec![plan.with_framing(
-        ResponseFraming::DeclaredContentLength { bytes: whole + 17 },
-    )])
+    let simulator = SequenceSimulator::spawn(vec![
+        plan.with_framing(ResponseFraming::DeclaredContentLength { bytes: whole + 17 })
+    ])
     .unwrap();
     let client = super::TallyClient::new(super::TallyConfig {
         host: "127.0.0.1".into(),

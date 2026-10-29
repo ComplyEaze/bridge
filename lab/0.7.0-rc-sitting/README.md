@@ -106,7 +106,7 @@ THE LOCK:      <to fill: the period locked on Tally's screen, its first day; its
 THE DATE:      <to fill>
 MARKS WINDOW:  <to fill: the vouchers window of every MARKS read>
 C2 RAW MARKS:  <to fill: the request file, its sha256, and the GET /status command>
-PART 2:        <to fill: the data folder of the 7 Oct 2026 rehearsal and the company it posted into, or "not run">
+PART 2:        not available: no captured whole-refusal answer (the lab found no 7 Oct 2026 data folder holding one). R3 rests on Part 1; if Part 1 gives no whole refusal, the settle dialog stays covered by tests only, as #2150 says.
 GO-AHEAD:      <to fill>
 ```
 

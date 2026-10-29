@@ -102,9 +102,17 @@ pub(super) fn settle_preview(line: &ImportLedgerLine, result: &Value) -> String 
         (Some(first), _) => format!("dated {first}"),
         _ => String::new(),
     };
-    let matched = result["counts"]["matching_content_observed"]
-        .as_u64()
-        .unwrap_or(0);
+    // A match that is cancelled or optional is not in the accounts, so the
+    // line never counts it as held, as the binding's summary does not.
+    let matched = result["vouchers"].as_array().map_or(0, |vouchers| {
+        vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher["status"] == "matching_content_observed"
+                    && voucher["accounting_effective"] == true
+            })
+            .count()
+    });
     let (noun, these, each) = if count == 1 {
         ("voucher", "this voucher", "the voucher")
     } else {
@@ -174,11 +182,20 @@ pub(super) fn report() -> Value {
     json!({"state": "settled", "next_step": NEXT_STEP})
 }
 
+/// Whether a voucher's next step still asks for the settlement it now has:
+/// the lines of `tally_reported_not_created` and of a voucher a later read
+/// cannot find after Tally reported it not created end on that call.
+pub(super) fn asks_for_settlement(next_step: Option<&str>) -> bool {
+    next_step
+        .is_some_and(|line| line.contains("call acknowledge_post_review with doubt not_created"))
+}
+
 /// The binding summary of a settled batch, in place of the open one.
 pub(super) const SUMMARY: &str = "A person settled this batch after Tally reported that its post \
     created none of its vouchers: ComplyEaze Bridge never sends them again.";
 
-const NEXT_STEP: &str = "A person settled this batch in ComplyEaze Bridge's own dialog, saying \
+pub(super) const NEXT_STEP: &str =
+    "A person settled this batch in ComplyEaze Bridge's own dialog, saying \
     each voucher is in the book or will not be posted. It is closed and counted as settled, but \
     not marked posted, and its rows are never built or posted again. If a voucher is wanted in the \
     book and is not there, it can only be entered in Tally.";

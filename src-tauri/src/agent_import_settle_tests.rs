@@ -171,6 +171,12 @@ async fn a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held
         verified["post_span_binding"]["summary"],
         super::super::super::settle::SUMMARY
     );
+    // The voucher's own line no longer asks for the settlement it has.
+    assert_eq!(
+        verified["unverified_vouchers"][0]["next_step"],
+        super::super::super::settle::NEXT_STEP,
+        "{verified}"
+    );
     assert_eq!(
         sent(simulator).len(),
         3 * span_readback(empty_collection(), 10).len()
@@ -601,4 +607,86 @@ fn the_journaled_answer_is_read_from_the_batch_s_records() {
     assert!(!case(None, &[]));
     assert!(!case(Some(10), &["posted_verified"]));
     assert!(!case(Some(10), &["bound"]));
+}
+
+/// A settlement replaces the first line of the binding's summary only. A
+/// restore that reached other posts of the company is still named after it,
+/// so the person is told to verify them again (#1050).
+#[test]
+fn a_settled_summary_keeps_what_follows_its_first_line() {
+    use super::super::super::settled_post_span_summary;
+    let settled = super::super::super::settle::SUMMARY;
+    let restored = json!({
+        "state": "refused",
+        "rollback_recorded": true,
+        "other_batches_covered": {"count": 1},
+    });
+    let summary = settled_post_span_summary(&restored);
+    assert!(summary.starts_with(settled), "{summary}");
+    assert!(
+        summary.ends_with(
+            " This check also found the company's books restored from a backup after other posts of it, and recorded that: verify the other post named in other_batches_covered again, and check their vouchers in Tally."
+        ),
+        "{summary}"
+    );
+    let two = json!({
+        "state": "refused",
+        "rollback_recorded": true,
+        "other_batches_covered": {"count": 2},
+    });
+    assert!(settled_post_span_summary(&two)
+        .contains("verify the 2 other posts named in other_batches_covered again"),);
+    // No restore, no examples to name: the settled line alone.
+    assert_eq!(
+        settled_post_span_summary(&json!({"state": "not_bound"})),
+        settled
+    );
+}
+
+/// The dialog counts a match as "in the book" only when it is in the accounts:
+/// a cancelled or optional voucher with the same content is not (#1039).
+#[test]
+fn the_settle_dialog_counts_only_matches_in_the_accounts() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let line = saved_captured_line(&server);
+    let found = |effective: bool| {
+        settle_preview(
+            &line,
+            &json!({"vouchers": [{
+                "status": "matching_content_observed",
+                "accounting_effective": effective,
+            }]}),
+        )
+        .replace('\n', " ")
+    };
+    assert!(
+        found(false).contains("found, for 0 of the 1 voucher sent,"),
+        "{}",
+        found(false)
+    );
+    assert!(
+        found(true).contains("found, for 1 of the 1 voucher sent,"),
+        "{}",
+        found(true)
+    );
+}
+
+/// A voucher's next step stops asking for the settlement only where it asked
+/// for it: the two lines that end on that call.
+#[test]
+fn only_the_next_steps_that_ask_for_the_settlement_are_replaced() {
+    use super::super::super::settle::{asks_for_settlement, NEXT_STEP};
+    use super::super::super::verification::{
+        plain_next_step, REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP,
+    };
+    assert!(asks_for_settlement(plain_next_step(
+        "tally_reported_not_created"
+    )));
+    assert!(asks_for_settlement(Some(
+        REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP
+    )));
+    assert!(!asks_for_settlement(plain_next_step("sent_not_attributed")));
+    assert!(!asks_for_settlement(Some(NEXT_STEP)));
+    assert!(!asks_for_settlement(None));
 }

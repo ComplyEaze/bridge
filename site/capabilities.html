@@ -57,7 +57,7 @@
   <section class="page-hero">
     <div class="page-hero__inner">
       <h1>What ComplyEaze&nbsp;Bridge can do</h1>
-      <p>The 34 tools release 0.7.0 offers in Claude Desktop, 33 of them with its default settings (posting off) and <code>audit_test_run</code> only when its own setting is ticked, counted by the release&rsquo;s own check of each published package (it reports 33, and 35 with posting on) and named from the source of that release, and the two that posting adds and the two that master writes adds. Checked against release 0.7.0 on <time datetime="0000-00-00">[cut date]</time>; the Releases page says which release is the latest.</p>
+      <p>The 34 tools release 0.7.0 offers in Claude Desktop, 33 of them with its default settings (posting off) and <code>audit_test_run</code> only when its own setting is ticked, counted by the release&rsquo;s own check of each published package (it reports 33, and 35 with posting on) and named from the source of that release, and the two that posting adds and the two that master writes adds. Checked against release 0.7.0 on <time datetime="2026-10-30">30 October 2026</time>; the Releases page says which release is the latest.</p>
     </div>
   </section>
 
@@ -94,7 +94,7 @@
           <tr><th scope="row"><code>read_evidence</code></th><td>ComplyEaze&nbsp;Bridge&rsquo;s own recent reads, as fingerprints, with no figures</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>sales_register</code></th><td>Sales and Credit Note vouchers that touch a ledger under Duties &amp; Taxes, as the books record them</td><td>Read-only</td><td>A register of what the books record, not a GST return.</td></tr>
           <tr><th scope="row"><code>statement_tie_out</code></th><td>Whether the bank ledger stands where a parsed bank statement says it stood at the start and at the end of the statement&rsquo;s dates, or of whole calendar months of it: three gaps and the dates</td><td>Read-only</td><td>The balances themselves are not returned. Run once in the lab, on one synthetic company of TallyPrime 7.1 Silver.</td></tr>
-          <tr><th scope="row"><code>stock_summary</code></th><td>The closing stock value of each item as of 31 March, and its closing quantity where Tally&rsquo;s own Stock Summary shows the item on a line of its own</td><td>Read-only</td><td>Small books only: a book with many masters of any kind, ledgers included, is refused today. Other dates are refused; only the year ending 31 March 2026 has been checked. An item inside a stock group returns no quantity.</td></tr>
+          <tr><th scope="row"><code>stock_summary</code></th><td>The closing stock value of each item as of a month&rsquo;s last day, and its closing quantity where Tally&rsquo;s own Stock Summary shows the item on a line of its own; an item inside a stock group returns its quantity from the item list, marked as not compared</td><td>Read-only</td><td>Small books only: a book with many masters of any kind, ledgers included, is refused today, and so is a date that is not a month&rsquo;s last day. Month ends inside the year were checked on two lab books.</td></tr>
           <tr><th scope="row"><code>tally_status</code></th><td>Whether TallyPrime&rsquo;s gateway answers, and which companies are loaded</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>trial_balance</code></th><td>The ledger-wise Trial Balance for a date range</td><td>Read-only</td><td></td></tr>
           <tr><th scope="row"><code>validate_masters</code></th><td>Checks ledger names against the live book before you build an import file</td><td>Read-only</td><td></td></tr>
@@ -113,7 +113,7 @@
       <p class="caps-lead">Posting is off in a new install. If you turn it on in the extension&rsquo;s settings, two more tools appear, and each needs you, in a ComplyEaze&nbsp;Bridge window:</p>
       <ul class="faq-next">
         <li><code>post_import</code> posts one saved Journal, Payment, Receipt or Contra, or a saved batch of 2 to 50 of them, after you approve it in a ComplyEaze&nbsp;Bridge window (for a batch, its summary), then reads it back.</li>
-        <li><code>acknowledge_post_review</code> asks you, in its own window, to record that you reviewed a voucher ComplyEaze&nbsp;Bridge posted whose ledger now points to a different master. The assistant cannot approve it for you.</li>
+        <li><code>acknowledge_post_review</code> asks you, in its own window, to record that you checked a post in Tally: a voucher ComplyEaze&nbsp;Bridge posted whose ledger now points to a different master, a post matched only by its content, or, to settle it, a post Tally answered as creating none of its vouchers. It changes nothing in Tally. The assistant cannot approve it for you. After one of the last two is recorded, do not go back to 0.6.1.</li>
       </ul>
     </section>
 

@@ -2176,7 +2176,7 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
 /// import's admission, which read the same ledger source, so the step speaks of "this read".
 ///
 /// Measured on one book (TallyPrime 7.2 Silver, a party ledger holding dollar vouchers): Tally
-/// wrote a rupee ledger's closing balance as `$1000100.00 @ ₹ 86/$ = ₹ 86009641.25`, with no
+/// wrote a rupee ledger's closing balance as `$100.00 @ ₹ 87/$ = ₹ 8700.00`, with no
 /// space after the symbol. The detector that sets such a row aside (`is_currency_composite`) is
 /// strict and needs a space there, as the 7.1 captures have, so the row was kept as a plain
 /// amount and the parse refused it as a foreign-currency balance, with this cause. The refusal is

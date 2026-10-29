@@ -1,0 +1,8 @@
+Pushed copies that differ from the files kept on the lab PC: lab-PC paths replaced by placeholders. Each changed file, with the original's bytes and sha256 and what was replaced.
+answers/009-p1-parse-a.json: original 4916 B sha256 3cfb1c93e6e2ccf037d619c52455e255d7867164baafe63d83c6da79a1954161; 1 x -> <password folder>; 1 x -> <lab folder>
+answers/010-x1-build.json: original 12401 B sha256 f1e89fc246d7c5c73a80a97d2e490078138167bfac90e49c8f78c3f4472c1ad8; 2 x -> <lab folder>
+answers/021-s6-p3-parse-a.json: original 4913 B sha256 703e5eb3c1bc683911a95546312c18ee530bb1b5914148dd3ef9580433e0e82d; 1 x -> <password folder>; 1 x -> <lab folder>
+answers/022-s6-x2-build.json: original 10565 B sha256 362a64cc6c6ff4357c133c74110135edb8664df7b0e96c21ebbdb1f9073320fc; 2 x -> <lab folder>
+restore-plan.txt: original 682 B sha256 8ba6326fd86c0a10fd53481bb6749f78ba19ad2387e27d5c1f77297534bd87f9; 1 x -> <Tally data folder>
+evidence/s0-netstat.txt: original 9486 B sha256 75faf1c48803a386bdceef7415540c676ed68ab3ac6a7db590a4b9e5aec70d58; only the port-9001 LISTENING lines kept
+evidence/c10-netstat.txt: original 11465 B sha256 50409628b12ec6ddbf233c9e624d80d726608b89d976cd690f6e178e168f8ae5; only the port-9001 LISTENING lines kept

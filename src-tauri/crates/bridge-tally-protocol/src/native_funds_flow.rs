@@ -25,16 +25,15 @@ use crate::{
     native_cash_flow::{
         parse_native_cash_flow, CashFlowMonth, NativeCashFlowError, WholeMonthWindow,
     },
-    native_statement_reports::{render_built_in_report_request, NativeStatementAmount},
+    native_statement_reports::{
+        render_built_in_report_request, BuiltInReport, NativeStatementAmount,
+    },
 };
-
-/// The report name Tally's gateway accepts (live capture, 6 Oct 2026).
-const REPORT_ID: &str = "Funds Flow";
 
 /// Renders the only supported request: Tally's own Funds Flow by name over the
 /// window, for the named company. No TDL.
 pub fn render_native_funds_flow_request(company: &str, window: &WholeMonthWindow) -> String {
-    render_built_in_report_request(REPORT_ID, company, window.period())
+    render_built_in_report_request(BuiltInReport::FundsFlow, company, window.period())
 }
 
 /// One month's row, each column exactly as Tally printed it under its own

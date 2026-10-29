@@ -36,10 +36,7 @@ pub enum NativeStatementKind {
 impl NativeStatementKind {
     /// The report name Tally's gateway accepts (§12a.11).
     pub fn report_id(self) -> &'static str {
-        match self {
-            Self::BalanceSheet => "Balance Sheet",
-            Self::ProfitAndLoss => "Profit and Loss",
-        }
+        BuiltInReport::from(self).id()
     }
 
     fn shape(self) -> Shape {
@@ -139,22 +136,79 @@ pub fn render_native_statement_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
-    render_built_in_report_request(kind.report_id(), company, period)
+    render_built_in_report_request(kind.into(), company, period)
 }
 
-/// The same envelope for any built-in report named by `id`. The Stock Summary
+/// The built-in reports Bridge requests by name: a closed set fixed in code,
+/// so no run-time string can choose the report ID of a request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BuiltInReport {
+    BalanceSheet,
+    ProfitAndLoss,
+    SalesRegister,
+    PurchaseRegister,
+    CashFlow,
+    FundsFlow,
+    NegativeLedgers,
+    NegativeStock,
+    StockSummary,
+}
+
+impl BuiltInReport {
+    #[cfg(test)]
+    pub(crate) const ALL: [Self; 9] = [
+        Self::BalanceSheet,
+        Self::ProfitAndLoss,
+        Self::SalesRegister,
+        Self::PurchaseRegister,
+        Self::CashFlow,
+        Self::FundsFlow,
+        Self::NegativeLedgers,
+        Self::NegativeStock,
+        Self::StockSummary,
+    ];
+
+    /// The report name Tally's gateway accepts. Plain ASCII words, so the
+    /// name needs no XML escaping.
+    pub(crate) const fn id(self) -> &'static str {
+        match self {
+            Self::BalanceSheet => "Balance Sheet",
+            Self::ProfitAndLoss => "Profit and Loss",
+            Self::SalesRegister => "Sales Register",
+            Self::PurchaseRegister => "Purchase Register",
+            // Accepted by Tally in a live capture, 6 Oct 2026.
+            Self::CashFlow => "Cash Flow",
+            // Accepted by Tally in a live capture, 6 Oct 2026.
+            Self::FundsFlow => "Funds Flow",
+            // Accepted by Tally in a live capture, 9 Oct 2026.
+            Self::NegativeLedgers => "Negative Ledgers",
+            // Accepted by Tally in a live capture, 6 Oct 2026.
+            Self::NegativeStock => "Negative Stock",
+            Self::StockSummary => "Stock Summary",
+        }
+    }
+}
+
+impl From<NativeStatementKind> for BuiltInReport {
+    fn from(kind: NativeStatementKind) -> Self {
+        match kind {
+            NativeStatementKind::BalanceSheet => Self::BalanceSheet,
+            NativeStatementKind::ProfitAndLoss => Self::ProfitAndLoss,
+        }
+    }
+}
+
+/// The same envelope for any built-in report. The Stock Summary
 /// (`native_stock_summary`) is requested through it, so its request is this
-/// shape by construction. `id` is `&'static str`: a literal, or a literal an
-/// enum's `report_id` selects, fixed in Bridge's code. A run-time string cannot
-/// be passed without leaking it or holding it in a static.
+/// shape by construction.
 pub(crate) fn render_built_in_report_request(
-    id: &'static str,
+    report: BuiltInReport,
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        id = xml_escape(id),
+        id = report.id(),
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),

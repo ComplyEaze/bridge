@@ -34,13 +34,10 @@ use std::fmt;
 use crate::{
     native_outstandings::NativeLedgerSnapshotPeriod,
     native_statement_reports::{
-        amount, read_text, render_built_in_report_request, NativeStatementAmount,
+        amount, read_text, render_built_in_report_request, BuiltInReport, NativeStatementAmount,
     },
     tolerant_xml::sanitize_invalid_numeric_references,
 };
-
-/// The report name Tally's gateway accepts (live capture, 9 Oct 2026).
-const REPORT_ID: &str = "Negative Ledgers";
 
 /// Renders the only supported request: Tally's own Negative Ledgers by name over
 /// the period, for the named company. No TDL.
@@ -48,7 +45,7 @@ pub fn render_native_negative_ledgers_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
-    render_built_in_report_request(REPORT_ID, company, period)
+    render_built_in_report_request(BuiltInReport::NegativeLedgers, company, period)
 }
 
 /// A ledger's closing balance as Tally listed it: the side and the amount without

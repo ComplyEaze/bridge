@@ -277,3 +277,121 @@ fn a_census_slice_holding_rows_of_another_collection_is_refused() {
         assert_eq!(parse(&decode(EMPTY_SLICE), COMPANY_GUID, 8), Ok(Vec::new()));
     }
 }
+
+const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+
+fn stock_lab(name: &str) -> String {
+    let path = format!(
+        "{}/tests/fixtures/{name}.utf16le.xml",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    decode(&std::fs::read(path).expect("committed capture"))
+}
+
+fn stock_lab_bytes(name: &str) -> Vec<u8> {
+    std::fs::read(format!(
+        "{}/tests/fixtures/{name}.utf16le.xml",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .expect("committed capture")
+}
+
+/// The stock-item census on BRIDGE STOCK LAB (#1233, `STOCK_CAPTURE_PROVENANCE.md`): three slices
+/// covering its mark of 292 answered 0, 0 and 55 rows, and the census counts the 55 items once
+/// each, as many as Tally's own `NUMSTOCKITEMS` read in the same sitting.
+#[test]
+fn a_captured_stock_item_census_counts_the_books_items_once() {
+    use bridge_tally_protocol::ledger_census::{Census, CensusLimits, CensusPlan, StockItems};
+    let plan = CensusPlan::<StockItems>::new(
+        300,
+        CensusLimits {
+            slice_width: 100,
+            max_slices: 3,
+        },
+    )
+    .unwrap();
+    let mut census = Census::new(plan);
+    let empty = stock_lab("stock_item_census_slice_stock_lab_empty_live");
+    let full = stock_lab("stock_item_census_slice_stock_lab_200_300_live");
+    for answer in [&empty, &empty, &full] {
+        let slice = census.next_slice().unwrap();
+        let guids = parse_stock_item_census_slice(answer, STOCK_LAB_GUID, slice.width())
+            .expect("a captured slice");
+        census.accept(guids).unwrap();
+    }
+    assert_eq!(census.finish().unwrap().get(), 55);
+    // The ledger census does not read stock-item rows.
+    assert_eq!(
+        parse_ledger_census_slice(&full, STOCK_LAB_GUID, 100),
+        Err(StandardLedgerCatalogError::MalformedResponse)
+    );
+    // A slice narrower than its rows refuses at the parser's bound.
+    assert_eq!(
+        parse_stock_item_census_slice(&full, STOCK_LAB_GUID, 54),
+        Err(StandardLedgerCatalogError::BoundsViolation)
+    );
+}
+
+/// The stock-group census slice on BRIDGE STOCK LAB returned the same three groups as the
+/// `masters` tool's stock-group read in the same sitting.
+#[test]
+fn a_captured_stock_group_census_slice_returns_the_masters_groups() {
+    use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
+    let census = parse_stock_group_census_slice(
+        &stock_lab("stock_group_census_slice_stock_lab_0_300_live"),
+        STOCK_LAB_GUID,
+        300,
+    )
+    .expect("a captured slice");
+    let masters = parse_native_masters(
+        NativeMasterKind::StockGroups,
+        &stock_lab("stock_groups_masters_stock_lab_live"),
+        STOCK_LAB_GUID,
+    )
+    .expect("a captured masters answer");
+    let census: std::collections::BTreeSet<_> = census.into_iter().collect();
+    let listed: std::collections::BTreeSet<_> = masters
+        .rows
+        .iter()
+        .map(|row| row.guid.to_ascii_lowercase())
+        .collect();
+    assert_eq!(census.len(), 3);
+    assert_eq!(census, listed);
+}
+
+/// The two census requests sent to BRIDGE STOCK LAB are the builders' bytes.
+#[test]
+fn the_captured_census_requests_are_the_builders_bytes() {
+    use bridge_tally_protocol::ledger_census::{
+        render_stock_group_census_slice_request, render_stock_item_census_slice_request,
+        CensusLimits, CensusPlan, StockGroups, StockItems,
+    };
+    let items = CensusPlan::<StockItems>::new(
+        300,
+        CensusLimits {
+            slice_width: 100,
+            max_slices: 3,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        bridge_tally_protocol::encode_tally_xml_request_utf16le(
+            &render_stock_item_census_slice_request("BRIDGE STOCK LAB", &items.slices()[2])
+        ),
+        stock_lab_bytes("stock_item_census_slice_stock_lab_200_300_request")
+    );
+    let groups = CensusPlan::<StockGroups>::new(
+        300,
+        CensusLimits {
+            slice_width: 300,
+            max_slices: 1,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        bridge_tally_protocol::encode_tally_xml_request_utf16le(
+            &render_stock_group_census_slice_request("BRIDGE STOCK LAB", &groups.slices()[0])
+        ),
+        stock_lab_bytes("stock_group_census_slice_stock_lab_0_300_request")
+    );
+}

@@ -532,13 +532,11 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
     assert!(!was_sent(&observed, &report));
 }
 
-/// An empty census slice as Tally answers it: the stock-item census's slices past every item on
-/// BRIDGE STOCK LAB (`lab/1233-stock-census-slice-answers`, sha256 `cf34fa0a…`) are byte-identical
-/// to this committed capture, the stock-item collection of a book with no item. An empty answer
-/// names no company.
+/// An empty census slice as Tally answered it on BRIDGE STOCK LAB (a slice past every item). An
+/// empty answer names no company.
 fn empty_census_slice() -> String {
     decode(include_bytes!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/stock_items_empty_book_fy_live.utf16le.xml"
+        "../../crates/bridge-tally-protocol/tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml"
     ))
 }
 

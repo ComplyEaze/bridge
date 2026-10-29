@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml
+# parser: parse_stock_item_census_slice(max 100)
+# source: captured
+Ok([])

@@ -1417,10 +1417,10 @@ async fn a_book_past_the_single_read_mark_is_counted_before_any_item_request() {
     let mark = u64::try_from(16_000_000 / stock_item_worst_row_bytes()).unwrap() + 1;
     assert_eq!(mark, 875);
     let mut plans = Book::captured().through_flags(14, mark);
-    // An empty census slice as Tally answers it: byte-identical to the stock-item census's
-    // slices past every item on BRIDGE STOCK LAB (`lab/1233-stock-census-slice-answers`).
+    // An empty census slice as Tally answered it on BRIDGE STOCK LAB; an empty answer names no
+    // company.
     plans.push(xml(decode(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/stock_items_empty_book_fy_live.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml"
     ))));
     let one = OneServer::spawn(plans);
     let refused = one.call(args(AS_OF, 0, 500, None)).await;

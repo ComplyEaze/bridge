@@ -1463,6 +1463,50 @@ fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
     );
 }
 
+/// A Bills report request held past the request limit, or answered past the size cap (#1356,
+/// measured at a year-end date on a dense book): the next step does not invite a retry loop and
+/// names the one narrower read, an earlier `as_of`. Only under the outstandings code: the same
+/// transport causes reach every other read.
+#[test]
+fn a_bills_report_past_the_request_limit_is_not_retried_in_a_loop() {
+    for cause in ["request_deadline_exceeded", "response_size_limit_exceeded"] {
+        let text = remediation_for("native_outstandings_read_failed", Some(cause))
+            .expect("the cause has a next step under outstandings");
+        assert!(
+            text.contains("Do not repeat the same call in a loop"),
+            "{text}"
+        );
+        assert!(
+            text.contains("an earlier `as_of` reads fewer open bills"),
+            "{text}"
+        );
+        assert!(!text.contains("call outstandings once more"), "{text}");
+        assert_eq!(refusal_remediation(cause), None, "{cause}");
+        // Another tool's code with the same cause gets none of the Bills advice.
+        assert_eq!(
+            remediation_for("trial_balance_read_failed", Some(cause)),
+            None,
+            "{cause}"
+        );
+    }
+}
+
+/// The next step for a party ledger row without its line (#1356) says that only a bill trail can
+/// be narrowed by a reference: the unadjusted detail has no narrower read.
+#[test]
+fn the_party_ledger_row_step_offers_a_reference_for_a_bill_trail_only() {
+    let text = refusal_remediation("party_ledger_row_without_line").expect("a next step");
+    assert!(text.contains("Only a bill trail can be narrowed"), "{text}");
+    assert!(
+        text.contains("The unadjusted detail has no narrower read"),
+        "{text}"
+    );
+    assert!(
+        text.contains("do not repeat the same call in a loop"),
+        "{text}"
+    );
+}
+
 /// RD1 (2 Oct): no field said how many open bills there were, so a page cut
 /// at `limit` read like the whole list while its totals covered every bill.
 /// `open_bills_total` counts the bills in the requested direction before any

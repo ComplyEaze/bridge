@@ -4031,10 +4031,21 @@ refusal stands and carries `window_scope` with `basis` `whole_book` and the `rea
 ledger read itself keeps its own code, with `window_scope` `basis` `ledger_scoped`: a part not
 admitted against the census (`voucher_window_part_not_admitted`, which is what a book that moved
 between the census and the read looks like), a row with no line on the ledger
-(`party_ledger_row_without_line`), or the party's own vouchers needing too many requests. The
-ledger census costs one request (sent twice, as every read is) per 8,192 of the book's AlterIDs,
-spent after the company window's census, so such a call can take about twice as long; that cost
-is unmeasured. A named bill's window never starts before the books.
+(`party_ledger_row_without_line`), or the party's own vouchers needing too many requests. A
+refusal from a later step, after the party was read by its ledger (the closing marks read, a book
+that moved, or the detail's checks of what was read), keeps its own code and carries
+`window_scope` `basis` `ledger_scoped` too. The ledger census costs one request (sent twice, as
+every read is) per 8,192 of the book's AlterIDs, spent after the company window's census, so such
+a call can take about twice as long; that cost is unmeasured. A named bill's window never starts
+before the books.
+
+The read of Tally's Bills Receivable and Payable reports comes before any party detail, and on a
+large book it can be the step that fails: on one synthetic book of about 30,000 vouchers, at the
+end of its first year (31 March 2026), one of its requests was held past the 20-second limit and
+the whole call was refused as `native_outstandings_read_failed`, cause `request_deadline_exceeded`,
+with no figure returned, while the same book three months into the year answered (#1356). That
+refusal's next step tells the assistant not to repeat the call in a loop and that an earlier
+`as_of` reads fewer open bills. Where the limit falls on a given book is not measured.
 The company's two change marks are read before the statement of open bills and again after the
 voucher window, and a detail whose marks moved between them is refused as
 `voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report

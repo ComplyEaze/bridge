@@ -1712,8 +1712,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              vouchers for the window needed too many requests, and Tally returned a voucher that \
              has no line on that ledger, so the detail used none of them. Tell the user the \
              party's detail could not be read this way, and do not repeat the same call in a \
-             loop. A shorter window helps when a bill is named: name a `reference` that \
-             `open_bills` lists for the party, and the read starts at that bill's date.",
+             loop. Only a bill trail can be narrowed: naming a `reference` that `open_bills` \
+             lists for the party starts its read at that bill's date. The unadjusted detail has \
+             no narrower read.",
         ),
         // A ledger-scoped movement read returned a voucher with no line on the ledger (#485):
         // nothing was summed. The same figures are in the Trial Balance, which does not read
@@ -2181,6 +2182,16 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
              returned. When the refusal carries a `bill_row`, it names the report and the row \
              in the order Tally sent them, which may not be the order on screen. Do not retry; \
              tell the user what the cause says.",
+        ),
+        // One request of the Bills report was held past the transport's 20-second limit, or
+        // answered past its size cap (#1356 measured the first on a dense book at a year-end
+        // date). The report grows with the bills open at the date.
+        "request_deadline_exceeded" | "response_size_limit_exceeded" => Some(
+            "Tally's Bills Receivable or Payable report at this date took longer to answer, or \
+             was larger, than one request ComplyEaze Bridge sends may take, so no figures were \
+             returned. On a large book it grows with the bills open at the date. Do not repeat \
+             the same call in a loop: tell the user, and say that an earlier `as_of` reads \
+             fewer open bills, which is their call.",
         ),
         "native_tally_reported_failure" => Some(
             "Tally answered the Bills report request with a failure, so no figures were returned. \

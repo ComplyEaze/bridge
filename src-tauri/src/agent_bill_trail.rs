@@ -873,6 +873,14 @@ pub(super) const LEDGER_SCOPED_REFUSAL: ScopeReport = ScopeReport {
     note: "The company's vouchers for the window needed more reads than one call may spend, so the party was read by its ledger, and that read was refused: this is its refusal.",
 };
 
+/// A refusal from a step after the party was read by its ledger (#1356): the closing marks read,
+/// a book that moved, or the detail's own checks of what was read. Its code is the step's own.
+pub(super) const LEDGER_SCOPED_LATER_REFUSAL: ScopeReport = ScopeReport {
+    basis: "ledger_scoped",
+    reason: None,
+    note: "The company's vouchers for the window needed more reads than one call may spend, so the party was read by its ledger; this refusal came from a later step of the detail.",
+};
+
 /// The ledger a party detail reads by (#1356), after `refusal` of the book's window. Only when the
 /// window needed more requests than one call may spend (the one refusal a narrower read can
 /// answer): any other refusal stands as it is (`Err(None)`). Then only for a ledger matched alone
@@ -1143,6 +1151,15 @@ impl Server {
                 }
             }
         };
+        // A refusal after the party was read by its ledger says so, as the ledger read's own do.
+        let by_ledger = count_key == "party_vouchers_read";
+        let scoped = |failure: ToolFailure| {
+            if by_ledger {
+                failure.with_window_scope(LEDGER_SCOPED_LATER_REFUSAL)
+            } else {
+                failure
+            }
+        };
         // `opening` was read before the statement of open bills, which came before the
         // catalogue: the marks read now must be those, or a ledger was renamed (or the book
         // otherwise moved) between the reads this detail ties together by name. An undivided
@@ -1150,9 +1167,9 @@ impl Server {
         let (closing, closing_evidence) = self
             .read_company_marks_once(identity, &company.name)
             .await
-            .map_err(|failure| with_evidence(failure, &evidence))?;
+            .map_err(|failure| scoped(with_evidence(failure, &evidence)))?;
         evidence = combine_evidence(evidence, closing_evidence);
-        let late = |failure: ToolFailure| with_evidence(failure, &evidence);
+        let late = |failure: ToolFailure| scoped(with_evidence(failure, &evidence));
         if let Some(code) = super::register::window_drift(opening, closing) {
             return Err(late(ToolFailure::from(code.to_string())));
         }
@@ -1164,7 +1181,6 @@ impl Server {
         let party_json = redact_value(party_name_value(party.clone()), self.settings.redaction);
         let mut window = json!({"from": from, "to": as_of});
         window[count_key] = json!(vouchers_read);
-        let by_ledger = count_key == "party_vouchers_read";
         let mut detail = party_detail(
             kind,
             &party,

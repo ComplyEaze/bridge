@@ -1137,28 +1137,41 @@ read is the only thing `stock_summary` checks, and `checks` says so field by
 field. They are for investigation only (`use` says so); neither is a stock value
 or a total, and the items' side adds only the closing values present.
 
-**A quantity is returned only where Tally agrees with it.** `checks` says per
-field what is `checked`, `checked_per_item` or `not_checked`: the closing-value
-total is checked; the closing quantity is checked item by item; each value on its
-own, the names, parents and base units, whether the date was honoured and whether
-the item list is complete are not.
+**A quantity under the root is returned only where Tally agrees with it; one
+inside a stock group is the item list's own figure.** `checks` says per field
+what is `checked`, `checked_where_agreed` or `not_checked`: the closing-value
+total is checked; the closing quantity only where it is `agreed`; each value on
+its own, the names, parents and base units, whether the date was honoured and
+whether the item list is complete are not.
 
 An item's `closing.quantity` is an object with a `state`. It is `agreed`, with
-`amount` and `unit`, only where Tally's own plain Stock Summary has exactly one
-line with the item's name, and that line shows the same quantity, the same unit
-and the same amount (two empty amounts agree). Every other state says why no
-quantity is returned:
+`amount` and `unit`, only where the item sits directly under the root and Tally's
+own plain Stock Summary has exactly one line with the item's name, and that line
+shows the same quantity, the same unit and the same amount (two empty amounts
+agree).
+
+It is `inside_stock_group`, with `item_list_amount` and `item_list_unit`, when
+the item's own parent is a stock group. The plain report has a line only for what
+sits directly under the root, so a line of the same name is read as a group's,
+and the quantity is the item's own row in the stock item list, which nothing
+compared. The keys differ from `agreed`'s on purpose: never read this figure as
+an agreed one. On one synthetic book (TallyPrime 7.2, groups three deep beside an
+item under the root, two units, one negative quantity), each such quantity
+equalled Tally's Stock Summary screen with every level expanded. Neither the
+value total nor the item count checks a quantity, and an item with an empty or
+zero value adds nothing to the value total, so nothing in a read vouches for a
+nested quantity.
+
+Every other state says why no quantity is returned:
 
 - `none_sent`: Tally sent no closing quantity, which is not zero.
 - `unread`: the quantity is a compound unit, or has a unit with a space in it. It
   is also counted in `totals.closing_quantity_unread_count` and does not refuse
   the read.
-- `inside_stock_group`: the item's own parent is not the root, that is a stock
-  group (any other parent text gets this state too, which only withholds). In
-  the captures the report listed only what sits directly under the root (it is
-  not expanded; no capture yet holds a group and an item under the root side by
-  side), so the item is taken to have no line of its own, whatever a line of the
-  same name shows.
+- `parent_not_resolved`: the item's parent reads `Primary` without Tally's root
+  marker (ASCII case and outer spaces ignored), or carries a marker anywhere
+  else. It may be a group a person named Primary or a root spelling Bridge does
+  not know, so it is neither compared with the report nor taken for a group.
 - `report_has_no_line`: the item sits directly under the root and no line of the
   report carries its name: it has nothing to show, or the report names it
   differently (an alias, a spacing difference, a case difference). It is also

@@ -93,7 +93,7 @@ with no figures, to a log on this computer.
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `statement_tie_out` | Whether the bank ledger stands where a parsed bank statement says it stood at the start and at the end of the statement's dates, or of whole calendar months of it: three gaps and the dates; the balances themselves are not returned | Nothing |
-| `stock_summary` | The closing stock value of each item as of a 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own; an item inside a stock group returns no quantity; small books only (a book with many masters of any kind is refused, and so is any other date); only the year ending 31 March 2026 has been checked | Nothing |
+| `stock_summary` | The closing stock value of each item as of a 31 March, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own; an item inside a stock group returns its own quantity from Tally's stock item list, marked as not compared; small books only (a book with many masters of any kind is refused, and so is any other date); only the year ending 31 March 2026 has been checked | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
 | `validate_masters` | Checks ledger names against the live book before you build an import file | Nothing |

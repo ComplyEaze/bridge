@@ -287,6 +287,7 @@ const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const GST_LEDGER_LAB_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
+const NESTED_STOCK_GUID: &str = "4b6094e2-d6db-46b6-a4ad-90c283cd1b52";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
 const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
@@ -1539,6 +1540,24 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_stock_summary_report",
         parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_nested_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_nested_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_nested_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, NESTED_STOCK_GUID)),
     },
     // Currency reads: src/native_outstandings/wire_currency_tests.rs,
     // wire_company_currency_tests.rs; the app's replays for the rest, read as production reads a

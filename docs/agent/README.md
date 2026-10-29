@@ -188,7 +188,7 @@ A compliance ledger read (`ledger_masters fields=compliance`) whose company's ma
 mark puts the estimated response over Bridge's budget has its ledgers counted first with a
 balance-free catalogue read (a stable pair, bound to the company by name and GUID) (#637, #668,
 #679). A count that fits is read whole. A count that does not is read in parts: the catalogue's
-parent groups are packed by ledger count into parts of at most 4,266 ledgers (3,404 with `include_mailing_details`, 2,000 with `include_gst_details`) and 200 parents, and
+parent groups are packed by ledger count into parts of at most 4,266 ledgers (3,200 with `include_mailing_details`, 2,000 with `include_gst_details`) and 200 parents, and
 each part is one filtered master and balance read, all inside the one extent bracket. Every ledger
 the catalogue named must come back exactly once, in its own part, with the name and parent the
 catalogue gave it; otherwise the whole call is refused and nothing partial is returned. A part
@@ -203,7 +203,7 @@ whose name cannot sit in a filter, such as one with a control character, are rea
 last part, the complement: a filter that excludes every named parent (`NOT (...)`, at most 200
 parents per formula, all applied together), and the same coverage proof applies to it. A book
 that cannot be split is refused before any master request: one parent group, or the ledgers
-under unnameable parents, over 4,266 ledgers (3,404 with `include_mailing_details`, 2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
+under unnameable parents, over 4,266 ledgers (3,200 with `include_mailing_details`, 2,000 with `include_gst_details`; `parent_over_budget`), more than 12 named parts
 (`parent_partition_too_many_parts`), a complement filter over 256 KiB
 (`parent_complement_over_budget`), a ledger with no parent (`ledger_without_parent`), every
 ledger under an unnameable parent name (`parent_name_unsupported`, which carries
@@ -258,13 +258,14 @@ number or a town at either end of a line can stay readable; the mailing entry's 
 assistant's provider under every redaction mode (the flat `pin_code`, `gst_pin_code` and `state` already go on every
 compliance read, unchanged); for a party that is an individual, such as a proprietor, the flat PIN code and state sent
 on every compliance read, and the mailing entry's PIN code, state and country when asked for, can point to the
-locality of a home address. The read is admitted at 4,700 bytes a ledger instead of 3,750, from the one growth
-measured (948 bytes for one populated party row; UNVERIFIED for a populated book), so a read holds at most 3,404 ledgers
+locality of a home address. The read is admitted at 5,000 bytes a ledger instead of 3,750, above the largest row
+measured (4,902 bytes: a party with two short dated entries; UNVERIFIED for a populated book, and a party with three entries
+or longer address lines is larger), so a read holds at most 3,200 ledgers
 (the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
 refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
 repeat `include_mailing_details` on later pages. Measured on one synthetic book; a second dated entry, a party with two
 mailing rows and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
-local file, names the mailing details only where the book's master-alteration mark is at most 3,404 (the
+local file, names the mailing details only where the book's master-alteration mark is at most 3,200 (the
 whole read fits their bound) and otherwise sends the standard request, as before #1490, so a book that exported
 before is never refused for the larger estimate; its header then says that no ledger's mailing details were
 observed and the status column reads not observed. Where it reads them it shows only the entry in force on its

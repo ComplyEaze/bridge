@@ -618,7 +618,7 @@ size below is wire bytes: the responses are UTF-16LE, so the file size is the by
   catalogue read at three different times agreed with itself.
 - **Row cost depends on the row.** A ledger with party fields cost about 3.2 to 3.3 KB in the
   master read and a plain ledger about 1.9 to 2.0 KB, so 2,875 bytes per ledger is a mean for this
-  synthetic mix, not a bound. The 3,750 bytes per ledger Bridge budgeted (#637; 4,700 for a read that names the mailing details, #1490) sits above it.
+  synthetic mix, not a bound. The 3,750 bytes per ledger Bridge budgeted (#637; 5,000 for a read that names the mailing details, #1490) sits above it.
 - **A part read of the master is cheap (the #679 go/no-go, GO).** A 20-ledger part took 0.037 to
   0.122 s, 4 to 14 percent of the whole master read, against a no-go line of 50 percent. 150
   ledgers took 0.08 s, 300 took 0.14 to 0.22 s and 907 took 0.38 s: time tracked the row count
@@ -725,16 +725,16 @@ row cost seen here.
 
 **Bridge's parent partition (#679) is CODE, live unproven.** A counted book that does not fit one read
 is split by the parent groups the catalogue names: packed first-fit-decreasing by ledger count into
-parts of at most 4,266 ledgers (3,404 when the request names the mailing details, as `ledger_masters` with `include_mailing_details` does, and the workbook does only for a book whose master-alteration mark is at most 3,404, otherwise sending the standard request; 2,000 with the GST details) and at most 200 parents, at most 12 parts (so at most 2,400 parents, refused as `parent_partition_too_many_parts` above that), and read through the
+parts of at most 4,266 ledgers (3,200 when the request names the mailing details, as `ledger_masters` with `include_mailing_details` does, and the workbook does only for a book whose master-alteration mark is at most 3,200, otherwise sending the standard request; 2,000 with the GST details) and at most 200 parents, at most 12 parts (so at most 2,400 parents, refused as `parent_partition_too_many_parts` above that), and read through the
 `$Parent = "a" OR $Parent = "b"` filter measured above, with the reserved root written as
 `&#4; Primary`. Each part is read as its master pair then its balance pair inside one extent bracket,
 and every catalogue ledger must come back exactly once, from its own part, with the catalogue's name
 and parent, or the whole call is refused. The routing is by count, not by mark: any mark whose
-catalogue Bridge can bound is counted, and a count over 4,266 (3,404 with the mailing details) is read in parts. The catalogue is
+catalogue Bridge can bound is counted, and a count over 4,266 (3,200 with the mailing details) is read in parts. The catalogue is
 bounded before it is sent (mark times 1,400 bytes, at most 32,000,000, a mark of 22,857), because a
 response past the transport's 32 MiB cap is cut off mid-read and the connection dropped with the
 rest unread, which is an abandoned read. On one real book the largest parents hold about 2,000, 1,900
-and 1,500 ledgers (rounded), all under a part's 3,404 or 4,266, so a parent too large for a part is not the
+and 1,500 ledgers (rounded), all under a part's 3,200 or 4,266, so a parent too large for a part is not the
 constraint there; a book with about 1,350 parents, most holding a few ledgers, is why parts are
 packed by ledger count. The 200-parent limit is set from a measurement on the synthetic book of 4,339
 ledgers: an `OR` of 1, 8, 50 and 200 parents answered every time with exactly the parents named (VERIFIED

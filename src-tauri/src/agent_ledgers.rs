@@ -394,7 +394,7 @@ fn requested_mailing_details(args: &Value, gst_details: bool) -> Result<bool, St
 /// What a result with `include_mailing_details` says about the rows it adds.
 const MAILING_DETAILS_LIMITATIONS: [&str; 2] = [
     "compliance.mailing_details holds each ledger's dated mailing details as Tally sent them: every entry with its date, mailing name, address lines, PIN code, state and country, oldest first; the flat address, pin_code and state fields can be empty for a party that holds an address here. Under mask_parties the mailing name, every address line and the flat address are shortened like a party name; the PIN code, state and country are returned under every mode.",
-    "Measured on one synthetic book of TallyPrime 7.1 Silver (one party with one dated entry); a second dated entry, an entry with no date and other releases are not measured. The read is admitted at 4,700 bytes a ledger instead of 3,750, from the one growth measured (948 bytes for one populated party row), not a measured ratio; a large book may be read in more parts or refused as too large.",
+    "Measured on one synthetic book of TallyPrime 7.1 Silver (one party with one dated entry); a second dated entry, an entry with no date and other releases are not measured. The read is admitted at 5,000 bytes a ledger instead of 3,750, above the largest row measured (4,902 bytes: a party with two short dated entries), not a measured ratio; a large book may be read in more parts or refused as too large.",
 ];
 
 /// What a result with `include_gst_details` says about the rows it adds, so

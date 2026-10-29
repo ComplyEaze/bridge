@@ -5759,7 +5759,7 @@ mod through_the_tool {
             let lead = &response["structuredContent"]["result"]["limitations"];
             assert!(
                 lead.to_string()
-                    .contains("admitted at 4,700 bytes a ledger"),
+                    .contains("admitted at 5,000 bytes a ledger"),
                 "{lead}"
             );
         }

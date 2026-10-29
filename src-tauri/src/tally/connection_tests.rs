@@ -1818,14 +1818,20 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     use super::ComplianceRead::{Standard, WithGstDetails, WithMailingDetails};
     assert_eq!(
         super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED,
-        4_700
+        5_000
     );
+    // The figure stays above the largest row measured with the list named: the party with two
+    // dated entries (TallyPrime 7.2, 4,902 UTF-16 bytes), so a read of rows no larger than it
+    // cannot go over the budget it is divided from (#1490).
+    const {
+        assert!(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED >= 4_902);
+    }
     let standard = super::compliance_master_ledgers_per_read(Standard);
     let mailing = super::compliance_master_ledgers_per_read(WithMailingDetails);
     let details = super::compliance_master_ledgers_per_read(WithGstDetails);
     assert_eq!(
         (standard, mailing, details),
-        (4_266, 3_404, 2_000),
+        (4_266, 3_200, 2_000),
         "the registers keep their limit; the others are the budget over their own estimates"
     );
     // A mark the registers admit is counted first when the mailing details are named.
@@ -1849,8 +1855,8 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
 
 /// The party/ledger master export asks for the mailing details only where the whole read
 /// fits their bound, so a book the standard request read before is never refused for the
-/// larger per-ledger estimate: a mark inside 3,404 is sent the mailing request, any larger
-/// mark (a group of 3,405 to 4,266 ledgers included) the standard one, and no other kind of
+/// larger per-ledger estimate: a mark inside 3,200 is sent the mailing request, any larger
+/// mark (a group of 3,201 to 4,266 ledgers included) the standard one, and no other kind of
 /// read is changed (#1490).
 #[test]
 fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
@@ -1858,7 +1864,7 @@ fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
         Standard, WithGstDetails, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Ask,
     };
     let bound = super::compliance_master_ledgers_per_read(WithMailingDetails);
-    assert_eq!(bound, 3_404);
+    assert_eq!(bound, 3_200);
     assert_eq!(Ask.resolved_for_mark(0), WithMailingDetails);
     assert_eq!(Ask.resolved_for_mark(bound), WithMailingDetails);
     assert_eq!(Ask.resolved_for_mark(bound + 1), Standard);

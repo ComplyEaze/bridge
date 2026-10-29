@@ -654,11 +654,12 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
 /// from the tree that has them. The two stay what they were
 /// to each other: the later-dated variant differs from the plain one only by its note.
 /// Both digests were taken again when the five mailing columns and the Covered text
-/// changed the package (#1490); nothing since then may change them.
+/// changed the package (#1490); and again when the note's mailing bound went from 3,404 to 3,200
+/// ledgers with the larger per-ledger estimate (the one text change); nothing since then may change them.
 const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
-    "1fb1a6fe7b97def5d4cce4988b4de6587c7c8f7a0612ad4ccb505f1bf70fae44";
+    "3c5831fadce1a40a618f96e897f4dcfa1f50ba4c982a49e56bfb900e2c629d0e";
 const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
-    "c9487f08243cdfcc9dc898e241c3637fd2531d2b9822f7eb6c224284276068d4";
+    "05b08d316cb1a87839fbeccd84736b8acf44b06bc7ce32a8335b8c62a3d1ec1c";
 
 #[test]
 fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {

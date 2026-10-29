@@ -357,15 +357,17 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// ([`ComplianceRead::WithMailingDetails`], bridge#1490). UNVERIFIED. Naming it
 /// grew the one populated party row of the captured eight-ledger book by 948
 /// bytes (3,010 to 3,958 UTF-16 bytes; one dated entry of two short address
-/// lines) and every other row by 122. The figure is the shared 3,750 plus 950,
-/// which is more than the mean of a mixed book needs and less than a book of
-/// parties with longer addresses or a second entry may: a party row of 3.3 KB
-/// plus a 950-byte entry leaves about 450 bytes under it, and a longer address
-/// or a second entry (about 900 more, extrapolated) goes over it. No such book
-/// has been read. The 20 s request deadline leaves no slack over the 16 MB
-/// budget, so an under-estimate can be an abandoned read, not only a refusal:
-/// the Windows live check of this change names a dense book for this figure.
-const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 4_700;
+/// lines) and every other row by 122. A second dated entry on that party then
+/// grew its row by 944 more, to 4,902 (TallyPrime 7.2, 2026-10-29, eight
+/// ledgers, mean 2,612 a ledger). The figure, 5,000, is above that largest row
+/// measured, so a read of rows no larger than it cannot go over the budget; it is
+/// not a bound. A party with three entries (about 950 more each, extrapolated),
+/// or longer address lines, goes over it, and a book of such parties can still be
+/// admitted and overrun. No such book has been read. The 20 s request deadline
+/// leaves no slack over the 16 MB budget, so an under-estimate can be an
+/// abandoned read, not only a refusal. It was 4,700 before the second entry was
+/// measured.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 5_000;
 
 /// Bytes one ledger is estimated to add to the compliance master response when
 /// the request also names each ledger's `GSTDETAILS.LIST`
@@ -542,13 +544,13 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// ledgers than one part may carry is refused as `parent_over_budget`, never
 /// split, because a group cannot be read in pieces by `$Parent`. That figure is
 /// the budget over the read's per-ledger constant, not a measurement: 4,266
-/// ledgers for a [`ComplianceRead::Standard`] read, 3,404 for a
+/// ledgers for a [`ComplianceRead::Standard`] read, 3,200 for a
 /// [`ComplianceRead::WithMailingDetails`] one and 2,000 for a
 /// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
-/// limit. It admits about 51,000 ledgers (about 40,800 with the mailing
+/// limit. It admits about 51,000 ledgers (about 38,400 with the mailing
 /// details, about 24,000 with the GST details), far past what the mark bound
 /// admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;

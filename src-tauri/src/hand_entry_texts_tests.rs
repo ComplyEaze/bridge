@@ -30,7 +30,6 @@ const PINNED: &[(&str, usize)] = &[
     ("src/agent_import.rs", 8),
     ("src/agent_import_numbering.rs", 2),
     ("src/agent_import_post.rs", 5),
-    ("src/agent_masters.rs", 1),
 ];
 
 /// The text of every string literal in `source`, in order. Comments are skipped; a backslash at

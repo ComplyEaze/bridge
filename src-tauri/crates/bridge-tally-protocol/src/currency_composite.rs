@@ -10,9 +10,12 @@
 //! (`fixtures/trial_balance_currency_forex_live`).
 //!
 //! [`is_currency_composite`] classifies the shape and reads no value, so
-//! nothing downstream can mistake a composite for an amount; the voucher,
-//! trial-balance and outstandings readers use it, and set the row aside or
-//! refuse it (the ledger-opening reader uses the looser classifier named below). [`parse_currency_composite`]
+//! nothing downstream can mistake a composite for an amount; the voucher parse
+//! uses it and refuses the row. The ledger snapshot classification (the compliance
+//! read of `ledger_masters`, the registers, the invoice import and the outstandings
+//! read) and the Trial Balance with currency use [`is_balance_composite`], this
+//! layout or the 7.2 layout of [`is_unspaced_currency_composite`], and set the row
+//! aside by name (the ledger-opening reader uses the looser classifier named below). [`parse_currency_composite`]
 //! reads a composite into its parts, and is not called by any reader yet (#683):
 //! a later slice adopts it everywhere at once, and deletes then the sign check
 //! in `agent_voucher_parse.rs` (`composite_signs_agree`) and the looser
@@ -77,11 +80,16 @@ pub fn is_currency_composite(text: &str) -> bool {
 /// layout has `$ 100.00`), the base amount keeping a space after its symbol, and a single space
 /// before ` = ` (the 7.1 layout has two).
 ///
-/// Admitted only as far as the two captures show: the foreign and the base amount have exactly
-/// two decimal places, the rate is a whole number or empty, and the symbols agree as in the other
-/// layout. A rate with decimals, a base amount written against its symbol, a second space before
-/// ` = `, or any other change is not this layout, so its caller refuses it. The two layouts never
-/// both match one string: this one needs the foreign amount unspaced and the other needs it spaced.
+/// Admitted by shape, not by value: the foreign and the base amount have exactly two decimal
+/// places, the rate is a whole number or empty, and the symbols agree as in the other layout. A
+/// rate with decimals, a base amount written against its symbol, a second space before ` = `, or
+/// any other change in the layout is not this layout, so its caller refuses it. Shapes no capture
+/// shows also pass, as they do the 7.1 check, and the tests pin each: an empty or zero rate with
+/// non-zero amounts, amounts of opposite signs, a zero base with a foreign value, leading zeros,
+/// and a foreign or base symbol other than `$` and the rupee symbol. A row that passes is set
+/// aside by name and its value is never read, so no figure can come from one. The two layouts
+/// never both match one string: this one needs the foreign amount unspaced and the other needs
+/// it spaced.
 pub fn is_unspaced_currency_composite(text: &str) -> bool {
     let Some((foreign, rest)) = split_once_exact(text, " @ ") else {
         return false;

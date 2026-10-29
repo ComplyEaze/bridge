@@ -2227,8 +2227,7 @@ fn party_ledger_master_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
         "native_foreign_currency_ledger_balance" => Some(
             "Tally wrote a ledger's balance in a foreign currency in a layout ComplyEaze Bridge \
-             does not recognise yet (`<amount> @ <rate> = <base amount>` where it expects a space \
-             after each currency symbol; #683), so this read is refused rather than guessed at, \
+             does not recognise (#683), so this read is refused rather than guessed at, \
              not because the response was damaged, and nothing was returned from it. Do not \
              repeat it in a loop: it refuses again. Tell the user that this read cannot give this \
              company's ledgers while Tally writes a balance that way, and that Tally itself \

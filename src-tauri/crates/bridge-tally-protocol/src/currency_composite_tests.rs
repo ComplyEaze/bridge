@@ -702,6 +702,32 @@ fn the_zero_total_with_an_empty_rate_is_the_unspaced_layout() {
     ));
 }
 
+/// Shapes no capture shows that the unspaced check admits by shape, pinned so a change is seen
+/// (the 7.1 check admits its own, listed in the module doc). The row is set aside by name and its
+/// value is never read, so none of these can give a figure.
+#[test]
+fn the_shapes_the_unspaced_check_admits_without_a_capture_are_pinned() {
+    for text in [
+        // an empty or a zero rate with non-zero amounts
+        "$100.00 @ \u{20b9} /$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 0/$ = \u{20b9} 8700.00",
+        // amounts of opposite signs
+        "-$100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        // a signed zero, and a zero base with a foreign value
+        "-$0.00 @ \u{20b9} /$ = -\u{20b9} 0.00",
+        "$100.00 @ \u{20b9} 87/$ = \u{20b9} 0.00",
+        // leading zeros
+        "$0100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 087/$ = \u{20b9} 8700.00",
+        // a foreign or a base symbol other than `$` and the rupee symbol
+        "\u{20ac}100.00 @ \u{20b9} 87/\u{20ac} = \u{20b9} 8700.00",
+        "US$100.00 @ \u{20b9} 87/US$ = \u{20b9} 8700.00",
+        "$100.00 @ I\u{20b9} 87/$ = I\u{20b9} 8700.00",
+    ] {
+        assert!(is_unspaced_currency_composite(text), "{text}");
+    }
+}
+
 /// Reading a composite into its parts is unchanged and still the 7.1 layout alone: the 7.2
 /// layout is classified, not read, until a capture shows the arithmetic the parse needs.
 #[test]

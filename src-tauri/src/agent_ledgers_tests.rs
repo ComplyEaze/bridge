@@ -4601,6 +4601,11 @@ mod through_the_tool {
         assert!(remediation.contains("#683"), "{error}");
     }
 
+    /// The whole next step of the refusal for a foreign-currency balance in a layout no capture
+    /// shows (#2071, #683). It names no layout: the layouts the captures show are set aside, so
+    /// what reaches this step is another shape.
+    const FOREIGN_BALANCE_STEP: &str = "Tally wrote a ledger's balance in a foreign currency in a layout ComplyEaze Bridge does not recognise (#683), so this read is refused rather than guessed at, not because the response was damaged, and nothing was returned from it. Do not repeat it in a loop: it refuses again. Tell the user that this read cannot give this company's ledgers while Tally writes a balance that way, and that Tally itself shows them.";
+
     /// bridge#2071 and #683, through the tool: a rupee ledger whose closing balance is a composite
     /// is set aside by name, in the layout of the 7.1 captures (a space after the foreign symbol)
     /// and in the layout TallyPrime 7.2 wrote in the lab (`-$100.00 @ ₹ 87/$ = -₹ 8700.00`, as
@@ -4647,15 +4652,7 @@ mod through_the_tool {
             "{error}"
         );
         let remediation = error["remediation"].as_str().expect("a next step");
-        assert_eq!(
-            remediation,
-            crate::agent::remediation_for(
-                "party_ledger_master_read_failed",
-                Some("native_foreign_currency_ledger_balance")
-            )
-            .unwrap()
-        );
-        assert!(remediation.contains("layout"), "{remediation}");
+        assert_eq!(remediation, FOREIGN_BALANCE_STEP);
         assert!(!remediation.contains("-$100.00"), "{remediation}");
     }
 
@@ -4693,11 +4690,7 @@ mod through_the_tool {
         );
         let remediation =
             crate::agent::remediation_for(&failure.code, failure.cause).expect("a next step");
-        assert!(remediation.contains("#683"), "{remediation}");
-        assert!(
-            remediation.contains("Do not repeat it in a loop"),
-            "{remediation}"
-        );
+        assert_eq!(remediation, FOREIGN_BALANCE_STEP);
         // The ledger's name is not in the step.
         assert!(!remediation.contains("BRIDGE FX DEBTOR A"), "{remediation}");
         // The step belongs to this code: the same cause under another code is given none of

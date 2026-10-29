@@ -89,6 +89,39 @@ fn the_snapshot_read_without_a_base_still_refuses_the_composite() {
     );
 }
 
+/// The outstandings read classifies the same snapshot with `parse_native_ledger_snapshot_classified`
+/// (`tally/runtime.rs`), the function under the compliance read (#642). On a book with several
+/// Currency masters the 7.2 composite ledgers, parties among them, are named in `mixed` and never
+/// read, so their balances and bills leave every figure and the result is partial, as for the 7.1
+/// layout (`a_book_with_only_mixed_ledgers_set_aside_is_still_partial` in the agent tests). A book
+/// with one Currency master keeps its refusal, decided at `runtime.rs` from the base's master
+/// count. The tool is not tested end to end on this book: the lab's open-bills and book-extent
+/// answers for it are not committed.
+#[test]
+fn the_outstandings_snapshot_read_sets_the_72_composite_ledgers_aside_too() {
+    let read = parse_native_ledger_snapshot_classified(&snapshot(), &rupee())
+        .expect("the outstandings classification no longer refuses the capture");
+    assert!(read.foreign.is_empty());
+    let base = read
+        .base
+        .iter()
+        .map(|entry| entry.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(base, ["Cash"], "only the plain rupee ledger is read");
+    assert_eq!(read.mixed.len(), 4, "{:?}", read.mixed);
+    for name in [
+        "BRIDGE Export Sales",
+        "BRIDGE Lab Bank",
+        "BRIDGE USD Customer",
+        "Profit & Loss A/c",
+    ] {
+        assert!(
+            read.mixed.iter().any(|set_aside| set_aside == name),
+            "{name}"
+        );
+    }
+}
+
 /// One closing balance of the capture with its layout changed in each way no capture shows is
 /// not set aside: the row is kept as a plain amount, and the parse refuses it, as before.
 #[test]

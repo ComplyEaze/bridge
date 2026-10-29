@@ -527,37 +527,56 @@ fn row_of(
     }
 }
 
-/// The two rows the lab read from Tally, as the lab's answers hold them
-/// (`lab/2068-nonint-trial-balance-answers` at 87446099, `tool-answers/004-tb.json`,
-/// BRIDGE NONINT LAB, TallyPrime 7.2 Silver, 28 Oct 2026): the Closing Stock ledger with a
-/// closing balance of 1,400.00 keyed on Tally's screen keeps its opening as `TBALCLOSING`
-/// and shows the keyed figure only as its debit total; the Customer ledger beside it ties.
+/// The two captured answers of #2068 (`tests/fixtures/native/PROVENANCE.md`), one book not
+/// integrated with inventory and one integrated: each has a Closing Stock ledger whose closing
+/// balance of 1,400.00 was keyed on Tally's screen. Tally keeps its opening as `TBALCLOSING` and
+/// shows the keyed figure only as its debit total, so that row alone does not add up, by the
+/// same 400.00 on both books; the row is parsed as it was sent.
 #[test]
-fn the_closing_stock_row_the_lab_read_does_not_add_up_and_its_neighbours_do() {
-    let closing_stock = row_of(
-        amount("-1000.00"),
-        amount("-400.00"),
-        NativeTrialBalanceAmount::PresentEmpty,
-        amount("-1000.00"),
-    );
-    assert_eq!(
-        closing_stock.movements(),
-        NativeTrialBalanceMovements::Differ("400.00".to_string())
-    );
-    let customer = row_of(
-        amount("0.00"),
-        amount("-1600.00"),
-        NativeTrialBalanceAmount::PresentEmpty,
-        amount("-1600.00"),
-    );
-    assert_eq!(customer.movements(), NativeTrialBalanceMovements::Tie);
-    let sales = row_of(
-        amount("0.00"),
-        NativeTrialBalanceAmount::PresentEmpty,
-        amount("1600.00"),
-        amount("1600.00"),
-    );
-    assert_eq!(sales.movements(), NativeTrialBalanceMovements::Tie);
+fn a_keyed_closing_stock_ledger_is_the_only_row_that_does_not_add_up() {
+    for (bytes, company) in [
+        (
+            &include_bytes!(
+                "../../tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml"
+            )[..],
+            "567653b1-c8be-4deb-b4fc-3ea5de801884",
+        ),
+        (
+            &include_bytes!(
+                "../../tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml"
+            )[..],
+            "3fc2a3c7-1da8-4bc4-a472-44028cdebca7",
+        ),
+    ] {
+        let report = parse_native_trial_balance(&forex_capture(bytes), company).unwrap();
+        assert_eq!(report.rows.len(), 8, "{company}");
+        let mut differing = Vec::new();
+        for row in &report.rows {
+            if let NativeTrialBalanceMovements::Differ(gap) = row.movements() {
+                differing.push((row.name.as_str(), gap));
+            }
+        }
+        assert_eq!(
+            differing,
+            [("Closing Stock", "400.00".to_string())],
+            "{company}"
+        );
+        let stock = report
+            .rows
+            .iter()
+            .find(|r| r.name == "Closing Stock")
+            .unwrap();
+        assert_eq!(
+            [&stock.opening, &stock.debit, &stock.credit, &stock.closing],
+            [
+                &amount("-1000.00"),
+                &amount("-400.00"),
+                &NativeTrialBalanceAmount::PresentEmpty,
+                &amount("-1000.00"),
+            ],
+            "{company}"
+        );
+    }
 }
 
 /// An empty amount is taken as zero in this check, as the statements' own row check does, so

@@ -199,9 +199,42 @@ pub struct TbRow {
     pub closing_paise: i64,
 }
 
+/// Whether a Trial Balance row's closing is its opening plus its debit less its credit (#2068).
+/// Tally exports the four as separate fields. On two synthetic TallyPrime 7.2 books, one
+/// integrated with inventory and one not, a Closing Stock ledger whose closing balance was keyed
+/// on Tally's screen kept its opening as `TBALCLOSING` and showed the change only in
+/// `DEBITTOTALS`; every other captured row ties. The row is kept as Tally sent it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TbMovements {
+    Tie,
+    /// `closing - (opening + debit - credit)`, Dr positive.
+    Differ {
+        by_paise: i64,
+    },
+}
+
 impl TbRow {
     pub fn movement_paise(&self) -> i64 {
         self.closing_paise - self.opening_paise
+    }
+
+    /// The closing the row's own movements reach: opening + debit - credit. `None` on overflow.
+    pub fn closing_by_movements_paise(&self) -> Option<i64> {
+        self.opening_paise
+            .checked_add(self.debit_paise)?
+            .checked_sub(self.credit_paise)
+    }
+
+    /// `None` on overflow.
+    pub fn movements(&self) -> Option<TbMovements> {
+        let by_paise = self
+            .closing_paise
+            .checked_sub(self.closing_by_movements_paise()?)?;
+        Some(if by_paise == 0 {
+            TbMovements::Tie
+        } else {
+            TbMovements::Differ { by_paise }
+        })
     }
 }
 
@@ -2253,5 +2286,126 @@ mod tests {
             opening_stock(Some(true), Some(&broken), Some(&from), Some(&from)),
             OpeningStock::Unknown(OpeningStockUnknown::Unreadable)
         );
+    }
+
+    /// A captured Trial Balance answer of #2068, read as a `trial_balance` part is: its bytes as
+    /// Tally sent them (`bridge-tally-protocol/tests/fixtures/native/PROVENANCE.md`).
+    fn captured_tb(bytes: &[u8]) -> BTreeMap<String, TbRow> {
+        load_tb(&xml::read(bytes, "probe").unwrap(), "probe").unwrap()
+    }
+
+    const NONINT_TB: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml"
+    );
+    const INTEGRATED_TB: &[u8] = include_bytes!(
+        "../../bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml"
+    );
+
+    /// On both captured books the Closing Stock ledger, opened at 1,000.00 Dr with 1,400.00 Dr
+    /// keyed as its closing, is read as Tally sent it (closing 1,000.00, debit 400.00) and is the
+    /// only row whose closing is not its opening plus its debit less its credit.
+    #[test]
+    fn a_keyed_closing_stock_ledger_is_the_only_captured_row_that_does_not_tie() {
+        for tb in [captured_tb(NONINT_TB), captured_tb(INTEGRATED_TB)] {
+            assert_eq!(tb.len(), 8);
+            let stock = &tb["Closing Stock"];
+            assert_eq!(
+                (
+                    stock.opening_paise,
+                    stock.debit_paise,
+                    stock.credit_paise,
+                    stock.closing_paise
+                ),
+                (100_000, 40_000, 0, 100_000)
+            );
+            assert_eq!(stock.closing_by_movements_paise(), Some(140_000));
+            let differing: Vec<(&str, TbMovements)> = tb
+                .iter()
+                .filter(|(_, row)| row.movements() != Some(TbMovements::Tie))
+                .map(|(name, row)| (name.as_str(), row.movements().unwrap()))
+                .collect();
+            assert_eq!(
+                differing,
+                [("Closing Stock", TbMovements::Differ { by_paise: -40_000 })]
+            );
+        }
+    }
+
+    #[test]
+    fn movements_tie_exactly_and_refuse_an_overflow() {
+        let row = |opening, debit, credit, closing| TbRow {
+            opening_paise: opening,
+            debit_paise: debit,
+            credit_paise: credit,
+            closing_paise: closing,
+        };
+        assert_eq!(row(100, 50, 30, 120).movements(), Some(TbMovements::Tie));
+        assert_eq!(
+            row(100, 50, 30, 121).movements(),
+            Some(TbMovements::Differ { by_paise: 1 })
+        );
+        assert_eq!(
+            row(0, 0, 0, -500).movements(),
+            Some(TbMovements::Differ { by_paise: -500 })
+        );
+        assert_eq!(row(i64::MAX, 1, 0, 0).closing_by_movements_paise(), None);
+        assert_eq!(row(i64::MAX, 1, 0, 0).movements(), None);
+        assert_eq!(
+            row(0, 0, 0, i64::MIN).movements(),
+            Some(TbMovements::Differ { by_paise: i64::MIN })
+        );
+        assert_eq!(row(1, 0, 0, i64::MIN).movements(), None);
+    }
+
+    fn stock_book(tb: BTreeMap<String, TbRow>) -> Book {
+        let mut book = Book {
+            tb,
+            ..Book::default()
+        };
+        book.ledgers.insert(
+            "Closing Stock".to_string(),
+            Ledger {
+                name: "Closing Stock".to_string(),
+                parent: "Stock-in-Hand".to_string(),
+                chain: vec!["Stock-in-Hand".to_string(), "Current Assets".to_string()],
+                chain_complete: true,
+                master_opening_paise: 0,
+                pan: String::new(),
+                gstin: String::new(),
+                guid: String::new(),
+                masterid: None,
+            },
+        );
+        book
+    }
+
+    /// The financial statements on the captured rows, as they stand (no change here). On the book
+    /// not integrated with inventory the closing stock is the opening plus the debit, 1,400.00,
+    /// which is the figure Tally's own Profit and Loss used on that book
+    /// (`lab/692-nonint-lab-answers`, raw `n-r1`); Tally's closing field (1,000.00) is shown only
+    /// beside it, as stale. On the integrated book the stock items' values (1,000.00 at the start,
+    /// 1,200.00 at the end, the lab's Stock Summary) are not added to a Stock-in-Hand ledger that
+    /// carries a value, and no profit is shown.
+    #[test]
+    fn the_statements_use_the_movements_on_the_captured_books_or_refuse() {
+        let interest = BTreeSet::new();
+        let nonint = stock_book(captured_tb(NONINT_TB));
+        let (statements, _) = crate::financial_statements::compute(&nonint, &interest).unwrap();
+        assert_eq!(
+            statements.stock_basis,
+            crate::financial_statements::StockBasis::Ledgers
+        );
+        assert_eq!(statements.closing_stock, Some(140_000));
+        assert_eq!(statements.closing_stock_tb_field, 100_000);
+
+        let mut integrated = stock_book(captured_tb(INTEGRATED_TB));
+        integrated.opening_stock = OpeningStock::Valued(100_000);
+        integrated.closing_stock = ClosingStock::Valued(120_000);
+        let (statements, _) = crate::financial_statements::compute(&integrated, &interest).unwrap();
+        assert!(matches!(
+            &statements.stock_basis,
+            crate::financial_statements::StockBasis::Unknown { why, .. }
+                if why == &[crate::financial_statements::StockUnknown::LedgerAlso]
+        ));
     }
 }

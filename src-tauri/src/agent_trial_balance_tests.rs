@@ -274,6 +274,42 @@ mod listing {
         let _ = one.requests();
     }
 
+    /// The two captured answers of #2068, unedited (`native/PROVENANCE.md` in the protocol
+    /// crate's fixtures): on each, the Closing Stock ledger alone is flagged, by 400.00, and is
+    /// returned with the closing Tally sent (its opening), not the keyed 1,400.00.
+    #[test]
+    fn a_keyed_closing_stock_ledger_is_flagged_as_sent_on_both_captured_books() {
+        for (bytes, company) in [
+            (
+                &include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml")[..],
+                "567653b1-c8be-4deb-b4fc-3ea5de801884",
+            ),
+            (
+                &include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml")[..],
+                "3fc2a3c7-1da8-4bc4-a472-44028cdebca7",
+            ),
+        ] {
+            let report = bridge_tally_protocol::native_trial_balance::parse_native_trial_balance(
+                &decode(bytes),
+                company,
+            )
+            .unwrap();
+            let rows = report.rows.into_iter().map(ledger_row).collect::<Vec<_>>();
+            assert_eq!(rows.len(), 8, "{company}");
+            let flagged = rows
+                .iter()
+                .filter(|row| row.get("movements_differ_by").is_some())
+                .collect::<Vec<_>>();
+            assert_eq!(flagged.len(), 1, "{rows:?}");
+            // Unwrapped from the party-name marker when the server renders the answer.
+            assert_eq!(flagged[0]["ledger"][PARTY_NAME_MARKER], "Closing Stock");
+            assert_eq!(flagged[0]["movements_differ_by"], "400.00");
+            assert_eq!(flagged[0]["opening"]["value"], "-1000.00");
+            assert_eq!(flagged[0]["debit"]["value"], "-400.00");
+            assert_eq!(flagged[0]["closing"]["value"], "-1000.00");
+        }
+    }
+
     /// On a partial read the label that says so stays the first limitation, and the note about
     /// a ledger that does not add up follows it, on every page. The captured several-currency
     /// answer has one element of its base ledger BRIDGE INR DEBTOR A edited (closing -3000.00 to

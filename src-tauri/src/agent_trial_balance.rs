@@ -1,12 +1,29 @@
 //! Thin MCP presentation of the shared native report operation.
 use super::*;
-use bridge_tally_protocol::native_trial_balance::NativeTrialBalanceMovements;
+use bridge_tally_protocol::native_trial_balance::{
+    NativeTrialBalanceMovements, NativeTrialBalanceRow,
+};
 use bridge_tally_protocol::tally_root_as_sent;
 
 /// The first limitation when a ledger's closing is not its opening plus its debit and credit
 /// totals (#2068). Measured on a Closing Stock ledger with a closing balance keyed on Tally's
 /// screen, on two synthetic TallyPrime 7.2 books (one integrated with inventory, one not).
 const MOVEMENTS_DIFFER_LIMITATION: &str = "{count} ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals, counting an empty amount as zero. Each is returned as Tally sent it and nothing is corrected. On the books measured this was a Closing Stock ledger whose closing balance was keyed on Tally's screen: Tally kept the opening as the closing and showed the change only in the debit total. The closing of such a ledger is not necessarily the figure Tally's statements use: on the book not integrated with inventory they used the keyed figure, and on the integrated one they valued the stock from the stock item. The column totals include the closing as sent.";
+
+/// One ledger of the answer, as Tally sent it. A row whose own columns do not add up also
+/// carries `movements_differ_by`: closing minus opening, debit and credit (#2068).
+fn ledger_row(row: NativeTrialBalanceRow) -> Value {
+    let movements = row.movements();
+    let mut json = json!({
+        "ledger": party_name(row.name), "guid": row.guid,
+        "parent": row.parent.returned_text().map(tally_root_as_sent), "opening": row.opening,
+        "debit": row.debit, "credit": row.credit, "closing": row.closing,
+    });
+    if let NativeTrialBalanceMovements::Differ(gap) = movements {
+        json["movements_differ_by"] = json!(gap);
+    }
+    json
+}
 
 impl Server {
     pub(super) async fn trial_balance(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -44,27 +61,16 @@ impl Server {
                         ToolFailure::from_runtime("trial_balance_read_failed", error)
                             .with_prior_evidence(prior.clone())
                     })?;
-                let mut movements_differ = 0usize;
                 let rows = read
                     .report
                     .rows
                     .into_iter()
-                    .map(|row| {
-                        let movements = row.movements();
-                        let mut json = json!({
-                            "ledger": party_name(row.name), "guid": row.guid,
-                            "parent": row.parent.returned_text().map(tally_root_as_sent), "opening": row.opening,
-                            "debit": row.debit, "credit": row.credit, "closing": row.closing,
-                        });
-                        // The row stays as Tally sent it; this says its own columns do not
-                        // add up, and by how much (closing minus opening, debit and credit).
-                        if let NativeTrialBalanceMovements::Differ(gap) = movements {
-                            json["movements_differ_by"] = json!(gap);
-                            movements_differ += 1;
-                        }
-                        json
-                    })
+                    .map(ledger_row)
                     .collect::<Vec<_>>();
+                let movements_differ = rows
+                    .iter()
+                    .filter(|row| row.get("movements_differ_by").is_some())
+                    .count();
                 let read_evidence = evidence_from_runtime_read(read.evidence);
                 // What this read covers, from the same typed scope that decides
                 // the frame below: whole only when no ledger was set aside.

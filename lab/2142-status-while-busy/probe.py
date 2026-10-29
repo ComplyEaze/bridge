@@ -26,7 +26,9 @@
 # probe); 200 probes; 900 s in all, checked before each probe. On a STOP no more probes are sent, the
 # read curl is never killed, and if it is still running the helper waits up to 600 s for it to end on
 # its own so its result is logged. A cut read that answered whole is logged as a result
-# (`read_answered_before_cut`), not a STOP. Any other exit code (a Python error exits 1) is a STOP too.
+# (`read_answered_before_cut`), not a STOP. A read with no end 600 s after it was sent is a STOP too
+# (`read_unanswered`). Exit 1: a refusal before anything was sent (bad arguments, a wrong sha256, an
+# existing log), or a Python error, which may come after the read was sent.
 import argparse
 import datetime
 import hashlib
@@ -53,8 +55,15 @@ def utc():
     return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='milliseconds')
 
 
+class Parser(argparse.ArgumentParser):
+    # argparse exits 2 on a usage error; 2 is this helper's STOP, so a usage error exits 1.
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        sys.exit(f'probe: {message}')
+
+
 def main():
-    parser = argparse.ArgumentParser()
+    parser = Parser()
     parser.add_argument('--block', required=True)
     parser.add_argument('--out', required=True)
     parser.add_argument('--read')
@@ -100,6 +109,8 @@ def main():
                 read_state['failed'] = not whole
             elif process.returncode == 0:
                 record('read_answered_before_cut', exit=0)
+                read_state['failed'] = not (len(fields) > 1 and fields[0] == '200'
+                                            and fields[1] != '0')
             elif process.returncode != CURL_TIMEOUT_EXIT:
                 read_state['failed'] = True
         except Exception as error:  # the helper must not go on probing blind
@@ -129,6 +140,7 @@ def main():
             command[1:1] = ['--max-time', str(args.cut_after)]
         sent_t = round(time.monotonic() - start, 3)
         read = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        read_state['sent_t'] = sent_t
         record('read_sent', command=command, pid=read.pid, read_sent_t=sent_t)
         threading.Thread(target=reap, args=(read, sent_t), daemon=True).start()
         read_ended.wait(GAP_SECONDS)
@@ -145,6 +157,9 @@ def main():
             return 0
         if os.path.exists(os.path.join(args.out, f'STOP-{args.block}')):
             return stop('operator_stop')
+        if (read is not None and not read_state['ended']
+                and time.monotonic() - start - read_state['sent_t'] > PROBE_WAIT_SECONDS):
+            return stop('read_unanswered')
         if probes >= MAX_PROBES or time.monotonic() - start > MAX_BLOCK_SECONDS:
             return stop('probe_or_time_cap')
         after_read = read_state['ended'] if read is not None else None

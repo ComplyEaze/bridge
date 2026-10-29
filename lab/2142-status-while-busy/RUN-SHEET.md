@@ -34,27 +34,31 @@ Named differences from LAB-COMMON (the stricter rule holds everywhere else):
 1. **Two requests at once, only inside a B block.** C3 sends one request at a time. Inside a B block, `probe.py` sends the one read and, beside it, `GET /status` probes one at a time: never more than one probe in flight, and never more than two requests in all.
    - **Outside a B block,** one request at a time, as C3 says.
    - **No call of ComplyEaze Bridge is made while `probe.py` runs.**
-   - Sending `/status` beside a running report read is new for this lab, apart from the single `/status` after a cut on record above. **Before the sitting, the run coordinator checks the private record of gateway hazards for any rule against it.** A rule against it means the row is not run. The notes record that the check was made and its result, without its content.
+   - **Between two screenshots,** probes go on being sent: a named exception to C3's "nothing is sent while a dialog is up", since a dialog is seen only at the next screenshot. Rule 4's stop file ends the probes at once when one is seen.
+   - Sending `/status` beside a running report read is new for this lab, apart from the single `/status` after a cut on record above. **Before the sitting, the run coordinator checks the private record of gateway hazards for any rule against it.** A rule against it means the row is not run. The notes record this line: "private record checked by the run coordinator on 30 Oct 2026; no rule found; concurrent use not previously measured". The nearest recorded hazard, a modal dialog that leaves `/status` dead, is met by rule 4's stop file.
 2. **Probe timing.** Each probe is `curl.exe -sS -w "%{http_code} %{size_download} %{time_total}" -o <file> http://127.0.0.1:9001/status`, with no `--max-time`, as C3 says. This sheet's line is the authority: LAB-COMMON C2 c gives no command text. A probe counts as answered only with exit 0, status 200 and 51 bytes (the body earlier rows recorded). Anything else is `probe.py`'s STOP. A probe without an answer in 600 s is C3's "without an answer": STOP. `probe.py` leaves that curl running and sends nothing more.
 3. **The read.** Each read is C3's line with `%{time_total}` added to `-w`, sending `requests/r-4-receivable-20260331.utf16le.xml`: 770 bytes, sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f, a byte copy of the request R4 sent (`lab/2119-bills-read-timing` at 6af5124c).
-   - **In B1 and B3:** no `--max-time`. EXPECT status 200 and 13,679,490 bytes with sha256 5a406cab1a2fe7f6581591a0e910215c48cf380ce04f7558b0896f109a560f5a (R4's and R5's answer). Size bound: 20,000,000 bytes; above it = STOP. A size up to the bound other than 13,679,490, or another sha256, is recorded, not a STOP; the run coordinator weighs it. After B1 and B3 the operator compares the headers file's CONTENT-LENGTH with the size; a mismatch is C3's STOP.
+   - **In B1 and B3:** no `--max-time`. EXPECT status 200 and 13,679,490 bytes with sha256 5a406cab1a2fe7f6581591a0e910215c48cf380ce04f7558b0896f109a560f5a (R4's and R5's answer). Size bound: 20,000,000 bytes; above it = STOP. A size up to the bound other than 13,679,490, or another sha256, is recorded, not a STOP; the run coordinator weighs it. The matching sha256 stands in for C4's parse of the answer; an answer with another sha256 is parsed by the run coordinator afterwards, not during the sitting. After B1 and B3 the operator compares the headers file's CONTENT-LENGTH with the size; a mismatch is C3's STOP.
    - **In B2 and B4:** `--max-time 20`, one named exception to C3's "no --max-time". EXPECT curl exit 28 (a client timeout), with no whole answer. That ending is this row's subject, not C3's "ended without one = STOP".
    - **Sends:** the cut read is sent twice in the row (B2, B4) and the whole read twice (B1, B3), each a named exception to C3's "never sent again", because repeating it is what the row measures.
    - **Checks by `probe.py`:** it refuses to send unless the request file's sha256 is the one above (`--read-sha256`). A whole read (B1, B3) that does not end with exit 0, status 200 and some bytes is a STOP. A cut read that answers whole within 20 s is logged as `read_answered_before_cut`, a result to record, not a STOP. A cut read that ends any other way than exit 28 or exit 0 (a refused or reset connection, say) is a STOP: such a read may never have reached Tally, and its block would measure nothing.
 4. **Running a block.** ComplyEaze Bridge is started at step 1 and stays idle during every block: no call is made to it then, and it sends nothing to Tally of itself. `probe.py` is run from this sheet's folder, in the background, by exactly this, in PowerShell:
    `$p = Start-Process -PassThru -NoNewWindow -FilePath python -ArgumentList @('-I','probe.py', <the block's arguments>) -RedirectStandardOutput C:\bridge-lab\2142\answers\<block>-stdout.txt -RedirectStandardError C:\bridge-lab\2142\answers\<block>-stderr.txt; $null = $p.Handle`
-   and, once it has ended, `$p.WaitForExit(); $p.ExitCode`. While it runs, the only other act is screen capture. Exit 0 is the block as designed. Exit 2 is a STOP (below). Any other exit code (a Python error exits 1) is a STOP too. Both files are kept.
+   and, once it has ended, `$p.WaitForExit(); $p.ExitCode`. While it runs, the only other act is screen capture. `-ArgumentList` takes each argument as its own array element, written out in full as in the steps. Exit 0 is the block as designed. Exit 2 is a STOP (below). Exit 1 is a STOP too: either `probe.py` refused before sending anything (its stderr says why), or it failed with a Python error, maybe after the read was sent. Any other exit code is a STOP. Both files are kept.
    - **A dialog during a block:** create the empty file `C:\bridge-lab\2142\answers\STOP-<block>`. `probe.py` checks for it before each probe and then stops sending. That is the only way to stop it; never end a process. Then C7.
    - **Screenshots:** a screenshot of Tally's whole window just before each block starts, every 30 s while it runs, and straight after it ends (before anything else, the timed `ledger_masters` included). Screen capture only: no click, no focus change, no key. A dialog in any of them is C7.
    - **The answers folder** is `C:\bridge-lab\2142\answers`, created empty before step 1 and listed (absent or empty, else STOP). `--out` names it in every block.
-   - **On exit 2** (a STOP): send nothing more, and do not end any curl. `probe.py` has already waited up to 600 s for a read curl still running to end on its own, and logged its result (`stop_wait_ended`). If that wait ran out, record the read's answer file size and sha256 and its headers file as they are. Then report.
-5. **The timed `ledger_masters` after B2 and B4** is sent once, within 30 s of the UTC of the block's `end` log line (only the closing screenshot comes between), and never repeated. Record the UTC of the `end` line and of the call's send.
+   - **On exit 1:** send nothing more and end nothing. List the `curl.exe` processes (`tasklist /FI "IMAGENAME eq curl.exe"`). If the log has a `read_sent` line and no `read_ended` line, wait for that curl to end on its own, for up to 10 minutes, then record the read's answer and headers files as they are. Then report.
+   - **On exit 2** (a STOP): send nothing more, and do not end any curl. A probe without an answer (`probe_unanswered`) is also left running, with its pid in the `stop` line and its body file kept. `probe.py` has already waited up to 600 s for a read curl still running to end on its own, and logged its result (`stop_wait_ended`). If that wait ran out, record the read's answer file size and sha256 and its headers file as they are. Then report.
+5. **The timed `ledger_masters` after B2 and B4** is sent once, within 15 s of the UTC of the block's `end` log line (only the closing screenshot comes between), and never repeated. Record the UTC of the `end` line and of the call's send.
    - **Answered:** record its seconds, its marks and the answer whole.
    - **Refused:** whatever the code or cause (a refusal for time, as above, among them), that is a result. Record the code, cause and next step text whole, and its seconds. Then the marks are read once, after the wait in rule 6, by another `ledger_masters` (basic), sent only if `GET /status` answered 200 and no dialog is up. A `GET /status` that does not answer 200 there is C3's STOP, and the marks are then read as C8 allows, or not at all.
 6. **Waits between blocks.** After every B block (after the timed `ledger_masters` for B2 and B4), wait 120 s, taking a screenshot of Tally's whole window every 30 s, then ONE `GET /status` by rule 2's line (200). Then the next step.
-7. **Marks.** `ledger_masters` with `fields` basic: `snapshot.master_alter_id`, `snapshot.voucher_alter_id`. Read at step 1 (M0, V0), after B2 (M1, V1, from the timed read or rule 5's later one), after B4 (M2, V2, the same way) and at the end (M3, V3). All read must be equal; a mark that moves = STOP.
+7. **Marks.** `ledger_masters` with `fields` basic: `snapshot.master_alter_id`, `snapshot.voucher_alter_id`. Read at step 1 (M0, V0), after B2 (M1, V1, from the timed read or rule 5's later one), after B4 (M2, V2, the same way) and at the end (M3, V3). All reads must be equal; a mark that moves = STOP.
 8. **One Tally.** At step 0 and at the end, as C2 a and b set out, plus `Get-NetTCPConnection -LocalPort 9001 -State Listen`: exactly one `tally.exe`, and it owns port 9001.
 9. **Keys.** The Gateway is the only screen used. No key is pressed except the arrows and Enter of Select Company at step 0, and the Company > Shut of C10. **Never Ctrl+Q or Escape at the Gateway of Tally.**
+
+C1 and C2 as applied: step 0 runs with no company loaded, and THE COMPANY is loaded straight after it, so "only THE COMPANY is loaded" holds from that load. C2 d's MARKS read is met by step 1's `list_companies` (exactly one company) and `ledger_masters` snapshot marks: no raw MARKS request is sent.
 
 Licensed mode only; Education mode = STOP.
 
@@ -93,17 +97,17 @@ Run it over stdio with:
    - `tools/list` (saved whole).
    - `list_companies`: EXPECT exactly THE COMPANY, `identity_state` `verified_tuple`, `books_from` 20250401.
    - `ledger_masters` (basic): M0 and V0 (EXPECT 328 and 29900; any other = STOP). Record its seconds: the first of two times of this read at rest.
-2. **A1**, at rest: `probe.py --block A1`. Ten probes.
-3. **B1**, beside the whole read: `probe.py --block B1 --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94e…` (the whole sha256, as in Files). Then rule 6's wait and `/status`.
-4. **B2**, beside the read cut at 20 s: `probe.py --block B2 --read … --read-sha256 … --cut-after 20`.
+2. **A1**, at rest: `probe.py --block A1 --out C:\bridge-lab\2142\answers`. Ten probes.
+3. **B1**, beside the whole read: `probe.py --block B1 --out C:\bridge-lab\2142\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f`. Then rule 6's wait and `/status`.
+4. **B2**, beside the read cut at 20 s: `probe.py --block B2 --out C:\bridge-lab\2142\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f --cut-after 20`.
    - As soon as it exits 0 and its closing screenshot is taken, the timed `ledger_masters` (basic), by rule 5. M1 and V1 come from it, or from rule 5's later read.
    - Then rule 6's wait and `/status`.
-5. **A2**, at rest: `probe.py --block A2`.
-6. **B3**, as B1: `probe.py --block B3 --read … --read-sha256 …`. Then rule 6's wait and `/status`.
-7. **B4**, as B2: `probe.py --block B4 --read … --read-sha256 … --cut-after 20`.
+5. **A2**, at rest: `probe.py --block A2 --out C:\bridge-lab\2142\answers`.
+6. **B3**, as B1: `probe.py --block B3 --out C:\bridge-lab\2142\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f`. Then rule 6's wait and `/status`.
+7. **B4**, as B2: `probe.py --block B4 --out C:\bridge-lab\2142\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f --cut-after 20`.
    - Then the timed `ledger_masters` by rule 5 (M2, V2).
    - Then rule 6's wait and `/status`.
-8. **A3**, at rest: `probe.py --block A3`.
+8. **A3**, at rest: `probe.py --block A3 --out C:\bridge-lab\2142\answers`.
 9. `ledger_masters` (basic): M3 and V3. Record its seconds: the second time of this read at rest.
 10. Stop ComplyEaze Bridge (its stop file), and record its exit code and error stream. Hash the exe.
 11. LAB-COMMON C10:
@@ -123,23 +127,23 @@ STOP RULES:
 - a mark that moves;
 - an answer above its bound;
 - a probe without an answer in 600 s, or any other request without one in 10 minutes (leave that curl running, send nothing);
-- `probe.py` exiting 2;
+- `probe.py` exiting with any code but 0;
 - Ctrl+Q or Escape at the Gateway (an incident: if a prompt shows, press no key, take a screenshot and STOP; only if the process list shows NO `tally.exe`, C9);
 - an exe sha256 that is not the one named.
 
 ## What the row records
 For each block, a table: each probe's number, its start time since the block began (`t` of `probe_sent`), its `time_total`, whether it was sent before or after the read ended, and its status. Then:
 - **A blocks:** the least, the most and the median of the ten `time_total`.
-- **B1 and B3 (the decisive table):** the read's `time_total` and `read_end_t`. Probes are placed by `t` against `read_end_t` only, never by the log's `after_read` flag, which only drives the helper's own count. For each probe whose `probe_sent` `t` is more than 1 s before `read_end_t`: its end (`t` plus its `time_total`) against `read_end_t`, and its `time_total`. A probe sent within 1 s of `read_end_t` is listed as not decisive and left out of the reading. Each other probe is one of three:
+- **B1 and B3 (the decisive table):** the read's `time_total` and `read_end_t`. Probes are placed by `t` against `read_end_t` only, never by the log's `after_read` flag, which only drives the helper's own count. For each probe whose `probe_sent` `t` is more than 1.5 s before `read_end_t`: its end (`t` plus its `time_total`) against `read_end_t`, and its `time_total`. A probe sent within 1.5 s of `read_end_t` is listed as not decisive and left out of the reading. Each other probe is one of three:
   - **waited:** it ended no earlier than 0.5 s before `read_end_t`, in 1 s or more;
   - **answered quickly while busy:** it ended more than 0.5 s before `read_end_t`, in under 1 s;
   - **answered slowly while busy:** it ended more than 0.5 s before `read_end_t`, in 1 s or more.
-  - **Reading:** if every such probe waited, `/status` waits behind the read on this Tally. If any answered quickly while busy, `/status` answers while Tally is building, and is not a signal that Tally is busy. Slow answers while busy are recorded as a third result. None is a STOP.
+  - **Reading:** if every such probe waited, `/status` waits behind the read on this Tally. If any answered quickly while busy, `/status` answers while Tally is building, and is not a signal that Tally is busy. Slow answers while busy are recorded as a third result. None is a STOP. If B1 and B3 disagree, both are reported and no reading is given.
 - **B2 and B4:**
   - the drain's length as `/status` sees it: from `read_end_t` (the cut) to the end of the last probe that took 1 s or more and ended after the cut, or "none was slow after the cut". The end of the third quick probe in a row is given beside it, as a second figure, since it includes the probes' 2 s gaps;
   - each probe's `time_total` in between;
-  - the timed `ledger_masters`: answered or refused, its seconds, and the seconds between the block's `end` line and its send, against the slower of the two times at rest (steps 1 and 9).
-  - **Reading:** answered within twice that time at rest or that time plus 2 s, whichever is larger, says a quick `/status` after a cut meant Tally was ready for a data read. Slower, or refused, says it did not.
+  - the timed `ledger_masters`: answered or refused, its seconds, and the seconds between the block's `end` line and its send, against the two times at rest (steps 1 and 9), both given, the threshold taken from the slower.
+  - **Reading:** answered within twice that time at rest or that time plus 2 s, whichever is larger, says a quick `/status` after a cut meant Tally was ready for a data read. Slower, or refused, says it did not. If the call went out more than 15 s after the `end` line, the reading is not decisive: record it.
 
 **Confidence:** one sitting, PARTIAL until repeated. **Not covered:**
 - other reads and books;

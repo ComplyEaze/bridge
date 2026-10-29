@@ -3030,7 +3030,12 @@ the name absent is sent after the create's send ended, and Tally has been seen t
 serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection; a connection
 ComplyEaze Bridge reuses for the create is not measured (#2176). Their answers carry
-`verification.basis` `read_after_send_order`.
+`verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
+absent state only when the read-back's Tally reports TallyPrime 7.2 Silver,
+licensed. On any other the batch stays open, its name held, with a reason that
+names what is not covered: `absent_not_measured_on_gold`,
+`absent_not_measured_on_this_release`, `absent_not_measured_in_education` or
+`absent_tally_release_not_known`, and a next step that says so.
 
 Later calls cannot settle these states, and their batches keep holding the name: a
 read that found the name absent while the company's master mark moved back, or

@@ -1182,6 +1182,11 @@ impl Server {
             }
             (None, None) => {}
         }
+        // A settled absent state says what it rests on here too, as the call
+        // that judged it did.
+        if verdict.is_some_and(|verdict| verdict.state().is_absent()) {
+            result["verification"]["basis"] = json!("read_after_send_order");
+        }
         ToolOutcome {
             payload: json!({ "result": result }),
             evidence,

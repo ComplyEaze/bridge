@@ -112,6 +112,19 @@ pub struct AgentRead {
     /// The stricter of the date-boundary profiles the read's opening and
     /// closing identity brackets observed: Education if either reported it.
     pub boundary_profile: DateBoundaryProfile,
+    /// The Tally both brackets saw: its release and licence tier, or nothing
+    /// known when they differ.
+    pub observed_tally: ObservedTally,
+}
+
+/// What an identity bracket's company list said of the Tally that answered:
+/// its release and its licence tier (Silver or Gold, none in Education). A
+/// field is `None` when the capability answer did not give it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ObservedTally {
+    pub release: Option<String>,
+    pub license_tier: Option<bridge_tally_core::LicenseTier>,
+    pub education: bool,
 }
 
 /// What the endpoint queue read to admit a post, before the aim: the reads of
@@ -137,7 +150,8 @@ async fn fetch_admitted_agent_read(
     identity: &VerifiedCompanyIdentity,
     request: super::agent_read_request::AgentReadRequest,
 ) -> anyhow::Result<(AgentRead, RuntimeReadEvidence)> {
-    let opening = bracket_verified_company_identity_observing_mode(client, identity).await?;
+    let (opening, opening_tally) =
+        bracket_verified_company_identity_observing_mode(client, identity).await?;
     if !request.window_accepted_by(opening) {
         return Err(EducationBoundaryRefusal.into());
     }
@@ -146,9 +160,10 @@ async fn fetch_admitted_agent_read(
         .fetch_native_report_paired_with_evidence(request_xml.clone())
         .await?;
     let evidence = RuntimeReadEvidence::paired(&request_xml, encoded_sha256.clone(), encoded_bytes);
-    let closing = bracket_verified_company_identity_observing_mode(client, identity)
-        .await
-        .map_err(|error| with_read_evidence(error, evidence.clone()))?;
+    let (closing, closing_tally) =
+        bracket_verified_company_identity_observing_mode(client, identity)
+            .await
+            .map_err(|error| with_read_evidence(error, evidence.clone()))?;
     // Education reported only after the read may have served it: which mode
     // answered is unknown, so the read is refused as if it had been sent in
     // Education (a licence server dropping out mid-read does this).
@@ -169,6 +184,11 @@ async fn fetch_admitted_agent_read(
             encoded_bytes,
             encoded_sha256,
             boundary_profile: profile,
+            observed_tally: if opening_tally == closing_tally {
+                opening_tally
+            } else {
+                ObservedTally::default()
+            },
         },
         evidence,
     ))
@@ -653,7 +673,7 @@ async fn fetch_admitted_audit_part(
     // As for every admitted agent read (bridge#581): the mode comes from the
     // bracket's own company list, and a window Education would serve empty is
     // refused before it is sent.
-    let opening = bracket_verified_company_identity_observing_mode(client, identity).await?;
+    let (opening, _) = bracket_verified_company_identity_observing_mode(client, identity).await?;
     if !request.window_accepted_by(opening) {
         return Err(EducationBoundaryRefusal.into());
     }
@@ -696,7 +716,7 @@ async fn fetch_admitted_audit_part(
             evidence.clone(),
         ));
     }
-    let closing = bracket_verified_company_identity_observing_mode(client, identity)
+    let (closing, _) = bracket_verified_company_identity_observing_mode(client, identity)
         .await
         .map_err(|error| with_read_evidence(error, evidence.clone()))?;
     // Education reported only after the part may have been served by it: which
@@ -1150,14 +1170,16 @@ async fn bracket_verified_company_identity(
 async fn bracket_verified_company_identity_observing_mode(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,
-) -> anyhow::Result<DateBoundaryProfile> {
-    let (companies, _, education) = client.fetch_companies_observing_education_mode().await?;
+) -> anyhow::Result<(DateBoundaryProfile, ObservedTally)> {
+    let (companies, _, education, tally) =
+        client.fetch_companies_observing_education_mode().await?;
     admit_company_identity(&companies, identity)?;
-    Ok(if education {
+    let profile = if education {
         DateBoundaryProfile::EducationRestricted
     } else {
         DateBoundaryProfile::ModeAgnostic
-    })
+    };
+    Ok((profile, tally))
 }
 
 /// A read refused because Education mode would not honour its

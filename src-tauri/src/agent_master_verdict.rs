@@ -24,7 +24,9 @@
 //!    master changed or missing, no loaded company's mark moved and no counter
 //!    claiming a create: `confirmed_absent`; the same, but with the target
 //!    company's mark moved forward and no ledger or group in the index that
-//!    the pre-image did not hold: `confirmed_absent_after_change`;
+//!    the pre-image did not hold: `confirmed_absent_after_change`. Either is
+//!    given only on a Tally where the order it rests on was measured
+//!    ([`OrderCoverage`]); elsewhere the batch stays open with the reason;
 //! 5. every check of [`Checks`] passed: `posted_verified`;
 //! 6. on a reconcile only, with no answer from Tally on file, every other
 //!    check passed and the found ledger's `ALTERID` the target company's
@@ -110,6 +112,38 @@ pub(super) struct ReadBack {
     /// The ledgers and the groups of the paired index, as one list.
     pub(super) masters: Option<Vec<IndexedMaster>>,
     pub(super) party: PartyRead,
+    /// Whether the order the absent states rest on was measured on the Tally
+    /// the index read went to.
+    pub(super) order_coverage: OrderCoverage,
+}
+
+/// Whether the order Tally serves requests in, which both absent states rest
+/// on, was measured on the Tally a read-back went to. It was measured only on
+/// TallyPrime 7.2 Silver, licensed (the abandoned-create rows and the order
+/// rows of #1713). Built only from what the read's identity brackets saw, so
+/// no caller can claim a measured Tally it did not read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum OrderCoverage {
+    Measured,
+    /// The reason the batch stays open, naming what is not covered.
+    NotMeasured(&'static str),
+}
+
+impl OrderCoverage {
+    pub(super) fn of(tally: &crate::tally::ObservedTally) -> Self {
+        use bridge_tally_core::LicenseTier;
+        if tally.education {
+            return Self::NotMeasured("absent_not_measured_in_education");
+        }
+        match (tally.release.as_deref(), tally.license_tier) {
+            (Some("7.2"), Some(LicenseTier::Silver)) => Self::Measured,
+            (_, Some(LicenseTier::Gold)) => Self::NotMeasured("absent_not_measured_on_gold"),
+            (Some(_), Some(LicenseTier::Silver)) => {
+                Self::NotMeasured("absent_not_measured_on_this_release")
+            }
+            _ => Self::NotMeasured("absent_tally_release_not_known"),
+        }
+    }
 }
 
 /// What the journal and the intent already hold.
@@ -662,15 +696,25 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         && !missing
         && same_companies
         && !counters_claim_a_write;
+    // Either absent state is given only where its basis was measured; on any
+    // other Tally the batch stays open, with the reason naming what is not.
+    let uncovered = match read.order_coverage {
+        OrderCoverage::Measured => None,
+        OrderCoverage::NotMeasured(reason) => Some(reason),
+    };
     if absent_and_unchanged && target_marks.is_some() && !target_moved {
-        return Judgement {
-            state: MasterVerdictState::ConfirmedAbsent,
-            guid: None,
-            checks,
-            reasons: vec!["not_in_book"],
-            name_absent_in_read_book: name_absent,
-            sealed: (),
-        };
+        if let Some(reason) = uncovered {
+            reasons.push(reason);
+        } else {
+            return Judgement {
+                state: MasterVerdictState::ConfirmedAbsent,
+                guid: None,
+                checks,
+                reasons: vec!["not_in_book"],
+                name_absent_in_read_book: name_absent,
+                sealed: (),
+            };
+        }
     }
     // The mark moved since the intent: the create may have run and its ledger
     // been deleted, or another master changed. A ledger or group the pre-image
@@ -682,14 +726,27 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         .keys()
         .any(|guid| !facts.pre_image.contains_key(guid));
     if absent_and_unchanged && moved_forward && !master_new_since_intent {
-        return Judgement {
-            state: MasterVerdictState::ConfirmedAbsentAfterChange,
-            guid: None,
-            checks,
-            reasons: vec!["not_in_book", "mark_moved_since_intent"],
-            name_absent_in_read_book: name_absent,
-            sealed: (),
-        };
+        if let Some(reason) = uncovered {
+            reasons.push(reason);
+        } else {
+            return Judgement {
+                state: MasterVerdictState::ConfirmedAbsentAfterChange,
+                guid: None,
+                checks,
+                reasons: vec!["not_in_book", "mark_moved_since_intent"],
+                name_absent_in_read_book: name_absent,
+                sealed: (),
+            };
+        }
+    }
+    // An absent name that stays open says why, where the read showed the
+    // cause.
+    if absent_and_unchanged && uncovered.is_none() {
+        if moved_forward && master_new_since_intent {
+            reasons.push("master_new_since_intent");
+        } else if target_marks.is_some_and(|(before, after)| after < before) {
+            reasons.push("mark_went_back_since_intent");
+        }
     }
 
     // 5. The ledger the write should have made, described field by field.

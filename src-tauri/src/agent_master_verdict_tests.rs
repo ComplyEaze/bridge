@@ -137,6 +137,7 @@ impl World {
                     master(MasterKind::Ledger, new_ledger(), 8, &[NAME]),
                 ]),
                 party: PartyRead::Rows(vec![row]),
+                order_coverage: OrderCoverage::Measured,
             },
         }
     }
@@ -1344,6 +1345,7 @@ fn a_mark_moved_forward_with_no_master_new_settles_as_absent_after_change() {
     assert_eq!(
         judgement.reasons,
         vec![
+            "mark_went_back_since_intent",
             "name_not_one_ledger_in_book",
             "target_mark_not_moved",
             "counters_unavailable",
@@ -1371,6 +1373,11 @@ fn a_master_new_since_the_intent_keeps_an_absent_name_open() {
             "{kind:?}"
         );
         assert!(judgement.name_absent_in_read_book, "{kind:?}");
+        assert!(
+            judgement.reasons.contains(&"master_new_since_intent"),
+            "{kind:?}: {:?}",
+            judgement.reasons
+        );
     }
 }
 
@@ -1936,5 +1943,76 @@ fn an_open_judgement_is_never_terminal() {
         assert!(!judgement.state.is_terminal(), "{verdict:?}");
         assert_eq!(judgement.guid, None);
         assert_eq!(judgement.reasons, vec!["a_reason"]);
+    }
+}
+
+/// The order an absent state rests on was measured on TallyPrime 7.2 Silver,
+/// licensed, only: every other Tally, an unknown one included, is not covered.
+#[test]
+fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
+    use crate::tally::ObservedTally;
+    use bridge_tally_core::LicenseTier;
+    let tally = |release: Option<&str>, tier: Option<LicenseTier>, education: bool| ObservedTally {
+        release: release.map(str::to_string),
+        license_tier: tier,
+        education,
+    };
+    for (seen, expected) in [
+        (
+            tally(Some("7.2"), Some(LicenseTier::Silver), false),
+            OrderCoverage::Measured,
+        ),
+        (
+            tally(Some("7.2"), Some(LicenseTier::Gold), false),
+            OrderCoverage::NotMeasured("absent_not_measured_on_gold"),
+        ),
+        (
+            tally(Some("7.1"), Some(LicenseTier::Silver), false),
+            OrderCoverage::NotMeasured("absent_not_measured_on_this_release"),
+        ),
+        (
+            tally(None, Some(LicenseTier::Silver), false),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
+        (
+            tally(Some("7.2"), None, false),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
+        (
+            tally(Some("7.2"), None, true),
+            OrderCoverage::NotMeasured("absent_not_measured_in_education"),
+        ),
+        (
+            ObservedTally::default(),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
+    ] {
+        assert_eq!(OrderCoverage::of(&seen), expected, "{seen:?}");
+    }
+}
+
+/// On a Tally not covered, neither absent state is given: the batch stays open
+/// with the reason that names the Tally, and the rest of the read is judged.
+#[test]
+fn neither_absent_state_is_given_on_a_tally_not_covered() {
+    for reason in [
+        "absent_not_measured_on_gold",
+        "absent_not_measured_on_this_release",
+        "absent_tally_release_not_known",
+        "absent_not_measured_in_education",
+    ] {
+        for after in [7, 8] {
+            let mut world = World::untouched(suspense());
+            world.marks()[0] = mark(TARGET, after);
+            world.read.order_coverage = OrderCoverage::NotMeasured(reason);
+            let judgement = world.judge();
+            assert_eq!(
+                judgement.state,
+                MasterVerdictState::ReconciliationRequired,
+                "{reason} {after}"
+            );
+            assert!(judgement.reasons.contains(&reason), "{reason} {after}");
+            assert!(!judgement.state.is_terminal());
+        }
     }
 }

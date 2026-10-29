@@ -20,7 +20,8 @@
 //! one), and the answer reports the state, the GUID when found and each check.
 use super::super::master_ledger::{read_pre_image, MasterMark, MasterVerdict, MasterVerdictState};
 use super::verdict::{
-    judge, party_read_needed, Facts, Judgement, Moment, PartyRead, PartyView, ReadBack,
+    judge, party_read_needed, Facts, Judgement, Moment, OrderCoverage, PartyRead, PartyView,
+    ReadBack,
 };
 use super::*;
 use crate::tally::VerifiedCompanyIdentity;
@@ -46,11 +47,14 @@ pub(super) const NEXT_ABSENT_AFTER_CHANGE: &str = "A later read of the book foun
 /// either way: with a send on file it only reads the book back, and with none
 /// it asks for approval again before anything is sent.
 pub(super) const NEXT_SEND_NOT_KNOWN: &str = "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.";
-pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back this time. Call post_ledger_creates with this batch_id again later to read it back (it sends nothing), or look at the company's ledgers in Tally. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it. Never post this batch again.";
+pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back this time. Call post_ledger_creates with this batch_id again once Tally is idle to read it back (it sends nothing), or look at the company's ledgers in Tally. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it. Never post this batch again.";
 /// The read-back found no ledger of this name, and the outcome is still open.
 /// A read that found the name absent and did not settle: nothing more can be
 /// settled now, and the name stays held.
 pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, and the outcome of this batch is not settled (see the reasons). ComplyEaze Bridge cannot settle it now: a create it sent may still be waiting in Tally. While the batch stays open, ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for, and will not create it again. Calling post_ledger_creates with this batch_id again, once Tally is idle, sends nothing: it reads the book back, shows whether a ledger of this name now exists, and judges one that has appeared. Never post this batch again.";
+/// The read found the name absent on a Tally where what an absent state rests
+/// on was not measured: the batch stays open.
+pub(super) const NEXT_ABSENT_UNCOVERED: &str = "The read-back found no ledger of this name, but ComplyEaze Bridge closes a batch on an absent ledger only on TallyPrime 7.2 Silver, licensed, the one Tally where the order it rests on (a read sent after the create was served after it) was measured, and the reasons say how this Tally differs. The batch stays open, and ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for: a create it sent may still be waiting in Tally. Calling post_ledger_creates with this batch_id again sends nothing and reads the book back again. Check the company's ledgers in Tally. Never post this batch again.";
 /// A ledger of this name is in the book and the read-back could not verify it.
 pub(super) const NEXT_PRESENT_NOT_VERIFIED: &str = "A ledger of this name is in the book, but ComplyEaze Bridge could not verify that it is the one this batch sent (see the checks and reasons). There is nothing to create: compare the ledger in Tally with this batch by eye. Never post this batch again.";
 /// The book was not compared: the batch's company is not loaded, was renamed,
@@ -105,6 +109,16 @@ pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'stati
     }
     if judgement.reasons().contains(&"company_scope_changed") {
         NEXT_LOAD_SAME_COMPANIES
+    } else if judgement.reasons().iter().any(|reason| {
+        matches!(
+            *reason,
+            "absent_not_measured_in_education"
+                | "absent_not_measured_on_gold"
+                | "absent_not_measured_on_this_release"
+                | "absent_tally_release_not_known"
+        )
+    }) {
+        NEXT_ABSENT_UNCOVERED
     } else if moment == Moment::Reconcile && judgement.name_absent_in_read_book() {
         NEXT_ABSENT_NOT_SETTLED
     } else if judgement.guid().is_some() {
@@ -240,6 +254,14 @@ fn single_parent_part(parent: &str) -> Option<ParentPart> {
     .cloned()
 }
 
+#[cfg(test)]
+tokio::task_local! {
+    /// The coverage a tool test says the read-back's Tally has, standing in
+    /// for a captured company list of that release. Absent, the coverage is
+    /// read from the answer as it is in a shipped build.
+    pub(super) static TEST_ORDER_COVERAGE: OrderCoverage;
+}
+
 /// What a read-back came to, with a status for each read that carries no book data.
 struct BookBack {
     read: ReadBack,
@@ -289,14 +311,24 @@ impl Server {
         // 2. The paired indexes.
         let mut masters: Option<Vec<IndexedMaster>> = None;
         let mut profile = None;
+        // Not measured until the index read says which Tally answered.
+        let mut order_coverage = OrderCoverage::NotMeasured("absent_tally_release_not_known");
         let ledgers = match ledger_name_index_read(company) {
-            Ok(request) => self.post_read_observing_boundary(identity, request).await,
+            Ok(request) => self.post_read_observing_tally(identity, request).await,
             Err(_) => Err(ToolFailure::from("master_request_invalid".to_string())),
         };
         match ledgers {
             Err(failure) => status["ledger_index"] = unavailable(&failure.code),
-            Ok((ledgers_xml, ledger_evidence, boundary)) => {
+            Ok((ledgers_xml, ledger_evidence, boundary, tally)) => {
                 status["ledger_index"] = json!("read");
+                order_coverage = OrderCoverage::of(&tally);
+                // The one seam: a tool test says which Tally answered, where
+                // its captured company list is of another release. It is
+                // compiled under bare `cfg(test)`, so no shipped build holds it.
+                #[cfg(test)]
+                if let Ok(forced) = TEST_ORDER_COVERAGE.try_with(|coverage| *coverage) {
+                    order_coverage = forced;
+                }
                 *evidence = combine_evidence(evidence.clone(), ledger_evidence);
                 profile = Some(boundary);
                 match self
@@ -356,6 +388,7 @@ impl Server {
                 marks,
                 masters,
                 party,
+                order_coverage,
             },
             status,
         }

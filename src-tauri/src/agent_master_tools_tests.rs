@@ -13,7 +13,8 @@ use super::super::master_ledger::{
     read_pre_image, MasterVerdict, MasterVerdictState, VerdictItem, TEST_FAULTS,
 };
 use super::super::master_post::{TEST_LEDGER_INDEX, TEST_LEDGER_INDEX_AFTER_POST};
-use super::verify::{judged_next_step, not_read_back_next_step};
+use super::verdict::OrderCoverage;
+use super::verify::{judged_next_step, not_read_back_next_step, TEST_ORDER_COVERAGE};
 use super::*;
 use crate::agent::master_writes_effective;
 use crate::agent::{Posting, Redaction, Settings};
@@ -383,7 +384,13 @@ fn saved_batch(server: &Server, name: &str) -> (MasterBatch, Value) {
 /// read-back after a POST sees the same book: the ledger is not there.
 async fn posting<F: std::future::Future>(scripted: &ScriptedApproval, call: F) -> F::Output {
     SCRIPTED_APPROVAL
-        .scope(scripted.clone(), TEST_LEDGER_INDEX.scope(book(), call))
+        .scope(
+            scripted.clone(),
+            TEST_ORDER_COVERAGE.scope(
+                OrderCoverage::Measured,
+                TEST_LEDGER_INDEX.scope(book(), call),
+            ),
+        )
         .await
 }
 
@@ -393,10 +400,17 @@ async fn posting_then<F: std::future::Future>(
     after: Vec<IndexedMaster>,
     call: F,
 ) -> F::Output {
+    // These tests judge the verdict, not the release: the captured company
+    // list is of 7.1, where an absent state is not settled, so the Tally is
+    // said to be the measured one. The gate on the release is tested below on
+    // the captured answer itself.
     SCRIPTED_APPROVAL
         .scope(
             scripted.clone(),
-            TEST_LEDGER_INDEX.scope(book(), TEST_LEDGER_INDEX_AFTER_POST.scope(after, call)),
+            TEST_ORDER_COVERAGE.scope(
+                OrderCoverage::Measured,
+                TEST_LEDGER_INDEX.scope(book(), TEST_LEDGER_INDEX_AFTER_POST.scope(after, call)),
+            ),
         )
         .await
 }
@@ -4604,6 +4618,65 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
     assert_eq!(result(&again)["dispatch"]["resent"], false);
     assert!(scripted.masters().is_empty(), "nobody was asked again");
     assert_eq!(journal_bytes(directory.path()), before);
+}
+
+/// The gate on the release, on the captured company list itself: it reports
+/// TallyPrime 7.1 Silver, where the order an absent state rests on was not
+/// measured. A reconcile that would settle as absent on 7.2 Silver stays open
+/// here, for both absent states, with the reason and a step that says so.
+#[tokio::test]
+async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
+    for target in [7, 8] {
+        let plans = through_post(xml(created_one()).with_delivery(
+            Delivery::ResetAfterRequestProcessed {
+                delay: Duration::from_millis(0),
+            },
+        ));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (batch, args) = saved_batch(&server, LEDGER);
+        posting(
+            &ScriptedApproval::approving(),
+            server.call_tool("post_ledger_creates", args.clone()),
+        )
+        .await;
+        sent(simulator);
+        let reads =
+            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, 3, None))).unwrap();
+        let later = server_at(reads.address(), directory.path());
+        // No coverage seam: the read-back reads the release from the answer.
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                TEST_LEDGER_INDEX.scope(
+                    book(),
+                    TEST_LEDGER_INDEX_AFTER_POST
+                        .scope(book(), later.call_tool("post_ledger_creates", args)),
+                ),
+            )
+            .await;
+        sent(reads);
+        assert_eq!(
+            result(&response)["state"],
+            "reconciliation_required",
+            "{target}: {response}"
+        );
+        assert!(
+            result(&response)["verification"]["reasons"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("absent_not_measured_on_this_release")),
+            "{target}: {response}"
+        );
+        assert_eq!(
+            result(&response)["next_step"],
+            verify::NEXT_ABSENT_UNCOVERED,
+            "{target}"
+        );
+        assert_eq!(result(&response)["verification"]["settled"], false);
+        assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+    }
 }
 
 #[tokio::test]

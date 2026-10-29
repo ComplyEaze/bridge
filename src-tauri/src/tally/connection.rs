@@ -1665,7 +1665,7 @@ impl TallyClient {
     ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence)> {
         self.fetch_companies_observing_education_mode()
             .await
-            .map(|(companies, evidence, _)| (companies, evidence))
+            .map(|(companies, evidence, _, _)| (companies, evidence))
     }
 
     /// As [`Self::fetch_companies_with_wire_evidence`], also returning whether
@@ -1675,15 +1675,33 @@ impl TallyClient {
     /// further request is made.
     pub(crate) async fn fetch_companies_observing_education_mode(
         &self,
-    ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence, bool)> {
+    ) -> anyhow::Result<(
+        Vec<TallyCompany>,
+        RuntimeReadEvidence,
+        bool,
+        super::runtime::ObservedTally,
+    )> {
         let mut evidence = RuntimeReadEvidence::empty();
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), &mut evidence)
             .await?;
-        let education = parse_company_gateway_capability_observation(&xml)
-            .map(|observation| observation.educational_mode)
-            .unwrap_or(false)
+        let observation = parse_company_gateway_capability_observation(&xml).ok();
+        let education = observation
+            .as_ref()
+            .is_some_and(|observation| observation.educational_mode)
             || bridge_tally_protocol::company_list_may_be_in_educational_mode(&xml);
+        let tally =
+            observation.map_or_else(super::runtime::ObservedTally::default, |observation| {
+                super::runtime::ObservedTally {
+                    release: observation.release,
+                    license_tier: match (education, observation.silver, observation.gold) {
+                        (false, true, false) => Some(LicenseTier::Silver),
+                        (false, false, true) => Some(LicenseTier::Gold),
+                        _ => None,
+                    },
+                    education,
+                }
+            });
         let discovered = xml_parser::parse_companies_from_collection(&xml)
             .map_err(|error| with_read_evidence(error, evidence.clone()))?;
         let companies = normalize_discovered_companies(discovered).map_err(|_| {
@@ -1694,7 +1712,7 @@ impl TallyClient {
                 evidence.clone(),
             )
         })?;
-        Ok((companies, evidence, education))
+        Ok((companies, evidence, education, tally))
     }
 
     /// Re-enumerates the trusted `Company` collection, then proves one

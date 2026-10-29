@@ -2,7 +2,7 @@
 
 About 90 minutes. `LAB-COMMON.md` in this folder (v3, sha256 `5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6`) applies in full; where this sheet and it differ, the stricter holds. THE COMPANY is backed up first (BK0), stock items are imported into it, and BK0 is restored at the end. Nothing is keyed in Tally beyond the Backup and Restore screens and loading the company.
 
-**THIS SHEET RUNS ONLY WITH #2180's BUILD, AND ONLY AFTER THE RUN COORDINATOR'S YES TO DOWNLOAD IT.** #2180 stays a draft until this sheet passes, and a draft pull request runs no bundle job. So its bundle comes from a run of `ci.yml` started by hand on #2180's branch (which runs every job on both systems), and a pull request's bundle is downloaded only on the run coordinator's yes. Until THE BUILD below is filled in, `SHA256.txt` is regenerated for the changed README, and both are committed again, nothing in this sheet is sent.
+**THIS SHEET RUNS ONLY WITH #2180's BUILD, AND ONLY AFTER THE RUN COORDINATOR'S YES TO DOWNLOAD IT.** #2180 stays a draft until this sheet passes, and a draft pull request runs no bundle job. So its bundle comes from a run of `ci.yml` started by hand on #2180's branch (which runs every job on both systems), and a pull request's bundle is downloaded only on the run coordinator's yes. THE BUILD below names that run; nothing in this sheet is sent before the run coordinator's yes to download it.
 
 **WHAT IT DECIDES.** `stock_summary` reads a company's stock items in one request and, until #2180, admitted it only when the master mark (`ALTMSTID`) was at most 874. #2180 counts the stock items and stock groups by AlterID span past that mark, and admits the same read when at most 874 items are counted. It refuses with the counted figures above that. Neither path has run against a live book: the only books in the lab with stock are under the mark. This sheet makes one past it, with items imported in a shape this book has taken before, and records three things:
 1. **On the counted path** (mark past 874, at most 874 items), the call returns the book's items with `value_total_matched`, as many rows as Tally's own count. It sends one census slice per collection before the item read.
@@ -14,8 +14,8 @@ About 90 minutes. `LAB-COMMON.md` in this folder (v3, sha256 `5370c6d288cd0f54a4
 - **The stock group and unit the imports use:** `Lab Raw Materials` and `U.`. Both exist on this book: 40 of its 55 items were imported under them on 2 October 2026, by "All Masters" imports with the same item fields.
 - **If step 1 reads other marks or another count: STOP.** The book is not the one this sheet was written for.
 
-**THE BUILD** (fill in from the run started by hand on #2180's branch, after the run coordinator's yes; nothing is sent until it is filled in):
-- Pull request #2180 at head `________`. Workflow run `________` (started by hand), artifact `unsigned-bundle-smoke-windows-latest` id `________`, zip digest `sha256:________`. `bridge_mcp.exe` sha256 `________`.
+**THE BUILD** (from the run started by hand on #2180's branch; it is downloaded only after the run coordinator's yes):
+- Pull request #2180 at head `b8110b1f46fce66b4fa0474137250ca58a9b156d`. Workflow run `40942539219` (started by hand on the branch), artifact `unsigned-bundle-smoke-windows-latest` id `12929180854`, 57,348,809 bytes, zip digest `sha256:338f65948ad65804858779676f090ad6df0e210bbfeaf63772fe0d2e35590e4c` (it expires 5 Nov 2026 19:58 UTC). Check the downloaded zip's sha256 against that digest; another = STOP. `bridge_mcp.exe` sha256: recorded at step 0 from the unpacked zip.
 - Hash the exe before the first call and after the last; another hash = STOP.
 - Over MCP stdio, one launch, with a new empty `BRIDGE_AGENT_DATA_DIR` and `BRIDGE_TERMS_ACCEPTED=true`. Leave `BRIDGE_AGENT_ENABLE_WRITES`, `BRIDGE_AGENT_ENABLE_IMPORT`, `BRIDGE_AGENT_MAX_BYTES` and `BRIDGE_AGENT_REDACTION` unset: the tool writes nothing.
 - Record the version the tool list reports, and that `list_companies`, `stock_summary` and `egress_log` are in it. Every call's answer is saved whole, with its sha256, and with the wall time from the call's send to its answer.
@@ -125,3 +125,5 @@ About 90 minutes. `LAB-COMMON.md` in this folder (v3, sha256 `5370c6d288cd0f54a4
 - a notes file with UTC times.
 
 Screenshots and the backup file stay on the lab PC, listed by name, bytes and sha256. No item name or amount from the book goes into any text line of the evidence other than the raw answers and the parser's tables.
+
+**The pre-push scan and the span bounds.** The census slices' AlterID span bounds (multiples of 4,000, in the slice requests' names and text) coincide with figures the pre-push scan holds, so this sheet's own push named `SHA256.txt` and 28 of the slice request files as places where such a figure is accepted. The evidence branch's push names the same kind of places: its copies or listings of those requests, its send log and timing table where they repeat a bound, and any answer whose text carries one. A figure anywhere else is not accepted that way: it is reported.

@@ -5,14 +5,17 @@
 #
 #   -Target child    the dialog child: <ChildExe> --confirm-journal, fed -InputFile (a nonce line, the count line 1 and the box text).
 #   -Target control  the 1780-E control box: powershell.exe -NoProfile -ExecutionPolicy Bypass -File <ControlScript> -Variant c
-#                    -DelaySeconds 0 -Out <Out>.control.txt (its box has the approval box's flags; stdin is empty).
+#                    -DelaySeconds 0 -Out <stem>.control.txt (its box has the approval box's flags; stdin is empty).
 #   -Stdio tokio     stdin an anonymous pipe, stdout an anonymous pipe, stderr the NUL device; CreateProcess with handle inheritance,
 #                    STARTF_USESTDHANDLES, and the creation flag CREATE_UNICODE_ENVIRONMENT (0x400) only: no CREATE_NO_WINDOW, no
 #                    DETACHED_PROCESS, no breakaway, no STARTF_USESHOWWINDOW. That is what tokio's Command does with piped, piped, null.
-#   -Stdio files     stdin the -InputFile, stdout <Out>.stdout, stderr <Out>.stderr (what Start-Process -RedirectStandard* gives).
+#   -Stdio files     stdin the -InputFile, stdout <stem>.stdout, stderr <stem>.stderr, each opened with share mode READ|WRITE so that they can be read while the child runs (what Start-Process -RedirectStandard* gives).
 # Like the product's parent it writes the input, closes stdin, reads stdout to its end, waits for the child, and ends the child
-# (TerminateProcess) if it is still running after -TimeoutSeconds (kill_on_drop's effect). It writes to -Out: its own pid, the
-# command line, the stdio kind, the creation flags, the child's pid, and at the end the exit code and the bytes read from stdout.
+# (TerminateProcess) if it is still running after -TimeoutSeconds (kill_on_drop's effect). That is the ONE process this script ends:
+# the child it started itself, by the pid and handle its own CreateProcess returned (the named carve-out of the run sheet from
+# LAB-COMMON C2). It ends nothing else. It writes to -Out: its own pid, the command line (with the user's name scrubbed), the stdio
+# kind, the creation flags, the child's pid, and at the end the exit code and the bytes read from stdout.
+# <stem> is -Out without a trailing .txt: -Out C:\...\f1.txt gives f1.txt, f1.stdout, f1.stderr and f1.control.txt.
 param(
     [Parameter(Mandatory = $true)][ValidateSet('child', 'control')][string]$Target,
     [Parameter(Mandatory = $true)][ValidateSet('tokio', 'files')][string]$Stdio,
@@ -20,7 +23,7 @@ param(
     [string]$ChildExe,
     [string]$InputFile,
     [string]$ControlScript,
-    [int]$TimeoutSeconds = 180
+    [int]$TimeoutSeconds = 60
 )
 Add-Type -TypeDefinition @"
 using System;
@@ -47,7 +50,7 @@ public static class Spawn {
     static SECURITY_ATTRIBUTES Inheritable() { SECURITY_ATTRIBUTES sa = new SECURITY_ATTRIBUTES(); sa.nLength = Marshal.SizeOf(typeof(SECURITY_ATTRIBUTES)); sa.bInheritHandle = 1; return sa; }
     static IntPtr Open(string path, bool write) {
         SECURITY_ATTRIBUTES sa = Inheritable();
-        IntPtr h = CreateFile(path, write ? 0x40000000u : 0x80000000u, write ? 2u : 1u, ref sa, write ? 2u : 3u, 0x80u, IntPtr.Zero);
+        IntPtr h = CreateFile(path, write ? 0x40000000u : 0x80000000u, 3u, ref sa, write ? 2u : 3u, 0x80u, IntPtr.Zero);
         if (h == new IntPtr(-1)) throw new Exception("CreateFile failed for a path: " + Marshal.GetLastWin32Error());
         return h;
     }
@@ -98,7 +101,12 @@ public static class Spawn {
 }
 "@
 function Stamp { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }
-function Emit([string]$line) { [System.IO.File]::AppendAllText($Out, $line + "`r`n", [System.Text.Encoding]::UTF8) }
+function Scrub([string]$s) {
+    if ($env:USERNAME -and $env:USERNAME.Length -ge 3) { $s = $s -replace [regex]::Escape($env:USERNAME), '<user>' }
+    $s -replace '(?i)([A-Z]:\\Users\\)[^\\]+', '${1}<user>'
+}
+function Emit([string]$line) { [System.IO.File]::AppendAllText($Out, (Scrub $line) + "`r`n", [System.Text.Encoding]::UTF8) }
+$stem = $Out -replace '\.txt$', ''
 if ($Target -eq 'child') {
     if (-not $ChildExe -or -not $InputFile) { throw 'child needs -ChildExe and -InputFile' }
     $exe = $ChildExe
@@ -107,11 +115,11 @@ if ($Target -eq 'child') {
 } else {
     if (-not $ControlScript) { throw 'control needs -ControlScript' }
     $exe = (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe')
-    $cmdline = '"' + $exe + '" -NoProfile -ExecutionPolicy Bypass -File "' + $ControlScript + '" -Variant c -DelaySeconds 0 -Out "' + $Out + '.control.txt"'
+    $cmdline = '"' + $exe + '" -NoProfile -ExecutionPolicy Bypass -File "' + $ControlScript + '" -Variant c -DelaySeconds 0 -Out "' + $stem + '.control.txt"'
     $bytes = New-Object byte[] 0
 }
 Emit ("SPAWN " + (Stamp) + " parent_pid=" + $PID + " target=" + $Target + " stdio=" + $Stdio + " creation_flags=0x400 startf=0x100 timeout_s=" + $TimeoutSeconds)
 Emit ("SPAWN command_line=" + $cmdline)
 $started = Get-Date
-$result = [Spawn]::Run($exe, $cmdline, $Stdio, $InputFile, ($Out + '.stdout'), ($Out + '.stderr'), $bytes, $TimeoutSeconds, [Action[int]]{ param($childPid) Emit ("SPAWN " + (Stamp) + " child_pid=" + $childPid) })
+$result = [Spawn]::Run($exe, $cmdline, $Stdio, $InputFile, ($stem + '.stdout'), ($stem + '.stderr'), $bytes, $TimeoutSeconds, [Action[int]]{ param($childPid) Emit ("SPAWN " + (Stamp) + " child_pid=" + $childPid) })
 Emit ("SPAWN " + (Stamp) + " " + $result + " elapsed_s=" + [Math]::Round(((Get-Date) - $started).TotalSeconds, 1))

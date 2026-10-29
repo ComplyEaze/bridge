@@ -190,6 +190,14 @@
       "note": "the NAME Tally generated for the bank allocation of a post-dated receipt keyed by hand in the synthetic lab company BRIDGE BILLTRAIL LAB, as returned in the read-only captures of #1356 on 28 October 2026 (lab branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9)"
     },
     {
+      "uuid": "567653b1-c8be-4deb-b4fc-3ea5de801884",
+      "note": "company identifier of the synthetic lab company BRIDGE NONINT LAB, created in the lab on 21 October 2026 with invented masters, as Tally returned it in read-only captures on 27 and 28 October 2026 (lab branch lab/692-nonint-lab-answers at cbdc638d9537ecec9421ad913e3a9a170b732a0a); the ledger identifiers in the same captures are this value with a suffix"
+    },
+    {
+      "uuid": "3fc2a3c7-1da8-4bc4-a472-44028cdebca7",
+      "note": "company identifier of the synthetic lab company BRIDGE INTEGRATED CTRL LAB, created in the lab on 28 October 2026 with invented masters, as Tally returned it in captures of that day (lab branch lab/2068-integrated-write-control-answers at c539688fd75e6e92d0f79ff6c8ddb5adf435a85d); the ledger identifiers in the same captures are this value with a suffix"
+    },
+    {
       "uuid": "1bb48be5-baba-45b2-90d8-7593244915a9",
       "note": "company identifier of the synthetic lab company BRIDGE FOREXGROUP LAB (number 100090), created in the lab on 28 October 2026 with invented masters and vouchers keyed by hand (on 28 and again on 29 October), as Tally returned it in read-only captures on 29 October 2026 (lab branches lab/683-x1-forex-grouping-answers and lab/2071-forex-rerun-answers at 0d7eb0bf5cae)"
     }

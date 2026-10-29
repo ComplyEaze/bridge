@@ -376,12 +376,126 @@ async fn egress_log_reads_back_receipts_that_carry_a_full_trail() {
         let parsed: Value = serde_json::from_str(line.as_str().unwrap()).unwrap();
         assert_eq!(parsed["request_trail"]["sent"], TRAIL_LAST + 5);
     }
-    // A much larger `limit` over such receipts exceeds the byte cap, and is then
-    // refused by its code, not cut mid-line (ask for fewer receipts).
+    // A much larger `limit` over such receipts exceeds the byte cap: the answer keeps the newest
+    // whole receipts that fit the cap as the response is really encoded (both copies and the
+    // envelope), says so with `truncated` and counts the rest in `omitted_for_size`; it is no
+    // longer refused (#2125).
     let many = server.call_tool("egress_log", json!({"limit": 100})).await;
-    assert_eq!(many["isError"], true, "{many}");
+    assert_eq!(many["isError"], false, "{many}");
+    assert_eq!(many["structuredContent"]["truncated"], true, "{many}");
+    let kept = many["structuredContent"]["result"]["records"]
+        .as_array()
+        .unwrap();
+    let omitted = many["structuredContent"]["result"]["omitted_for_size"]
+        .as_u64()
+        .unwrap();
+    assert!(!kept.is_empty() && kept.len() < 40, "{}", kept.len());
+    // The file holds 40 receipts and the scan reaches all of them: what is kept and what is
+    // left out account for every receipt.
+    assert_eq!(kept.len() as u64 + omitted, 40);
+    // Whole lines, newest first.
+    for (position, line) in kept.iter().enumerate() {
+        let parsed: Value = serde_json::from_str(line.as_str().unwrap()).unwrap();
+        assert_eq!(parsed["index"], 39 - position);
+    }
+    // And the answer is within the cap as it is sent.
+    assert!(many.to_string().len() <= 200_000);
+}
+
+/// The fixture of the next two tests: `count` receipts of the same length, so that a cap can be
+/// set to the byte.
+fn equal_receipts(directory: &tempfile::TempDir, count: usize, padding: usize) {
+    let path = directory.path().join("agent-egress.jsonl");
+    for index in 0..count {
+        let line = serde_json::json!({"record_type": "response_prepared", "index": format!("{index:04}"), "padding": "x".repeat(padding)}).to_string();
+        append_egress_line(&path, &line).unwrap();
+    }
+}
+
+fn server_with_cap(directory: &tempfile::TempDir, max_bytes: usize) -> super::super::Server {
+    use super::super::{Redaction, Server, Settings, TallyEndpointConfig};
+    Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 256,
+        max_bytes,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    })
+}
+
+/// The boundary, to the byte: a cap equal to the size of the answer for twelve receipts returns
+/// all twelve and nothing is marked left out; one byte less returns eleven, marked, and the
+/// eleven are within that cap as sent.
+#[tokio::test]
+async fn egress_log_keeps_the_newest_receipts_that_fit_at_the_exact_boundary() {
+    use serde_json::json;
+    let directory = tempfile::tempdir().unwrap();
+    equal_receipts(&directory, 12, 1_000);
+    let whole = server_with_cap(&directory, 1_000_000)
+        .call_tool("egress_log", json!({"limit": 12}))
+        .await;
+    assert_eq!(whole["structuredContent"]["truncated"], false, "{whole}");
+    let size = whole.to_string().len();
+    let at = server_with_cap(&directory, size)
+        .call_tool("egress_log", json!({"limit": 12}))
+        .await;
+    assert_eq!(at["isError"], false, "{at}");
+    assert_eq!(at["structuredContent"]["truncated"], false, "{at}");
+    assert!(at["structuredContent"]["result"]
+        .get("omitted_for_size")
+        .is_none());
     assert_eq!(
-        many["structuredContent"]["error"]["code"], "agent_response_too_large",
-        "{many}"
+        at["structuredContent"]["result"]["records"]
+            .as_array()
+            .unwrap()
+            .len(),
+        12
+    );
+    let under = server_with_cap(&directory, size - 1)
+        .call_tool("egress_log", json!({"limit": 12}))
+        .await;
+    assert_eq!(under["isError"], false, "{under}");
+    assert_eq!(under["structuredContent"]["truncated"], true, "{under}");
+    let result = &under["structuredContent"]["result"];
+    assert_eq!(result["records"].as_array().unwrap().len(), 11);
+    assert_eq!(result["omitted_for_size"], 1);
+    assert!(under.to_string().len() < size);
+    // The newest eleven: the oldest receipt is the one left out.
+    let first = result["records"][0].as_str().unwrap();
+    assert!(first.contains("\"0011\""), "{first}");
+}
+
+/// One receipt that alone is over the cap cannot be cut mid-line, so the call is refused with
+/// the existing code, as before (#2125); so is any cap too small for the first newest receipt.
+#[tokio::test]
+async fn egress_log_still_refuses_when_one_receipt_alone_is_over_the_cap() {
+    use serde_json::json;
+    let directory = tempfile::tempdir().unwrap();
+    equal_receipts(&directory, 3, 60_000);
+    let refused = server_with_cap(&directory, 100_000)
+        .call_tool("egress_log", json!({"limit": 3}))
+        .await;
+    assert_eq!(refused["isError"], true, "{refused}");
+    assert_eq!(
+        refused["structuredContent"]["error"]["code"], "agent_response_too_large",
+        "{refused}"
+    );
+    // The same receipts fit a cap that holds one of them: the newest only, two counted left out.
+    let one = server_with_cap(&directory, 300_000)
+        .call_tool("egress_log", json!({"limit": 3}))
+        .await;
+    assert_eq!(one["isError"], false, "{one}");
+    let result = &one["structuredContent"]["result"];
+    let kept = result["records"].as_array().unwrap().len();
+    assert_eq!(
+        kept as u64 + result["omitted_for_size"].as_u64().unwrap(),
+        3
     );
 }

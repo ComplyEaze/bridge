@@ -1,0 +1,7 @@
+
+LocalAddress LocalPort  State OwningProcess
+------------ ---------  ----- -------------
+::                9001 Listen         13992
+0.0.0.0           9001 Listen         13992
+
+

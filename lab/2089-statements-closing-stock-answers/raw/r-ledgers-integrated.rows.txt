@@ -1,0 +1,9 @@
+bytes 12312 ledgers 8
+'Cash' PARENT 'Cash-in-Hand' {'TBALOPENING': '0.00', 'DEBITTOTALS': '', 'CREDITTOTALS': '', 'TBALCLOSING': ''} adds up: True
+'Closing Stock' PARENT 'Stock-in-Hand' {'TBALOPENING': '-1000.00', 'DEBITTOTALS': '-400.00', 'CREDITTOTALS': '', 'TBALCLOSING': '-1000.00'} adds up: False
+'Customer' PARENT 'Sundry Debtors' {'TBALOPENING': '0.00', 'DEBITTOTALS': '-1600.00', 'CREDITTOTALS': '', 'TBALCLOSING': '-1600.00'} adds up: True
+'Lab Capital' PARENT 'Capital Account' {'TBALOPENING': '1000.00', 'DEBITTOTALS': '', 'CREDITTOTALS': '', 'TBALCLOSING': '1000.00'} adds up: True
+'Profit & Loss A/c' PARENT ' Primary' {'TBALOPENING': '0.00', 'DEBITTOTALS': '', 'CREDITTOTALS': '', 'TBALCLOSING': '0.00'} adds up: True
+'Purchases' PARENT 'Purchase Accounts' {'TBALOPENING': '0.00', 'DEBITTOTALS': '-1200.00', 'CREDITTOTALS': '', 'TBALCLOSING': '-1200.00'} adds up: True
+'Sales' PARENT 'Sales Accounts' {'TBALOPENING': '0.00', 'DEBITTOTALS': '', 'CREDITTOTALS': '1600.00', 'TBALCLOSING': '1600.00'} adds up: True
+'Supplier' PARENT 'Sundry Creditors' {'TBALOPENING': '0.00', 'DEBITTOTALS': '', 'CREDITTOTALS': '1200.00', 'TBALCLOSING': '1200.00'} adds up: True

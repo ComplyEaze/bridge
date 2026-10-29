@@ -1,0 +1,14 @@
+2026-10-29T02:30:43Z exe sha256 9f73d533dcac8a24d1d33389a7db33cf4055e212f7dc97f8c170f00c08b73fd1 ok; launch-env.json sha256 75144d5f6ef4ebd9490f631646e6e5b5d77e0ca2e0ebc07d870440b77cadbca9; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-29T02:30:43Z launched pid 16392; stderr to server-stderr-20261029T023043Z.log
+2026-10-29T02:30:43Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+2026-10-29T02:30:53Z 000-tools-list.json tool=list secs=0.011 isError=None error=None saved_sha256=6d663ae7a1b1e38236657f0a7b6d38b9587f086bcd09299ef4b46f5f13a3d642
+2026-10-29T02:30:54Z 001-list-companies.json tool=list_companies secs=0.096 isError=False error=None saved_sha256=9bbb6c63235bdc396443e902f95c1e7c83d7fef6d05a708ca3d4145a49647d9c
+2026-10-29T02:30:56Z 002-s3-lm.json tool=ledger_masters secs=0.777 isError=False error=None saved_sha256=8219d92942f73c515822e0d7960c822dfb743dd2f8f8ee7f67d47bc0f254d6d2
+2026-10-29T02:31:11Z 003-s5-tb.json tool=trial_balance secs=0.834 isError=False error=None saved_sha256=c9110c842480b167e039788f915c1f8e4c8885a58ab8ef7a705c5967a389e0a5
+2026-10-29T02:31:15Z 004-s5-tb-marks.json tool=ledger_masters secs=0.876 isError=False error=None saved_sha256=38930fe0512464074174039de1b4ac50256d60df72b1d3eef318b5ce730e2147
+2026-10-29T02:31:18Z 005-s5-pl.json tool=profit_and_loss secs=1.466 isError=True error=None saved_sha256=90bbb1fb973da8bb8b9f7c150059fa29d544597326cf191749ced0fc471a96f3
+2026-10-29T02:31:23Z 006-s5-pl-marks.json tool=ledger_masters secs=0.809 isError=False error=None saved_sha256=7c2ee1a359eb0a16e3b516f53278b29407d23708539528296a3d009b15530a2c
+2026-10-29T02:31:26Z 007-s5-bs.json tool=balance_sheet secs=1.238 isError=True error=None saved_sha256=f491313dd464804354f7797359ed6486b3cdacb2142f817ef0714e695b0b89a5
+2026-10-29T02:31:30Z 008-s5-bs-marks.json tool=ledger_masters secs=0.806 isError=False error=None saved_sha256=eb31ca0af47eb37b1653c8b86c0cbc6c173a7b217036d3be7f030fb281e3fdb0
+2026-10-29T02:31:31Z 009-s5-egress.json tool=egress_log secs=0.117 isError=False error=None saved_sha256=6d21cffac9fb9ccc584964f31eace27ecf08cadb02777b60901fc9f8af8b7eee
+2026-10-29T02:31:46Z session ended; server pid 16392 exit code 0

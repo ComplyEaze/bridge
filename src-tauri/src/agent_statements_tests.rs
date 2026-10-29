@@ -97,14 +97,32 @@ fn plans_full(
     profit_and_loss: String,
     inventory_flags: Option<String>,
 ) -> Vec<ScenarioPlan> {
+    plans_of(
+        known_lab_report(),
+        balance_sheet,
+        profit_and_loss,
+        inventory_flags,
+    )
+}
+
+fn known_lab_report() -> String {
+    include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
+    )
+    .to_string()
+}
+
+/// [`plans_full`] with the Trial Balance given as text.
+fn plans_of(
+    report: String,
+    balance_sheet: String,
+    profit_and_loss: String,
+    inventory_flags: Option<String>,
+) -> Vec<ScenarioPlan> {
     let companies = xml(companies());
     let currency = decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
     ));
-    let report = include_str!(
-        "../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
-    )
-    .to_string();
     let mut plans = Vec::new();
     pair(&mut plans, companies.clone());
     plans.extend([status(), companies.clone(), companies.clone()]);
@@ -645,4 +663,72 @@ async fn an_unusable_trial_balance_answer_names_its_cause_on_both_statements() {
             "{tool}: {error}"
         );
     }
+}
+
+/// #692: a Trial Balance row that does not add up refuses both statements, and
+/// the refusal names the row's ledger and gap, says what to do, and keeps the
+/// evidence of every read already made. Synthetic mutation of the captured
+/// row, as `reports::statements` mutates it, the same class as the lab's Closing Stock row
+/// (`lab/2089-statements-closing-stock-answers`) refused the same way.
+#[tokio::test]
+async fn a_row_that_does_not_add_up_names_its_ledger_gap_and_next_step() {
+    // As on the lab's Closing Stock row, an empty credit: the Trial Balance read takes
+    // the row (an empty amount is not checked there), and the derivation refuses it.
+    // Padded with spaces between elements so the answer keeps its length.
+    let mutated = known_lab_report().replacen(
+        "<CREDITTOTALS TYPE=\"Amount\">4027.00</CREDITTOTALS>",
+        "<CREDITTOTALS TYPE=\"Amount\"></CREDITTOTALS>       ",
+        1,
+    );
+    assert_ne!(mutated, known_lab_report());
+    assert_eq!(mutated.len(), known_lab_report().len());
+    let (tied, _, _) = call(
+        "profit_and_loss",
+        plans_with("-11027.00", profit_and_loss()),
+    )
+    .await;
+    let tied_bytes = tied["structuredContent"]["evidence"]["bytes"].clone();
+    for tool in ["profit_and_loss", "balance_sheet"] {
+        // Every read of a successful call is made: the refusal comes after them.
+        let plans = plans_of(
+            mutated.clone(),
+            balance_sheet("-11027.00"),
+            profit_and_loss(),
+            None,
+        );
+        let (response, sent, expected) = call(tool, plans).await;
+        assert_eq!(sent, expected);
+        assert_eq!(response["isError"], true, "{response}");
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], format!("{tool}_read_failed"), "{error}");
+        assert_eq!(error["cause"], "statement_trial_balance_row_inconsistent");
+        assert_eq!(error["ledger"], "Ageing Sales");
+        assert_eq!(error["gap"], "4027.00");
+        assert_eq!(
+            error["remediation"],
+            refusal_remediation("statement_trial_balance_row_inconsistent").unwrap()
+        );
+        // Every read the tool made before the derivation refused, not only the company's.
+        assert_eq!(
+            response["structuredContent"]["evidence"]["bytes"],
+            tied_bytes
+        );
+    }
+}
+
+/// The detail is taken only from the typed refusal, never from its text.
+#[test]
+fn the_inconsistent_row_is_read_from_the_typed_refusal_only() {
+    use crate::reports::statements::{RowGap, StatementsError};
+    let row = RowGap {
+        ledger: "Ageing Customer A".to_string(),
+        gap: "-0.01".to_string(),
+    };
+    let typed = anyhow::Error::new(StatementsError::RowInconsistent(row.clone()))
+        .context("statement derivation");
+    assert_eq!(ToolFailure::inconsistent_row(&typed), Some(row));
+    let text = anyhow::anyhow!("statement_trial_balance_row_inconsistent");
+    assert_eq!(ToolFailure::inconsistent_row(&text), None);
+    let other = anyhow::Error::new(StatementsError::Arithmetic);
+    assert_eq!(ToolFailure::inconsistent_row(&other), None);
 }

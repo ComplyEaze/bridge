@@ -54,6 +54,20 @@ Each call is `outstandings` with `company_guid` THE COMPANY's GUID, `party` `DN 
 - D5. `ledger_masters` (basic) again. EXPECT the marks of P1, since the calls write nothing. A difference = record it and STOP.
 - D6. Optional, on the run coordinator's word: Tally's own Ledger Outstandings screen for `DN Party 001` as on 30 June 2025. Screenshot it, and record each bill's name and pending amount beside D1's.
 
+## Amendment of 29 Oct 2026: D3' (run as its own sitting, after the answers of D1 to D5)
+The first sitting's D3 (to 31 March 2026) was refused before the party detail ran: the `outstandings` tool's own read of Tally's bills reports at that date held one request past the 20-second limit (`native_outstandings_read_failed`, `request_deadline_exceeded`). D3' reaches the same path, the party read by its ledger in more than one date part, at a date where the bills read is about the size D1 read.
+
+- Same BUILD-T, same launch file, same company. Run P0 and P1 again first (GUID and marks: voucher mark 29900 or above).
+- D3'. `outstandings`, `party` `DN Party 001`, `as_of` `20250731`, `detail` `bill_trail`.
+  - EXPECT a result, not a refusal. The company window (about 9,900 vouchers) needs more reads than one call may spend, so the party is read by its ledger: 82 vouchers by the ledger census captured on 28 Oct, at most 42 a part, so at least two date parts.
+  - EXPECT `detail.window` to hold `party_vouchers_read` 82, and no `company_vouchers_read`.
+  - EXPECT `detail.window_scope.basis` `ledger_scoped`, with `vouchers_read` 82.
+  - EXPECT `detail.ledger_match.matched` `exact`, and every bill `tied`. Record `detail.state` and each bill's `state`.
+  - A refusal is the finding, not a STOP: keep it whole, with its code, `cause`, `reads` and `window_scope`. If it is `native_outstandings_read_failed` again, say so: the detail did not run.
+- D4'. `egress_log` (the newest 200): for D3', the requests sent and failed, counts only.
+- D5'. `ledger_masters` (basic): EXPECT the marks of P1.
+- C10, then stop BUILD-T. Evidence: add `answers/` files 008 onward, a D3' section in `RESULTS.md` and its lines in `notes.txt`, on `lab/1356-party-detail-by-ledger-answers`.
+
 ## The book
 It does not change; every call is a read. The marks are read at the start and the end, and must be equal.
 

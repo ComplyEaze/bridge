@@ -1,11 +1,13 @@
 # sha256  bytes  file
 d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
-84b3888632e7db5b23bb5d82dbfec9df337ae237b45f884103c63a10e0ee19c2  9885  README.md
+ec94669cd80d006857e741bef35e022a666dcfe65c356933ee61a5ee2219553a  12723  README.md
 8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
 42e10b108bd529e58ae553650e4d6aada926aa24cd9ba181057701a1102ae84a  1278  requests/c1-stock-item-census-0-100.utf16le.xml
 56fbb450854ac2bbecf4bbda7940c84d7cdfa058198cfd2c694e4ebb0de4fcf3  1282  requests/c2-stock-item-census-100-200.utf16le.xml
 7a6be97b852389f583a6b1a34588c70fb543f390a7b022c30e79e7a635e6d9e7  1282  requests/c3-stock-item-census-200-300.utf16le.xml
 e30b7e9a66aa985677241267fc1eb2f098957f622a0b30211107e40c5b4716e2  1294  requests/c4-stock-item-census-400000-400010.utf16le.xml
+fde31f91ddc6ba716be5abb31a14f3649ab2631bf9ba72585cd416c79e84ab62  1284  requests/g1-stock-group-census-0-300.utf16le.xml
 a2aa2aa4cc0d8521afc556a125d69543b05507cd14222e4b386d82c9275d187d  1258  requests/k1-stock-items-fy.utf16le.xml
+b3a8894e2c2dad67979f3e4e63c5f0215c09fe7fd940ae5ec935f8a34a03e0e4  1130  requests/k2-stock-groups-masters.utf16le.xml
 d32ae8566eab3887a688f9bd2464b8338f22cc39e15502377e2c8197f5d36ce1  1640  requests/m-marks-S.utf16le.xml

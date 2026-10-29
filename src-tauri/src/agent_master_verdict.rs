@@ -156,6 +156,14 @@ pub(super) struct Checks {
     /// overwritten by the Create and every other check would still pass.
     pub(super) counters: Check,
     pub(super) target_mark_moved: Check,
+    /// The target company's mark moved by this one create and by no other
+    /// master change. Straight after the POST: a step of exactly one. On a
+    /// later read, which the book may have moved past: the found ledger's
+    /// `ALTERID` is the intent's mark plus one, where each measured gateway
+    /// write put the master it wrote (protocol reference §9.4j). Any other step
+    /// is a doubt for a person, never a create (ADR 0004, 10 Oct amendment,
+    /// condition 3).
+    pub(super) target_mark_step_one: Check,
     pub(super) other_marks_unmoved: Check,
     pub(super) pre_image_unchanged: Check,
     /// The found ledger's `ALTERID` is the target company's mark at the intent
@@ -176,6 +184,7 @@ impl Checks {
             opening_balance: Check::NotChecked,
             counters: Check::NotChecked,
             target_mark_moved: Check::NotChecked,
+            target_mark_step_one: Check::NotChecked,
             other_marks_unmoved: Check::NotChecked,
             pre_image_unchanged: Check::NotChecked,
             first_change_after_intent: Check::NotChecked,
@@ -194,6 +203,7 @@ impl Checks {
             && passed(self.opening_balance)
             && passed(self.counters)
             && passed(self.target_mark_moved)
+            && passed(self.target_mark_step_one)
             && passed(self.other_marks_unmoved)
             && passed(self.pre_image_unchanged)
     }
@@ -457,6 +467,15 @@ fn party_checks(item: &LedgerCreateItem, row: &PartyView, checks: &mut Checks) {
 /// The reason each failed check gives, except the pre-image's, which `judge`
 /// words itself (a changed master and a missing one are different doubts).
 fn reasons_of(checks: &Checks) -> Vec<&'static str> {
+    // A mark that did not move, or a ledger whose `ALTERID` already names the
+    // doubt, has given its own reason for a failed step.
+    let step = if checks.target_mark_moved == Check::Failed
+        || checks.first_change_after_intent == Check::Failed
+    {
+        Check::NotChecked
+    } else {
+        checks.target_mark_step_one
+    };
     [
         (checks.name, "name_not_one_ledger_in_book"),
         (checks.guid_new, "ledger_guid_in_pre_image"),
@@ -466,6 +485,7 @@ fn reasons_of(checks: &Checks) -> Vec<&'static str> {
         (checks.opening_balance, "opening_balance_not_zero"),
         (checks.counters, "counters_not_one_created"),
         (checks.target_mark_moved, "target_mark_not_moved"),
+        (step, "target_mark_step_not_one"),
         (checks.other_marks_unmoved, "other_company_mark_moved"),
     ]
     .into_iter()
@@ -528,6 +548,12 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     let target_marks = pre.get(facts.company_guid).zip(now.get(facts.company_guid));
     if let Some((before, after)) = target_marks {
         checks.target_mark_moved = passed(after > before);
+        // Straight after the POST, the one create is the only change the
+        // step may hold. A later read is decided by the ledger's `ALTERID`,
+        // below, once the ledger is found.
+        if facts.moment == Moment::JustPosted {
+            checks.target_mark_step_one = passed(before.checked_add(1) == Some(*after));
+        }
     }
     if others_moved {
         checks.other_marks_unmoved = Check::Failed;
@@ -642,6 +668,13 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
 
     // 5. The ledger the write should have made, described field by field.
     let found = located.sole_exact_ledger.clone();
+    if facts.moment == Moment::Reconcile {
+        if let (Some(guid), Some(intent_mark)) = (&found, pre.get(facts.company_guid)) {
+            checks.target_mark_step_one = current.get(guid).map_or(Check::NotChecked, |alter_id| {
+                passed(FirstChangeAfterIntent::of(*intent_mark, *alter_id).is_ok())
+            });
+        }
+    }
     if let Some(guid) = &found {
         match &read.party {
             PartyRead::Rows(rows) => {

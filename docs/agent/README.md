@@ -2891,7 +2891,10 @@ the paired ledger and group names, and the new ledger's parent, tax fields, GSTI
 and opening balance) and answers with one state: `posted_verified` (exactly one
 ledger of the name, new, with the parent, tax fields, GSTIN and opening balance
 as sent; bill-wise is not read back; no ledger or group that existed before
-changed; no other loaded company's master mark moved),
+changed; the company's own master mark moved by exactly one, or, on a later call,
+the ledger's `ALTERID` shows it as the first master change in the company after
+the last read before the send, which `verification.checks.target_mark_step_one`
+shows; no other loaded company's master mark moved),
 `posted_into_existing_master` or `master_write_located_elsewhere` (loud: check
 Tally, do not retry), `confirmed_absent` (only from a later call: its read found
 the name absent and the company's master mark unmoved; a create that Tally

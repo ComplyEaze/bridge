@@ -261,6 +261,7 @@ fn a_clean_create_of_each_kind_is_posted_verified_with_every_check_passed() {
             checks.opening_balance,
             checks.counters,
             checks.target_mark_moved,
+            checks.target_mark_step_one,
             checks.other_marks_unmoved,
             checks.pre_image_unchanged,
         ] {
@@ -626,7 +627,7 @@ fn each_counter_outside_one_created_none_altered_no_errors_no_exceptions_fails()
 }
 
 #[test]
-fn the_target_mark_must_have_moved_forward() {
+fn straight_after_the_post_the_target_mark_must_step_by_exactly_one() {
     for after in [7, 6] {
         let mut world = World::clean(suspense());
         world.marks()[0] = mark(TARGET, after);
@@ -636,7 +637,48 @@ fn the_target_mark_must_have_moved_forward() {
             |checks| checks.target_mark_moved,
             "target_mark_not_moved",
         );
+        // One reason for the one fact.
+        assert!(!world.judge().reasons.contains(&"target_mark_step_not_one"));
     }
+    // A step of two: another master change in the company between the aim
+    // read and this read-back. The ledger is as sent, but the doubt stands.
+    for after in [9, 40] {
+        let mut world = World::clean(suspense());
+        world.marks()[0] = mark(TARGET, after);
+        assert_doubt(
+            &world,
+            &format!("{after}"),
+            |checks| checks.target_mark_step_one,
+            "target_mark_step_not_one",
+        );
+        let judgement = world.judge();
+        assert_eq!(judgement.checks.target_mark_moved, Check::Passed);
+        assert_eq!(judgement.reasons, vec!["target_mark_step_not_one"]);
+        assert!(!judgement.state.is_terminal());
+        assert_eq!(judgement.guid.as_deref(), Some(new_ledger()));
+    }
+}
+
+/// A later read cannot use the step: the book may have moved on since. The
+/// ledger's own `ALTERID` decides it, so master changes after the create do
+/// not stop a verdict, and a change before it is not forgotten by waiting.
+#[test]
+fn a_later_read_decides_the_step_by_the_ledgers_alter_id() {
+    let mut world = World::clean(suspense());
+    world.moment = Moment::Reconcile;
+    world.marks()[0] = mark(TARGET, 40);
+    assert_verified(&world, "changes after the create");
+    assert_eq!(world.judge().checks.target_mark_step_one, Check::Passed);
+    // The step-two case above, read again later: the other change came
+    // first, so the ledger is the second change after the intent.
+    world.new_ledger_alter_id(9);
+    assert_doubt(
+        &world,
+        "a change before the create",
+        |checks| checks.target_mark_step_one,
+        "target_mark_step_not_one",
+    );
+    assert_eq!(world.judge().reasons, vec!["target_mark_step_not_one"]);
 }
 
 #[test]
@@ -747,6 +789,7 @@ fn all_passed_needs_every_check_counters_included() {
         opening_balance: Check::Passed,
         counters: Check::Passed,
         target_mark_moved: Check::Passed,
+        target_mark_step_one: Check::Passed,
         other_marks_unmoved: Check::Passed,
         pre_image_unchanged: Check::Passed,
         first_change_after_intent: Check::NotChecked,
@@ -804,6 +847,11 @@ fn all_passed_needs_every_check_counters_included() {
         .all_passed());
         assert!(!Checks {
             target_mark_moved: flipped,
+            ..all
+        }
+        .all_passed());
+        assert!(!Checks {
+            target_mark_step_one: flipped,
             ..all
         }
         .all_passed());

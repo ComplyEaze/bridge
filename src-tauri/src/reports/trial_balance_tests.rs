@@ -450,25 +450,25 @@ fn a_keyed_closing_stock_ledger_carries_its_gap_in_every_desktop_view() {
 #[test]
 fn a_report_whose_rows_add_up_is_serialized_as_before() {
     use sha2::Digest;
-    for (xml, company, bytes, sha256) in [
-        (
-            include_str!(
-                "../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
-            ),
-            "eebb9a9f-1679-4468-9e8f-814c729674cb",
-            1_682,
-            "d9b565219240c67e6bf42e6e15064c0c764623acb8076cbcabff6ffdc5559e6d",
+    let report = parse_native_trial_balance(
+        include_str!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
         ),
-    ] {
-        let report = parse_native_trial_balance(xml, company).unwrap();
-        let mut ours = Vec::new();
-        serialize_report_with_movements(&report, &mut serde_json::Serializer::new(&mut ours))
-            .unwrap();
-        let hex: String = sha2::Sha256::digest(&ours)
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
-        assert_eq!((ours.len(), hex.as_str()), (bytes, sha256), "{company}");
-        assert_eq!(movements_differ_limitation(&report.rows), None);
-    }
+        "eebb9a9f-1679-4468-9e8f-814c729674cb",
+    )
+    .unwrap();
+    let mut ours = Vec::new();
+    serialize_report_with_movements(&report, &mut serde_json::Serializer::new(&mut ours)).unwrap();
+    let hex: String = sha2::Sha256::digest(&ours)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        (ours.len(), hex.as_str()),
+        (
+            1_682,
+            "d9b565219240c67e6bf42e6e15064c0c764623acb8076cbcabff6ffdc5559e6d"
+        )
+    );
+    assert_eq!(movements_differ_limitation(&report.rows), None);
 }

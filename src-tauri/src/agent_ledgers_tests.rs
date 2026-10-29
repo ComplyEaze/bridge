@@ -4528,6 +4528,60 @@ mod through_the_tool {
         assert!(remediation.contains("#683"), "{error}");
     }
 
+    /// The refusal of a compliance read whose ledger snapshot carries a foreign-currency closing
+    /// balance, on the real capture (#2071): the captured several-currency ledgers, read by the
+    /// parser as the unclassified compliance read reads them, give the typed variant; the refusal
+    /// built from it carries the code and cause as measured in the lab, and the step is chosen by
+    /// that code and cause together. The step is not reached through the tool here: the lab's
+    /// raw answers are not in the merge gate's manifest, and the classified read sets such a
+    /// ledger aside instead of refusing.
+    #[test]
+    fn a_foreign_currency_closing_balance_refuses_the_compliance_read_with_a_next_step() {
+        use bridge_tally_protocol::native_outstandings::{
+            parse_native_ledger_snapshot, NativeOutstandingsError,
+        };
+        let capture = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ));
+        let Err(variant) = parse_native_ledger_snapshot(&capture) else {
+            panic!("the capture's composite closing balance is refused");
+        };
+        assert_eq!(
+            variant,
+            NativeOutstandingsError::ForeignCurrencyLedgerBalance {
+                ledger_name: "BRIDGE FX DEBTOR A".to_string()
+            }
+        );
+        let failure = crate::agent::ToolFailure::from_runtime(
+            "party_ledger_master_read_failed",
+            anyhow::Error::new(variant),
+        );
+        assert_eq!(failure.code, "party_ledger_master_read_failed");
+        assert_eq!(
+            failure.cause,
+            Some("native_foreign_currency_ledger_balance")
+        );
+        let remediation =
+            crate::agent::remediation_for(&failure.code, failure.cause).expect("a next step");
+        assert!(remediation.contains("#683"), "{remediation}");
+        assert!(
+            remediation.contains("Do not repeat it in a loop"),
+            "{remediation}"
+        );
+        // The ledger's name is not in the step.
+        assert!(!remediation.contains("BRIDGE FX DEBTOR A"), "{remediation}");
+        // The step belongs to this code: the same cause under another code is given none of
+        // its own (the open-bills read says it in band, with a different step).
+        assert_eq!(
+            crate::agent::remediation_for("ledger_export_invalid", failure.cause),
+            None
+        );
+        assert_eq!(
+            crate::agent::remediation_for("native_outstandings_read_failed", failure.cause),
+            None
+        );
+    }
+
     #[tokio::test]
     async fn compliance_rows_carry_the_chain_resolved_from_the_captured_groups() {
         let plans = compliance_plans(masters(), balances());

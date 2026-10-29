@@ -22,6 +22,9 @@ pub struct TrialBalanceResponse {
     /// base-currency ledgers; the screen shows it with the ledgers left out
     /// (bridge#709).
     scope_limitation: Option<&'static str>,
+    /// Present only when some ledger's closing is not its opening plus its debit and credit
+    /// totals; those rows carry `movements_differ_by` (#2068). The MCP answer's words.
+    movements_differ_limitation: Option<String>,
 }
 
 fn scope_limitation(read: &TrialBalanceRead) -> Option<&'static str> {
@@ -193,6 +196,8 @@ pub async fn fetch_tally_trial_balance(
         .await
         .map_err(read_error)?;
     let scope_limitation = scope_limitation(&read);
+    let movements_differ_limitation =
+        crate::reports::trial_balance::movements_differ_limitation(&read.report.rows);
     let export_id = exports.insert(read.clone()).map_err(|_| {
         local_error(
             "trial_balance_export_budget",
@@ -204,6 +209,7 @@ pub async fn fetch_tally_trial_balance(
         read,
         export_id,
         scope_limitation,
+        movements_differ_limitation,
     })
 }
 

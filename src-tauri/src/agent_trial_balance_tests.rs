@@ -318,6 +318,17 @@ mod listing {
         }
     }
 
+    /// The limitation's words are the ones the answer carried before the text moved to
+    /// `reports::trial_balance` for the desktop to share (#2132): pinned whole, so the answer
+    /// stays byte-identical.
+    #[test]
+    fn the_movements_limitation_keeps_the_answers_words() {
+        assert_eq!(
+            crate::reports::trial_balance::MOVEMENTS_DIFFER_LIMITATION,
+            "{count} ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals, counting an empty amount as zero. Each is returned as Tally sent it and nothing is corrected. On the books measured this was a Closing Stock ledger whose closing balance was keyed on Tally's screen: Tally kept the opening as the closing and showed the change only in the debit total. The closing of such a ledger is not necessarily the figure Tally's statements use: on the book not integrated with inventory they used the keyed figure, and on the integrated one they valued the stock from the stock item. The column totals include the closing as sent."
+        );
+    }
+
     /// On a partial read the label that says so stays the first limitation, and the note about
     /// a ledger that does not add up follows it, on every page. The captured several-currency
     /// answer has one element of its base ledger BRIDGE INR DEBTOR A edited (closing -3000.00 to

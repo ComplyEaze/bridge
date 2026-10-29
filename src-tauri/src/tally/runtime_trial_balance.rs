@@ -25,6 +25,9 @@ pub struct TrialBalanceRead {
     pub from: TallyDate,
     pub to: TallyDate,
     pub currency: CompanyCurrency,
+    /// Each row as Tally sent it; on the desktop a row whose columns do not add up also carries
+    /// `movements_differ_by` (#2068).
+    #[serde(serialize_with = "crate::reports::trial_balance::serialize_report_with_movements")]
     pub report: NativeTrialBalance,
     pub totals: crate::reports::trial_balance::TrialBalanceTotals,
     pub read_at: String,

@@ -13,7 +13,9 @@ type Company = {
 
 type Amount = { state: "present"; value: string } | { state: "present_empty" };
 type ParentObservation = string | null;
-type TrialBalanceRow = { name: string; guid: string; parent: ParentObservation; opening: Amount; debit: Amount; credit: Amount; closing: Amount };
+// `movements_differ_by` is present only on a row whose closing is not its opening plus its
+// debit and credit totals: closing minus that sum, in Tally's sign (#2068).
+type TrialBalanceRow = { name: string; guid: string; parent: ParentObservation; opening: Amount; debit: Amount; credit: Amount; closing: Amount; movements_differ_by?: string };
 type ObservedAmountTotal = { sum: string; empty_count: number };
 type TrialBalanceTotals = { opening: ObservedAmountTotal; debit: ObservedAmountTotal; credit: ObservedAmountTotal; closing: ObservedAmountTotal };
 // Which ledgers a read covers. A several-currency book's read covers its plain
@@ -37,6 +39,7 @@ type TrialBalanceResult = {
   };
   export_id: string;
   scope_limitation: string | null;
+  movements_differ_limitation?: string | null;
 };
 
 type TrialBalanceCaptureParentQuery = {
@@ -414,6 +417,7 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
               </details>
             </div>
           )}
+          {result?.movements_differ_limitation && <p className="section-note trial-balance-movements-note" role="note">{result.movements_differ_limitation}</p>}
           {queried && <p className="section-note">Selected rows: {queried.query.selected_rows.length} of {queried.query.source_row_count} from this capture. These exact observed-parent totals are a subset, not a qualified financial group balance.{partialScope ? " They are drawn from the base-currency ledgers only." : ""} The capture had {queried.capture.expires_in_seconds} seconds remaining when this selection was derived and this query did not read Tally.</p>}
           <dl className="trial-balance-totals">
             <div><dt>{queried ? "Selected opening net" : partialScope ? "Opening net, base-currency ledgers only" : displayedTotals?.opening.empty_count === 0 ? "Difference in opening balances" : "Observed opening net"}</dt><dd>{displayedTotals && formatBalance({ state: "present", value: displayedTotals.opening.sum }, currency.symbol, currency.decimal_places)}{displayedTotals?.opening.empty_count ? ` · ${displayedTotals.opening.empty_count} empty source values` : ""}</dd></div>
@@ -422,7 +426,7 @@ export function TrialBalanceScreen({ config, company, liveReadNavigationLocked, 
             <div><dt>{queried ? "Selected closing total" : "Closing total"}</dt><dd>{displayedTotals && formatBalance({ state: "present", value: displayedTotals.closing.sum }, currency.symbol, currency.decimal_places)}{displayedTotals?.closing.empty_count ? ` · ${displayedTotals.closing.empty_count} empty source values` : ""}</dd></div>
           </dl>
           <div className="trial-balance-table-wrap">
-            <table className="trial-balance-table"><caption className="visually-hidden">Trial Balance ledger totals</caption><thead><tr><th scope="col">Ledger</th><th scope="col">Parent</th><th scope="col">Opening</th><th scope="col">Debit (Dr)</th><th scope="col">Credit (Cr)</th><th scope="col">Closing</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.guid}><th scope="row">{row.name}</th><td>{formatParent(row.parent)}</td><td>{formatBalance(row.opening, currency.symbol, currency.decimal_places)}</td><td>{formatAmount(row.debit, currency.symbol, currency.decimal_places, true)}</td><td>{formatAmount(row.credit, currency.symbol, currency.decimal_places, true)}</td><td>{formatBalance(row.closing, currency.symbol, currency.decimal_places)}</td></tr>)}</tbody></table>
+            <table className="trial-balance-table"><caption className="visually-hidden">Trial Balance ledger totals</caption><thead><tr><th scope="col">Ledger</th><th scope="col">Parent</th><th scope="col">Opening</th><th scope="col">Debit (Dr)</th><th scope="col">Credit (Cr)</th><th scope="col">Closing</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.guid}><th scope="row">{row.name}</th><td>{formatParent(row.parent)}</td><td>{formatBalance(row.opening, currency.symbol, currency.decimal_places)}</td><td>{formatAmount(row.debit, currency.symbol, currency.decimal_places, true)}</td><td>{formatAmount(row.credit, currency.symbol, currency.decimal_places, true)}</td><td>{formatBalance(row.closing, currency.symbol, currency.decimal_places)}{row.movements_differ_by !== undefined && <span className="trial-balance-movements-flag"> · does not add up: differs by {formatAmount({ state: "present", value: row.movements_differ_by }, currency.symbol, currency.decimal_places)} (source signed)</span>}</td></tr>)}</tbody></table>
           </div>
           <div className="trial-balance-pagination" aria-label="Trial Balance rows">
             <span>{queried ? "Selected rows" : "Rows"} {firstRow}–{lastRow} of {totalRows}</span>

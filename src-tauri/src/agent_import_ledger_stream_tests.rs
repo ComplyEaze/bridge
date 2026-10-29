@@ -1548,7 +1548,9 @@ fn a_restore_leaves_a_hand_import_and_a_later_post_where_they_were() {
     let read = journal.len() as u64;
     journal.push(seen(&p1, 1, read));
     journal.push(record(&later));
-    journal.push(intent(&later, Some(1)));
+    // Its floor is above the record's mark, so only its place after the
+    // record keeps it uncovered.
+    journal.push(intent(&later, Some(1 + created)));
     let counted = settlement(Cursor::new(journal.concat())).unwrap();
     assert!(created > 0);
     // P1 restored; `later` sent after the record, no answer: no response;

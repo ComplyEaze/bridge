@@ -132,8 +132,9 @@ statements, the egress log, lab files, lock files, other) the file count, bytes
 and the age in days of the oldest file, symlinks it did not follow, sockets
 and other special files it did not count, folders it could not list (named, not
 read as empty), and the import journal's state: batches, batches sent or found
-posted, how many of those are not settled (with no recorded response, or with a
-response but a latest status that is not `posted_verified`: a post Tally
+posted, how many of those are not settled (with no recorded response, with a
+response but a latest status that is not `posted_verified`, or covered by a
+recorded restore whatever their status: a post Tally
 rejected stays not settled; `not_settled_binding_refused` counts the native
 posts whose binding to their own vouchers was refused, all of which stay not
 settled for good, a post Tally rejected in part or whole among them;
@@ -143,8 +144,8 @@ recorded checking in Tally (`acknowledge_post_review` with `doubt` set to
 `content_only`), still not settled and never verified; `not_settled_restored`
 counts the native posts a recorded restore covers (bridge#1050), not settled
 whatever their latest status reads; they never read `posted_verified` again,
-so they stay there, and in no other count, until a later change records that
-their vouchers are back: check them in Tally;
+and nothing in ComplyEaze Bridge clears that count yet, so they stay there, in
+no other count, with their rows held: check them in Tally;
 none of these overlaps
 `not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`;
 `settled_by_person` counts the native posts Tally answered as creating none of their vouchers that a person

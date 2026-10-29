@@ -776,7 +776,8 @@ pub(super) struct Settlement {
     /// found posted at some point.
     pub(super) sent_or_found: usize,
     /// Batches with a dispatch intent that are not settled: no recorded
-    /// response, or a response but the latest status is not `posted_verified`.
+    /// response, a response but the latest status is not `posted_verified`, or
+    /// a native post a recorded restore covers, whatever its status (#1050).
     pub(super) unsettled: usize,
     /// Of `unsettled`, the batches with no recorded response, other than those
     /// a recorded restore covers (in `unsettled_restored`).
@@ -792,9 +793,9 @@ pub(super) struct Settlement {
     /// verified, and their rows stay held.
     pub(super) unsettled_reviewed: usize,
     /// Of `unsettled`, the native posts a recorded restore covers (#1050):
-    /// whatever their latest status, their vouchers may be gone from the book.
-    /// A covered post never reads `posted_verified` again, so it stays here
-    /// until a later change records that its vouchers are back. They count in
+    /// whatever their latest status, the book may no longer hold what was
+    /// recorded for them. A covered post never reads `posted_verified` again,
+    /// and nothing in ComplyEaze Bridge clears this count yet. They count in
     /// no other part of `unsettled`: one with no response, a refused binding, a
     /// review or a settlement counts here alone (a restore voids the last two).
     pub(super) unsettled_restored: usize,
@@ -1211,7 +1212,9 @@ pub(super) fn invoice_number_control(
 /// sent and does not stop anything; a lost answer, a post Tally declined and a
 /// readback that does not match all do. A later `posted_verified` lifts the
 /// stop by itself and voids a release made before it, so a divergence found
-/// after that is a new stop.
+/// after that is a new stop. A recorded restore's cover is not counted yet
+/// (#1050): a covered invoice batch whose latest status reads
+/// `posted_verified` still lifts the stop. That waits for a ruling.
 pub(super) fn invoice_stops(
     reader: impl BufRead,
     company_guid: &str,

@@ -258,8 +258,10 @@ impl LedgerCreateItem {
 /// (L0 and L0b, part of #690) sent three and then ten creates in one request
 /// and each read back one create counted per ledger, a mark step of the
 /// batch's size and the `ALTERID`s right after the mark, in request order.
-/// The approval box lists two lines a ledger; a box of ten (27 lines) has not
-/// been seen on the lab's Windows screen.
+/// The approval box lists two lines a ledger (27 lines for ten). On Windows
+/// it is measured against the screen when it opens and refused, nothing
+/// approved, when it is not wholly on it; a box of ten has not yet been shown
+/// on the lab's screen.
 pub(crate) const MAX_LEDGERS_PER_BATCH: usize = 10;
 
 /// One request's ledgers, in the order they are sent and shown.

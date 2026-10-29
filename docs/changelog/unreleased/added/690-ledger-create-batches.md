@@ -7,4 +7,5 @@
   batch whose answer from Tally was lost is never `posted_unattributed`. Measured in one request on TallyPrime 7.2
   (one synthetic company, once each): three and ten ledgers, each counted one create per ledger, the master mark
   stepped by the batch's size, and each new ledger took the next mark value in request order. Not measured: other
-  releases and editions, and the dialog for a batch, including whether a box of ten ledgers fits a Windows screen.
+  releases and editions, and the box for a batch on screen. On Windows a box that is not wholly on the screen is
+  refused with nothing approved; whether a box of ten fits the lab's screen has not been tried.

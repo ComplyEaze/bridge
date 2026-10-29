@@ -141,7 +141,10 @@ settled for good, a post Tally rejected in part or whole among them;
 only, their binding refused or no answer from Tally recorded, that a person
 recorded checking in Tally (`acknowledge_post_review` with `doubt` set to
 `content_only`), still not settled and never verified; none of these overlaps
-`not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`),
+`not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`;
+`settled_by_person` counts the native posts Tally answered as creating none of their vouchers that a person
+settled (`acknowledge_post_review` with `doubt` set to `not_created`), which are in none of the `not_settled`
+counts),
 batches with no recorded dispatch that were never found posted
 (`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
@@ -2910,8 +2913,9 @@ answer from Tally was lost is never `posted_unattributed`; it stays
 of ten were measured in one request on TallyPrime 7.2 (one synthetic company,
 once each): each counted one create per ledger, the master mark stepped by the
 batch's size and each new ledger took the next mark value in request order. The
-dialog for a batch of more than three has not been seen on a Windows screen, so
-whether a box of ten ledgers fits it is not known. A ledger of the batch whose
+box is measured against the screen when it opens on Windows, and a box that is not
+wholly on the screen is refused (`master_review_too_large`) with nothing approved;
+whether a box of ten ledgers fits the lab's screen has not been tried. A ledger of the batch whose
 name was already taken was altered in place and took its own value in that
 order, so a write into an existing ledger does not show in the step; it shows as
 `ALTERED` and in the read-back, which answer `posted_into_existing_master`.
@@ -2979,7 +2983,10 @@ cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
 `master_approval_timed_out` say the person declined the dialog, the dialog could
 not be shown, or the person did not answer in time; each says nothing was sent,
 and a declined or timed-out answer's `next_step` says that the next call with the
-same `batch_id` opens a new dialog. In an answer,
+same `batch_id` opens a new dialog. `master_review_too_large` from
+`post_ledger_creates` says the dialog's text was over its limit or, on Windows,
+where the dialog is measured against the screen as the post's is, that it did not
+fit the screen whole; nothing was sent. In an answer,
 `verification.verdict_written` is true when this call appended the verdict (an
 open verdict already on file in the same words is not appended again);
 `verification.verdict_record_error` is the code of why the verdict was not
@@ -3423,6 +3430,25 @@ one stands (`ack_already_recorded`), and a readback that no longer shows the sta
 batch's records change, or a rollback is recorded, while the dialog is open (`ack_changed_while_reviewing`).
 A multi-voucher batch whose voucher mark step was not confirmed is a different case: the review of
 `acknowledge_post_review` is kept on this computer and does not change its status.
+
+A native post whose saved answer from Tally reported none of its vouchers created (every counter reported, none
+created, one exception for each voucher sent, nothing else counted; for a batch, the post also recorded its
+voucher step as matching) stays `reconciliation_required` for good, and ComplyEaze Bridge never sends it again:
+Tally can still finish work its client gave up on, so a second send could book a voucher twice (bridge#1709).
+Once the person says each voucher is in the book or will not be posted, `acknowledge_post_review` with `doubt`
+set to `not_created` settles the batch, in its own dialog (`--confirm-settle`, titled to close the batch), which
+the model cannot answer. It is admitted only while the journal holds that answer and a fresh readback shows the
+batch neither `posted_verified`, bound, still binding nor rolled back (`ack_not_created_not_established`
+otherwise; `ack_batch_not_posted` for a batch never sent; `ack_already_recorded` while one stands). The record,
+in the import journal, changes nothing in Tally and no status or verdict, binds no voucher and sends nothing. Its
+rows stay held, so a rebuild of them is still refused (`import_txn_already_posted`), and a Sales invoice keeps
+its stop until the separate release (`doubt` set to `invoice_stop`). `verify_import` reports it as
+`person_settlement`, with its own `next_step` and a binding summary that says a person settled the batch, and
+`local_data_report` counts the batch as `settled_by_person` instead of `not_settled`. A later `posted_verified`,
+a later answer from Tally with an outcome, a binding or a recorded rollback of the book voids it. Nothing is
+written when the batch's records change while the dialog is open (`ack_changed_while_reviewing`). A build older
+than this record refuses the whole import journal once one is written, as for a stop release: do not downgrade
+after recording one.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an

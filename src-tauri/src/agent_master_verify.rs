@@ -102,7 +102,9 @@ pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'stati
         NEXT_LOAD_SAME_COMPANIES
     } else if moment == Moment::Reconcile && judgement.name_absent_in_read_book() {
         NEXT_ABSENT_NOT_SETTLED
-    } else if judgement.guid().is_some() {
+    } else if judgement.guids().iter().any(Option::is_some) {
+        // A ledger of a name is in the book: one ledger's GUID, or any of a
+        // batch's (a batch names no single GUID).
         NEXT_PRESENT_NOT_VERIFIED
     } else {
         NEXT_RECONCILE

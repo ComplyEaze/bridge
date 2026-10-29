@@ -2125,11 +2125,56 @@ async fn a_declined_approval_records_nothing_and_sends_nothing() {
         "the reads before the dialog, no POST"
     );
     assert_eq!(scripted.masters().len(), 1);
+    assert_eq!(scripted.master_counts(), vec![1]);
     assert_eq!(journal_bytes(directory.path()), before);
     assert!(!directory
         .path()
         .join(format!("master-pre-image-{}.json", batch.batch_id))
         .exists());
+}
+
+/// The dialog for a batch is asked about the batch's own count, so a box for
+/// three ledgers says three, and its preview lists all three.
+#[tokio::test]
+async fn the_dialog_for_a_batch_is_asked_about_its_count() {
+    let directory = tempfile::tempdir().unwrap();
+    let names = [LEDGER, "Second Suspense Ledger", "Third Suspense Ledger"];
+    let prepare = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let server = server_at(prepare.address(), directory.path());
+    let prepared = TEST_LEDGER_INDEX
+        .scope(
+            book(),
+            server.call_tool(
+                "prepare_ledger_creates",
+                json!({
+                    "company_guid": GUID,
+                    "ledgers": names.map(|name| json!({"name": name, "kind": "suspense"})),
+                }),
+            ),
+        )
+        .await;
+    sent(prepare);
+    let batch_id = result(&prepared)["batch_id"].as_str().unwrap().to_string();
+    let post = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let server = server_at(post.address(), directory.path());
+    let scripted = ScriptedApproval::declining();
+    let response = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", json!({"batch_id": batch_id})),
+    )
+    .await;
+    sent(post);
+    assert_eq!(
+        error_code(&response),
+        "master_approval_declined",
+        "{response}"
+    );
+    assert_eq!(scripted.master_counts(), vec![3]);
+    let shown = scripted.masters();
+    assert!(shown[0].starts_with("Create 3 ledgers in"), "{}", shown[0]);
+    for name in names {
+        assert!(shown[0].contains(name), "{name}");
+    }
 }
 
 #[tokio::test]

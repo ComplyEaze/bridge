@@ -3004,8 +3004,11 @@ overwrite it.
 
 Later calls cannot settle these states, and their batches keep holding the name: a
 read that found the name absent while the company's master mark moved; a ledger
-present with no counters, or with a field that differs; a create Tally rejected,
-once the mark moves; and the reasons `pre_image_master_missing`,
+present with no counters, or with a field that differs; a ledger changed in Tally
+after its create, or created after another master change, which reads
+`ledger_altered_since_create` (its `ALTERID` is past the first change after the
+last read before the send); a create Tally rejected, once the mark moves; and the
+reasons `pre_image_master_missing`,
 `pre_image_unreadable` and `master_index_not_usable`. A later call judges the book
 as it then is, so a state stays unsettled only while the book stays as it was read.
 A company that is not loaded or was renamed is not read back until the same

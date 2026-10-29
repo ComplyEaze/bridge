@@ -660,25 +660,55 @@ fn straight_after_the_post_the_target_mark_must_step_by_exactly_one() {
 }
 
 /// A later read cannot use the step: the book may have moved on since. The
-/// ledger's own `ALTERID` decides it, so master changes after the create do
-/// not stop a verdict, and a change before it is not forgotten by waiting.
+/// ledger's own `ALTERID` decides it, so changes to other masters after the
+/// create do not stop a verdict, and a change that came before the create is
+/// not forgotten by waiting.
 #[test]
 fn a_later_read_decides_the_step_by_the_ledgers_alter_id() {
     let mut world = World::clean(suspense());
     world.moment = Moment::Reconcile;
     world.marks()[0] = mark(TARGET, 40);
-    assert_verified(&world, "changes after the create");
+    assert_verified(&world, "changes to other masters after the create");
     assert_eq!(world.judge().checks.target_mark_step_one, Check::Passed);
     // The step-two case above, read again later: the other change came
-    // first, so the ledger is the second change after the intent.
+    // first, so the ledger is the second change after the intent. Its reason
+    // is the ledger's own, not a step that may have been one.
     world.new_ledger_alter_id(9);
     assert_doubt(
         &world,
         "a change before the create",
         |checks| checks.target_mark_step_one,
-        "target_mark_step_not_one",
+        "ledger_altered_since_create",
     );
-    assert_eq!(world.judge().reasons, vec!["target_mark_step_not_one"]);
+    assert_eq!(world.judge().reasons, vec!["ledger_altered_since_create"]);
+    // An ALTERID at or below the intent's mark is not after it at all.
+    world.new_ledger_alter_id(7);
+    assert_eq!(
+        world.judge().reasons,
+        vec!["ledger_alter_id_not_after_intent"]
+    );
+}
+
+/// A clean create that the person then edits in Tally reads, on a later call
+/// with Tally's answer on file, as a ledger changed since its create: open,
+/// and saying so. Its step straight after the POST was one.
+#[test]
+fn a_ledger_edited_after_a_clean_create_stays_open_as_altered_since_create() {
+    let mut world = World::clean(suspense());
+    assert_verified(&world, "straight after the post");
+    world.moment = Moment::Reconcile;
+    world.marks()[0] = mark(TARGET, 9);
+    world.new_ledger_alter_id(9);
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert_eq!(judgement.checks.counters, Check::Passed);
+    assert_eq!(
+        judgement.checks.first_change_after_intent,
+        Check::NotChecked
+    );
+    assert_eq!(judgement.checks.target_mark_step_one, Check::Failed);
+    assert_eq!(judgement.reasons, vec!["ledger_altered_since_create"]);
+    assert_eq!(judgement.guid.as_deref(), Some(new_ledger()));
 }
 
 #[test]
@@ -1287,7 +1317,25 @@ fn right_after_a_post_a_missing_ledger_is_never_confirmed_absent() {
 
 #[test]
 fn a_moved_target_mark_forbids_confirmed_absent() {
-    for after in [8, 6] {
+    for (after, reasons) in [
+        (
+            8,
+            vec!["name_not_one_ledger_in_book", "counters_unavailable"],
+        ),
+        // A step a later read does not judge: no ledger of the name is found.
+        (
+            9,
+            vec!["name_not_one_ledger_in_book", "counters_unavailable"],
+        ),
+        (
+            6,
+            vec![
+                "name_not_one_ledger_in_book",
+                "target_mark_not_moved",
+                "counters_unavailable",
+            ],
+        ),
+    ] {
         let mut world = World::untouched(suspense());
         world.marks()[0] = mark(TARGET, after);
         let judgement = world.judge();
@@ -1296,6 +1344,7 @@ fn a_moved_target_mark_forbids_confirmed_absent() {
             MasterVerdictState::ReconciliationRequired,
             "{after}"
         );
+        assert_eq!(judgement.reasons, reasons, "{after}");
     }
 }
 

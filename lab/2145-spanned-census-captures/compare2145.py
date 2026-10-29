@@ -1,24 +1,32 @@
 #!/usr/bin/env python3 -I
 """Compare one window's census answers (#2145).
 
-Run: python -I compare2145.py RECORDED_SHA256|none M UNSPANNED_ANSWER SPANNED_ANSWER
+Run: python -I compare2145.py RECORDED|none M UNSPANNED_ANSWER SPANNED_ANSWER
 
-RECORDED_SHA256 is the SHA-256 of the census answer the replay holds for that window (in the sheet), or `none` where the
-replay holds none. M is the span's top. Each answer is read as bytes and hashed, then decoded (UTF-16LE, with or without
-a BOM), stripped ONLY of the characters XML forbids (LAB-COMMON C4) and parsed as XML. Rows are the VOUCHER children of
-ENVELOPE/BODY/DATA/COLLECTION, each listed as (GUID, ALTERID, DATE), never trimmed.
+RECORDED is the BODY digest of the census answer the replay holds for that window (in the sheet), or `none` where the
+replay holds none. M is the span's top.
 
-It prints both answers' sizes, hashes and rows, then the verdicts:
-- A: the unspanned answer equals the recorded answer, byte for byte (the window is as it was when recorded);
-- B: the spanned answer equals the recorded answer, byte for byte (the replay can carry the recorded answer for the
-  spanned request, by this measurement);
-- C: every row of the spanned answer has ALTERID at most M.
-A and B are skipped (printed as SKIPPED) when RECORDED_SHA256 is `none`. A row of the UNSPANNED answer above M is printed
-as a count, not a verdict: the book may have moved since it was recorded.
+The BODY digest of an answer: decode it (UTF-16LE, with or without a BOM), remove the one CMPINFO element (from
+`<CMPINFO>` to `</CMPINFO>` inclusive; an answer with none keeps its text, one with more than one is an error), and take
+the SHA-256 of what is left, encoded as UTF-8. CMPINFO holds the Tally session's object counts, which differ between
+sessions and with the companies loaded even when every row is the same, so it is left out of the comparison and printed.
+
+Each answer is also stripped ONLY of the characters XML forbids (LAB-COMMON C4) and parsed as XML. Rows are the VOUCHER
+children of ENVELOPE/BODY/DATA/COLLECTION, each listed as (GUID, ALTERID, DATE), never trimmed.
+
+It prints both answers' sizes, byte hashes, BODY digests, CMPINFO blocks and rows, whether the two answers are equal byte
+for byte, and the number of control rows above M (the book may have moved since it was recorded), then the verdicts:
+- A: the control's BODY digest equals the recorded one (the window is as it was when recorded);
+- B: the spanned answer's BODY digest equals the recorded one (the replay's census answer stands for the spanned request,
+  by this measurement);
+- C: every row of the spanned answer has ALTERID at most M;
+- D: each answer holds ENVELOPE/BODY/DATA/COLLECTION and at least one VOUCHER row (every window this sheet reads held one
+  when recorded; an empty or error answer must not pass).
+A and B are SKIPPED when RECORDED is `none`.
 
 Exit 0 when every verdict that ran holds; 1 when one does not (each listed); 2 for an error, never a verdict: a file
-that cannot be read, an answer that does not parse, a root other than ENVELOPE, or a VOUCHER row without a GUID, an
-ALTERID that is not a number, or a GUID repeated.
+that cannot be read, an answer that does not parse, a root other than ENVELOPE, more than one CMPINFO, or a VOUCHER row
+without a GUID, an ALTERID that is not a number, or a GUID repeated.
 """
 import hashlib
 import re
@@ -27,10 +35,19 @@ import xml.etree.ElementTree as ET
 
 FORBIDDEN_RAW = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
 FORBIDDEN_REF = re.compile(r'&#(?:x0*(?:[0-8bBcCeEfF]|1[0-9a-fA-F])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));')
+CMPINFO = re.compile(r'<CMPINFO>.*?</CMPINFO>', re.S)
 
 
 class Refused(Exception):
     pass
+
+
+def body_digest(text, path):
+    found = CMPINFO.findall(text)
+    if len(found) > 1 or text.count('<CMPINFO>') != len(found):
+        raise Refused('%s: CMPINFO is not one whole element' % path)
+    stripped = CMPINFO.sub('', text, count=1)
+    return hashlib.sha256(stripped.encode('utf-8')).hexdigest(), (found[0] if found else '')
 
 
 def load(path):
@@ -43,15 +60,17 @@ def load(path):
         text = body.decode('utf-16-le')
     except UnicodeDecodeError as error:
         raise Refused('%s is not UTF-16LE: %s' % (path, error))
-    text = FORBIDDEN_REF.sub('', FORBIDDEN_RAW.sub('', text))
+    digest, cmpinfo = body_digest(text, path)
+    clean = FORBIDDEN_REF.sub('', FORBIDDEN_RAW.sub('', text))
     # Tally's answers may carry user-defined fields with an undeclared UDF: prefix (#899).
-    text = text.replace('<ENVELOPE', '<ENVELOPE xmlns:UDF="urn:x-tally-udf"', 1)
+    clean = clean.replace('<ENVELOPE', '<ENVELOPE xmlns:UDF="urn:x-tally-udf"', 1)
     try:
-        root = ET.fromstring(text)
+        root = ET.fromstring(clean)
     except ET.ParseError as error:
         raise Refused('%s does not parse: %s' % (path, error))
     if root.tag != 'ENVELOPE':
         raise Refused('%s: the root is %s, not ENVELOPE' % (path, root.tag))
+    has_collection = root.find('./BODY/DATA/COLLECTION') is not None
     rows = []
     seen = set()
     for voucher in root.findall('./BODY/DATA/COLLECTION/VOUCHER'):
@@ -68,7 +87,7 @@ def load(path):
             raise Refused('%s: GUID %s has ALTERID %r' % (path, guid, alter))
         seen.add(guid)
         rows.append((guid, int(alter), field('DATE')))
-    return data, rows
+    return data, digest, cmpinfo, has_collection, rows
 
 
 def main():
@@ -80,23 +99,26 @@ def main():
         print(__doc__)
         return 2
     try:
-        unspanned, unspanned_rows = load(unspanned_path)
-        spanned, spanned_rows = load(spanned_path)
+        unspanned = load(unspanned_path)
+        spanned = load(spanned_path)
     except Refused as error:
         print('ERROR: %s' % error)
         return 2
-    for name, data, rows in [('unspanned', unspanned, unspanned_rows), ('spanned', spanned, spanned_rows)]:
-        print('%-9s %d bytes, sha256 %s, %d VOUCHER rows' % (name, len(data), hashlib.sha256(data).hexdigest(), len(rows)))
+    for name, (data, digest, cmpinfo, _, rows) in [('unspanned', unspanned), ('spanned', spanned)]:
+        print('%-9s %d bytes, sha256 %s, BODY digest %s, %d VOUCHER rows' % (name, len(data), hashlib.sha256(data).hexdigest(), digest, len(rows)))
+        print('  CMPINFO: %s' % ' '.join(cmpinfo.split()))
         for row in rows:
             print('  %r' % (row,))
-    print('unspanned rows above %d: %d' % (top, sum(1 for _, alter, _ in unspanned_rows if alter > top)))
+    print('the two answers are equal byte for byte: %s' % ('yes' if unspanned[0] == spanned[0] else 'no'))
+    print('unspanned rows above %d: %d' % (top, sum(1 for _, alter, _ in unspanned[4] if alter > top)))
     verdicts = []
     if recorded == 'none':
         print('SKIPPED: A and B (no recorded answer)')
     else:
-        verdicts.append(('A: the unspanned answer equals the recorded one, byte for byte', hashlib.sha256(unspanned).hexdigest() == recorded))
-        verdicts.append(('B: the spanned answer equals the recorded one, byte for byte', hashlib.sha256(spanned).hexdigest() == recorded))
-    verdicts.append(('C: every row of the spanned answer is inside the span (ALTERID <= %d)' % top, all(alter <= top for _, alter, _ in spanned_rows)))
+        verdicts.append(("A: the control's BODY digest equals the recorded one", unspanned[1] == recorded))
+        verdicts.append(("B: the spanned answer's BODY digest equals the recorded one", spanned[1] == recorded))
+    verdicts.append(('C: every row of the spanned answer is inside the span (ALTERID <= %d)' % top, all(alter <= top for _, alter, _ in spanned[4])))
+    verdicts.append(('D: each answer holds a COLLECTION and at least one VOUCHER row', all(answer[3] and answer[4] for answer in (unspanned, spanned))))
     for text, held in verdicts:
         print('%s: %s' % ('HOLDS' if held else 'DOES NOT HOLD', text))
     return 0 if all(held for _, held in verdicts) else 1

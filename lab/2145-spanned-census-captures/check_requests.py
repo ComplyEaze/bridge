@@ -1,17 +1,19 @@
 #!/usr/bin/env python3 -I
 """Check this sheet's census requests before anything is sent (#2145).
 
-Run: python -I check_requests.py requests
+Run (in this folder): python -I check_requests.py requests
 
-For every window in WINDOWS below it checks, by bytes, that:
+First it checks every line of SHA256.txt (sha256, bytes, path) against the file it names, and that `requests/` holds
+exactly the files WINDOWS and MARKS name, no more and no fewer. Then, for every window in WINDOWS, it checks by bytes that:
 - the unspanned request (the control) and the spanned one decode as UTF-16LE with a byte-order mark and parse as XML;
 - each names the window's company once in SVCURRENTCOMPANY and its from and to dates in SVFROMDATE, SVTODATE and the
   two $$Date literals;
 - the spanned request is the control with ` AND $AlterID &gt; 0 AND $AlterID &lt;= M` inserted once, at the end of the
   census formula, and nothing else changed.
-It prints `census: ok N, FAIL F` and exits 0 only when F is 0. It prints no company figure beyond the names and dates
-already in this sheet.
+It prints `files: ok N, FAIL F` and `census: ok N, FAIL F`, and exits 0 only when both FAIL counts are 0. It prints no
+company figure beyond the names and dates already in this sheet.
 """
+import hashlib
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -28,6 +30,41 @@ WINDOWS = [
     ("g-%snov" % day, "BRIDGE GST LEDGER LAB", "202511" + day, "202511" + day, 64, "g-%snov" % day)
     for day in ["03", "04", "05", "06", "07", "08", "10", "11", "12", "13", "14", "15", "16", "17"]
 ]
+
+
+MARKS = ["a-marks", "p-marks", "g-marks", "s-marks"]
+
+
+def expected_files():
+    names = {"%s.request.utf16le.xml" % key for key in MARKS}
+    for key, _, _, _, mark, control in WINDOWS:
+        names.add("%s_c1_unspanned.request.utf16le.xml" % control)
+        names.add("%s_c2_spanned_0_%d.request.utf16le.xml" % (key, mark))
+    return names
+
+
+def check_files(folder):
+    ok = fail = 0
+    for line in open("SHA256.txt", encoding="utf-8"):
+        parts = line.split()
+        if len(parts) != 3:
+            continue
+        digest, size, path = parts
+        try:
+            data = open(path, "rb").read()
+        except OSError:
+            data = None
+        if data is None or hashlib.sha256(data).hexdigest() != digest or str(len(data)) != size:
+            fail += 1
+            print("FAIL file %s" % path)
+        else:
+            ok += 1
+    present, wanted = set(os.listdir(folder)), expected_files()
+    for name in sorted(present ^ wanted):
+        fail += 1
+        print("FAIL %s: %s" % ("unexpected file" if name in present else "missing file", name))
+    print("files: ok %d, FAIL %d" % (ok, fail))
+    return fail
 
 
 def text(path):
@@ -62,6 +99,7 @@ def main():
     if len(sys.argv) != 2:
         print(__doc__)
         return 2
+    file_fail = check_files(sys.argv[1])
     ok = fail = 0
     for window in WINDOWS:
         try:
@@ -74,7 +112,7 @@ def main():
         else:
             ok += 1
     print("census: ok %d, FAIL %d" % (ok, fail))
-    return 0 if fail == 0 else 1
+    return 0 if fail == 0 and file_fail == 0 else 1
 
 
 if __name__ == "__main__":

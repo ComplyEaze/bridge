@@ -6,65 +6,69 @@ Not for merge. READS ONLY, on four synthetic companies the lab already holds, on
 
 **THE REQUESTS** (`requests/`, UTF-16LE with a byte-order mark):
 - `X-marks`: the company marks read, the product's own request (`Bridge Agent Company High Water`) for that company.
-- `KEY_c1_unspanned`: the census the replay recorded. Each is byte-equal to the request its replay pins: the sha256 pinned in the test, or for the pilot audit the committed request file. Two windows of one day share one control (`a-d3-0401`).
+- `KEY_c1_unspanned`: the census the replay recorded. Each is byte-equal to the request its replay pins: the sha256 pinned in the test, or for the pilot audit the committed request file. For STOCK LAB, whose replay's call sent no census, it is the code's own rendering of the census that call would send now. Two windows of one day share one control (`a-d3-0401`).
 - `KEY_c2_spanned_0_M`: the same request with ` AND $AlterID &gt; 0 AND $AlterID &lt;= M` added at the end of its census formula, and nothing else changed. M is the voucher mark the replay's call read. The shape is the one sent spanned on 26 Oct and 28 Oct to three other synthetic books, with no dialog.
 
-**REQUESTS BY CURL** are allowed by the owner's decision of 26 Oct 2026 that requests sent by curl may be used to discover shapes. Each request is sent exactly as LAB-COMMON C3 says, one at a time. Before the first send, run `python -I check_requests.py requests` in this folder: EXPECT `census: ok 20, FAIL 0`; anything else = STOP, nothing sent. **Size bounds:** 16,384 bytes for a marks answer and 1,000,000 bytes for a census answer (the recorded ones are 5,444 to 126,960 bytes). **Time:** each request has 600 s to answer (C3). If no answer comes, or `GET /status` sent after it has no answer 60 s after it was sent, the gateway is held: STOP, leave the curl running, press no key, send nothing more, report, and wait (no state read and no shut until the run coordinator says).
+**REQUESTS BY CURL** are allowed by the owner's decision of 26 Oct 2026 that requests sent by curl may be used to discover shapes. Each request is sent exactly as LAB-COMMON C3 says, one at a time. Before the first send, run `python -I check_requests.py requests` in this folder: EXPECT `files: ok 48, FAIL 0` and `census: ok 20, FAIL 0`; anything else = STOP, nothing sent. **Size bounds:** 16,384 bytes for a marks answer and 1,000,000 bytes for a census answer (the recorded ones are 5,444 to 126,960 bytes). **Time:** each request has 600 s to answer (C3). If no answer comes, or `GET /status` sent after it has no answer 60 s after it was sent, the gateway is held: STOP, leave the curl running, press no key, send nothing more, report, and wait (no state read and no shut until the run coordinator says).
 
 ## The books and windows
 
-| Part | THE COMPANY (GUID) | Window (from to) | M | Control | Spanned | Replay's recorded census answer (sha256) |
+| Part | THE COMPANY (GUID) | Window (from to) | M | Control | Spanned | RECORDED: the BODY digest of the replay's census answer |
 |---|---|---|---|---|---|---|
-| A | BRIDGE AMEND LAB (`17a10910-773c-42c6-bd66-7bba9a392536`) | 20260403 | 1676 | `a-wa1_c1` | `a-wa1_c2_spanned_0_1676` | `d92b4aff960009b5f42d4ba77512894989efee1a77ff50afe50b8362b3dd7be7` (`agent/wa1-payment-voucher-census`) |
-| A | | 20260401 | 1469 | `a-d3-0401_c1` | `a-d3batch_c2_spanned_0_1469` | `eb90841da8d2237f43fee668b5219a3bb287e064d85ff27b3536c4ac003166ae` (`agent/d3-batch-voucher-census`) |
-| A | | 20260401 | 1685 | (the same control) | `a-d3cancel_c2_spanned_0_1685` | `743dcd652b3d8470975056c07b3a4643a025866404bf902bc0a13ea6d1d541e5` (`agent/d3-cancelled-voucher-census`) |
-| A | | 20260617 | 1790 | `a-l1_c1` | `a-l1_c2_spanned_0_1790` | `a46f499f37692b910c070c80d95b01d136082f15bb2ec35bec3814561af966d6` (`agent/l1-reentry-voucher-census`) |
-| P | BRIDGE PILOT LAB (`6b43e498-430c-4d5c-bfef-d32e2ab93c85`) | 20260401 20270331 | 68 | `p-audit_c1` | `p-audit_c2_spanned_0_68` | `11c0077ba4a02cf6b076e56364b00928f20390db68257a65ffd25efc35e03f55` (`agent/audit-read-pilot-lab/pilot-lab-audit-census`) |
-| G | BRIDGE GST LEDGER LAB (`aae372c5-a894-491c-8843-5532e43d2d2f`) | 20251103 | 64 | `g-03nov_c1` | `g-03nov_c2_spanned_0_64` | `f0d39e7fa67588da76d66a40363a6ec72e216d92948858e09570f19e53f58113` |
-| G | | 20251104 | 64 | `g-04nov_c1` | `g-04nov_c2_spanned_0_64` | `d0f5d50a525a1735b342427ac4cfe98dd6f88509350bc24d0b800a0167d5e214` |
-| G | | 20251105 | 64 | `g-05nov_c1` | `g-05nov_c2_spanned_0_64` | `ff6393088fdbd1c670251c2b1da6d15dce93bff0ecbfd3483270c8ae86f2013c` |
-| G | | 20251106 | 64 | `g-06nov_c1` | `g-06nov_c2_spanned_0_64` | `4f669c66dda0031f567447088619496d6f5d9be02e234d450b08bf7cc54f018b` |
-| G | | 20251107 | 64 | `g-07nov_c1` | `g-07nov_c2_spanned_0_64` | `4587e4d498c77fa5a563fe899c6583b1d3037f8ddf77582eee50f68775eea7a0` |
-| G | | 20251108 | 64 | `g-08nov_c1` | `g-08nov_c2_spanned_0_64` | `4395c211e7ebe55f3e754846634be1ace1299a8fd499948df0a6734aa1e0c01a` |
-| G | | 20251110 | 64 | `g-10nov_c1` | `g-10nov_c2_spanned_0_64` | `700d208be69301e70a8d5a71b68d82fd8edcb00592c7343b677e5716d02dd67b` |
-| G | | 20251111 | 64 | `g-11nov_c1` | `g-11nov_c2_spanned_0_64` | `946bee1424766c64aa5df4a7fe4259ac04f207c90d803139785b4c6972905d27` |
-| G | | 20251112 | 64 | `g-12nov_c1` | `g-12nov_c2_spanned_0_64` | `f96c8f32d34379e19d6fb4ef587a8aa8ce703a09eb148207360598e5679a9497` |
-| G | | 20251113 | 64 | `g-13nov_c1` | `g-13nov_c2_spanned_0_64` | `81db84c63f6a675b562e5407d9618c3012a0d6b3564a3752049b85da0e805f4a` |
-| G | | 20251114 | 64 | `g-14nov_c1` | `g-14nov_c2_spanned_0_64` | `fb6df7804b4bbee2680309ce36e2bb691fe348baa0a5cd19e21617dddfbd4cac` |
-| G | | 20251115 | 64 | `g-15nov_c1` | `g-15nov_c2_spanned_0_64` | `a75c6fffb5390c3788cf5bf4f07c5cfe79434141ae9c663588222258cfd44c81` |
-| G | | 20251116 | 64 | `g-16nov_c1` | `g-16nov_c2_spanned_0_64` | `8c1a770145779c10d5c103d22c366c661fbc99621abe5702e3669f248b5e6e1f` |
-| G | | 20251117 | 64 | `g-17nov_c1` | `g-17nov_c2_spanned_0_64` | `599435920156c7bba90ef2c4fe075932c597278188b1811e8d1340bcddbcf074` |
+| A | BRIDGE AMEND LAB (`17a10910-773c-42c6-bd66-7bba9a392536`) | 20260403 | 1676 | `a-wa1_c1` | `a-wa1_c2_spanned_0_1676` | `0d010d39400090149aa24d8238f15ce77bda51e35eeb2cf201259b9c93a4c28d` (`agent/wa1-payment-voucher-census`) |
+| A | | 20260401 | 1469 | `a-d3-0401_c1` | `a-d3batch_c2_spanned_0_1469` | `285f230b7bb2c77644832b7dc9d68d641dfea375e3a571ba2e4e3a391e9c5b9f` (`agent/d3-batch-voucher-census`) |
+| A | | 20260401 | 1685 | (the same control) | `a-d3cancel_c2_spanned_0_1685` | `f7bfe767de3ce652d99ae202d4d29b044283cee88281f60b47c43b82e47bcb00` (`agent/d3-cancelled-voucher-census`) |
+| A | | 20260617 | 1790 | `a-l1_c1` | `a-l1_c2_spanned_0_1790` | `eaf4b24a00e82083a96efa50e3a5034230d704d2b3c770cdcad67f1138c54a9f` (`agent/l1-reentry-voucher-census`) |
+| P | BRIDGE PILOT LAB (`6b43e498-430c-4d5c-bfef-d32e2ab93c85`) | 20260401 20270331 | 68 | `p-audit_c1` | `p-audit_c2_spanned_0_68` | `0aab1a3bb6a64ac0643ef3dd6529a470248c2f0fecbb4674a868f32b63dd4f52` (`agent/audit-read-pilot-lab/pilot-lab-audit-census`) |
+| G | BRIDGE GST LEDGER LAB (`aae372c5-a894-491c-8843-5532e43d2d2f`) | 20251103 | 64 | `g-03nov_c1` | `g-03nov_c2_spanned_0_64` | `4a11daa46a426a8e37dd13e737cb7635e2b436f63db14295ffa3753c70d6a91c` |
+| G | | 20251104 | 64 | `g-04nov_c1` | `g-04nov_c2_spanned_0_64` | `6880219726e715cef3b69df2f76c6bb425baef1ab6c6de2c9168c90e263241e3` |
+| G | | 20251105 | 64 | `g-05nov_c1` | `g-05nov_c2_spanned_0_64` | `f14596976cdd6d333d95b7c3d43cad509be920ea1a17a51905a915fd021c2bea` |
+| G | | 20251106 | 64 | `g-06nov_c1` | `g-06nov_c2_spanned_0_64` | `d31317eca2f31dfde6f68c17f3728094429d7efe8ed0804f5e68a481ae56b6e1` |
+| G | | 20251107 | 64 | `g-07nov_c1` | `g-07nov_c2_spanned_0_64` | `110ea43ba917d97f3d60badedd397ff8ec3608d3221f67f04dd575f88420e40a` |
+| G | | 20251108 | 64 | `g-08nov_c1` | `g-08nov_c2_spanned_0_64` | `670bfb45fc5a42e92e0c7565cfb1830b4add211e22154e8db00781dfb48e573b` |
+| G | | 20251110 | 64 | `g-10nov_c1` | `g-10nov_c2_spanned_0_64` | `f472d38bf28d364f2f5e30ee81c60948eea3a4b6ae03c13a7670cdd860702e92` |
+| G | | 20251111 | 64 | `g-11nov_c1` | `g-11nov_c2_spanned_0_64` | `a210c0e15803a643f9dec486bb065b9dc559abea1ea494278f15dec700628f03` |
+| G | | 20251112 | 64 | `g-12nov_c1` | `g-12nov_c2_spanned_0_64` | `64e55b940b5389cb39b05e1e722828fd23197bfd4ea22a321b431f5499f0b4b9` |
+| G | | 20251113 | 64 | `g-13nov_c1` | `g-13nov_c2_spanned_0_64` | `7df652a8bd20772fd5520f6fd9a54ad70fbc6a63d3fd2cfd1330f9f40361f467` |
+| G | | 20251114 | 64 | `g-14nov_c1` | `g-14nov_c2_spanned_0_64` | `538bba68d236530c1cad07a1c87bea3a5464ec31b936b950fa497bf88f8d9e5c` |
+| G | | 20251115 | 64 | `g-15nov_c1` | `g-15nov_c2_spanned_0_64` | `4757b4a8c4e9f333cf2e1c953ebffce335f2e2f7029431352a63a8add0b1109d` |
+| G | | 20251116 | 64 | `g-16nov_c1` | `g-16nov_c2_spanned_0_64` | `e0bf18db5dd8ccb1a76cb3a3ec656dccc548ec796f6c89d16fdb7a3122741130` |
+| G | | 20251117 | 64 | `g-17nov_c1` | `g-17nov_c2_spanned_0_64` | `0a1701b562804002b19728fa60ec9f4107423d36ed9d8c5609d6b461038dab6b` |
 | S | BRIDGE STOCK LAB (`1edb9b05-8d35-4c0c-9959-dce655730463`) | 20250421 | 3 | `s-0421_c1` | `s-0421_c2_spanned_0_3` | none: the replay's call sent no census, so it holds no census answer |
 
-The GST LEDGER LAB answers are the `agent/gst-ledger-l1/s6-DDnov-n-1` records. All paths are under `src-tauri/crates/bridge-tally-protocol/tests/fixtures/`.
+The GST LEDGER LAB answers are the `agent/gst-ledger-l1/s6-DDnov-n-1` records. All paths are under `src-tauri/crates/bridge-tally-protocol/tests/fixtures/`. The BODY digest is defined in `compare2145.py`: the SHA-256 of the answer's text with its one CMPINFO element removed. CMPINFO holds the Tally session's object counts, which differ between sessions and with the companies loaded, even when every row is the same.
+
+M is the voucher mark each replay's call read. For GST LEDGER LAB the call read it after the census, but the book held 64 throughout: the marks answers of all fourteen calls are byte-equal.
 
 ## Before the sitting
-1. Check every file here against `SHA256.txt`.
-2. `python -I check_requests.py requests`: EXPECT `census: ok 20, FAIL 0`.
+1. Copy this folder to `C:/bridge-lab/2145/sheet/` and work from there.
+2. `python -I check_requests.py requests` in that folder: it checks every file against `SHA256.txt` and the census requests. EXPECT `files: ok 48, FAIL 0` and `census: ok 20, FAIL 0`.
 3. Tally licensed; Educational mode = STOP (C1). Record the release and licence mode only.
-4. The working folder is `C:/bridge-lab/2145/` (absent or empty before, else STOP), with one folder per part (`A`, `P`, `G`, `S`).
+4. The answers go to `C:/bridge-lab/2145/answers/` (absent or empty before, else STOP), with one folder per part (`A`, `P`, `G`, `S`).
 
 ## The reads: parts A, P, G and S, in that order, each in full before the next
 1. Load THE COMPANY alone (C1). C2 step 0. Then the part's `X-marks`.
-   - **The GUID check:** EXPECT one COMPANY row with THE COMPANY's GUID. Another GUID, or more than one row = STOP the part.
-   - Record ALTVCHID and ALTMSTID. **ALTVCHID below the part's highest M** (A: 1790, P: 68, G: 64, S: 3) = STOP the part: the book is not the one recorded (it may have been restored to an older state). At or above it, go on, recording the value.
+   - **The GUID check:** EXPECT one COMPANY row with THE COMPANY's GUID. Another GUID, or more than one row = STOP.
+   - Record ALTVCHID and ALTMSTID. **ALTVCHID below the part's highest M** (A: 1790, P: 68, G: 64, S: 3) = STOP: the book is not the one recorded (it may have been restored to an older state). At or above it, go on, recording the value.
+   - **Any STOP ends the sitting**, in this part and before every later one: C8, then C10 for the book loaded (except a held gateway, rule above), and no later part is run without the run coordinator's word.
 2. For each window of the part, in the table's order: send its control, then its spanned request. (Part A sends `a-d3-0401_c1` once, before both 1 April spanned requests.)
 3. A dialog, a hang, a non-200 or an answer that does not parse = STOP (C3, C7, C9). The gateway is not probed again.
 4. The part's `X-marks` again. EXPECT the marks of step 1, since the reads write nothing. A difference = record it and STOP.
 5. C10 (Shut Company). Then the next part.
 
 ## EXPECT and the comparison (recorded; the lab judges only the STOP rules)
-For each window run `python -I compare2145.py RECORDED M CONTROL_ANSWER SPANNED_ANSWER`, with RECORDED and M from the table (`none` for part S), and keep its whole output. It prints both answers' rows as (GUID, ALTERID, DATE), and the number of rows of the control above M, then:
-- **A, the control equals the recorded answer:** the window is as it was when recorded. EXPECT it to hold for parts P and G, and for A's 20260403 and 20260617 windows. EXPECT it **not** to hold for A's 1 April window recorded at M 1469: on that day the book was altered after that record (the record at M 1685 is of the same day, three vouchers later altered past 1469). That is the finding, not a STOP.
-- **B, the spanned answer equals the recorded answer:** the replay can carry the recorded answer for the spanned request, by this measurement. EXPECT it to hold wherever A holds. Where it does not hold, the replay needs a decision (below), not a guess.
+For each window run `python -I compare2145.py RECORDED M CONTROL_ANSWER SPANNED_ANSWER`, with RECORDED and M from the table (`none` for part S), and keep its whole output. It prints both answers' sizes, hashes, BODY digests, CMPINFO blocks and rows as (GUID, ALTERID, DATE), whether the two answers are byte-equal, and the number of control rows above M, then:
+- **A, the control's BODY digest equals the recorded one:** the window is as it was when recorded. EXPECT it to hold for parts P and G, and for A's 20260403, 20260617 and 1 April (M 1685) windows. EXPECT it **not** to hold for A's 1 April window recorded at M 1469: on that day the book was altered after that record. The record at M 1685 is of the same day, with three of its 50 vouchers altered past 1469.
+- **B, the spanned answer's BODY digest equals the recorded one:** the replay's census answer stands for the spanned request, by this measurement. EXPECT it to hold wherever A holds. EXPECT it **not** to hold for the M 1469 window either: the span to 1469 returns 47 of the 50 vouchers.
 - **C, every row of the spanned answer is inside the span.** EXPECT it to hold everywhere.
+- **D, each answer holds a collection and at least one row.** EXPECT it to hold everywhere: every window here held at least one voucher when recorded, and part S's day holds the one voucher its replay read. An empty answer or an error answer fails it.
 
-Exit 0: every verdict that ran holds. Exit 1: one does not. Exit 2: an error, never a verdict.
+Exit 0: every verdict that ran holds. Exit 1: one does not; that is a finding, recorded with the whole output, and the sheet goes on. The two expected for the M 1469 window are recorded as expected. Exit 2: an answer could not be read or does not parse, which is C3's STOP.
 
-For part S there is no recorded census answer. EXPECT one row dated 21 Apr 2025 with ALTERID 3 or below in both answers, the vouchers of the replay's recorded window read.
+For part S there is no recorded census answer. EXPECT one row dated 21 Apr 2025 with ALTERID 3 or below in both answers; D enforces the row, C the ALTERID.
 
 ## Where a verdict does not hold
-Nothing is re-sent and nothing is edited in the book. The row is reported with both row lists. Each such replay is then decided on the issue: re-recorded from the book as it is now, or kept unchanged and named as a replay of the unspanned census. No restore is made for this sheet.
+Nothing is re-sent and nothing is edited in the book. The row is reported with both row lists, and part S's row count and dates likewise. Each such replay is then decided on the issue: re-recorded from the book as it is now, or kept unchanged and named as a replay of the unspanned census. No restore is made for this sheet.
 
 ## The books
 None changes; every request is a read. The marks are read at the start and the end of each part, and must be equal.

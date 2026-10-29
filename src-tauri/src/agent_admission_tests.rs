@@ -1800,9 +1800,14 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// of them merged together measures 201,142, 226,977, 229,475 and 234,200 bytes.
 /// On 28 Oct 2026 every budget was set once to that measured size plus at least
 /// 500 bytes, rounded up to a thousand, so that the six do not each need a raise.
+/// On 29 Oct 2026 master measured 201,963, 227,466, 229,964 and 234,937 bytes,
+/// margins of 37, 534, 36 and 63. Two changes then waited on bytes: the
+/// per-cost-centre summary of #1231 (about +150 in every list) and the settlement
+/// text of #1709 (about +260 in the three lists with posting on). Every budget was
+/// raised by 1,000 bytes once, for both.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [202_000, 228_000, 230_000, 235_000];
+const TOOL_LIST_BUDGETS: [usize; 4] = [203_000, 229_000, 231_000, 236_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

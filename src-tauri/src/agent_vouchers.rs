@@ -1211,21 +1211,14 @@ impl Server {
         shape: VoucherReadShape,
         composites: VoucherComposites,
     ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
-        self.read_voucher_window(
+        read_entry_window_rows_with(
+            &AgentReader(self),
             identity,
             company,
             from,
             to,
             shape,
-            WindowPlanSource::Estimate { known_marks: None },
-            WindowReadLimits::for_shape(shape).counting_small_books(),
-            |xml| match composites {
-                VoucherComposites::Withhold => {
-                    parse_agent_rows_withholding(xml, identity.company_guid())
-                }
-                VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
-                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
-            },
+            composites,
         )
         .await
     }
@@ -1260,6 +1253,37 @@ impl Server {
         )
         .await
     }
+}
+
+/// [`Server::read_entry_window_rows`] through any window reader, so that a
+/// caller's tests can serve it the answers a lab captured.
+pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    composites: VoucherComposites,
+) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
+    read_voucher_window_with(
+        reader,
+        identity,
+        company,
+        from,
+        to,
+        shape,
+        WindowPlanSource::Estimate { known_marks: None },
+        WindowReadLimits::for_shape(shape).counting_small_books(),
+        |xml| match composites {
+            VoucherComposites::Withhold => {
+                parse_agent_rows_withholding(xml, identity.company_guid())
+            }
+            VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
+                .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
+        },
+    )
+    .await
 }
 
 /// At most this many withheld vouchers are listed; `withheld_total` is exact.

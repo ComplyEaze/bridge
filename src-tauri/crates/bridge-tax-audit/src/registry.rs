@@ -260,7 +260,7 @@ pub fn find(id: &str) -> Option<&'static PortedTest> {
 /// Read, verify and build the book, then run test `id` on it: its canonical parity dump.
 pub fn run_canonical(
     id: &str,
-    engagement: &Engagement,
+    engagement: &crate::DirectoryEngagement,
     rules: &Rules,
     caller: &CallerData,
 ) -> Result<serde_json::Value> {

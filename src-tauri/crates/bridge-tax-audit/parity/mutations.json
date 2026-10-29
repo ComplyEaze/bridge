@@ -7432,28 +7432,12 @@
   "to": "        if false\n            && roles\n                .get(\"trade_creditors_source\")"
  },
  {
-  "id": "S1-03",
-  "by": "author",
-  "what": "a held-book engagement can be loaded as a directory",
-  "file": "src/lib.rs",
-  "from": "    if engagement.in_memory {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\",",
-  "to": "    if false {\n        return Err(AuditError::refused(\n            \"CFG-no-directory\","
- },
- {
-  "id": "S1-04",
-  "by": "author",
-  "what": "a directory engagement is marked as held",
-  "file": "src/lib.rs",
-  "from": "            in_memory,\n",
-  "to": "            in_memory: true,\n"
- },
- {
   "id": "S1-05",
   "by": "author",
-  "what": "a held-book engagement keeps a directory path",
+  "what": "a directory engagement's read is not under its config directory",
   "file": "src/lib.rs",
-  "from": "            read_dir: base_dir.map_or_else(PathBuf::new, |b| b.join(path)),",
-  "to": "            read_dir: PathBuf::from(\"x\"),"
+  "from": "        let read_dir = base_dir.map_or_else(PathBuf::new, |b| b.join(path));\n",
+  "to": "        let read_dir = PathBuf::from(path);\n"
  },
  {
   "id": "S1-06",
@@ -7474,18 +7458,18 @@
  {
   "id": "S1-08",
   "by": "author",
-  "what": "a held book reads a legacy creditor file when the source is set after parsing",
+  "what": "a legacy source set after parsing is taken as the one read at parse",
   "file": "src/lib.rs",
-  "from": "        if self.in_memory && legacy {",
-  "to": "        if false && legacy {"
+  "from": "            Some(read) if Some(&read.source) == source => {\n",
+  "to": "            Some(read) => {\n"
  },
  {
   "id": "S1-09",
   "by": "author",
   "what": "a legacy source is taken for any other kind, and the reverse",
   "file": "src/lib.rs",
-  "from": "            == Some(\"legacy_json\");\n        if self.in_memory && legacy {",
-  "to": "            != Some(\"legacy_json\");\n        if self.in_memory && legacy {"
+  "from": "        .and_then(toml::Value::as_str)\n        == Some(\"legacy_json\")\n}\n",
+  "to": "        .and_then(toml::Value::as_str)\n        != Some(\"legacy_json\")\n}\n"
  },
  {
   "id": "CQ-01",
@@ -14278,5 +14262,29 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "S1-10",
+  "by": "author",
+  "what": "a legacy source's file read as naming no ledger",
+  "file": "src/lib.rs",
+  "from": "                names: read_legacy_names(source, b),\n",
+  "to": "                names: Ok(Vec::new()),\n"
+ },
+ {
+  "id": "S1-11",
+  "by": "author",
+  "what": "a legacy source no engagement read taken as no source",
+  "file": "src/lib.rs",
+  "from": "            _ => Err(AuditError::refused(\n                \"CFG-no-directory\",\n                \"a legacy_json trade-creditor source names a file this engagement did not read: only its own [roles], parsed with a directory, is read\",\n            )),\n",
+  "to": "            _ => Ok(None),\n"
+ },
+ {
+  "id": "S1-12",
+  "by": "author",
+  "what": "a legacy source's stored read error taken as no names",
+  "file": "src/lib.rs",
+  "from": "                read.names.clone().map(Some).map_err(AuditError::Config)\n",
+  "to": "                read.names.clone().map(Some).or(Ok(None))\n"
  }
 ]

@@ -388,11 +388,8 @@ pub(super) async fn read_audit_book(
     let (parts, marks) = collect_parts(runtime, config, identity, period, limits).await?;
     let (store, read_id, manifest_sha256) = memory_read(identity, period, marks, &parts)?;
     let admitted = Read::open_from(&store, &read_id, &manifest_sha256)?;
-    admitted.check(
-        &engagement.period,
-        engagement.allow_unbracketed_read,
-        engagement.company_pin.as_ref(),
-    )?;
+    // An engagement for a held book has no [snapshot], so no unbracketed-read opt-in.
+    admitted.check(&engagement.period, false, engagement.company_pin.as_ref())?;
     let book = bridge_tax_audit::book::load_book(&admitted, identity.display_name())?;
     Ok(AuditBook {
         engagement,

@@ -4376,6 +4376,79 @@ mod through_the_tool {
         assert_eq!(error["cause"], "duplicate_master_identity", "{error}");
     }
 
+    /// The plans of a compliance read of the several-currency book of the capture
+    /// (FOREX_601D_CAPTURE_PROVENANCE), with `balance` as the answer to the balance read.
+    fn several_currency_compliance_plans(balance: String) -> Vec<ScenarioPlan> {
+        let companies = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+        )));
+        let extent = xml(captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/company_extents_forex_live.utf16le.xml"
+        )));
+        let fixture = |bytes: &[u8]| xml(captured(bytes));
+        let mut plans = Vec::new();
+        pair(&mut plans, companies.clone());
+        plans.push(companies.clone());
+        pair(&mut plans, extent.clone());
+        for source in [
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_multi_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+            )),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/company_currencyname_live.utf16le.xml"
+            )),
+        ] {
+            pair(&mut plans, source);
+        }
+        pair(&mut plans, extent.clone());
+        plans.push(companies.clone());
+        plans.extend([status(), companies.clone(), companies.clone()]);
+        pair(&mut plans, extent.clone());
+        for source in [
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/compliance_master_forex_live.utf16le.xml"
+            )),
+            xml(balance.clone()),
+            fixture(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/group_snapshot_forex_live.utf16le.xml"
+            )),
+        ] {
+            pair(&mut plans, source);
+        }
+        pair(&mut plans, extent.clone());
+        plans.extend([companies.clone(), status(), companies.clone()]);
+        // A second page is served from the first page's snapshot: identity,
+        // then the bracketed extent pair only.
+        pair(&mut plans, companies.clone());
+        plans.push(companies.clone());
+        pair(&mut plans, extent);
+        plans.push(companies);
+        plans
+    }
+
+    /// The captured balance answer of that book, with the closing balance of one rupee ledger
+    /// (`FX Party 01`) replaced by `composite`; nothing else is changed.
+    fn forex_balances_with(composite: &str) -> String {
+        let capture = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/balance_snapshot_forex_live.utf16le.xml"
+        ));
+        let row = capture
+            .find("<LEDGER NAME=\"FX Party 01\"")
+            .expect("the ledger's row");
+        let tail = &capture[row..];
+        let open = tail.find("<CLOSINGBALANCE").expect("a closing balance");
+        let start = row + open + tail[open..].find('>').unwrap() + 1;
+        let end = start + capture[start..].find("</CLOSINGBALANCE>").unwrap();
+        assert!(
+            capture[start..end].contains(" @ "),
+            "a composite to replace"
+        );
+        format!("{}{}{}", &capture[..start], composite, &capture[end..])
+    }
+
     /// bridge#551, through the tool on the several-currency book's captures:
     /// the compliance read admits it through the classified base, returns its
     /// plain rupee ledgers only, and names the three dollar ledgers and the
@@ -4526,6 +4599,116 @@ mod through_the_tool {
         assert_eq!(error["cause"], "foreign_currency_ledger_balance");
         let remediation = error["remediation"].as_str().unwrap();
         assert!(remediation.contains("#683"), "{error}");
+    }
+
+    /// bridge#2071, through the tool: the lab's composite layout (TallyPrime 7.2 writes
+    /// `-$100.00 @ ₹ 87/$ = -₹ 8700.00`: no space after the symbol, as in the lab's Lab Bank row)
+    /// is one Bridge's strict detector does not recognise, so the rupee ledger holding it is not
+    /// set aside and the compliance read is refused, with the code and cause as measured in the
+    /// lab and the step. The same row in the captured 7.1 layout (a space after the symbol) is
+    /// set aside by name and the read returns: the layout is the one thing that differs. The
+    /// balance answer is the committed capture of the several-currency book with one closing
+    /// balance replaced; the lab's own raw answer is not a fixture here (it would need a
+    /// merge-gate manifest entry first).
+    #[tokio::test]
+    async fn a_composite_layout_bridge_does_not_recognise_refuses_the_compliance_read_with_its_step(
+    ) {
+        let forex = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+        let args = json!({"company_guid":forex,"fields":"compliance"});
+        // The lab's layout.
+        let unspaced = "-$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00";
+        let one = OneServer::spawn(several_currency_compliance_plans(forex_balances_with(
+            unspaced,
+        )));
+        let response = one.call(args.clone()).await;
+        let error = refusal(&response);
+        assert_eq!(error["code"], "party_ledger_master_read_failed", "{error}");
+        assert_eq!(
+            error["cause"], "native_foreign_currency_ledger_balance",
+            "{error}"
+        );
+        let remediation = error["remediation"].as_str().expect("a next step");
+        assert_eq!(
+            remediation,
+            crate::agent::remediation_for(
+                "party_ledger_master_read_failed",
+                Some("native_foreign_currency_ledger_balance")
+            )
+            .unwrap()
+        );
+        assert!(remediation.contains("layout"), "{remediation}");
+        assert!(!remediation.contains("-$100.00"), "{remediation}");
+        // The captured 7.1 layout of the same balance: a space after each symbol.
+        let spaced = "-$ 100.00 @ \u{20b9} 87/$  = -\u{20b9} 8700.00";
+        let other = OneServer::spawn(several_currency_compliance_plans(forex_balances_with(
+            spaced,
+        )));
+        let read = other.call(args).await;
+        assert_ne!(read["isError"], true, "{read}");
+        let result = &read["structuredContent"]["result"];
+        assert_eq!(
+            result["base_currency_ledgers_mixed_excluded"]["ledgers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|name| *name == "FX Party 01")
+                .count(),
+            1,
+            "{result}"
+        );
+    }
+
+    /// The typed pieces of that refusal on the committed 7.1 capture of the several-currency
+    /// ledgers (#2071): the strict snapshot parse gives the variant `ForeignCurrencyLedgerBalance`
+    /// as a type, not by text; the refusal built from it carries the code and cause the lab
+    /// measured; and the step is chosen by that code and cause together, so the same cause under
+    /// another code has none of its own. The path the tool takes with the lab's layout is the
+    /// test above.
+    #[test]
+    fn a_foreign_currency_closing_balance_refuses_the_compliance_read_with_a_next_step() {
+        use bridge_tally_protocol::native_outstandings::{
+            parse_native_ledger_snapshot, NativeOutstandingsError,
+        };
+        let capture = captured(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ));
+        let Err(variant) = parse_native_ledger_snapshot(&capture) else {
+            panic!("the capture's composite closing balance is refused");
+        };
+        assert_eq!(
+            variant,
+            NativeOutstandingsError::ForeignCurrencyLedgerBalance {
+                ledger_name: "BRIDGE FX DEBTOR A".to_string()
+            }
+        );
+        let failure = crate::agent::ToolFailure::from_runtime(
+            "party_ledger_master_read_failed",
+            anyhow::Error::new(variant),
+        );
+        assert_eq!(failure.code, "party_ledger_master_read_failed");
+        assert_eq!(
+            failure.cause,
+            Some("native_foreign_currency_ledger_balance")
+        );
+        let remediation =
+            crate::agent::remediation_for(&failure.code, failure.cause).expect("a next step");
+        assert!(remediation.contains("#683"), "{remediation}");
+        assert!(
+            remediation.contains("Do not repeat it in a loop"),
+            "{remediation}"
+        );
+        // The ledger's name is not in the step.
+        assert!(!remediation.contains("BRIDGE FX DEBTOR A"), "{remediation}");
+        // The step belongs to this code: the same cause under another code is given none of
+        // its own (the open-bills read says it in band, with a different step).
+        assert_eq!(
+            crate::agent::remediation_for("ledger_export_invalid", failure.cause),
+            None
+        );
+        assert_eq!(
+            crate::agent::remediation_for("native_outstandings_read_failed", failure.cause),
+            None
+        );
     }
 
     #[tokio::test]

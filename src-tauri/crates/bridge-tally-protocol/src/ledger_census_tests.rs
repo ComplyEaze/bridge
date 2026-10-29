@@ -276,3 +276,88 @@ fn the_company_name_is_escaped_and_the_formula_is_digits_only() {
     assert_eq!(request.matches("$$").count(), 1);
     assert!(request.contains("$$SysName:XML"));
 }
+
+fn every_refusal<C>() -> [CensusError<C>; 6] {
+    [
+        CensusError::PlanInvalid,
+        CensusError::TooManySlices { slices: 6 },
+        CensusError::SliceOverBound { rows: 6 },
+        CensusError::DuplicateIdentity,
+        CensusError::CensusEmpty,
+        CensusError::Incomplete,
+    ]
+}
+
+/// Made generic over the collection, the ledger census says what it said before.
+#[test]
+fn the_ledger_census_refusals_keep_their_words() {
+    let texts = every_refusal::<Ledgers>().map(|error| error.to_string());
+    assert_eq!(
+        texts,
+        [
+            "the ledger census plan was invalid",
+            "the ledger census needs more slices than allowed",
+            "a ledger census slice returned more rows than it spans",
+            "the ledger census saw one ledger twice",
+            "the ledger census found no ledger",
+            "the ledger census stopped before its last slice",
+        ]
+    );
+}
+
+/// A stock-item census's refusals have codes of their own, none a ledger census's, and name
+/// stock items.
+#[test]
+fn a_stock_item_census_refuses_in_its_own_words_and_codes() {
+    let codes = every_refusal::<StockItems>().map(CensusError::safe_code);
+    let distinct: HashSet<_> = codes.iter().collect();
+    assert_eq!(distinct.len(), codes.len());
+    assert!(codes
+        .iter()
+        .all(|code| code.starts_with("stock_item_span_")));
+    let ledger: HashSet<_> = every_refusal::<Ledgers>()
+        .map(CensusError::safe_code)
+        .into_iter()
+        .collect();
+    assert!(codes.iter().all(|code| !ledger.contains(code)));
+    assert_eq!(
+        CensusError::<StockItems>::DuplicateIdentity.to_string(),
+        "the stock item census saw one stock item twice"
+    );
+}
+
+/// The plan and census are the ledger census's: the slices tile the mark and the census counts
+/// each stock item once.
+#[test]
+fn a_stock_item_census_tiles_and_counts_as_the_ledger_census_does() {
+    let plan = CensusPlan::<StockItems>::new(25, LIMITS).unwrap();
+    let spans: Vec<_> = plan
+        .slices()
+        .iter()
+        .map(|slice| (slice.after(), slice.through()))
+        .collect();
+    assert_eq!(spans, [(0, 10), (10, 20), (20, 25)]);
+    let mut census = Census::new(plan);
+    census.accept(guids("a", 10)).unwrap();
+    census.accept(Vec::new()).unwrap();
+    census.accept(guids("c", 5)).unwrap();
+    assert_eq!(census.finish().unwrap().get(), 15);
+}
+
+/// The candidate stock-item request: a `StockItem` collection, GUID only, with the company's GUID
+/// computed, under the ledger census's digits-only formula. No live capture of these bytes exists
+/// yet (#1233), so its shape is checked, not its bytes.
+#[test]
+fn the_stock_item_slice_request_is_the_ledger_formula_over_stock_items() {
+    let plan = CensusPlan::<StockItems>::new(10, LIMITS).unwrap();
+    let request = render_stock_item_census_slice_request("A & B <LAB>", &plan.slices()[0]);
+    assert!(request.contains("<SVCURRENTCOMPANY>A &amp; B &lt;LAB&gt;</SVCURRENTCOMPANY>"));
+    assert!(request.contains(r#"NAME="BridgeSpan">$AlterID &gt; 0 AND $AlterID &lt;= 10</SYSTEM>"#));
+    assert!(request.contains("<TYPE>StockItem</TYPE><FETCH>GUID</FETCH>"));
+    assert!(
+        request.contains("<COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>")
+    );
+    assert!(request.contains("<FILTERS>BridgeSpan</FILTERS>"));
+    assert_eq!(request.matches("$$").count(), 1);
+    assert!(!request.contains("SVFROMDATE") && !request.contains("SVTODATE"));
+}

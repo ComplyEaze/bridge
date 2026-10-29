@@ -868,11 +868,12 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
 - **The element makes every row longer. VERIFIED on this book.** The answer is 20,896 bytes against 19,094 for the read
   that did not name it. By ledger row (UTF-16 bytes, counted by structure): the one party that holds an address grew
   from 3,010 to 3,958 (its mailing element is 934 bytes), and each of the other seven rows by 122 (an empty element is
-  108 bytes). A second entry on that party was then measured (TallyPrime 7.2, 2026-10-29, `lab/1490-mailing-captures-answers`): the answer grew from 20,896 to 21,840 bytes, so the second entry added 944 bytes and the party's row is 4,902; the eight ledgers average 2,612 bytes a ledger. Bridge's per-ledger budget for a read that names the list is
+  108 bytes). A second entry on that party was then measured (TallyPrime 7.2, 2026-10-29, `lab/1490-mailing-captures-answers`): the answer grew from 20,896 to 21,840 bytes, so the second entry added 944 bytes and the party's row is 4,902; the eight ledgers average 2,612 bytes a ledger with one entry (20,896 / 8) and 2,730 with two (21,840 / 8). Bridge's per-ledger budget for a read that names the list is
   5,000 bytes (above that largest row; it was 4,700 before the second entry was measured) against 3,750 for one that does not (UNVERIFIED: a party with three entries, longer address lines or a book of many populated parties has not been read). `ledger_masters` sends it only when asked (`include_mailing_details`, refused with `include_gst_details` because the request naming both has not been captured).
-- **Not shown.** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
-  sends them, is not measured: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), a party with two
-  mailing rows, an entry with no `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers.
+- **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
+  sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
+  `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one
+  party, sent oldest first; three or more entries, an entry with no date and a book of many populated parties are not measured.
 
 Bridge reads the list into a dated history (`compliance.mailing_details` of `ledger_masters` with `include_mailing_details`, and the mailing columns of
 the party/ledger master workbook) and leaves the flat fields as returned. A response that carries no such element is

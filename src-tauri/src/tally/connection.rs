@@ -359,7 +359,8 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// bytes (3,010 to 3,958 UTF-16 bytes; one dated entry of two short address
 /// lines) and every other row by 122. A second dated entry on that party then
 /// grew its row by 944 more, to 4,902 (TallyPrime 7.2, 2026-10-29, eight
-/// ledgers, mean 2,612 a ledger). The figure, 5,000, is above that largest row
+/// ledgers; the read averaged 2,612 bytes a ledger with one entry and 2,730 with
+/// two). The figure, 5,000, is above that largest row
 /// measured, so a read of rows no larger than it cannot go over the budget; it is
 /// not a bound. A party with three entries (about 950 more each, extrapolated),
 /// or longer address lines, goes over it, and a book of such parties can still be

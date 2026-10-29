@@ -1,0 +1,18 @@
+compare A1 A2 20260101: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 22520 whole_rows_from_first_day 7380 matched 7380 only_in_part 22520 only_in_whole 0 subset no
+ (exit 0)
+compare A5 A2 20260101: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 22520 whole_rows_from_first_day 7380 matched 7380 only_in_part 22520 only_in_whole 0 subset no
+ (exit 0)
+compare A1 A3 20251001: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 14976 whole_rows_from_first_day 14924 matched 14924 only_in_part 14976 only_in_whole 0 subset no
+ (exit 0)
+compare A5 A3 20251001: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 14976 whole_rows_from_first_day 14924 matched 14924 only_in_part 14976 only_in_whole 0 subset no
+ (exit 0)
+compare A1 A4 20250701: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 7432 whole_rows_from_first_day 22468 matched 22468 only_in_part 7432 only_in_whole 0 subset no
+ (exit 0)
+compare A5 A4 20250701: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 7432 whole_rows_from_first_day 22468 matched 22468 only_in_part 7432 only_in_whole 0 subset no
+ (exit 0)
+compare A1 A6 20260101: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 22520 whole_rows_from_first_day 7380 matched 7380 only_in_part 22520 only_in_whole 0 subset no
+ (exit 0)
+compare A5 A6 20260101: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 22520 whole_rows_from_first_day 7380 matched 7380 only_in_part 22520 only_in_whole 0 subset no
+ (exit 0)
+compare A1 A5 20250401: compare ok whole_rows 29900 part_rows 29900 part_rows_before_first_day 0 whole_rows_from_first_day 29900 matched 29900 only_in_part 0 only_in_whole 0 subset yes
+ (exit 0)

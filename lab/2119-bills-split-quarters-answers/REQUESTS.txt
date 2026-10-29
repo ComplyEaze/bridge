@@ -1,0 +1,5 @@
+The raw requests sent (the sheet's requests/, unchanged), by name, size and sha256:
+q-1-from-20250401.utf16le.xml 770 B sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f
+q-2-from-20250701.utf16le.xml 770 B sha256 07466127becba3058ec20dd2e6850b4a61c5aa9d095a0f24f2d4d8c92eb4dd91
+q-3-from-20251001.utf16le.xml 770 B sha256 b035abb731cf8b508b61f73621c25aff147598364ddb39631b3f2e500f1051f1
+q-4-from-20260101.utf16le.xml 770 B sha256 bd9cde1ac1c2ea1e6be446a2e731c703cad8e80868fbb3d0b21425e50a0f39f6

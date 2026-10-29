@@ -1,0 +1,5 @@
+﻿command: Get-NetTCPConnection -LocalPort 9001 -State Listen
+time: 2026-10-29T06:48:17.393Z
+exit: 0
+:::9001 pid 13992
+0.0.0.0:9001 pid 13992

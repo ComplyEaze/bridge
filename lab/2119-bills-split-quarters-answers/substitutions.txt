@@ -1,0 +1,4 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+evidence/c10-netstat.txt: original 9868 B sha256 2049d7ecbba07e13c81a9f0e21e51cb025403bb43bece364e0f0852668bfcdb7; only the port-9001 LISTENING lines kept
+evidence/s0-netstat.txt: original 10026 B sha256 e4f82ceed561dd99f98fdbe576055cfb685412da1efd810edb12bb2a5d1eafd2; only the port-9001 LISTENING lines kept
+scripts/rawt.ps1: original 3596 B sha256 9de2123c94aa042156f8a3c84c46f48ef97172f1457e1426154179a019fac835; 2 x -> <lab folder>; 1 x -> <capture helper>

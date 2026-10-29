@@ -1511,14 +1511,14 @@ fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
 
 /// The next step for a Bills report request cut at the request limit, as the assistant receives
 /// it (#1356, #2119). Every clause is one the lab measured on one dense synthetic book
-/// (`lab/2119-bills-read-timing-answers`): the open-bill counts either side of the limit (15,000
-/// answered; 22,500 and 29,900 refused) and an earlier date answering; and a read sent straight
-/// after a cut refused for time as well (`lab/0.7.0-master-live-checks-answers`).
+/// (`lab/2119-bills-read-timing-answers`): the open-bill counts either side of the earlier
+/// 20-second limit (15,000 answered; 22,500 and 29,900 refused) and an earlier date answering; and
+/// a read sent straight after a cut refused for time as well (`lab/0.7.0-master-live-checks-answers`).
 const BILLS_REPORT_DEADLINE_STEP: &str = "Tally took longer to answer one request of its Bills \
     Receivable or Payable report at this date than ComplyEaze Bridge waits (60 seconds), so no \
     figures were returned. On the one large book measured, that report's time grew with the bills \
-    open at the date: with about 15,000 open bills it answered, and with about 22,500 and about \
-    29,900 it did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
+    open at the date: under an earlier 20-second limit, with about 15,000 open bills it answered, \
+    and with about 22,500 and about 29,900 it did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
     and on that book a read sent straight after was refused for time as well. Do not repeat the \
     same call, and do not send another read of this company straight away: tell the user, wait, \
     then call `tally_status` once, and go on only when it answers. On that book an earlier \
@@ -1652,18 +1652,25 @@ async fn ageing_outstandings_holding(
 }
 
 /// A Bills Receivable or Payable post cut at its own request limit is refused with the Bills
-/// report's own cause and next step, through the real read (#2119). A cut on the pair's second
-/// post keeps the first post's body in the refusal's evidence.
+/// report's own cause and next step, through the real read (#2119), while every other request has
+/// the default limit. A cut on the pair's second post keeps the first post's body in the refusal's
+/// evidence.
 #[tokio::test]
 async fn a_bills_post_cut_at_the_limit_is_refused_with_its_own_cause() {
-    let limit = std::time::Duration::from_millis(300);
+    let bills_limit = std::time::Duration::from_millis(300);
     let mut bytes = Vec::new();
     for held in [
         AgeingBillsPosts::receivable as fn(AgeingBillsPosts) -> usize,
         AgeingBillsPosts::receivable_second,
         AgeingBillsPosts::payable,
     ] {
-        let (response, _) = ageing_outstandings_holding(held, limit, Some(limit), false).await;
+        let (response, _) = ageing_outstandings_holding(
+            held,
+            bridge_tally_transport::DEFAULT_REQUEST_TIMEOUT,
+            Some(bills_limit),
+            false,
+        )
+        .await;
         assert_eq!(response["isError"], true, "{response}");
         let error = &response["structuredContent"]["result"]["error"];
         assert_eq!(

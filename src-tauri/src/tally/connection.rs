@@ -1145,10 +1145,12 @@ mod bills_report {
     /// 20-second default. Accepted on 29 Oct 2026 as a recorded exception to ruling 2
     /// (`docs/tally/UNIT_A_RULING_2.md`), for these two requests only.
     ///
-    /// What it covers: the one large book measured answered its Bills Receivable report in full
-    /// at about 29,900 open bills, about 13.7 MB on the wire (about 457.5 bytes a bill), inside
-    /// this limit. The 32 MiB response cap binds before this limit only above about 768 bytes a
-    /// bill; an answer over the cap is refused as `ResponseTooLarge`, never read in part. A
+    /// What it covers: the one large synthetic book measured answered its Bills Receivable report
+    /// in full at about 29,900 open bills, 13,679,490 bytes on the wire (about 457.5 bytes a bill),
+    /// in 41.5 s and 36.7 s (`lab/2119-bills-read-timing-answers`), inside this limit. At the
+    /// about 1.4 ms a bill measured there, this limit reaches about 43,000 bills, so the 32 MiB
+    /// response cap binds first only where a bill costs above about 768 bytes; an answer over the
+    /// cap is refused as `ResponseTooLarge`, never read in part. A
     /// response shorter than its declared length is refused as `ResponseTruncated`. A shorter
     /// answer that Tally itself declares whole (implementation guide §2.6, I4) is caught only
     /// when the pair's two answers differ.

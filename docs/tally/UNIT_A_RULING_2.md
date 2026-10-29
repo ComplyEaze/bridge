@@ -53,14 +53,18 @@ addressable window exceeds the per-request budget. This is not a tuning problem.
 I4's invisible truncation — trading a loud, correct failure for a silent wrong answer.
 
 **Deviation, 29 October 2026 (owner-accepted, #2119).** The two requests of Tally's native Bills
-Receivable and Bills Payable reports have a 60-second limit; every other request keeps 20 seconds.
-The ruling's premise does not carry to them: one of these answers costs about 457 bytes a bill
-against about 20,650 a voucher row here, so the 32 MiB cap binds before 60 seconds only above
-about 768 bytes a bill, and Bridge never parses a partial body (an over-cap answer is
-`ResponseTooLarge`, a short one `ResponseTruncated`). A date split cannot bound them: Tally
-ignored `SVFROMDATE` in these reports when it was measured (#2119). Only a `NativeBillsRequest`, which only the Bills
-renderer makes, reaches the transport with the longer limit. I4 still holds: a truncation Tally
-declares whole is caught only when the pair's two answers differ.
+Receivable and Bills Payable reports have a 60-second limit; every other request keeps 20
+seconds. The ruling's premise does not carry to them: on the synthetic book measured, one of
+these answers cost about 457 bytes and 1.4 ms a bill (`lab/2119-bills-read-timing-answers`)
+against about 20,650 bytes a voucher row here. 60 seconds then reaches about 43,000 bills, so
+the 32 MiB cap binds first only where a bill costs above about 768 bytes, and Bridge never
+parses a partial body (an over-cap answer is `ResponseTooLarge`, a short one
+`ResponseTruncated`). A date split cannot bound them: Tally ignored `SVFROMDATE` in these
+reports when it was measured (#2119). Only a `NativeBillsRequest`, which only the Bills renderer
+makes, reaches the transport with the longer limit. I4 still holds: a truncation Tally declares
+whole is caught only when the pair's two answers differ. Each report is read twice, so one call
+can outlast a host that gives a tool call about 60 seconds; the exception ships only after a lab
+row has measured a whole call through Claude Desktop.
 
 ---
 

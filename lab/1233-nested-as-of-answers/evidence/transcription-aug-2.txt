@@ -1,0 +1,13 @@
+Transcription 2, Stock Summary (Detailed, all levels expanded), period 1-Apr-25 to 31-Aug-25, read about a minute after transcription 1 (window capture t-aug-2.png at 06:55:33Z shows the quantity column; the rate and value columns read from the screen tool's view of the same screen at 06:55:4xZ). Line | quantity (pushed copy: quantity column only; the rate and value columns are in the copy kept on the lab PC)
+Lab Group One |
+  Lab Group Two |
+    Lab Group Three |
+      Lab Depth3 Oil | (-)0.750 Kgs
+      Lab Depth3 Pin | 40 Nos
+    Lab Depth2 Resin | 1.250 Kgs
+    Lab Depth2 Washer | 30 Nos
+  Lab Depth1 Nut | 20 Nos
+  Lab Depth1 Powder | 2.500 Kgs
+Lab Root Bolt | 10 Nos
+Grand Total | 10 Nos
+Agrees with transcription 1 line for line.

@@ -1,0 +1,20 @@
+Comparison: each item row of a1/b1 (CLOSINGBALANCE) against both transcriptions of its date (quantity and unit; 2.500 Kgs equals 2.5 Kgs).
+31 Aug 2025: item | parent | CLOSINGBALANCE | transcription 1 | transcription 2 | equal
+  Lab Depth1 Nut | Lab Group One | 20 Nos | 20 Nos | 20 Nos | yes
+  Lab Depth1 Powder | Lab Group One | 2.500 Kgs | 2.500 Kgs | 2.500 Kgs | yes
+  Lab Depth2 Resin | Lab Group Two | 1.250 Kgs | 1.250 Kgs | 1.250 Kgs | yes
+  Lab Depth2 Spare | Lab Group Two | <empty> | (not on screen) | (not on screen) | no quantity in the row; not on the screen (zero items hidden)
+  Lab Depth2 Washer | Lab Group Two | 30 Nos | 30 Nos | 30 Nos | yes
+  Lab Depth3 Oil | Lab Group Three | -0.750 Kgs | (-)0.750 Kgs | (-)0.750 Kgs | yes
+  Lab Depth3 Pin | Lab Group Three | 40 Nos | 40 Nos | 40 Nos | yes
+  Lab Root Bolt | Primary | 10 Nos | 10 Nos | 10 Nos | yes
+30 Sep 2025: item | parent | CLOSINGBALANCE | transcription 1 | transcription 2 | equal
+  Lab Depth1 Nut | Lab Group One | 20 Nos | 20 Nos | 20 Nos | yes
+  Lab Depth1 Powder | Lab Group One | 2.500 Kgs | 2.500 Kgs | 2.500 Kgs | yes
+  Lab Depth2 Resin | Lab Group Two | 1.250 Kgs | 1.250 Kgs | 1.250 Kgs | yes
+  Lab Depth2 Spare | Lab Group Two | <empty> | (not on screen) | (not on screen) | no quantity in the row; not on the screen (zero items hidden)
+  Lab Depth2 Washer | Lab Group Two | 35 Nos | 35 Nos | 35 Nos | yes
+  Lab Depth3 Oil | Lab Group Three | -0.750 Kgs | (-)0.750 Kgs | (-)0.750 Kgs | yes
+  Lab Depth3 Pin | Lab Group Three | 35 Nos | 35 Nos | 35 Nos | yes
+  Lab Root Bolt | Primary | 10 Nos | 10 Nos | 10 Nos | yes
+C1 (Lab Depth3 Pin) and B1 (Lab Depth2 Washer) against EXPECT: 31 Aug 40 and 30 Nos; 30 Sep 35 and 35 Nos: see the rows above (a1: 40, 30; b1: 35, 35).

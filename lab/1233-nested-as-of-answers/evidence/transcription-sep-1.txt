@@ -1,0 +1,13 @@
+Transcription 1, Stock Summary (Detailed, all levels expanded), period 1-Apr-25 to 30-Sep-25 (capture t-sep-1.png; rate and value columns read from the screen tool's view of the same screen). Line | quantity (pushed copy: quantity column only; the rate and value columns are in the copy kept on the lab PC)
+Lab Group One |
+  Lab Group Two |
+    Lab Group Three |
+      Lab Depth3 Oil | (-)0.750 Kgs
+      Lab Depth3 Pin | 35 Nos
+    Lab Depth2 Resin | 1.250 Kgs
+    Lab Depth2 Washer | 35 Nos
+  Lab Depth1 Nut | 20 Nos
+  Lab Depth1 Powder | 2.500 Kgs
+Lab Root Bolt | 10 Nos
+Grand Total | 10 Nos
+(Lab Depth2 Spare not on the screen: zero quantity, hidden.)

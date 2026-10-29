@@ -38,6 +38,36 @@ impl WholeBookReason {
         matches!(self, Self::PlanNeedsDaySplit | Self::ScopedReadFoundNothing)
     }
 
+    /// What a refusal of the book's window read carries beside its code (its own note: no figure
+    /// was taken, and the book's window may not have been read).
+    const fn report(self) -> ScopeReport {
+        ScopeReport {
+            basis: "whole_book",
+            reason: Some(self.code()),
+            note: self.refusal_note(),
+        }
+    }
+
+    /// The sentence beside a refusal: that the read refused is the book's window, which was the
+    /// read to make because of the reason, and not a read by the ledger. It says nothing was taken
+    /// and nothing about what that read found.
+    const fn refusal_note(self) -> &'static str {
+        match self {
+            Self::NameOutsideScopedAlphabet => {
+                "The named ledger's name is not one the ledger-scoped read sends (a character, spacing or length it does not admit), so the whole book's vouchers for the period were the read to make, and this refusal is that read's. No figure was taken."
+            }
+            Self::NameHoldsFormulaWord => {
+                "The named ledger's name holds a word that Tally's formulas read as an operator, and the ledger-scoped read has not been observed on such a name, so the whole book's vouchers for the period were the read to make, and this refusal is that read's. No figure was taken."
+            }
+            Self::PlanNeedsDaySplit => {
+                "A day of the named ledger's vouchers was too heavy for one ledger-scoped read, so the whole book's vouchers for the period were the read to make, and this refusal is that read's. No figure was taken."
+            }
+            Self::ScopedReadFoundNothing => {
+                "The ledger-scoped read found no vouchers for the named ledger, which is not taken as proof that there are none, so the whole book's vouchers for the period were the read to make, and this refusal is that read's. No figure was taken."
+            }
+        }
+    }
+
     const fn note(self) -> &'static str {
         match self {
             Self::NameOutsideScopedAlphabet => {
@@ -74,6 +104,32 @@ pub(super) fn scope_name_of(name: &str) -> Result<LedgerScopeName, WholeBookReas
         | LedgerScopeNameError::Spacing
         | LedgerScopeNameError::Character => WholeBookReason::NameOutsideScopedAlphabet,
     })
+}
+
+/// `window_scope.read_cost_excludes` says what the result's `read_cost` leaves out: the
+/// ledger-scoped attempt that was sent and given up (`abandoned`). It is put only beside a
+/// `read_cost`: a quick call carries no block and nothing to qualify.
+fn settle_read_cost_exclusion(result: &mut serde_json::Map<String, Value>, abandoned: bool) {
+    if !abandoned || !result.contains_key("read_cost") {
+        return;
+    }
+    if let Some(scope) = result
+        .get_mut("window_scope")
+        .and_then(Value::as_object_mut)
+    {
+        scope.insert(
+            "read_cost_excludes".to_string(),
+            json!("first_ledger_scoped_attempt"),
+        );
+    }
+}
+
+/// A refusal of the book's window read, read for a ledger that was named, says so (#485).
+fn tag_window_refusal(failure: ToolFailure, whole_book: Option<WholeBookReason>) -> ToolFailure {
+    match whole_book {
+        Some(reason) => failure.with_window_scope(reason.report()),
+        None => failure,
+    }
 }
 
 /// What the result says about a read by the ledger's own vouchers. It states what was compared,
@@ -120,6 +176,8 @@ impl Server {
             // The one place a ledger enters a request (#485): the catalogue's own spelling of
             // the ledger just resolved, never the argument. A name the scoped read does not
             // admit reads the book's window instead, and the result says so.
+            // Why the book's window is read though a ledger was named, once that is decided: a
+            // refusal of that read says so too (#485).
             let mut whole_book = None;
             let scope_name = match selected.as_ref().map(|found| scope_name_of(found.name())) {
                 Some(Ok(name)) => Some(name),
@@ -159,10 +217,13 @@ impl Server {
                             WindowPlanSource::Estimate { known_marks: None },
                             None,
                         )
-                        .await?;
+                        .await
+                        .map_err(|failure| tag_window_refusal(failure, whole_book))?;
                     (read, WindowScope::Book)
                 }
-                Err(failure) => return Err(failure),
+                // The book's window read, after a name the scoped read does not send, or any
+                // read when no ledger was named (`whole_book` is then `None`).
+                Err(failure) => return Err(tag_window_refusal(failure, whole_book)),
             };
             let MovementPage {
                 rows: vouchers,
@@ -205,9 +266,9 @@ impl Server {
                     Some(_) => {
                         let mut drifted = ToolFailure::from("voucher_snapshot_drifted".to_string());
                         drifted.evidence = failure.evidence;
-                        drifted
+                        tag_window_refusal(drifted, whole_book)
                     }
-                    None => failure,
+                    None => tag_window_refusal(failure, whole_book),
                 })?;
             let closing_voucher_evidence = closing_read.evidence;
             let closing_snapshot = closing_voucher_evidence.response_sha256.clone();
@@ -308,14 +369,7 @@ impl Server {
                 (None, _) => Value::Null,
                 (Some(_), None) => json!({"basis": "ledger_scoped", "vouchers_read": voucher_rows_observed, "note": LEDGER_SCOPED_NOTE}),
                 (Some(_), Some(reason)) => {
-                    let mut scope =
-                        json!({"basis": "whole_book", "reason": reason.code(), "note": reason.note()});
-                    if reason.abandons_a_scoped_read() {
-                        // The `read_cost` below is the book's window reads: the scoped attempt
-                        // that was given up is not in it.
-                        scope["read_cost_excludes"] = json!("first_ledger_scoped_attempt");
-                    }
-                    scope
+                    json!({"basis": "whole_book", "reason": reason.code(), "note": reason.note()})
                 }
             };
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {"state": if opening_unobserved {"partial"} else {"complete"}, "partial_reason": opening_unobserved.then_some("opening_balance_not_observed"), "ledger_match": selected.as_ref().map(|found| found.to_json(self.settings.redaction)), "ledgers": rows, "offset": offset, "next_offset": next_offset, "voucher_rows_observed": voucher_rows_observed, "window_scope": window_scope, "balance_basis": "tally_period_opening_plus_direct_voucher_movement", "evidence_method": "runtime_ledger_opening_at_from_plus_literal_window_entries"}});
@@ -331,6 +385,12 @@ impl Server {
             );
             if let (Some(result), Some(cost)) = (payload["result"].as_object_mut(), cost.as_object()) {
                 result.extend(cost.iter().map(|(key, value)| (key.clone(), value.clone())));
+                // The `read_cost` is the book's window reads: a scoped attempt that was given up
+                // is not in it.
+                settle_read_cost_exclusion(
+                    result,
+                    whole_book.is_some_and(WholeBookReason::abandons_a_scoped_read),
+                );
             }
             Ok(ToolOutcome {
                 payload,

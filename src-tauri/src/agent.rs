@@ -1716,14 +1716,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              `open_bills` lists for the party, and the read starts at that bill's date.",
         ),
         // A ledger-scoped movement read returned a voucher with no line on the ledger (#485):
-        // nothing was summed. The same figures are in the Trial Balance, which does not read
-        // vouchers.
+        // nothing was summed. The Trial Balance gives that ledger's figures without reading
+        // vouchers (not compared with this read's), but Education refuses it, so the step
+        // names the condition.
         "ledger_scope_row_without_line" => Some(
             "ComplyEaze Bridge read this ledger's vouchers by the ledger, and Tally returned a \
              voucher that has no line on that ledger, so it summed nothing and released no \
              figure. Tell the user the ledger's movement could not be read this way, and do not \
-             repeat the same call in a loop. For the ledger's opening, debit, credit and closing \
-             over the same dates, use trial_balance, which does not read vouchers.",
+             repeat the same call in a loop. Where Tally is not in Education mode (which \
+             refuses it), trial_balance gives that ledger's opening, debit, credit and closing \
+             over the dates without reading vouchers.",
         ),
         // A cause, reached through `voucher_window_part_not_admitted`. Since
         // #985 a window read whole is admitted against the census that sized

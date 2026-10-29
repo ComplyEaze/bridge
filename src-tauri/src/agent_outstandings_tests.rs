@@ -727,9 +727,50 @@ async fn ageing_outstandings_with(
     ledgers: String,
     extra_arguments: Value,
 ) -> Value {
-    use tally_protocol_simulator::{
-        Fixture, ProductStatus, ScenarioPlan, SequenceSimulator, WireEncoding,
-    };
+    let (plans, _) = ageing_plans(receivable, ledgers, &extra_arguments);
+    let simulator = tally_protocol_simulator::SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = ageing_server(simulator.address().port(), directory.path());
+    let response = server
+        .call_tool("outstandings", ageing_arguments(&extra_arguments))
+        .await;
+    simulator.cancel();
+    response
+}
+
+/// Where the native outstandings read's Bills posts sit in [`ageing_plans`]: each report is
+/// read as a pair (post, status, post, status), Receivable first, then the groups, then Payable.
+#[derive(Clone, Copy, Debug)]
+struct AgeingBillsPosts {
+    first: usize,
+}
+
+impl AgeingBillsPosts {
+    fn receivable(self) -> usize {
+        self.first
+    }
+    fn receivable_second(self) -> usize {
+        self.first + 2
+    }
+    fn groups(self) -> usize {
+        self.first + 4
+    }
+    fn payable(self) -> usize {
+        self.first + 8
+    }
+}
+
+/// The ageing book's requests for one `outstandings` call, in order, and where its Bills posts
+/// are among them.
+fn ageing_plans(
+    receivable: Option<String>,
+    ledgers: String,
+    extra_arguments: &Value,
+) -> (
+    Vec<tally_protocol_simulator::ScenarioPlan>,
+    AgeingBillsPosts,
+) {
+    use tally_protocol_simulator::{Fixture, ProductStatus, ScenarioPlan, WireEncoding};
     fn decode(bytes: &[u8]) -> String {
         String::from_utf16(
             &bytes
@@ -778,6 +819,7 @@ async fn ageing_outstandings_with(
     plans.extend([status(), companies.clone(), companies.clone()]);
     // The native outstandings read.
     pair(&mut plans, extent.clone());
+    let posts = AgeingBillsPosts { first: plans.len() };
     let receivable = receivable.unwrap_or_else(|| {
         decode(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml"
@@ -797,14 +839,16 @@ async fn ageing_outstandings_with(
     pair(&mut plans, xml(ledgers));
     pair(&mut plans, extent);
     plans.extend([companies.clone(), status(), companies]);
-    let simulator = SequenceSimulator::spawn(plans).unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    let server = Server::new(Settings {
+    (plans, posts)
+}
+
+fn ageing_server(port: u16, data_dir: &std::path::Path) -> Server {
+    Server::new(Settings {
         endpoint: TallyEndpointConfig {
             host: "127.0.0.1".into(),
-            port: simulator.address().port(),
+            port,
         },
-        data_dir: directory.path().into(),
+        data_dir: data_dir.into(),
         max_rows: 500,
         max_bytes: 200_000,
         redaction: Redaction::None,
@@ -812,7 +856,10 @@ async fn ageing_outstandings_with(
         posting: Posting::Off,
         master_writes_enabled: false,
         audit_enabled: false,
-    });
+    })
+}
+
+fn ageing_arguments(extra_arguments: &Value) -> Value {
     let mut arguments =
         json!({"company_guid": "eebb9a9f-1679-4468-9e8f-814c729674cb", "as_of": "20260801"});
     for (key, value) in extra_arguments.as_object().into_iter().flatten() {
@@ -823,9 +870,7 @@ async fn ageing_outstandings_with(
             arguments[key] = value.clone();
         }
     }
-    let response = server.call_tool("outstandings", arguments).await;
-    simulator.cancel();
-    response
+    arguments
 }
 
 /// The captured ageing ledgers predate `CURRENCYNAME`; this is the labelled
@@ -1431,6 +1476,7 @@ fn the_amount_remediation_says_what_a_bill_row_names() {
 #[test]
 fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
     for cause in [
+        "native_bills_report_deadline_exceeded",
         "native_date_year_invalid",
         "bills_xml_malformed",
         "native_amount_invalid",
@@ -1463,63 +1509,228 @@ fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
     );
 }
 
-/// A Bills report request held past the request limit (#1356, measured at a year-end date on a
-/// dense book) reaches the response as an unanswered reason, not a typed cause. Rendered as the
-/// assistant receives it, the refusal names a next step that does not invite a retry loop and
-/// names the one narrower read, an earlier `as_of`. The same timeout under another tool's code
-/// does not get that step.
+/// The next step for a Bills report request cut at the request limit, as the assistant receives
+/// it (#1356, #2119). Every clause is one the lab measured on one dense synthetic book
+/// (`lab/2119-bills-read-timing-answers`): the open-bill counts either side of the limit (15,000
+/// answered; 22,500 and 29,900 refused) and an earlier date answering; and a read sent straight
+/// after a cut refused for time as well (`lab/0.7.0-master-live-checks-answers`).
+const BILLS_REPORT_DEADLINE_STEP: &str = "Tally took longer to answer one request of its Bills \
+    Receivable or Payable report at this date than ComplyEaze Bridge waits (20 seconds), so no \
+    figures were returned. On the one large book measured, that report's time grew with the bills \
+    open at the date: with about 15,000 open bills it answered, and with about 22,500 and about \
+    29,900 it did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
+    and on that book a read sent straight after was refused for time as well. Do not repeat the \
+    same call, and do not send another read of this company straight away: tell the user, wait, \
+    then call `tally_status` once, and go on only when it answers. On that book an earlier \
+    `as_of`, with fewer bills open, answered; whether one does here depends on how many bills \
+    were open then, and choosing it is the user's call.";
+
+/// Only a Bills report post cut at the limit gets the Bills report's next step (#2119). Before,
+/// the step was chosen for any request of the outstandings read cut at the limit, and so blamed
+/// the Bills report for a groups, ledger or status request. Another tool's read cut the same way
+/// does not get it either.
 #[test]
-fn a_bills_report_past_the_request_limit_is_not_retried_in_a_loop() {
+fn only_a_bills_report_post_cut_at_the_limit_gets_the_bills_step() {
+    use bridge_tally_transport::TallyTransportError;
     let directory = tempfile::tempdir().unwrap();
-    let server = Server::new(Settings {
-        endpoint: TallyEndpointConfig {
-            host: "127.0.0.1".into(),
-            port: 9,
-        },
-        data_dir: directory.path().into(),
-        max_rows: 500,
-        max_bytes: 200_000,
-        redaction: Redaction::None,
-        import_enabled: false,
-        posting: Posting::Off,
-        master_writes_enabled: false,
-        audit_enabled: false,
-    });
-    let refused = |tool: &str, code: &str| {
-        let failure = ToolFailure::from_runtime(
-            code,
-            anyhow::Error::new(bridge_tally_transport::TallyTransportError::RequestTimedOut),
-        );
+    let server = ageing_server(9, directory.path());
+    let refused = |tool: &str, code: &str, error: anyhow::Error| {
+        let failure = ToolFailure::from_runtime(code, error);
         let response =
             server.finish_tool_response(tool, &json!({}), chrono::Utc::now(), Err(failure));
         response.value["structuredContent"]["result"]["error"].clone()
     };
-    let error = refused("outstandings", "native_outstandings_read_failed");
+    let bills_post = || {
+        crate::tally::runtime::mark_bills_report_deadline(anyhow::Error::new(
+            crate::tally::connection::PairedNativeReportResponseFailure::new(anyhow::Error::new(
+                TallyTransportError::RequestTimedOut,
+            )),
+        ))
+    };
+    let error = refused(
+        "outstandings",
+        "native_outstandings_read_failed",
+        bills_post(),
+    );
     assert_eq!(error["code"], "native_outstandings_read_failed", "{error}");
-    assert_eq!(error["cause"], "request_deadline_exceeded", "{error}");
-    // #2119: every clause is one the lab measured (lab/2119-bills-read-timing-answers):
-    // the open-bill counts either side of the limit (15,000 answered; 22,500 and 29,900 refused),
-    // and an earlier date answered. No repeat of one date was measured, so none is claimed.
     assert_eq!(
-        error["remediation"],
-        "Tally took longer to answer one request of its Bills Receivable or Payable report at \
-         this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
-         the one large book measured, that report's time grew with the bills open at the date: \
-         with about 15,000 open bills it answered, and with about 22,500 and about 29,900 it \
-         did not. Do not repeat the same call: tell the user. On that book an earlier `as_of`, with fewer bills open, answered; whether \
-         one does here depends on how many bills were open then, and choosing it is the \
-         user's call.",
+        error["cause"], "native_bills_report_deadline_exceeded",
         "{error}"
     );
-    // Another tool's read past the same limit does not get the Bills report's step.
-    let other = refused("trial_balance", "trial_balance_read_failed");
-    assert_eq!(other["cause"], "request_deadline_exceeded", "{other}");
+    assert_eq!(error["remediation"], BILLS_REPORT_DEADLINE_STEP, "{error}");
+
+    // Another request of the same read cut at the same limit: its own reason, no Bills step.
+    let other_request = refused(
+        "outstandings",
+        "native_outstandings_read_failed",
+        anyhow::Error::new(TallyTransportError::RequestTimedOut),
+    );
+    assert_eq!(
+        other_request["cause"], "request_deadline_exceeded",
+        "{other_request}"
+    );
     assert!(
-        !other["remediation"]
+        !other_request["remediation"]
             .as_str()
             .unwrap_or_default()
             .contains("Bills"),
-        "{other}"
+        "{other_request}"
+    );
+    // A Bills post that failed another way is not marked.
+    let dropped = crate::tally::runtime::mark_bills_report_deadline(anyhow::Error::new(
+        crate::tally::connection::PairedNativeReportResponseFailure::new(anyhow::Error::new(
+            TallyTransportError::ConnectionFailed,
+        )),
+    ));
+    assert!(!dropped
+        .chain()
+        .any(|cause| cause.is::<crate::tally::runtime::BillsReportDeadlineExceeded>()));
+    // Another tool's read past the same limit does not get the Bills report's step.
+    let other_tool = refused("trial_balance", "trial_balance_read_failed", bills_post());
+    assert!(
+        !other_tool["remediation"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Bills"),
+        "{other_tool}"
+    );
+}
+
+/// One `outstandings` call on the ageing book under a short request limit (and, when given, a
+/// tool cancellation), with the `held` request answered late: past that limit, or past the
+/// cancellation. Returns the response and how many requests Bridge sent.
+async fn ageing_outstandings_holding(
+    held: impl FnOnce(AgeingBillsPosts) -> usize,
+    limit: std::time::Duration,
+    cancel_when_held: bool,
+) -> (Value, usize) {
+    let (mut plans, posts) = ageing_plans(
+        None,
+        ageing_ledgers_with_currency("Ageing Customer A"),
+        &json!({}),
+    );
+    let held = held(posts);
+    plans[held] =
+        plans[held]
+            .clone()
+            .with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(
+                std::time::Duration::from_millis(1_500),
+            ));
+    let simulator = tally_protocol_simulator::SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = ageing_server(simulator.address().port(), directory.path());
+    server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: limit,
+            ..Default::default()
+        },
+    );
+    let cancellation = tokio_util::sync::CancellationToken::new();
+    let call = crate::tally::runtime::TOOL_CANCELLATION.scope(
+        cancellation.clone(),
+        server.call_tool("outstandings", ageing_arguments(&json!({}))),
+    );
+    let withdraw = async {
+        if cancel_when_held {
+            // The held request has reached the simulator: withdraw while it is in flight.
+            while simulator.received() <= held {
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+            cancellation.cancel();
+        }
+    };
+    let (response, ()) = tokio::join!(call, withdraw);
+    let sent = simulator.received();
+    simulator.cancel();
+    (response, sent)
+}
+
+/// A Bills Receivable or Payable post cut at the request limit is refused with the Bills report's
+/// own cause and next step, through the real read (#2119). A cut on the pair's second post keeps
+/// the first post's body in the refusal's evidence.
+#[tokio::test]
+async fn a_bills_post_cut_at_the_limit_is_refused_with_its_own_cause() {
+    let limit = std::time::Duration::from_millis(300);
+    let mut bytes = Vec::new();
+    for held in [
+        AgeingBillsPosts::receivable as fn(AgeingBillsPosts) -> usize,
+        AgeingBillsPosts::receivable_second,
+        AgeingBillsPosts::payable,
+    ] {
+        let (response, _) = ageing_outstandings_holding(held, limit, false).await;
+        assert_eq!(response["isError"], true, "{response}");
+        let error = &response["structuredContent"]["result"]["error"];
+        assert_eq!(
+            error["code"], "native_outstandings_read_failed",
+            "{response}"
+        );
+        assert_eq!(
+            error["cause"], "native_bills_report_deadline_exceeded",
+            "{response}"
+        );
+        assert_eq!(
+            error["remediation"], BILLS_REPORT_DEADLINE_STEP,
+            "{response}"
+        );
+        bytes.push(
+            response["structuredContent"]["evidence"]["bytes"]
+                .as_u64()
+                .expect("the refusal's evidence"),
+        );
+    }
+    assert!(
+        bytes[1] > bytes[0],
+        "the first Receivable body is kept when the second post is cut: {bytes:?}"
+    );
+}
+
+/// Control: the groups report, read between the two Bills reports and cut at the same limit, keeps
+/// the transport's reason and gets no Bills step.
+#[tokio::test]
+async fn a_groups_post_cut_at_the_limit_does_not_blame_the_bills_report() {
+    let (response, _) = ageing_outstandings_holding(
+        AgeingBillsPosts::groups,
+        std::time::Duration::from_millis(300),
+        false,
+    )
+    .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(
+        error["code"], "native_outstandings_read_failed",
+        "{response}"
+    );
+    assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    assert!(
+        !error["remediation"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Bills"),
+        "{response}"
+    );
+}
+
+/// A call withdrawn while its first Bills Receivable post is in flight (#778, #2119): that post
+/// runs to its end, since giving it up would not stop Tally, and nothing more is sent, so the
+/// pair's second post and every later report are never asked of Tally.
+#[tokio::test]
+async fn a_withdrawn_call_sends_nothing_after_the_bills_post_in_flight() {
+    let (response, sent) = ageing_outstandings_holding(
+        AgeingBillsPosts::receivable,
+        bridge_tally_transport::DEFAULT_REQUEST_TIMEOUT,
+        true,
+    )
+    .await;
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "request_cancelled", "{response}");
+    let (_, posts) = ageing_plans(
+        None,
+        ageing_ledgers_with_currency("Ageing Customer A"),
+        &json!({}),
+    );
+    assert_eq!(
+        sent,
+        posts.receivable() + 1,
+        "only the post in flight was sent: {response}"
     );
 }
 

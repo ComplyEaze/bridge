@@ -867,6 +867,57 @@ fn unconfirmed_unless_wire_refused(
 #[error("request_cancelled")]
 pub(crate) struct ToolCancelled;
 
+/// A post of Tally's Bills Receivable or Payable report cut at the request
+/// limit (#2119), as a cause of its own. The outstandings read's other
+/// requests are cut at the same limit with only the transport's reason, so a
+/// next step written for the Bills report names no other read.
+///
+/// Transparent, as `PairedNativeReportResponseFailure` is: the message is the
+/// wrapped error's and the source is its head, so the transport error stays in
+/// the chain and how the failure classifies does not change.
+#[derive(Debug)]
+pub(crate) struct BillsReportDeadlineExceeded(anyhow::Error);
+
+impl BillsReportDeadlineExceeded {
+    pub(crate) const SAFE_CODE: &'static str = "native_bills_report_deadline_exceeded";
+}
+
+impl std::fmt::Display for BillsReportDeadlineExceeded {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, formatter)
+    }
+}
+
+impl std::error::Error for BillsReportDeadlineExceeded {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+
+/// A Bills report read's failure, marked [`BillsReportDeadlineExceeded`] when
+/// one of its two posts was cut at the request limit. A health check between
+/// or after them is not the report's request and is not marked. The mark goes
+/// under the read's evidence, so a body read before the cut stays accounted.
+pub(crate) fn mark_bills_report_deadline(error: anyhow::Error) -> anyhow::Error {
+    let cut = error
+        .chain()
+        .filter_map(|cause| {
+            cause.downcast_ref::<crate::tally::connection::PairedNativeReportResponseFailure>()
+        })
+        .any(|post| post.transport_error() == Some(&TallyTransportError::RequestTimedOut));
+    if !cut {
+        return error;
+    }
+    match error.downcast::<RuntimeReadFailure>() {
+        Ok(RuntimeReadFailure { evidence, source }) => RuntimeReadFailure {
+            evidence,
+            source: anyhow::Error::new(BillsReportDeadlineExceeded(source)),
+        }
+        .into(),
+        Err(error) => anyhow::Error::new(BillsReportDeadlineExceeded(error)),
+    }
+}
+
 /// Retains admitted source commitments when a runtime read cannot be released.
 #[derive(Debug, thiserror::Error)]
 #[error("{source}")]
@@ -4292,7 +4343,16 @@ impl TallyRuntime {
     ) -> anyhow::Result<(OutstandingsLoadResult, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
+        // The calling tool's withdrawal, when it can be withdrawn (#778): a
+        // withdrawn call finishes the request in flight and starts no other,
+        // so a host that stops waiting does not leave Tally the rest of the
+        // read's paired reports (#2119).
+        let withdrawal = TOOL_CANCELLATION.try_with(Clone::clone).ok();
         self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let client = match &withdrawal {
+                Some(token) => client.withdrawable(token.clone()),
+                None => client,
+            };
             let identity = identity.clone();
             let as_of = as_of.clone();
             let currency_witness = currency_witness.clone();
@@ -4337,7 +4397,8 @@ impl TallyRuntime {
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
                         .fetch_native_report_paired(receivable_request.clone())
-                        .await?;
+                        .await
+                        .map_err(mark_bills_report_deadline)?;
                     let (receivable_body, encoded_bytes, encoded_sha256) = match receivable {
                         NativePairedRead::Stable {
                             body,
@@ -4391,7 +4452,8 @@ impl TallyRuntime {
                     let payable_request = read(NativeBillsReportKind::Payable);
                     let payable = client
                         .fetch_native_report_paired(payable_request.clone())
-                        .await?;
+                        .await
+                        .map_err(mark_bills_report_deadline)?;
                     let (payable_body, encoded_bytes, encoded_sha256) = match payable {
                         NativePairedRead::Stable {
                             body,

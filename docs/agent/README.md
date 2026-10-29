@@ -4092,10 +4092,15 @@ a credit sign, more than one opening bill.
 The read of Tally's Bills Receivable and Payable reports comes before any party detail, and on a
 large book it can be the step that fails: on one synthetic book of about 30,000 vouchers, at the
 end of its first year (31 March 2026), one of its requests was held past the 20-second limit and
-the whole call was refused as `native_outstandings_read_failed`, cause `request_deadline_exceeded`,
-with no figure returned, while the same book three months into the year answered (#1356). That
-refusal's next step tells the assistant not to repeat the call in a loop and that an earlier
-`as_of` reads fewer open bills. Where the limit falls on a given book is not measured.
+the whole call was refused as `native_outstandings_read_failed`, with no figure returned, while the
+same book three months into the year answered (#1356). A Bills report request cut at the limit has
+its own cause, `native_bills_report_deadline_exceeded` (#2119); another request of the read cut the
+same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
+repeat the call. Tally can go on building the report after the limit (a read sent straight after
+was refused for time too), so it also says to wait and let `tally_status` answer before the next
+read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
+falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
+flight and sends nothing more (#778).
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and

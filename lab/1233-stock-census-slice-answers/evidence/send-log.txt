@@ -1,0 +1,21 @@
+m-a sent 2026-10-29T18:23:41.561Z answered 2026-10-29T18:23:41.779Z curl_exit 0 printed 200 4894 0.009853 content_length 4894 bytes 4894 sha256 6b68c769a11de31494248b096ad683cd669eb44613b3d22df33d1f353cd2efe1
+rows 1
+{'GUID': '1edb9b05-8d35-4c0c-9959-dce655730463', 'ALTMSTID': '292', 'ALTVCHID': '4', 'NUMSTOCKITEMS': '55', 'ISINVENTORYON': 'Yes', 'BOOKSFROM': '20250401', 'LASTVOUCHERDATE': '20250421'}
+m-a2 (m-marks-S) bound 8192 sent 2026-10-29T18:25:54.243Z answered 2026-10-29T18:25:54.357Z curl_exit 0 printed "200 4894 0.012808" content_length 4894 bytes 4894 sha256 6b68c769a11de31494248b096ad683cd669eb44613b3d22df33d1f353cd2efe1
+m-a2 capture shots/m-a2-after.png; GET /status exit 0 printed 200 51
+c1 (c1-stock-item-census-0-100) bound 400000 sent 2026-10-29T18:26:08.149Z answered 2026-10-29T18:26:08.254Z curl_exit 0 printed "200 2998 0.029819" content_length 2998 bytes 2998 sha256 cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+c1 capture shots/c1-after.png; GET /status exit 0 printed 200 51
+c2 (c2-stock-item-census-100-200) bound 400000 sent 2026-10-29T18:26:09.990Z answered 2026-10-29T18:26:10.075Z curl_exit 0 printed "200 2998 0.018572" content_length 2998 bytes 2998 sha256 cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+c2 capture shots/c2-after.png; GET /status exit 0 printed 200 51
+c3 (c3-stock-item-census-200-300) bound 400000 sent 2026-10-29T18:26:12.093Z answered 2026-10-29T18:26:12.201Z curl_exit 0 printed "200 30262 0.026458" content_length 30262 bytes 30262 sha256 db77a9065fea6813f888ab2e9ca27475ea18286e31aaa275a58a21bf30b6d374
+c3 capture shots/c3-after.png; GET /status exit 0 printed 200 51
+c4 (c4-stock-item-census-400000-400010) bound 16384 sent 2026-10-29T18:26:13.868Z answered 2026-10-29T18:26:13.957Z curl_exit 0 printed "200 2998 0.019395" content_length 2998 bytes 2998 sha256 cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+c4 capture shots/c4-after.png; GET /status exit 0 printed 200 51
+g1 (g1-stock-group-census-0-300) bound 1200000 sent 2026-10-29T18:26:15.928Z answered 2026-10-29T18:26:16.016Z curl_exit 0 printed "200 4496 0.019297" content_length 4496 bytes 4496 sha256 b3204c318fe38b1379541843ca30ce643bee59a3439d8af11c8259749425d167
+g1 capture shots/g1-after.png; GET /status exit 0 printed 200 51
+c1r (c1-stock-item-census-0-100) bound 400000 sent 2026-10-29T18:26:17.890Z answered 2026-10-29T18:26:17.969Z curl_exit 0 printed "200 2998 0.017817" content_length 2998 bytes 2998 sha256 cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+c1r capture shots/c1r-after.png; GET /status exit 0 printed 200 51
+k2 (k2-stock-groups-masters) bound 4100000 sent 2026-10-29T18:26:19.651Z answered 2026-10-29T18:26:19.738Z curl_exit 0 printed "200 6296 0.023515" content_length 6296 bytes 6296 sha256 31a5b8979f1bed4e52698183ceebf8760763e0c41c33c56a1f3b6e3a718b12a6
+k2 capture shots/k2-after.png; GET /status exit 0 printed 200 51
+m-b (m-marks-S) bound 8192 sent 2026-10-29T18:26:21.327Z answered 2026-10-29T18:26:21.395Z curl_exit 0 printed "200 4894 0.010196" content_length 4894 bytes 4894 sha256 6b68c769a11de31494248b096ad683cd669eb44613b3d22df33d1f353cd2efe1
+m-b capture shots/m-b-after.png; GET /status exit 0 printed 200 51

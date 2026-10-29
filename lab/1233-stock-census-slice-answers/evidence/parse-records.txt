@@ -1,0 +1,26 @@
+c1: COLLECTION present True attrs {'ISMSTDEPTYPE': 'Yes', 'MSTDEPTYPE': '512'}; HEADER/STATUS '1'; rows 0; other children []; bytes 2998
+   repeated GUIDs 0; GUIDs not prefixed by the company 0; BRIDGECOMPANYGUID not the company 0; untrimmed GUIDs 0
+   row shapes (child names, attributes): []
+c2: COLLECTION present True attrs {'ISMSTDEPTYPE': 'Yes', 'MSTDEPTYPE': '512'}; HEADER/STATUS '1'; rows 0; other children []; bytes 2998
+   repeated GUIDs 0; GUIDs not prefixed by the company 0; BRIDGECOMPANYGUID not the company 0; untrimmed GUIDs 0
+   row shapes (child names, attributes): []
+c3: COLLECTION present True attrs {'ISMSTDEPTYPE': 'Yes', 'MSTDEPTYPE': '512'}; HEADER/STATUS '1'; rows 55; other children []; bytes 30262
+   repeated GUIDs 0; GUIDs not prefixed by the company 0; BRIDGECOMPANYGUID not the company 0; untrimmed GUIDs 0
+   row shapes (child names, attributes): [(('BRIDGECOMPANYGUID', 'GUID'), ('NAME', 'RESERVEDNAME'))]
+c4: COLLECTION present True attrs {'ISMSTDEPTYPE': 'Yes', 'MSTDEPTYPE': '512'}; HEADER/STATUS '1'; rows 0; other children []; bytes 2998
+   repeated GUIDs 0; GUIDs not prefixed by the company 0; BRIDGECOMPANYGUID not the company 0; untrimmed GUIDs 0
+   row shapes (child names, attributes): []
+g1: COLLECTION present True attrs {'ISMSTDEPTYPE': 'Yes', 'MSTDEPTYPE': '128'}; HEADER/STATUS '1'; rows 3; other children []; bytes 4496
+   repeated GUIDs 0; GUIDs not prefixed by the company 0; BRIDGECOMPANYGUID not the company 0; untrimmed GUIDs 0
+   row shapes (child names, attributes): [(('BRIDGECOMPANYGUID', 'GUID'), ('NAME', 'RESERVEDNAME'))]
+c1r: COLLECTION present True attrs {'ISMSTDEPTYPE': 'Yes', 'MSTDEPTYPE': '512'}; HEADER/STATUS '1'; rows 0; other children []; bytes 2998
+   repeated GUIDs 0; GUIDs not prefixed by the company 0; BRIDGECOMPANYGUID not the company 0; untrimmed GUIDs 0
+   row shapes (child names, attributes): []
+k2: COLLECTION present True attrs {'ISMSTDEPTYPE': 'Yes', 'MSTDEPTYPE': '128'}; HEADER/STATUS '1'; rows 3; other children []; bytes 6296
+   repeated GUIDs 0; GUIDs not prefixed by the company 0; BRIDGECOMPANYGUID not the company 0; untrimmed GUIDs 0
+   row shapes (child names, attributes): [(('ALTERID', 'BRIDGECOMPANYGUID', 'GUID', 'LANGUAGENAME.LIST', 'MASTERID', 'PARENT'), ('NAME', 'RESERVEDNAME'))]
+c1+c2+c3 rows 55; distinct 55; equals NUMSTOCKITEMS 55: True
+c1r same GUIDs in the same order as c1: True
+g1 rows 3, k2 rows 3; set equal True; only in g1 []; only in k2 []
+c1 empty; bytes equal c4: True
+c2 empty; bytes equal c4: True

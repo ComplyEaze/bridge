@@ -1,0 +1,10 @@
+#1233 stock-item census slice notes (UTC). Sheet lab/1233-stock-census-slice at bcee293e2534034f1f6e8f9af884547e0ae86d29: SHA256.txt 12 of 12 equal; check-request-ids.py: census: ok 8, skipped 0, FAIL 0.
+2026-10-29T18:23:10Z Step 0 with no company loaded: capture; one tally.exe owns 9001; /status 200.
+2026-10-29T18:23:3xZ BRIDGE STOCK LAB (100027) loaded alone (Select Company filter, Enter). Gateway: Current Period 1-Apr-25 to 31-Mar-26; current date Monday 21-Apr-2025; last entry 21-Apr-25.
+2026-10-29T18:23:41Z Step 1, m-a (m-marks-S): 4894 B = CONTENT-LENGTH, sha256 6b68c769a11de31494248b096ad683cd669eb44613b3d22df33d1f353cd2efe1. One COMPANY row, THE COMPANY's GUID: ALTMSTID 292, ALTVCHID 4, NUMSTOCKITEMS 55, ISINVENTORYON Yes, BOOKSFROM 20250401, LASTVOUCHERDATE 20250421.
+Gate: the marks, the count, inventory and BOOKSFROM hold; the current date recorded at step 0 (21 Apr 2025) is NOT on or after 31 March 2026. Stop: nothing further sent. Reported to the run lead.
+2026-10-29T18:24Z C10: BRIDGE STOCK LAB shut from the Company menu; Select Company, none loaded; 18:24:18Z one tally.exe owns 9001; /status 200. No XML request after the shut. No Tally setting changed.
+On the run lead's word (run without k1): 2026-10-29T18:25:20Z step 0 again with no company loaded (one tally.exe owns 9001; /status 200); BRIDGE STOCK LAB loaded alone; Gateway as before (current date 21-Apr-2025).
+2026-10-29T18:25:54Z m-a2: byte-equal to m-a (292 / 4 / 55, Yes, 20250401).
+2026-10-29T18:26:08Z to 18:26:21Z: c1, c2, c3, c4, g1, c1r, k2, m-b, one at a time, each with a capture of Tally's window (no dialog) and GET /status 200 after it. k1 not sent. Parsed by structure (evidence/parse-records.txt).
+2026-10-29T18:27Z C10: shut from the Company menu; none loaded; one tally.exe owns 9001; /status 200; no XML after the shut.

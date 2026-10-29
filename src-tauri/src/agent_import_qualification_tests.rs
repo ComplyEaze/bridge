@@ -33,6 +33,7 @@ fn the_published_rules_name_every_qualified_type_and_claim_no_other() {
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let published = server.voucher_schema().unwrap().payload;
@@ -143,6 +144,7 @@ async fn an_unshaped_bank_voucher_is_refused_before_dispatch_or_persistence() {
                 redaction: super::super::super::Redaction::None,
                 import_enabled: true,
                 posting: crate::agent::Posting::Off,
+                master_writes_enabled: false,
                 audit_enabled: false,
             });
             let mut input = admitted_payload();
@@ -281,6 +283,7 @@ async fn a_sales_voucher_is_refused_before_any_request_and_nothing_is_written() 
         redaction: super::super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let invoice = |number: &str| {

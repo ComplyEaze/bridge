@@ -258,7 +258,20 @@ pub fn render_party_ledger_master_request(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
-    render_party_ledger_master(company, period, None, "")
+    render_party_ledger_master(company, period, None, false, "")
+}
+
+/// The party-master request that also names each ledger's dated mailing details
+/// (`LEDMAILINGDETAILS.LIST`, bridge#1490): the one `ledger_masters` sends when
+/// asked for them (`include_mailing_details`) and the party/ledger master
+/// workbook sends. Its answer holds a longer element on every row, so it has its
+/// own size estimate; the readers that never use the mailing details keep
+/// [`render_party_ledger_master_request`].
+pub fn render_party_ledger_master_request_with_mailing_details(
+    company: &str,
+    period: &NativeLedgerExportPeriod,
+) -> String {
+    render_party_ledger_master(company, period, None, true, "")
 }
 
 /// What [`render_party_ledger_master_request_with_gst_details`] appends to the
@@ -278,7 +291,7 @@ pub fn render_party_ledger_master_request_with_gst_details(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
-    render_party_ledger_master(company, period, None, GST_DETAILS_FETCH_SUFFIX)
+    render_party_ledger_master(company, period, None, false, GST_DETAILS_FETCH_SUFFIX)
 }
 
 /// The compliance master read restricted to the ledgers under one
@@ -288,7 +301,18 @@ pub fn render_party_ledger_master_request_for_parents(
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
-    render_party_ledger_master(company, period, Some(part), "")
+    render_party_ledger_master(company, period, Some(part), false, "")
+}
+
+/// [`render_party_ledger_master_request_for_parents`] naming the mailing details,
+/// as [`render_party_ledger_master_request_with_mailing_details`] does for a
+/// whole read.
+pub fn render_party_ledger_master_request_for_parents_with_mailing_details(
+    company: &str,
+    period: &NativeLedgerExportPeriod,
+    part: &ParentPart,
+) -> String {
+    render_party_ledger_master(company, period, Some(part), true, "")
 }
 
 /// [`render_party_ledger_master_request_for_parents`] with the same `FETCH`
@@ -300,17 +324,23 @@ pub fn render_party_ledger_master_request_for_parents_with_gst_details(
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
-    render_party_ledger_master(company, period, Some(part), GST_DETAILS_FETCH_SUFFIX)
+    render_party_ledger_master(company, period, Some(part), false, GST_DETAILS_FETCH_SUFFIX)
 }
 
 fn render_party_ledger_master(
     company: &str,
     period: &NativeLedgerExportPeriod,
     part: Option<&ParentPart>,
+    mailing_details: bool,
     fetch_suffix: &str,
 ) -> String {
+    let mailing = if mailing_details {
+        ", LEDMAILINGDETAILS.LIST"
+    } else {
+        ""
+    };
     let fetch = format!(
-        "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST{fetch_suffix}"
+        "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST{mailing}{fetch_suffix}"
     );
     render_native_ledger_collection_request(company, period, &fetch, true, part)
 }

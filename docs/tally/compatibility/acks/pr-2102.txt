@@ -1,0 +1,8 @@
+docs/adr/0015-tally-selected-read-qualification-authority.md
+scripts/check-tally-request-builder-hazards.mjs
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs
+src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/tally/tdl_engine.rs
+reviewer: lamemustafa

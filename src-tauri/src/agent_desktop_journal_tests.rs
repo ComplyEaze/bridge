@@ -264,6 +264,7 @@ fn service_debiting(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     // Fixture construction exclusively owns this temporary directory. Avoid a

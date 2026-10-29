@@ -3,6 +3,7 @@ pub(crate) mod approved_import;
 mod box_fit;
 pub mod connection;
 pub mod connector;
+pub(crate) mod ledger_create_item;
 pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
 // Crate-internal only: `tally::runtime` is the sole consumer.

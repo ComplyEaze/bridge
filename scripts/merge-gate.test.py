@@ -82,7 +82,7 @@ class MergeGateControls(unittest.TestCase):
         # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
         cls.repo = cls.bin / "gate-repo"
         (cls.repo / "scripts").mkdir(parents=True)
-        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json"):
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json", "check-ai-attribution.mjs"):
             shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
         os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
         cls.origin = cls.bin / "origin.git"
@@ -508,6 +508,60 @@ class MergeGateControls(unittest.TestCase):
 
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    # -- AI attribution is a note, never a block (owner practice of 25 Oct 2026) ------------
+
+    def assert_noted(self, scenario, text):
+        result = self.run_gate(scenario)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("BLOCK", result.stdout)
+        self.assertIn("AI attribution: " + text, result.stdout)
+        return result
+
+    def test_a_generated_with_line_in_the_title_or_body_is_a_note_in_each_form(self):
+        for scenario in ("attribution-body-plain", "attribution-body-link", "attribution-body-comment", "attribution-title", "attribution-body-markdown"):
+            with self.subTest(scenario=scenario):
+                self.assert_noted(scenario, "")
+
+    def test_a_coauthor_line_in_the_body_is_a_note_that_says_a_squash_copies_the_body(self):
+        self.assert_noted("attribution-body-trailer", "body: a Co-authored-by line")
+
+    def test_the_body_is_noted_even_when_the_commit_list_is_not_proven(self):
+        result = self.run_gate("attribution-body-with-unproven-commits")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("AI attribution: body: a \"Generated with\" line", result.stdout)
+        self.assertIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_a_trailer_on_a_commit_whatever_its_date_is_a_note_that_says_a_squash_can_copy_it(self):
+        for scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated"):
+            with self.subTest(scenario=scenario):
+                result = self.assert_noted(scenario, "commit ")
+                self.assertIn("a squash merge can copy it into the commit on master", result.stdout)
+
+    def test_a_committer_identity_naming_an_assistant_is_a_note(self):
+        self.assert_noted("attribution-identity", "commit ")
+
+    def test_a_check_that_crashes_is_not_a_pass(self):
+        # The helper exits 1 with nothing on stdout (a crash, an old node): no answer, so the gate must say it could not determine.
+        copy = self.private_copy("attribution-crash")
+        for source in ("process.exit(1);\n", "process.exit(0);\n", "throw new Error('boom');\n", "console.log('REFUSE x');\nconsole.log('CHECKED 1');\nprocess.exit(0);\n",
+                       "console.log('NOTE x');\nconsole.log('CHECKED 0');\nprocess.exit(1);\n", "console.log('CHECKED 9');\nprocess.exit(0);\n",
+                       "console.log('CHECKED 1');\nconsole.log('NOTE after');\nprocess.exit(0);\n"):
+            (copy / "scripts" / "check-ai-attribution.mjs").write_text(source)
+            self.git_copy(copy, "add", "-A")
+            self.git_copy(copy, "commit", "-q", "-m", "a broken helper")
+            self.git_copy(copy, "push", "-q", "origin", "master")
+            for scenario in ("attribution-trailer-after", "pass"):
+                with self.subTest(scenario=scenario, helper=source):
+                    result = self.run_copy(copy, scenario)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertNotIn("MAY MERGE", result.stdout)
+                    self.assertIn("could not run the AI attribution check", result.stdout)
+
+    def test_a_human_coauthor_after_the_rule_passes_and_a_clean_pull_request_says_so(self):
+        self.assert_pass("attribution-trailer-human-after", "no AI attribution in the title, body or commits")
+        self.assert_pass("pass", "no AI attribution in the title, body or commits")
 
     def test_arbitrary_customer_address_in_a_coauthor_trailer_still_blocks(self):
         self.assert_blocked("customer-coauthor-trailer", "customer email shape")
@@ -1247,7 +1301,7 @@ class MergeGateControls(unittest.TestCase):
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
-                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier", "changes-the-lab-manifest"):
+                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier", "changes-the-lab-manifest", "changes-the-attribution-check"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 

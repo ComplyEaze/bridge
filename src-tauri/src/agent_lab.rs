@@ -1006,6 +1006,175 @@ pub(super) async fn lab_read_inventory(
 }
 
 // ---------------------------------------------------------------------------
+// The tool: lab_read_purchase_identity (#1904)
+// ---------------------------------------------------------------------------
+
+/// Differences listed at most, so a read that differs everywhere stays a small answer.
+const MAX_IDENTITY_DIFFERENCES: usize = 100;
+
+/// The widest window this tool reads, in days: both reads go out whole, unplanned, where the
+/// production read would plan a heavy window from a census and divide it, so the tool stays on
+/// windows the production read sends whole on a lab book.
+const MAX_IDENTITY_WINDOW_DAYS: usize = 31;
+
+/// Where two parsed reads of one window differ, keyed by the voucher's GUID (the parser refuses a
+/// repeated or missing one): a GUID one read has and the other lacks, and every row field whose
+/// value differs (`amounts` holds each entry's ledger, amount and side and its bill allocations).
+/// Only the fields the parser keeps are compared. Only the field's name is listed, never its
+/// values, which can be names from the book: the values are in the exchange this tool persists on
+/// the lab machine.
+fn purchase_identity_differences(agent: &[Value], narrow: &[Value]) -> Vec<Value> {
+    let by_guid = |rows: &[Value]| {
+        rows.iter()
+            .filter_map(|row| Some((row["guid"].as_str()?.to_string(), row.clone())))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let (agent, narrow) = (by_guid(agent), by_guid(narrow));
+    let guids = agent
+        .keys()
+        .chain(narrow.keys())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut out = Vec::new();
+    for guid in guids {
+        match (agent.get(guid), narrow.get(guid)) {
+            (Some(_), None) => out.push(json!({"guid": guid, "only_in": "agent"})),
+            (None, Some(_)) => out.push(json!({"guid": guid, "only_in": "narrow"})),
+            (Some(left), Some(right)) => {
+                let fields = left
+                    .as_object()
+                    .into_iter()
+                    .chain(right.as_object())
+                    .flat_map(|row| row.keys())
+                    .collect::<std::collections::BTreeSet<_>>();
+                for field in fields {
+                    if left.get(field) != right.get(field) {
+                        out.push(json!({"guid": guid, "field": field}));
+                    }
+                }
+            }
+            (None, None) => {}
+        }
+    }
+    out
+}
+
+/// One read's size: its rows and the characters of its decoded answer (the whole answer, envelope
+/// included; the wire carries it as UTF-16), per row.
+fn identity_read_size(xml: &str, rows: usize) -> Value {
+    let chars = xml.chars().count();
+    json!({
+        "rows": rows,
+        "response_chars": chars,
+        "response_chars_per_row": (rows > 0).then(|| chars / rows),
+    })
+}
+
+/// Whether `from..=to` spans at most [`MAX_IDENTITY_WINDOW_DAYS`] days.
+fn identity_window_fits(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> bool {
+    let mut day = from.clone();
+    for _ in 1..MAX_IDENTITY_WINDOW_DAYS {
+        if &day >= to {
+            return true;
+        }
+        match day.next_day() {
+            Ok(next) => day = next,
+            Err(_) => return false,
+        }
+    }
+    &day >= to
+}
+
+/// LAB-ONLY: the candidate narrow read for a supplier invoice already in the books (#1904), sent
+/// beside the agent read it would replace, on the same window, through the same dispatch path, and
+/// compared field by field after the same parser. It writes nothing.
+pub(super) async fn lab_read_purchase_identity(
+    server: &Server,
+    args: &Value,
+) -> Result<ToolOutcome, ToolFailure> {
+    let guid = required_string(args, "company_guid")?;
+    let date = |key| -> Result<bridge_tally_core::TallyDate, ToolFailure> {
+        Ok(normalized_date(required_string(args, key)?)?)
+    };
+    let (from, to) = (date("from")?, date("to")?);
+    if from > to {
+        return Err("invalid_date_range".to_string().into());
+    }
+    if !identity_window_fits(&from, &to) {
+        return Err("lab_identity_window_too_wide".to_string().into());
+    }
+    require_lab_read_guards(server)?;
+    let (company, identity, mut evidence) = server.verified_company(guid).await?;
+    let result: Result<ToolOutcome, ToolFailure> = async {
+        let mut reads = Vec::new();
+        for (label, request) in [
+            (
+                "lab_read_purchase_identity.agent",
+                lab_agent_class_vouchers_read(identity.display_name(), &from, &to),
+            ),
+            (
+                "lab_read_purchase_identity.narrow",
+                lab_purchase_identity_vouchers_read(identity.display_name(), &from, &to),
+            ),
+        ] {
+            let request = request.map_err(ToolFailure::from)?;
+            let (xml, read_evidence) = lab_post_read(server, &identity, label, request).await?;
+            evidence = combine_evidence(evidence.clone(), read_evidence);
+            // A refusal of the narrow answer by the parser is a finding of this tool, not a
+            // failure of it: it is returned beside the agent read's size.
+            let parsed = parse_agent_rows(&xml, identity.company_guid());
+            if let Ok(rows) = &parsed {
+                if !window_honoured(rows, from.as_str(), to.as_str()) {
+                    return Err(ToolFailure::from("window_not_honoured".to_string())
+                        .with_prior_evidence(evidence.clone()));
+                }
+            }
+            reads.push((xml, parsed));
+        }
+        let (narrow_xml, narrow) = reads.pop().expect("two reads");
+        let (agent_xml, agent) = reads.pop().expect("two reads");
+        let agent =
+            agent.map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+        // Each read's window was checked against its own rows; a refused narrow answer was not.
+        let mut agent_size = identity_read_size(&agent_xml, agent.len());
+        agent_size["window_honoured"] = json!(true);
+        let mut result = json!({
+            "profile": "lab_read_purchase_identity_v1",
+            "agent": agent_size,
+        });
+        match narrow {
+            Err(code) => {
+                result["narrow"] = json!({"refused": code});
+            }
+            Ok(narrow) => {
+                let differences = purchase_identity_differences(&agent, &narrow);
+                let mut narrow_size = identity_read_size(&narrow_xml, narrow.len());
+                narrow_size["window_honoured"] = json!(true);
+                result["narrow"] = narrow_size;
+                // Two empty answers agree vacuously: no voucher was compared.
+                result["inconclusive"] = json!(agent.is_empty() && narrow.is_empty());
+                result["differences"] = json!({
+                    "total": differences.len(),
+                    "listed": differences.iter().take(MAX_IDENTITY_DIFFERENCES).collect::<Vec<_>>(),
+                    "listed_truncated": differences.len() > MAX_IDENTITY_DIFFERENCES,
+                });
+            }
+        }
+        Ok(ToolOutcome {
+            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
+            evidence: evidence.clone(),
+            company_guid: Some(guid.to_string()),
+            truncated: false,
+        })
+    }
+    .await;
+    result.map_err(|failure| failure.with_prior_evidence(evidence))
+}
+
+// ---------------------------------------------------------------------------
+
 // The tool: lab_voucher_key_probe (#685)
 // ---------------------------------------------------------------------------
 
@@ -1478,6 +1647,7 @@ mod tests {
             "lab_import_masters",
             "lab_import_vouchers",
             "lab_read_inventory",
+            "lab_read_purchase_identity",
             "lab_voucher_key_probe",
         ] {
             assert_eq!(
@@ -2001,6 +2171,7 @@ mod tests {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let expected = render_lab_master_collection(
@@ -2118,6 +2289,60 @@ mod tests {
                 kind.tally_type()
             );
         }
+    }
+
+    /// #1904: the candidate narrow read is the agent's class-resolved read with only its entry
+    /// wildcard narrowed, so a difference between the two answers is the FETCH list's alone.
+    #[test]
+    fn the_narrow_purchase_identity_read_differs_from_the_agent_read_only_in_its_entry_fields() {
+        let from = bridge_tally_core::TallyDate::parse("20251201").unwrap();
+        let to = bridge_tally_core::TallyDate::parse("20251231").unwrap();
+        let narrow =
+            render_agent_lab_purchase_identity_vouchers("BRIDGE GST LEDGER LAB", &from, &to)
+                .unwrap();
+        let agent =
+            render_agent_class_vouchers_in_span("BRIDGE GST LEDGER LAB", &from, &to, None).unwrap();
+        let entries = "ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,\
+ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,ALLLEDGERENTRIES.BILLALLOCATIONS.*,";
+        assert_eq!(narrow.matches(entries).count(), 1, "{narrow}");
+        assert_eq!(narrow.replace(entries, "ALLLEDGERENTRIES.*,"), agent);
+    }
+
+    #[test]
+    fn purchase_identity_differences_name_the_voucher_and_field_never_their_values() {
+        let row = |guid: &str, party: &str| {
+            json!({"guid": guid, "party": party, "reference": "GS1/P/0001",
+                   "amounts": [{"ledger": "Purchase - Goods", "amount": "-10000.00"}]})
+        };
+        let agent = vec![
+            row("g-1", "SYN GS1 Supplier B"),
+            row("g-2", "SYN GS1 Supplier B"),
+        ];
+        assert!(purchase_identity_differences(&agent, &agent.clone()).is_empty());
+        // A bill allocation the narrow read lost, a voucher only one read has.
+        let mut narrow = vec![agent[0].clone()];
+        narrow[0]["amounts"][0]["bill_allocations"] = json!([]);
+        let found = purchase_identity_differences(&agent, &narrow);
+        assert_eq!(
+            found,
+            vec![
+                json!({"guid": "g-1", "field": "amounts"}),
+                json!({"guid": "g-2", "only_in": "agent"}),
+            ]
+        );
+        assert!(!found
+            .iter()
+            .any(|item| item.to_string().contains("SYN GS1")));
+    }
+
+    #[test]
+    fn the_identity_read_takes_a_window_of_at_most_31_days() {
+        let date = |text: &str| bridge_tally_core::TallyDate::parse(text).unwrap();
+        assert!(identity_window_fits(&date("20251201"), &date("20251201")));
+        assert!(identity_window_fits(&date("20251201"), &date("20251231")));
+        assert!(!identity_window_fits(&date("20251201"), &date("20260101")));
+        assert!(identity_window_fits(&date("20250201"), &date("20250303")));
+        assert!(!identity_window_fits(&date("20250401"), &date("20260331")));
     }
 
     /// A native post's REMOTEID and a voucher GUID, from the merge gate's

@@ -1,0 +1,369 @@
+# fixture: voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml
+# parser: parse_agent_rows(BANKREF_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(1),
+        "amounts": Array [
+            Object {
+                "amount": String("50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260403"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("TLab Bank A"),
+            },
+            Object {
+                "amount": String("-50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260403"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque/DD"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("TLab Bank B"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260403"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000001"),
+        "is_invoice": Bool(false),
+        "master_id": String("1"),
+        "narration": String("UTR 111111111111"),
+        "optional": Bool(false),
+        "party": String("TLab Bank A"),
+        "post_dated": Bool(false),
+        "voucher_number": String("1"),
+        "voucher_type": String("Contra"),
+    },
+    Object {
+        "alter_id": Number(2),
+        "amounts": Array [
+            Object {
+                "amount": String("50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260403"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("value"),
+                            "value": String("222222222222"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Same Bank Transfer"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("TLab Bank A"),
+            },
+            Object {
+                "amount": String("-50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260403"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("value"),
+                            "value": String("222222222222"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Same Bank Transfer"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("TLab Bank B"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260403"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000002"),
+        "is_invoice": Bool(false),
+        "master_id": String("2"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("TLab Bank A"),
+        "post_dated": Bool(false),
+        "voucher_number": String("2"),
+        "voucher_type": String("Contra"),
+    },
+    Object {
+        "alter_id": Number(4),
+        "amounts": Array [
+            Object {
+                "amount": String("50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260403"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("TLab Bank B"),
+            },
+            Object {
+                "amount": String("-50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260403"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque/DD"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("TLab Bank A"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260403"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000004"),
+        "is_invoice": Bool(false),
+        "master_id": String("4"),
+        "narration": String("UTR 444444444444"),
+        "optional": Bool(false),
+        "party": String("TLab Bank B"),
+        "post_dated": Bool(false),
+        "voucher_number": String("4"),
+        "voucher_type": String("Contra"),
+    },
+    Object {
+        "alter_id": Number(3),
+        "amounts": Array [
+            Object {
+                "amount": String("50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260404"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("TLab Bank A"),
+            },
+            Object {
+                "amount": String("-50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260404"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque/DD"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("TLab Bank B"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260404"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000003"),
+        "is_invoice": Bool(false),
+        "master_id": String("3"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("TLab Bank A"),
+        "post_dated": Bool(false),
+        "voucher_number": String("3"),
+        "voucher_type": String("Contra"),
+    },
+    Object {
+        "alter_id": Number(5),
+        "amounts": Array [
+            Object {
+                "amount": String("50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260405"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("value"),
+                            "value": String("123456"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("TLab Bank A"),
+            },
+            Object {
+                "amount": String("-50000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20260405"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("value"),
+                            "value": String("123456"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque/DD"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("TLab Bank B"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260405"),
+        "guid": String("8fb5f4db-478d-4084-b1e5-5b8f5d3fef60-00000005"),
+        "is_invoice": Bool(false),
+        "master_id": String("5"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("TLab Bank A"),
+        "post_dated": Bool(false),
+        "voucher_number": String("5"),
+        "voucher_type": String("Contra"),
+    },
+])

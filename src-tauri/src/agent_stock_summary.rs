@@ -25,16 +25,18 @@ const VERIFICATION: &str = "stable_paired_sources_with_company_mode_and_extent_g
 const NOT_ATOMIC: &str =
     "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only";
 
-const ONE_PERIOD_MEASURED: &str = "Only the period ending 31 March 2026 has been measured: a 31 March of another year is admitted, sharing the request shape but not the measurement";
+const PERIOD_ENDS_MEASURED: &str = "`as_of` is a month's last day. Measured on TallyPrime 7.2 at 31 May, 31 August and 30 September 2025 on two synthetic books (one item under the root; groups three deep) and at 31 March 2026: the items and Tally's Stock Summary each follow `as_of`, not the company's own current period. A read to the date of one Sales voucher (15 October 2025, not a month end) counted that voucher. The period starts on 1 April: a company whose financial year starts in another month is read from 1 April all the same. Not measured: February's end, a month end with a voucher on it, several vouchers or a Stock Journal or purchase dated on `as_of`, TallyPrime 7.1 at a date other than 31 March, a year after the company's current period, and a book that starts mid-year";
 
 /// The rows read and Tally's own stock item count differ. The numbers travel
 /// in the refusal's `counts`.
 const ITEM_COUNT_DIFFERS: &str = "stock_summary_item_count_differs";
 
 /// What is and is not checked, per field, in one closed vocabulary: `checked`,
-/// `checked_per_item`, `not_checked`. Only the value total is compared with a
-/// second source as a whole; a quantity is returned only for an item whose own
-/// line in that source agrees with it, and each item says whether it did.
+/// `checked_where_agreed`, `not_checked`. Only the value total is compared with
+/// a second source as a whole; a closing quantity is compared only for an item
+/// under the root, whose own line in that source must agree (`agreed`), and an
+/// item inside a stock group carries its row's own figure, which nothing
+/// compared. Each item says which.
 /// Tally's item count is a cross-check that refuses a short list; it is not
 /// proof of a complete one.
 fn checks() -> Value {
@@ -42,7 +44,7 @@ fn checks() -> Value {
         "closing_value_total": "checked",
         "item_list_complete": "not_checked",
         "closing_value_each": "not_checked",
-        "closing_quantity": "checked_per_item",
+        "closing_quantity": "checked_where_agreed",
         "name_parent_unit": "not_checked",
         "as_of_honoured": "not_checked",
     })
@@ -214,7 +216,7 @@ impl Server {
                             "limitations": [
                                 NOT_ATOMIC,
                                 "Tally's own stock item count is 0 and the stock item list is empty. The Stock Summary came back empty, which agrees with them and by itself is not told apart from a report Tally did not render. Nothing else was checked",
-                                ONE_PERIOD_MEASURED,
+                                PERIOD_ENDS_MEASURED,
                             ],
                         }),
                     ),
@@ -363,7 +365,7 @@ fn inventory_basis(integrated: NativeFlag) -> String {
         NativeFlag::Unknown => "Tally did not send ISINTEGRATED",
     };
     format!(
-        "{reported}. These are the stock items' closing values with the sign Tally sends (a negative value is a debit: stock held); how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured. The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and a quantity is returned only where Tally's own Stock Summary shows the same one (`closing.quantity`)."
+        "{reported}. These are the stock items' closing values with the sign Tally sends (a negative value is a debit: stock held); how the books use them (as closing stock, or against a Stock-in-Hand ledger) is not measured. The closing values of all this company's stock items add up to the total of Tally's own Stock Summary for the period (`tie_out.total`). Only that total was compared: no item's value was checked on its own, and a quantity is compared only for an item under the root, against Tally's own Stock Summary (`closing.quantity`)."
     )
 }
 
@@ -374,17 +376,17 @@ fn inventory_basis(integrated: NativeFlag) -> String {
 /// absent parent stays null. `guid` is the identity and stays plain. The item's
 /// `opening` is read and validated but not serialized
 /// ([`NativeStockItem::opening`]); its closing quantity leaves only as
-/// `closing.quantity`, and only where the report agrees
+/// `closing.quantity`, which says whether it was compared
 /// ([`NativeStockPosition::agreement`]).
 fn stock_row(item: &NativeStockItem) -> Value {
     let mut row = json!(item);
     mark_party_field(&mut row, "name");
-    if item
-        .parent
-        .as_deref()
-        .is_some_and(|parent| !bridge_tally_protocol::is_tally_reserved_root(parent))
-    {
-        mark_party_field(&mut row, "parent");
+    match item.parent.as_deref() {
+        Some(parent) if bridge_tally_protocol::is_tally_reserved_root(parent) => {
+            row["parent"] = json!(bridge_tally_protocol::tally_root_as_sent(parent));
+        }
+        Some(_) => mark_party_field(&mut row, "parent"),
+        None => {}
     }
     row
 }
@@ -410,7 +412,9 @@ fn stock_frame(
         "limitations": [
             NOT_ATOMIC,
             "Only the closing-value TOTAL is compared with Tally's own Stock Summary (`checks`): no item's value is checked on its own, so `value_total_matched` can stand beside `partial: true` when some items have no closing value",
-            "A closing quantity is returned only where Tally's own plain Stock Summary shows the same item by name with the same quantity, unit and amount: `closing.quantity.state` is `agreed`, with `amount` and `unit`. Every other item says why not: `none_sent` (Tally sent none, which is not zero), `unread` (a compound unit, or a unit with a space in it; also counted in `totals.closing_quantity_unread_count`, and the read is not refused), `inside_stock_group` (the item's own parent is not the root, that is a stock group; in the captures the report listed only what sits directly under the root, so it is taken to have no line of its own), `report_has_no_line` (the item sits under the root and no line of the report carries its name: it has nothing to show, or the report names it differently; also given when Tally sent no parent, whatever a line shows), `report_name_not_unique` or `report_differs`",
+            "A closing quantity of an item under the root is returned only where Tally's own plain Stock Summary shows the same item by name with the same quantity, unit and amount: `closing.quantity.state` is `agreed`, with `amount` and `unit`",
+            "That report has no line for an item inside a stock group, so such an item's closing quantity is its own row's in the stock item list, which nothing compared: `inside_stock_group`, with `item_list_amount` and `item_list_unit`, never `amount` and `unit`. On one synthetic book (TallyPrime 7.2, groups three deep, two units, one negative quantity), each such quantity equalled Tally's Stock Summary screen with every level expanded; no other book or release was measured. Neither the value total nor the item count checks a quantity, and an item with an empty or zero value adds nothing to the value total, so nothing in this read vouches for a nested quantity",
+            "Every other item says why no quantity is returned: `none_sent` (Tally sent none, which is not zero), `unread` (a compound unit, or a unit with a space in it; also counted in `totals.closing_quantity_unread_count`, and the read is not refused), `parent_not_resolved` (the item's parent reads `Primary` without Tally's root marker, or carries a marker anywhere else: it may be a group a person named Primary, so it is neither compared nor taken for a group), `report_has_no_line` (the item sits under the root and no line of the report carries its name: it has nothing to show, or the report names it differently; also given when Tally sent no parent, whatever a line shows), `report_name_not_unique` or `report_differs`",
             "The Stock Summary does not say whether a line is a stock group or an item: a line is tied to an item by its name, quantity, unit and amount and by the item sitting directly under the root",
             "An empty closing value is not zero: it is returned as null and counted (`empty_closing_value_count`), and `value_sum` is null with `partial` true whenever any item's closing value is empty. A value Tally sent as 0.00 is a value",
             "An item valued at zero or with no value adds nothing to either total, so nothing but Tally's own item count (`item_count_cross_check`) vouches for it; a read whose rows differ from that count either way is refused. The count followed the one delete measured (one synthetic company, one sample), which is not proof of a complete list (`checks.item_list_complete`)",
@@ -418,10 +422,10 @@ fn stock_frame(
             "Values keep the sign Tally sends, as in the trial balance: a negative value is a debit, which is stock held, and Tally's own Stock Summary screen shows it as a positive value; a positive value is what that screen shows as negative, `(-)`. Measured on one synthetic company on licensed TallyPrime 7.1 Silver against Tally's own screen. `value_sum` adds the values with those signs, so stock held gives a negative sum (`totals.value_sum_signs` says so)",
             "`totals`, `tie_out` and `item_count_cross_check` cover the whole book, whatever `items` filters",
             "Item names, parents and base units come from one source and are not checked against another",
-            ONE_PERIOD_MEASURED,
+            PERIOD_ENDS_MEASURED,
             "A company split by year, whose sibling companies share its GUID, is refused (`company_flags_not_one_row`)",
             "Small books only: a book whose master-alteration mark is over the admitted size is refused before any item is read",
-            "Under mask_parties an item's `name` and `parent` are masked, because stock-item and stock-group names are free text that can carry a customer's or supplier's name; Tally's reserved root as a parent is left as it is, and `guid` is not masked",
+            "Under mask_parties an item's `name` and `parent` are masked, because stock-item and stock-group names are text a person types, which can carry a customer's or supplier's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is not masked, and `guid` is not masked",
         ],
     })
 }

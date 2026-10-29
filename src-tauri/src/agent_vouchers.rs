@@ -130,8 +130,8 @@ impl VoucherPageSnapshot {
     fn describe(&self, reused: bool) -> Value {
         json!({
             "id": self.id,
-            "master_alter_id": self.marks.masters,
-            "voucher_alter_id": self.marks.vouchers,
+            "master_alter_id": self.marks.masters(),
+            "voucher_alter_id": self.marks.reported_vouchers(),
             "read_at": self.read_at,
             "reused": reused,
         })
@@ -227,19 +227,23 @@ enum PageServe {
     Fresh(Option<Value>),
 }
 
-/// The rows of one page, redacted and party-marked as `vouchers` always did.
+/// The rows of one page, redacted and party-marked as `vouchers` always did, with each
+/// entry's bank allocations (#1231) and goods lines (#2015) only when the call asked for them.
 pub(super) fn page_items(
     server: &Server,
     rows: &[Value],
-    offset: usize,
-    limit: usize,
+    (offset, limit): (usize, usize),
+    (bank, goods): (BankAllocationsShown, GoodsLinesShown),
 ) -> Vec<Value> {
     rows.iter()
         .skip(offset)
         .take(limit)
         .map(|row| {
             redact_value(
-                mark_voucher_party_names(row.clone()),
+                mark_voucher_party_names(present_voucher_goods_lines(
+                    present_voucher_bank_allocations(row.clone(), bank),
+                    goods,
+                )),
                 server.settings.redaction,
             )
         })
@@ -269,9 +273,22 @@ pub(super) const GROUP_LEDGER_LIST_MARK_LIMIT: u64 =
 /// what a bucket is.
 pub(super) const GROUP_BASIS: &str = "groups are the book's masters read now (each ledger's group chain was the same when read before the window and again after it), not the grouping in force on each voucher's date; a `group` bucket holds only the ledgers directly under that group, as the ledger master shows it (its `covers` says so; so does a `subtree_totals` row's, for the group and everything under it), so a predefined group whose ledgers sit in sub-groups has no bucket or a small one: its whole figure, descendants included, is in `subtree_totals` (a `group` summary only), which overlap and do not add up to `totals`; a `primary_group` bucket holds every ledger under the group directly under the reserved root, keyed by its reserved name (a group the book's user made there by its name); a ledger directly under the root has a bucket of its own named Primary; `members` lists the ledgers in a bucket, largest movement first and at most 10, with `members_total` exact; a ledger whose group chain cannot be walked, or that the ledger list does not hold, refuses the summary (`summary_group_unresolved`)";
 
+/// What a `cost_centre` summary adds to its basis (#1231): what a bucket is and how its figures tie
+/// out. Measured on one synthetic book with Cost Centres on (TallyPrime 7.2): a Payment allocated to two
+/// centres of one category, and a Journal entry allocated in full under two categories.
+pub(super) const COST_CENTRE_BASIS: &str = "a `cost_centre` bucket is one cost centre under one cost category (`category`; a centre named under two categories has two buckets) and adds the cost-centre allocations of each counted entry, each on the side its own amount's sign gives; `members` lists the ledgers whose allocations fall in it, largest movement first and at most 10; each category allocates the whole entry, so the categories overlap and their buckets are not added across categories: `category_totals` gives each category's figure, `totals` counts each allocated entry once, and `entries_unallocated` holds the counted entries with no allocation (with `totals`, every counted entry); an empty summary says that nothing in the window was allocated, not that the company's Cost Centres setting is off (allocations were read on a book with the setting at No); an entry whose allocations could not be read (`summary_cost_centre_unreadable`) or whose category does not add up to the entry (`summary_cost_centre_allocation_mismatch`) refuses the summary";
+
 /// A refused summary as a failure: a ledger whose group chain could not be walked names the gap as
 /// the cause, so the answer says what to look at in the book's groups.
 pub(super) fn summary_failure(code: String) -> ToolFailure {
+    // An entry's own reason is the cause: the code travels with it as text, never data.
+    if let Some(reason) = code.strip_prefix("summary_cost_centre_unreadable:") {
+        let mut failure = ToolFailure::from("summary_cost_centre_unreadable".to_string());
+        failure.cause = Some(
+            CostCentreProblem::from_reason(reason).map_or("unknown", CostCentreProblem::reason),
+        );
+        return failure;
+    }
     match code.strip_prefix("summary_group_unresolved:") {
         Some(rest) => {
             let (gap, ledger) = match rest.split_once(':') {
@@ -310,9 +327,10 @@ pub(super) fn render_page_body(
     rows: &[Value],
     summary: Option<&SummaryRequest>,
     (offset, limit): (usize, usize),
+    shown: (BankAllocationsShown, GoodsLinesShown),
 ) -> Result<PageBody, ToolFailure> {
     let Some(request) = summary else {
-        let items = page_items(server, rows, offset, limit);
+        let items = page_items(server, rows, (offset, limit), shown);
         return Ok(PageBody {
             items_key: "items",
             profile: "agent_vouchers_v1_filters",
@@ -338,13 +356,23 @@ pub(super) fn render_page_body(
         ("totals", summary.totals),
         (
             "basis",
-            json!(if request.group.needs_placements() {
-                format!("{GROUP_BASIS}; {SUMMARY_BASIS}")
-            } else {
-                SUMMARY_BASIS.to_string()
+            json!(match request.group {
+                SummaryGroup::Group | SummaryGroup::PrimaryGroup => {
+                    format!("{GROUP_BASIS}; {SUMMARY_BASIS}")
+                }
+                SummaryGroup::CostCentre => format!("{COST_CENTRE_BASIS}; {SUMMARY_BASIS}"),
+                _ => SUMMARY_BASIS.to_string(),
             }),
         ),
     ];
+    if request.group == SummaryGroup::CostCentre {
+        // Category names are masked like the buckets' own.
+        extra.push((
+            "category_totals",
+            redact_value(json!(summary.category_totals), server.settings.redaction),
+        ));
+        extra.push(("entries_unallocated", summary.entries_unallocated));
+    }
     if request.group == SummaryGroup::Group {
         // Group names are shown as the book has them, so the totals are not redacted.
         extra.push(("subtree_totals", json!(summary.subtree_totals)));
@@ -500,6 +528,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let type_selector = VoucherTypeSelector::from_args(args)?;
         let search = VoucherSearch::from_args(args, server.settings.redaction)?;
         let summary_group = SummaryGroup::from_args(args)?;
+        let shown = (
+            BankAllocationsShown::from_args(args)?,
+            GoodsLinesShown::from_args(args)?,
+        );
         // A type GUID that is not this company's cannot name any of its
         // types: refused rather than answered with an empty selection.
         if let Some(VoucherTypeSelector::Guid(type_guid)) = &type_selector {
@@ -542,6 +574,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                         &mut accumulated,
                         &guid,
                         summary_group,
+                        shown,
                     )
                     .await?
                 {
@@ -559,11 +592,11 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 .read_company_marks_once(&identity, &company.name)
                 .await?;
             accumulate_evidence(&mut accumulated, marks_evidence);
-            if marks.masters > GROUP_LEDGER_LIST_MARK_LIMIT {
+            if marks.masters() > GROUP_LEDGER_LIST_MARK_LIMIT {
                 let mut failure = ToolFailure::from("summary_group_book_too_large".to_string());
                 failure.read_size = Some(Box::new(ReadSize {
-                    master_alter_id: marks.masters,
-                    estimated_bytes: marks.masters.saturating_mul(GROUP_LEDGER_LIST_BYTES_PER_LEDGER),
+                    master_alter_id: marks.masters(),
+                    estimated_bytes: marks.masters().saturating_mul(GROUP_LEDGER_LIST_BYTES_PER_LEDGER),
                     limit_bytes: GROUP_LEDGER_LIST_LIMIT_BYTES,
                     limit_master_alter_id: GROUP_LEDGER_LIST_MARK_LIMIT,
                 }));
@@ -786,7 +819,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             selected_ledger: selected_ledger.clone(),
             placements: placements.clone(),
         });
-        let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit))?;
+        let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit), shown)?;
         let (mut payload, truncated) = voucher_page_payload(
             &company,
             result_state,
@@ -908,6 +941,7 @@ impl Server {
         accumulated: &mut Option<Evidence>,
         guid: &str,
         summary_group: Option<SummaryGroup>,
+        shown: (BankAllocationsShown, GoodsLinesShown),
     ) -> Result<PageServe, ToolFailure> {
         let held = self
             .voucher_pages
@@ -948,7 +982,13 @@ impl Server {
             selected_ledger: snapshot.selected_ledger.clone(),
             placements: snapshot.placements.clone(),
         });
-        let body = render_page_body(self, &snapshot.rows, summary.as_ref(), (offset, limit))?;
+        let body = render_page_body(
+            self,
+            &snapshot.rows,
+            summary.as_ref(),
+            (offset, limit),
+            shown,
+        )?;
         if let (Some(reason), Some(evidence)) = (snapshot.reason, accumulated.as_mut()) {
             evidence.reason_code = Some(reason.to_string());
         }
@@ -1194,21 +1234,14 @@ impl Server {
         shape: VoucherReadShape,
         composites: VoucherComposites,
     ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
-        self.read_voucher_window(
+        read_entry_window_rows_with(
+            &AgentReader(self),
             identity,
             company,
             from,
             to,
             shape,
-            WindowPlanSource::Estimate { known_marks: None },
-            WindowReadLimits::for_shape(shape).counting_small_books(),
-            |xml| match composites {
-                VoucherComposites::Withhold => {
-                    parse_agent_rows_withholding(xml, identity.company_guid())
-                }
-                VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
-                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
-            },
+            composites,
         )
         .await
     }
@@ -1243,6 +1276,37 @@ impl Server {
         )
         .await
     }
+}
+
+/// [`Server::read_entry_window_rows`] through any window reader, so that a
+/// caller's tests can serve it the answers a lab captured.
+pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    composites: VoucherComposites,
+) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
+    read_voucher_window_with(
+        reader,
+        identity,
+        company,
+        from,
+        to,
+        shape,
+        WindowPlanSource::Estimate { known_marks: None },
+        WindowReadLimits::for_shape(shape).counting_small_books(),
+        |xml| match composites {
+            VoucherComposites::Withhold => {
+                parse_agent_rows_withholding(xml, identity.company_guid())
+            }
+            VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
+                .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
+        },
+    )
+    .await
 }
 
 /// At most this many withheld vouchers are listed; `withheld_total` is exact.

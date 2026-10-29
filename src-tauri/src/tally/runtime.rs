@@ -63,6 +63,10 @@ mod company_features_tests;
 mod month_register;
 pub(crate) use month_register::MonthRegisterReadError;
 
+#[path = "runtime_negative_ledgers.rs"]
+mod negative_ledgers;
+pub(crate) use negative_ledgers::NegativeLedgersReadError;
+
 #[path = "runtime_stock_summary.rs"]
 mod stock_summary;
 pub(crate) use stock_summary::StockSummaryReadError;
@@ -108,6 +112,24 @@ pub struct AgentRead {
     /// The stricter of the date-boundary profiles the read's opening and
     /// closing identity brackets observed: Education if either reported it.
     pub boundary_profile: DateBoundaryProfile,
+}
+
+/// What the endpoint queue read to admit a post, before the aim: the reads of
+/// the request's own kind.
+enum QueuedReads {
+    Vouchers {
+        catalogue: String,
+        groups: Option<String>,
+        currencies: String,
+        /// An invoice's masters, read again for the admission's judge (#1337).
+        invoice_answers: Option<Box<super::approved_import::InvoiceAnswers>>,
+    },
+    Masters {
+        ledgers_first: String,
+        ledgers_second: String,
+        groups_first: String,
+        groups_second: String,
+    },
 }
 
 async fn fetch_admitted_agent_read(
@@ -845,6 +867,57 @@ fn unconfirmed_unless_wire_refused(
 #[error("request_cancelled")]
 pub(crate) struct ToolCancelled;
 
+/// A post of Tally's Bills Receivable or Payable report cut at the request
+/// limit (#2119), as a cause of its own. The outstandings read's other
+/// requests are cut at the same limit with only the transport's reason, so a
+/// next step written for the Bills report names no other read.
+///
+/// Transparent, as `PairedNativeReportResponseFailure` is: the message is the
+/// wrapped error's and the source is its head, so the transport error stays in
+/// the chain and how the failure classifies does not change.
+#[derive(Debug)]
+pub(crate) struct BillsReportDeadlineExceeded(anyhow::Error);
+
+impl BillsReportDeadlineExceeded {
+    pub(crate) const SAFE_CODE: &'static str = "native_bills_report_deadline_exceeded";
+}
+
+impl std::fmt::Display for BillsReportDeadlineExceeded {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, formatter)
+    }
+}
+
+impl std::error::Error for BillsReportDeadlineExceeded {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
+    }
+}
+
+/// A Bills report read's failure, marked [`BillsReportDeadlineExceeded`] when
+/// one of its two posts was cut at the request limit. A health check between
+/// or after them is not the report's request and is not marked. The mark goes
+/// under the read's evidence, so a body read before the cut stays accounted.
+pub(crate) fn mark_bills_report_deadline(error: anyhow::Error) -> anyhow::Error {
+    let cut = error
+        .chain()
+        .filter_map(|cause| {
+            cause.downcast_ref::<crate::tally::connection::PairedNativeReportResponseFailure>()
+        })
+        .any(|post| post.transport_error() == Some(&TallyTransportError::RequestTimedOut));
+    if !cut {
+        return error;
+    }
+    match error.downcast::<RuntimeReadFailure>() {
+        Ok(RuntimeReadFailure { evidence, source }) => RuntimeReadFailure {
+            evidence,
+            source: anyhow::Error::new(BillsReportDeadlineExceeded(source)),
+        }
+        .into(),
+        Err(error) => anyhow::Error::new(BillsReportDeadlineExceeded(error)),
+    }
+}
+
 /// Retains admitted source commitments when a runtime read cannot be released.
 #[derive(Debug, thiserror::Error)]
 #[error("{source}")]
@@ -1348,6 +1421,8 @@ struct LedgerOpeningRead {
 #[derive(Debug)]
 pub(crate) struct PartyLedgerMasterListing {
     pub(crate) records: Vec<bridge_tally_protocol::PartyLedgerMasterRecord>,
+    /// Each record's ledger GUID, by ledger name, as the same rows carried it.
+    pub(crate) ledger_guids: std::collections::BTreeMap<String, String>,
     pub(crate) groups: Vec<bridge_tally_protocol::TallyNamedMaster>,
     /// Ledgers kept in another currency, set aside by name.
     pub(crate) foreign_currency_ledgers_excluded:
@@ -1970,6 +2045,11 @@ fn party_ledger_listing(
     let count_cross_check = source.count_cross_check;
     // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
     let opening_as_of = source.from.clone();
+    let ledger_guids = source
+        .rows
+        .iter()
+        .map(|row| (row.name.clone(), row.guid.clone()))
+        .collect();
     let records = source
         .rows
         .into_iter()
@@ -1985,6 +2065,7 @@ fn party_ledger_listing(
         .collect();
     PartyLedgerMasterListing {
         records,
+        ledger_guids,
         groups,
         foreign_currency_ledgers_excluded: foreign,
         mixed_currency_ledgers_excluded: mixed,
@@ -3669,7 +3750,7 @@ impl TallyRuntime {
     /// One approved mutation through the shared endpoint queue. The durable
     /// intent is committed after identity admission and before any import bytes.
     /// Unlike paired reads, an import must never be repeated automatically.
-    pub(crate) async fn post_approved_import<A, F>(
+    pub(crate) async fn post_approved_import<A, F, L>(
         &self,
         config: TallyConfig,
         identity: &VerifiedCompanyIdentity,
@@ -3679,7 +3760,8 @@ impl TallyRuntime {
     ) -> anyhow::Result<ApprovedImportDispatch>
     where
         A: Fn(super::approved_import::QueuedAdmission<'_>) -> anyhow::Result<()>,
-        F: Fn() -> Result<(), super::approved_import::BeforeDispatchError>,
+        F: Fn() -> Result<L, super::approved_import::BeforeDispatchError>,
+        L: super::approved_import::DispatchLicense,
     {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
@@ -3709,6 +3791,16 @@ impl TallyRuntime {
                     // the intent or sends may move into it
                     // (`tests/approval_seam_gate.rs` holds it to that).
                     let (admission_evidence, before_marks) = async {
+                        // A master post is for the company it was rendered for: the
+                        // request names it, and the identity brackets check this one.
+                        // A mismatch is a wiring fault, refused before any request.
+                        if let super::approved_import::ApprovedKind::Masters(masters) = &request.kind {
+                            if masters.company() != &identity {
+                                return Err(anyhow::Error::from(
+                                    super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent,
+                                ));
+                            }
+                        }
                         // Admit the initial observed product/mode and company scope before
                         // any queued monetary source read. Those observations can become
                         // stale during queued source reads, so the same admission is
@@ -3760,61 +3852,123 @@ impl TallyRuntime {
                             binding_marks.encoded_sha256.clone(),
                             binding_marks.encoded_body.len(),
                         ));
-                        let (catalogue, catalogue_evidence) = fetch_admitted_agent_read(
-                            &reads,
-                            &identity,
-                            request.ledger_catalogue_request(),
-                        )
-                        .await
-                        .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
-                        let admission_evidence = admission_evidence.combine(catalogue_evidence);
-                        // A bank voucher's legs are classified from the ledgers'
-                        // parents (in the catalogue above) and the group tree, so
-                        // both are re-read here, inside the same identity brackets,
-                        // after approval and before the POST.
-                        let (groups, admission_evidence) = match request.group_collection_request() {
-                            Some(group_request) => {
-                                let (groups, group_evidence) =
-                                    fetch_admitted_agent_read(&reads, &identity, group_request)
+                        // What the request kind reads to be admitted, inside the same
+                        // identity brackets. A voucher post re-reads the ledger
+                        // catalogue, the group tree for a bank voucher, and the
+                        // Currency masters. A master post reads the ledger index and
+                        // the group index, each twice (the recheck requires the pairs
+                        // byte-equal, as it does the voucher absence reads).
+                        let (queued_reads, admission_evidence) = match &request.kind {
+                            super::approved_import::ApprovedKind::Vouchers(vouchers) => {
+                                let (catalogue, catalogue_evidence) = fetch_admitted_agent_read(
+                                    &reads,
+                                    &identity,
+                                    vouchers.ledger_catalogue_request(),
+                                )
+                                .await
+                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(catalogue_evidence);
+                                // A bank voucher's legs are classified from the ledgers'
+                                // parents (in the catalogue above) and the group tree, so
+                                // both are re-read here, inside the same identity brackets,
+                                // after approval and before the POST.
+                                let (groups, admission_evidence) = match vouchers.group_collection_request() {
+                                    Some(group_request) => {
+                                        let (groups, group_evidence) =
+                                            fetch_admitted_agent_read(&reads, &identity, group_request)
+                                                .await
+                                                .map_err(|error| {
+                                                    with_read_evidence(error, admission_evidence.clone())
+                                                })?;
+                                        (Some(groups), admission_evidence.combine(group_evidence))
+                                    }
+                                    None => (None, admission_evidence),
+                                };
+                                // Every post re-reads the company's Currency masters in the
+                                // same brackets: it goes only into a book with exactly one
+                                // (bridge#551), and one can be added while approval waits.
+                                let (currencies, currency_evidence) =
+                                    fetch_admitted_agent_read(&reads, &identity, vouchers.currency_request())
+                                        .await
+                                        .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(currency_evidence);
+                                // An invoice's masters (#1337): the reads its admission
+                                // makes, sent again here in the same brackets and judged
+                                // by that admission's own rule in the recheck below, so a
+                                // master that moved while the approval waited is seen
+                                // under the lock and not only before it.
+                                let (invoice_answers, admission_evidence) = match vouchers.invoice_plan() {
+                                    Some(plan) => {
+                                        // Boxed: this future would otherwise sit inside the
+                                        // post's, whatever the voucher type.
+                                        let (answers, invoice_evidence) = Box::pin(read_invoice_plan(
+                                            &reads,
+                                            &identity,
+                                            plan,
+                                            &binding_marks.text,
+                                            &currencies.body,
+                                        ))
                                         .await
                                         .map_err(|error| {
                                             with_read_evidence(error, admission_evidence.clone())
                                         })?;
-                                (Some(groups), admission_evidence.combine(group_evidence))
+                                        (Some(Box::new(answers)), admission_evidence.combine(invoice_evidence))
+                                    }
+                                    None => (None, admission_evidence),
+                                };
+                                (
+                                    QueuedReads::Vouchers {
+                                        catalogue: catalogue.body,
+                                        groups: groups.map(|groups| groups.body),
+                                        currencies: currencies.body,
+                                        invoice_answers,
+                                    },
+                                    admission_evidence,
+                                )
                             }
-                            None => (None, admission_evidence),
-                        };
-                        // Every post re-reads the company's Currency masters in the
-                        // same brackets: it goes only into a book with exactly one
-                        // (bridge#551), and one can be added while approval waits.
-                        let (currencies, currency_evidence) =
-                            fetch_admitted_agent_read(&reads, &identity, request.currency_request())
-                                .await
-                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
-                        let admission_evidence = admission_evidence.combine(currency_evidence);
-                        // An invoice's masters (#1337): the reads its admission
-                        // makes, sent again here in the same brackets and judged
-                        // by that admission's own rule in the recheck below, so a
-                        // master that moved while the approval waited is seen
-                        // under the lock and not only before it.
-                        let (invoice_answers, admission_evidence) = match request.invoice_plan() {
-                            Some(plan) => {
-                                // Boxed: this future would otherwise sit inside the
-                                // post's, whatever the voucher type.
-                                let (answers, invoice_evidence) = Box::pin(read_invoice_plan(
+                            super::approved_import::ApprovedKind::Masters(masters) => {
+                                let (ledgers_first, evidence) = fetch_admitted_agent_read(
                                     &reads,
                                     &identity,
-                                    plan,
-                                    &binding_marks.text,
-                                    &currencies.body,
-                                ))
+                                    masters.ledger_index_request(),
+                                )
                                 .await
-                                .map_err(|error| {
-                                    with_read_evidence(error, admission_evidence.clone())
-                                })?;
-                                (Some(answers), admission_evidence.combine(invoice_evidence))
+                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(evidence);
+                                let (ledgers_second, evidence) = fetch_admitted_agent_read(
+                                    &reads,
+                                    &identity,
+                                    masters.ledger_index_request(),
+                                )
+                                .await
+                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(evidence);
+                                let (groups_first, evidence) = fetch_admitted_agent_read(
+                                    &reads,
+                                    &identity,
+                                    masters.group_index_request(),
+                                )
+                                .await
+                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(evidence);
+                                let (groups_second, evidence) = fetch_admitted_agent_read(
+                                    &reads,
+                                    &identity,
+                                    masters.group_index_request(),
+                                )
+                                .await
+                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(evidence);
+                                (
+                                    QueuedReads::Masters {
+                                        ledgers_first: ledgers_first.body,
+                                        ledgers_second: ledgers_second.body,
+                                        groups_first: groups_first.body,
+                                        groups_second: groups_second.body,
+                                    },
+                                    admission_evidence,
+                                )
                             }
-                            None => (None, admission_evidence),
                         };
                         let (profile, mode_evidence) = observe_read_boundary(&reads)
                             .await
@@ -3838,22 +3992,29 @@ impl TallyRuntime {
                         // helper retains its required identity/health brackets; only
                         // the company-marks snapshot that aims the POST (#574)
                         // follows this verdict, and no profile or catalogue read.
-                        let (first_read, first_evidence) = fetch_admitted_agent_read(
-                            &reads,
-                            &identity,
-                            request.verification_request(),
-                        )
-                        .await
-                        .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
-                        let admission_evidence = admission_evidence.combine(first_evidence);
-                        let (second_read, second_evidence) = fetch_admitted_agent_read(
-                            &reads,
-                            &identity,
-                            request.verification_request(),
-                        )
-                        .await
-                        .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
-                        let admission_evidence = admission_evidence.combine(second_evidence);
+                        let (absence_reads, admission_evidence) = match &request.kind {
+                            super::approved_import::ApprovedKind::Vouchers(vouchers) => {
+                                let (first_read, first_evidence) = fetch_admitted_agent_read(
+                                    &reads,
+                                    &identity,
+                                    vouchers.verification_request(),
+                                )
+                                .await
+                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(first_evidence);
+                                let (second_read, second_evidence) = fetch_admitted_agent_read(
+                                    &reads,
+                                    &identity,
+                                    vouchers.verification_request(),
+                                )
+                                .await
+                                .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                let admission_evidence = admission_evidence.combine(second_evidence);
+                                (Some((first_read.body, second_read.body)), admission_evidence)
+                            }
+                            // The index pairs above are the master post's absence reads.
+                            super::approved_import::ApprovedKind::Masters(_) => (None, admission_evidence),
+                        };
                         // The last Tally request before the POST (#574): every
                         // loaded company's change marks, one unpaired read. The
                         // import names its company only by name, so the aim is
@@ -3878,23 +4039,64 @@ impl TallyRuntime {
                             before_marks.encoded_sha256.clone(),
                             before_marks.encoded_body.len(),
                         ));
-                        recheck_admission(super::approved_import::QueuedAdmission {
-                            first: &first_read.body,
-                            second: &second_read.body,
-                            catalogue: &catalogue.body,
-                            groups: groups.as_ref().map(|groups| groups.body.as_str()),
-                            currencies: &currencies.body,
-                            company_marks_at_binding: &binding_marks.text,
-                            company_marks: &before_marks.text,
-                            ledger_binding: request.ledger_binding(),
-                            invoice: request.invoice_plan().zip(invoice_answers.as_ref()).map(
-                                |(plan, answers)| super::approved_import::QueuedInvoice {
-                                    plan,
-                                    answers,
+                        // The reads and the request are of one kind by construction; a
+                        // pair that is not is a wiring fault, refused as such before the
+                        // intent rather than posted.
+                        let queued = match (&request.kind, &queued_reads, &absence_reads) {
+                            (
+                                super::approved_import::ApprovedKind::Vouchers(vouchers),
+                                QueuedReads::Vouchers {
+                                    catalogue,
+                                    groups,
+                                    currencies,
+                                    invoice_answers,
                                 },
-                            ),
-                        })
-                        .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
+                                Some((first, second)),
+                            ) => super::approved_import::QueuedAdmission::Vouchers {
+                                first,
+                                second,
+                                catalogue,
+                                groups: groups.as_deref(),
+                                currencies,
+                                company_marks_at_binding: &binding_marks.text,
+                                company_marks: &before_marks.text,
+                                ledger_binding: vouchers.ledger_binding(),
+                                invoice: vouchers.invoice_plan().zip(invoice_answers.as_deref()).map(
+                                    |(plan, answers)| super::approved_import::QueuedInvoice {
+                                        plan,
+                                        answers,
+                                    },
+                                ),
+                            },
+                            (
+                                super::approved_import::ApprovedKind::Masters(masters),
+                                QueuedReads::Masters {
+                                    ledgers_first,
+                                    ledgers_second,
+                                    groups_first,
+                                    groups_second,
+                                },
+                                None,
+                            ) => super::approved_import::QueuedAdmission::Masters {
+                                item: masters.item(),
+                                company: masters.company(),
+                                ledgers_first,
+                                ledgers_second,
+                                groups_first,
+                                groups_second,
+                                company_marks_at_binding: &binding_marks.text,
+                                company_marks: &before_marks.text,
+                            },
+                            _ => {
+                                return Err(with_read_evidence(
+                                    super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent
+                                        .into(),
+                                    admission_evidence.clone(),
+                                ))
+                            }
+                        };
+                        recheck_admission(queued)
+                            .map_err(|error| with_read_evidence(error, admission_evidence.clone()))?;
                         Ok::<_, anyhow::Error>((admission_evidence, before_marks))
                     }
                     .await
@@ -3928,7 +4130,7 @@ impl TallyRuntime {
                             admission_evidence.clone(),
                         )
                     })?;
-                    before_dispatch().map_err(|error| {
+                    let license = before_dispatch().map_err(|error| {
                         let error = match error {
                             super::approved_import::BeforeDispatchError::Refused(refusal) => {
                                 anyhow::Error::from(refusal)
@@ -3939,6 +4141,19 @@ impl TallyRuntime {
                         };
                         with_read_evidence(error, admission_evidence.clone())
                     })?;
+                    // The licence the closure returned must cover this request:
+                    // a master request is sent only on the intent recorded for
+                    // the very bytes it carries, and a voucher request on none
+                    // but its own kind's. Anything else is a wiring fault, and
+                    // nothing is sent (the intent, if one was recorded, stands).
+                    if !super::approved_import::DispatchLicense::licenses(license, &request) {
+                        return Err(with_read_evidence(
+                            anyhow::Error::from(
+                                super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent,
+                            ),
+                            admission_evidence.clone(),
+                        ));
+                    }
                     let mut response_evidence = RuntimeReadEvidence::empty();
                     let body = wire
                         .post_probe_xml(xml, &mut response_evidence)
@@ -4128,7 +4343,16 @@ impl TallyRuntime {
     ) -> anyhow::Result<(OutstandingsLoadResult, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
+        // The calling tool's withdrawal, when it can be withdrawn (#778): a
+        // withdrawn call finishes the request in flight and starts no other,
+        // so a host that stops waiting does not leave Tally the rest of the
+        // read's paired reports (#2119).
+        let withdrawal = TOOL_CANCELLATION.try_with(Clone::clone).ok();
         self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let client = match &withdrawal {
+                Some(token) => client.withdrawable(token.clone()),
+                None => client,
+            };
             let identity = identity.clone();
             let as_of = as_of.clone();
             let currency_witness = currency_witness.clone();
@@ -4173,7 +4397,8 @@ impl TallyRuntime {
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
                         .fetch_native_report_paired(receivable_request.clone())
-                        .await?;
+                        .await
+                        .map_err(mark_bills_report_deadline)?;
                     let (receivable_body, encoded_bytes, encoded_sha256) = match receivable {
                         NativePairedRead::Stable {
                             body,
@@ -4227,7 +4452,8 @@ impl TallyRuntime {
                     let payable_request = read(NativeBillsReportKind::Payable);
                     let payable = client
                         .fetch_native_report_paired(payable_request.clone())
-                        .await?;
+                        .await
+                        .map_err(mark_bills_report_deadline)?;
                     let (payable_body, encoded_bytes, encoded_sha256) = match payable {
                         NativePairedRead::Stable {
                             body,

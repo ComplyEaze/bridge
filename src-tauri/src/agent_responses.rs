@@ -6,6 +6,9 @@ use super::*;
 enum PageShape {
     Outstandings,
     Rows(&'static str),
+    /// A list of the newest records first, with no offset to resume from (the egress log, #2125):
+    /// trimmed to its newest rows, the count left out said in `omitted_for_size`.
+    Newest(&'static str),
 }
 
 /// A base-currency-ledgers-only outstandings result's lists of ledgers left
@@ -50,12 +53,19 @@ fn page_shape(response: &Value) -> Option<(PageShape, usize)> {
             widths.into_iter().max().unwrap_or(0),
         ));
     }
+    // The egress log names its order: its records are the newest receipts, and a trimmed answer
+    // keeps the newest. No other result carries `order`, so no other `records` list is trimmed.
+    if result["order"] == "newest_first" {
+        if let Some(rows) = result["records"].as_array() {
+            return Some((PageShape::Newest("records"), rows.len()));
+        }
+    }
     ["items", "ledgers", "masters"].into_iter().find_map(|key| {
         // `masters` also keys the unpaged results of validate_masters and
-        // build_import_xml, and `items` the unpaged result of gst_uncertain_vouchers;
-        // none carries an `offset`: only a paged result can be trimmed with a
-        // resumable cursor.
-        if matches!(key, "masters" | "items") && !result["offset"].is_u64() {
+        // build_import_xml, `items` the unpaged result of gst_uncertain_vouchers and
+        // `ledgers` the unpaged negative_ledgers answer; none carries an `offset`:
+        // only a paged result can be trimmed with a resumable cursor.
+        if !result["offset"].is_u64() {
             return None;
         }
         result[key]
@@ -123,6 +133,14 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
                 .expect("observed page rows")
                 .truncate(width);
             result["next_offset"] = json!(offset + width as u64);
+        }
+        PageShape::Newest(key) => {
+            let rows = result[key].as_array_mut().expect("observed page rows");
+            let cut = rows.len().saturating_sub(width) as u64;
+            rows.truncate(width);
+            // Each cap check may cut again: what is left out adds up.
+            let before = result["omitted_for_size"].as_u64().unwrap_or(0);
+            result["omitted_for_size"] = json!(before + cut);
         }
     }
     response["truncated"] = json!(true);

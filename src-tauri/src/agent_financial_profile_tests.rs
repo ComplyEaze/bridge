@@ -121,6 +121,7 @@ async fn monetary_tools_refuse_unobserved_mode_or_unsupported_product_with_compl
                 redaction: Redaction::None,
                 import_enabled: false,
                 posting: Posting::Off,
+                master_writes_enabled: false,
                 audit_enabled: false,
             });
             let response = server.call_tool(tool, args.clone()).await;

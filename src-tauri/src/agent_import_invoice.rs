@@ -452,9 +452,11 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
             _ => "invoice_sales_ledger_rate_history_unmeasured",
         });
     };
-    if !gst.applicable_from.as_deref().is_some_and(|from| {
-        from.len() == 8 && from.bytes().all(|byte| byte.is_ascii_digit()) && from <= as_of
-    }) {
+    if !gst
+        .applicable_from
+        .as_deref()
+        .is_some_and(|from| TallyDate::parse(from).is_ok() && from <= as_of)
+    {
         return Err("invoice_sales_ledger_rate_not_in_force");
     }
     if gst.unmeasured {
@@ -1224,8 +1226,7 @@ pub(super) fn fit_plan(
 /// currency were judged before the plan's reads were sent.
 pub(super) fn admit_queued_invoice(
     voucher: &ImportVoucher,
-    company_name: &str,
-    company_guid: &str,
+    identity: &crate::tally::VerifiedCompanyIdentity,
     catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
     control: &super::ledger::NumberControl,
     today: &bridge_tally_core::TallyDate,
@@ -1237,8 +1238,7 @@ pub(super) fn admit_queued_invoice(
         .as_mut()
         .and_then(|detail| detail.observed.take());
     let judge = InvoiceJudge {
-        company_name,
-        company_guid,
+        identity,
         voucher: &fresh,
         catalogue,
         control,
@@ -1982,8 +1982,7 @@ fn unusable(code: &'static str) -> Verdict {
 /// invoice, the catalogue its party's bill-wise flag is read from, and the
 /// number control the journal offers.
 pub(super) struct InvoiceJudge<'a> {
-    pub(super) company_name: &'a str,
-    pub(super) company_guid: &'a str,
+    pub(super) identity: &'a crate::tally::VerifiedCompanyIdentity,
     pub(super) voucher: &'a ImportVoucher,
     pub(super) catalogue: &'a bridge_tally_protocol::StandardLedgerCatalogV2,
     pub(super) control: &'a super::ledger::NumberControl,
@@ -2115,7 +2114,7 @@ impl InvoiceJudge<'_> {
         &self,
         need: Need,
     ) -> Result<crate::tally::agent_read_request::AgentReadRequest, Verdict> {
-        let company = self.company_name;
+        let company = self.identity.display_name();
         match need {
             Need::LedgerCount => admitted(super::super::invoice_ledger_count_read(company)),
             Need::VoucherTypes => admitted(super::super::invoice_voucher_types_read(company)),
@@ -2124,8 +2123,8 @@ impl InvoiceJudge<'_> {
             }
             Need::GroupHsn => admitted(super::super::invoice_group_hsn_read(company)),
             Need::CompanyHsn => {
-                crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn_named(
-                    company,
+                crate::tally::agent_read_request::AgentReadRequest::invoice_company_hsn(
+                    self.identity,
                 )
                 .map_err(|error| Verdict::Failed(error.to_string()))
             }
@@ -2171,7 +2170,7 @@ impl InvoiceJudge<'_> {
             return Err(unusable("invoice_number_control_unreadable"));
         };
         admitted(super::super::invoice_number_read(
-            self.company_name,
+            self.identity.display_name(),
             &number,
             (&window.0, &window.1),
         ))
@@ -2186,7 +2185,7 @@ impl InvoiceJudge<'_> {
         listing_as_of: bridge_tally_core::TallyDate,
     ) -> Result<InvoiceReadPlan, Verdict> {
         Ok(InvoiceReadPlan {
-            company_name: self.company_name.to_string(),
+            company_name: self.identity.display_name().to_string(),
             listing_as_of,
             precheck: queued_precheck,
             ledger_count: self.request(Need::LedgerCount)?,
@@ -2227,8 +2226,8 @@ impl InvoiceJudge<'_> {
         let mark = size_gate(
             marks,
             answers.ledger_count.as_deref(),
-            self.company_name,
-            self.company_guid,
+            self.identity.display_name(),
+            self.identity.company_guid(),
         )?;
 
         // 1. The compliance listing.
@@ -2243,9 +2242,12 @@ impl InvoiceJudge<'_> {
         let Some(rates_body) = answers.rates.as_deref() else {
             return Err(Verdict::Need(Need::Rates));
         };
-        let (rates, listed) =
-            wire::parse_ledger_rates_and_rows(rates_body, self.company_guid, &self.named())
-                .map_err(|code| Verdict::Failed(code.to_string()))?;
+        let (rates, listed) = wire::parse_ledger_rates_and_rows(
+            rates_body,
+            self.identity.company_guid(),
+            &self.named(),
+        )
+        .map_err(|code| Verdict::Failed(code.to_string()))?;
         // A scoped read is believed only when its rows are exactly the
         // catalogue's ledgers under those parents.
         scope.prove(&listed).map_err(refusing)?;
@@ -2364,13 +2366,16 @@ impl InvoiceJudge<'_> {
         let Some(registration_body) = answers.registration.as_deref() else {
             return Err(Verdict::Need(Need::Registration));
         };
-        let company_state =
-            wire::parse_company_registration(registration_body, self.company_guid, &as_of)
-                .map_err(|outcome| match outcome {
-                    wire::RegistrationOutcome::Refused(code) => refusing(refuse(code)),
-                    wire::RegistrationOutcome::Failed(code) => unusable(code),
-                })?
-                .state;
+        let company_state = wire::parse_company_registration(
+            registration_body,
+            self.identity.company_guid(),
+            &as_of,
+        )
+        .map_err(|outcome| match outcome {
+            wire::RegistrationOutcome::Refused(code) => refusing(refuse(code)),
+            wire::RegistrationOutcome::Failed(code) => unusable(code),
+        })?
+        .state;
 
         let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
             .map_err(Verdict::Refused)?;
@@ -2422,7 +2427,7 @@ impl InvoiceJudge<'_> {
         let Some(company_body) = answers.company_hsn.as_deref() else {
             return Err(Verdict::Need(Need::CompanyHsn));
         };
-        let company = wire::parse_company_hsn(company_body, self.company_guid)
+        let company = wire::parse_company_hsn(company_body, self.identity.company_guid())
             .map_err(|code| Verdict::Failed(code.to_string()))?;
         // The build reads the groups only when a sales ledger's own row defers
         // to them. The queue's `read_invoice_plan` always reads them, and an
@@ -2431,7 +2436,7 @@ impl InvoiceJudge<'_> {
         // (`InvoiceReadUnusable`, before any intent), never the build.
         let groups = match answers.group_hsn.as_deref() {
             Some(body) => Some(
-                wire::parse_group_hsn(body, self.company_guid)
+                wire::parse_group_hsn(body, self.identity.company_guid())
                     .map_err(|code| Verdict::Failed(code.to_string()))?,
             ),
             None => None,
@@ -2525,8 +2530,7 @@ impl super::super::Server {
         let today = bridge_tally_core::TallyDate::parse(super::super::tally_host_today())
             .map_err(|_| failed("current_date_invalid"))?;
         let judge = InvoiceJudge {
-            company_name: company.name.as_str(),
-            company_guid: identity.company_guid(),
+            identity,
             voucher: &*voucher,
             catalogue,
             control: &control,
@@ -2693,6 +2697,7 @@ pub(super) fn render_sales_invoice_xml(
     remote_id: Uuid,
     date: &str,
     narration: &str,
+    action: super::VoucherAction,
 ) -> Option<String> {
     let detail = voucher.invoice.as_ref()?;
     let observed = detail.observed.as_ref()?;
@@ -2726,6 +2731,7 @@ pub(super) fn render_sales_invoice_xml(
         legs.push_str(&leg(entry, false));
     }
     let type_name = xml_escape(&detail.voucher_type_name);
+    let action = action.as_str();
     let party = xml_escape(&party_entry.ledger);
     let gstin = observed
         .party_gstin
@@ -2733,7 +2739,7 @@ pub(super) fn render_sales_invoice_xml(
         .map(|gstin| format!("<PARTYGSTIN>{}</PARTYGSTIN>", xml_escape(gstin)))
         .unwrap_or_default();
     Some(format!(
-        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{narration}{legs}</VOUCHER></TALLYMESSAGE>",
+        "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{remote_id}\" VCHTYPE=\"{type_name}\" ACTION=\"{action}\" OBJVIEW=\"Invoice Voucher View\"><DATE>{date}</DATE><EFFECTIVEDATE>{date}</EFFECTIVEDATE><REFERENCEDATE>{date}</REFERENCEDATE><REFERENCE>{}</REFERENCE><VOUCHERTYPENAME>{type_name}</VOUCHERTYPENAME><VOUCHERNUMBER>{}</VOUCHERNUMBER><PARTYLEDGERNAME>{party}</PARTYLEDGERNAME><PARTYNAME>{party}</PARTYNAME><BASICBASEPARTYNAME>{party}</BASICBASEPARTYNAME><PARTYMAILINGNAME>{party}</PARTYMAILINGNAME><BASICBUYERNAME>{party}</BASICBUYERNAME><CONSIGNEEMAILINGNAME>{party}</CONSIGNEEMAILINGNAME>{gstin}<STATENAME>{}</STATENAME><CONSIGNEESTATENAME>{consignee_state}</CONSIGNEESTATENAME><PLACEOFSUPPLY>{}</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>{}</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE>{narration}{legs}</VOUCHER></TALLYMESSAGE>",
         xml_escape(number),
         xml_escape(number),
         xml_escape(&observed.party_state),

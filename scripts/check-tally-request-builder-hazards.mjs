@@ -17,9 +17,7 @@ const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[r
 // to this list and a distinct request-profile decision.
 const expected = new Set([
   "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_company_list|Company Report",
-  "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|BRIDGE Ledger Export V1",
   "custom-report|src-tauri/src/tally/tdl_engine.rs::legacy_company_list_request|Company Report",
-  "function-argument-with-space|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|$$NumItems:BRIDGE Ledger Collection V1",
 ]);
 
 // Method and function names whose value is money, by suffix. A money method
@@ -87,9 +85,8 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
   // tracked via brace-depth), inside a file under a tests/ directory
   // (integration tests), or in a file reached only through a test-only
   // `mod name;` declaration (testOnlyFiles(), by its #[cfg] attribute and never
-  // by the file's name: #837). This is deliberate, not incidental: unit tests such
-  // as `exact_report_collection_is_shared_by_count_and_rows`, which live
-  // inside `#[cfg(test)] mod tests { ... }`, assert against string literals
+  // by the file's name: #837). This is deliberate, not incidental: unit tests,
+  // which live inside `#[cfg(test)] mod tests { ... }`, may assert against string literals
   // containing `<REPORT NAME="...">` or `$$NumItems:... With Spaces` as
   // *expectations*, not as a dispatched request. Those are not request
   // builders and must not be scanned.

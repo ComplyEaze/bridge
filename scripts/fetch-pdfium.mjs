@@ -191,7 +191,7 @@ async function downloadOnce(url, limit, fetchImpl) {
   // An answer with no body (a 204, say) is malformed, not transient: refused on the first sight.
   if (!response.body) throw new Refusal(`${url}: HTTP ${response.status} with no body; refusing it`);
   // Read at most one byte past the pin, so an oversized answer is refused by its count, not read whole.
-  // The 120-second signal bounds the whole download, body included, not each read.
+  // The 120-second signal bounds one whole attempt, body included, not each read; a retry makes a new one.
   const chunks = [];
   let total = 0;
   try {

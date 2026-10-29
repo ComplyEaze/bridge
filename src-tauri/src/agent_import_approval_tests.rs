@@ -5,8 +5,8 @@
 //! test-only seam, held open until a test answers it.
 use super::*;
 use crate::agent::agent_import::approval::{
-    ApprovalBinding, Begin, Joined, PostApprovals, CALL_CEILING, MAX_KEPT_REFUSALS, MEASURED_POST,
-    MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
+    ApprovalBinding, Begin, Joined, PostApprovals, PreviewForm, CALL_CEILING, MAX_KEPT_REFUSALS,
+    MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
 use crate::agent::agent_protocol::{run_post, serve_stdio, Framer, ToolCallEnd};
 use crate::tally::agent_read_request::AgentReadRequest;
@@ -790,6 +790,7 @@ async fn the_wait_stops_at_a_withdrawal() {
                 None,
                 high_water_read(),
                 high_water_read(),
+                None,
             )
         })
         .await;
@@ -832,7 +833,7 @@ async fn nothing_is_held_for_a_withdrawn_call() {
         })
         .await;
     assert_eq!(held.err().as_deref(), Some("request_cancelled"));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     let (request, answered, native) = granted(&line, 1).await;
     let held = crate::tally::runtime::TOOL_CANCELLATION
         .scope(withdrawn, async {
@@ -840,7 +841,7 @@ async fn nothing_is_held_for_a_withdrawn_call() {
         })
         .await;
     assert_eq!(held.err().as_deref(), Some("request_cancelled"));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
 }
 
 /// A held dialog whose task ended with no answer (it panicked or was aborted)
@@ -874,7 +875,7 @@ async fn a_dialog_that_ended_unanswered_does_not_block_another_batch() {
         .unwrap();
     assert!(matches!(
         approvals.begin("bridge-00000000-0000-4000-8000-000000000586"),
-        Begin::Ask
+        Begin::Ask(_)
     ));
     assert!(!approvals.holds(&line.batch_id));
     assert!(
@@ -922,7 +923,7 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
     let approvals = PostApprovals::new(directory.path());
     hold_declined(&approvals, &line, &line.batch_id).await;
     assert!(
-        matches!(approvals.begin(OTHER), Begin::Ask),
+        matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "it blocks no other batch"
     );
     assert!(matches!(
@@ -930,20 +931,20 @@ async fn a_kept_refusal_is_returned_once_and_a_withdrawal_drops_it() {
         Begin::Refused(code) if code == "import_approval_declined"
     ));
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "returned once"
     );
 
     hold_declined(&approvals, &line, &line.batch_id).await;
-    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
     approvals.revoke(&line.batch_id, "request_cancelled");
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "a withdrawal drops it"
     );
     assert!(!approvals.holds(&line.batch_id));
     assert!(
-        matches!(approvals.begin(OTHER), Begin::Ask),
+        matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "nothing is left held"
     );
 }
@@ -957,17 +958,17 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(100));
     // Kept while fresh, then aged out.
     hold_declined(&approvals, &line, &line.batch_id).await;
-    assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+    assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "aged out"
     );
     // The age runs from the click, not from the later call that notices it.
     hold_declined(&approvals, &line, &line.batch_id).await;
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert!(
-        matches!(approvals.begin(&line.batch_id), Begin::Ask),
+        matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
         "aged from the click"
     );
     assert!(!approvals.holds(&line.batch_id));
@@ -976,10 +977,10 @@ async fn kept_refusals_age_out_and_the_oldest_goes_past_the_cap() {
     let batch = |i: usize| format!("bridge-00000000-0000-4000-8000-{i:012}");
     for i in 0..=MAX_KEPT_REFUSALS {
         hold_declined(&approvals, &line, &batch(i)).await;
-        assert!(matches!(approvals.begin(OTHER), Begin::Ask));
+        assert!(matches!(approvals.begin(OTHER), Begin::Ask(_)));
     }
     assert!(
-        matches!(approvals.begin(&batch(0)), Begin::Ask),
+        matches!(approvals.begin(&batch(0)), Begin::Ask(_)),
         "the oldest was dropped"
     );
     for kept in [batch(1), batch(MAX_KEPT_REFUSALS)] {
@@ -1079,41 +1080,132 @@ async fn a_batch_posted_elsewhere_releases_its_hold() {
 
 /// `post_import` over the stdio path every agent post takes, cancelled once
 /// `simulator` has received `after` requests when that is given, and failed
-/// if it has not ended within `bound`.
+/// if it has not ended within `bound`. A post that ends before that request
+/// arrives is not waited for: nothing is left to cancel, and its answer goes
+/// to the caller's assertions (#2093). One that has not ended within `bound`
+/// fails saying where it stood.
 async fn post_over_stdio(
     server: &Server,
     args: &Value,
     cancel: Option<(&SequenceSimulator, usize)>,
     bound: Duration,
 ) -> ToolCallEnd {
+    let started = std::time::Instant::now();
+    let ended = std::cell::Cell::new(false);
     let (client, source) = tokio::io::duplex(1 << 16);
     let (_client_read, mut client_write) = tokio::io::split(client);
     let (source_read, mut source_write) = tokio::io::split(source);
     let mut reader = BufReader::new(source_read);
-    let post = SCRIPTED_APPROVAL.scope(ScriptedApproval::approving(), async {
-        run_post(
-            server,
-            &json!(7),
-            args,
-            &mut reader,
-            &mut Framer::default(),
-            &mut std::collections::VecDeque::new(),
-            &mut source_write,
-        )
-        .await
-    });
+    let post = async {
+        let end = SCRIPTED_APPROVAL
+            .scope(ScriptedApproval::approving(), async {
+                run_post(
+                    server,
+                    &json!(7),
+                    args,
+                    &mut reader,
+                    &mut Framer::default(),
+                    &mut std::collections::VecDeque::new(),
+                    &mut source_write,
+                )
+                .await
+            })
+            .await;
+        ended.set(true);
+        end
+    };
     let canceller = async {
         if let Some((simulator, after)) = cancel {
             while simulator.received() <= after {
+                if ended.get() {
+                    return;
+                }
                 tokio::time::sleep(Duration::from_millis(2)).await;
             }
             client_write.write_all(CANCEL_7).await.unwrap();
         }
     };
-    let (outcome, ()) = tokio::time::timeout(bound, async { tokio::join!(post, canceller) })
-        .await
-        .unwrap();
+    let Ok((outcome, ())) =
+        tokio::time::timeout(bound, async { tokio::join!(post, canceller) }).await
+    else {
+        panic!(
+            "the post had not ended {:?} after it started (bound {bound:?}): the simulator had \
+             received {:?} requests, and the cancel was to follow request {:?}",
+            started.elapsed(),
+            cancel.map(|(simulator, _)| simulator.received()),
+            cancel.map(|(_, after)| after),
+        );
+    };
     outcome.unwrap()
+}
+
+/// How a post over stdio ended, for a failed assertion: its answer, cut short.
+fn described(outcome: &ToolCallEnd) -> String {
+    match outcome {
+        ToolCallEnd::Answered(response) => format!(
+            "answered: {}",
+            response
+                .value
+                .to_string()
+                .chars()
+                .take(2_000)
+                .collect::<String>()
+        ),
+        ToolCallEnd::Withdrawn { .. } => "withdrawn as cancelled".into(),
+    }
+}
+
+/// A post that ends before the request the cancel waits for is answered, not
+/// waited on until its bound (#2093): here the cancel is to follow a request
+/// the post never makes, and the post runs to its end.
+#[tokio::test]
+async fn a_post_that_ends_before_the_held_request_is_not_waited_for() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let never = usize::MAX - 1;
+    let outcome = post_over_stdio(
+        &server,
+        &args,
+        Some((&simulator, never)),
+        Duration::from_secs(20),
+    )
+    .await;
+    let _ = sent(simulator);
+    assert!(
+        matches!(outcome, ToolCallEnd::Answered(_)),
+        "{}",
+        described(&outcome)
+    );
+    assert_eq!(intents(directory.path()), 1, "it posted, uncancelled");
+}
+
+/// A post that has not ended within its bound fails saying where it stood:
+/// how far into it the bound ran out, the requests the simulator had received
+/// and the one the cancel was to follow (#2093). Its first read is answered
+/// only after 300 milliseconds, so it cannot end within the 50 of its bound.
+#[tokio::test]
+#[should_panic(expected = "requests, and the cancel was to follow request Some(0)")]
+async fn a_post_that_has_not_ended_within_its_bound_says_where_it_stood() {
+    let mut plans = before_approval();
+    plans[0] = plans[0]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(Duration::from_millis(300)));
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let _ = post_over_stdio(
+        &server,
+        &args,
+        Some((&simulator, 0)),
+        Duration::from_millis(50),
+    )
+    .await;
 }
 
 /// A cancellation that lands inside the queue's lease operation, through the
@@ -1122,8 +1214,8 @@ async fn post_over_stdio(
 /// written and no POST is sent, and the approval lapses as cancelled. Run with
 /// each of the lease's reads before the POST held in turn. The control, the
 /// same run never cancelled, posts: so the cancellation is what stopped it.
-#[tokio::test]
-async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
+#[test]
+fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() {
     let lease_reads = after_approval(xml(created_one())).len() - 1;
     async fn one_case(held_at: Option<usize>, bound: Duration) {
         let mut plans = before_approval();
@@ -1151,7 +1243,8 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
         if let Some(held_at) = held_at {
             assert!(
                 matches!(outcome, ToolCallEnd::Withdrawn { .. }),
-                "{held_at}: answered as cancelled"
+                "{held_at}: answered as cancelled, but {}",
+                described(&outcome)
             );
             assert_eq!(intents(directory.path()), 0, "{held_at}");
             assert_eq!(
@@ -1171,48 +1264,74 @@ async fn a_cancel_inside_the_lease_finishes_the_held_read_and_starts_no_other() 
                 "{held_at}"
             );
         } else {
-            assert!(matches!(outcome, ToolCallEnd::Answered(_)));
+            assert!(
+                matches!(outcome, ToolCallEnd::Answered(_)),
+                "the control: {}",
+                described(&outcome)
+            );
             assert_eq!(intents(directory.path()), 1, "the control posts");
             assert!(observed.len() > post_at);
         }
     }
 
-    // A case has its own simulator (on its own port), directory, server and
-    // approvals, and spends its time waiting on that simulator, so the cases
-    // run side by side on this thread, a group at a time. A group is no wider
-    // than this, so that the cancellation of a case is never held back by the
-    // others for more than a small part of the 300 milliseconds a held read
-    // lasts. Every case is joined, and a panic in any of them is passed on
-    // after the others have finished, with the case named.
-    //
-    // The cases of a group share one thread, and the synchronous work of each
-    // runs while the others wait, so on a loaded runner a late case of a group
-    // can end only after the others: a case's bound is one case's allowance
-    // for every case of its group, not a fixed time.
-    const AT_ONCE: usize = 11;
-    const ONE_CASE: Duration = Duration::from_secs(20);
+    // Each case runs on a thread and a runtime of its own, as a separate
+    // process would, with its own simulator (on its own port), directory,
+    // server, approvals and bound: a case that is slow, or blocks its thread,
+    // holds back no other (#2093). Every case is joined, and a panic in any of
+    // them is passed on after the others have finished, with the case named.
+    // A case whose thread is blocked, so that its own bound cannot fire, fails
+    // by name once the cases have had their bound and a margin.
+    const ONE_CASE: Duration = Duration::from_secs(60);
+    const MARGIN: Duration = Duration::from_secs(30);
     let cases = (0..lease_reads).map(Some).chain([None]).collect::<Vec<_>>();
-    for group in cases.chunks(AT_ONCE) {
-        let bound = ONE_CASE * u32::try_from(group.len()).unwrap();
-        let local = tokio::task::LocalSet::new();
-        local
-            .run_until(async {
-                let running = group
-                    .iter()
-                    .map(|&held_at| (held_at, tokio::task::spawn_local(one_case(held_at, bound))))
-                    .collect::<Vec<_>>();
-                let mut panicked = None;
-                for (held_at, case) in running {
-                    if let Err(error) = case.await {
-                        eprintln!("case {held_at:?} failed");
-                        panicked.get_or_insert(error);
+    let (finished, ends) = std::sync::mpsc::channel();
+    let running = cases
+        .iter()
+        .map(|&held_at| {
+            let finished = finished.clone();
+            let case = std::thread::Builder::new()
+                .name(format!("case {held_at:?}"))
+                .spawn(move || {
+                    // Sent however the case ends, a panic included.
+                    struct Ended(Option<usize>, std::sync::mpsc::Sender<Option<usize>>);
+                    impl Drop for Ended {
+                        fn drop(&mut self) {
+                            let _ = self.1.send(self.0);
+                        }
                     }
-                }
-                if let Some(error) = panicked {
-                    std::panic::resume_unwind(error.into_panic());
-                }
-            })
-            .await;
+                    let _ended = Ended(held_at, finished);
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                        .unwrap()
+                        .block_on(Box::pin(one_case(held_at, ONE_CASE)));
+                })
+                .unwrap();
+            (held_at, case)
+        })
+        .collect::<Vec<_>>();
+    let started = std::time::Instant::now();
+    let mut pending = cases.clone();
+    while !pending.is_empty() {
+        let left = (ONE_CASE + MARGIN).saturating_sub(started.elapsed());
+        match ends.recv_timeout(left) {
+            Ok(held_at) => pending.retain(|case| *case != held_at),
+            Err(_) => panic!(
+                "cases {pending:?} had not ended {:?} after they started: a case's thread is \
+                 blocked, so its own bound could not fire",
+                started.elapsed()
+            ),
+        }
+    }
+    let mut panicked = None;
+    for (held_at, case) in running {
+        if let Err(error) = case.join() {
+            eprintln!("case {held_at:?} failed");
+            panicked.get_or_insert(error);
+        }
+    }
+    if let Some(error) = panicked {
+        std::panic::resume_unwind(error);
     }
 }
 
@@ -1497,7 +1616,7 @@ async fn a_redemption_ended_before_its_intent_is_not_left_taken() {
     assert!(!server.post_approvals.holds(&line.batch_id), "not stranded");
     assert!(matches!(
         server.post_approvals.begin(&line.batch_id),
-        Begin::Ask
+        Begin::Ask(_)
     ));
     assert_eq!(
         server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
@@ -1542,6 +1661,7 @@ async fn dialog_with(scripted: ScriptedApproval, vouchers: usize) -> PendingPost
                 None,
                 high_water_read(),
                 high_water_read(),
+                None,
             )
         })
         .await
@@ -1576,7 +1696,7 @@ fn binding_of(line: &ImportLedgerLine, preview: &str) -> ApprovalBinding {
         amends_batch_id: None,
     }))
     .unwrap();
-    ApprovalBinding::new(line, preview, &binding)
+    ApprovalBinding::new(line, preview, &binding, PreviewForm::Listed)
 }
 
 fn held_line(directory: &std::path::Path) -> (Server, ImportLedgerLine) {
@@ -1652,7 +1772,7 @@ async fn a_redemption_for_anything_else_is_refused_and_lapses() {
         assert_eq!(note["reason"], "approval_binding_changed", "{case}");
         assert_eq!(note["redeemable"], false, "{case}");
         assert!(
-            matches!(approvals.begin(&line.batch_id), Begin::Ask),
+            matches!(approvals.begin(&line.batch_id), Begin::Ask(_)),
             "{case}"
         );
     }
@@ -1723,7 +1843,7 @@ async fn an_expired_approval_lapses_with_a_note() {
         .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
     std::thread::sleep(Duration::from_millis(5));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     let note = approvals.lapse_note(&line.batch_id).unwrap();
     assert_eq!(note["reason"], "approval_expired");
     assert_eq!(note["state"], "approval_lapsed_unposted");
@@ -1762,7 +1882,7 @@ async fn an_approval_does_not_survive_its_process() {
         .unwrap();
     drop(approvals);
     let restarted = PostApprovals::new(directory.path());
-    assert!(matches!(restarted.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(restarted.begin(&line.batch_id), Begin::Ask(_)));
     let note = restarted.lapse_note(&line.batch_id).unwrap();
     assert_eq!(note["reason"], "process_ended");
     assert_eq!(note["redeemable"], false);
@@ -1793,7 +1913,7 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
         .unwrap();
     tokio::time::sleep(Duration::from_millis(20)).await;
     approvals.revoke(&line.batch_id, "request_cancelled");
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     assert!(approvals
         .take_for_dispatch(&line.batch_id, &binding)
         .is_err());
@@ -1825,7 +1945,7 @@ async fn an_answer_revoked_before_its_redemption_is_never_spent() {
         approvals.settle_join(&line.batch_id, Ok(answer)),
         Joined::Refused(code) if code == "import_approval_revoked"
     ));
-    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask));
+    assert!(matches!(approvals.begin(&line.batch_id), Begin::Ask(_)));
     assert!(approvals
         .take_for_dispatch(&line.batch_id, &binding)
         .is_err());
@@ -1928,8 +2048,8 @@ fn the_dialog_shows_each_narration_exactly_as_the_post_sends_it() {
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     for shown in [
-        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"",
-        "Journal 20260901  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Second rent\"",
+        "Journal 1-Sep-2026  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"",
+        "Journal 1-Sep-2026  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Second rent\"",
     ] {
         assert!(batch.lines().any(|text| text == shown), "{shown}\n{batch}");
     }
@@ -2191,7 +2311,10 @@ async fn a_redeem_only_begin_goes_on_only_for_this_batchs_live_approval() {
     approvals
         .hold_approved(&line.batch_id, binding.clone(), request, native, answered)
         .unwrap();
-    assert_eq!(approvals.begin_redeem(&line.batch_id), Ok(()));
+    assert_eq!(
+        approvals.begin_redeem(&line.batch_id),
+        Ok(PreviewForm::Listed)
+    );
     let (taken, _, _) = approvals
         .take_for_dispatch(&line.batch_id, &binding)
         .unwrap();
@@ -2626,7 +2749,7 @@ fn assert_refused_and_slot_freed(clicked: Clicked, refused: &Value, code: &str) 
     let approvals = &clicked.server.post_approvals;
     assert!(!approvals.holds(&clicked.line.batch_id), "not stranded");
     assert!(
-        matches!(approvals.begin(OTHER), Begin::Ask),
+        matches!(approvals.begin(OTHER), Begin::Ask(_)),
         "another batch is asked, not refused as busy"
     );
     assert_eq!(
@@ -2820,7 +2943,7 @@ async fn a_batch_lost_between_the_passes_does_not_strand_its_approval() {
     assert_eq!(scripted.counts(), [1], "no second dialog: {answer}");
     assert_eq!(intents(directory.path()), 0);
     assert!(!server.post_approvals.holds(&line.batch_id), "not stranded");
-    assert!(matches!(server.post_approvals.begin(OTHER), Begin::Ask));
+    assert!(matches!(server.post_approvals.begin(OTHER), Begin::Ask(_)));
     assert_eq!(
         server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
         "post_refused_before_intent"
@@ -2869,4 +2992,987 @@ async fn a_skip_recorded_after_the_click_is_refused_in_the_redeeming_call_and_wi
     // the redeeming call read nothing: only the first call's reads were made
     assert_eq!(observed.len(), before_approval().len());
     assert_eq!(intents(directory.path()), 0);
+}
+
+// A master approval is a second kind in the same single slot. Everything below
+// is held and redeemed through the same `PostApprovals`; only the kind differs.
+
+mod masters {
+    use super::*;
+    use crate::agent::agent_import::approval::HeldRequest;
+    use crate::agent::agent_import::master_post::MasterPostRequest;
+    use crate::tally::approved_import::PostKind;
+    use crate::tally::ledger_create_item::{
+        AdmittedDutyHead, AdmittedLedgerKind, LedgerCreateItem, MasterName, PartySide,
+        VerifiedGstin,
+    };
+    use crate::tally::VerifiedCompanyIdentity;
+    use bridge_tally_protocol::GstDutyHead;
+
+    const LAB: &str = "BRIDGE MASTERS LAB";
+    fn lab_guid() -> &'static str {
+        crate::synthetic_guid(1)
+    }
+    const GSTIN: &str = "08ZZZZZ0000Z2ZP";
+    const PREVIEW: &str = "Create ledger \"MLab Party\" under Sundry Debtors";
+    const SHA: &str = "a2f4c3ea8b6a8c0d1e0b4f3a96d6e1d3c5b8f7a2e0b4c6d8f1a3b5c7d9e0f2a4";
+    const ORIGIN: &str = "http://127.0.0.1:9000";
+
+    fn company() -> VerifiedCompanyIdentity {
+        VerifiedCompanyIdentity::test_fixture(LAB, lab_guid())
+    }
+
+    fn party(name: &str, gstin: Option<&str>, bill_wise: bool) -> LedgerCreateItem {
+        LedgerCreateItem::new(
+            MasterName::new(name).unwrap(),
+            AdmittedLedgerKind::Party {
+                side: PartySide::SundryDebtors,
+                gstin: gstin.map(|value| VerifiedGstin::new(value).unwrap()),
+                bill_wise,
+            },
+        )
+    }
+
+    fn item() -> LedgerCreateItem {
+        party("MLab Party", Some(GSTIN), true)
+    }
+
+    fn binding(item: &LedgerCreateItem) -> ApprovalBinding {
+        ApprovalBinding::masters(SHA, ORIGIN, &company(), item, PREVIEW)
+    }
+
+    fn marks() -> AgentReadRequest {
+        AgentReadRequest::parse(
+            bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2.render(),
+        )
+        .unwrap()
+    }
+
+    fn answered() -> Answered {
+        Answered {
+            approved: true,
+            at: std::time::Instant::now(),
+            at_wall: std::time::SystemTime::now(),
+        }
+    }
+
+    /// An approval the masters dialog granted for `item`, with the request it
+    /// was rendered for.
+    fn granted_masters(item: &LedgerCreateItem) -> (ApprovedImport, MasterPostRequest) {
+        (
+            ApprovedImport::approved_masters_for_test(item.clone(), &company(), marks()),
+            MasterPostRequest::render(item.clone(), &company()),
+        )
+    }
+
+    fn hold_masters(approvals: &PostApprovals, batch_id: &str, item: &LedgerCreateItem) {
+        let (request, held) = granted_masters(item);
+        approvals
+            .hold_approved(batch_id, binding(item), request, held, answered())
+            .unwrap();
+    }
+
+    /// A master approval cannot be redeemed for a voucher post, and a voucher
+    /// approval cannot be redeemed for a master post: the kind is refused as a
+    /// changed binding, the approval lapses with a note that is not an approval,
+    /// and the slot is open again.
+    #[tokio::test]
+    async fn a_master_approval_cannot_be_redeemed_for_a_voucher_post_and_the_reverse() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let voucher_binding = binding_of(&line, "Synthetic preview");
+        // The control: each approval is redeemed for its own kind.
+        let (request, held) = granted_masters(&item());
+        approvals
+            .hold_approved(&batch, binding(&item()), request, held, answered())
+            .unwrap();
+        let (taken, redeemed, held) = approvals
+            .take_for_dispatch(&batch, &binding(&item()))
+            .unwrap();
+        assert_eq!(redeemed.post_kind(), PostKind::Masters);
+        let HeldRequest::Masters(held) = held else {
+            panic!("a master approval comes back with its master request");
+        };
+        assert_eq!(held.item(), &item());
+        assert_eq!(
+            held.sha256(),
+            bridge_tally_protocol::sha256_hex(held.xml().as_bytes())
+        );
+        assert!(redeemed.sends_exactly(held.xml()));
+        drop(taken);
+
+        // A master approval, a voucher redemption.
+        hold_masters(&approvals, &batch, &item());
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &voucher_binding)
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed")
+        );
+        let note = approvals.lapse_note(&batch).unwrap();
+        assert_eq!(note["reason"], "approval_binding_changed");
+        assert_eq!(note["redeemable"], false);
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+
+        // A voucher approval, a master redemption.
+        let (request, answered_at, native) = granted(&line, 1).await;
+        approvals
+            .hold_approved(
+                &batch,
+                voucher_binding.clone(),
+                request,
+                native,
+                answered_at,
+            )
+            .unwrap();
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &binding(&item()))
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed")
+        );
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+    }
+
+    /// The binding of the two kinds is never equal, even for the same batch
+    /// digest, endpoint and preview.
+    #[tokio::test]
+    async fn the_two_kinds_bind_differently_and_name_their_kind() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let voucher = binding_of(&line, PREVIEW);
+        let masters = ApprovalBinding::masters(
+            &line.sha256,
+            line.endpoint_origin.as_deref().unwrap(),
+            &company(),
+            &item(),
+            PREVIEW,
+        );
+        assert_ne!(voucher, masters);
+        assert_eq!(voucher.kind(), PostKind::Vouchers);
+        assert_eq!(masters.kind(), PostKind::Masters);
+    }
+
+    /// The approval is held beside the request it covers, and each of the
+    /// three must be for the kind being posted, by kind: a binding of one
+    /// kind with an approval or a held request of the other is refused, and so
+    /// is a held request whose bytes are not the ones approved.
+    #[tokio::test]
+    async fn a_held_approval_whose_parts_disagree_on_kind_is_refused() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let (voucher_request, voucher_answered, native) = granted(&line, 1).await;
+        let fresh = binding(&item());
+        let (masters_request, masters_held) = granted_masters(&item());
+        let other_held = MasterPostRequest::render(party("Another", None, false), &company());
+
+        // Masters binding, voucher approval.
+        approvals
+            .hold_approved(
+                &batch,
+                fresh.clone(),
+                voucher_request,
+                masters_held.clone(),
+                voucher_answered,
+            )
+            .unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_binding_changed"),
+            "the approved request is a voucher's"
+        );
+        // Masters binding and approval, voucher held request.
+        approvals
+            .hold_approved(
+                &batch,
+                fresh.clone(),
+                masters_request.clone(),
+                native,
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_binding_changed"),
+            "the held request is a voucher's"
+        );
+        // Everything a master's, but the held bytes are another request's.
+        approvals
+            .hold_approved(
+                &batch,
+                fresh.clone(),
+                masters_request.clone(),
+                other_held,
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_binding_changed"),
+            "the held request is not the one approved"
+        );
+        // Voucher binding, master approval and held request.
+        let voucher_binding = binding_of(&line, "Synthetic preview");
+        approvals
+            .hold_approved(
+                &batch,
+                voucher_binding.clone(),
+                masters_request,
+                masters_held,
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &voucher_binding)
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed"),
+            "the held request is a master's too"
+        );
+        // Voucher binding and held request, master approval: only the approved
+        // request's own kind tells these apart.
+        let (request, _) = granted_masters(&item());
+        approvals
+            .hold_approved(
+                &batch,
+                voucher_binding.clone(),
+                request,
+                native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap(),
+                answered(),
+            )
+            .unwrap();
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &voucher_binding)
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed"),
+            "only the approved request is a master's"
+        );
+    }
+
+    /// Redeemed only for what the person was shown: every field of the item,
+    /// the company tuple, the batch digest, the endpoint and the preview. Each
+    /// change is refused, and the approval lapses.
+    #[tokio::test]
+    async fn a_master_redemption_for_anything_else_is_refused_and_lapses() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let base = item();
+        let other_company =
+            VerifiedCompanyIdentity::test_fixture(LAB, "00000000-0000-4000-8000-000000000002");
+        let renamed_company = VerifiedCompanyIdentity::test_fixture("Another Lab", lab_guid());
+        let fresh_bindings: Vec<(&str, ApprovalBinding)> = vec![
+            ("name", binding(&party("MLab Party 2", Some(GSTIN), true))),
+            ("gstin absent", binding(&party("MLab Party", None, true))),
+            (
+                "gstin other",
+                binding(&party("MLab Party", Some("27ZZZZZ0000Z1ZQ"), true)),
+            ),
+            (
+                "bill-wise",
+                binding(&party("MLab Party", Some(GSTIN), false)),
+            ),
+            (
+                "side",
+                binding(&LedgerCreateItem::new(
+                    MasterName::new("MLab Party").unwrap(),
+                    AdmittedLedgerKind::Party {
+                        side: PartySide::SundryCreditors,
+                        gstin: Some(VerifiedGstin::new(GSTIN).unwrap()),
+                        bill_wise: true,
+                    },
+                )),
+            ),
+            (
+                "kind",
+                binding(&LedgerCreateItem::new(
+                    MasterName::new("MLab Party").unwrap(),
+                    AdmittedLedgerKind::Suspense,
+                )),
+            ),
+            (
+                "duty head",
+                binding(&LedgerCreateItem::new(
+                    MasterName::new("MLab Party").unwrap(),
+                    AdmittedLedgerKind::GstDuty {
+                        head: AdmittedDutyHead::new(GstDutyHead::SgstUtgst).unwrap(),
+                    },
+                )),
+            ),
+            (
+                "digest",
+                ApprovalBinding::masters(&"0".repeat(64), ORIGIN, &company(), &base, PREVIEW),
+            ),
+            (
+                "endpoint",
+                ApprovalBinding::masters(SHA, "http://127.0.0.1:1", &company(), &base, PREVIEW),
+            ),
+            (
+                "company guid",
+                ApprovalBinding::masters(SHA, ORIGIN, &other_company, &base, PREVIEW),
+            ),
+            (
+                "company name",
+                ApprovalBinding::masters(SHA, ORIGIN, &renamed_company, &base, PREVIEW),
+            ),
+            (
+                "preview",
+                ApprovalBinding::masters(SHA, ORIGIN, &company(), &base, "Another preview"),
+            ),
+        ];
+        for (case, fresh) in fresh_bindings {
+            assert_ne!(fresh, binding(&base), "{case} must differ from the base");
+            hold_masters(&approvals, &batch, &base);
+            assert_eq!(
+                approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+                Some("import_approval_binding_changed"),
+                "{case}"
+            );
+            let note = approvals.lapse_note(&batch).unwrap();
+            assert_eq!(note["reason"], "approval_binding_changed", "{case}");
+            assert!(matches!(approvals.begin(&batch), Begin::Ask(_)), "{case}");
+        }
+    }
+
+    /// Spent once, under the lock, before an intent: a second redemption (in
+    /// use, not revoked), a second spend, and a spend after a revocation are
+    /// refused, for a master approval as for a voucher's.
+    #[tokio::test]
+    async fn a_master_approval_is_spent_once_and_never_after_a_revocation() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let fresh = binding(&item());
+        hold_masters(&approvals, &batch, &item());
+        let (taken, _, _) = approvals.take_for_dispatch(&batch, &fresh).unwrap();
+        assert_eq!(
+            approvals.take_for_dispatch(&batch, &fresh).err().as_deref(),
+            Some("import_approval_in_use")
+        );
+        approvals.spend(&batch, taken.id()).unwrap();
+        assert_eq!(
+            approvals.spend(&batch, taken.id()).err(),
+            Some(UnderLockRefusal::ApprovalRevoked)
+        );
+        drop(taken);
+        assert!(
+            approvals.lapse_note(&batch).is_none(),
+            "a spent approval leaves no note"
+        );
+        assert!(
+            approvals.take_for_dispatch(&batch, &fresh).is_err(),
+            "nothing is left to redeem again"
+        );
+
+        hold_masters(&approvals, &batch, &item());
+        let (taken, _, _) = approvals.take_for_dispatch(&batch, &fresh).unwrap();
+        approvals.revoke(&batch, "request_cancelled");
+        assert_eq!(
+            approvals.spend(&batch, taken.id()).err(),
+            Some(UnderLockRefusal::ApprovalRevoked)
+        );
+        assert_eq!(
+            approvals.lapse_note(&batch).unwrap()["reason"],
+            "request_cancelled"
+        );
+    }
+
+    /// An approval not redeemed in time lapses with a note, whichever kind it
+    /// is for, and a late redemption is refused as expired.
+    #[tokio::test]
+    async fn an_expired_master_approval_lapses_with_a_note() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::with_ttl(directory.path(), Duration::from_millis(1));
+        hold_masters(&approvals, &batch, &item());
+        std::thread::sleep(Duration::from_millis(5));
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+        let note = approvals.lapse_note(&batch).unwrap();
+        assert_eq!(note["reason"], "approval_expired");
+        assert_eq!(note["redeemable"], false);
+
+        hold_masters(&approvals, &batch, &item());
+        std::thread::sleep(Duration::from_millis(5));
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &binding(&item()))
+                .err()
+                .as_deref(),
+            Some("import_approval_expired")
+        );
+    }
+
+    /// A master approval holds the same single slot: nothing else is held
+    /// beside it, and it does not survive its process.
+    #[tokio::test]
+    async fn a_master_approval_shares_the_one_slot_and_dies_with_its_process() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        hold_masters(&approvals, &batch, &item());
+        let (request, held) = granted_masters(&item());
+        assert_eq!(
+            approvals
+                .hold_approved(OTHER, binding(&item()), request, held, answered())
+                .err()
+                .as_deref(),
+            Some("post_approval_busy")
+        );
+        assert!(matches!(
+            approvals.begin(OTHER),
+            Begin::Busy("post_approval_busy")
+        ));
+        drop(approvals);
+        let restarted = PostApprovals::new(directory.path());
+        assert!(matches!(restarted.begin(&batch), Begin::Ask(_)));
+        assert_eq!(
+            restarted.lapse_note(&batch).unwrap()["reason"],
+            "process_ended"
+        );
+        assert!(restarted
+            .take_for_dispatch(&batch, &binding(&item()))
+            .is_err());
+    }
+
+    /// A master dialog left open is held, joined, and redeemed like a voucher's.
+    #[tokio::test]
+    async fn a_held_master_dialog_is_joined_then_redeemed_for_its_own_kind() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let scripted = ScriptedApproval::approving();
+        let dialog = SCRIPTED_APPROVAL
+            .scope(scripted.clone(), async {
+                PendingPostApproval::ask_masters(item(), company(), PREVIEW.to_string(), marks())
+            })
+            .await;
+        approvals
+            .hold_pending(
+                &batch,
+                binding(&item()),
+                dialog,
+                MasterPostRequest::render(item(), &company()),
+            )
+            .unwrap();
+        let Begin::Join(dialog) = approvals.begin(&batch) else {
+            panic!("a held dialog is joined");
+        };
+        let answer = dialog
+            .answer_within(Duration::from_secs(5))
+            .await
+            .ok()
+            .expect("answered");
+        assert!(matches!(
+            approvals.settle_join(&batch, Ok(answer)),
+            Joined::Approved
+        ));
+        assert_eq!(scripted.masters(), vec![PREVIEW.to_string()]);
+        // Redeemed for a voucher post, refused; the dialog's answer is spent
+        // on the refusal.
+        assert_eq!(
+            approvals
+                .take_for_dispatch(&batch, &binding_of(&line, "Synthetic preview"))
+                .err()
+                .as_deref(),
+            Some("import_approval_binding_changed")
+        );
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+    }
+
+    /// A call that names a batch of the other kind withdraws nothing: a voucher
+    /// tool given a master batch id leaves the master approval held, a master
+    /// tool given a voucher batch id leaves the voucher approval held, and each
+    /// kind's own withdrawal still works.
+    #[tokio::test]
+    async fn withdrawing_a_post_of_one_kind_leaves_the_other_kinds_approval() {
+        let directory = tempfile::tempdir().unwrap();
+        let (_server, line) = held_line(directory.path());
+        let batch = line.batch_id.clone();
+        let approvals = PostApprovals::new(directory.path());
+        let held_master = |approvals: &PostApprovals| hold_masters(approvals, &batch, &item());
+        let redeemable =
+            |approvals: &PostApprovals| matches!(approvals.begin(&batch), Begin::Redeem(_));
+
+        // A master approval, withdrawn as a voucher post: kept.
+        held_master(&approvals);
+        approvals.revoke_unredeemed(&batch, "post_refused_before_intent");
+        assert!(redeemable(&approvals), "revoke_unredeemed (voucher)");
+        approvals.revoke(&batch, "batch_already_dispatched");
+        assert!(redeemable(&approvals), "revoke (voucher)");
+        approvals.revoke_of(PostKind::Vouchers, &batch, "request_cancelled");
+        assert!(redeemable(&approvals), "revoke_of (voucher)");
+        // Withdrawn as a master post: gone, with a note.
+        approvals.revoke_unredeemed_of(PostKind::Masters, &batch, "post_refused_before_intent");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+        assert_eq!(
+            approvals.lapse_note(&batch).unwrap()["reason"],
+            "post_refused_before_intent"
+        );
+        held_master(&approvals);
+        approvals.revoke_of(PostKind::Masters, &batch, "request_cancelled");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+
+        // A voucher approval, withdrawn as a master post: kept.
+        let (request, answered_at, native) = granted(&line, 1).await;
+        approvals
+            .hold_approved(
+                &batch,
+                binding_of(&line, "Synthetic preview"),
+                request,
+                native,
+                answered_at,
+            )
+            .unwrap();
+        approvals.revoke_unredeemed_of(PostKind::Masters, &batch, "post_refused_before_intent");
+        assert!(redeemable(&approvals), "revoke_unredeemed_of (masters)");
+        approvals.revoke_of(PostKind::Masters, &batch, "request_cancelled");
+        assert!(redeemable(&approvals), "revoke_of (masters)");
+        approvals.revoke_unredeemed(&batch, "post_refused_before_intent");
+        assert!(matches!(approvals.begin(&batch), Begin::Ask(_)));
+    }
+}
+
+/// A dialog for `vouchers` vouchers, answered as `scripted` decides, that
+/// tells `note` if its box did not fit the screen (#1832).
+async fn dialog_noting(
+    scripted: ScriptedApproval,
+    vouchers: usize,
+    note: Option<Box<dyn FnOnce() + Send>>,
+) -> PendingPostApproval {
+    SCRIPTED_APPROVAL
+        .scope(scripted, async {
+            PendingPostApproval::ask(
+                "<ENVELOPE/>".into(),
+                "Synthetic preview".into(),
+                vec![bridge_tally_core::TallyDate::parse("20260901").unwrap(); vouchers],
+                high_water_read(),
+                high_water_read(),
+                cash_binding(),
+                None,
+                high_water_read(),
+                high_water_read(),
+                note,
+            )
+        })
+        .await
+}
+
+/// A batch of `count` Journals made from the saved one.
+fn batch_of(one: &ImportLedgerLine, count: usize) -> ImportLedgerLine {
+    let mut batch = one.clone();
+    for at in 1..count {
+        let mut next = one.vouchers[0].clone();
+        next.bridge_txn_id = format!("journal-583-{}", at + 1);
+        batch.vouchers.push(next);
+    }
+    batch
+}
+
+/// The totals form leaves out the voucher lines and says why, the listed form
+/// shows them, and one voucher has no other form (#1832).
+#[test]
+fn the_totals_form_is_the_listed_forms_fallback_text_and_nothing_else() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let (one, _) = saved_batch(&server);
+    let endpoint = server.settings.endpoint.clone();
+    let footer = agent_post_timing_lines();
+    let form = |line: &ImportLedgerLine, form| {
+        review_preview_with_form(line, &endpoint, &footer, form).unwrap()
+    };
+    let two = batch_of(&one, 2);
+    let listed = form(&two, PreviewForm::Listed);
+    let totals = form(&two, PreviewForm::TotalsOnly);
+    let voucher_line =
+        "Journal 1-Sep-2026  12.5  Dr \"WR2 Sales\"  Cr \"Cash\"  \"Synthetic test only\"";
+    assert!(listed.lines().any(|text| text == voucher_line), "{listed}");
+    assert!(!listed.contains(VOUCHER_LINES_DO_NOT_FIT), "{listed}");
+    assert!(!totals.lines().any(|text| text == voucher_line), "{totals}");
+    assert!(totals.contains(VOUCHER_LINES_DO_NOT_FIT), "{totals}");
+    assert!(totals.lines().count() < listed.lines().count());
+    // Everything the person checks first is the same in both.
+    let head = |text: &str| text.lines().take(6).collect::<Vec<_>>().join("\n");
+    assert_eq!(head(&listed), head(&totals));
+    // The same text the cap fallback gives a batch whose lines do not fit.
+    assert_eq!(totals, form(&two, PreviewForm::TotalsOnly), "deterministic");
+    // One voucher has no shorter form.
+    assert_eq!(
+        form(&one, PreviewForm::Listed),
+        form(&one, PreviewForm::TotalsOnly)
+    );
+    // A refusal before the lines is kept: a batch past the limit shows its
+    // sentence in both forms.
+    let many = batch_of(&one, BATCH_REVIEW_MAX_VOUCHER_LINES + 1);
+    assert_eq!(
+        form(&many, PreviewForm::Listed),
+        form(&many, PreviewForm::TotalsOnly)
+    );
+}
+
+/// What the person was shown includes which form: the same preview bound as
+/// the other form is another binding (#1832).
+#[test]
+fn a_binding_names_its_form() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let ledgers = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &catalogue(),
+        "WR2 Unicode Lab",
+        GUID,
+    )
+    .unwrap()
+    .bind_selected(["Cash".to_string()])
+    .unwrap();
+    let listed = ApprovalBinding::new(&line, "Preview", &ledgers, PreviewForm::Listed);
+    let totals = ApprovalBinding::new(&line, "Preview", &ledgers, PreviewForm::TotalsOnly);
+    assert_eq!(
+        listed,
+        ApprovalBinding::new(&line, "Preview", &ledgers, PreviewForm::Listed)
+    );
+    assert_ne!(listed, totals);
+}
+
+/// A batch whose listed box did not fit the screen is asked again as totals
+/// only; another batch is not; a withdrawal, its time running out, and the cap
+/// end it (#1832).
+#[tokio::test]
+async fn a_noted_batch_is_asked_again_as_totals_only_for_as_long_as_it_is_remembered() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let approvals = PostApprovals::new(directory.path());
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::Listed)
+    ));
+    approvals.note_listed_did_not_fit(&line.batch_id)();
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+    assert!(matches!(
+        approvals.begin(OTHER),
+        Begin::Ask(PreviewForm::Listed)
+    ));
+    // Asked as often as it is asked: nothing but a withdrawal or time ends it.
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+    approvals.revoke(&line.batch_id, "test");
+    assert!(matches!(
+        approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::Listed)
+    ));
+
+    let brief = PostApprovals::with_ttl(directory.path(), Duration::from_millis(100));
+    brief.note_listed_did_not_fit(&line.batch_id)();
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(
+        matches!(brief.begin(&line.batch_id), Begin::Ask(PreviewForm::Listed)),
+        "aged out"
+    );
+
+    // Noting a batch again replaces its note, so repeats never crowd out
+    // another batch's.
+    let again = PostApprovals::new(directory.path());
+    again.note_listed_did_not_fit(OTHER)();
+    for _ in 0..=MAX_KEPT_REFUSALS + 8 {
+        again.note_listed_did_not_fit(&line.batch_id)();
+    }
+    assert!(matches!(
+        again.begin(OTHER),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+
+    let batch = |i: usize| format!("bridge-00000000-0000-4000-8000-{i:012}");
+    for i in 0..=MAX_KEPT_REFUSALS {
+        approvals.note_listed_did_not_fit(&batch(i))();
+    }
+    assert!(
+        matches!(approvals.begin(&batch(0)), Begin::Ask(PreviewForm::Listed)),
+        "the oldest was dropped"
+    );
+    for kept in [batch(1), batch(MAX_KEPT_REFUSALS)] {
+        assert!(matches!(
+            approvals.begin(&kept),
+            Begin::Ask(PreviewForm::TotalsOnly)
+        ));
+    }
+}
+
+/// Only a dialog that reports a box that did not fit, and only one given the
+/// note, makes a batch remembered; the dialog still refuses as it did (#1832).
+#[tokio::test]
+async fn only_a_box_that_did_not_fit_notes_its_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_server, line) = held_line(directory.path());
+    let wait = Duration::from_secs(5);
+    let batch = line.batch_id.as_str();
+
+    // A box that did not fit: refused as too large, and noted.
+    let approvals = PostApprovals::new(directory.path());
+    let note = approvals.note_listed_did_not_fit(batch);
+    let dialog = dialog_noting(ScriptedApproval::too_tall_first(1), 2, Some(note)).await;
+    let (answer, answered) = dialog.answer_within(wait).await.ok().expect("answered");
+    assert_eq!(answer.err().as_deref(), Some("import_review_too_large"));
+    assert!(!answered.approved);
+    assert!(matches!(
+        approvals.begin(batch),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+
+    // The totals box, asked with no note, is approved or refused on its own.
+    let again = dialog_noting(ScriptedApproval::approving(), 2, None).await;
+    assert!(again.answer_within(wait).await.ok().unwrap().0.is_ok());
+
+    // An approval, a decline, and a box that did not fit but was given no note
+    // (the totals box, one voucher) record nothing.
+    for (scripted, vouchers, note_given, noted) in [
+        (ScriptedApproval::approving(), 2, true, false),
+        (ScriptedApproval::declining(), 2, true, false),
+        (ScriptedApproval::too_tall_first(1), 2, false, false),
+        (ScriptedApproval::too_tall_first(1), 2, true, true),
+    ] {
+        let approvals = PostApprovals::new(directory.path());
+        let note = note_given.then(|| approvals.note_listed_did_not_fit(batch));
+        let dialog = dialog_noting(scripted, vouchers, note).await;
+        let _ = dialog.answer_within(wait).await.ok().expect("answered");
+        let form = if noted {
+            PreviewForm::TotalsOnly
+        } else {
+            PreviewForm::Listed
+        };
+        assert!(
+            matches!(approvals.begin(batch), Begin::Ask(shown) if shown == form),
+            "{noted}"
+        );
+    }
+}
+
+/// Only a text that lists the vouchers one line each says so: a batch of more
+/// than ten vouchers, and the totals form of any batch, stand in for the lines,
+/// so a box of theirs that does not fit is not one the totals can shrink
+/// (#1832).
+#[test]
+fn only_a_text_that_lists_the_vouchers_says_it_lists_them() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let (one, _) = saved_batch(&server);
+    let endpoint = server.settings.endpoint.clone();
+    let footer = agent_post_timing_lines();
+    let lists = |count: usize, form| {
+        review_text(&batch_of(&one, count), &endpoint, &footer, form)
+            .unwrap()
+            .lists_vouchers()
+    };
+    assert!(lists(2, PreviewForm::Listed));
+    assert!(lists(10, PreviewForm::Listed));
+    // over ten vouchers: the lines are not shown whichever form is asked
+    assert!(!lists(11, PreviewForm::Listed));
+    assert!(!lists(50, PreviewForm::Listed));
+    // the totals form never lists
+    assert!(!lists(2, PreviewForm::TotalsOnly));
+    assert!(!lists(10, PreviewForm::TotalsOnly));
+    // one voucher is the voucher: no lines to stand in for
+    assert!(!review_text(&one, &endpoint, &footer, PreviewForm::Listed)
+        .unwrap()
+        .lists_vouchers());
+}
+
+/// A batch of two whose box with the voucher lines does not fit the screen
+/// (#1832): the first call is refused as too large and posts nothing, the
+/// second asks the person for the totals only, and a later call posts what the
+/// person approved. The three calls run the whole path, so a form lost between
+/// the ask, the held approval and the redemption fails here.
+#[tokio::test]
+async fn a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    plans.extend(before_approval());
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_two(&server);
+
+    // 1. The box with the voucher lines does not fit: refused, nothing held.
+    let too_tall = ScriptedApproval::too_tall_first(1);
+    let refused = SCRIPTED_APPROVAL
+        .scope(
+            too_tall.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&refused)["error"]["code"],
+        "import_review_too_large",
+        "{refused}"
+    );
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id));
+    let listed = too_tall.previews();
+    assert_eq!(listed.len(), 1);
+    assert!(
+        !listed[0].contains(VOUCHER_LINES_DO_NOT_FIT),
+        "{}",
+        listed[0]
+    );
+
+    // 2. Asked again: the totals only, and the dialog stays open for the person.
+    let held = ScriptedApproval::held();
+    let pending = SCRIPTED_APPROVAL
+        .scope(held.clone(), server.call_tool("post_import", args.clone()))
+        .await;
+    assert_eq!(
+        result(&pending)["approval"]["state"],
+        "pending",
+        "{pending}"
+    );
+    let totals = held.previews();
+    assert_eq!(totals.len(), 1);
+    assert!(
+        totals[0].contains(VOUCHER_LINES_DO_NOT_FIT),
+        "{}",
+        totals[0]
+    );
+    assert_ne!(totals[0], listed[0]);
+    assert_eq!(
+        held.counts(),
+        [2],
+        "the person was asked about both vouchers"
+    );
+
+    // 3. The person approves it; the next call posts it, once, as the batch
+    // the person approved.
+    held.answer(true);
+    until_answered(&server, &line.batch_id).await;
+    let posted = server.call_tool("post_import", args).await;
+    let observed = sent(simulator);
+    assert_eq!(result(&posted)["attempt_recorded"], true, "{posted}");
+    assert_eq!(
+        dispatch_intent(directory.path())["batch_id"],
+        line.batch_id.as_str()
+    );
+    assert!(observed.len() > post_at, "the POST was sent: {posted}");
+    assert_eq!(held.counts(), [2], "nobody was asked a third time");
+}
+
+/// The same refusal, then the totals box does not fit either: refused again and
+/// nothing posted. The totals ask notes nothing of its own, and the first
+/// refusal's note stands, so the next ask is the totals again until the note
+/// runs out (#1832).
+#[tokio::test]
+async fn a_totals_box_that_does_not_fit_either_is_refused_and_the_next_ask_is_the_totals_again() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (line, args) = saved_batch_of_two(&server);
+    let scripted = ScriptedApproval::too_tall_first(2);
+    for _ in 0..2 {
+        let refused = SCRIPTED_APPROVAL
+            .scope(
+                scripted.clone(),
+                server.call_tool("post_import", args.clone()),
+            )
+            .await;
+        assert_eq!(
+            result(&refused)["error"]["code"],
+            "import_review_too_large",
+            "{refused}"
+        );
+    }
+    let previews = scripted.previews();
+    assert_eq!(previews.len(), 2);
+    assert!(!previews[0].contains(VOUCHER_LINES_DO_NOT_FIT));
+    assert!(previews[1].contains(VOUCHER_LINES_DO_NOT_FIT));
+    assert_eq!(intents(directory.path()), 0);
+    assert!(!server.post_approvals.holds(&line.batch_id));
+    // The totals ask recorded nothing of its own, and the note from the first
+    // refusal is still there: the next ask is the totals again.
+    assert!(matches!(
+        server.post_approvals.begin(&line.batch_id),
+        Begin::Ask(PreviewForm::TotalsOnly)
+    ));
+    drop(simulator);
+}
+
+/// The totals form's approval answered too late for its call to post it is held
+/// and redeemed by the next call as the same form: the redeem rebuilds the
+/// totals text, not the voucher lines, and posts exactly the batch (#1832).
+#[tokio::test]
+async fn a_totals_approval_held_for_the_next_call_is_redeemed_as_totals() {
+    let mut plans = before_approval();
+    plans.extend(before_approval());
+    plans.extend(before_approval());
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    // A post measured at the whole ceiling never fits in the answering call.
+    server.post_approvals = std::sync::Arc::new(PostApprovals::with_measured_post(
+        directory.path(),
+        CALL_CEILING,
+    ));
+    let (line, args) = saved_batch_of_two(&server);
+    let too_tall = ScriptedApproval::too_tall_first(1);
+    let refused = SCRIPTED_APPROVAL
+        .scope(
+            too_tall.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&refused)["error"]["code"],
+        "import_review_too_large",
+        "{refused}"
+    );
+
+    let approving = ScriptedApproval::approving();
+    let approved = SCRIPTED_APPROVAL
+        .scope(
+            approving.clone(),
+            server.call_tool("post_import", args.clone()),
+        )
+        .await;
+    assert_eq!(
+        result(&approved)["approval"]["state"],
+        "approved",
+        "{approved}"
+    );
+    assert!(approving.previews()[0].contains(VOUCHER_LINES_DO_NOT_FIT));
+    assert_eq!(intents(directory.path()), 0);
+    assert!(server.post_approvals.holds(&line.batch_id));
+
+    // A call that is given a dialog that would approve the voucher lines, and
+    // would show them: it must not be reached, the held approval is redeemed.
+    let again = ScriptedApproval::approving();
+    let posted = SCRIPTED_APPROVAL
+        .scope(again.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(result(&posted)["attempt_recorded"], true, "{posted}");
+    assert!(again.previews().is_empty(), "nobody was asked again");
+    assert_eq!(
+        dispatch_intent(directory.path())["batch_id"],
+        line.batch_id.as_str()
+    );
+    assert!(observed.len() > post_at, "{posted}");
 }

@@ -9,6 +9,7 @@ use bridge_tally_protocol::native_masters::{
 use bridge_tally_protocol::native_voucher_type_numbering::{
     DuplicateSetting, NumberingSubMethod, SeriesNumberingMethod, VoucherTypeNumbering,
 };
+use bridge_tally_protocol::tally_root_as_sent;
 
 impl Server {
     pub(super) async fn masters(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
@@ -64,7 +65,7 @@ impl Server {
                         .map(|group| {
                             json!({
                                 "name": group.name,
-                                "parent": group.parent.nonempty_returned_text(),
+                                "parent": group.parent.nonempty_returned_text().map(tally_root_as_sent),
                                 "reserved_name": group.reserved_name,
                             })
                         })
@@ -100,7 +101,7 @@ impl Server {
             "Not an atomic snapshot: paired reads and an unchanged book extent detect observed change only",
             "One kind per call; no counts or hints; a master's aliases are not returned",
             if marks_party_text(kind) {
-                "Under mask_parties, godown, stock-group, stock-item, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is left as it is"
+                "Under mask_parties, godown, stock-group, stock-item, cost-centre and cost-category names, parents and categories are masked, because a job-work godown, a supplier-named stock group or stock item or a customer-named cost centre can carry a party's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is not masked"
             } else {
                 "Voucher-type, unit and account-group names are not masked by mask_parties: they are configuration labels, not counterparties (godown, stock-group, stock-item, cost-centre and cost-category names are masked)"
             },
@@ -116,7 +117,7 @@ impl Server {
                 "series_numbering was measured on one synthetic book (TallyPrime 7.1 Silver, Windows): 24 voucher types, each with one series named `Default`, of which three (Journal Automatic, Payment Manual with duplicates prevented, Receipt Manual with duplicates not prevented) were checked against Tally's screen; Automatic (Manual Override) through this tool (it is mapped from the series text measured on a synthetic book on 13 October 2026), more than one series (returned as `series_count`, with nothing read from it), Multi-user Auto, a single series not named `Default`, a voucher type created new and other releases were not measured",
                 "An `unrecognised` series method is never `manual`; a series that lacks a method or duplicate setting, repeats one, or prints a duplicate setting other than Yes or No is returned as `field_invalid`, never defaulted",
                 "Under `automatic`, and under no other method, series_numbering carries `sub_method`, the series' own NUMBERINGSUBMETHOD: `auto_retain` (the screen's Retain Original Voucher No.), `auto_renumber` (Renumber Vouchers), `absent` when the series printed none, or the raw text under `unrecognised` for any other text, a blank one included, never read as `auto_retain`; a series that repeats it is `field_invalid`. A Manual series printed `Auto Retain` too on both books read, which is not the numbering in force there, so it is not returned for one",
-                "sub_method was measured on a second synthetic book (TallyPrime 7.1 Silver, Windows) and one voucher type, Receipt, whose screen was set to Renumber Vouchers and back: it read `Auto Retain`, `Auto Renumber`, then `Auto Retain`, and with the type on Renumber Vouchers numbers already in the book changed, at the switch, when a voucher with an earlier date was entered by hand, and when one was sent by import without a number (the import's answer reported nothing altered and no voucher's AlterID moved). Not measured: any other wording, a series that prints no sub-method, other voucher types, a batch of several vouchers, Gold, other releases and the same through ComplyEaze Bridge's own post",
+                "sub_method was measured on a second synthetic book (TallyPrime 7.1 Silver, Windows) and one voucher type, Receipt, whose screen was set to Renumber Vouchers and back: it read `Auto Retain`, `Auto Renumber`, then `Auto Retain`, and with the type on Renumber Vouchers numbers already in the book changed, at the switch, when a voucher with an earlier date was entered on Tally's voucher screen, and when one was sent by import without a number (the import's answer reported nothing altered and no voucher's AlterID moved). Not measured: any other wording, a series that prints no sub-method, other voucher types, a batch of several vouchers, Gold, other releases and the same through ComplyEaze Bridge's own post",
                 "The integrated read, the two requests sent as one tool call, was run live on 14 October 2026 on two synthetic books (TallyPrime 7.1 Silver, Windows; 24 voucher types each, each with exactly one series, whose name is not read): it was not refused, and on the six types whose numbering was set or checked on Tally's screen it returned that numbering (Manual with duplicates prevented, Manual with duplicates not prevented, Automatic); the other types, left at a new company's defaults and not checked on screen, read Automatic",
             ]),
             MastersKind::Native(NativeMasterKind::CostCentres | NativeMasterKind::CostCategories) => {
@@ -288,7 +289,7 @@ fn native_row(row: &NativeMasterRow, mark_party_text: bool) -> Value {
     let mut json = json!({
         "name": row.name, "guid": row.guid,
         "master_id": row.master_id, "alter_id": row.alter_id,
-        "parent": row.parent,
+        "parent": row.parent.as_deref().map(tally_root_as_sent),
     });
     if mark_party_text {
         mark_party_field(&mut json, "name");

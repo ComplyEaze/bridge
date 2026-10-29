@@ -1329,12 +1329,16 @@ enum Preflight {
         census: Option<WindowCensus>,
         /// The marks the census was bounded by, when they were read.
         marks: Option<CompanyMarks>,
+        /// The census requests this read sent ([`CensusPlan::requests`]); 0 when none was.
+        census_requests: u64,
     },
     /// Counted per day; plan it.
     Counted {
         census: WindowCensus,
         /// The marks the census was bounded by, when they were read.
         marks: Option<CompanyMarks>,
+        /// The census requests this read sent ([`CensusPlan::requests`]); 0 when none was.
+        census_requests: u64,
     },
 }
 
@@ -1887,7 +1891,7 @@ where
                     if !counted.within(first, last) {
                         return Err("window_not_honoured".to_string().into());
                     }
-                    whole_or_counted(counted, None, limits)
+                    whole_or_counted(counted, None, 0, limits)
                 }
                 WindowPlanSource::Estimate { known_marks } => estimate_window_volume(
                     reader,
@@ -1910,6 +1914,7 @@ where
                 Preflight::Whole {
                     census: counted,
                     marks,
+                    ..
                 } => {
                     if let Some(counted) = &counted {
                         ceiling = marks
@@ -1926,6 +1931,7 @@ where
                 Preflight::Counted {
                     census: counted,
                     marks,
+                    ..
                 } => {
                     ceiling = marks
                         .map_or(0, |marks| marks.vouchers())
@@ -2248,7 +2254,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     )
     .await
     .map_err(|failure| with_prior(failure, &preflight, &None))?;
-    let census = match estimate {
+    let (census, census_requests) = match estimate {
         Preflight::Whole { census: None, .. } => {
             return Ok(WindowCount::NotCounted {
                 marks: opening,
@@ -2257,15 +2263,19 @@ pub(super) async fn count_window_only<R: WindowReader>(
         }
         Preflight::Whole {
             census: Some(census),
+            census_requests,
             ..
         }
-        | Preflight::Counted { census, .. } => census,
+        | Preflight::Counted {
+            census,
+            census_requests,
+            ..
+        } => (census, census_requests),
     };
     let mut closing = None;
     if let Some(opened) = opening {
-        let spans = census_spans(opened.vouchers(), limits.census_capacity())
-            .map_or(usize::MAX, Iterator::count);
-        if spans > 1 {
+        // The count of the census that was sent, not one derived again from the marks.
+        if census_requests > 1 {
             let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
                 .await
                 .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
@@ -2360,9 +2370,10 @@ async fn estimate_window_volume<R: WindowReader>(
         return Ok(Preflight::Whole {
             census: None,
             marks: None,
+            census_requests: 0,
         });
     }
-    let rows = census_window(
+    let (rows, census_requests) = census_window(
         reader, identity, scope, company, window, days, high_water, limits, preflight, boundary,
     )
     .await?;
@@ -2374,9 +2385,15 @@ async fn estimate_window_volume<R: WindowReader>(
         return Ok(Preflight::Counted {
             census,
             marks: Some(marks),
+            census_requests,
         });
     }
-    Ok(whole_or_counted(census, Some(marks), limits))
+    Ok(whole_or_counted(
+        census,
+        Some(marks),
+        census_requests,
+        limits,
+    ))
 }
 
 /// Whether a window read of a book whose voucher mark is `high_water` sends no
@@ -2400,11 +2417,12 @@ pub(super) fn census_read_count(
     if skips_census(high_water, limits) {
         return Ok(0);
     }
-    census_spans(high_water, limits.census_capacity()).map(|spans| spans.count() as u64)
+    CensusPlan::new(WindowScope::Book, high_water, limits).map(|plan| plan.requests())
 }
 
 /// Count the window's vouchers per day, every census request bounded
-/// before it is sent. See [`census_spans`].
+/// before it is sent ([`CensusPlan`]). Returns the rows and the number of
+/// census requests sent, which is the plan's.
 #[allow(clippy::too_many_arguments)]
 async fn census_window<R: WindowReader>(
     reader: &R,
@@ -2417,9 +2435,9 @@ async fn census_window<R: WindowReader>(
     limits: WindowReadLimits,
     preflight: &mut Option<Evidence>,
     boundary: &mut Option<DateBoundaryProfile>,
-) -> Result<Vec<CensusRow>, ToolFailure> {
+) -> Result<(Vec<CensusRow>, u64), ToolFailure> {
     let unestimated = || ToolFailure::from(VOLUME_UNESTIMATED.to_string());
-    let spans = census_spans(high_water, limits.census_capacity())
+    let plan = CensusPlan::new(scope, high_water, limits)
         .map_err(|code| ToolFailure::from(code.to_string()))?;
     // The first plan reads at most this many vouchers a request (the default
     // figure, which every plan starts from) and may send at most `max_reads`
@@ -2427,18 +2445,9 @@ async fn census_window<R: WindowReader>(
     // a certain refusal: it is refused there, before the census spans left.
     let per_read = vouchers_per_read(limits.budget_bytes, limits.default_bytes_per_voucher);
     let plannable = per_read.saturating_mul(limits.max_reads as u64);
-    let mut spans = spans.peekable();
+    let mut spans = plan.spans().peekable();
     let mut rows = Vec::new();
     while let Some(span) = spans.next() {
-        // A ledger census is always spanned, the one form observed: a book that fits
-        // one census request is asked over (0, high_water], the same rows.
-        let span = match scope {
-            WindowScope::Book => span,
-            WindowScope::Ledger(_) => Some(span.unwrap_or(AlterIdSpan {
-                after: 0,
-                through: high_water,
-            })),
-        };
         let request = match (scope, span) {
             (WindowScope::Ledger(ledger), Some(span)) => {
                 ledger_census_read(company, ledger, from, to, span)?
@@ -2478,7 +2487,7 @@ async fn census_window<R: WindowReader>(
             .into_failure());
         }
     }
-    Ok(rows)
+    Ok((rows, plan.requests()))
 }
 
 /// Why a census refused its window as unestimated, as a data-free cause beside
@@ -2564,7 +2573,54 @@ pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans
     })
 }
 
+/// The census requests of one window read, fixed before the first is sent: the
+/// spans of [`census_spans`], and for a ledger always a span, the one form
+/// observed (a book that fits one census is asked over `(0, high_water]`, the
+/// same rows). [`Self::requests`] is the one count of them: what the read
+/// states beforehand ([`census_read_count`]) and what decides afterwards
+/// whether the marks are read again ([`count_window_only`]).
+#[derive(Clone, Debug)]
+pub(super) struct CensusPlan {
+    spans: CensusSpans,
+    requests: u64,
+    high_water: u64,
+    ledger: bool,
+}
+
+impl CensusPlan {
+    /// The plan for a book whose voucher mark is `high_water`, or
+    /// [`BOOK_TOO_LARGE`] before any request.
+    pub(super) fn new(
+        scope: WindowScope<'_>,
+        high_water: u64,
+        limits: WindowReadLimits,
+    ) -> Result<Self, &'static str> {
+        let spans = census_spans(high_water, limits.census_capacity())?;
+        Ok(Self {
+            requests: spans.clone().count() as u64,
+            spans,
+            high_water,
+            ledger: matches!(scope, WindowScope::Ledger(_)),
+        })
+    }
+
+    /// The number of census requests the plan sends.
+    pub(super) fn requests(&self) -> u64 {
+        self.requests
+    }
+
+    /// The span of each request, in order.
+    pub(super) fn spans(&self) -> impl Iterator<Item = Option<AlterIdSpan>> {
+        let (ledger, through) = (self.ledger, self.high_water);
+        self.spans.clone().map(move |span| match span {
+            None if ledger => Some(AlterIdSpan { after: 0, through }),
+            span => span,
+        })
+    }
+}
+
 /// See [`census_spans`].
+#[derive(Clone, Debug)]
 pub(super) struct CensusSpans {
     whole: bool,
     after: u64,
@@ -2685,6 +2741,7 @@ fn admit_union<T: WindowRow>(rows: &[T]) -> Result<(), String> {
 fn whole_or_counted(
     census: WindowCensus,
     marks: Option<CompanyMarks>,
+    census_requests: u64,
     limits: WindowReadLimits,
 ) -> Preflight {
     if census
@@ -2695,9 +2752,14 @@ fn whole_or_counted(
         Preflight::Whole {
             census: Some(census),
             marks,
+            census_requests,
         }
     } else {
-        Preflight::Counted { census, marks }
+        Preflight::Counted {
+            census,
+            marks,
+            census_requests,
+        }
     }
 }
 

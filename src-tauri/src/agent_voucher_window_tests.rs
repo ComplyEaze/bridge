@@ -2271,6 +2271,68 @@ fn census_spans_tile_the_mark_and_none_holds_more_than_one_census() {
     assert_eq!(census_spans(249_948, 8192).unwrap().count(), 31);
 }
 
+/// The census plan's one count is the number of requests it yields, which is what a read states
+/// beforehand and what decides afterwards whether the marks are read again (#899). A book's
+/// census is the spans of `census_spans`; a ledger's is always spanned, so a ledger whose book
+/// fits one census is asked over `(0, mark]`, the same one request.
+#[test]
+fn a_census_plan_counts_the_requests_it_yields_and_spans_every_ledger_request() {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let capacity = limits.census_capacity();
+    let ledger = bridge_tally_protocol::ledger_scope::LedgerScopeName::new("DN Sales").unwrap();
+    for mark in [
+        1,
+        capacity - 1,
+        capacity,
+        capacity + 1,
+        3 * capacity,
+        249_948,
+    ] {
+        let book = CensusPlan::new(WindowScope::Book, mark, limits).unwrap();
+        assert_eq!(book.requests(), book.spans().count() as u64, "mark {mark}");
+        assert_eq!(
+            book.spans().collect::<Vec<_>>(),
+            census_spans(mark, capacity).unwrap().collect::<Vec<_>>(),
+            "mark {mark}"
+        );
+        let scoped = CensusPlan::new(WindowScope::Ledger(&ledger), mark, limits).unwrap();
+        assert_eq!(scoped.requests(), book.requests(), "mark {mark}");
+        assert!(scoped.spans().all(|span| span.is_some()), "mark {mark}");
+        assert_eq!(
+            scoped.spans().last().flatten().map(|span| span.through),
+            Some(mark),
+            "mark {mark}"
+        );
+    }
+    assert_eq!(
+        CensusPlan::new(WindowScope::Book, capacity, limits)
+            .unwrap()
+            .requests(),
+        1
+    );
+    assert_eq!(
+        CensusPlan::new(WindowScope::Ledger(&ledger), capacity, limits)
+            .unwrap()
+            .spans()
+            .collect::<Vec<_>>(),
+        [Some(AlterIdSpan {
+            after: 0,
+            through: capacity
+        })]
+    );
+    let largest = capacity * MAX_CENSUS_READS as u64;
+    assert_eq!(
+        CensusPlan::new(WindowScope::Book, largest, limits)
+            .unwrap()
+            .requests(),
+        256
+    );
+    assert_eq!(
+        CensusPlan::new(WindowScope::Book, largest + 1, limits).err(),
+        Some(BOOK_TOO_LARGE)
+    );
+}
+
 /// `voucher_read_cost` states a call's census before it runs from `census_read_count`;
 /// the read decides whether to count with `skips_census` and then walks `census_spans`.
 /// One rule, so the two agree on every mark, including the boundaries.

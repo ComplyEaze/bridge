@@ -91,20 +91,22 @@ pub fn render_native_stock_summary_request(
     render_built_in_report_request(BuiltInReport::StockSummary, company, period)
 }
 
-/// The date a stock summary is read as of. Only a 31 March is constructible,
-/// because only a 31 March period end (a financial-year end) has been measured
-/// for stock, the report tie-out included. Any other date, one that the boundary
-/// rule of Bridge's other reads would admit included, is refused as
-/// [`NativeStockError::AsOfNotMeasured`]. Of the 31 Marches, only the period
-/// ending 31 March 2026 has been measured: another year's 31 March is admitted
-/// here, sharing the request shape but not the measurement. Other dates will be
-/// admitted in a later change, once captures back them.
+/// The date a stock summary is read as of: the last day of a month, the shape
+/// of every period end measured for stock (31 March, 31 May, 31 August and 30
+/// September, on two synthetic books, §12a.13). Any other date, one that the
+/// boundary rule of Bridge's other reads would admit included, is refused as
+/// [`NativeStockError::AsOfNotMeasured`], and so is a date whose next day cannot
+/// be formed. The rule is the calendar's, not a list: February's end is admitted
+/// by it, unmeasured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StockSummaryAsOf(TallyDate);
 
 impl StockSummaryAsOf {
     pub fn new(date: TallyDate) -> Result<Self, NativeStockError> {
-        if matches!(&date.as_str()[4..8], "0331") {
+        let month_end = date
+            .next_day()
+            .is_ok_and(|next| next.as_str().ends_with("01"));
+        if month_end {
             Ok(Self(date))
         } else {
             Err(NativeStockError::AsOfNotMeasured)
@@ -185,12 +187,6 @@ impl NativeQuantityRead {
 /// only by the gate's comparison.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemListQuantity(NativeStockQuantity);
-
-impl ItemListQuantity {
-    pub fn quantity(&self) -> &NativeStockQuantity {
-        &self.0
-    }
-}
 
 /// Whether a closing quantity is returned, and on what. An item under the root
 /// gets one only where Tally's own plain Stock Summary shows the same item by
@@ -339,7 +335,8 @@ pub enum NativeStockError {
     /// The company's stock item count is missing, empty or not a number, so
     /// nothing says whether every item was read.
     ItemCountUnavailable,
-    /// The `as_of` is not a 31 March, the only date measured for stock.
+    /// The `as_of` is not the last day of a month, the only shape of period end
+    /// measured for stock.
     AsOfNotMeasured,
 }
 

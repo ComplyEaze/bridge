@@ -319,10 +319,10 @@ async fn an_unsupported_date_or_filter_is_refused_before_any_read() {
         assert_eq!(error(&response)["code"], code, "{response}");
         assert_eq!(response["structuredContent"]["evidence"]["bytes"], 0);
     };
-    // Only a 31 March is admitted: no other date is measured for stock, the
-    // days 1 and 2 and another month's 31st that other reads admit included.
+    // Only a month's last day is admitted: no other date is measured for stock,
+    // the days 1 and 2 that other reads admit and a 30th of a 31-day month included.
     for as_of in [
-        "20260731", "20260401", "20260402", "20260101", "20260315", "20260630",
+        "20260730", "20260401", "20260402", "20260101", "20260315", "20260629",
     ] {
         refused_with(
             one.call(json!({"company_guid":GUID,"as_of":as_of})).await,
@@ -330,7 +330,7 @@ async fn an_unsupported_date_or_filter_is_refused_before_any_read() {
         );
     }
     refused_with(
-        one.call(json!({"company_guid":GUID,"as_of":"2026-07-31"}))
+        one.call(json!({"company_guid":GUID,"as_of":"2026-07-15"}))
             .await,
         "stock_summary_as_of_not_measured",
     );
@@ -370,17 +370,20 @@ async fn an_unsupported_date_or_filter_is_refused_before_any_read() {
 }
 
 #[tokio::test]
-async fn a_date_that_is_not_a_31_march_is_refused_with_its_remediation_before_any_request() {
+async fn a_date_that_is_not_a_months_last_day_is_refused_with_its_remediation_before_any_request() {
     // A server whose Tally is not there: any request would fail as a refused
     // connection, not as the typed refusal asserted here, and no bytes of
     // evidence are recorded.
     let one = OneServer::unreachable();
-    for as_of in ["2026-07-31", "2026-04-01", "2026-04-02"] {
+    for as_of in ["2026-07-30", "2026-04-01", "2026-04-02"] {
         let response = one.call(args(as_of, 0, 500, None)).await;
         assert_eq!(error(&response)["code"], "stock_summary_as_of_not_measured");
         assert_eq!(response["structuredContent"]["evidence"]["bytes"], 0);
         let remediation = error(&response)["remediation"].as_str().unwrap();
-        assert!(remediation.contains("31 March"), "{remediation}");
+        assert!(
+            remediation.contains("the last day of that month"),
+            "{remediation}"
+        );
     }
 }
 
@@ -415,10 +418,8 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
     assert_eq!(mark, 874);
     assert!(description.contains(&format!("{mark}")));
     for phrase in [
-        "must be a 31 March",
-        "the period ending 31 March 2026",
-        "other years' 31 March",
-        "admitted but unmeasured",
+        "must be a month's last day",
+        "Month ends inside the year were measured on TallyPrime 7.2; a voucher dated on the end date was counted on a 15 October read, not at a month end; the company's own year start is not read",
         "null with `partial` true whenever any item's closing value is empty",
         "written at the scale of the values it adds",
         "stock_summary_too_large",
@@ -441,7 +442,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "so its quantity is its own row's in the item list, not compared (`inside_stock_group`, with `item_list_amount` and `item_list_unit`",
         "`checks` says per field what is `checked`, `checked_where_agreed` or `not_checked`",
         "`closing` holds `value` exactly as Tally sends it, and `quantity` (a `state`, with `amount` and `unit` when `agreed`, `item_list_amount` and `item_list_unit` when `inside_stock_group`)",
-        "`parent_not_resolved` for a parent reading Primary without Tally's root marker, `report_has_no_line`, `report_name_not_unique`, `report_differs`",
+        "`parent_not_resolved` for a parent reading Primary without Tally's root marker or carrying a marker anywhere else, `report_has_no_line`, `report_name_not_unique`, `report_differs`",
         "tally_stock_summary_shows_no_value",
         "stock_values_not_comparable",
         "only Tally's own stock item count vouches for it",
@@ -564,7 +565,7 @@ async fn a_page_holds_one_read_and_the_next_continues_it_under_either_date_form(
         .unwrap()
         .iter()
         .any(|line| line.as_str().unwrap().starts_with(
-            "Only the period ending 31 March 2026 has been measured: a 31 March of another year is admitted"
+            "`as_of` is a month's last day. Measured on TallyPrime 7.2 at 31 May, 31 August and 30 September 2025 on two synthetic books (one item under the root; groups three deep) and at 31 March 2026: the items and Tally's Stock Summary each follow `as_of`, not the company's own current period. A read to the date of one Sales voucher (15 October 2025, not a month end) counted that voucher. The period starts on 1 April: a company whose financial year starts in another month is read from 1 April all the same. Not measured: February's end, a month end with a voucher on it, several vouchers or a Stock Journal or purchase dated on `as_of`, TallyPrime 7.1 at a date other than 31 March, a year after the company's current period, and a book that starts mid-year"
         )));
     assert_eq!(first["structuredContent"]["truncated"], true);
     assert_eq!(page["snapshot"]["reused"], false);

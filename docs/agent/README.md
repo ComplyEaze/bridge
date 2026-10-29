@@ -1098,16 +1098,18 @@ Gold and other releases.
 Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
 the closing stock value per stock item, with the total of those values checked
 against Tally's own Stock Summary, and whether inventory is integrated with the
-accounts. `as_of` must be a 31 March (a
-financial-year end), the only date measured for stock, and not before the book's
-start or after today. A date that is not a 31 March is refused as
-`stock_summary_as_of_not_measured` before any request, and retrying the same date
-refuses again. A 31 March before the book's start or after today is refused as
+accounts. `as_of` must be a month's last day, the shape of every period end
+measured for stock, and not before the book's start or after today. Any other
+date is refused as `stock_summary_as_of_not_measured` before any request, and
+retrying the same date refuses again. Month ends inside the year were measured on
+two synthetic TallyPrime 7.2 books (a voucher dated on the end date was counted
+on a 15 October read, not at a month end); February's end, a month end with a
+voucher on it, several vouchers or a Stock Journal or purchase on the end date, 7.1 at such a date and a company whose year does not start on 1 April
+were not. A month end before the book's start or after today is refused as
 `stock_summary_as_of_before_books` or `stock_summary_as_of_in_future`, after the
-status, company and extent reads. The only period measured is the period ending 31 March 2026
-(FY 2025-26); other years' 31 March share its request shape but not its
-measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
-or the book's start if that is later.
+status, company and extent reads. The period runs from 1 April of the year
+containing `as_of` (the company's own financial-year start is not read), or the
+book's start if that is later, to `as_of`.
 
 A row is returned only when a check ran and held. The top-level `state` is one of
 three values:

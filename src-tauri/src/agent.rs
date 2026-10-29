@@ -1492,10 +1492,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
-            "stock_summary reads only an `as_of` that is a 31 March (a financial-year end), \
-             and no request was sent. Ask for a 31 March `as_of`; retrying the same date \
-             refuses again. Only the period ending 31 March 2026 has been measured for \
-             stock: another year's 31 March is read, but its figures are unmeasured.",
+            "stock_summary reads only an `as_of` that is the last day of a month, and no \
+             request was sent. Ask for the last day of that month, or of another month; \
+             retrying the same date refuses again.",
         ),
         "summary_group_unresolved" => Some(
             "A ledger in this window could not be placed under a group, so no group total was \

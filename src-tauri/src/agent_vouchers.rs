@@ -273,9 +273,22 @@ pub(super) const GROUP_LEDGER_LIST_MARK_LIMIT: u64 =
 /// what a bucket is.
 pub(super) const GROUP_BASIS: &str = "groups are the book's masters read now (each ledger's group chain was the same when read before the window and again after it), not the grouping in force on each voucher's date; a `group` bucket holds only the ledgers directly under that group, as the ledger master shows it (its `covers` says so; so does a `subtree_totals` row's, for the group and everything under it), so a predefined group whose ledgers sit in sub-groups has no bucket or a small one: its whole figure, descendants included, is in `subtree_totals` (a `group` summary only), which overlap and do not add up to `totals`; a `primary_group` bucket holds every ledger under the group directly under the reserved root, keyed by its reserved name (a group the book's user made there by its name); a ledger directly under the root has a bucket of its own named Primary; `members` lists the ledgers in a bucket, largest movement first and at most 10, with `members_total` exact; a ledger whose group chain cannot be walked, or that the ledger list does not hold, refuses the summary (`summary_group_unresolved`)";
 
+/// What a `cost_centre` summary adds to its basis (#1231): what a bucket is and how its figures tie
+/// out. Measured on one synthetic book with Cost Centres on (TallyPrime 7.2): a Payment allocated to two
+/// centres of one category, and a Journal entry allocated in full under two categories.
+pub(super) const COST_CENTRE_BASIS: &str = "a `cost_centre` bucket is one cost centre under one cost category (`category`; a centre named under two categories has two buckets) and adds the cost-centre allocations of each counted entry, each on the side its own amount's sign gives; `members` lists the ledgers whose allocations fall in it, largest movement first and at most 10; each category allocates the whole entry, so the categories overlap and their buckets are not added across categories: `category_totals` gives each category's figure, `totals` counts each allocated entry once, and `entries_unallocated` holds the counted entries with no allocation (with `totals`, every counted entry); an empty summary says that nothing in the window was allocated, not that the company's Cost Centres setting is off (allocations were read on a book with the setting at No); an entry whose allocations could not be read (`summary_cost_centre_unreadable`) or whose category does not add up to the entry (`summary_cost_centre_allocation_mismatch`) refuses the summary";
+
 /// A refused summary as a failure: a ledger whose group chain could not be walked names the gap as
 /// the cause, so the answer says what to look at in the book's groups.
 pub(super) fn summary_failure(code: String) -> ToolFailure {
+    // An entry's own reason is the cause: the code travels with it as text, never data.
+    if let Some(reason) = code.strip_prefix("summary_cost_centre_unreadable:") {
+        let mut failure = ToolFailure::from("summary_cost_centre_unreadable".to_string());
+        failure.cause = Some(
+            CostCentreProblem::from_reason(reason).map_or("unknown", CostCentreProblem::reason),
+        );
+        return failure;
+    }
     match code.strip_prefix("summary_group_unresolved:") {
         Some(rest) => {
             let (gap, ledger) = match rest.split_once(':') {
@@ -343,13 +356,23 @@ pub(super) fn render_page_body(
         ("totals", summary.totals),
         (
             "basis",
-            json!(if request.group.needs_placements() {
-                format!("{GROUP_BASIS}; {SUMMARY_BASIS}")
-            } else {
-                SUMMARY_BASIS.to_string()
+            json!(match request.group {
+                SummaryGroup::Group | SummaryGroup::PrimaryGroup => {
+                    format!("{GROUP_BASIS}; {SUMMARY_BASIS}")
+                }
+                SummaryGroup::CostCentre => format!("{COST_CENTRE_BASIS}; {SUMMARY_BASIS}"),
+                _ => SUMMARY_BASIS.to_string(),
             }),
         ),
     ];
+    if request.group == SummaryGroup::CostCentre {
+        // Category names are masked like the buckets' own.
+        extra.push((
+            "category_totals",
+            redact_value(json!(summary.category_totals), server.settings.redaction),
+        ));
+        extra.push(("entries_unallocated", summary.entries_unallocated));
+    }
     if request.group == SummaryGroup::Group {
         // Group names are shown as the book has them, so the totals are not redacted.
         extra.push(("subtree_totals", json!(summary.subtree_totals)));

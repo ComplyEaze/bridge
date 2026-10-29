@@ -1511,6 +1511,25 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              ledger, month or voucher_type instead. Retrying this call refuses again until the \
              book is corrected.",
         ),
+        "summary_cost_centre_unreadable" => Some(
+            "An entry in this window carries cost-centre allocations that could not be read whole, \
+             so no cost-centre total was given: a total short of an allocation it could not read \
+             would mislead. `cause` says why, as the entry's own \
+             `cost_centre_allocations_unreadable` does. Call vouchers with the same window and \
+             selectors and no `summarise_by` to find the entry, and show the person the entry and \
+             the cause; or summarise by ledger, month or voucher_type instead. Retrying this call \
+             refuses again until the book changes.",
+        ),
+        "summary_cost_centre_allocation_mismatch" => Some(
+            "An entry's cost-centre allocations under one cost category do not add up to the \
+             entry's amount, so no cost-centre total was given: every category measured held the \
+             whole entry, and the part outside a centre cannot be placed. Call vouchers with the \
+             same window and selectors and no `summarise_by`, find the entry whose \
+             `cost_centre_allocations` under one category differ from its `amount`, and ask the \
+             person to check that entry's cost-centre allocation in Tally; or summarise by ledger, \
+             month or voucher_type instead. Retrying this call refuses again until the book \
+             changes.",
+        ),
         "summary_group_book_too_large" => Some(
             "The company's master-alteration mark (`size.master_alter_id`) is above the limit a \
              group summary reads the ledger list at (`size.limit_master_alter_id`), so no request \

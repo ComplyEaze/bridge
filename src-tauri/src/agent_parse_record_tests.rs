@@ -46,6 +46,7 @@ const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
+const COST_KEY_LAB: &str = "ddf3a557-704c-4f61-ae8d-46a3380062a1";
 const CORPUS_DENSE: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
 const BILLTRAIL_LAB: &str = "9ab5002c-e910-4242-83e4-a27cc490600b";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
@@ -692,6 +693,16 @@ fn rows() -> Vec<Row> {
         "voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
         "parse_agent_rows(SHAPE_LAB)",
         |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml",
+        "parse_agent_rows(COST_KEY_LAB)",
+        |_, t| agent_rows(t, COST_KEY_LAB)
+    ));
+    rows.push(row!(
+        "voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml",
+        "parse_agent_rows(COST_KEY_LAB)",
+        |_, t| agent_rows(t, COST_KEY_LAB)
     ));
     rows.push(row!(
         "voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",

@@ -888,7 +888,7 @@ fn the_vouchers_description_states_the_tie_rule_of_summary_buckets() {
         .expect("vouchers is in the catalogue");
     assert!(
         description.contains(
-            "Buckets are ordered by the larger movement first (ledger, type, group, primary_group), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
+            "Buckets are ordered by the larger movement first (ledger, type, group, primary_group, cost_centre), ties in movement keeping the order in which the bucket was first counted in the window, or by month."
         ),
         "the vouchers description lacks the bucket order and its tie rule"
     );
@@ -1670,7 +1670,7 @@ fn the_rules_three_descriptions_leave_to_their_arguments_stay_on_them() {
             "vouchers",
             "summarise_by",
             &[
-                "ledger, month, voucher_type, group or primary_group",
+                "ledger, month, voucher_type, group, primary_group or cost_centre",
                 "instead of the vouchers, over the same window, selectors and search; offset and limit page the buckets",
             ][..],
         ),

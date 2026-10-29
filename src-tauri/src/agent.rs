@@ -2216,18 +2216,18 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
 /// import's admission, which read the same ledger source, so the step speaks of "this read".
 ///
 /// Measured on one book (TallyPrime 7.2 Silver, a party ledger holding dollar vouchers): Tally
-/// wrote a rupee ledger's closing balance as `$100.00 @ ₹ 87/$ = ₹ 8700.00`, with no
-/// space after the symbol. The detector that sets such a row aside (`is_currency_composite`) is
-/// strict and needs a space there, as the 7.1 captures have, so the row was kept as a plain
-/// amount and the parse refused it as a foreign-currency balance, with this cause. The refusal is
-/// about a layout Bridge does not recognise yet, not about foreign currency as such: the 7.1
-/// layout is set aside by name (#551). A retry gives the same refusal.
+/// wrote a rupee ledger's closing balance as `$100.00 @ ₹ 87/$ = ₹ 8700.00`, with no space after
+/// the foreign symbol, which the detector of the 7.1 captures did not recognise, so the row was
+/// kept as a plain amount and the parse refused it as a foreign-currency balance, with this
+/// cause. Both layouts are now recognised and the row is set aside by name (#551, #683); the
+/// refusal that is left is for a layout no capture shows, for example a rate with decimals. It is
+/// about a layout Bridge does not recognise yet, not about foreign currency as such. A retry gives
+/// the same refusal.
 fn party_ledger_master_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
         "native_foreign_currency_ledger_balance" => Some(
             "Tally wrote a ledger's balance in a foreign currency in a layout ComplyEaze Bridge \
-             does not recognise yet (`<amount> @ <rate> = <base amount>` where it expects a space \
-             after each currency symbol; #683), so this read is refused rather than guessed at, \
+             does not recognise (#683), so this read is refused rather than guessed at, \
              not because the response was damaged, and nothing was returned from it. Do not \
              repeat it in a loop: it refuses again. Tell the user that this read cannot give this \
              company's ledgers while Tally writes a balance that way, and that Tally itself \

@@ -278,6 +278,7 @@ fn company_features(text: &str, guid: &str, name: &str, number: &str) -> String 
 }
 
 const FOREX_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+const FOREXGROUP_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
 const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 /// The parity lab book's company GUID, as scrubbed in its captures (`native_masters_tests.rs`).
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
@@ -303,7 +304,17 @@ const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.u
 /// tests' `among_several_for_tests` is not public): the currency read with `ORIGINALNAME` and the
 /// company's `CURRENCYNAME`. `expected` is the base the tests name.
 fn base_among_several(currencies: &str, guid: &str, expected: &str) -> BaseCurrencyName {
-    let company = parse_company_currency_name(&fixture_text(COMPANY_CURRENCY_NAMES), guid)
+    base_among_several_from(currencies, COMPANY_CURRENCY_NAMES, guid, expected)
+}
+
+/// [`base_among_several`] with the company read named.
+fn base_among_several_from(
+    currencies: &str,
+    company_names: &str,
+    guid: &str,
+    expected: &str,
+) -> BaseCurrencyName {
+    let company = parse_company_currency_name(&fixture_text(company_names), guid)
         .expect("the captured company currency name");
     let base = parse_currency_master_list(&fixture_text(currencies))
         .expect("the captured currency masters")
@@ -319,6 +330,17 @@ fn forex_base() -> BaseCurrencyName {
         "tests/fixtures/currency_originalname_forex_live.utf16le.xml",
         FOREX_GUID,
         "I\u{20b9}",
+    )
+}
+
+/// `₹`, BRIDGE FOREXGROUP LAB's base, identified as Bridge identifies it from the lab's own two
+/// reads on 7.2: the Currency masters with `ORIGINALNAME` and the company's `CURRENCYNAME`.
+fn forexgroup_base() -> BaseCurrencyName {
+    base_among_several_from(
+        "tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml",
+        "tests/fixtures/native/company_base_currency_forex_72.utf16le.xml",
+        FOREXGROUP_GUID,
+        "\u{20b9}",
     )
 }
 
@@ -1224,6 +1246,26 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683, #2071): composites written with the foreign
+    // symbol against its digits. The base is identified from the lab's own currency reads.
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
     // Built-in Cash Flow reports: src/native_cash_flow_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_cash_flow_probe_b_fy_live.utf16le.xml",
@@ -1681,6 +1723,32 @@ const ROWS: &[Row] = &[
         parser: "parse_currency_master_list",
         parse: |_, text| currency_masters(text),
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683): the book's Currency masters and the company's
+    // own currency name, which name its base.
+    Row {
+        fixture: "tests/fixtures/native/currency_masters_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_currency",
+        parse: |_, text| currency(text),
+    },
+    Row {
+        fixture: "tests/fixtures/native/currency_masters_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_currency_master_list",
+        parse: |_, text| currency_masters(text),
+    },
+    Row {
+        fixture: "tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_currency_master_list",
+        parse: |_, text| currency_masters(text),
+    },
+    Row {
+        fixture: "tests/fixtures/native/company_base_currency_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_currency_name(FOREXGROUP)",
+        parse: |_, text| typed(parse_company_currency_name(text, FOREXGROUP_GUID)),
+    },
     // The company's own currency name: src/native_outstandings/wire_company_currency_tests.rs, and
     // the note-day replay's base-currency read for SHAPE LAB.
     Row {
@@ -1772,6 +1840,36 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot",
         parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_compliance_ledger_snapshot_for_company(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_compliance_ledger_snapshot_for_company(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_classified_for_company(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_ledger_snapshot_classified_for_company(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
     },
     Row {
         fixture: "tests/fixtures/balance_snapshot_forex_live.utf16le.xml",

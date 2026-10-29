@@ -4601,26 +4601,50 @@ mod through_the_tool {
         assert!(remediation.contains("#683"), "{error}");
     }
 
-    /// bridge#2071, through the tool: the lab's composite layout (TallyPrime 7.2 writes
-    /// `-$100.00 @ ₹ 87/$ = -₹ 8700.00`: no space after the symbol, as in the lab's Lab Bank row)
-    /// is one Bridge's strict detector does not recognise, so the rupee ledger holding it is not
-    /// set aside and the compliance read is refused, with the code and cause as measured in the
-    /// lab and the step. The same row in the captured 7.1 layout (a space after the symbol) is
-    /// set aside by name and the read returns: the layout is the one thing that differs. The
-    /// balance answer is the committed capture of the several-currency book with one closing
-    /// balance replaced; the lab's own raw answer is not a fixture here (it would need a
-    /// merge-gate manifest entry first).
+    /// The whole next step of the refusal for a foreign-currency balance in a layout no capture
+    /// shows (#2071, #683). It names no layout: the layouts the captures show are set aside, so
+    /// what reaches this step is another shape.
+    const FOREIGN_BALANCE_STEP: &str = "Tally wrote a ledger's balance in a foreign currency in a layout ComplyEaze Bridge does not recognise (#683), so this read is refused rather than guessed at, not because the response was damaged, and nothing was returned from it. Do not repeat it in a loop: it refuses again. Tell the user that this read cannot give this company's ledgers while Tally writes a balance that way, and that Tally itself shows them.";
+
+    /// bridge#2071 and #683, through the tool: a rupee ledger whose closing balance is a composite
+    /// is set aside by name, in the layout of the 7.1 captures (a space after the foreign symbol)
+    /// and in the layout TallyPrime 7.2 wrote in the lab (`-$100.00 @ ₹ 87/$ = -₹ 8700.00`, as
+    /// in the lab's Lab Bank row: no space after the foreign symbol, one before `=`). A layout no
+    /// capture shows (here a rate with decimals) is not recognised, so the row stays a plain amount
+    /// and the compliance read is refused, with the code and cause the lab measured and the step.
+    /// The balance answer is the committed capture of the several-currency book with one closing
+    /// balance replaced.
     #[tokio::test]
-    async fn a_composite_layout_bridge_does_not_recognise_refuses_the_compliance_read_with_its_step(
-    ) {
+    async fn the_72_layout_is_set_aside_and_a_layout_no_capture_shows_refuses_with_its_step() {
         let forex = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
         let args = json!({"company_guid":forex,"fields":"compliance"});
-        // The lab's layout.
-        let unspaced = "-$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00";
+        let set_aside = |read: &Value| {
+            assert_ne!(read["isError"], true, "{read}");
+            let result = &read["structuredContent"]["result"];
+            let named = result["base_currency_ledgers_mixed_excluded"]["ledgers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|name| *name == "FX Party 01")
+                .count();
+            assert_eq!(named, 1, "{result}");
+        };
+        // The lab's 7.2 layout, and the captured 7.1 layout of the same balance.
+        for composite in [
+            "-$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+            "-$ 100.00 @ \u{20b9} 87/$  = -\u{20b9} 8700.00",
+        ] {
+            let one = OneServer::spawn(several_currency_compliance_plans(forex_balances_with(
+                composite,
+            )));
+            set_aside(&one.call(args.clone()).await);
+        }
+        // A rate with decimals is in neither layout.
+        let unrecognised = "-$100.00 @ \u{20b9} 87.5/$ = -\u{20b9} 8750.00";
         let one = OneServer::spawn(several_currency_compliance_plans(forex_balances_with(
-            unspaced,
+            unrecognised,
         )));
-        let response = one.call(args.clone()).await;
+        let response = one.call(args).await;
         let error = refusal(&response);
         assert_eq!(error["code"], "party_ledger_master_read_failed", "{error}");
         assert_eq!(
@@ -4628,34 +4652,8 @@ mod through_the_tool {
             "{error}"
         );
         let remediation = error["remediation"].as_str().expect("a next step");
-        assert_eq!(
-            remediation,
-            crate::agent::remediation_for(
-                "party_ledger_master_read_failed",
-                Some("native_foreign_currency_ledger_balance")
-            )
-            .unwrap()
-        );
-        assert!(remediation.contains("layout"), "{remediation}");
+        assert_eq!(remediation, FOREIGN_BALANCE_STEP);
         assert!(!remediation.contains("-$100.00"), "{remediation}");
-        // The captured 7.1 layout of the same balance: a space after each symbol.
-        let spaced = "-$ 100.00 @ \u{20b9} 87/$  = -\u{20b9} 8700.00";
-        let other = OneServer::spawn(several_currency_compliance_plans(forex_balances_with(
-            spaced,
-        )));
-        let read = other.call(args).await;
-        assert_ne!(read["isError"], true, "{read}");
-        let result = &read["structuredContent"]["result"];
-        assert_eq!(
-            result["base_currency_ledgers_mixed_excluded"]["ledgers"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .filter(|name| *name == "FX Party 01")
-                .count(),
-            1,
-            "{result}"
-        );
     }
 
     /// The typed pieces of that refusal on the committed 7.1 capture of the several-currency
@@ -4692,11 +4690,7 @@ mod through_the_tool {
         );
         let remediation =
             crate::agent::remediation_for(&failure.code, failure.cause).expect("a next step");
-        assert!(remediation.contains("#683"), "{remediation}");
-        assert!(
-            remediation.contains("Do not repeat it in a loop"),
-            "{remediation}"
-        );
+        assert_eq!(remediation, FOREIGN_BALANCE_STEP);
         // The ledger's name is not in the step.
         assert!(!remediation.contains("BRIDGE FX DEBTOR A"), "{remediation}");
         // The step belongs to this code: the same cause under another code is given none of

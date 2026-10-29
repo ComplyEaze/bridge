@@ -1130,6 +1130,9 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if cause.is::<crate::tally::connection::NativeReportPairDrift>() {
             return Some(crate::tally::connection::NativeReportPairDrift::SAFE_CODE);
         }
+        if cause.is::<crate::tally::runtime::BillsReportDeadlineExceeded>() {
+            return Some(crate::tally::runtime::BillsReportDeadlineExceeded::SAFE_CODE);
+        }
         // The named company is not loaded in Tally, was renamed, or was listed more than once
         // (#1699): the read failed closed, and this says why.
         if let Some(identity) = crate::tally::runtime::company_identity_cause(cause) {
@@ -2172,26 +2175,6 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
     }
 }
 
-/// The next step for an `outstandings` read of Tally's Bills report that no response answered
-/// in time (#1356). One request was held past the transport's 20-second limit: measured on a
-/// dense book at a year-end date, where the report grows with the bills open at the date. Only
-/// under the outstandings code, after the code's and the typed cause's own steps; the same
-/// unanswered reason reaches every other read, where this advice would be wrong.
-fn outstandings_unanswered_remediation(reason: &str) -> Option<&'static str> {
-    match reason {
-        "request_deadline_exceeded" => Some(
-            "Tally took longer to answer one request of its Bills Receivable or Payable report at \
-             this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
-             the one large book measured, that report's time grew with the bills open at the date: \
-             with about 15,000 open bills it answered, and with about 22,500 and about 29,900 it \
-             did not. Do not repeat the same call: tell the user. On that book an earlier `as_of`, with fewer bills open, answered; whether \
-             one does here depends on how many bills were open then, and choosing it is the \
-             user's call.",
-        ),
-        _ => None,
-    }
-}
-
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -2251,8 +2234,27 @@ const TRIAL_BALANCE_READ_FAILED_REMEDIATION: &str = "No Trial Balance figures we
 /// only under that code: the same cause codes reach other tools through `?` sites that never
 /// read the Bills report, and the text below would be wrong for them. A refusal is whole:
 /// leaving one bill out would change the totals, so nothing is returned.
+///
+/// A Bills report request cut at the 20-second limit (#1356, #2119) has its own cause, so this step
+/// is never given for another request of the read cut the same way. Measured on one dense synthetic
+/// book at year-end dates (`lab/2119-bills-read-timing-answers`): the report's time grew with the
+/// bills open at the date. On that book a read sent straight after a cut was refused for time too,
+/// since Tally goes on building an answer after the request is given up
+/// (`lab/0.7.0-master-live-checks-answers`; protocol reference §11b.2).
 fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
+        crate::tally::runtime::BillsReportDeadlineExceeded::SAFE_CODE => Some(
+            "Tally took longer to answer one request of its Bills Receivable or Payable report at \
+             this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
+             the one large book measured, that report's time grew with the bills open at the date: \
+             with about 15,000 open bills it answered, and with about 22,500 and about 29,900 it \
+             did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
+             and on that book a read sent straight after was refused for time as well. Do not \
+             repeat the same call, and do not send another read of this company straight away: \
+             tell the user, wait, then call `tally_status` once, and go on only when it answers. On \
+             that book an earlier `as_of`, with fewer bills open, answered; whether one does here \
+             depends on how many bills were open then, and choosing it is the user's call.",
+        ),
         cause if cause.starts_with("native_date_") => Some(
             "A date in Tally's Bills Receivable or Payable report is not one ComplyEaze Bridge can \
              read, so no figures were returned. When the refusal carries a `bill_row`, it names the \
@@ -2654,15 +2656,6 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
-                    .or_else(|| {
-                        (code == "native_outstandings_read_failed")
-                            .then(|| {
-                                unanswered.and_then(|unanswered| {
-                                    outstandings_unanswered_remediation(unanswered.0)
-                                })
-                            })
-                            .flatten()
-                    })
                     .or_else(|| {
                         unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
                     })

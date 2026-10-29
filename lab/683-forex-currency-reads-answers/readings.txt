@@ -1,0 +1,20 @@
+r1: parses; CURRENCY rows 2
+  NAME attr '$' (len 1 code points [U+0024]); NAME element '$'
+    MAILINGNAME 'USD'
+    DECIMALPLACES ' 2'
+  NAME attr '₹' (len 1 code points [U+20B9]); NAME element '₹'
+    MAILINGNAME 'INR'
+    DECIMALPLACES ' 2'
+r2: parses; CURRENCY rows 2
+  NAME attr '$' (len 1 code points [U+0024]); NAME element '$'
+    MAILINGNAME 'USD'
+    DECIMALPLACES ' 2'
+    ORIGINALNAME '$' (len 1 code points [U+0024])
+  NAME attr '₹' (len 1 code points [U+20B9]); NAME element '₹'
+    MAILINGNAME 'INR'
+    DECIMALPLACES ' 2'
+    ORIGINALNAME '₹' (len 1 code points [U+20B9])
+r3: parses; COMPANY rows 1
+  NAME attr 'BRIDGE FOREXGROUP LAB'; NAME element 'BRIDGE FOREXGROUP LAB'; GUID '1bb48be5-baba-45b2-90d8-7593244915a9'; CURRENCYNAME '₹' (len 1 code points [U+20B9])
+m0: COMPANY rows 1; GUID 1bb48be5-baba-45b2-90d8-7593244915a9 ALTMSTID 211 ALTVCHID 4
+m1: COMPANY rows 1; GUID 1bb48be5-baba-45b2-90d8-7593244915a9 ALTMSTID 211 ALTVCHID 4

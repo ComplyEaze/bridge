@@ -1,0 +1,11 @@
+status before m0: '<RESPONSE>TallyPrime Server is Running</RESPONSE>  200 51'
+m0 marks before 2026-10-29T04:25:47.246Z after 2026-10-29T04:25:47.719Z exit 0
+m0 status after: curl exit 0 '<RESPONSE>TallyPrime Server is Running</RESPONSE>  200 51'
+r1 currency-masters before 2026-10-29T04:25:47.826Z after 2026-10-29T04:25:47.949Z exit 0
+r1 status after: curl exit 0 '<RESPONSE>TallyPrime Server is Running</RESPONSE>  200 51'
+r2 currency-masters-originalname before 2026-10-29T04:25:48.649Z after 2026-10-29T04:25:48.751Z exit 0
+r2 status after: curl exit 0 '<RESPONSE>TallyPrime Server is Running</RESPONSE>  200 51'
+r3 company-base-currency before 2026-10-29T04:25:48.922Z after 2026-10-29T04:25:49.030Z exit 0
+r3 status after: curl exit 0 '<RESPONSE>TallyPrime Server is Running</RESPONSE>  200 51'
+m1 marks before 2026-10-29T04:25:49.216Z after 2026-10-29T04:25:49.366Z exit 0
+m1 status after: curl exit 0 '<RESPONSE>TallyPrime Server is Running</RESPONSE>  200 51'

@@ -1712,8 +1712,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              vouchers for the window needed too many requests, and Tally returned a voucher that \
              has no line on that ledger, so the detail used none of them. Tell the user the \
              party's detail could not be read this way, and do not repeat the same call in a \
-             loop. A shorter window helps when a bill is named: name a `reference` that \
-             `open_bills` lists for the party, and the read starts at that bill's date.",
+             loop. Only a bill trail can be narrowed: naming a `reference` that `open_bills` \
+             lists for the party starts its read at that bill's date. The unadjusted detail has \
+             no narrower read.",
         ),
         // A ledger-scoped movement read returned a voucher with no line on the ledger (#485):
         // nothing was summed. The Trial Balance gives that ledger's figures without reading
@@ -2128,6 +2129,24 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
         ),
         "endpoint_circuit_cooldown" => Some(
             "ComplyEaze Bridge held this request back after repeated failed requests to Tally, and sent nothing. Tell the user to confirm Tally is running with the XML server enabled; after about ten seconds the request can be repeated.",
+        ),
+        _ => None,
+    }
+}
+
+/// The next step for an `outstandings` read of Tally's Bills report that no response answered
+/// in time (#1356). One request was held past the transport's 20-second limit: measured on a
+/// dense book at a year-end date, where the report grows with the bills open at the date. Only
+/// under the outstandings code, after the code's and the typed cause's own steps; the same
+/// unanswered reason reaches every other read, where this advice would be wrong.
+fn outstandings_unanswered_remediation(reason: &str) -> Option<&'static str> {
+    match reason {
+        "request_deadline_exceeded" => Some(
+            "Tally took longer to answer one request of its Bills Receivable or Payable report at \
+             this date than ComplyEaze Bridge waits, so no figures were returned. On a large book \
+             that report grows with the bills open at the date. Do not repeat the same call in a \
+             loop: tell the user, and say that an earlier `as_of` reads fewer open bills, which \
+             is their call.",
         ),
         _ => None,
     }
@@ -2562,6 +2581,15 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
+                    .or_else(|| {
+                        (code == "native_outstandings_read_failed")
+                            .then(|| {
+                                unanswered.and_then(|unanswered| {
+                                    outstandings_unanswered_remediation(unanswered.0)
+                                })
+                            })
+                            .flatten()
+                    })
                     .or_else(|| {
                         unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
                     })

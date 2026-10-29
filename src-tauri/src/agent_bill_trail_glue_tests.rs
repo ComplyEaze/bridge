@@ -753,3 +753,81 @@ async fn a_book_that_did_not_move_is_answered() {
     );
     assert_eq!(served, 22);
 }
+
+/// The steps after the vouchers were read (#1356): when the party was read by its ledger, a
+/// refusal from them, here a book that moved before the closing marks read, keeps its own code
+/// and says in `window_scope` that it came after that read; when the company's window was read,
+/// it carries none.
+#[tokio::test]
+async fn a_refusal_after_the_ledger_read_says_it_came_after_that_read() {
+    use crate::agent::bill_trail::LEDGER_SCOPED_LATER_REFUSAL;
+    let window = {
+        let bytes = include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+        );
+        let words = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf16(&words).unwrap()
+    };
+    for by_ledger in [true, false] {
+        // The verified company (its first four legs), then the closing marks read, which
+        // answers a voucher mark of 11 against the opening 10.
+        let cycle = import_cycle_plans();
+        let mut plans = cycle[..4].to_vec();
+        let moved = plan_of_text(&format!(
+            "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>11</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"
+        ));
+        let mut closing = cycle[10..16].to_vec();
+        closing[1] = moved.clone();
+        closing[3] = moved;
+        plans.extend(closing);
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = Server::new(Settings {
+            endpoint: TallyEndpointConfig {
+                host: simulator.address().ip().to_string(),
+                port: simulator.address().port(),
+            },
+            data_dir: directory.path().to_path_buf(),
+            max_rows: 500,
+            max_bytes: 200_000,
+            redaction: Redaction::None,
+            import_enabled: false,
+            posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
+            audit_enabled: false,
+        });
+        let (company, identity, evidence) = server.verified_company(CAPTURED_GUID).await.unwrap();
+        let rows = crate::agent::voucher_parse::parse_agent_rows(&window, CAPTURED_GUID).unwrap();
+        let resolved = crate::agent::LedgerMatch::Exact {
+            name: "WR2 Sales".to_string(),
+            similar: Vec::new(),
+        };
+        let result = server
+            .finish_party_detail(
+                &identity,
+                &company,
+                &tally_date(AS_OF),
+                &tally_date("20260401"),
+                &resolved,
+                "WR2 Sales",
+                (DetailKind::BillTrail, None),
+                (&[], &[]),
+                500,
+                OPENING_MARKS,
+                (rows, by_ledger),
+                evidence,
+            )
+            .await;
+        simulator.cancel();
+        let failure = result.unwrap_err();
+        assert_eq!(
+            failure.code, "voucher_window_changed_during_read",
+            "{by_ledger}"
+        );
+        let expected = by_ledger.then_some(LEDGER_SCOPED_LATER_REFUSAL);
+        assert_eq!(failure.window_scope(), expected, "{by_ledger}");
+    }
+}

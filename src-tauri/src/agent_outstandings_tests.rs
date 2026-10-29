@@ -1698,8 +1698,8 @@ async fn a_bills_post_cut_at_the_limit_is_refused_with_its_own_cause() {
 }
 
 /// The Bills report posts have a longer limit than every other request (#2119): held past the
-/// ordinary limit, each of them is still answered and the read completes. The same hold on the
-/// groups post, the control below, is refused.
+/// ordinary limit, each of them is still answered and the read completes, after the hold. The
+/// same hold on the groups post, the control below, is refused.
 #[tokio::test]
 async fn a_bills_post_held_past_the_ordinary_limit_is_answered() {
     for held in [
@@ -1707,6 +1707,7 @@ async fn a_bills_post_held_past_the_ordinary_limit_is_answered() {
         AgeingBillsPosts::receivable_second,
         AgeingBillsPosts::payable,
     ] {
+        let started = std::time::Instant::now();
         let (response, _) =
             ageing_outstandings_holding(held, std::time::Duration::from_millis(300), None, false)
                 .await;
@@ -1714,6 +1715,10 @@ async fn a_bills_post_held_past_the_ordinary_limit_is_answered() {
         assert!(
             response["structuredContent"]["result"]["error"].is_null(),
             "{response}"
+        );
+        assert!(
+            started.elapsed() >= std::time::Duration::from_millis(1_500),
+            "the held post was waited for"
         );
     }
 }

@@ -1151,10 +1151,9 @@ mod bills_report {
     /// this limit. If the time keeps growing at the about 1.2 to 1.4 ms a bill of those two runs
     /// (inferred), this limit reaches about 43,000 to 49,000 bills, so the 32 MiB response cap
     /// binds first only where a bill costs above about 690 to 780 bytes. An answer over the cap is
-    /// refused as `ResponseTooLarge`, never read in part. A
-    /// response shorter than its declared length is refused as `ResponseTruncated`. A shorter
-    /// answer that Tally itself declares whole (implementation guide §2.6, I4) is caught only
-    /// when the pair's two answers differ.
+    /// refused as `ResponseTooLarge`, never read in part. A response shorter than its declared
+    /// length is refused as `ResponseTruncated`. A shorter answer that Tally itself declares whole
+    /// (implementation guide §2.6, I4) is caught only when the pair's two answers differ.
     pub(crate) const BILLS_REPORT_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
     /// Behind an `Arc`, so a client, held in many futures, grows by one pointer.
@@ -1318,6 +1317,8 @@ impl TallyClient {
         }
     }
 
+    /// Test seam for the ordinary transport's client builder; the Bills report transport keeps
+    /// the production one.
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
         let wire = WireGateConfig::default();
@@ -1342,7 +1343,7 @@ impl TallyClient {
     }
 
     /// Test seam: `policy` for every request but the Bills report's, which
-    /// keeps `bills_report_limit`.
+    /// keeps the default policy with `bills_report_limit` as its limit.
     #[cfg(test)]
     pub(crate) fn with_transport_policy(
         config: TallyConfig,

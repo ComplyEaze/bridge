@@ -1949,8 +1949,9 @@ fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
 }
 
 /// A Bills report answer shorter than the length it declares is refused as `ResponseTruncated`
-/// at once (#2119): under the Bills report's longer limit, a short answer is neither waited out
-/// to that limit nor read in part, and the pair's second post is never sent.
+/// well before even the default limit (#2119): under the Bills report's longer limit, a short
+/// answer is neither waited out to that limit nor read in part, and the pair's second post is
+/// never sent.
 #[tokio::test]
 async fn a_bills_report_body_shorter_than_its_declared_length_is_truncated() {
     use bridge_tally_protocol::native_outstandings::{

@@ -4135,12 +4135,14 @@ The read of Tally's Bills Receivable and Payable reports comes before any party 
 large book it can be the step that fails: on one synthetic book of about 30,000 vouchers, at the
 end of its first year (31 March 2026), one of its requests was held past the 20-second limit and
 the whole call was refused as `native_outstandings_read_failed`, with no figure returned, while the
-same book three months into the year answered (#1356). The two Bills report requests now have a
-60-second limit of their own; every other request keeps 20 seconds (#2119). Each report is read
-twice, so on that book a call at the end of the year is expected to take well over a minute
-(inferred, not measured through a host), and each Bills post holds the endpoint for its whole time:
-another ComplyEaze Bridge process reading the same Tally meanwhile is refused busy after its usual
-wait. A Bills report request cut at its limit has its own cause,
+same book three months into the year answered (#1356). The Bills Receivable and Payable report
+requests now have a 60-second limit of their own; every other request keeps 20 seconds (#2119).
+Each report is read twice, so on that book a call at the end of the year is expected to take well
+over a minute (inferred, not measured through a host), and each Bills post holds the endpoint for
+its whole time: another ComplyEaze Bridge process reading the same Tally meanwhile is refused busy
+after its usual wait, and in the desktop app another read of the same Tally waits behind it and is
+refused (`endpoint_queue_deadline_exceeded`) after 30 seconds. The MCP server holds a second tool
+call until the first ends. A Bills report request cut at its limit has its own cause,
 `native_bills_report_deadline_exceeded`; another request of the read cut at its limit keeps
 `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to repeat the
 call. Tally can go on building the report after the limit (a read sent straight after was refused

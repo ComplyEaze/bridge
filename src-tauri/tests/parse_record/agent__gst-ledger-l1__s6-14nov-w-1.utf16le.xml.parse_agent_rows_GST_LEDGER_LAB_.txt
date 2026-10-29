@@ -18,6 +18,15 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("SYN GS1 Supplier"),
             },
@@ -69,18 +78,45 @@ Ok([
                         "stock_item": String("GS1 Item"),
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Goods"),
             },
             Object {
                 "amount": String("-450.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input CGST"),
             },
             Object {
                 "amount": String("-450.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input SGST"),
             },

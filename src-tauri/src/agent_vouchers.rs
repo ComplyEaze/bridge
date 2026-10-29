@@ -228,21 +228,25 @@ enum PageServe {
 }
 
 /// The rows of one page, redacted and party-marked as `vouchers` always did, with each
-/// entry's bank allocations (#1231) and goods lines (#2015) only when the call asked for them.
+/// entry's bank allocations (#1231), goods lines (#2015) and GST details (#2027) only when the
+/// call asked for them.
 pub(super) fn page_items(
     server: &Server,
     rows: &[Value],
     (offset, limit): (usize, usize),
-    (bank, goods): (BankAllocationsShown, GoodsLinesShown),
+    (bank, goods, gst): (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
 ) -> Vec<Value> {
     rows.iter()
         .skip(offset)
         .take(limit)
         .map(|row| {
             redact_value(
-                mark_voucher_party_names(present_voucher_goods_lines(
-                    present_voucher_bank_allocations(row.clone(), bank),
-                    goods,
+                mark_voucher_party_names(present_voucher_gst_details(
+                    present_voucher_goods_lines(
+                        present_voucher_bank_allocations(row.clone(), bank),
+                        goods,
+                    ),
+                    gst,
                 )),
                 server.settings.redaction,
             )
@@ -327,7 +331,7 @@ pub(super) fn render_page_body(
     rows: &[Value],
     summary: Option<&SummaryRequest>,
     (offset, limit): (usize, usize),
-    shown: (BankAllocationsShown, GoodsLinesShown),
+    shown: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
 ) -> Result<PageBody, ToolFailure> {
     let Some(request) = summary else {
         let items = page_items(server, rows, (offset, limit), shown);
@@ -531,6 +535,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let shown = (
             BankAllocationsShown::from_args(args)?,
             GoodsLinesShown::from_args(args)?,
+            GstDetailsShown::from_args(args)?,
         );
         // A type GUID that is not this company's cannot name any of its
         // types: refused rather than answered with an empty selection.
@@ -941,7 +946,7 @@ impl Server {
         accumulated: &mut Option<Evidence>,
         guid: &str,
         summary_group: Option<SummaryGroup>,
-        shown: (BankAllocationsShown, GoodsLinesShown),
+        shown: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
     ) -> Result<PageServe, ToolFailure> {
         let held = self
             .voucher_pages

@@ -8,18 +8,45 @@ Ok([
             Object {
                 "amount": String("-100.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Output CGST"),
             },
             Object {
                 "amount": String("-100.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Output SGST"),
             },
             Object {
                 "amount": String("200.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Cash"),
             },

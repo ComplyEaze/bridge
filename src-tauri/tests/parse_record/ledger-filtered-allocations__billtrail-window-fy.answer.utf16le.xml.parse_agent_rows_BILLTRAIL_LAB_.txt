@@ -18,12 +18,76 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Lab Party P1"),
             },
             Object {
                 "amount": String("20000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Sales"),
             },
@@ -49,6 +113,15 @@ Ok([
             Object {
                 "amount": String("-3000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Lab Bank"),
             },
@@ -65,6 +138,15 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Party P1"),
             },
@@ -90,6 +172,15 @@ Ok([
             Object {
                 "amount": String("-4000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Lab Bank"),
             },
@@ -106,6 +197,15 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Party P1"),
             },
@@ -150,12 +250,76 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Lab Party P1"),
             },
             Object {
                 "amount": String("9000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Sales"),
             },
@@ -181,6 +345,15 @@ Ok([
             Object {
                 "amount": String("-8000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Lab Bank"),
             },
@@ -197,6 +370,15 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Party P1"),
             },
@@ -239,12 +421,76 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Party P1"),
             },
             Object {
                 "amount": String("-1000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Lab Sales"),
             },
@@ -280,6 +526,15 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Lab Party P1"),
             },
@@ -308,6 +563,15 @@ Ok([
                     },
                 ],
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Lab Bank"),
             },

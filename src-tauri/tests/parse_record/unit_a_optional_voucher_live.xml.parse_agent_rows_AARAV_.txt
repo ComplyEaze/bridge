@@ -18,12 +18,30 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("BRIDGE PROBE PARTY OPT"),
             },
             Object {
                 "amount": String("-9999.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Cash"),
             },
@@ -55,12 +73,30 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("BRIDGE PROBE PARTY OPT"),
             },
             Object {
                 "amount": String("-9999.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Cash"),
             },

@@ -16,24 +16,106 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Chem Supplier 1"),
             },
             Object {
                 "amount": String("1000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Purchase - Local"),
             },
             Object {
                 "amount": String("90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("CGST"),
             },
             Object {
                 "amount": String("90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("State Tax"),
             },

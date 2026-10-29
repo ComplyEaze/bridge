@@ -5,6 +5,8 @@ use super::*;
 mod bank_allocations;
 #[path = "agent_voucher_cost_centres.rs"]
 mod cost_centres;
+#[path = "agent_voucher_entry_gst.rs"]
+mod entry_gst;
 #[path = "agent_voucher_goods_lines.rs"]
 mod goods_lines;
 #[path = "agent_voucher_scalars.rs"]
@@ -12,6 +14,7 @@ mod scalars;
 use bank_allocations::BankAllocationCollector;
 use cost_centres::CostCentreCollector;
 pub(super) use cost_centres::CostCentreProblem;
+use entry_gst::EntryGstCollector;
 use goods_lines::GoodsLineCollector;
 pub(super) use scalars::*;
 
@@ -331,6 +334,7 @@ fn parse_voucher_rows(
     let mut cost = CostCentreCollector::default();
     let mut bank = BankAllocationCollector::default();
     let mut goods = GoodsLineCollector::default();
+    let mut gst = EntryGstCollector::default();
     let mut current_tag = String::new();
     let mut scope = NativeCollectionScope::default();
     // Set by a composite amount under `CompositePolicy::Withhold`, per voucher.
@@ -368,11 +372,13 @@ fn parse_voucher_rows(
                     cost.reset();
                     bank.reset();
                     goods.reset();
+                    gst.reset();
                 }
                 if let Some(tail) = scope.entry_tail() {
                     cost.start(tail, &tag);
                     bank.start(tail, &tag);
                     goods.start(tail, &tag);
+                    gst.start(tail, &tag);
                 }
                 if tag == "BILLALLOCATIONS.LIST" && scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST")
                 {
@@ -392,6 +398,12 @@ fn parse_voucher_rows(
                 current_tag = tag;
             }
             Ok(quick_xml::events::Event::Text(text)) => {
+                if let Some(tail) = scope.entry_tail() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => gst.text(tail, &current_tag, &value),
+                        Err(_) => gst.undecodable(tail),
+                    }
+                }
                 if scope.in_cost_centres() {
                     match decoded_agent_text(text.clone()) {
                         Ok(value) => {
@@ -429,6 +441,9 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::CData(text)) => {
                 let value = text.to_string();
+                if let Some(tail) = scope.entry_tail() {
+                    gst.text(tail, &current_tag, &value);
+                }
                 if scope.in_cost_centres() {
                     cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
                 }
@@ -450,6 +465,12 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::GeneralRef(reference)) => {
+                if let Some(tail) = scope.entry_tail() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => gst.text(tail, &current_tag, &value),
+                        Err(_) => gst.undecodable(tail),
+                    }
+                }
                 if scope.in_cost_centres() {
                     match decoded_agent_reference(reference.clone()) {
                         Ok(value) => {
@@ -491,6 +512,7 @@ fn parse_voucher_rows(
                     cost.end(tail);
                     bank.end(tail);
                     goods.end(tail);
+                    gst.end(tail);
                 }
                 if scope.bill_allocation() {
                     if let Some(allocation_row) = allocation.take().filter(|row| !row.is_empty()) {
@@ -664,6 +686,15 @@ fn parse_voucher_rows(
                             Ok(rows) => parsed_entry["goods_lines"] = Value::Array(rows),
                             Err(problem) => {
                                 parsed_entry["goods_lines_unreadable"] = json!(problem.reason());
+                            }
+                        }
+                        // The same for the entry's GST details (#2027): its rates, taxability and
+                        // type of supply as Tally sent them, withheld unless `vouchers` asks.
+                        match gst.finish() {
+                            Ok(None) => {}
+                            Ok(Some(details)) => parsed_entry["gst_details"] = details,
+                            Err(problem) => {
+                                parsed_entry["gst_details_unreadable"] = json!(problem.reason());
                             }
                         }
                         if parsed_amount.as_ref().is_some_and(|parsed| {
@@ -846,6 +877,7 @@ fn parse_voucher_rows(
                     cost.start(tail, &name);
                     bank.start(tail, &name);
                     goods.start(tail, &name);
+                    gst.start(tail, &name);
                 }
                 scope.start(name.clone());
                 if scope.repeated_collection {
@@ -855,6 +887,7 @@ fn parse_voucher_rows(
                     cost.end(tail);
                     bank.end(tail);
                     goods.end(tail);
+                    gst.end(tail);
                 }
                 scope.end(&name)?;
             }
@@ -1030,6 +1063,9 @@ mod bank_allocation_tests;
 #[cfg(test)]
 #[path = "agent_voucher_cost_centres_tests.rs"]
 mod cost_centre_tests;
+#[cfg(test)]
+#[path = "agent_voucher_entry_gst_tests.rs"]
+mod entry_gst_tests;
 #[cfg(test)]
 #[path = "agent_voucher_goods_lines_tests.rs"]
 mod goods_line_tests;

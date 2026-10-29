@@ -8,6 +8,61 @@ Ok([
             Object {
                 "amount": String("-2500.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Local"),
             },
@@ -22,6 +77,15 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Chem Supplier 4"),
             },
@@ -54,6 +118,15 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Chem Supplier 4"),
             },
@@ -105,6 +178,15 @@ Ok([
                         "stock_item": String("Soda Ash Light"),
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Local"),
             },

@@ -8,24 +8,106 @@ Ok([
             Object {
                 "amount": String("-10000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Goods"),
             },
             Object {
                 "amount": String("-900.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input CGST"),
             },
             Object {
                 "amount": String("-900.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input SGST"),
             },
             Object {
                 "amount": String("11800.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("SYN Supplier Intra (M2)"),
             },
@@ -51,18 +133,91 @@ Ok([
             Object {
                 "amount": String("-20000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Goods"),
             },
             Object {
                 "amount": String("-3600.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input IGST"),
             },
             Object {
                 "amount": String("23600.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("SYN Supplier Inter (M2)"),
             },
@@ -89,24 +244,106 @@ Ok([
             Object {
                 "amount": String("-5000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Services"),
             },
             Object {
                 "amount": String("-450.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input CGST"),
             },
             Object {
                 "amount": String("-450.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input SGST 9% (M2)"),
             },
             Object {
                 "amount": String("5900.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("SYN Supplier Intra (M2)"),
             },
@@ -133,30 +370,121 @@ Ok([
             Object {
                 "amount": String("-1000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Purchase - Goods"),
             },
             Object {
                 "amount": String("-90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input CGST"),
             },
             Object {
                 "amount": String("-90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input SGST"),
             },
             Object {
                 "amount": String("10.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("TDS Payable (M2)"),
             },
             Object {
                 "amount": String("1170.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("SYN Supplier Intra (M2)"),
             },
@@ -182,24 +510,106 @@ Ok([
             Object {
                 "amount": String("-1180.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("SYN Supplier Intra (M2)"),
             },
             Object {
                 "amount": String("1000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Purchase - Goods"),
             },
             Object {
                 "amount": String("90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Input CGST"),
             },
             Object {
                 "amount": String("90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Input SGST"),
             },
@@ -233,24 +643,106 @@ Ok([
                         },
                     },
                 ],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Counter Sales - Unregistered"),
             },
             Object {
                 "amount": String("10000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("CGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("SGST/UTGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("IGST"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                        Object {
+                            "duty_head": Object {
+                                "state": String("value"),
+                                "value": String("State Cess"),
+                            },
+                            "rate": Object {
+                                "kind": String("zero"),
+                            },
+                        },
+                    ],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Sales - Goods"),
             },
             Object {
                 "amount": String("900.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Output CGST"),
             },
             Object {
                 "amount": String("900.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Output SGST"),
             },
@@ -276,36 +768,90 @@ Ok([
             Object {
                 "amount": String("-1000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Freight Inward (M2)"),
             },
             Object {
                 "amount": String("-90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input CGST"),
             },
             Object {
                 "amount": String("-90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Input SGST"),
             },
             Object {
                 "amount": String("90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Output CGST"),
             },
             Object {
                 "amount": String("90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Output SGST"),
             },
             Object {
                 "amount": String("1000.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("SYN Supplier Intra (M2)"),
             },
@@ -331,18 +877,45 @@ Ok([
             Object {
                 "amount": String("-90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Output CGST"),
             },
             Object {
                 "amount": String("-90.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Output SGST"),
             },
             Object {
                 "amount": String("180.00"),
                 "bill_allocations": Array [],
+                "gst_details": Object {
+                    "rates": Array [],
+                    "taxability": Object {
+                        "state": String("empty"),
+                    },
+                    "type_of_supply": Object {
+                        "state": String("empty"),
+                    },
+                },
                 "is_deemed_positive": String("No"),
                 "ledger": String("Cash"),
             },

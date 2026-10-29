@@ -532,6 +532,7 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
                 mark_entry_party_names(entry);
                 withhold_entry_bank_allocations(entry);
                 withhold_entry_goods_lines(entry);
+                withhold_entry_gst_details(entry);
             }
         }
     }
@@ -549,6 +550,7 @@ fn mark_register_side_item(mut item: Value) -> Value {
             mark_entry_party_names(entry);
             withhold_entry_bank_allocations(entry);
             withhold_entry_goods_lines(entry);
+            withhold_entry_gst_details(entry);
         }
     }
     if let Some(names) = item

@@ -375,6 +375,43 @@ fn present_voucher_goods_lines(mut voucher: Value, shown: GoodsLinesShown) -> Va
     voucher
 }
 
+/// Whether an answer that returns a voucher's entries shows their GST details (#2027): each
+/// entry's rates per duty head, taxability and type of supply. Only `vouchers` called with
+/// `include_gst_details: true` shows them; the parse always reads them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum GstDetailsShown {
+    Withheld,
+    Shown,
+}
+
+impl GstDetailsShown {
+    /// From the `include_gst_details` argument: absent or false withholds them.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "include_gst_details")? {
+            Some(true) => Self::Shown,
+            Some(false) | None => Self::Withheld,
+        })
+    }
+}
+
+/// An entry as an answer that did not ask for GST details shows it: without them.
+fn withhold_entry_gst_details(entry: &mut Value) {
+    if let Some(entry) = entry.as_object_mut() {
+        entry.remove("gst_details");
+        entry.remove("gst_details_unreadable");
+    }
+}
+
+/// A voucher's entries without their GST details, unless `shown` asks for them.
+fn present_voucher_gst_details(mut voucher: Value, shown: GstDetailsShown) -> Value {
+    if shown == GstDetailsShown::Withheld {
+        if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
+            entries.iter_mut().for_each(withhold_entry_gst_details);
+        }
+    }
+    voucher
+}
+
 fn mark_voucher_party_names(mut voucher: Value) -> Value {
     for field in ["party", "party_ledger_name"] {
         mark_party_field(&mut voucher, field);

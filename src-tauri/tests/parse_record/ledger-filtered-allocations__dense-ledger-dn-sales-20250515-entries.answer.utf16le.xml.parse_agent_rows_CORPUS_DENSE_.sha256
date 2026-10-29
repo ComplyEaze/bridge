@@ -1,5 +1,5 @@
 # fixture: ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml
 # parser: parse_agent_rows(CORPUS_DENSE)
 # source: captured
-sha256 5570cb4132e81702ad48adde2af9d985dc6123bf47e7f4a1d59a51ddbb40b53a
-length 131283
+sha256 4f83802e83f227d7fdce853150483a73db4bc9e76f2d0ce749cf64aece4dc6e2
+length 347845

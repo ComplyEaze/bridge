@@ -1,0 +1,5 @@
+step 0 2026-10-29T11:50:57Z
+Tally current date (Gateway): Monday, 20-Apr-2026; BRIDGE SHAPE LAB the one company (Gateway capture shots/s0-tally.png)
+C2 raw MARKS: request 976 B (gen_census.py marks, company file BRIDGE SHAPE LAB); answer 3,396 B = CONTENT-LENGTH, exit 0, 200; one COMPANY row, GUID 3a6bd6e1-b835-4bff-89dd-8a6af138c346, ALTMSTID 292, ALTVCHID 112
+exe 32607744 e95269fb9ab2d72676902891615d733e2cb13e12cc003b483afbc0c0110d9a58
+launch-env.json sha256 d8eca2942c5cf3e70dea64302322b2e525fbe0b3255873b227a6ee1d3ebc8f68; BRIDGE_AGENT_ENABLE_WRITES present: True

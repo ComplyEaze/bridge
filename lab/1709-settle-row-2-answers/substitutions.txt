@@ -1,0 +1,8 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+evidence/c10-netstat.txt: original 9650 B sha256 28a0fcb49f9cb1fa8f02da44e3b879e4edbe9edb24be3d0df3561f2f1819ebfe; only the port-9001 LISTENING lines kept
+evidence/s0-netstat.txt: original 9877 B sha256 cec4b274f3da64d673f3b985dbe0a6760fa0c34f357442c69428c3c37802986f; only the port-9001 LISTENING lines kept
+notes.txt: original 10516 B sha256 a60517a5d1a329e469f10c36521c3803cde9c4e929112a694e76baea55088d3c; 1 x -> run lead's word; 11 x -> run lead; 2 x -> stop
+restore-plan.txt: original 743 B sha256 38781bc7b4c775113f287596aa38413c1ad61a56a2e00540079ce1bad468eb9c; 1 x -> <Tally data folder>
+scripts/call.py: original 1224 B sha256 a4d1b7fa8a56e2189f4898306445d8915238a0322fbbf84092c2bd6d92b0fc1f; 1 x -> <lab folder>
+scripts/reads.py: original 4453 B sha256 bf8f5cea1f5bab509cee5963188aa3d334b0fc944ae29fc6c3def7d82f47347c; 1 x -> '<lab folder>'
+scripts/step0.ps1: original 2411 B sha256 701842664ecefedf41f668d34a035b8a8173ccb987b59e67ff72e2c2d31e47d0; 2 x -> <lab folder>

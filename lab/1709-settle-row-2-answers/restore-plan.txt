@@ -1,0 +1,7 @@
+restore-plan.txt (#1709-settle second sitting, step 7.2), written 2026-10-29T12:06:32Z
+Source folder: <lab folder of the first sitting>\backups (holds that one file)
+File: TDBK1800_100021.001, 102,253 B, sha256 a95a19edb1678aca19444cef80470cb67d0374b5fe96f25520f84e76af933841 (re-hashed now: a95a19edb1678aca19444cef80470cb67d0374b5fe96f25520f84e76af933841)
+Restore list time expected: 29 Oct 2026 about 09:37 UTC = 15:07 IST (the first sitting's record; file time 09:38:31Z)
+Company: BRIDGE SHAPE LAB, number 100021
+Restore Data Path: Tally's data folder <Tally data folder>
+Prompts expected (the only ones answered): 'Accept ?' = Yes; 'Company data folder (100021) already exists ... Skip ... Replace' = Replace

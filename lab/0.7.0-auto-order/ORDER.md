@@ -112,3 +112,10 @@ None of these 0.7.0 sheets toggles a setting only to isolate a variable. Rows 7 
 - The data folder is the new empty folder the sheet names, not the first sitting's.
 - The go-ahead: the owner's standing word of 28 Oct 2026 that the lab PC has full authority for its rows (restarting Tally, posting on, answering Bridge's windows), and the go-ahead recorded above for #2150's build.
 - The answers go to a NEW branch `lab/1709-settle-row-2-answers`, made from the sheet head, in the folder `lab/1709-settle-row-2-answers/`. The first sitting's `lab/1709-settle-row-answers` is not touched.
+
+**Row 23, #1780 row 1780-H (added 29 Oct 2026): the approval boxes opened system-modal, on #2107's build; after row 22's second sitting.**
+- The sheet is `lab/1780-system-modal-box` at 693a04f5258cb14592b197b966de5aa1e60c0572 (one row, 1780-H, with its inputs and SHA256.txt).
+- BUILD-H: #2107 at head 488983145f940dfd9fa84e33a93eec37f59328e2, Bridge CI run 40865537013, artifact 12894022601 (`unsigned-bundle-smoke-windows-latest`, digest sha256:970e1e422270cfdde68b4a58cc6b8bc7d202ea39f17ac7a1ce7d410577234ab0). From that run's `mcpb-smoke.json`: `bridge_mcp.exe` a946979561b61f51e6dab3539d3de98fd48c8f103f61d2e3abe787acf3240c23, `pdfium.dll` 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118, `bridge-tally.mcpb` e6767ac5f8abaa39b34a8ada2d37b8b956e71ddfc72c5878d433f93e04302b16. Check the zip against the digest and each file against these before the first call; any other hash = STOP.
+- The go-ahead: the owner's word of 29 Oct 2026 that the lab may download the builds its rows need, pull request bundles included, and the standing word of 28 Oct 2026 that the lab PC has full authority for its rows (posting on, master writes on, answering Bridge's windows).
+- Part D (the desktop client as the server's parent) needs the owner at the PC; it does not block the rest of the row.
+- The answers go to a NEW branch `lab/1780-system-modal-box-answers`, made from the sheet head.

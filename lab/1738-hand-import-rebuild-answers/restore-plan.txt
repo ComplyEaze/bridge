@@ -1,0 +1,7 @@
+Restore plan (#1738 hand-import rebuild, step 8; LAB-COMMON C6).
+Folder: <lab folder>\S0 (holds one file only)
+File: TDBK1800_100051.001, 28,318 B, sha256 79bc512a7349fe580b76f3dc3eb5768813ca3f372cf89297aff600dc4151d5c5, backed up 29-Oct-2026 11:53 IST (S0, before step 0b)
+Company: BRIDGE TRANSFER LAB, number 100051
+Restore Data Path: Tally's data folder (<Tally data folder>)
+Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (100051) already exists ... Skip ... Replace ..." = Replace.
+After: M 210 and V 7 (M0s, V0s); TLab Suspense absent (four ledgers); no voucher 1 to 31 Aug 2026; Contra numbering automatic, auto_retain.

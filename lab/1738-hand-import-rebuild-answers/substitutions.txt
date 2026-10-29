@@ -1,0 +1,12 @@
+Pushed copies that differ from the files kept on the lab PC: lab-PC paths replaced by placeholders. Each changed file, with the original's bytes and sha256 and what was replaced.
+answers/008-p1-parse-a.json: original 1903 B sha256 97de15a50fb39227f5870c9b7b4f86e807d2ba9e3f4c793695fc3c34d2c5fc26; 1 x -> <password folder>; 1 x -> <lab folder>
+answers/009-p1-parse-a-redo.json: original 4916 B sha256 14311f587b4dafaac7c261a243c0c4226174145ae8afec1388bd08d3fff82029; 1 x -> <password folder>; 1 x -> <lab folder>
+answers/010-x1-build.json: original 12403 B sha256 b499c2eaa5a9bfa788e3f14518c7e9bca6b4cd724035d8dd73b6eb3fabc3dd9b; 2 x -> <lab folder>
+answers/016-s3-p2-parse-b.json: original 4913 B sha256 d13c1c11345d40c56ec9954f76c857c71407d7731ecdf709fd82211abf025aa3; 1 x -> <password folder>; 1 x -> <lab folder>
+answers/024-s6-p3-parse-a.json: original 4914 B sha256 20a900f12cddf6f7766f49249386b5f9e2e0a1036091bbbee05c4b1f5e8e8a6e; 1 x -> <password folder>; 1 x -> <lab folder>
+restore-plan.txt: original 680 B sha256 7128b5f6d1c0b3bbaf3c65def58c7e95449d3544a74b07e55d7ce2eb177a4a18; 1 x -> <Tally data folder>
+evidence/s8-company-folder-before.txt: original 1865 B sha256 c0cb5f2045f64e11dc0ceb29423e46fe909aeed64004c0d3c33cb2775773c0e2; kept size, time and name of each file (owner and mode columns dropped)
+evidence/s8-company-folder-after.txt: original 1247 B sha256 8ba9bbb37ca0caaf0aa02f42930d8458df22fac7527ea2a60e9ff30a38b06596; kept size, time and name of each file (owner and mode columns dropped)
+attempt-1/notes.txt: original 2035 B sha256 8f427ff740ac5d67698e3390caf1e84de90a5582d78978ce614fcdaad39b61cd; the capitalised stop word written as "stopped"
+evidence/s0-netstat.txt: original 9256 B sha256 f3e2582710ce38be13057318b2d931816de8d74abe9a9cdfc48a9c17237122d2; only the port-9001 LISTENING lines kept (forward fix: the first commit carried the full output)
+evidence/c10-netstat.txt: original 9488 B sha256 1fd4a14f8226d737601d35f91a38964dc9ba5ec86f8852e177457b27a1ea0570; only the port-9001 LISTENING lines kept (forward fix: the first commit carried the full output)

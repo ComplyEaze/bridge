@@ -1,0 +1,20 @@
+{
+ "additionalProperties": false,
+ "properties": {
+  "batch_id": {
+   "description": "The batch_id build_import_xml returned for the saved batch.",
+   "maxLength": 43,
+   "minLength": 43,
+   "type": "string"
+  },
+  "company_guid": {
+   "description": "The company's company_guid, as list_companies returns it.",
+   "type": "string"
+  }
+ },
+ "required": [
+  "company_guid",
+  "batch_id"
+ ],
+ "type": "object"
+}

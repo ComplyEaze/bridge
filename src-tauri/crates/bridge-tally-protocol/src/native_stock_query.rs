@@ -49,8 +49,8 @@ pub enum StockQueryError {
     /// A godown or batch name that is empty, has space at either end, holds the sanitiser's
     /// marker, or is past the assumed name bound.
     NameInvalid,
-    /// A quantity that is empty, holds the sanitiser's marker, or is not `<number> <unit>`:
-    /// never read as zero.
+    /// A quantity that is empty, has space at either end, holds the sanitiser's marker, or is not
+    /// `<number> <unit>`: never read as zero.
     QuantityUnparseable,
     /// A second line for a godown and batch already read.
     LineRepeated,
@@ -182,8 +182,9 @@ fn captured(name: &[u8]) -> bool {
 /// godown and batch. No capture holds both kinds of group, so either kind may come first, but
 /// the kinds do not interleave. Each of these refuses the whole answer: an element outside that
 /// set, in another case or with an attribute; a comment or declaration; a group or triple cut
-/// short; a group after a line; an empty or unreadable quantity; a name that is empty, padded,
-/// marked by the sanitiser or over-long; and a godown and batch read twice.
+/// short; a group after a line; a quantity that is empty, padded, marked by the sanitiser or
+/// unreadable; a name that is empty, padded, marked by the sanitiser or over-long; and a godown and
+/// batch read twice.
 pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError> {
     let sanitized = sanitize_invalid_numeric_references(xml);
     let mut reader = Reader::from_str(&sanitized);
@@ -198,12 +199,9 @@ pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError>
             .map_err(|_| StockQueryError::Malformed)?
         {
             Event::Start(element) => {
-                if element.attributes().next().is_some() {
-                    return Err(StockQueryError::Malformed);
-                }
                 let name = element.name().as_ref().as_bytes().to_vec();
                 if !root_seen {
-                    if name.as_slice() != b"ENVELOPE" {
+                    if name.as_slice() != b"ENVELOPE" || element.attributes().next().is_some() {
                         return Err(StockQueryError::Malformed);
                     }
                     root_seen = true;
@@ -212,8 +210,13 @@ pub fn parse_stock_query(xml: &str) -> Result<StockQueryAnswer, StockQueryError>
                 if root_closed {
                     return Err(StockQueryError::Malformed);
                 }
+                // Tally's failure element first, in any case and with any attribute, as in the
+                // empty-element branch below.
                 refuse_error_element(&upper(element.name()))
                     .map_err(|_| StockQueryError::TallyReportedFailure)?;
+                if element.attributes().next().is_some() {
+                    return Err(StockQueryError::Malformed);
+                }
                 let text = read_text(&mut reader, element.name()).map_err(|error| match error {
                     NativeMastersError::TallyReportedFailure => {
                         StockQueryError::TallyReportedFailure
@@ -277,7 +280,8 @@ fn read_fields(fields: &[(Vec<u8>, String)]) -> Result<StockQueryAnswer, StockQu
             return Err(StockQueryError::LineRepeated);
         }
         let amount = &fields[at + 2].1;
-        if amount.contains(TALLY_SANITIZED_MARKER) {
+        // Not trimmed as the stock read's grammar would: no captured quantity is padded.
+        if amount.contains(TALLY_SANITIZED_MARKER) || amount.trim() != amount {
             return Err(StockQueryError::QuantityUnparseable);
         }
         lines.push(StockQueryLine {

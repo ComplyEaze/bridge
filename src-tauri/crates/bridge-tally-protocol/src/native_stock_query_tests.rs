@@ -427,9 +427,10 @@ fn other_shapes_outside_the_capture_refuse_and_an_entity_is_read() {
 }
 
 /// Shapes no capture holds, refused under their codes: the sanitiser's marker in a name or a unit
-/// (Tally's `&#4;`), a name padded at either end, a godown and batch read twice, a kind of group
+/// (Tally's `&#4;`), a name or quantity padded at either end, a godown and batch read twice, a kind of group
 /// coming back after the other, an element in another case or with an attribute, a comment and a
-/// declaration. Either kind of group may come first, and an empty element with no attribute
+/// declaration. Tally's failure element is its failure in any case and with an attribute. Either
+/// kind of group may come first, and an empty element with no attribute
 /// reads as one with no text.
 #[test]
 fn unmeasured_shapes_refuse_and_either_group_order_reads() {
@@ -527,6 +528,45 @@ fn unmeasured_shapes_refuse_and_either_group_order_reads() {
         (
             format!("<?xml version=\"1.0\"?>\r\n{kit}"),
             StockQueryError::Malformed,
+        ),
+        (
+            damaged(&kit, "</ENVELOPE>", "<error>x</error>\r\n</ENVELOPE>", 1),
+            StockQueryError::TallyReportedFailure,
+        ),
+        (
+            damaged(&kit, "</ENVELOPE>", "<LINEERROR X=\"1\">x</LINEERROR>\r\n</ENVELOPE>", 1),
+            StockQueryError::TallyReportedFailure,
+        ),
+        (
+            damaged(&kit, "</ENVELOPE>", "<LINEERROR X=\"1\"/>\r\n</ENVELOPE>", 1),
+            StockQueryError::TallyReportedFailure,
+        ),
+        (
+            damaged(
+                &soda,
+                "<STQGODOWNNAME>Factory Floor</STQGODOWNNAME>",
+                "<STQGODOWNNAME> Factory Floor</STQGODOWNNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &kit,
+                "<STQGODOWNQTY>-13 Nos</STQGODOWNQTY>",
+                "<STQGODOWNQTY> -13 Nos</STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+        (
+            damaged(
+                &kit,
+                "<STQGODOWNQTY>-13 Nos</STQGODOWNQTY>",
+                "<STQGODOWNQTY>-13 Nos </STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
         ),
     ];
     for (text, expected) in cases {

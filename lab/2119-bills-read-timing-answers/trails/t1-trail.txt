@@ -1,0 +1,35 @@
+record 2026-10-29T02:43:41.905Z bytes_prepared 181261 truncated True
+sent 48 failed 0 omitted 16 kept 32
+seq | kind | request_bytes | response_bytes | held_ms | outcome
+17 | status |  | 51 | 0 | answered
+18 | post | 2524 | 4012 | 5 | answered
+19 | status |  | 51 | 0 | answered
+20 | post | 2524 | 4012 | 5 | answered
+21 | post | 2524 | 4012 | 4 | answered
+22 | post | 1100 | 3854 | 4 | answered
+23 | status |  | 51 | 1 | answered
+24 | post | 1100 | 3854 | 3 | answered
+25 | status |  | 51 | 0 | answered
+26 | post | 770 | 6835092 | 18096 | answered
+27 | status |  | 51 | 0 | answered
+28 | post | 770 | 6835092 | 19424 | answered
+29 | status |  | 51 | 0 | answered
+30 | post | 1072 | 54280 | 20 | answered
+31 | status |  | 51 | 0 | answered
+32 | post | 1072 | 54280 | 17 | answered
+33 | status |  | 51 | 0 | answered
+34 | post | 764 | 46 | 1461 | answered
+35 | status |  | 51 | 0 | answered
+36 | post | 764 | 46 | 2474 | answered
+37 | status |  | 51 | 2 | answered
+38 | post | 1290 | 155270 | 66 | answered
+39 | status |  | 51 | 3 | answered
+40 | post | 1290 | 155270 | 45 | answered
+41 | status |  | 51 | 0 | answered
+42 | post | 1100 | 3854 | 4 | answered
+43 | status |  | 51 | 1 | answered
+44 | post | 1100 | 3854 | 3 | answered
+45 | status |  | 51 | 0 | answered
+46 | post | 2524 | 4012 | 7 | answered
+47 | status |  | 51 | 0 | answered
+48 | post | 2524 | 4012 | 10 | answered

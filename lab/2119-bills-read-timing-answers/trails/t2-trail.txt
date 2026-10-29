@@ -1,0 +1,29 @@
+record 2026-10-29T02:44:27.209Z bytes_prepared 1374 truncated False
+sent 26 failed 1 omitted 0 kept 26
+seq | kind | request_bytes | response_bytes | held_ms | outcome
+1 | post | 2524 | 4012 | 6 | answered
+2 | status |  | 51 | 1 | answered
+3 | post | 2524 | 4012 | 4 | answered
+4 | status |  | 51 | 0 | answered
+5 | post | 2524 | 4012 | 7 | answered
+6 | post | 1100 | 3854 | 4 | answered
+7 | status |  | 51 | 0 | answered
+8 | post | 1100 | 3854 | 5 | answered
+9 | status |  | 51 | 0 | answered
+10 | post | 972 | 3400 | 6 | answered
+11 | status |  | 51 | 0 | answered
+12 | post | 972 | 3400 | 6 | answered
+13 | status |  | 51 | 0 | answered
+14 | post | 1100 | 3854 | 4 | answered
+15 | status |  | 51 | 1 | answered
+16 | post | 1100 | 3854 | 5 | answered
+17 | status |  | 51 | 0 | answered
+18 | post | 2524 | 4012 | 6 | answered
+19 | status |  | 51 | 0 | answered
+20 | post | 2524 | 4012 | 7 | answered
+21 | post | 2524 | 4012 | 5 | answered
+22 | post | 1100 | 3854 | 5 | answered
+23 | status |  | 51 | 0 | answered
+24 | post | 1100 | 3854 | 5 | answered
+25 | status |  | 51 | 0 | answered
+26 | post | 770 |  | 20008 | request_deadline_exceeded

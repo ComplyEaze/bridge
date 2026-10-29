@@ -275,7 +275,7 @@ async fn the_export_sends_the_standard_request_for_a_book_past_the_mailing_bound
             refusal_with(&extent_with_master_mark(mark), read, &[BILLS], false).await;
         evidence.request_sha256
     };
-    // A mark in 3,405 to 4,266: the standard read admits the whole book by the mark alone.
+    // A mark in 3,201 to 4,266: the standard read admits the whole book by the mark alone.
     assert_eq!(sent(3_500, Export).await, sent(3_500, Standard).await);
     assert_eq!(sent(4_266, Export).await, sent(4_266, Standard).await);
     // The control: the mailing kind would not take that path (it counts the ledgers first).

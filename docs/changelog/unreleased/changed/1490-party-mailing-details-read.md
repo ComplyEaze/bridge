@@ -7,5 +7,6 @@
   It is refused together with `include_gst_details`, as the request naming both has not been captured. Under
   `mask_parties` the mailing name, every address line and the flat address field are shortened like a party's name, to
   their first two and last two characters; the PIN code, state and country are returned under every redaction mode. A
-  second mailing entry with a later date, a party with two mailing rows and other releases are not measured. The
+  second mailing entry with a later date was read on TallyPrime 7.2 (one party, oldest first); three or more entries, an
+  entry with no date and other releases are not measured. The
   registers do not read the mailing details and keep their request and their estimate.

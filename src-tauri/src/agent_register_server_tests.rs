@@ -467,7 +467,11 @@ fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Valu
         STOCK_LAB_COMPANY,
         &tally_date(arguments["from"].as_str().unwrap()),
         &tally_date(arguments["to"].as_str().unwrap()),
-        None,
+        // The census the code sends now: spanned to the mark the record read (3).
+        AlterIdSpan {
+            after: 0,
+            through: 3,
+        },
     )
     .unwrap();
     let mut census = requests[window].clone();
@@ -495,6 +499,28 @@ fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Valu
 /// Replays one recorded call (the files `<prefix>_sequence.json` and the responses it names, in
 /// `directory`) and returns the tool's response, the record and the requests that were not the
 /// recorded ones. `expected_requests` is what the call is known to have sent.
+/// `requests` with each census leg asking for the census the code sends now, spanned to the mark
+/// (#2145): where `{prefix}_voucher_census_spanned_request.utf16le.xml` is kept, each census leg's
+/// fingerprint becomes that file's. The file is the request the lab sent spanned and found answered
+/// byte for byte as recorded (see the directory's PROVENANCE.md), so the recorded answer stays; the
+/// replay checks the code renders exactly those bytes.
+fn with_the_spanned_census(directory: &str, prefix: &str, mut requests: Vec<Value>) -> Vec<Value> {
+    let name = format!("{prefix}_voucher_census_spanned_request.utf16le.xml");
+    if !std::path::Path::new(directory).join(&name).exists() {
+        return requests;
+    }
+    let spanned = sha256_hex(&recorded_file(directory, &name));
+    let mut legs = 0;
+    for request in &mut requests {
+        if request["request_id"] == "Bridge Agent Voucher Census" {
+            request["request_sha256"] = json!(spanned);
+            legs += 1;
+        }
+    }
+    assert_eq!(legs, 2, "{prefix}: the census is one paired read");
+    requests
+}
+
 async fn replay_recorded(
     directory: &str,
     prefix: &str,
@@ -508,7 +534,11 @@ async fn replay_recorded(
         "the record lists every request of the call"
     );
     assert_eq!(sequence["requests_sent"], expected_requests);
-    let requests = with_census_a_small_book_now_sends(recorded.clone(), &sequence["arguments"]);
+    let requests = with_the_spanned_census(
+        directory,
+        prefix,
+        with_census_a_small_book_now_sends(recorded.clone(), &sequence["arguments"]),
+    );
     let plans = requests
         .iter()
         .map(|request| {
@@ -645,8 +675,9 @@ async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_t
     assert_eq!(row, &answer["result"]["items"][0]);
 }
 
-/// Every request file of `note-days/` is a request one of the three calls sent, and every request
-/// a call sent has its file: the record's fingerprints and the files' own bytes agree.
+/// Every request file of `note-days/` is a request one of the three calls sent, or the census the
+/// code sends for that call now (spanned, #2145), and every such request has its file: the record's
+/// fingerprints and the files' own bytes agree.
 #[test]
 fn the_note_day_request_files_are_exactly_the_requests_the_three_calls_sent() {
     request_files_are_exactly_the_requests_sent(
@@ -698,6 +729,11 @@ fn request_files_are_exactly_the_requests_sent(directory: &str, prefixes: &[&str
                 .iter()
                 .filter_map(|request| request["request_sha256"].as_str().map(str::to_string)),
         );
+        // The census the code sends for this call now, where one was captured (#2145).
+        let spanned = format!("{prefix}_voucher_census_spanned_request.utf16le.xml");
+        if std::path::Path::new(directory).join(&spanned).exists() {
+            sent.insert(hex(&recorded_file(directory, &spanned)));
+        }
     }
     assert_eq!(on_disk, sent);
 }

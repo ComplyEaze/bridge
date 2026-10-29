@@ -2417,7 +2417,7 @@ pub(super) fn census_read_count(
     if skips_census(high_water, limits) {
         return Ok(0);
     }
-    CensusPlan::new(WindowScope::Book, high_water, limits).map(|plan| plan.requests())
+    CensusPlan::new(high_water, limits).map(|plan| plan.requests())
 }
 
 /// Count the window's vouchers per day, every census request bounded
@@ -2437,8 +2437,8 @@ async fn census_window<R: WindowReader>(
     boundary: &mut Option<DateBoundaryProfile>,
 ) -> Result<(Vec<CensusRow>, u64), ToolFailure> {
     let unestimated = || ToolFailure::from(VOLUME_UNESTIMATED.to_string());
-    let plan = CensusPlan::new(scope, high_water, limits)
-        .map_err(|code| ToolFailure::from(code.to_string()))?;
+    let plan =
+        CensusPlan::new(high_water, limits).map_err(|code| ToolFailure::from(code.to_string()))?;
     // The first plan reads at most this many vouchers a request (the default
     // figure, which every plan starts from) and may send at most `max_reads`
     // requests, so a census that has already counted more than both allow is
@@ -2448,11 +2448,9 @@ async fn census_window<R: WindowReader>(
     let mut spans = plan.spans().peekable();
     let mut rows = Vec::new();
     while let Some(span) = spans.next() {
-        let request = match (scope, span) {
-            (WindowScope::Ledger(ledger), Some(span)) => {
-                ledger_census_read(company, ledger, from, to, span)?
-            }
-            _ => voucher_census_read(company, from, to, span)?,
+        let request = match scope {
+            WindowScope::Ledger(ledger) => ledger_census_read(company, ledger, from, to, span)?,
+            WindowScope::Book => voucher_census_read(company, from, to, span)?,
         };
         let (xml, evidence) = match reader.read(identity, request, WindowReadKind::Census).await {
             Ok((xml, evidence, observed)) => {
@@ -2472,11 +2470,13 @@ async fn census_window<R: WindowReader>(
             Err(failure) => return Err(failure),
         };
         fold_evidence(preflight, evidence);
-        rows.extend(parse_voucher_census(&xml, days, span).map_err(|code| {
-            let mut refused = unestimated();
-            refused.cause = census_refusal_cause(&code);
-            refused
-        })?);
+        rows.extend(
+            parse_voucher_census(&xml, days, Some(span)).map_err(|code| {
+                let mut refused = unestimated();
+                refused.cause = census_refusal_cause(&code);
+                refused
+            })?,
+        );
         let counted = rows.len() as u64;
         if per_read > 0 && counted > plannable && spans.peek().is_some() {
             // The caller adds the census's evidence, as for any refusal here.
@@ -2545,12 +2545,14 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// a cardinality bound fixed before it is sent (§11c.3).
 ///
 /// A date census alone is bounded only by the whole book: a date range can
-/// hold every voucher the book has. So a book whose mark fits one census is
-/// counted in one date census of the window, bounded by the mark itself; any
-/// larger book is counted in AlterID spans of `capacity` across `(0, mark]`,
-/// each also narrowed to the window's dates, and each bounded by construction
-/// because AlterIDs are distinct. The spans are produced one at a time, and a
-/// mark needing more of them than [`MAX_CENSUS_READS`] is refused before any is.
+/// hold every voucher the book has. So every census is an AlterID span across
+/// `(0, mark]`, narrowed to the window's dates and bounded by construction
+/// because AlterIDs are distinct: one span `(0, mark]` for a book whose mark
+/// fits one census, spans of `capacity` for a larger one. A single census is
+/// spanned too, so a voucher saved after the mark was read cannot raise it past
+/// the mark (#2145; byte-equal to the unspanned census wherever both were read
+/// live). The spans are produced one at a time, and a mark needing more of them
+/// than [`MAX_CENSUS_READS`] is refused before any is.
 ///
 /// The cost is a census count proportional to the book, not the window: a
 /// mark of 250,000 is 31 census requests however short the window. That is a
@@ -2565,7 +2567,6 @@ pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans
         return Err(BOOK_TOO_LARGE);
     }
     Ok(CensusSpans {
-        whole: high_water <= capacity,
         after: 0,
         high_water,
         capacity,
@@ -2574,33 +2575,23 @@ pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans
 }
 
 /// The census requests of one window read, fixed before the first is sent: the
-/// spans of [`census_spans`], and for a ledger always a span, the one form
-/// observed (a book that fits one census is asked over `(0, high_water]`, the
-/// same rows). [`Self::requests`] is the one count of them: what the read
-/// states beforehand ([`census_read_count`]) and what decides afterwards
-/// whether the marks are read again ([`count_window_only`]).
+/// spans of [`census_spans`]. [`Self::requests`] is the one count of them: what
+/// the read states beforehand ([`census_read_count`]) and what decides
+/// afterwards whether the marks are read again ([`count_window_only`]).
 #[derive(Clone, Debug)]
 pub(super) struct CensusPlan {
     spans: CensusSpans,
     requests: u64,
-    high_water: u64,
-    ledger: bool,
 }
 
 impl CensusPlan {
     /// The plan for a book whose voucher mark is `high_water`, or
     /// [`BOOK_TOO_LARGE`] before any request.
-    pub(super) fn new(
-        scope: WindowScope<'_>,
-        high_water: u64,
-        limits: WindowReadLimits,
-    ) -> Result<Self, &'static str> {
+    pub(super) fn new(high_water: u64, limits: WindowReadLimits) -> Result<Self, &'static str> {
         let spans = census_spans(high_water, limits.census_capacity())?;
         Ok(Self {
             requests: spans.clone().count() as u64,
             spans,
-            high_water,
-            ledger: matches!(scope, WindowScope::Ledger(_)),
         })
     }
 
@@ -2610,18 +2601,14 @@ impl CensusPlan {
     }
 
     /// The span of each request, in order.
-    pub(super) fn spans(&self) -> impl Iterator<Item = Option<AlterIdSpan>> {
-        let through = self.high_water;
-        self.spans
-            .clone()
-            .map(move |span| Some(span.unwrap_or(AlterIdSpan { after: 0, through })))
+    pub(super) fn spans(&self) -> impl Iterator<Item = AlterIdSpan> {
+        self.spans.clone()
     }
 }
 
 /// See [`census_spans`].
 #[derive(Clone, Debug)]
 pub(super) struct CensusSpans {
-    whole: bool,
     after: u64,
     high_water: u64,
     capacity: u64,
@@ -2629,15 +2616,11 @@ pub(super) struct CensusSpans {
 }
 
 impl Iterator for CensusSpans {
-    type Item = Option<AlterIdSpan>;
+    type Item = AlterIdSpan;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
             return None;
-        }
-        if self.whole {
-            self.done = true;
-            return Some(None);
         }
         let through = self
             .after
@@ -2649,7 +2632,7 @@ impl Iterator for CensusSpans {
         };
         self.after = through;
         self.done = through >= self.high_water;
-        Some(Some(span))
+        Some(span)
     }
 }
 

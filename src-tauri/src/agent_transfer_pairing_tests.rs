@@ -2055,24 +2055,24 @@ mod whole_day {
     const M_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m.request.utf16le.xml");
     const M1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml");
     const M2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml");
-    const D03_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.request.utf16le.xml");
     const D03_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml");
     const D03_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml");
+    const D03_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.request.utf16le.xml");
     const D03_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.request.utf16le.xml");
     const D03_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml");
-    const D04_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.request.utf16le.xml");
     const D04_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml");
     const D04_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml");
+    const D04_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.request.utf16le.xml");
     const D04_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.request.utf16le.xml");
     const D04_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml");
-    const D05_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.request.utf16le.xml");
     const D05_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml");
     const D05_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml");
+    const D05_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.request.utf16le.xml");
     const D05_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.request.utf16le.xml");
     const D05_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml");
-    const D06_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.request.utf16le.xml");
     const D06_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml");
     const D06_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml");
+    const D06_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.request.utf16le.xml");
     const D06_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.request.utf16le.xml");
     const D06_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml");
     type Exchange = (&'static [u8], &'static [u8]);
@@ -2159,19 +2159,19 @@ mod whole_day {
     /// The reads one day needs, in the order the code sends them: the marks, the
     /// day's census, the day's vouchers.
     fn day_d03() -> Vec<Exchange> {
-        vec![(M_REQ, M1), (D03_C1_REQ, D03_C1), (D03_V_REQ, D03_V)]
+        vec![(M_REQ, M1), (D03_C2_REQ, D03_C2), (D03_V_REQ, D03_V)]
     }
 
     fn day_d04() -> Vec<Exchange> {
-        vec![(M_REQ, M1), (D04_C1_REQ, D04_C1), (D04_V_REQ, D04_V)]
+        vec![(M_REQ, M1), (D04_C2_REQ, D04_C2), (D04_V_REQ, D04_V)]
     }
 
     fn day_d05() -> Vec<Exchange> {
-        vec![(M_REQ, M1), (D05_C1_REQ, D05_C1), (D05_V_REQ, D05_V)]
+        vec![(M_REQ, M1), (D05_C2_REQ, D05_C2), (D05_V_REQ, D05_V)]
     }
 
     fn day_d06() -> Vec<Exchange> {
-        vec![(M_REQ, M1), (D06_C1_REQ, D06_C1), (D06_V_REQ, D06_V)]
+        vec![(M_REQ, M1), (D06_C2_REQ, D06_C2), (D06_V_REQ, D06_V)]
     }
 
     fn lab_days() -> [(&'static str, Vec<Exchange>); 4] {

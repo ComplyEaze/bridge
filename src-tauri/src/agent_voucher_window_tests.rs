@@ -834,29 +834,23 @@ fn an_undivided_read_is_byte_identical_to_the_request_before_the_bound() {
 
 #[test]
 fn the_census_request_is_an_admitted_light_collection_export() {
+    // Every census carries its span (#2145): there is no census without one.
     let dated = render_agent_voucher_census(
         "Synthetic & Book",
         &tally_date("20260401"),
         &tally_date("20260430"),
-        None,
+        AlterIdSpan {
+            after: 0,
+            through: 4096,
+        },
     )
     .unwrap();
     assert!(crate::tally::agent_read_request::AgentReadRequest::parse(dated.clone()).is_ok());
     assert!(dated.contains("<FETCH>GUID,ALTERID,DATE</FETCH>"));
     assert!(dated.contains("Synthetic &amp; Book"));
-    assert!(dated
-        .contains("$Date &gt;= $$Date:\"20260401\" AND $Date &lt;= $$Date:\"20260430\"</SYSTEM>"));
-    let spanned = render_agent_voucher_census(
-        "Synthetic & Book",
-        &tally_date("20260401"),
-        &tally_date("20260401"),
-        Some(AlterIdSpan {
-            after: 0,
-            through: 4096,
-        }),
-    )
-    .unwrap();
-    assert!(spanned.contains("AND $AlterID &gt; 0 AND $AlterID &lt;= 4096</SYSTEM>"));
+    assert!(dated.contains(
+        "$Date &gt;= $$Date:\"20260401\" AND $Date &lt;= $$Date:\"20260430\" AND $AlterID &gt; 0 AND $AlterID &lt;= 4096</SYSTEM>"
+    ));
 }
 
 // --- Through the simulator --------------------------------------------------
@@ -1282,7 +1276,7 @@ async fn an_unobservable_high_water_mark_refuses_the_window_unread() {
 }
 
 #[tokio::test]
-async fn a_book_whose_mark_fits_one_census_is_counted_in_one_date_census() {
+async fn a_book_whose_mark_fits_one_census_is_counted_in_one_census_spanned_to_its_mark() {
     // A mark of exactly one census's rows bounds a date census of any window,
     // so the window is counted by date alone: one census, which here proves the
     // window small enough to read whole — the request it was before the bound.
@@ -1313,7 +1307,10 @@ async fn a_book_whose_mark_fits_one_census_is_counted_in_one_date_census() {
                 &company(),
                 &tally_date("20260801"),
                 &tally_date("20260801"),
-                None,
+                AlterIdSpan {
+                    after: 0,
+                    through: limits.census_capacity(),
+                },
             )
             .unwrap(),
             render_agent_vouchers(
@@ -1373,7 +1370,10 @@ async fn a_small_book_is_counted_only_when_the_read_asks_for_it() {
                 &company(),
                 &tally_date("20260801"),
                 &tally_date("20260801"),
-                None,
+                AlterIdSpan {
+                    after: 0,
+                    through: 3,
+                },
             )
             .unwrap(),
             render_agent_vouchers(
@@ -1436,20 +1436,20 @@ async fn a_book_one_voucher_past_one_census_is_counted_in_alterid_spans() {
                 &company(),
                 &tally_date("20260801"),
                 &tally_date("20260801"),
-                Some(AlterIdSpan {
+                AlterIdSpan {
                     after: 0,
                     through: capacity,
-                }),
+                },
             )
             .unwrap(),
             render_agent_voucher_census(
                 &company(),
                 &tally_date("20260801"),
                 &tally_date("20260801"),
-                Some(AlterIdSpan {
+                AlterIdSpan {
                     after: capacity,
                     through: capacity + 1,
-                }),
+                },
             )
             .unwrap(),
             render_agent_vouchers(
@@ -1702,7 +1702,10 @@ async fn a_census_the_transport_refuses_is_not_divided_but_refused() {
             &company(),
             &tally_date("20260801"),
             &tally_date("20260802"),
-            None,
+            AlterIdSpan {
+                after: 0,
+                through: 4,
+            },
         )
         .unwrap()],
     );
@@ -2012,14 +2015,20 @@ async fn the_vouchers_tool_counts_a_small_book_before_reading_its_window() {
                 &company(),
                 &tally_date("20260801"),
                 &tally_date("20260831"),
-                None,
+                AlterIdSpan {
+                    after: 0,
+                    through: 3,
+                },
             )
             .unwrap(),
             render_agent_voucher_census(
                 &company(),
                 &tally_date("20260801"),
                 &tally_date("20260831"),
-                None,
+                AlterIdSpan {
+                    after: 0,
+                    through: 3,
+                },
             )
             .unwrap(),
             render_agent_vouchers(
@@ -2213,11 +2222,12 @@ async fn a_light_first_part_does_not_widen_the_next_beyond_the_floor() {
 }
 
 #[test]
-fn a_book_whose_mark_fits_one_census_is_counted_by_date_and_a_larger_one_in_spans() {
+fn a_book_whose_mark_fits_one_census_is_counted_in_one_span_to_its_mark_and_a_larger_one_in_spans()
+{
     // The switch point, on each side. A mark of exactly one census's capacity
-    // bounds a date census of any window, so that stays the one request it
-    // was; one more voucher and no date census is bounded, so the book is
-    // counted in AlterID spans, each bounded by construction.
+    // is one request, spanned to the mark (#2145): a voucher saved after the
+    // mark was read cannot raise it. One more voucher and the book is counted in
+    // AlterID spans of the capacity, each bounded by construction.
     // Sized against the whole transport cap: 32 MiB at 4 KiB a row.
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
     assert_eq!(capacity, 8192);
@@ -2225,37 +2235,41 @@ fn a_book_whose_mark_fits_one_census_is_counted_by_date_and_a_larger_one_in_span
         census_spans(capacity, capacity)
             .unwrap()
             .collect::<Vec<_>>(),
-        [None]
+        [AlterIdSpan {
+            after: 0,
+            through: capacity
+        }]
     );
     assert_eq!(
         census_spans(capacity + 1, capacity)
             .unwrap()
             .collect::<Vec<_>>(),
         [
-            Some(AlterIdSpan {
+            AlterIdSpan {
                 after: 0,
                 through: capacity
-            }),
-            Some(AlterIdSpan {
+            },
+            AlterIdSpan {
                 after: capacity,
                 through: capacity + 1
-            }),
+            },
         ]
     );
-    // An empty book is one date census too.
+    // An empty book is the empty span; it is never sent, since a mark of zero
+    // sends no census (`skips_census`).
     assert_eq!(
         census_spans(0, capacity).unwrap().collect::<Vec<_>>(),
-        [None]
+        [AlterIdSpan {
+            after: 0,
+            through: 0
+        }]
     );
 }
 
 #[test]
 fn census_spans_tile_the_mark_and_none_holds_more_than_one_census() {
     for mark in [4097_u64, 8192, 8193, 250_000] {
-        let spans = census_spans(mark, 4096)
-            .unwrap()
-            .map(Option::unwrap)
-            .collect::<Vec<_>>();
+        let spans = census_spans(mark, 4096).unwrap().collect::<Vec<_>>();
         assert_eq!(spans.len() as u64, mark.div_ceil(4096), "mark {mark}");
         assert_eq!(spans.first().unwrap().after, 0);
         assert_eq!(spans.last().unwrap().through, mark);
@@ -2272,14 +2286,12 @@ fn census_spans_tile_the_mark_and_none_holds_more_than_one_census() {
 }
 
 /// The census plan's one count is the number of requests it yields, which is what a read states
-/// beforehand and what decides afterwards whether the marks are read again (#899). A book's
-/// census is the spans of `census_spans`; a ledger's is always spanned, so a ledger whose book
-/// fits one census is asked over `(0, mark]`, the same one request.
+/// beforehand and what decides afterwards whether the marks are read again. Every request is a
+/// span, and the spans tile `(0, mark]` (#2145).
 #[test]
-fn a_census_plan_counts_the_requests_it_yields_and_spans_every_ledger_request() {
+fn a_census_plan_counts_the_requests_it_yields_and_spans_every_request() {
     let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
     let capacity = limits.census_capacity();
-    let ledger = bridge_tally_protocol::ledger_scope::LedgerScopeName::new("DN Sales").unwrap();
     for mark in [
         1,
         capacity - 1,
@@ -2288,47 +2300,35 @@ fn a_census_plan_counts_the_requests_it_yields_and_spans_every_ledger_request() 
         3 * capacity,
         249_948,
     ] {
-        let book = CensusPlan::new(WindowScope::Book, mark, limits).unwrap();
-        assert_eq!(book.requests(), book.spans().count() as u64, "mark {mark}");
+        let plan = CensusPlan::new(mark, limits).unwrap();
+        let spans = plan.spans().collect::<Vec<_>>();
+        assert_eq!(plan.requests(), spans.len() as u64, "mark {mark}");
         assert_eq!(
-            book.spans().collect::<Vec<_>>(),
+            spans,
             census_spans(mark, capacity).unwrap().collect::<Vec<_>>(),
             "mark {mark}"
         );
-        let scoped = CensusPlan::new(WindowScope::Ledger(&ledger), mark, limits).unwrap();
-        assert_eq!(scoped.requests(), book.requests(), "mark {mark}");
-        assert!(scoped.spans().all(|span| span.is_some()), "mark {mark}");
+        assert_eq!(spans.first().map(|span| span.after), Some(0), "mark {mark}");
         assert_eq!(
-            scoped.spans().last().flatten().map(|span| span.through),
+            spans.last().map(|span| span.through),
             Some(mark),
             "mark {mark}"
         );
     }
     assert_eq!(
-        CensusPlan::new(WindowScope::Book, capacity, limits)
-            .unwrap()
-            .requests(),
-        1
-    );
-    assert_eq!(
-        CensusPlan::new(WindowScope::Ledger(&ledger), capacity, limits)
+        CensusPlan::new(capacity, limits)
             .unwrap()
             .spans()
             .collect::<Vec<_>>(),
-        [Some(AlterIdSpan {
+        [AlterIdSpan {
             after: 0,
             through: capacity
-        })]
+        }]
     );
     let largest = capacity * MAX_CENSUS_READS as u64;
+    assert_eq!(CensusPlan::new(largest, limits).unwrap().requests(), 256);
     assert_eq!(
-        CensusPlan::new(WindowScope::Book, largest, limits)
-            .unwrap()
-            .requests(),
-        256
-    );
-    assert_eq!(
-        CensusPlan::new(WindowScope::Book, largest + 1, limits).err(),
+        CensusPlan::new(largest + 1, limits).err(),
         Some(BOOK_TOO_LARGE)
     );
 }
@@ -2396,10 +2396,10 @@ fn a_book_needing_more_census_spans_than_allowed_is_refused_before_any_is_made()
     let mut spans = census_spans(largest, 4096).unwrap();
     assert_eq!(
         spans.next(),
-        Some(Some(AlterIdSpan {
+        Some(AlterIdSpan {
             after: 0,
             through: 4096
-        }))
+        })
     );
 }
 
@@ -2514,10 +2514,10 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
                 &company(),
                 &tally_date("20260801"),
                 &tally_date("20260801"),
-                Some(AlterIdSpan {
+                AlterIdSpan {
                     after: 0,
                     through: 8
-                })
+                }
             )
             .unwrap()
         )
@@ -3444,7 +3444,10 @@ async fn education_refuses_a_window_starting_on_an_unaccepted_day_before_sending
         &company(),
         &tally_date("20260405"),
         &tally_date("20260405"),
-        None,
+        AlterIdSpan {
+            after: 0,
+            through: 3,
+        },
     )
     .unwrap();
     assert!(observed
@@ -3541,7 +3544,10 @@ async fn an_empty_window_beside_a_busy_day_is_partial_by_the_wider_reads_rows() 
         &company(),
         &tally_date("20260802"),
         &tally_date("20260802"),
-        None,
+        AlterIdSpan {
+            after: 0,
+            through: 3,
+        },
     )
     .unwrap();
     let window = render_agent_vouchers(
@@ -3687,7 +3693,10 @@ async fn an_education_plan_with_an_unaccepted_part_boundary_is_refused_before_an
             &company(),
             &tally_date("20260801"),
             &tally_date("20260831"),
-            None,
+            AlterIdSpan {
+                after: 0,
+                through: 3,
+            },
         )
         .unwrap()],
     );
@@ -4027,7 +4036,10 @@ fn widened_census_reads(sent: &[tally_protocol_simulator::ObservedRequest]) -> u
         &company(),
         &tally_date("20260731"),
         &tally_date("20260901"),
-        None,
+        AlterIdSpan {
+            after: 0,
+            through: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity(),
+        },
     )
     .unwrap();
     sent.iter()
@@ -4248,7 +4260,10 @@ async fn education_refuses_the_corroboration_census_of_a_widened_window_it_canno
         &company(),
         &tally_date("20260430"),
         &tally_date("20260601"),
-        None,
+        AlterIdSpan {
+            after: 0,
+            through: limits.census_capacity(),
+        },
     )
     .unwrap();
     assert!(sent
@@ -7832,7 +7847,7 @@ mod ledger_scoped {
         assert_eq!(census.matches("<CHILDOF>").count(), 1);
         assert!(census.contains("<CHILDOF>Sales 2025</CHILDOF>"), "{census}");
         assert!(census.contains("<TYPE>Vouchers : Ledger</TYPE>"));
-        let book = render_agent_voucher_census(COMPANY, &day, &day, None).unwrap();
+        let book = render_agent_voucher_census(COMPANY, &day, &day, span(0, 8192)).unwrap();
         assert!(
             !book.contains("CHILDOF") && !book.contains("Ledger Census"),
             "{book}"

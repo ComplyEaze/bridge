@@ -294,6 +294,8 @@ const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
 const TIEOUT_D_GUID: &str = "6a9518b2-a88c-417c-a700-40243f9d9119";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
+const NONINT_LAB_GUID: &str = "567653b1-c8be-4deb-b4fc-3ea5de801884";
+const INTEGRATED_CTRL_LAB_GUID: &str = "3fc2a3c7-1da8-4bc4-a472-44028cdebca7";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
 
 /// The base of a book with several masters, built the way
@@ -1173,6 +1175,19 @@ const ROWS: &[Row] = &[
                 "915d42f8-42ae-4b03-8291-55f596e3a2ea",
             ))
         },
+    },
+    // A Closing Stock ledger with a keyed closing balance (#2068), one book of each kind.
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, NONINT_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, INTEGRATED_CTRL_LAB_GUID)),
     },
     Row {
         fixture: "tests/fixtures/statement_trial_balance_fy_live.utf16le.xml",

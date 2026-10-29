@@ -11,13 +11,15 @@ spanned to an AlterID range; o-m.request: the company high-water read). Only fou
     licensed TallyPrime accepts and the product sends; this sheet runs in licensed mode only);
   - the span (lo, hi]: non-negative integers, lo < hi, and hi - lo at most 8192, the product's own census capacity.
 `aligned` prints a span the product itself sends, one of `census_spans` in agent_voucher_window.rs ((k * 8192, (k + 1) * 8192],
-the last one ending at the mark): with --newest the newest one that is a full 8192 wide, with --before LO the full one that ends
-at LO, with --after HI the one that starts at HI. It prints the two bounds: they stay on the screen.
+the last one ending at the mark): with --last the last one (it ends at the mark, so it holds the newest AlterIDs; it is narrower
+than 8192 unless the mark is a multiple of it), with --newest the newest one that is a full 8192 wide, with --before LO the full
+one that ends at LO, with --after HI the one that starts at HI. It prints the two bounds: they stay on the screen.
 Nothing read from Tally chooses the report, the collection, the fetch list or the formula.
 
   python -I gen_census.py --check
   python -I gen_census.py census --company-file F --from 20250401 --to 20260331 --lo N --hi N --out PATH
   python -I gen_census.py marks --company-file F --out PATH
+  python -I gen_census.py aligned --mark V --last         (the last product span, ending at the mark)
   python -I gen_census.py aligned --mark V --newest       (the newest full product span)
   python -I gen_census.py aligned --mark V --before LO    (the full product span ending at LO)
   python -I gen_census.py aligned --mark V --after HI     (the product span starting at HI)
@@ -75,9 +77,12 @@ def window(frm, to):
     return frm, to
 
 
-def aligned(mark, newest=False, before=None, after=None):
-    if mark <= PRODUCT_CAPACITY or [newest, before is not None, after is not None].count(True) != 1:
-        raise SystemExit("aligned needs a mark above 8192 (below it the product sends no span) and exactly one of --newest, --before and --after")
+def aligned(mark, newest=False, before=None, after=None, last=False):
+    if mark <= PRODUCT_CAPACITY or [last, newest, before is not None, after is not None].count(True) != 1:
+        raise SystemExit("aligned needs a mark above 8192 (below it the product sends no span) and exactly one of --last, --newest, --before and --after")
+    if last:
+        lo = (mark - 1) // PRODUCT_CAPACITY * PRODUCT_CAPACITY
+        return lo, mark
     if newest:
         hi = mark // PRODUCT_CAPACITY * PRODUCT_CAPACITY
         return hi - PRODUCT_CAPACITY, hi
@@ -139,6 +144,8 @@ def check():
     assert aligned(29900, newest=True) == (16384, 24576) and aligned(24576, newest=True) == (16384, 24576)
     assert aligned(8193, newest=True) == (0, 8192) and aligned(29900, before=16384) == (8192, 16384)
     assert aligned(29900, after=24576) == (24576, 29900) and aligned(29900, after=0) == (0, 8192)
+    assert aligned(29900, last=True) == (24576, 29900) and aligned(24576, last=True) == (16384, 24576)
+    assert aligned(8193, last=True) == (8192, 8193)
     for mark, args in ((8192, {"newest": True}), (2000, {"after": 0}), (29900, {"before": 0}), (29900, {"before": 100}),
                        (29900, {"after": 100}), (29900, {"after": 32768}), (29900, {})):
         try:
@@ -165,6 +172,7 @@ def main():
     m.add_argument("--out", required=True)
     a = sub.add_parser("aligned")
     a.add_argument("--mark", type=int, required=True)
+    a.add_argument("--last", action="store_true")
     a.add_argument("--newest", action="store_true")
     a.add_argument("--before", type=int)
     a.add_argument("--after", type=int)
@@ -173,7 +181,7 @@ def main():
         check()
         return 0
     if args.mode == "aligned":
-        print("%d %d" % aligned(args.mark, args.newest, args.before, args.after))
+        print("%d %d" % aligned(args.mark, args.newest, args.before, args.after, args.last))
         return 0
     if args.mode in ("census", "marks"):
         name = company(open(args.company_file, encoding="utf-8-sig").read().rstrip("\r\n"))

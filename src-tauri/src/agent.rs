@@ -3151,7 +3151,7 @@ impl Server {
             reason_code: None,
         };
         Ok(ToolOutcome {
-            payload: json!({"result": {"records": tail.records}}),
+            payload: json!({"result": {"records": tail.records, "order": "newest_first"}}),
             evidence,
             company_guid: None,
             truncated: tail.truncated,

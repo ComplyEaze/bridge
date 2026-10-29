@@ -222,7 +222,6 @@ fn nonpageable_results_refuse_byte_trimming_without_inventing_continuations() {
         ("tally_status", "loaded_companies"),
         ("validate_masters", "masters"),
         ("read_evidence", "records"),
-        ("egress_log", "records"),
     ] {
         // History tools may already report a bounded tail. That does not make
         // the tail offset-pageable, and its existing truncation must survive.
@@ -1055,5 +1054,56 @@ fn a_result_with_no_page_drops_its_section_in_the_mcp_and_jsonrpc_envelopes_too(
     assert_eq!(
         enforce_mcp_result_byte_cap(&mut too_big, 100, "build_import_xml", 0),
         Err("agent_response_too_large".to_string())
+    );
+}
+
+/// The egress log's answer names its order, so a result over a cap keeps its newest receipts: the
+/// cap is checked at three stages, each of which may cut again, and the count left out adds up
+/// across them. An answer that does not name its order (the evidence log's) is not trimmed.
+#[test]
+fn a_newest_first_list_is_trimmed_to_its_newest_and_counts_what_every_stage_cut() {
+    let records = (0..8)
+        .map(|id| {
+            json!(format!(
+                "{{\"index\":{id},\"padding\":\"{}\"}}",
+                "x".repeat(300)
+            ))
+        })
+        .collect::<Vec<_>>();
+    let answer =
+        json!({"truncated": false, "result": {"records": records, "order": "newest_first"}});
+    let size = answer.to_string().len();
+    // First stage: a cap that holds about five of the eight.
+    let (first, trimmed, _) = enforce_response_byte_cap(answer.clone(), size * 5 / 8).unwrap();
+    assert!(trimmed);
+    assert_eq!(first["truncated"], true);
+    let kept = first["result"]["records"].as_array().unwrap().len();
+    assert!((1..8).contains(&kept));
+    assert_eq!(first["result"]["omitted_for_size"], 8 - kept as u64);
+    assert!(first.to_string().len() <= size * 5 / 8);
+    // The kept receipts are the first of the list, which is the newest.
+    assert_eq!(
+        first["result"]["records"][0],
+        answer["result"]["records"][0]
+    );
+    // A later stage with a smaller cap cuts again, and the two counts add up.
+    let mut mcp =
+        json!({"content":[{"type":"text","text":""}], "isError":false, "structuredContent":first});
+    enforce_mcp_result_byte_cap(&mut mcp, size, "egress_log", 0).unwrap();
+    let again = mcp["structuredContent"]["result"]["records"]
+        .as_array()
+        .unwrap()
+        .len();
+    assert!(again < kept);
+    assert_eq!(
+        mcp["structuredContent"]["result"]["omitted_for_size"],
+        8 - again as u64
+    );
+    // Nothing named its order: the same list is refused, not trimmed.
+    let mut unnamed = answer;
+    unnamed["result"].as_object_mut().unwrap().remove("order");
+    assert_eq!(
+        enforce_response_byte_cap(unnamed, size / 4).unwrap_err(),
+        "agent_response_too_large"
     );
 }

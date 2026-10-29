@@ -573,9 +573,11 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
                 result["window_scope"]["reason"], "ledger_scope_plan_needs_day_split",
                 "{result}"
             );
-            // The `read_cost` below it counts the book's window; the scoped attempt is not in it.
-            assert_eq!(
-                result["window_scope"]["read_cost_excludes"], "first_ledger_scoped_attempt",
+            // A quick call carries no `read_cost`, so there is nothing for the scoped attempt to
+            // be left out of.
+            assert!(result.get("read_cost").is_none(), "{result}");
+            assert!(
+                result["window_scope"].get("read_cost_excludes").is_none(),
                 "{result}"
             );
             assert!(result.get("read_cost").is_none(), "{result}");
@@ -1276,4 +1278,117 @@ async fn a_name_outside_the_scoped_alphabet_reads_the_books_window_and_says_so()
     for leg in [33, 35] {
         assert_eq!(observed[leg].request_body_sha256, sent, "leg {leg}");
     }
+}
+
+/// The book's window, read for a name the scoped read does not send, is refused (a voucher with
+/// one balancing side missing): the refusal says it is the book's window refusing, with the
+/// reason, so it is not taken for the ledger's own (#485).
+#[tokio::test]
+async fn a_refused_books_window_after_a_fallback_says_it_is_the_books_window() {
+    let company = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    ));
+    let extent = captured_utf8(include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    ));
+    let ledger = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-period-opening.utf16le.xml"
+    ));
+    let currency = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_inr_modern_live.utf16le.xml"
+    ));
+    let voucher = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-three-vouchers.utf16le.xml"
+    ));
+    let high_water = captured_utf8(
+        "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>61c6de69-1748-461c-ad3f-162cb949df9f</GUID><ALTVCHID>3</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>",
+    );
+    let status = ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime));
+    let opening = || {
+        vec![
+            status.clone(),
+            company.clone(),
+            company.clone(),
+            extent.clone(),
+            status.clone(),
+            extent.clone(),
+            status.clone(),
+            currency.clone(),
+            status.clone(),
+            currency.clone(),
+            status.clone(),
+            ledger.clone(),
+            status.clone(),
+            ledger.clone(),
+            status.clone(),
+            extent.clone(),
+            status.clone(),
+            extent.clone(),
+            status.clone(),
+            company.clone(),
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let voucher_read = |body: ScenarioPlan| {
+        vec![
+            company.clone(),
+            body.clone(),
+            status.clone(),
+            body,
+            status.clone(),
+            company.clone(),
+        ]
+    };
+    let mut plans = vec![
+        company.clone(),
+        status.clone(),
+        company.clone(),
+        status.clone(),
+    ];
+    plans.extend(opening());
+    plans.extend(voucher_read(high_water));
+    let mut omitted = voucher.fixture.body().to_string();
+    let start = omitted.find("<ALLLEDGERENTRIES.LIST>").unwrap();
+    let end = start
+        + omitted[start..].find("</ALLLEDGERENTRIES.LIST>").unwrap()
+        + "</ALLLEDGERENTRIES.LIST>".len();
+    omitted.replace_range(start..end, "");
+    let mut unbalanced = voucher.clone();
+    unbalanced.fixture = Fixture::SyntheticXml(omitted);
+    plans.extend(voucher_read(unbalanced));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let response = server
+        .call_tool(
+            "ledger_movement",
+            json!({
+                "company_guid":"61c6de69-1748-461c-ad3f-162cb949df9f",
+                "from":"20260801", "to":"20260802", "ledger":"Profit & Loss A/c"
+            }),
+        )
+        .await;
+    simulator.finish().unwrap();
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "voucher_entries_unbalanced", "{response}");
+    assert_eq!(error["window_scope"]["basis"], "whole_book", "{response}");
+    assert_eq!(
+        error["window_scope"]["reason"], "ledger_name_outside_scoped_alphabet",
+        "{response}"
+    );
 }

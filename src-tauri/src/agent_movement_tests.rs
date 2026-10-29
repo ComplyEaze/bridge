@@ -536,11 +536,43 @@ fn the_whole_book_reasons_are_distinct_and_only_the_scoped_read_codes_ask_for_on
 }
 
 /// A scoped read that returned a row with no line on the ledger refuses with a next step: the
-/// Trial Balance carries the same figures without reading vouchers, and the call is not repeated.
+/// Trial Balance gives that ledger's figures without reading vouchers where Tally is not in
+/// Education mode (which refuses it), and the call is not repeated.
 #[test]
 fn the_row_without_a_line_refusal_names_its_next_step() {
     let step = crate::agent::refusal_remediation(LEDGER_SCOPE_ROW_WITHOUT_LINE)
         .expect("the refusal has a next step");
     assert!(step.contains("trial_balance"), "{step}");
     assert!(step.contains("do not repeat"), "{step}");
+    assert!(step.contains("Education"), "{step}");
+    assert!(!step.contains("same figures"), "{step}");
+}
+
+/// `read_cost_excludes` stays only beside a `read_cost`.
+#[test]
+fn the_read_cost_exclusion_is_kept_only_beside_a_read_cost() {
+    let scope = || serde_json::json!({"basis": "whole_book", "read_cost_excludes": "first_ledger_scoped_attempt"});
+    let mut quick = serde_json::json!({"window_scope": scope()})
+        .as_object()
+        .unwrap()
+        .clone();
+    settle_read_cost_exclusion(&mut quick);
+    assert!(quick["window_scope"].get("read_cost_excludes").is_none());
+    assert_eq!(quick["window_scope"]["basis"], "whole_book");
+    let mut slow = serde_json::json!({"window_scope": scope(), "read_cost": {}})
+        .as_object()
+        .unwrap()
+        .clone();
+    settle_read_cost_exclusion(&mut slow);
+    assert_eq!(
+        slow["window_scope"]["read_cost_excludes"],
+        "first_ledger_scoped_attempt"
+    );
+    // No ledger named: no scope, nothing to settle.
+    let mut none = serde_json::json!({"window_scope": null})
+        .as_object()
+        .unwrap()
+        .clone();
+    settle_read_cost_exclusion(&mut none);
+    assert!(none["window_scope"].is_null());
 }

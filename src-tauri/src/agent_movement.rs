@@ -38,6 +38,15 @@ impl WholeBookReason {
         matches!(self, Self::PlanNeedsDaySplit | Self::ScopedReadFoundNothing)
     }
 
+    /// What a refusal of the book's window read carries beside its code.
+    const fn report(self) -> ScopeReport {
+        ScopeReport {
+            basis: "whole_book",
+            reason: Some(self.code()),
+            note: self.note(),
+        }
+    }
+
     const fn note(self) -> &'static str {
         match self {
             Self::NameOutsideScopedAlphabet => {
@@ -76,6 +85,20 @@ pub(super) fn scope_name_of(name: &str) -> Result<LedgerScopeName, WholeBookReas
     })
 }
 
+/// `window_scope.read_cost_excludes` says what the result's `read_cost` leaves out, so it stays
+/// only beside a `read_cost`: a quick call carries no block and nothing to qualify.
+fn settle_read_cost_exclusion(result: &mut serde_json::Map<String, Value>) {
+    if result.contains_key("read_cost") {
+        return;
+    }
+    if let Some(scope) = result
+        .get_mut("window_scope")
+        .and_then(Value::as_object_mut)
+    {
+        scope.remove("read_cost_excludes");
+    }
+}
+
 /// What the result says about a read by the ledger's own vouchers. It states what was compared,
 /// not that the two reads agree: the lab has compared them for one party ledger over a month
 /// and for one sales ledger on a day, and not for post-dated, optional, cancelled or zero-amount
@@ -91,6 +114,9 @@ impl Server {
             return Err("invalid_date_range".to_string().into());
         }
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
+        // Why the book's window was read though a ledger was named, once that is decided: a
+        // refusal that follows says so too (#485).
+        let mut whole_book = None;
         let result: Result<ToolOutcome, ToolFailure> = async {
             let books_from = normalized_date(
                 company
@@ -120,7 +146,6 @@ impl Server {
             // The one place a ledger enters a request (#485): the catalogue's own spelling of
             // the ledger just resolved, never the argument. A name the scoped read does not
             // admit reads the book's window instead, and the result says so.
-            let mut whole_book = None;
             let scope_name = match selected.as_ref().map(|found| scope_name_of(found.name())) {
                 Some(Ok(name)) => Some(name),
                 Some(Err(reason)) => {
@@ -331,6 +356,7 @@ impl Server {
             );
             if let (Some(result), Some(cost)) = (payload["result"].as_object_mut(), cost.as_object()) {
                 result.extend(cost.iter().map(|(key, value)| (key.clone(), value.clone())));
+                settle_read_cost_exclusion(result);
             }
             Ok(ToolOutcome {
                 payload,
@@ -340,7 +366,15 @@ impl Server {
             })
         }
         .await;
-        result.map_err(|failure| failure.with_prior_evidence(evidence))
+        result.map_err(|failure| {
+            let failure = failure.with_prior_evidence(evidence);
+            match whole_book {
+                // A refusal of the book's window read, after the scoped read was given up or
+                // never sent, says that this is the book's window refusing and not the ledger's.
+                Some(reason) => failure.with_window_scope(reason.report()),
+                None => failure,
+            }
+        })
     }
 
     pub(super) async fn read_movement_ledgers(

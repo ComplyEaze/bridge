@@ -1,0 +1,1 @@
+- When `ledger_movement` reads the whole book's vouchers for a ledger instead of the ledger's own (a name the scoped read does not send, a day too heavy for one scoped read, or a scoped read that found nothing) and that read is then refused, the refusal now carries `window_scope` with the reason, so the refusal is not taken for the ledger's own. No request changed (part of #485).

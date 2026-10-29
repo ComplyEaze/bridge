@@ -140,7 +140,9 @@ The recipe of H1, with these differences:
 1. **At T0+11,** the pre-armed probe must show the box topmost and Tally holding the foreground. Otherwise skip to step 5 and write "HA skipped: Tally did not hold the foreground".
 2. **At about T0+13:** press and HOLD Alt, press Tab ONCE, and keep Alt held. The switcher opens.
 3. **Read the switcher by eye**, Alt still held: write down the title of every tile, in order, and whether one reads "ComplyEaze Bridge". The lab's screenshot helper, if it is pre-armed as in row 1780-H, takes one copy now. The screen tool takes none.
+   - **STOP rule: HA never selects the box's tile.** If the switcher shows a "ComplyEaze Bridge" tile anywhere, highlighted or not, press no further Tab and never release Alt while the switcher is open: Esc comes first (step 4).
 4. **With Alt still held, press Esc ONCE.** The switcher closes with no switch. Then release Alt.
+   - If the switcher is still open after the Esc: keep Alt held, press nothing else, click nothing, and STOP. Alt is released only on the run coordinator's word, since releasing it would switch to the highlighted tile.
 5. **Read:** one `zorder-probe-k.ps1`. Record the foreground. EXPECT Tally.
    - If the box is in front: record "the switch was not cancelled" and press nothing more.
 6. **No** by mouse on the box's No button. EXPECT exit 1 and `stdout_bytes=0`.

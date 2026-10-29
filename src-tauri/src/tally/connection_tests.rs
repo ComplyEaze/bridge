@@ -1821,8 +1821,9 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
         5_000
     );
     // The figure stays above the largest row measured with the list named: the party with two
-    // dated entries (TallyPrime 7.2, 4,902 UTF-16 bytes), so a read of rows no larger than it
-    // cannot go over the budget it is divided from (#1490).
+    // dated entries (TallyPrime 7.2, 4,902 UTF-16 bytes), so a read of rows no larger than that
+    // stays under the budget it is divided from, with room for the response's envelope. It is
+    // not a bound on a row (#1490).
     const {
         assert!(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED >= 4_902);
     }

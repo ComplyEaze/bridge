@@ -360,14 +360,18 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// lines) and every other row by 122. A second dated entry on that party then
 /// grew its row by 944 more, to 4,902 (TallyPrime 7.2, 2026-10-29, eight
 /// ledgers; the read averaged 2,612 bytes a ledger with one entry and 2,730 with
-/// two). The figure, 5,000, is above that largest row
-/// measured, so a read of rows no larger than it cannot go over the budget; it is
-/// not a bound. A party with three entries (about 950 more each, extrapolated),
-/// or longer address lines, goes over it, and a book of such parties can still be
-/// admitted and overrun. No such book has been read. The 20 s request deadline
-/// leaves no slack over the 16 MB budget, so an under-estimate can be an
-/// abandoned read, not only a refusal. It was 4,700 before the second entry was
-/// measured.
+/// two). The figure, 5,000, is above that largest row measured, which was a sparse
+/// probe row (3,010 bytes before the list was named): 3,200 rows of 4,902 bytes,
+/// with the response's own 3,010-byte envelope and 12 bytes between rows, come to
+/// about 15.73 MB, about 272 KB under the budget. It is not a bound: at exactly 5,000
+/// a row the rows alone fill the budget and the envelope goes over it (about 41 KB
+/// at 3,200 rows). A fully populated party row of 3.3 KB (the 1,989-ledger book
+/// above) with two entries is about 5,190 bytes, over the figure; so is a party with
+/// three entries (about 950 more each, extrapolated) or with longer address lines,
+/// and a book of such parties can still be admitted and overrun. No such book has
+/// been read. The 20 s request deadline leaves no slack over the 16 MB budget, so
+/// an under-estimate can be an abandoned read, not only a refusal. It was 4,700
+/// before the second entry was measured.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 5_000;
 
 /// Bytes one ledger is estimated to add to the compliance master response when

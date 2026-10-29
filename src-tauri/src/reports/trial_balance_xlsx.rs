@@ -129,8 +129,9 @@ pub fn render_trial_balance_xlsx(
     if let Some(limitation) = &movements_differ {
         sheet.write_string_with_format(row, 0, "Ledgers that do not add up", &bold)?;
         sheet.write_string_with_format(row, 1, limitation, &wrapped)?;
-        // About 600 characters wrap to about ten lines at this column width.
-        sheet.set_row_height(row, 150)?;
+        // About 660 characters: at the 270-character, six-line calibration of the limitation row
+        // above, about fifteen lines.
+        sheet.set_row_height(row, 225)?;
         row += 1;
     }
     row += 1;
@@ -150,7 +151,7 @@ pub fn render_trial_balance_xlsx(
         sheet.write_string_with_format(row, column as u16, label, &bold)?;
     }
     if movements_differ.is_some() {
-        sheet.write_string_with_format(row, 7, "movements_differ_by", &bold)?;
+        sheet.write_string_with_format(row, 7, "movements_differ_by (source signed)", &bold)?;
     }
     let header = row;
     row += 1;

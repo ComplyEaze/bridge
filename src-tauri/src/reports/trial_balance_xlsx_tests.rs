@@ -268,7 +268,10 @@ fn a_keyed_closing_stock_ledger_is_marked_in_the_workbook_with_its_gap() {
         assert!(text.contains(
             "1 ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals"
         ));
-        assert!(text.contains(">movements_differ_by<"), "the column header");
+        assert!(
+            text.contains(">movements_differ_by (source signed)<"),
+            "the column header"
+        );
         // The gap is written on the Closing Stock row only, as a number in Tally's sign; the
         // column's other cell is its header, a shared string.
         let xml = worksheet_xml(&bytes);

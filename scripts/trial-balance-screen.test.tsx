@@ -419,7 +419,8 @@ test("shows the observed closing empty count", async () => {
 // #2068: a Closing Stock ledger whose closing balance was keyed on Tally's screen keeps its
 // opening as its closing. The row the backend marks (`movements_differ_by`, the captured row's
 // values) is shown as sent, with the gap beside its closing, and the backend's limitation is
-// shown before the totals. A row without the mark shows neither.
+// shown before the totals. A row without the mark shows neither. "Short Ledger" is invented, to
+// show that a negative gap keeps its sign.
 test("marks a ledger whose closing is not its opening plus its movements, and says why", async () => {
   const limitation = "1 ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals, counting an empty amount as zero.";
   const keyed = {
@@ -450,12 +451,12 @@ test("marks a ledger whose closing is not its opening plus its movements, and sa
   const stock = rows.find((row) => row.querySelector("th")?.textContent === "Closing Stock");
   // The gap is the tool's `movements_differ_by` string in Tally's sign, shown with its sign kept
   // (formatAmount, not the magnitude a debit or credit column shows).
-  expect(stock?.textContent).toContain("₹1,000.00 Dr · does not add up: differs by ₹400.00 (source signed)");
-  expect(stock?.textContent).toContain(`differs by ${formatAmount({ state: "present", value: "400.00" }, "₹", 2)} (`);
+  expect(stock?.textContent).toContain("₹1,000.00 Dr · does not add up, movements_differ_by ₹400.00 (source signed)");
+  expect(stock?.textContent).toContain(`movements_differ_by ${formatAmount({ state: "present", value: "400.00" }, "₹", 2)} (`);
   const short = rows.find((row) => row.querySelector("th")?.textContent === "Short Ledger");
-  expect(short?.textContent).toContain(`differs by ${formatAmount({ state: "present", value: "-5.00" }, "₹", 2)} (source signed)`);
+  expect(short?.textContent).toContain(`movements_differ_by ${formatAmount({ state: "present", value: "-5.00" }, "₹", 2)} (source signed)`);
   // A negative gap keeps its sign, written with the screen's minus sign (U+2212).
-  expect(short?.textContent).toContain("differs by \u2212₹5.00 (source signed)");
+  expect(short?.textContent).toContain("movements_differ_by \u2212₹5.00 (source signed)");
   const cash = rows.find((row) => row.querySelector("th")?.textContent === "Cash");
   expect(cash?.textContent).not.toContain("does not add up");
   await waitForParentDiscovery();

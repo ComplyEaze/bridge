@@ -23,9 +23,10 @@ pub enum NativeTrialBalanceAmount {
     PresentEmpty,
 }
 
-/// Not `Serialize`: a row reaches a caller only through a presenter that also says whether its
-/// own columns add up ([`NativeTrialBalanceRow::movements`]), so no path can write a row without
-/// that check (#2068).
+/// Not `Serialize`, so a row cannot be written by derive: the desktop writes it only through its
+/// presenter, which also says whether its own columns add up
+/// ([`NativeTrialBalanceRow::movements`]). The MCP answer and the statements build their own
+/// JSON from the fields and run the same check (#2068).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NativeTrialBalanceRow {
     pub name: String,

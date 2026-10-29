@@ -23,7 +23,9 @@ pub struct TrialBalanceResponse {
     /// (bridge#709).
     scope_limitation: Option<&'static str>,
     /// Present only when some ledger's closing is not its opening plus its debit and credit
-    /// totals; those rows carry `movements_differ_by` (#2068). The MCP answer's words.
+    /// totals; those rows carry `movements_differ_by` (#2068). The MCP answer's words. Left out
+    /// otherwise, so such a read's response is unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
     movements_differ_limitation: Option<String>,
 }
 

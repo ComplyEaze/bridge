@@ -430,6 +430,31 @@ fn server_with_cap(directory: &tempfile::TempDir, max_bytes: usize) -> super::su
     })
 }
 
+/// `egress_log` called as `call_tool` calls a tool, but with the call's start set 50 s back, so
+/// its `duration_ms` has five digits however long the call takes (#2154). The answer is sized
+/// with that field in it, so a test that sets a cap to the byte from one answer otherwise depends
+/// on two calls' durations having as many digits: 9 ms against 10 ms moved the size by one byte.
+/// `read_at` is written to the millisecond in a fixed width, so nothing else in the answer varies.
+async fn egress_log_with_fixed_width_duration(
+    server: &super::super::Server,
+    arguments: serde_json::Value,
+) -> serde_json::Value {
+    let started = chrono::Utc::now() - chrono::Duration::seconds(50);
+    let (result, _) = crate::request_trail::with_request_trail(Box::pin(
+        server.tool_payload("egress_log", &arguments),
+    ))
+    .await;
+    let response = server.finish_tool_response("egress_log", &arguments, started, result);
+    let duration = response.value["structuredContent"]["evidence"]["duration_ms"]
+        .as_u64()
+        .expect("the answer's duration");
+    assert!((10_000..100_000).contains(&duration), "{duration}");
+    if let Some(evidence) = response.egress.evidence {
+        server.record_evidence(evidence);
+    }
+    response.value
+}
+
 /// The boundary, to the byte: a cap equal to the size of the answer for twelve receipts returns
 /// all twelve and nothing is marked left out; one byte less returns eleven, marked, and the
 /// eleven are within that cap as sent.
@@ -438,15 +463,21 @@ async fn egress_log_keeps_the_newest_receipts_that_fit_at_the_exact_boundary() {
     use serde_json::json;
     let directory = tempfile::tempdir().unwrap();
     equal_receipts(&directory, 12, 1_000);
-    let whole = server_with_cap(&directory, 1_000_000)
-        .call_tool("egress_log", json!({"limit": 12}))
-        .await;
+    let whole = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, 1_000_000),
+        json!({"limit": 12}),
+    )
+    .await;
     assert_eq!(whole["structuredContent"]["truncated"], false, "{whole}");
     let size = whole.to_string().len();
-    let at = server_with_cap(&directory, size)
-        .call_tool("egress_log", json!({"limit": 12}))
-        .await;
+    let at = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, size),
+        json!({"limit": 12}),
+    )
+    .await;
     assert_eq!(at["isError"], false, "{at}");
+    // The cap is the answer's own size, to the byte.
+    assert_eq!(at.to_string().len(), size, "{at}");
     assert_eq!(at["structuredContent"]["truncated"], false, "{at}");
     assert!(at["structuredContent"]["result"]
         .get("omitted_for_size")
@@ -458,9 +489,11 @@ async fn egress_log_keeps_the_newest_receipts_that_fit_at_the_exact_boundary() {
             .len(),
         12
     );
-    let under = server_with_cap(&directory, size - 1)
-        .call_tool("egress_log", json!({"limit": 12}))
-        .await;
+    let under = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, size - 1),
+        json!({"limit": 12}),
+    )
+    .await;
     assert_eq!(under["isError"], false, "{under}");
     assert_eq!(under["structuredContent"]["truncated"], true, "{under}");
     let result = &under["structuredContent"]["result"];
@@ -512,14 +545,18 @@ async fn egress_log_digest_covers_every_line_read_even_when_the_answer_is_trimme
     let path = directory.path().join("agent-egress.jsonl");
     let read = read_egress_tail(&path, 12).unwrap();
     assert_eq!(read.records.len(), 12);
-    let size = server_with_cap(&directory, 1_000_000)
-        .call_tool("egress_log", json!({"limit": 12}))
-        .await
-        .to_string()
-        .len();
-    let trimmed = server_with_cap(&directory, size - 1)
-        .call_tool("egress_log", json!({"limit": 12}))
-        .await;
+    let size = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, 1_000_000),
+        json!({"limit": 12}),
+    )
+    .await
+    .to_string()
+    .len();
+    let trimmed = egress_log_with_fixed_width_duration(
+        &server_with_cap(&directory, size - 1),
+        json!({"limit": 12}),
+    )
+    .await;
     let result = &trimmed["structuredContent"]["result"];
     let returned = result["records"].as_array().unwrap().len();
     assert_eq!(returned, 11);

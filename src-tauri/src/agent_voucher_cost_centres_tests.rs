@@ -492,3 +492,25 @@ fn on_an_item_invoice_an_allocation_beside_the_goods_line_is_read_and_one_inside
         }
     }
 }
+
+/// #1231: the cost-centre summary names an entry's reason as its refusal's cause, through the wire
+/// value: each reason is distinct and reads back as its own problem, and other text as none.
+#[test]
+fn each_unreadable_reason_reads_back_as_its_own_problem() {
+    let reasons = CostCentreProblem::ALL.map(CostCentreProblem::reason);
+    assert_eq!(
+        reasons
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        reasons.len()
+    );
+    for problem in CostCentreProblem::ALL {
+        assert_eq!(
+            CostCentreProblem::from_reason(problem.reason()),
+            Some(problem)
+        );
+    }
+    assert_eq!(CostCentreProblem::from_reason("cost_centre"), None);
+    assert_eq!(CostCentreProblem::from_reason(""), None);
+}

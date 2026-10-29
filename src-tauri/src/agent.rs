@@ -1131,6 +1131,9 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if cause.is::<crate::tally::connection::NativeReportPairDrift>() {
             return Some(crate::tally::connection::NativeReportPairDrift::SAFE_CODE);
         }
+        if cause.is::<crate::tally::runtime::BillsReportDeadlineExceeded>() {
+            return Some(crate::tally::runtime::BillsReportDeadlineExceeded::SAFE_CODE);
+        }
         // The named company is not loaded in Tally, was renamed, or was listed more than once
         // (#1699): the read failed closed, and this says why.
         if let Some(identity) = crate::tally::runtime::company_identity_cause(cause) {
@@ -1490,10 +1493,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
-            "stock_summary reads only an `as_of` that is a 31 March (a financial-year end), \
-             and no request was sent. Ask for a 31 March `as_of`; retrying the same date \
-             refuses again. Only the period ending 31 March 2026 has been measured for \
-             stock: another year's 31 March is read, but its figures are unmeasured.",
+            "stock_summary reads only an `as_of` that is the last day of a month, and no \
+             request was sent. Ask for the last day of that month, or of another month; \
+             retrying the same date refuses again.",
         ),
         "summary_group_unresolved" => Some(
             "A ledger in this window could not be placed under a group, so no group total was \
@@ -1509,6 +1511,25 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              kind groups for the groups, and ask them to correct it in Tally; or summarise by \
              ledger, month or voucher_type instead. Retrying this call refuses again until the \
              book is corrected.",
+        ),
+        "summary_cost_centre_unreadable" => Some(
+            "An entry in this window carries cost-centre allocations that could not be read whole, \
+             so no cost-centre total was given: a total short of an allocation it could not read \
+             would mislead. `cause` says why, as the entry's own \
+             `cost_centre_allocations_unreadable` does. Call vouchers with the same window and \
+             selectors and no `summarise_by` to find the entry, and show the person the entry and \
+             the cause; or summarise by ledger, month or voucher_type instead. Retrying this call \
+             refuses again until the book changes.",
+        ),
+        "summary_cost_centre_allocation_mismatch" => Some(
+            "An entry's cost-centre allocations under one cost category do not add up to the \
+             entry's amount, so no cost-centre total was given: every category measured held the \
+             whole entry, and the part outside a centre cannot be placed. Call vouchers with the \
+             same window and selectors and no `summarise_by`, find the entry whose \
+             `cost_centre_allocations` under one category differ from its `amount`, and ask the \
+             person to check that entry's cost-centre allocation in Tally; or summarise by ledger, \
+             month or voucher_type instead. Retrying this call refuses again until the book \
+             changes.",
         ),
         "summary_group_book_too_large" => Some(
             "The company's master-alteration mark (`size.master_alter_id`) is above the limit a \
@@ -2173,26 +2194,6 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
     }
 }
 
-/// The next step for an `outstandings` read of Tally's Bills report that no response answered
-/// in time (#1356). One request was held past the transport's 20-second limit: measured on a
-/// dense book at a year-end date, where the report grows with the bills open at the date. Only
-/// under the outstandings code, after the code's and the typed cause's own steps; the same
-/// unanswered reason reaches every other read, where this advice would be wrong.
-fn outstandings_unanswered_remediation(reason: &str) -> Option<&'static str> {
-    match reason {
-        "request_deadline_exceeded" => Some(
-            "Tally took longer to answer one request of its Bills Receivable or Payable report at \
-             this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
-             the one large book measured, that report's time grew with the bills open at the date: \
-             with about 15,000 open bills it answered, and with about 22,500 and about 29,900 it \
-             did not. Do not repeat the same call: tell the user. On that book an earlier `as_of`, with fewer bills open, answered; whether \
-             one does here depends on how many bills were open then, and choosing it is the \
-             user's call.",
-        ),
-        _ => None,
-    }
-}
-
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -2217,18 +2218,18 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
 /// import's admission, which read the same ledger source, so the step speaks of "this read".
 ///
 /// Measured on one book (TallyPrime 7.2 Silver, a party ledger holding dollar vouchers): Tally
-/// wrote a rupee ledger's closing balance as `$100.00 @ ₹ 87/$ = ₹ 8700.00`, with no
-/// space after the symbol. The detector that sets such a row aside (`is_currency_composite`) is
-/// strict and needs a space there, as the 7.1 captures have, so the row was kept as a plain
-/// amount and the parse refused it as a foreign-currency balance, with this cause. The refusal is
-/// about a layout Bridge does not recognise yet, not about foreign currency as such: the 7.1
-/// layout is set aside by name (#551). A retry gives the same refusal.
+/// wrote a rupee ledger's closing balance as `$100.00 @ ₹ 87/$ = ₹ 8700.00`, with no space after
+/// the foreign symbol, which the detector of the 7.1 captures did not recognise, so the row was
+/// kept as a plain amount and the parse refused it as a foreign-currency balance, with this
+/// cause. Both layouts are now recognised and the row is set aside by name (#551, #683); the
+/// refusal that is left is for a layout no capture shows, for example a rate with decimals. It is
+/// about a layout Bridge does not recognise yet, not about foreign currency as such. A retry gives
+/// the same refusal.
 fn party_ledger_master_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
         "native_foreign_currency_ledger_balance" => Some(
             "Tally wrote a ledger's balance in a foreign currency in a layout ComplyEaze Bridge \
-             does not recognise yet (`<amount> @ <rate> = <base amount>` where it expects a space \
-             after each currency symbol; #683), so this read is refused rather than guessed at, \
+             does not recognise (#683), so this read is refused rather than guessed at, \
              not because the response was damaged, and nothing was returned from it. Do not \
              repeat it in a loop: it refuses again. Tell the user that this read cannot give this \
              company's ledgers while Tally writes a balance that way, and that Tally itself \
@@ -2252,8 +2253,27 @@ const TRIAL_BALANCE_READ_FAILED_REMEDIATION: &str = "No Trial Balance figures we
 /// only under that code: the same cause codes reach other tools through `?` sites that never
 /// read the Bills report, and the text below would be wrong for them. A refusal is whole:
 /// leaving one bill out would change the totals, so nothing is returned.
+///
+/// A Bills report request cut at the 20-second limit (#1356, #2119) has its own cause, so this step
+/// is never given for another request of the read cut the same way. Measured on one dense synthetic
+/// book at year-end dates (`lab/2119-bills-read-timing-answers`): the report's time grew with the
+/// bills open at the date. On that book a read sent straight after a cut was refused for time too,
+/// since Tally goes on building an answer after the request is given up
+/// (`lab/0.7.0-master-live-checks-answers`; protocol reference §11b.2).
 fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
+        crate::tally::runtime::BillsReportDeadlineExceeded::SAFE_CODE => Some(
+            "Tally took longer to answer one request of its Bills Receivable or Payable report at \
+             this date than ComplyEaze Bridge waits (20 seconds), so no figures were returned. On \
+             the one large book measured, that report's time grew with the bills open at the date: \
+             with about 15,000 open bills it answered, and with about 22,500 and about 29,900 it \
+             did not. Tally can go on building the report after ComplyEaze Bridge stops waiting, \
+             and on that book a read sent straight after was refused for time as well. Do not \
+             repeat the same call, and do not send another read of this company straight away: \
+             tell the user, wait, then call `tally_status` once, and go on only when it answers. On \
+             that book an earlier `as_of`, with fewer bills open, answered; whether one does here \
+             depends on how many bills were open then, and choosing it is the user's call.",
+        ),
         cause if cause.starts_with("native_date_") => Some(
             "A date in Tally's Bills Receivable or Payable report is not one ComplyEaze Bridge can \
              read, so no figures were returned. When the refusal carries a `bill_row`, it names the \
@@ -2655,15 +2675,6 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
-                    .or_else(|| {
-                        (code == "native_outstandings_read_failed")
-                            .then(|| {
-                                unanswered.and_then(|unanswered| {
-                                    outstandings_unanswered_remediation(unanswered.0)
-                                })
-                            })
-                            .flatten()
-                    })
                     .or_else(|| {
                         unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
                     })

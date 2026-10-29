@@ -11,6 +11,7 @@ mod goods_lines;
 mod scalars;
 use bank_allocations::BankAllocationCollector;
 use cost_centres::CostCentreCollector;
+pub(super) use cost_centres::CostCentreProblem;
 use goods_lines::GoodsLineCollector;
 pub(super) use scalars::*;
 

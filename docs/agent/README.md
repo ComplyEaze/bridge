@@ -1101,16 +1101,18 @@ Gold and other releases.
 Use `stock_summary` with `company_guid` and `as_of` (YYYYMMDD or YYYY-MM-DD) for
 the closing stock value per stock item, with the total of those values checked
 against Tally's own Stock Summary, and whether inventory is integrated with the
-accounts. `as_of` must be a 31 March (a
-financial-year end), the only date measured for stock, and not before the book's
-start or after today. A date that is not a 31 March is refused as
-`stock_summary_as_of_not_measured` before any request, and retrying the same date
-refuses again. A 31 March before the book's start or after today is refused as
+accounts. `as_of` must be a month's last day, the shape of every period end
+measured for stock, and not before the book's start or after today. Any other
+date is refused as `stock_summary_as_of_not_measured` before any request, and
+retrying the same date refuses again. Month ends inside the year were measured on
+two synthetic TallyPrime 7.2 books (a voucher dated on the end date was counted
+on a 15 October read, not at a month end); February's end, a month end with a
+voucher on it, several vouchers or a Stock Journal or purchase on the end date, 7.1 at such a date and a company whose year does not start on 1 April
+were not. A month end before the book's start or after today is refused as
 `stock_summary_as_of_before_books` or `stock_summary_as_of_in_future`, after the
-status, company and extent reads. The only period measured is the period ending 31 March 2026
-(FY 2025-26); other years' 31 March share its request shape but not its
-measurement, so they are admitted but unmeasured. The period is the financial year containing `as_of`, from 1 April,
-or the book's start if that is later.
+status, company and extent reads. The period runs from 1 April of the year
+containing `as_of` (the company's own financial-year start is not read), or the
+book's start if that is later, to `as_of`.
 
 A row is returned only when a check ran and held. The top-level `state` is one of
 three values:
@@ -1140,28 +1142,41 @@ read is the only thing `stock_summary` checks, and `checks` says so field by
 field. They are for investigation only (`use` says so); neither is a stock value
 or a total, and the items' side adds only the closing values present.
 
-**A quantity is returned only where Tally agrees with it.** `checks` says per
-field what is `checked`, `checked_per_item` or `not_checked`: the closing-value
-total is checked; the closing quantity is checked item by item; each value on its
-own, the names, parents and base units, whether the date was honoured and whether
-the item list is complete are not.
+**A quantity under the root is returned only where Tally agrees with it; one
+inside a stock group is the item list's own figure.** `checks` says per field
+what is `checked`, `checked_where_agreed` or `not_checked`: the closing-value
+total is checked; the closing quantity only where it is `agreed`; each value on
+its own, the names, parents and base units, whether the date was honoured and
+whether the item list is complete are not.
 
 An item's `closing.quantity` is an object with a `state`. It is `agreed`, with
-`amount` and `unit`, only where Tally's own plain Stock Summary has exactly one
-line with the item's name, and that line shows the same quantity, the same unit
-and the same amount (two empty amounts agree). Every other state says why no
-quantity is returned:
+`amount` and `unit`, only where the item sits directly under the root and Tally's
+own plain Stock Summary has exactly one line with the item's name, and that line
+shows the same quantity, the same unit and the same amount (two empty amounts
+agree).
+
+It is `inside_stock_group`, with `item_list_amount` and `item_list_unit`, when
+the item's own parent is a stock group. The plain report has a line only for what
+sits directly under the root, so a line of the same name is read as a group's,
+and the quantity is the item's own row in the stock item list, which nothing
+compared. The keys differ from `agreed`'s on purpose: never read this figure as
+an agreed one. On one synthetic book (TallyPrime 7.2, groups three deep beside an
+item under the root, two units, one negative quantity), each such quantity
+equalled Tally's Stock Summary screen with every level expanded. Neither the
+value total nor the item count checks a quantity, and an item with an empty or
+zero value adds nothing to the value total, so nothing in a read vouches for a
+nested quantity.
+
+Every other state says why no quantity is returned:
 
 - `none_sent`: Tally sent no closing quantity, which is not zero.
 - `unread`: the quantity is a compound unit, or has a unit with a space in it. It
   is also counted in `totals.closing_quantity_unread_count` and does not refuse
   the read.
-- `inside_stock_group`: the item's own parent is not the root, that is a stock
-  group (any other parent text gets this state too, which only withholds). In
-  the captures the report listed only what sits directly under the root (it is
-  not expanded; no capture yet holds a group and an item under the root side by
-  side), so the item is taken to have no line of its own, whatever a line of the
-  same name shows.
+- `parent_not_resolved`: the item's parent reads `Primary` without Tally's root
+  marker (ASCII case and outer spaces ignored), or carries a marker anywhere
+  else. It may be a group a person named Primary or a root spelling Bridge does
+  not know, so it is neither compared with the report nor taken for a group.
 - `report_has_no_line`: the item sits directly under the root and no line of the
   report carries its name: it has nothing to show, or the report names it
   differently (an alias, a spacing difference, a case difference). It is also
@@ -1956,7 +1971,7 @@ list and the group list (see below).
   question a held window answers. `voucher_types` counts (`included`, `in_scope`)
   are taken before the search, so with a search they do not add up to `total`.
 
-**Summaries.** `summarise_by` (`ledger`, `month`, `voucher_type`, `group` or `primary_group`) replaces
+**Summaries.** `summarise_by` (`ledger`, `month`, `voucher_type`, `group`, `primary_group` or `cost_centre`) replaces
 `items` with `buckets`, over the same window, selectors and search. `offset` and
 `limit` page the buckets; a later page comes from the held window as a later page
 of vouchers does. A summary holds its own window (the grouping is part of the
@@ -1986,7 +2001,8 @@ each other.
   keeps them apart and pages without a repeat. To list the vouchers of a month
   bucket, narrow `from` and `to` to that month.
 - `totals` is the debit and credit the buckets add up to, `vouchers_summarised`
-  the vouchers behind them. `excluded_from_buckets` counts the vouchers left out
+  the vouchers behind them (for `cost_centre`, `totals` counts each allocated entry once and
+  `vouchers_summarised` also counts vouchers with no allocation; see below). `excluded_from_buckets` counts the vouchers left out
   the way `ledger_movement` leaves them out: cancelled, optional, and vouchers with
   no accounting entry (a Stock Journal). They are counted, not hidden. Post-dated
   vouchers are summed: `post_dated_included` counts those Tally flagged Yes and
@@ -2083,6 +2099,32 @@ each other.
     call itself, with a group snapshot derived from the live one for the end-to-end tests. Not
     measured: a large book, a group renamed or moved while a window is read, a held later page, the
     drift refusals.
+
+- **`cost_centre`** (#1231) adds the entries' cost-centre allocations (`cost_centre_allocations`, protocol
+  reference §8.2g) by category and centre:
+  - A bucket is one cost centre under one cost category: `group` is the centre and `category` the
+    category, both masked when parties are masked, as the masters tool masks them. A centre named
+    under two categories has two buckets. Each allocation adds to the side its own amount's sign
+    gives, as an entry's does. `members` lists the ledgers whose allocations fall in the bucket,
+    as for a group bucket. With `ledger`, only that ledger's entries are counted
+    (`entries_counted` is `selected_ledger`).
+  - Each category allocates the whole entry: in the capture, one entry was allocated in full under
+    two categories. So the categories overlap, and buckets of different categories are not added up.
+    `category_totals` gives each category's `entries`, `debit`, `credit` and `net`. `totals` counts
+    each allocated entry once. `entries_unallocated` holds the counted entries that carry no
+    allocation; with `totals` they are every counted entry.
+  - An empty summary says that nothing in the window was allocated, not that the company's Cost
+    Centres setting is off: allocations were read on a book with the setting at No, so the summary
+    neither reads nor refuses on the setting, and sends no request beyond the window's.
+  - An entry whose allocations could not be read whole refuses the summary as
+    `summary_cost_centre_unreadable`, with the entry's own reason as `cause`. An entry where one
+    category's allocations do not add up to the entry's amount refuses it as
+    `summary_cost_centre_allocation_mismatch`; no capture shows one. Another grouping of the same
+    window is not refused.
+  - Measured on one synthetic book with Cost Centres on (TallyPrime 7.2 Silver, 27 October 2026), on
+    the saved raw answers of two vouchers keyed on Tally's screen: a Payment allocated to two
+    centres of one category, and a Journal entry allocated in full under two categories. The built
+    tool's summary has not been run against a live Tally.
 
 A summary over a `partial` window is only as complete as that window: `state` and `reason` say which, and `basis` does not repeat them.
 
@@ -4114,10 +4156,15 @@ a credit sign, more than one opening bill.
 The read of Tally's Bills Receivable and Payable reports comes before any party detail, and on a
 large book it can be the step that fails: on one synthetic book of about 30,000 vouchers, at the
 end of its first year (31 March 2026), one of its requests was held past the 20-second limit and
-the whole call was refused as `native_outstandings_read_failed`, cause `request_deadline_exceeded`,
-with no figure returned, while the same book three months into the year answered (#1356). That
-refusal's next step tells the assistant not to repeat the call in a loop and that an earlier
-`as_of` reads fewer open bills. Where the limit falls on a given book is not measured.
+the whole call was refused as `native_outstandings_read_failed`, with no figure returned, while the
+same book three months into the year answered (#1356). A Bills report request cut at the limit has
+its own cause, `native_bills_report_deadline_exceeded` (#2119); another request of the read cut the
+same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
+repeat the call. Tally can go on building the report after the limit (a read sent straight after
+was refused for time too), so it also says to wait and let `tally_status` answer before the next
+read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
+falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
+flight and sends nothing more (#778).
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and

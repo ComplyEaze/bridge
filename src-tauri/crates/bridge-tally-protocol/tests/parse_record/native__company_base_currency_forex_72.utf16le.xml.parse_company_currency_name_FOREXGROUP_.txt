@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/native/company_base_currency_forex_72.utf16le.xml
+# parser: parse_company_currency_name(FOREXGROUP)
+# source: captured
+Ok("₹")

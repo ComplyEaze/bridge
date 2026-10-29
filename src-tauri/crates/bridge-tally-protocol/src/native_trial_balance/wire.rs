@@ -1,8 +1,8 @@
 //! Envelope and ledger-row admission for the native Trial Balance collection.
 use super::scalar::*;
 use super::{
-    is_currency_composite, CurrencyScopedTrialBalance, NativeTrialBalance,
-    NativeTrialBalanceAmount, NativeTrialBalanceError, NativeTrialBalanceRow,
+    is_balance_composite, CurrencyScopedTrialBalance, NativeTrialBalance, NativeTrialBalanceAmount,
+    NativeTrialBalanceError, NativeTrialBalanceRow,
 };
 use crate::native_outstandings::{classify_ledger_currencies, BaseCurrencyName};
 use crate::{
@@ -70,7 +70,7 @@ pub fn parse_native_trial_balance_with_currency(
         if row
             .amounts()
             .iter()
-            .any(|value| is_currency_composite(value))
+            .any(|value| is_balance_composite(value))
         {
             mixed.push(row.name);
             continue;

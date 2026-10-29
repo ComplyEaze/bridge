@@ -36,11 +36,12 @@ Licensed mode only; Education mode = STOP.
 1. Check every file here against `SHA256.txt`.
 2. `python -I gen_census.py --check`: EXPECT exactly `gen_census: ok (the census and marks templates reproduced byte for byte; an ampersand and quotes escaped once; the span, dates and parse checked)`.
 3. The working folder is `C:\bridge-lab\899h\` (local; absent or empty before, else STOP), with `requests\` and `answers\` in it.
+4. **Command history is off for the sitting.** In every PowerShell window used for this sheet, first run `Set-PSReadLineOption -HistorySaveStyle SaveNothing`, so no command line that carries the book's name, a date or an id is saved. (Step 9 checks the history file anyway.)
 
 ## Steps
-0. LAB-COMMON step 0 (C2) with no company loaded: the screenshot, the process list and port 9001, `GET /status`. Tally's About screen: the release and the licence (record them; Education = STOP).
+0. LAB-COMMON step 0 (C2) with no company loaded: the screenshot, the process list and port 9001, `GET /status`. Tally's About screen: record ONLY the release and the licence mode and edition (no serial number, no account, no e-mail address, nothing else the screen shows); Education = STOP.
 1. Load THE BOOK alone, by the arrow keys of Select Company (C1). A screenshot of the Gateway (local). Then write, in the working folder, with a plain text editor and in UTF-8:
-   - `company.txt`: the book's name exactly as Select Company lists it, on one line;
+   - `company.txt`: the book's name exactly as Select Company lists it, on one line, saved as UTF-8 **without a byte-order mark** (Notepad: Save As, Encoding UTF-8; the script drops a BOM anyway);
    - `dates.txt`: two lines, FROM (the first day of the books, day 1 or 2) and TO (the 31st of the month that ends the financial year holding the book's last voucher), each as eight digits `YYYYMMDD`, read from Tally's Gateway and Day Book. The window then covers every voucher, so rows are about the ids in the span.
    Neither file is committed or quoted. Record in the notes only that they exist.
 2. **M0.** `python -I gen_census.py marks --company-file <working folder>\company.txt --out <working folder>\requests\marks.utf16le.xml` prints `request written (N bytes)`: record N. Send it by C3's line (answer to `answers\m0.response`). Read it by structure: EXPECT exactly one COMPANY row; record V0 (`ALTVCHID`) and M0 (`ALTMSTID`) locally. **STOP if there is no row or more than one, or if V0 is below 2,000.**
@@ -54,7 +55,7 @@ Licensed mode only; Education mode = STOP.
 6. Compute and record, for each span sent: width, rows, rows per id, answer bytes (CONTENT-LENGTH), wire bytes per row (bytes divided by rows) and as a percentage of 4,096, the UTF-8 equivalent per row (half of it), `time_starttransfer`, `time_total`, milliseconds per row. Between S2 and S3 (and S1 and S2) compute the marginal bytes per row (the difference of the answers' bytes divided by the difference of their rows), which leaves out the fixed envelope. Then, at the S3 figures: the bytes of a full 8,192-row span as a share of 33,554,432, and its seconds, if the rate were the same.
 7. **M1.** `marks` again (to `answers\m1.response`): EXPECT the same V and M as step 2 (a difference is recorded and is not a STOP: the book is only read). Then LAB-COMMON C10: at the Gateway a screenshot, Company > Shut from the Gateway's menu (never Ctrl+Q at the Gateway); Select Company with none loaded; one tally.exe; 9001 LISTENING; `GET /status` 200. No XML request is sent after the shut.
 8. Write the results (below). Send the evidence branch's SHA to the run coordinator before pushing.
-9. **After the run coordinator's review, on its word:** delete from the working folder, one file at a time by its full name (no wildcard), every request, every answer, `company.txt`, `dates.txt` and the screenshots. Take a directory listing (names, sizes) before and after, and record that the after-listing is empty of those names. The listings carry no name of the book.
+9. **After the run coordinator's review, on its word:** delete from the working folder, one file at a time by its full name (no wildcard), every request, every answer, `company.txt`, `dates.txt` and the screenshots. Take a directory listing (names, sizes) before and after, and record that the after-listing is empty of those names. The listings carry no name of the book. Then open the PSReadLine history file (`(Get-PSReadLineOption).HistorySavePath`) and search it for `gen_census`, `company-file` and `census_read`: EXPECT no line; if there is one, delete those lines and record only that you did.
 
 STOP RULES: C7 and C8 of LAB-COMMON; any dialog; a second `tally.exe`; an answer above its bound (curl exit 63 is this: record it); a request without an answer in 10 minutes; a `census_read.py` failure; a plan that prints STOP (that one ends the ladder, it is not a fault); Education mode; Ctrl+Q or Escape at the Gateway (an incident: if a prompt shows, press no key, take a screenshot and STOP; only if the process list shows NO `tally.exe`, C9).
 
@@ -73,7 +74,7 @@ Per span: width, rows, rows per id, bytes, bytes per row, seconds to the first b
 - **FAIL of the row:** a request other than a committed product shape is sent; a name, id, date or mark appears in anything pushed; a mark moves in a way a read cannot explain; THE BOOK is not the only company loaded; the answers are not deleted after review.
 
 ## Evidence
-- RESULTS.md: one table (a line per span) and the computed figures of step 6; the build is not applicable; Tally's release and licence; the step-0 and close checks (process list, port 9001, `/status`).
+- RESULTS.md: one table (a line per span) and the computed figures of step 6; the build is not applicable; Tally's release and licence mode and edition ONLY (no serial number, account or e-mail address); the step-0 and close checks (process list, port 9001, `/status`).
 - `times.txt`: per request, the UTC start and end, curl's exit code and `-w` fields, CONTENT-LENGTH, the answer's sha256, the `census_read.py` line (it prints offsets and counts only).
 - `notes.txt` (UTC, one line per step; it names no id, date or mark), `SCREENSHOTS.txt` (name, size, sha256; the captures stay local), `SHA256.txt` over the committed files.
 - Evidence on a new branch, `lab/899-heavy-book-census-span-answers`; push only after the pre-push scan and the run coordinator's yes (C11).

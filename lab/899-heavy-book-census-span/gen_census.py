@@ -4,7 +4,7 @@
 The templates are the product's own requests, byte for byte, as captured live on 26 Oct 2026 and committed on master as
 src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/ (o-c2.request: the voucher census
 spanned to an AlterID range; o-m.request: the company high-water read). Only four things vary, each admitted by a closed rule:
-  - the company text (SVCURRENTCOMPANY): read from a file on the lab PC, XML-escaped ONCE as text with the product's escape set
+  - the company text (SVCURRENTCOMPANY): read from a file on the lab PC (UTF-8; a byte-order mark that Notepad adds is dropped), XML-escaped ONCE as text with the product's escape set
     (& < > " ' CR LF); it never appears in this sheet, in an argument or in anything printed;
   - the two dates (they land inside a quoted $$Date:"..." formula literal, where escaping does not protect, so only eight digits
     forming a real calendar date are admitted; the from-day must be 1 or 2 and the to-day 31, the product's window rule);
@@ -168,7 +168,7 @@ def main():
     if args.mode == "plan":
         return plan(args)
     if args.mode in ("census", "marks"):
-        name = company(open(args.company_file, encoding="utf-8").read().rstrip("\r\n"))
+        name = company(open(args.company_file, encoding="utf-8-sig").read().rstrip("\r\n"))
         data = build_census(name, date(args.frm, (1, 2)), date(args.to, (31,)), args.lo, args.hi) if args.mode == "census" else build_marks(name)
         with open(args.out, "xb") as handle:
             handle.write(data)

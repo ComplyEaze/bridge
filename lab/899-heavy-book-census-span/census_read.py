@@ -1,7 +1,7 @@
 """Reads one census answer by LAB-COMMON C4, streaming, and prints counts only.
 
 Run with `python -I census_read.py <answer> <lo> <hi>`; exit 0 = the answer parsed and holds no LINEERROR and no STATUS other than 1, 1 = it did not
-(the line printed says why; the sheet treats it as STOP), 2 = the command line is wrong.
+(the line printed says why, in fixed words that never repeat the span's bounds; the sheet treats it as STOP), 2 = the command line is wrong.
 
 Rows are the VOUCHER elements under ENVELOPE/BODY/DATA/COLLECTION (the CMPINFO count lines are not rows). Printed: the size in
 bytes, the number of rows, how many carry GUID, ALTERID and DATE (a missing one is counted), how many rows have an ALTERID not in
@@ -133,8 +133,9 @@ if __name__ == "__main__":
     except Failed as error:
         print("FAIL: {}".format(error))
         sys.exit(1)
-    except (OSError, ValueError) as error:
-        print("FAIL: {}".format(error))
+    except (OSError, ValueError):
+        # A fixed line, never the exception's text: it could carry the span's bounds or a path.
+        print("FAIL: the answer or the arguments could not be read")
         sys.exit(1)
     if result is None:
         print(__doc__)

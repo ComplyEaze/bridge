@@ -6,6 +6,7 @@ Run:  python -I summarise.py DIR
 Reads DIR/manifest.tsv only (the relay's own record; nothing is sent anywhere) and prints, one line each:
   requests: the count of each verdict;
   census: one line per census request (`Bridge Agent Voucher Census`): its dates, AlterID span, rows, bytes and seconds;
+  census total: the census requests and their rows added up;
   data parts: their count; the first part's rows; the most rows and the most bytes in one part; the seconds of the slowest;
     the total rows; the mean bytes per row (the measured wire weight of a voucher on this book, the envelope included);
   marks: the count of `Bridge Agent Company High Water` reads;
@@ -42,10 +43,12 @@ def main(argv):
         verdicts[line[4]] = verdicts.get(line[4], 0) + 1
     print("requests: %d (%s)" % (len(lines), ", ".join("%s %d" % item for item in sorted(verdicts.items()))))
     forwarded = [line for line in lines if line[4] == "forwarded"]
-    for line in forwarded:
-        if line[5] == CENSUS:
-            print("census: #%s %s-%s span (%s, %s] rows %s bytes %s seconds %s" % (
-                line[0], line[6], line[7], line[8], line[9], line[15], line[13], line[17]))
+    census = [line for line in forwarded if line[5] == CENSUS]
+    for line in census:
+        print("census: #%s %s-%s span (%s, %s] rows %s bytes %s seconds %s" % (
+            line[0], line[6], line[7], line[8], line[9], line[15], line[13], line[17]))
+    print("census total: %d requests, rows %d" % (
+        len(census), sum(int(line[15]) for line in census if line[15].isdigit())))
     parts = [line for line in forwarded if line[5] == DATA]
     counted = [line for line in parts if line[15].isdigit()]
     if parts:

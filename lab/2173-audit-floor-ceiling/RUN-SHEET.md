@@ -1,119 +1,226 @@
-# #2173: the tax audit's read of a period over 5,376 vouchers, before and after PR #2191, on BRIDGE CORPUS DENSE
+# #2173: the tax audit's read of a period over 5,376 vouchers, before and after PR #2191, on a new synthetic book and on BRIDGE CORPUS DENSE
 
-Not for merge. READS ONLY, on one synthetic company the lab already holds. `LAB-COMMON.md` in this folder (v3, a byte copy from `lab/626-1038-1050-run-sheets` at 8c602c15, sha256 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6) applies in full, with THE COMPANY below. Where this sheet and it differ, the stricter holds. `SHA256.txt` lists every file here with its bytes; check it before step 0. About 30 to 60 minutes.
+Not for merge. **A WRITE SITTING, THEN READS.** Phase A creates and fills a new synthetic company; Phase B only reads.
+- **The owner's word:** the owner's 28 Oct 2026 word covers writes to synthetic books. Each write phase still waits for the run coordinator's yes.
+- **LAB-COMMON:** `LAB-COMMON.md` in this folder applies in full. It is v3, a byte copy from `lab/626-1038-1050-run-sheets` at 8c602c15, sha256 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6. Where this sheet and it differ, the stricter holds.
+- **Files:** `SHA256.txt` lists every file here with its bytes; check it before step A0.
+- **Time:** about 90 minutes.
 
-**WHY.** The tax audit's read (`audit_test_run`) reads one period and cannot narrow it. Before #2191 it refused any period holding more than 5,376 vouchers before reading a single one, because it counted its reads at the heaviest voucher weight ever measured. #2191 refuses such a period before reading only when no measured weight could fit it in 128 requests: at most 10,837 vouchers, and fewer when days are dense. Otherwise it reads the first part, measures it, and reads on. This item records, through ComplyEaze Bridge's own tool calls:
-- the refusal before #2191 (step 0);
-- the read after it (step 1);
-- a period still over the new limit, refused with no data part sent (step 2).
-It also records the time of every census request over a quarter and over the year, which is not yet measured inside 20 seconds.
+**WHY.** The tax audit's read (`audit_test_run`) reads one period and cannot narrow it.
+- **Today (before #2191):** it refuses any period holding more than 5,376 vouchers, before reading a single one.
+- **With #2191:** it refuses such a period before reading only when no measured weight could fit it in 128 requests: at most 10,837 vouchers, fewer when days are dense.
+- **The whole-day rule:** the audit must read its period in whole days. #2191 therefore also refuses, before any data part, a period with a day no request can carry whole. That is a first voucher day over 42 vouchers, or any later day over 85.
+- **#2191 merges only after step B1 passes.**
 
-**THE COMPANY:** `BRIDGE CORPUS DENSE` (synthetic). Its GUID is `d45bc1b0-e5e3-4261-b3b2-cce3915f42d3`, and its voucher mark was 29,900 at the last sittings (28 and 29 Oct). Its financial year is 1 April 2025 to 31 March 2026, with about 82 vouchers a day. Licensed mode only; Education mode = STOP. TallyPrime 7.2 expected: record the release.
+This item records, through ComplyEaze Bridge's own tool calls:
+- **B0:** today's refusal, on a new book of 5,960 vouchers.
+- **B1:** the read #2191 now makes of that same book, part by part. This is the step the merge waits on.
+- **B2:** #2191's up-front refusal of a dense book's quarter. Its days hold about 82 vouchers each, the first included, so no request carries the first day whole; only census requests are sent.
+- **B3:** the dense book's year, a negative control: still refused, with no data part sent.
+
+**THE COMPANIES**
+- **NEW: `BRIDGE AUDIT FLOOR LAB`** (synthetic), created in Phase A; it does not exist yet. If a company of this name exists on the PC: STOP and report it. Its books begin 1 April 2025.
+  - **Ledgers:** `AFL Expenses` (Indirect Expenses) and `AFL Capital` (Capital Account).
+  - **Vouchers:** 5,960 Journals, each Dr `AFL Expenses` 100.00, Cr `AFL Capital` 100.00, with no voucher number given (Tally numbers them). They fall 40 on 1 April 2025, then 80 on every day from 2 April to 14 June 2025.
+  - **Its GUID is new.** It goes into the merge gate's synthetic-UUID registry before any evidence naming it is pushed. Until then the evidence shows it as `<company guid>`.
+  - It is kept, shut, for later re-reads. No restore is planned.
+- **`BRIDGE CORPUS DENSE`** (synthetic), GUID `d45bc1b0-e5e3-4261-b3b2-cce3915f42d3` (registered).
+  - **Mark:** 29,900 at the sittings of 28 and 29 Oct.
+  - **Period:** 1 April 2025 to 31 March 2026.
+  - **Density, recorded on one day:** 15 May 2025 held 82 vouchers, at AlterIDs 3579 to 3660 (lab row 485). B2 and B3's EXPECT lines assume about 82 vouchers on every day, the first included, and AlterIDs that follow the dates. If B2's census rows say otherwise, record them; that is not a STOP.
+- **Mode:** licensed only; Education mode = STOP. TallyPrime 7.2 expected: record the release.
+
+## Who acts, and how
+- **The lab operator, on the lab PC.**
+  - **On Tally's screen:** create the company, take the backup, and load and shut companies. Nothing else is keyed.
+  - **By curl, under C3:** the marks reads and the imports of Phase A. These are the request files in `requests/`.
+  - **Phase B tool calls:** made through the lab's own MCP client, which launches `bridge_mcp.exe` over stdio with the environment below, one call at a time. It saves each answer whole as a file, with its size and sha256.
+- **Ending a process.** Two processes may be ended: the build's own stdio session (by closing the MCP client's session) and the relay this item started (Ctrl+C in its console, under Difference 4). This is the one exception to LAB-COMMON's rule that nothing ends a process. Tally is never ended. Nothing is ended with taskkill.
 
 ## Differences from LAB-COMMON
-1. **No raw requests.** The operator sends no request file to Tally. Every read is a call of ComplyEaze Bridge's built tool, one at a time, through the relay (Difference 2). C2's step 0 runs WITHOUT its MARKS request. Its GET /status checks still run, straight to 127.0.0.1:9001.
-2. **The relay.** `read_relay.py` sits between ComplyEaze Bridge and Tally, on 127.0.0.1:9012. It forwards only `GET /status` and Export reads to 127.0.0.1:9001, and answers anything else 403 without forwarding it. It records every request whole, and every answer by size, sha256, rows and seconds; an answer of at most 1 MiB is kept whole. Read its header. Before step 0, run `python -I read_relay.py --self-test`. EXPECT exactly `self-test: ok (7 forwarded unchanged, 12 refused, none of the refused reached Tally; rows by structure; an abandoned answer read to its end)` and exit code 0. Anything else = do not use the relay; STOP.
-3. **Size bound.** The bound is the product's own (32 MiB an answer). The relay reads every answer to its end, with no time limit, as LAB-COMMON C3 does.
-4. **Time.** ComplyEaze Bridge gives up on a request at 20 seconds. The relay keeps reading Tally's answer to its end, so its `seconds` column is Tally's real time. Each tool call has 15 minutes. A call with no answer by then: STOP, leave it running, press no key, send nothing more, and report.
-5. **Held gateway.** After each tool call answers, `GET /status` straight to 9001. No answer within 60 seconds = the gateway is held: STOP, leave everything running, press no key, send nothing more, report, and wait (no state read and no shut until the run coordinator says).
+1. **Raw requests only in Phase A.** In Phase B the operator sends no request file to Tally; every read is a tool call through the relay. C2 step 0 runs WITHOUT its MARKS request in Phase B; its `GET /status` checks still go straight to 127.0.0.1:9001.
+2. **Writes.** The grant is exactly the following, and nothing else:
+   - the creation of THE NEW COMPANY on Tally's screen;
+   - one import of two ledgers (`m01`);
+   - thirteen voucher imports (`v01` to `v13`), each sent ONCE (C3).
+3. **Backup.** C5's backup before the first change cannot apply to a company that does not exist yet. The run coordinator waives it for the company's creation and its two ledgers.
+   - One backup, BK0, of THE NEW COMPANY, after its ledgers and before its first voucher. It goes into the new empty folder `C:\bridge-lab\2173l\backups\bk0\`, under C5.
+   - No restore is planned.
+4. **The relay.** `read_relay.py` sits between ComplyEaze Bridge and Tally on 127.0.0.1:9012. Read its header.
+   - **What passes:** it forwards only `GET /status` and Export reads to 127.0.0.1:9001, and answers anything else 403 without forwarding it.
+   - **What it records:**
+     - every request, whole;
+     - every answer by size, sha256, rows and seconds (an answer of at most 1 MiB is also kept whole);
+     - the census rows only as counts: census answers over 1 MiB are not kept.
+   - **Its timing is Tally's own.** It reads every answer to its end with no time limit, even after ComplyEaze Bridge has given up at 20 s. Its `seconds` column is therefore Tally's real time.
+   - **Self-test, before Phase B:** run `python -I read_relay.py --self-test`. EXPECT exactly `self-test: ok (7 forwarded unchanged, 12 refused, none of the refused reached Tally; rows by structure; an abandoned answer read to its end)` and exit code 0. Anything else = STOP.
+   - **Stopping it.** Stop it only when the last row of its `manifest.tsv` has a status and a seconds value, so that no answer is still being read. After a deadline that row may take minutes. Wait for it, up to 15 minutes. No row by then = STOP: leave the relay running and press no key.
+5. **Screens.** Take a screenshot of the whole Tally window before each Phase B step's first call and before each import. A dialog or a half-entered screen = C7: STOP.
+6. **Time.** Each tool call has 15 minutes. A call with no answer by then: STOP, leave it running, press no key, send nothing more, report.
+7. **Held gateway.** After each tool call answers, send `GET /status` straight to 9001.
+   - If Tally is still building an answer ComplyEaze Bridge gave up on (the relay's last row has no seconds value yet), wait for that row first (Difference 4).
+   - Then send `GET /status`. No answer within 60 seconds = the gateway is held: STOP, leave everything running, press no key, send nothing more, report, and wait.
 
-## The builds
-- **BUILD-A (step 0):** candidate A, the release-candidate bundle of master `026ba163d`, CI artifact `12928034390`. The release-candidate sitting downloads it; no second download is needed. Use its `bridge_mcp.exe`. Record its path, bytes and sha256 (Get-FileHash) before the first call. If the release-candidate sitting recorded a hash for the same file, the two must be equal, else STOP.
-- **BUILD-B (steps 1 and 2):** the bundle of a CI run on `fix/2173-audit-floor-ceiling`, the head of PR #2191, at `a4711a6a1155dc985ea703736d607ff3d7a59d4b` or a later head the run coordinator names. The run coordinator names the run, the artifact and the head before step 1. Record the same for its `bridge_mcp.exe`. Steps 1 and 2 wait for that word; step 0 does not.
+## The requests (`requests/`, UTF-16LE with a byte-order mark; check each against `SHA256.txt` before its first send)
+- **How they were made.** Each is the text ComplyEaze Bridge's own builders render, at master `026ba163`. A throwaway test called them with THE NEW COMPANY's name and wrote their output; no byte was typed by hand.
+  - `m00-marks`: the company marks read (`render_agent_company_high_water`), the request the product sends.
+  - `m01-ledgers`: the lab writer's own All Masters import of the two ledgers (`render_master_batch_xml` with `render_ledger_xml`, `agent_lab_import.rs`).
+  - `v01` to `v13`: the lab writer's own voucher import (`render_voucher_batch_xml`), each holding whole days, at most 500 vouchers. Each voucher's narration ends with the writer's `[BRIDGE-LAB:<id>]` attribution marker, and each carries its own `REMOTEID`. `plan.tsv` lists each file's vouchers and first and last date.
+- **Sizes.** The marks answer has a READ BOUND of 16,384 bytes; each import's answer, 65,536 bytes.
 
-## The environment (one ComplyEaze Bridge process per step; record each value; nothing else set)
-Run `bridge_mcp.exe` as the stdio server with exactly:
+## The builds (Phase B)
+- **BUILD-A (step B0):** candidate A, the release-candidate bundle of master `026ba163d`, CI artifact `12928034390`. The release-candidate sitting downloads it, so no second download is needed.
+  - Use its `bridge_mcp.exe`. Record its path, bytes and sha256 (Get-FileHash) before the first call and after the last; a change between them = STOP.
+  - If the release-candidate sitting recorded a hash for the same file, the two must be equal, else STOP.
+- **BUILD-B (steps B1 to B3):** the bundle of a run of `ci.yml` on `fix/2173-audit-floor-ceiling`, PR #2191, at `9f264724d1f856bfb6f55041ce15c5ba201b5fd6` or a later head the run coordinator names.
+  - A draft pull request runs no bundle job, so the run is one started by hand on the branch. The run coordinator names the run, the artifact, its zip digest and the head before step B1.
+  - Check the zip's sha256 against that digest, and hash the exe as for BUILD-A.
+  - Steps B1 to B3 wait for that word.
+
+## The environment (one ComplyEaze Bridge session per step; record each value; nothing else set)
 - `BRIDGE_TERMS_ACCEPTED=true` (the owner allowed the lab to set it on 25 Oct 2026);
 - `BRIDGE_TALLY_HOST=127.0.0.1` and `BRIDGE_TALLY_PORT=9012` (the relay);
 - `BRIDGE_AGENT_ENABLE_TAX_AUDIT=true`;
-- `BRIDGE_AGENT_DATA_DIR` = a new empty folder for this step: `C:\bridge-lab\2173l\s<step>\data`;
-- no `BRIDGE_AGENT_REDACTION` (a redaction setting refuses `audit_test_run`), no lab-write, import or posting setting.
+- `BRIDGE_AGENT_DATA_DIR` = a new empty folder for the step: `C:\bridge-lab\2173l\<step>\data`;
+- no `BRIDGE_AGENT_REDACTION` (a redaction setting refuses `audit_test_run`), and no lab-write, import or posting setting.
 
-The process is stopped after its step, and a new one is started for the next.
+## Phase A: build THE NEW COMPANY (WRITES, after the run coordinator's yes)
+**A0.** C2 step 0 with no company loaded (a company already loaded = STOP), without its MARKS read. EXPECT no company named `BRIDGE AUDIT FLOOR LAB` in Select Company's list.
 
-## The steps (one at a time; the next only when this one's EXPECT is recorded)
-Before step 0: C2 step 0 with THE COMPANY loaded alone, as Difference 1 says. Then the self-test (Difference 2).
+**A1.** Create the company `BRIDGE AUDIT FLOOR LAB`:
+- financial year and books beginning 1-4-2025;
+- no password;
+- every other field as the screen offers. If the Features screen opens, accept it unchanged and record every value it shows.
 
-**For each step:**
-1. Start the relay in its own console, with a new recording folder:
-   `Start-Process cmd.exe -WorkingDirectory <this folder, absolute> -ArgumentList '/k','python -I read_relay.py --listen-port 9012 --record C:\bridge-lab\2173l\s<step>\relay'`
-   EXPECT its first line: `relay: 127.0.0.1:9012 -> 127.0.0.1:9001, reads only, recording into C:\bridge-lab\2173l\s<step>\relay; Ctrl+C to stop`.
-2. Start the build named for the step with the environment above. Then call:
-   - `list_companies`: EXPECT exactly THE COMPANY, with the GUID above and `identity_state` `verified_tuple`;
-   - `tally_status`: record the release, licence and Education mode.
-3. Call `audit_test_run` ONCE, with:
-   - `company_guid` = the GUID above;
-   - `from` and `to` as the step says;
+Take a screenshot before accepting. Load it alone. Then:
+- Send `m00-marks` (name `m-a`). EXPECT one COMPANY row named `BRIDGE AUDIT FLOOR LAB`. Record its GUID, `ALTMSTID` and `ALTVCHID` (a company with no voucher may omit `ALTVCHID`: record that).
+- Record the company number.
+
+**A2.** Send `m01-ledgers`, then `m00-marks` (`m-l`).
+- The import's answer: EXPECT `CREATED` 2, the other counters 0, and no `LINEERROR` (C4); else STOP.
+- The marks: EXPECT `ALTMSTID` above `m-a`'s by at least 2. Record it.
+
+**A3.** Take backup BK0 (Difference 3, C5). Then `m00-marks` (`m-bk`): EXPECT it byte-equal to `m-l`, or differing only inside `CMPINFO`. Any other difference = STOP before `v01`.
+
+**A4.** Send `v01` to `v13` in order. After each one:
+- `m00-marks`;
+- a screenshot of the whole Tally window, before the next request (C3).
+
+For each import:
+- EXPECT `CREATED` equal to that file's count in `plan.tsv`;
+- EXPECT `ALTERED`, `DELETED`, `COMBINED`, `IGNORED`, `ERRORS`, `CANCELLED` and `EXCEPTIONS` 0, and no `LINEERROR`; else STOP;
+- record `ALTVCHID` after it.
+
+EXPECT `ALTVCHID` to rise by that import's count each time. A different step is recorded, not a STOP, provided `CREATED` matched.
+
+After `v13`, the 5,960 vouchers are in. Record `ALTVCHID` as M1; it should be 5,960 if the first voucher took AlterID 1. Then C10 (shut THE NEW COMPANY).
+
+STOP on: any dialog (C7); any import answer that differs from its EXPECT line; a voucher import's `CREATED` that differs from `plan.tsv`. A STOP part-way leaves the imports already sent in the book. Each one is sent once in this item's life, never again (C3).
+
+## Phase B: the reads (READ-ONLY, tool calls only)
+Before B0: the relay's self-test (Difference 4).
+
+**Each step:**
+1. Load the step's company alone. C2 step 0 (Difference 1), then a screenshot of the whole Tally window (Difference 5).
+2. Start the relay in its own console, with a new recording folder:
+   `Start-Process cmd.exe -WorkingDirectory <this folder, absolute> -ArgumentList '/k','python -I read_relay.py --listen-port 9012 --record C:\bridge-lab\2173l\<step>\relay'`
+   EXPECT its first line: `relay: 127.0.0.1:9012 -> 127.0.0.1:9001, reads only, recording into C:\bridge-lab\2173l\<step>\relay; Ctrl+C to stop`.
+3. Start the step's build with the environment above. Then:
+   - `list_companies`: EXPECT exactly the step's company, with `identity_state` `verified_tuple`; record its GUID.
+   - `tally_status`: record the release, the licence and the Education mode.
+4. Call `audit_test_run` ONCE, with:
+   - `company_guid` = that GUID;
+   - `from` and `to` as the table says;
    - `test` = `cash_44ab`;
    - `cash_groups` = `["Cash-in-Hand"]` and `bank_groups` = `["Bank Accounts"]`.
 
-   Note the UTC time at the call and at its answer. Keep the whole answer as a file, with its size and sha256. A refusal is an answer: record its code and any cause. Do not call it again.
-4. `GET /status` straight to 9001 (Difference 5). Stop the build's process. Stop the relay (Ctrl+C in its console).
-5. Run `python -I summarise.py C:\bridge-lab\2173l\s<step>\relay` and keep its output as a file. Check the EXPECT lines below against it and the answer.
+   Note the UTC time at the call and at its answer, and keep the whole answer as a file. A refusal is an answer: record its code. Do not call it again.
+5. Close the build's session. Then Difference 7 (the relay's last row, then `GET /status`), then stop the relay (Difference 4).
+6. Run `python -I summarise.py C:\bridge-lab\2173l\<step>\relay` and keep its output. Check it against the EXPECT lines.
+7. C10 (shut the step's company).
 
-| Step | Build | `from` to `to` | Vouchers in the period |
+| Step | Build | Company | `from` to `to` |
 |---|---|---|---|
-| 0 | BUILD-A | `2025-04-01` to `2025-06-30` | about 7,460 (91 days of about 82) |
-| 1 | BUILD-B | `2025-04-01` to `2025-06-30` | the same |
-| 2 | BUILD-B | `2025-04-01` to `2026-03-31` | about 29,900: the year, the negative control |
+| B0 | BUILD-A | BRIDGE AUDIT FLOOR LAB | `2025-04-01` to `2026-03-31` |
+| B1 | BUILD-B | BRIDGE AUDIT FLOOR LAB | `2025-04-01` to `2026-03-31` |
+| B2 | BUILD-B | BRIDGE CORPUS DENSE | `2025-04-01` to `2025-06-30` |
+| B3 | BUILD-B | BRIDGE CORPUS DENSE | `2025-04-01` to `2026-03-31` |
 
 ### EXPECT (recorded; the lab judges only the STOP rules)
-**Step 0 (before #2191).**
-- The answer is a refusal with the code `voucher_window_too_many_reads`.
-- The summary shows `data parts: 0`: no `Bridge Agent Vouchers` request was sent.
-- The census lines show the period's census:
-  - Spans are of 8,192 AlterIDs from 0, ending at the mark: (0, 8192], (8192, 16384], (16384, 24576], (24576, 29900].
-  - It stops once its count passes 5,376 with spans left. If the quarter's AlterIDs follow its dates, that is after the first span (rows about 7,460).
-  - Record how many census requests were sent and each one's rows and seconds.
-- Other branches:
-  - The answer is a refusal with cause `census_deadline_exceeded`: a census span took over 20 s. Record the relay's seconds for it; this is a finding, not a STOP.
-  - Any other answer: record it whole and report before step 1.
+**On any step,** an answer other than the step's EXPECT is recorded whole and reported before the next step. This includes:
+- an `audit_part_deadline_exceeded`, a request ComplyEaze Bridge gave up on at 20 s. On the audit's read a slow census, trial balance, ledger or company read is reported under this code. The relay's seconds give Tally's real time.
+- an `audit_part_response_size_limit_exceeded`, an answer over 32 MiB;
+- an `audit_part_drain_required`;
+- any engine code (`C1-…` to `C11-…`, `CFG-…`, `BIND-GROUP-UNKNOWN`).
 
-**Step 1 (after #2191, the same quarter).**
-- The answer is a result (`completed` or `completed_with_failed_book_checks`, either), or a refusal by the audit engine after the read. Record which.
-- The summary shows:
-  - **census** lines for all four spans, nothing stopped;
-  - **data parts:** between 89 and 128 (about 92: the first part holds at most 42 vouchers, then about one part a day of at most 85);
-  - **first part rows:** at most 42;
-  - **most rows:** at most 85;
-  - **most bytes:** at most 16,777,216;
-  - **total rows:** equal to the census rows in the quarter;
-  - **mean bytes per row:** this book's voucher weight on the wire, recorded for the first time;
-  - **marks:** at least 2 (the window opened and closed on its marks);
-  - **over:** none.
-- Other branches:
-  - **Refused `voucher_window_too_many_reads` with data parts 1:** the first part measured heavier than about 200 KiB a voucher, so a part holds fewer than a day. Record the mean bytes per row. The change behaves as designed; this book is too heavy for the quarter.
-  - **Refused with cause `census_deadline_exceeded`:** a census span over the quarter took over 20 s. Record the relay's seconds. Then this read also needs its census divided by date (#899), and that is the finding.
-  - **More than 128 data parts sent, or any data part over 16,777,216 bytes:** a defect in the build. Record it whole and report at once.
-  - **The call takes longer than 240 s:** record its time. The host limit on a desktop chat (240 s) would bound this read, not the read count.
-
-**Step 2 (after #2191, the year: the negative control).**
-- The answer is a refusal with the code `voucher_window_too_many_reads`.
-- The summary shows:
+**B0 (before #2191, the new book).**
+- **The answer:** a refusal, code `voucher_window_too_many_reads`.
+- **The census:**
+  - EXPECT one census line with no span: the mark, about 5,960, fits one census request, which this build sends unspanned;
+  - rows equal to M1 (5,960).
+- **The other lines:**
   - `data parts: 0`;
-  - census lines for the first two spans only, (0, 8192] and (8192, 16384], with all their rows in the year, about 16,384;
-  - the census stopped there with spans left, because the count passed 10,837.
-- Other branches:
-  - **Refused with cause `census_deadline_exceeded`:** a span over the year took over 20 s; the year's census was measured at 13 to 25 s a span on this book. Record the relay's seconds. Still no data part may be sent.
-  - **Any data part sent:** a defect in the build. Record it and report at once.
+  - `marks: 2` (the read's own opening read and the window's);
+  - `over: none`.
 
-After step 2: C2 step 0 again (Difference 1), then C10.
+**B1 (after #2191, the new book). The step #2191's merge waits on.**
+- **The answer:** a result, `completed` or `completed_with_failed_book_checks`, either. Record which, with the result whole.
+- **The census:** one census line, rows 5,960.
+- **The data parts:**
+  - `data parts: 75`: the first part is 1 April (40 vouchers), read at the default figure. Each later day of 80 is one part, read at the floor of 85 a request. The last part runs from 14 June to the period's end;
+  - `first part rows 40`, `most rows 80`, `total rows 5960`;
+  - `most bytes` at most 16,777,216;
+  - every data part line with an empty span (no part divided by AlterID).
+- **The other lines:**
+  - `marks: 3` (opening, the window's, closing);
+  - `over: none`.
+- **Record:** the mean bytes per row (this book's voucher weight on the wire) and the call's whole time.
+- **Other branches:**
+  - **`voucher_window_too_many_reads` after one data part:** the first part measured over 196,608 bytes a voucher, and a day of 80 no longer fits a part. Record the mean; the change behaves as designed.
+  - **`audit_window_divided_by_alterid`:** a defect in the build, since no day here needs dividing. Record it and report at once.
+  - **More than 75 data parts, or more than 128:** record and report.
+  - **The call over 240 s:** record its time. A desktop chat's host limit would then bound this read, not the read count.
+
+**B2 (after #2191, the dense quarter).**
+- **The answer:** a refusal, code `audit_window_divided_by_alterid`.
+- **The census, finished, nothing stopped:**
+  - four census lines with spans (0, 8192], (8192, 16384], (16384, 24576] and (24576, 29900];
+  - their rows add up to the quarter's vouchers, about 7,460, if the AlterIDs follow the dates.
+- **The other lines:**
+  - `data parts: 0`: no `Bridge Agent Vouchers` request was sent;
+  - `marks: 2`;
+  - `over: none`, unless a census span ran past 20 s (the general branch above).
+
+**B3 (after #2191, the dense year: the negative control).**
+- **The answer:** a refusal, code `voucher_window_too_many_reads`.
+- **The census lines:** the first two spans only, (0, 8192] and (8192, 16384], with about 16,384 rows in all. The census stopped there with spans left, because its count passed 10,837.
+- **The other lines:** `data parts: 0`. A data part sent = a defect in the build: record it and report at once.
+- **Timing:** each of these spans covers the whole year. One full span over this book's year was measured at 14.8 s and 25.0 s in two sittings (`lab/899-census-window-ladder-v2-answers` at 28aac587, and v1 at 3243b75c). So `audit_part_deadline_exceeded` is possible here (the general branch).
+
+After B3: C2 step 0 again (Difference 1), then C10.
 
 ## Evidence and close
-For each step:
-- the tool answers whole, with sizes and sha256;
-- the relay's folder: `manifest.tsv`, every request file, and the kept answers. Answers over 1 MiB were not kept; their sizes and sha256 are in the manifest;
-- the summary output;
-- the build's exe path, bytes and sha256, and the environment as set;
-- UTC times.
+- **Phase A:**
+  - every request's sha256 as sent;
+  - every answer whole, with its size and sha256;
+  - BK0's name, bytes, time and sha256;
+  - the marks after each import;
+  - THE NEW COMPANY's GUID and number, shown as `<company guid>` until it is registered.
+- **Phase B, for each step:**
+  - the tool answers whole;
+  - the relay's folder: `manifest.tsv`, the requests and the kept answers;
+  - the summary;
+  - the build's exe path, bytes and sha256;
+  - the environment as set;
+  - UTC times.
+- **Not pushed:** the data folders and the screenshots stay on the lab PC, listed by name, size and sha256.
+- **Also:** the notes, with one line per step.
 
-Also: the notes, one line per step, and the screenshots, which stay on the lab PC, listed by name, size and sha256.
-
-The evidence goes to a new branch, `lab/2173-audit-floor-ceiling-answers`, with `SHA256.txt`. The data folders stay on the lab PC: list their files by name, size and sha256, and push none of them. Push only after the pre-push scan and the run coordinator's yes.
+The evidence goes to a new branch, `lab/2173-audit-floor-ceiling-answers`, with `SHA256.txt`. Push it only after the pre-push scan and the run coordinator's yes.
 
 ## Not measured by this item
-- Any book but this one.
 - An inventory-heavy book, whose voucher weight and census time differ.
-- A period between 10,837 vouchers and the year.
+- A period between 10,837 vouchers and the dense year.
+- A book whose first voucher day holds between 43 and 85 vouchers. That is refused by the same rule as B2, through its first-day branch, which B2 also takes.
 - Gold, and Education mode.
 - The read through a desktop chat's own host limit.

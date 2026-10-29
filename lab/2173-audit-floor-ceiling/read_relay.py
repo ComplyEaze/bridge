@@ -174,6 +174,8 @@ def make_handler(state):
             self.reply(403, [("Content-Type", "text/plain; charset=utf-8")], body)
             state.recorder.write(index, arrived, method, self.path, "refused:" + reason, request, 403, body, None, None)
 
+        # A request already waiting for the lock is still sent when its client has gone away meanwhile.
+        # ComplyEaze Bridge sends one request at a time and none after a deadline, so none waits there.
         def forward(self, index, arrived, method, request):
             """Sends the request to Tally, reads the whole answer, returns it, then records it. The client's own
             Content-Type lines go on unchanged, in order, and none when it sent none."""

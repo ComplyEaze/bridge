@@ -1,0 +1,98 @@
+bytes 23568 ledgers 8 bytes per ledger 2946
+LEDGER 'Cash' PARENT 'Cash-in-Hand'
+   LEDMAILINGDETAILS.LIST count 1
+      placeholder '     '
+   LEDGSTREGDETAILS.LIST count 1
+      placeholder '     '
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []
+LEDGER 'Lab Party Duplicate Probe' PARENT 'Sundry Debtors'
+   LEDMAILINGDETAILS.LIST count 1
+      LEDMAILINGDETAILS.LIST
+        ADDRESS.LIST
+          ADDRESS '1 Test Street'
+          ADDRESS 'Test Area'
+        APPLICABLEFROM '20260401'
+        PINCODE '560001'
+        MAILINGNAME 'Lab Party Duplicate Probe'
+        STATE 'Karnataka'
+        COUNTRY 'India'
+   LEDGSTREGDETAILS.LIST count 2
+      LEDGSTREGDETAILS.LIST
+        APPLICABLEFROM '20260401'
+        GSTREGISTRATIONTYPE 'Regular'
+        PLACEOFSUPPLY 'Karnataka'
+        GSTIN '29ZZZZZ0000Z1ZM'
+      LEDGSTREGDETAILS.LIST
+        APPLICABLEFROM '20260701'
+        GSTREGISTRATIONTYPE 'Regular'
+        PLACEOFSUPPLY 'Karnataka'
+        GSTIN '29ZZZZZ0000Z2ZL'
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []
+LEDGER 'Profit & Loss A/c' PARENT 'Primary'
+   LEDMAILINGDETAILS.LIST count 1
+      placeholder '     '
+   LEDGSTREGDETAILS.LIST count 1
+      placeholder '     '
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []
+LEDGER 'Synthetic Bank' PARENT 'Bank Accounts'
+   LEDMAILINGDETAILS.LIST count 1
+      placeholder '     '
+   LEDGSTREGDETAILS.LIST count 1
+      placeholder '     '
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []
+LEDGER 'Synthetic Capital' PARENT 'Capital Account'
+   LEDMAILINGDETAILS.LIST count 1
+      placeholder '     '
+   LEDGSTREGDETAILS.LIST count 1
+      placeholder '     '
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []
+LEDGER 'Synthetic Creditor' PARENT 'Sundry Creditors'
+   LEDMAILINGDETAILS.LIST count 1
+      placeholder '     '
+   LEDGSTREGDETAILS.LIST count 1
+      placeholder '     '
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []
+LEDGER 'Synthetic Debtor' PARENT 'Sundry Debtors'
+   LEDMAILINGDETAILS.LIST count 1
+      placeholder '     '
+   LEDGSTREGDETAILS.LIST count 1
+      placeholder '     '
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []
+LEDGER 'Synthetic Suspense' PARENT 'Suspense A/c'
+   LEDMAILINGDETAILS.LIST count 1
+      placeholder '     '
+   LEDGSTREGDETAILS.LIST count 1
+      placeholder '     '
+   GSTDETAILS.LIST count 1
+      placeholder '     '
+   LEDADDRESS.LIST '     ' []
+   LEDPINCODE None []
+   LEDGSTPINCODE None []

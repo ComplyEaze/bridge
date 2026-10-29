@@ -1,0 +1,26 @@
+Pushed copies that differ from the files kept on the lab PC: each substitution, with the original's bytes and sha256.
+answers/001-tally-status.json: original 1825 B sha256 abcbc660b5ef80610fdb709af495fb068b6f78d1b8934ddfb9699f26e3eb19aa; 2 x -> <company guid>
+answers/002-list-companies.json: original 1571 B sha256 692e57be63ecea85449ecebadec94ec3bbd531783f63915748e19aca1490c9f1; 2 x -> <company guid>
+answers/003-m0-basic.json: original 4054 B sha256 2ecea20cdaed74990a18a128981d284e33f9a169cff8b91c0db30ed44be69b11; 3 x -> <company guid>
+answers/004-m0p-basic.json: original 4054 B sha256 80a0b1f0d10d9f19400de70b4af10f82d9342143aac37ed2aa19759ead2958ea; 3 x -> <company guid>
+answers/005-s3a-compliance.json: original 16437 B sha256 2319c4ac4a83b469c53a12fd132a11f30cf631d115e3bdeef764a3f513c7d5be; 3 x -> <company guid>
+answers/006-s3a-egress.json: original 41081 B sha256 ce62d16425e0879d746cf48f722604c026e319730b8f9ae939ced49fe6b3a8fd; 6 x -> <company guid>
+answers/007-s3a-mailing.json: original 19687 B sha256 58a210250f9ae89d766f6926ae6949da7fc6a9b6cc803986c9ee6a565f8705bb; 3 x -> <company guid>
+answers/008-s3a-mailing-egress.json: original 58294 B sha256 e5eb44d58a1f88de9ab95382780f50107f1f3f9e8ff7f88e85ad9ef293b4d265; 8 x -> <company guid>
+answers/009-s3b-mailing-masked.json: original 19481 B sha256 3848cfba0e7971b3e81f1c5b0882f81d5a05d7459420097ca6c7c786cf2135fd; 3 x -> <company guid>
+answers/010-s3b-egress.json: original 75521 B sha256 2d649d0155c2324ee18834561c3961c84888982ac1c061679bcd099adabc8587; 10 x -> <company guid>
+answers/011-s4-gst.json: original 21258 B sha256 10ad00fc238745684889d495a55474c87b3cfe9c31ea8db416a9870aed092708; 3 x -> <company guid>
+answers/012-s4-egress.json: original 91740 B sha256 31f3395141a5edc8399d90cb172138b4f6dfd38e97731e5ceae1340acd2ac37b; 12 x -> <company guid>
+answers/013-s4-gst-and-mailing.json: original 2240 B sha256 93933ca295dbc7f615fe826dddb02e9c852f45103a94a2c01c84054a6d21e9e3; 1 x -> <company guid>
+answers/014-s4-basic.json: original 4053 B sha256 de60e40a6a030b1bdd1ce81734d8b8526bff4c89101b9d1dc2fa82914fe5c9e9; 3 x -> <company guid>
+answers/015-s5-m1-basic.json: original 4053 B sha256 3f030a33f1688b4db49bb4034cb14bcddab9275acf3504e4ca68e6bfd4c53651; 3 x -> <company guid>
+answers/016-s6a-mailing.json: original 20141 B sha256 3c4c6e466ed3b623e5b928a0d963fbe12575e3d1196bd3d59d09d8660c1b8894; 3 x -> <company guid>
+answers/017-s6b-mailing.json: original 20141 B sha256 a4d7725de61d46e82dc3363fa36ddc1b2368f3bcfbb0c517ec31832616228c27; 3 x -> <company guid>
+answers/018-s6-marks.json: original 4053 B sha256 29056405d620d0bd5944737c534ef446d9cbe07ea0418ab8d810b48cde9b068b; 3 x -> <company guid>
+answers/019-s7-marks.json: original 4054 B sha256 288059a9318bb08ce94c7d17c08e732b3965f487fcce8f8dbcb109f0b825fe1b; 3 x -> <company guid>
+answers/020-s8-basic.json: original 4054 B sha256 c9de12169a706c0c5cfa5d37f032d45b9c6b8f5b2e09fecf8a8a3e66620c1aea; 3 x -> <company guid>
+raw/s2-q-to-20260831.xml: original 20896 B sha256 ceaa6d789d1ce9a41c7bcf233e5d26cbe383dcd261e57fb804935d8845cc75d5; 16 x -> &lt;company guid&gt; (UTF-16LE, XML-escaped so the copy still parses)
+raw/s4-q-gst-to-20260831.xml: original 23568 B sha256 4ff13fdfb2d52186d12e6431b93908c7663799761e7cf90b6347924ebd275b14; 16 x -> &lt;company guid&gt; (UTF-16LE, XML-escaped so the copy still parses)
+raw/s6a-q-to-20260831.xml: original 21840 B sha256 b1ad4409f04769b76d6fbaffec94843df040149f05a6e6a1e7467b057fd93c8f; 16 x -> &lt;company guid&gt; (UTF-16LE, XML-escaped so the copy still parses)
+raw/s6b-q-to-20260601.xml: original 21840 B sha256 b1ad4409f04769b76d6fbaffec94843df040149f05a6e6a1e7467b057fd93c8f; 16 x -> &lt;company guid&gt; (UTF-16LE, XML-escaped so the copy still parses)
+raw/s8-q-to-20260831.xml: original 20896 B sha256 ceaa6d789d1ce9a41c7bcf233e5d26cbe383dcd261e57fb804935d8845cc75d5; 16 x -> &lt;company guid&gt; (UTF-16LE, XML-escaped so the copy still parses)

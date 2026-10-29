@@ -1,0 +1,28 @@
+Captures and files kept on the lab PC (never pushed): name, bytes, sha256.
+Screenshots (whole Tally window):
+  bk1-before-accept.png 51864 484a0bfdae6f0aa7eeac82c335a076a6310c1f0e1a44cf6f08a1d0f5ba46b5f0
+  c10-no-company.png 72685 867e9f17cc2d057121a4c914a3d9a6feabdb9b7d4b1c214834c929b9a9e266dc
+  s0-about.png 77027 418beb562c51b04312e97468939fdd19de4f1a0e3b512059b7040ce79e1e2aac
+  s0-gateway-loaded.png 45107 8f06b121d85266a16f7394d5191c1f76c43317887f5f5b7a535347bed6b84c43
+  s1-day-book-year.png 38999 64dd415ad4439fed9d8398575b3f0d2b2a25270f5cec7503a4416b9adff6ce5c
+  s4-after-gst-send.png 44025 c5220f83bdea3641509dfe23fa465a3f9b00a794e8702d0d2d14c6fac0d9cfad
+  s5-gateway-after-keying.png 45114 70720d8d6fc1d06ee47d9e80d224025d87b1fb13c9cbcd6297e4eed08f2e1692
+  s5-mailing-history-before-accept.png 51164 601e9869706e7c4ffa1a562e2312c4d7c94c053aa30fe4fd3620bc826101c82b
+  s5-mailing-history-two-entries.png 51255 c863a13f436bd1410d01168b8eff56cc77098d6683faa47f5d4979f8d7ea53b7
+  s5-saved-ledger.png 46966 591dc6574dcb361370ddf933c3308d1dae8ca834f67c320ceeabfcd481703d01
+  s7-gateway-after.png 45114 70720d8d6fc1d06ee47d9e80d224025d87b1fb13c9cbcd6297e4eed08f2e1692
+  s7-history-after-blank-date.png 49277 43db253a9d5cd96966ca3a3fa93469736c12be3719374bfa7bae8c1e20c9343f
+  s8-gateway-after-restore.png 45107 8f06b121d85266a16f7394d5191c1f76c43317887f5f5b7a535347bed6b84c43
+  s8-restore-before-accept.png 35178 e8ec6e76c282fbb48c0e75b2e69826464ee61130e1fce7a4268d5806d5e4f8ab
+Backup BK1:
+  TDBK1800_100031.001 33318 81f678c3893da63222976d448c703da6bdd4e861673883e98f23c7f9b3e6306b
+Folder listings, full netstat output and the process list:
+  bk1-listing-before.txt 15 715add31ba42e4402a8e8c5fe501c8060e9f2af8ee899b143bb8bdf5620a8bbd
+  bk1-listing-after.txt 112 b24f0715fc1d967b1a25cec26f354364f6a87be69a5e01a7974d8b0b64207e0d
+  s8-company-folder-before.txt 1084 08d6745152fcc60e34b89af7362784f06c4a90dd7ee931b20adc4f9185aee657
+  s8-company-folder-after.txt 675 257fb6b1e4209574f20c030c9e0a44dad48d4617298538e7f714c80cbc12d4f8
+  s0-netstat-full.txt 9439 a129ffa923a4f5ddecbd51c6819b001a6aad40cb44205d5224cdb858e57c2e22
+  c10-netstat-full.txt 9425 acdd77fabff8f0a5aa4aedcb2ebb5ef720afdac58e9ae9d6bb02913d736b10a7
+  p0-process-list.txt 1328 0ceb6bdc9c2bbcf1a4e7ed2ece120f59747aa05926f461dc5973789c70ebbb34
+  s8-basic-printout.txt 1037 c22da5bacfbc105aed5c5762134aa8a7766d3481a9e67bd5e59df12b471a9168
+Launch files: launch-env.json 157 3a1d801b91439966d9085230e791c5e0e4d2ea2945865d99c93f7a818805b651; launch-env-mask.json 200 cfe7998e06b774aabe347bc2f99deec9c691af6013b4952f671e553967ce38c1

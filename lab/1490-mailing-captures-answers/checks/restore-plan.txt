@@ -1,0 +1,9 @@
+Restore plan, sheet step 8 (LAB-COMMON C6), 29 Oct 2026
+Source folder: <lab folder>\backups\bk1 (holds this one file only, checked before the restore)
+Source file: TDBK1800_100031.001, 33,318 bytes, sha256 81f678c3893da63222976d448c703da6bdd4e861673883e98f23c7f9b3e6306b
+Backup taken 29 Oct 2026 06:08 local time (00:38 UTC), step 1.
+Company: Bridge Lab Win 0.5.1, number 100031.
+Restore Data Path: Tally's data folder (the folder of the Select Company list); the company's own folder is 100031 under it.
+Order: shut the company (Company > Shut); Data > Backup & Restore > Restore; Restore Data Path = Tally's data folder; source = Specify Path, the bk1 folder; the list must show 100031 with the backup's date and time; select it only; screenshot; accept.
+Prompts expected and answered: "Accept ?" = Yes; "Company data folder (100031) already exists ... Replace will overwrite the existing folder." = Replace. Any other prompt: no key, screenshot, halt.
+After: load the company alone; screenshot of the whole window and of the Gateway; ledger_masters basic (marks, ledger rows) and the raw read q-to-20260831 (the probe's mailing list as at step 2, one entry).

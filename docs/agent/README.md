@@ -4135,14 +4135,23 @@ The read of Tally's Bills Receivable and Payable reports comes before any party 
 large book it can be the step that fails: on one synthetic book of about 30,000 vouchers, at the
 end of its first year (31 March 2026), one of its requests was held past the 20-second limit and
 the whole call was refused as `native_outstandings_read_failed`, with no figure returned, while the
-same book three months into the year answered (#1356). A Bills report request cut at the limit has
-its own cause, `native_bills_report_deadline_exceeded` (#2119); another request of the read cut the
-same way keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to
-repeat the call. Tally can go on building the report after the limit (a read sent straight after
-was refused for time too), so it also says to wait and let `tally_status` answer before the next
-read, and that an earlier `as_of` with fewer open bills answered on that book. Where the limit
-falls on a given book is not measured. A call withdrawn while the read runs finishes the request in
-flight and sends nothing more (#778).
+same book three months into the year answered (#1356). The Bills Receivable and Payable report
+requests now have a 60-second limit of their own; every other request keeps 20 seconds (#2119).
+Each report is read twice, so on that book a call at the end of the year took 76.9 seconds through a
+client with no limit of its own, and was cut at 60 seconds by a host that gives a tool call 60
+seconds (`docs/tally/UNIT_A_RULING_2.md`; one sitting, partial). Each Bills post holds the endpoint
+for its whole time: another ComplyEaze Bridge process reading the same Tally meanwhile, the desktop
+app behind a call of the MCP server among them, is refused busy (`tally_endpoint_busy`) after its
+usual wait of about 9.5 seconds. Behind the desktop app's own outstandings read, another read in the
+desktop app waits and is refused (`endpoint_queue_deadline_exceeded`) after 30 seconds. The MCP
+server holds a second tool call until the first ends. A Bills report request cut at its limit has
+its own cause, `native_bills_report_deadline_exceeded`; another request of the read cut at its
+limit keeps `request_deadline_exceeded`. The Bills cause's next step tells the assistant not to repeat the
+call. Tally can go on building the report after the limit (a read sent straight after was refused
+for time too), so it also says to wait and let `tally_status` answer before the next read, and that
+an earlier `as_of` with fewer open bills answered on that book. Where the limit falls on a given
+book is not measured. A call withdrawn while the read runs finishes the request in flight and sends
+nothing more (#778).
 
 `receivable` and `payable` follow the sign of each bill's balance, as Tally's own
 Bills Receivable and Bills Payable reports scope them, not the type of party, and

@@ -1947,3 +1947,136 @@ fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
         assert!(part.ledger_count() <= with.max_ledgers_per_part);
     }
 }
+
+/// A Bills report answer shorter than the length it declares is refused as `ResponseTruncated`
+/// well before even the default limit (#2119): under the Bills report's longer limit, a short
+/// answer is neither waited out to that limit nor read in part, and the pair's second post is
+/// never sent.
+#[tokio::test]
+async fn a_bills_report_body_shorter_than_its_declared_length_is_truncated() {
+    use bridge_tally_protocol::native_outstandings::{
+        render_native_bills_request, NativeBillsReportKind,
+    };
+    use bridge_tally_transport::{TallyTransportError, DEFAULT_REQUEST_TIMEOUT};
+    use tally_protocol_simulator::{
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+
+    let plan = ScenarioPlan::new(Fixture::ExportStatusOne).with_encoding(WireEncoding::Utf16Le);
+    let whole = plan.response_bytes().len();
+    let simulator = SequenceSimulator::spawn(vec![
+        plan.with_framing(ResponseFraming::DeclaredContentLength { bytes: whole + 17 })
+    ])
+    .unwrap();
+    let client = super::TallyClient::new(super::TallyConfig {
+        host: "127.0.0.1".into(),
+        port: simulator.address().port(),
+    })
+    .unwrap();
+    let request = render_native_bills_request(
+        NativeBillsReportKind::Receivable,
+        "Bridge Billwise Lab",
+        &TallyDate::parse("20250401").unwrap(),
+        &TallyDate::parse("20260331").unwrap(),
+    );
+    let started = std::time::Instant::now();
+    let error = match client.fetch_native_bills_report_paired(&request).await {
+        Ok(_) => panic!("a truncated Bills answer must be refused"),
+        Err(error) => error,
+    };
+    let post = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<super::PairedNativeReportResponseFailure>())
+        .expect("the Bills post's own failure");
+    assert_eq!(
+        post.transport_error(),
+        Some(&TallyTransportError::ResponseTruncated),
+        "{error:?}"
+    );
+    assert!(started.elapsed() < DEFAULT_REQUEST_TIMEOUT);
+    assert_eq!(simulator.finish().unwrap().len(), 1);
+}
+
+/// A client built as production builds it gives the Bills report its 60-second limit (#2119);
+/// every limit test elsewhere builds the Bills transport through a test limit.
+#[test]
+fn a_client_gives_the_bills_report_a_sixty_second_limit() {
+    let client = super::TallyClient::new(super::TallyConfig {
+        host: "127.0.0.1".into(),
+        port: 9000,
+    })
+    .unwrap();
+    assert_eq!(client.bills_report_limit(), Duration::from_secs(60));
+}
+
+/// A Bills report post is recorded in the call's request trail, as every other send is (#2119):
+/// the egress log does not leave it out.
+#[tokio::test]
+async fn a_bills_report_post_is_recorded_in_the_calls_request_trail() {
+    use bridge_tally_protocol::native_outstandings::{
+        render_native_bills_request, NativeBillsReportKind,
+    };
+    use tally_protocol_simulator::{
+        Fixture, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
+    };
+
+    let plan = ScenarioPlan::new(Fixture::ExportStatusOne).with_encoding(WireEncoding::Utf16Le);
+    let whole = plan.response_bytes().len();
+    let simulator = SequenceSimulator::spawn(vec![
+        plan.with_framing(ResponseFraming::DeclaredContentLength { bytes: whole + 17 })
+    ])
+    .unwrap();
+    let client = super::TallyClient::new(super::TallyConfig {
+        host: "127.0.0.1".into(),
+        port: simulator.address().port(),
+    })
+    .unwrap();
+    let request = render_native_bills_request(
+        NativeBillsReportKind::Receivable,
+        "Bridge Billwise Lab",
+        &TallyDate::parse("20250401").unwrap(),
+        &TallyDate::parse("20260331").unwrap(),
+    );
+    let (result, trail) = crate::request_trail::with_request_trail(Box::pin(
+        client.fetch_native_bills_report_paired(&request),
+    ))
+    .await;
+    assert!(result.is_err(), "a truncated Bills answer must be refused");
+    let trail = trail.expect("the Bills post is in the trail");
+    assert_eq!(trail["sent"], 1, "{trail}");
+    assert_eq!(trail["last"][0]["kind"], "post", "{trail}");
+    assert_ne!(trail["last"][0]["outcome"], "answered", "{trail}");
+    assert_eq!(simulator.finish().unwrap().len(), 1);
+}
+
+/// The Bills report transport of a client scoped to one operation draws on that operation's one
+/// wire-wait budget, not on a copy of what was left of it (#2119): once an ordinary send has used
+/// the budget up, none is left for a Bills post either.
+#[tokio::test]
+async fn a_bills_report_shares_the_operations_wire_budget() {
+    let wire =
+        crate::endpoint_wire::WireGateConfig::default().busy_at_send(0, Duration::from_secs(5));
+    let client = super::TallyClient::with_wire(
+        super::TallyConfig {
+            host: "127.0.0.1".into(),
+            port: 9000,
+        },
+        &wire,
+    )
+    .unwrap();
+    let budget = bridge_tally_transport::WireWaitBudget::new(Duration::from_millis(200));
+    let scoped = client.for_operation(budget.clone());
+    assert_eq!(
+        scoped.bills_report_wire_budget_remaining(),
+        Some(Duration::from_millis(200))
+    );
+    assert!(
+        scoped.status_probe().await.is_err(),
+        "the lock is held busy"
+    );
+    assert_eq!(budget.remaining(), Duration::ZERO);
+    assert_eq!(
+        scoped.bills_report_wire_budget_remaining(),
+        Some(Duration::ZERO)
+    );
+}

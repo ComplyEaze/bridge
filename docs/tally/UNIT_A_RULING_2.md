@@ -52,6 +52,32 @@ addressable window exceeds the per-request budget. This is not a tuning problem.
 **Do not raise the deadline in response.** A longer deadline walks into the 32 MiB cap and
 I4's invisible truncation — trading a loud, correct failure for a silent wrong answer.
 
+**Deviation, 29 October 2026 (owner-accepted, #2119).** The requests of Tally's native Bills
+Receivable and Bills Payable reports have a 60-second limit; every other request keeps 20
+seconds. The ruling's premise does not carry to them: on the synthetic book measured, one of
+these answers cost about 457 bytes and, over the six reads of one sitting on one machine, 1.2
+to 1.6 ms a bill (`lab/2119-bills-read-timing-answers`; partial) against about 20,650 bytes a
+voucher row here. If the time keeps within that rate (inferred), 60 seconds reaches about
+36,600 to 49,000 bills, so the 32 MiB cap binds first only where a bill costs above about 680
+to 920 bytes; and Bridge never parses a body over the cap (`ResponseTooLarge`) or shorter than its
+declared length (`ResponseTruncated`). A date split cannot bound them: Tally ignored
+`SVFROMDATE` in these reports when it was measured (six byte-identical answers,
+`lab/2119-bills-split-quarters-answers`; one sitting, partial). Only a `NativeBillsRequest`,
+which only the Bills renderer makes, reaches the transport with the longer limit. I4 is not
+closed for these reports: a truncation Tally declares whole is caught only when the pair's two
+answers differ, and one it repeats identically passes. Each
+report is read twice, and each Bills post holds the endpoint's wire lock for up to 60 seconds.
+
+Measured on that book at year end through this change (`lab/2119-bills-60s-row-answers`; one
+sitting, partial): through a stdio client with no limit of its own, the call answered in 76.9
+seconds with the raw read's totals, its two Receivable posts held 34.9 and 30.1 seconds. Through
+the servers the Claude desktop app serves to its Code tab on Windows, which gives a tool call 60
+seconds by default, the same call was cut at 60 seconds after its Receivable pair, and the host
+then replaced the server process. So a host with a 60-second limit for one tool call cannot reach
+this book at year end; a host with no such limit, or Claude Desktop's chat on macOS (a silent
+130-second call answered, a 250-second one cut at 240 seconds: protocol reference §11f,
+PARTIAL), can. Bridge cannot learn a host's limit (`docs/agent/mcp-host-call-timeouts.md`).
+
 ---
 
 ## Required work

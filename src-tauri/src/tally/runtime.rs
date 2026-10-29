@@ -799,10 +799,11 @@ tokio::task_local! {
     /// One user-level operation's wait for the endpoint wire lock (#697 item
     /// (a)): one MCP tool call, or a desktop command that scopes it (the ones
     /// in `commands.rs` that call `with_operation_wire_budget`), whose host
-    /// gives up after about 60 s. Every runtime operation run in this task
-    /// draws on the one budget the first of them creates, so the call waits at
-    /// most `WireRetryPolicy::total` in all, however many runtime operations
-    /// it makes. A task without it (a spawned snapshot run, a test, and the
+    /// may give up on a long call (`docs/agent/mcp-host-call-timeouts.md`).
+    /// Every runtime operation run in this task draws on the one budget the
+    /// first of them creates, so the call waits at most
+    /// `WireRetryPolicy::total` in all, however many runtime operations it
+    /// makes. A task without it (a spawned snapshot run, a test, and the
     /// desktop commands that do not scope it) gives each runtime operation a
     /// budget of its own: still bounded, never unbounded, but not one budget
     /// for the whole command.
@@ -2472,12 +2473,13 @@ impl TallySession {
         endpoint: EndpointKey,
         config: TallyConfig,
         policy: bridge_tally_transport::TransportPolicy,
+        bills_report_limit: std::time::Duration,
         wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             session_id: uuid::Uuid::new_v4().to_string(),
             endpoint,
-            client: TallyClient::with_transport_policy(config, policy, wire)?,
+            client: TallyClient::with_transport_policy(config, policy, bills_report_limit, wire)?,
             sequence: AtomicU64::new(0),
             active_requests: Mutex::new(HashMap::new()),
             health: Mutex::new(SessionHealth::default()),
@@ -2643,6 +2645,8 @@ pub struct TallyRuntime {
     terms: Option<Arc<crate::desktop_terms::DesktopTerms>>,
     #[cfg(test)]
     transport_policy: Option<bridge_tally_transport::TransportPolicy>,
+    #[cfg(test)]
+    bills_report_limit: Option<std::time::Duration>,
 }
 
 /// Opaque, owner-bound authority over one fresh reviewed probe.
@@ -2771,6 +2775,8 @@ impl TallyRuntime {
             terms: None,
             #[cfg(test)]
             transport_policy: None,
+            #[cfg(test)]
+            bills_report_limit: None,
         }
     }
 
@@ -2789,6 +2795,14 @@ impl TallyRuntime {
             transport_policy: Some(policy),
             ..Self::default()
         }
+    }
+
+    /// Test only: give the Bills report requests `limit` in place of their
+    /// production limit, so a test can cut one without waiting that long.
+    #[cfg(test)]
+    pub(crate) fn with_bills_report_limit(mut self, limit: std::time::Duration) -> Self {
+        self.bills_report_limit = Some(limit);
+        self
     }
 
     /// Share `wire`'s root (another runtime's, or a test's), or shorten its
@@ -2838,11 +2852,16 @@ impl TallyRuntime {
             }
         }
         #[cfg(test)]
-        let session = Arc::new(match self.transport_policy {
-            Some(policy) => {
-                TallySession::with_transport_policy(endpoint.clone(), config, policy, &self.wire)?
-            }
-            None => TallySession::new(endpoint.clone(), config, &self.wire)?,
+        let session = Arc::new(match (self.transport_policy, self.bills_report_limit) {
+            (None, None) => TallySession::new(endpoint.clone(), config, &self.wire)?,
+            (policy, bills_report_limit) => TallySession::with_transport_policy(
+                endpoint.clone(),
+                config,
+                policy.unwrap_or_default(),
+                bills_report_limit
+                    .unwrap_or(crate::tally::connection::BILLS_REPORT_REQUEST_TIMEOUT),
+                &self.wire,
+            )?,
         });
         #[cfg(not(test))]
         let session = Arc::new(TallySession::new(endpoint.clone(), config, &self.wire)?);
@@ -4396,7 +4415,7 @@ impl TallyRuntime {
                         |kind| render_native_bills_request(kind, company, &books_from, &as_of);
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
-                        .fetch_native_report_paired(receivable_request.clone())
+                        .fetch_native_bills_report_paired(&receivable_request)
                         .await
                         .map_err(mark_bills_report_deadline)?;
                     let (receivable_body, encoded_bytes, encoded_sha256) = match receivable {
@@ -4415,7 +4434,7 @@ impl TallyRuntime {
                     };
                     total_bytes += encoded_bytes;
                     read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                        &receivable_request,
+                        receivable_request.as_str(),
                         encoded_sha256,
                         encoded_bytes,
                     ));
@@ -4451,7 +4470,7 @@ impl TallyRuntime {
 
                     let payable_request = read(NativeBillsReportKind::Payable);
                     let payable = client
-                        .fetch_native_report_paired(payable_request.clone())
+                        .fetch_native_bills_report_paired(&payable_request)
                         .await
                         .map_err(mark_bills_report_deadline)?;
                     let (payable_body, encoded_bytes, encoded_sha256) = match payable {
@@ -4470,7 +4489,7 @@ impl TallyRuntime {
                     };
                     total_bytes += encoded_bytes;
                     read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                        &payable_request,
+                        payable_request.as_str(),
                         encoded_sha256,
                         encoded_bytes,
                     ));

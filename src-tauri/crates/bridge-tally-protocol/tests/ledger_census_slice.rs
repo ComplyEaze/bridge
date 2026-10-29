@@ -4,7 +4,8 @@
 //! in one place, so a refusal that does not fire fails a test that names it.
 
 use bridge_tally_protocol::{
-    decode_tally_xml_response_bytes_limited, parse_ledger_census_slice, ExpectedTallyTextEncoding,
+    decode_tally_xml_response_bytes_limited, parse_ledger_census_slice,
+    parse_stock_group_census_slice, parse_stock_item_census_slice, ExpectedTallyTextEncoding,
     StandardLedgerCatalogError,
 };
 
@@ -240,4 +241,39 @@ fn a_malformed_expected_company_guid_is_a_bounds_refusal() {
         parse_ledger_census_slice(&eight_rows(), "", 8),
         Err(StandardLedgerCatalogError::BoundsViolation)
     );
+}
+
+/// Each census reads only the rows of the collection it asked for: a ledger slice is no stock-item
+/// or stock-group slice, and a ledger slice whose rows are of another tag is refused.
+#[test]
+fn a_census_slice_holding_rows_of_another_collection_is_refused() {
+    for parse in [
+        parse_stock_item_census_slice,
+        parse_stock_group_census_slice,
+    ] {
+        assert_eq!(
+            parse(&eight_rows(), COMPANY_GUID, 8),
+            Err(StandardLedgerCatalogError::MalformedResponse)
+        );
+    }
+    let retagged = damaged(&eight_rows(), "<LEDGER NAME", "<STOCKITEM NAME", 8);
+    // A row closes on its own line; the `CMPINFO` block's `LEDGER` counter does not.
+    let retagged = damaged(&retagged, "\r\n    </LEDGER>", "\r\n    </STOCKITEM>", 8);
+    assert_eq!(
+        parse_ledger_census_slice(&retagged, COMPANY_GUID, 8),
+        Err(StandardLedgerCatalogError::MalformedResponse)
+    );
+    // The same rows under the stock-item tag are read by the stock-item parser, so the refusal
+    // above is the tag's alone. A live stock-item answer is pending its capture (#1233).
+    assert_eq!(
+        parse_stock_item_census_slice(&retagged, COMPANY_GUID, 8).map(|guids| guids.len()),
+        Ok(8)
+    );
+    // An empty slice has no row to refuse, whichever census asked for it.
+    for parse in [
+        parse_stock_item_census_slice,
+        parse_stock_group_census_slice,
+    ] {
+        assert_eq!(parse(&decode(EMPTY_SLICE), COMPANY_GUID, 8), Ok(Vec::new()));
+    }
 }

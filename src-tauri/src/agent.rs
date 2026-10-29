@@ -948,6 +948,9 @@ struct ReadSize {
     estimated_bytes: u64,
     limit_bytes: u64,
     limit_master_alter_id: u64,
+    /// For a `stock_summary` refused on its censuses' count (#1233): the items counted and the
+    /// most one read is admitted for. `None` for every other refusal, whose `size` is unchanged.
+    counted_items: Option<(u64, u64)>,
 }
 
 fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
@@ -980,6 +983,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         if let Some(crate::tally::runtime::StockSummaryReadError::TooLarge {
@@ -994,6 +998,23 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
+            });
+        }
+        if let Some(crate::tally::runtime::StockSummaryReadError::TooManyItems {
+            master_alter_id,
+            counted_items,
+            estimated_bytes,
+            limit_bytes,
+            limit_items,
+        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_items,
+                counted_items: Some((*counted_items, *limit_items)),
             });
         }
         if let Some(crate::tally::runtime::NegativeStockReadError::TooLarge {
@@ -1008,6 +1029,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         match cause
@@ -1023,6 +1045,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *mark_limit,
+                counted_items: None,
             }),
             _ => None,
         }
@@ -1170,8 +1193,10 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(stock.code());
         }
-        if let Some(crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)) =
-            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        if let Some(
+            crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)
+            | crate::tally::runtime::StockSummaryReadError::CensusRefused(reason),
+        ) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
         {
             return Some(reason);
         }
@@ -2726,6 +2751,10 @@ impl Server {
                             "limit_bytes": size.limit_bytes,
                             "limit_master_alter_id": size.limit_master_alter_id,
                         });
+                        if let Some((counted, limit)) = size.counted_items {
+                            error["size"]["counted_items"] = json!(counted);
+                            error["size"]["limit_items"] = json!(limit);
+                        }
                     }
                 }
                 // #629: the endpoint that was tried, so a wrong or reset port

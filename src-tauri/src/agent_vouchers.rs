@@ -599,6 +599,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                     estimated_bytes: marks.masters().saturating_mul(GROUP_LEDGER_LIST_BYTES_PER_LEDGER),
                     limit_bytes: GROUP_LEDGER_LIST_LIMIT_BYTES,
                     limit_master_alter_id: GROUP_LEDGER_LIST_MARK_LIMIT,
+                    counted_items: None,
                 }));
                 return Err(failure);
             }

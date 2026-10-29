@@ -1644,6 +1644,17 @@ impl TallyClient {
         Ok((response.into_text(), encoded_bytes, encoded_sha256))
     }
 
+    /// One AlterID census slice of a master collection other than ledgers (#1233), read once and
+    /// not paired, as the ledger census reads its slices: the census's own checks and the extent
+    /// read around it stand in for a second read. Returns the text, its encoded bytes and their
+    /// SHA-256.
+    pub(crate) async fn fetch_census_slice(
+        &self,
+        request_xml: String,
+    ) -> anyhow::Result<(String, usize, String)> {
+        self.post_xml_with_encoded_bytes(request_xml).await
+    }
+
     /// Discovers companies through Tally's documented `Company` collection
     /// (`ReadOnlyProfile::CompanyListV2`) rather than the legacy `CompanyListV1`
     /// custom TDL report. Unlike the legacy report -- which one Tally instance

@@ -688,4 +688,4 @@ Tally and TallyPrime are trade marks of Tally Solutions Pvt. Ltd. ComplyEaze
 Bridge is independent and is not affiliated with or endorsed by Tally
 Solutions; it uses these names only to describe compatibility.
 The historical `v0.1.0` release remains under the MIT license shipped with
-that tag; current development source is version `0.6.1` under Apache-2.0.
+that tag; current development source is version `0.7.0` under Apache-2.0.

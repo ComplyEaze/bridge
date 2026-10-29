@@ -4396,7 +4396,7 @@ impl TallyRuntime {
                         |kind| render_native_bills_request(kind, company, &books_from, &as_of);
                     let receivable_request = read(NativeBillsReportKind::Receivable);
                     let receivable = client
-                        .fetch_native_report_paired(receivable_request.clone())
+                        .fetch_native_report_paired(receivable_request.as_str().to_owned())
                         .await
                         .map_err(mark_bills_report_deadline)?;
                     let (receivable_body, encoded_bytes, encoded_sha256) = match receivable {
@@ -4415,7 +4415,7 @@ impl TallyRuntime {
                     };
                     total_bytes += encoded_bytes;
                     read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                        &receivable_request,
+                        receivable_request.as_str(),
                         encoded_sha256,
                         encoded_bytes,
                     ));
@@ -4451,7 +4451,7 @@ impl TallyRuntime {
 
                     let payable_request = read(NativeBillsReportKind::Payable);
                     let payable = client
-                        .fetch_native_report_paired(payable_request.clone())
+                        .fetch_native_report_paired(payable_request.as_str().to_owned())
                         .await
                         .map_err(mark_bills_report_deadline)?;
                     let (payable_body, encoded_bytes, encoded_sha256) = match payable {
@@ -4470,7 +4470,7 @@ impl TallyRuntime {
                     };
                     total_bytes += encoded_bytes;
                     read_evidence = read_evidence.clone().combine(RuntimeReadEvidence::paired(
-                        &payable_request,
+                        payable_request.as_str(),
                         encoded_sha256,
                         encoded_bytes,
                     ));

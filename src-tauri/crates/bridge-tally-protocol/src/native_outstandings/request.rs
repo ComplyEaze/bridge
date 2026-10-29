@@ -125,6 +125,19 @@ impl NativeBillsReportKind {
     }
 }
 
+/// A request for Tally's Bills Receivable or Bills Payable report, as
+/// [`render_native_bills_request`] renders it and only so (#2119). These two are
+/// the only requests given a longer per-request limit, so the type, not a
+/// caller's string, says that a request is one of them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NativeBillsRequest(String);
+
+impl NativeBillsRequest {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Renders the exact working request shape for the flat Bills
 /// Receivable/Payable `Data` report.
 pub fn render_native_bills_request(
@@ -132,14 +145,14 @@ pub fn render_native_bills_request(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-) -> String {
-    format!(
+) -> NativeBillsRequest {
+    NativeBillsRequest(format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
         id = kind.report_id(),
         company = xml_escape(company),
         from = from.as_str(),
         to = to.as_str(),
-    )
+    ))
 }
 
 /// Renders a request for the `List of Ledgers` collection, overridden to

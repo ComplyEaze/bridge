@@ -50,8 +50,8 @@ pub use request::{
     render_party_ledger_master_request_for_parents_with_mailing_details,
     render_party_ledger_master_request_with_gst_details,
     render_party_ledger_master_request_with_mailing_details, NativeBillsReportKind,
-    NativeLedgerExportPeriod, NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod,
-    NativeLedgerSnapshotPeriodError,
+    NativeBillsRequest, NativeLedgerExportPeriod, NativeLedgerExportPeriodError,
+    NativeLedgerSnapshotPeriod, NativeLedgerSnapshotPeriodError,
 };
 pub(crate) use wire::is_foreign_currency_balance;
 pub use wire::{

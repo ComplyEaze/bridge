@@ -11,7 +11,7 @@ fn renders_the_verified_working_bills_request_shape() {
         &to,
     );
     assert_eq!(
-        xml,
+        xml.as_str(),
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>Bills Receivable</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>Bridge Billwise Lab</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">20240401</SVFROMDATE><SVTODATE TYPE="Date">20260731</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#
     );
     let payable = render_native_bills_request(
@@ -20,7 +20,7 @@ fn renders_the_verified_working_bills_request_shape() {
         &from,
         &to,
     );
-    assert!(payable.contains("<ID>Bills Payable</ID>"));
+    assert!(payable.as_str().contains("<ID>Bills Payable</ID>"));
 }
 
 #[test]
@@ -119,8 +119,8 @@ fn escapes_company_names_in_both_requests() {
     let to = TallyDate::parse("20260731").unwrap();
     let xml =
         render_native_bills_request(NativeBillsReportKind::Receivable, "A & B <Co>", &from, &to);
-    assert!(xml.contains("A &amp; B &lt;Co&gt;"));
-    assert!(!xml.contains("A & B <Co>"));
+    assert!(xml.as_str().contains("A &amp; B &lt;Co&gt;"));
+    assert!(!xml.as_str().contains("A & B <Co>"));
 
     let snapshot_period = NativeLedgerSnapshotPeriod::new(
         DateBoundaryProfile::ModeAgnostic,

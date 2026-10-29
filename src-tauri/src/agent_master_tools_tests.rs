@@ -126,13 +126,14 @@ fn suspense_answer() -> String {
 }
 
 /// The ledgers the book holds once the create landed: the ones before it and
-/// the new one, with a GUID the pre-image did not hold.
+/// the new one, with a GUID the pre-image did not hold, at the `ALTERID` the
+/// first master change after the mark of 7 takes (protocol reference §9.4j).
 fn book_after() -> Vec<IndexedMaster> {
     let mut book = book();
     book.push(IndexedMaster {
         kind: MasterKind::Ledger,
         guid: NEW_GUID.into(),
-        alter_id: 12,
+        alter_id: 8,
         names: vec![LEDGER.into()],
     });
     book
@@ -957,6 +958,7 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
         "opening_balance",
         "counters",
         "target_mark_moved",
+        "target_mark_step_one",
         "other_marks_unmoved",
         "pre_image_unchanged",
     ] {
@@ -5175,10 +5177,12 @@ async fn an_answer_that_cannot_be_recorded_twice_is_judged_and_a_second_call_has
         "no verdict is written without its answer"
     );
     // A second call reads the book back, sends nothing and has no counters.
+    // The ledger was changed after the create (it is not the first master
+    // change after the intent), so without counters it stays open.
     let (later, creates) = later_call(
         &done,
-        reconcile_reads(8, 3, Some(suspense_answer())),
-        book_after(),
+        reconcile_reads(9, 3, Some(suspense_answer())),
+        book_with_new_ledger(9),
     )
     .await;
     let second = result(&later);
@@ -5387,10 +5391,12 @@ async fn a_later_call_whose_verdict_is_not_recorded_does_not_claim_counters_it_l
     assert_eq!(done.posts, 1, "one POST on the wire");
     let ((later, creates), unused) = faulting(
         vec!["verdict_lock_busy"],
+        // The ledger was changed after the create, so without counters it
+        // stays open.
         later_call(
             &done,
-            reconcile_reads(8, 3, Some(suspense_answer())),
-            book_after(),
+            reconcile_reads(9, 3, Some(suspense_answer())),
+            book_with_new_ledger(9),
         ),
     )
     .await;
@@ -5798,10 +5804,17 @@ async fn a_journal_that_cannot_be_read_after_the_answer_is_answered_from_what_ta
             expected.push("master_dispatch_response");
         }
         assert_eq!(record_types(done.directory.path()), expected);
+        // Without the answer on file, the ledger was changed after the create,
+        // so the later call stays open.
+        let (mark, book) = if recorded {
+            (8, book_after())
+        } else {
+            (9, book_with_new_ledger(9))
+        };
         let (later, creates) = later_call(
             &done,
-            reconcile_reads(8, 3, Some(suspense_answer())),
-            book_after(),
+            reconcile_reads(mark, 3, Some(suspense_answer())),
+            book,
         )
         .await;
         assert_eq!(creates, 0, "a later call sends nothing");

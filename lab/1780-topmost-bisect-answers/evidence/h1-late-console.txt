@@ -1,0 +1,20 @@
+H0 Tally window 13379766 (found by title)
+H0 Tally title clicked 2026-10-29T05:50:21.020Z
+H0 2026-10-29T05:50:21.829Z processes with the confirm-journal flag: 1
+H-late 2026-10-29T05:50:21.915Z: attached to the running child pid 16104 (started 05:48:26.118Z); the first runner had stopped at its own line-count error
+H-late trace started 2026-10-29T05:50:22.191Z pid 27964 in its own window: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-h1-late.txt -Seconds 100
+H-late Tally title clicked 2026-10-29T05:50:24.411Z
+H-late probe before the click start 2026-10-29T05:50:25.182Z end 2026-10-29T05:50:26.857Z : 1,1,0,16104,ComplyEaze Bridge - post this voucher? | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,14
+H3 2026-10-29T05:50:27.155Z box 20065310 rect 549,145,1003,741; text lines 23; confirm-input text lines 23
+H4 point logical (263,475) = screen tool (249,450); distance from the box 286 px
+H4 click into Tally 2026-10-29T05:50:27.312Z at H-T0+16.36 s
+H4 C+0 probe start 2026-10-29T05:50:27.332Z end 2026-10-29T05:50:28.827Z : 1,1,0,16104,ComplyEaze Bridge - post this voucher? | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,14
+H4 C+0 shot 2026-10-29T05:50:29.184Z
+H4 C+6 probe start 2026-10-29T05:50:33.326Z end 2026-10-29T05:50:34.345Z : 1,1,0,16104,ComplyEaze Bridge - post this voucher? | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,14
+H4 C+6 shot 2026-10-29T05:50:34.461Z
+H4 stderr lines at C+6: 1: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+H 2026-10-29T05:50:34.560Z box a window True; z box 1, Tally 4; child exited False
+H6 No clicked 2026-10-29T05:50:45.009Z, logical (850,709)
+H6 2026-10-29T05:50:45.830Z child exited True exit code 1; stdout 0 B
+H6 stderr whole: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true || box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+exit 0

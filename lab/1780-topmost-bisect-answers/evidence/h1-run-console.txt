@@ -1,0 +1,13 @@
+H0 Tally window 13379766 (found by title)
+H0 Tally title clicked 2026-10-29T05:48:21.474Z
+H0 2026-10-29T05:48:22.578Z processes with the confirm-journal flag: 0
+H1 trace started 2026-10-29T05:48:22.992Z pid 26836 in its own window: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-h1.txt -Seconds 100
+H1 Tally title clicked 2026-10-29T05:48:25.138Z
+H-T0 2026-10-29T05:48:26.156Z: child pid 16104: $p = Start-Process -FilePath '<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe' -ArgumentList '--confirm-journal' -NoNewWindow -PassThru -RedirectStandardInput '<lab folder>\requests\confirm-input.txt' -RedirectStandardOutput '<lab folder>\evidence\h1-stdout.txt' -RedirectStandardError '<lab folder>\evidence\h1-stderr.txt'; $null = $p.Handle ; Tally title clicked at once
+H-T0+8 probe start 2026-10-29T05:48:34.181Z end 2026-10-29T05:48:35.135Z : 1,1,1,16104,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+H-T0+13 probe start 2026-10-29T05:48:39.169Z end 2026-10-29T05:48:40.158Z : 1,1,1,16104,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+H-T0+13 shot 2026-10-29T05:48:40.397Z
+H3 stderr at H-T0+13: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+H3 2026-10-29T05:48:40.659Z box 20065310 rect 549,145,1003,741; text lines 24; confirm-input text lines 23
+H3 the box's line count differs: end nothing; STOP
+exit 42

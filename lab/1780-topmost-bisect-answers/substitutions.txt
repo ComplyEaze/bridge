@@ -1,0 +1,29 @@
+Pushed copies that differ from the files kept on the lab PC: lab-PC paths replaced by placeholders. Each changed file, with the original's bytes and sha256 and what was replaced.
+answers/003-c0-build.json: original 10676 B sha256 6a2aa95d92de88a29e47d5814dd5d25464a7471fcb2cf82406afa9bc9a4924df; 2 x -> <lab folder>
+evidence/b3-timeline.txt: original 828 B sha256 2b95f27a8a5f22e9f12480c354bdfbd61225f4bf77fb8b0bd333a8f20de77a0a; 3 x -> <lab folder>
+evidence/b5-processes.txt: original 688 B sha256 fb58ce7401b08bd4ee5d2b33e5f5f87155f5e16ccb2b7b6d03827105167b8e45; 2 x -> <another build folder>; 2 x -> <desktop client extensions>
+evidence/c-run-console.txt: original 3725 B sha256 4f2451824a1d7c1e37c56ee98a05f333c9a1e235466a8ebc88fb4bc55ee13f53; 2 x -> <build folder>; 2 x -> <lab folder>
+evidence/c-timeline.txt: original 3720 B sha256 37a2c677b201c2b1f5c57db63dc816ab32316925eaf97a9f123f23a6a712e7c2; 2 x -> <build folder>; 2 x -> <lab folder>
+evidence/h1-late-console.txt: original 1995 B sha256 2433db7f7f25057ab636318486668b24193f2a6bec40691767809265bb1ef3e3; 2 x -> <lab folder>
+evidence/h1-late-timeline.txt: original 1991 B sha256 32c3aecb2375b32bed0a84988f6305ea16fbd9567550e2977645e0e4e2341c0e; 2 x -> <lab folder>
+evidence/h1-run-console.txt: original 1609 B sha256 6413ce9e4f87ebc918d68a9cef3f4273b35202f06effb36506afe3748ed37400; 1 x -> <build folder>; 5 x -> <lab folder>
+evidence/h1-timeline.txt: original 1903 B sha256 2fbb5d82a9ce06d0f72104ea1b81925fab5b68cf17365944c66057554ef468c3; 1 x -> <build folder>; 5 x -> <lab folder>
+evidence/k1c-timeline.txt: original 2589 B sha256 63f779446b3b4fac1d41352654a916e34e6c4ef1841c6312cb5fbfd3ed118859; 4 x -> <lab folder>
+evidence/k1d-timeline.txt: original 2687 B sha256 332fdb66ee4046cb59d1b030404d6ac7302ace2cf3cce1c7d2c7ed4fcb3ebcb7; 4 x -> <lab folder>
+evidence/k1e-timeline.txt: original 2983 B sha256 337e5b4b0d8abf5a17d8a08225f7c35e92bb8f99be2d3c716b8b538968f2414c; 4 x -> <lab folder>
+evidence/k1f-timeline.txt: original 3083 B sha256 24865b9cbb0a72ab9128f2996a4945701668fb973f532b71a5ae05977f8a6563; 4 x -> <lab folder>
+evidence/trace-b3b.txt: original 2501 B sha256 ad7771c8dafc431869b7f17d0e3f5cadd55fcf8619cc8f8f191cbe261e962dc4; 1 x -> <lab folder>
+evidence/trace-c.txt: original 5804 B sha256 5f65b4d21e56247227b686b074cf9276fc3c721a6be34be8aba98bbccf32b8a6; 2 x -> <build folder>
+evidence/trace-h1-late.txt: original 2677 B sha256 e95acae98eeaa68594a9b68135857c6a0e88a23b98fa254c116ddba0d94d44d2; 2 x -> <build folder>
+evidence/trace-h1.txt: original 4707 B sha256 60314c7a6b56318ef7782db17e606dc2b8e6083079a9f16e0289f6f8495ec8ae; 2 x -> <build folder>
+evidence/trace-k1c.txt: original 3246 B sha256 954c0189995a6b66711680da5f39620197fd1567df860f662ba6a34f095baf78; 2 x -> <lab folder>
+evidence/trace-k1d.txt: original 3310 B sha256 65b9ef482a72ce41e849245b310cfe8d63e781fe970fc510911d30c5f3d18334; 2 x -> <lab folder>
+evidence/trace-k1e.txt: original 3855 B sha256 da788bd2aea414c9ca89b956f9022684ad939fd04fda219d241382a3468e1442; 2 x -> <lab folder>
+evidence/trace-k1f.txt: original 3955 B sha256 f3ceae56cf5498ecb6975d15ed36b552584ad609edb365e564dac40d9757ff3c; 2 x -> <lab folder>
+scripts/b3.ps1: original 3028 B sha256 29590edf7d64924bc6d799d7fe3261494d58d66c7f57fc76e034e9f09b6d8baf; 1 x -> <lab folder>
+scripts/k-run.ps1: original 9299 B sha256 531b4ffb2a9992872a9b1418bc66f1f8c116353e3d4d751bca929356a012abe4; 1 x -> <lab folder>
+scripts/h-run.ps1: original 10127 B sha256 cda004c90385d9626bd30cf545c5bde941da023021165467f58925d8f97df5bb; 1 x -> <build folder>; 1 x -> <lab folder>
+scripts/h-late.ps1: original 9816 B sha256 34471d71f2e25c44179d97a36d897a8ead1bf27081f4ecd012fa46b9cd798693; 1 x -> <build folder>; 1 x -> <lab folder>
+scripts/make-h-late.py: original 2162 B sha256 0ae1651c1d4e55cc03e76f4944bad12b3c2c8a5c8658400656012920a504623a; 2 x -> <lab folder>
+scripts/c-run.ps1: original 9845 B sha256 e27e9cb0c6cbb94ab589587766b3a45fbac7b20603a5188e4c49b0bfe7c1e2e7; 1 x -> <lab folder>
+scripts/control-forms.ps1: original 1706 B sha256 195857ad3805809e81ec93d5016473fb42b117ac8d4ece3e3e1dd26795d1c443; 1 x -> <lab folder>

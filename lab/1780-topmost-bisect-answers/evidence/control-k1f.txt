@@ -1,0 +1,1 @@
+﻿variant=f dpi_before_awareness=0 dpi_before_is_per_monitor_v2=False dpi_set=True thread_is_per_monitor_v2=True hook_installed=True front_started=True asked=2026-10-29T05:46:44.892Z answered=2026-10-29T05:47:05.326Z answer=7

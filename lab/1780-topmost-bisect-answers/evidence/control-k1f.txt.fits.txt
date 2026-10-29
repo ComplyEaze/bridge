@@ -1,0 +1,5 @@
+2026-10-29T05:46:44.975Z HCBT_ACTIVATE hwnd=0x19126e2
+2026-10-29T05:46:44.988Z box-fit: box=(698,444,1242,660) work=(0,0,1920,1030) fits=True
+2026-10-29T05:46:45.116Z front: raise done, already the foreground window
+2026-10-29T05:47:05.273Z HCBT_ACTIVATE hwnd=0x19126e2
+2026-10-29T05:47:05.288Z box-fit: box=(698,444,1242,660) work=(0,0,1920,1030) fits=True

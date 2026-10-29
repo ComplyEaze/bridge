@@ -1,0 +1,35 @@
+﻿START 2026-10-29T05:44:45.896Z title_part=Lab topmost control interval_ms=50 seconds=80
+FIRST 2026-10-29T05:44:54.171Z box_pid=25280
+PROC path=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=23128
+PROC command_line="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-box-product.ps1 -Variant c -DelaySeconds 5 -Out <lab folder>\evidence\control-k1c.txt 
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+T 2026-10-29T05:44:55.378Z fg_hwnd=0x19e1534 fg_pid=25280 box_pid=25280 windows=4
+W 2026-10-29T05:44:55.378Z hwnd=0x19e1534 class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=1364 owner=0 title=Lab topmost control
+W 2026-10-29T05:44:55.378Z hwnd=0x1652cfe class=ConsoleWindowClass visible=0 exstyle=0x000c0110 topmost=0 thread=26820 owner=0 title=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe
+W 2026-10-29T05:44:55.378Z hwnd=0x1fb1b6c class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=1364 owner=0x681b64 owner_class=IME owner_pid=25280 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T05:44:55.378Z hwnd=0x681b64 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=1364 owner=0x19e1534 owner_class=#32770 owner_pid=25280 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+H 2026-10-29T05:44:56.383Z unchanged
+H 2026-10-29T05:44:57.423Z unchanged
+H 2026-10-29T05:44:58.483Z unchanged
+H 2026-10-29T05:44:59.502Z unchanged
+H 2026-10-29T05:45:00.522Z unchanged
+T 2026-10-29T05:45:00.955Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=25280 windows=4
+W 2026-10-29T05:45:00.955Z hwnd=0x19e1534 class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=1364 owner=0 title=Lab topmost control
+W 2026-10-29T05:45:00.955Z hwnd=0x1652cfe class=ConsoleWindowClass visible=0 exstyle=0x000c0110 topmost=0 thread=26820 owner=0 title=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe
+W 2026-10-29T05:45:00.955Z hwnd=0x1fb1b6c class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=1364 owner=0x681b64 owner_class=IME owner_pid=25280 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T05:45:00.955Z hwnd=0x681b64 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=1364 owner=0x19e1534 owner_class=#32770 owner_pid=25280 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+H 2026-10-29T05:45:02.016Z unchanged
+H 2026-10-29T05:45:03.041Z unchanged
+H 2026-10-29T05:45:04.059Z unchanged
+H 2026-10-29T05:45:05.106Z unchanged
+H 2026-10-29T05:45:06.141Z unchanged
+H 2026-10-29T05:45:07.192Z unchanged
+H 2026-10-29T05:45:08.215Z unchanged
+H 2026-10-29T05:45:09.270Z unchanged
+T 2026-10-29T05:45:09.583Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=25280 windows=1
+W 2026-10-29T05:45:09.583Z hwnd=0x1652cfe class=ConsoleWindowClass visible=0 exstyle=0x000c0110 topmost=0 thread=26820 owner=0 title=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe
+T 2026-10-29T05:45:09.792Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=25280 windows=0
+H 2026-10-29T05:45:10.838Z unchanged
+H 2026-10-29T05:45:11.932Z unchanged
+GONE 2026-10-29T05:45:12.843Z
+END 2026-10-29T05:45:12.871Z

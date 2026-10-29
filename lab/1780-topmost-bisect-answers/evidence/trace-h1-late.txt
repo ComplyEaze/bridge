@@ -1,0 +1,35 @@
+﻿START 2026-10-29T05:50:24.352Z title_part=ComplyEaze Bridge interval_ms=50 seconds=100
+FIRST 2026-10-29T05:50:24.560Z box_pid=16104
+PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=5816
+PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal 
+PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+T 2026-10-29T05:50:26.701Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=16104 windows=3
+W 2026-10-29T05:50:26.701Z hwnd=0x1322c1e class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=20388 owner=0 title=ComplyEaze Bridge — post this voucher?
+W 2026-10-29T05:50:26.701Z hwnd=0x9b270a class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=20388 owner=0x1022700 owner_class=IME owner_pid=16104 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T05:50:26.701Z hwnd=0x1022700 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=20388 owner=0x1322c1e owner_class=#32770 owner_pid=16104 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+H 2026-10-29T05:50:27.723Z unchanged
+H 2026-10-29T05:50:28.772Z unchanged
+H 2026-10-29T05:50:29.812Z unchanged
+H 2026-10-29T05:50:30.864Z unchanged
+H 2026-10-29T05:50:31.927Z unchanged
+H 2026-10-29T05:50:32.969Z unchanged
+H 2026-10-29T05:50:33.980Z unchanged
+H 2026-10-29T05:50:35.017Z unchanged
+H 2026-10-29T05:50:36.031Z unchanged
+H 2026-10-29T05:50:37.077Z unchanged
+H 2026-10-29T05:50:38.172Z unchanged
+H 2026-10-29T05:50:39.206Z unchanged
+H 2026-10-29T05:50:40.211Z unchanged
+H 2026-10-29T05:50:41.230Z unchanged
+H 2026-10-29T05:50:42.284Z unchanged
+H 2026-10-29T05:50:43.321Z unchanged
+H 2026-10-29T05:50:44.395Z unchanged
+T 2026-10-29T05:50:45.080Z fg_hwnd=0x0 fg_pid=0 box_pid=16104 windows=3
+W 2026-10-29T05:50:45.080Z hwnd=0x1322c1e class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=20388 owner=0 title=ComplyEaze Bridge — post this voucher?
+W 2026-10-29T05:50:45.080Z hwnd=0x9b270a class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=20388 owner=0x1022700 owner_class=IME owner_pid=16104 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T05:50:45.080Z hwnd=0x1022700 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=20388 owner=0x1322c1e owner_class=#32770 owner_pid=16104 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+T 2026-10-29T05:50:45.745Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=16104 windows=0
+H 2026-10-29T05:50:46.780Z unchanged
+H 2026-10-29T05:50:47.836Z unchanged
+GONE 2026-10-29T05:50:48.805Z
+END 2026-10-29T05:50:48.813Z

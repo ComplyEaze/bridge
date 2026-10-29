@@ -1,0 +1,26 @@
+C1 Tally window 13379766 (found by title)
+C1 2026-10-29T05:52:34.998Z visible windows titled with 'ComplyEaze Bridge' before the trace: 0
+C1 trace started 2026-10-29T05:52:35.333Z pid 23436 in its own window: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-c.txt -Seconds 150
+C1 Tally title clicked 2026-10-29T05:52:37.413Z at logical (330,14)
+T0 2026-10-29T05:52:38.515Z queued 004-c1-post_import.json
+T0+8 probe start 2026-10-29T05:52:46.504Z end 2026-10-29T05:52:48.097Z : 3,0,1,20648,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+T0+13 probe start 2026-10-29T05:52:51.489Z end 2026-10-29T05:52:52.852Z : 3,0,1,20648,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+T0+13 shot 2026-10-29T05:52:53.105Z
+C1 trace: FIRST 2026-10-29T05:52:45.408Z box_pid=20648 || PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=12212 || PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+C2 2026-10-29T05:52:53.237Z box 25238518 rect 549,145,1003,741; text saved
+C3 point logical (263,475) = screen tool (249,450); distance from the box 286 px
+C3 click 2026-10-29T05:52:54.512Z at T0+16.03 s
+C+0 probe start 2026-10-29T05:52:54.538Z end 2026-10-29T05:52:55.759Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,20648,ComplyEaze Bridge - post this voucher? | visible_titled_windows,14
+C+0 shot 2026-10-29T05:52:55.894Z
+C+6 probe start 2026-10-29T05:53:00.515Z end 2026-10-29T05:53:01.640Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,20648,ComplyEaze Bridge - post this voucher? | visible_titled_windows,14
+C+6 shot 2026-10-29T05:53:01.780Z
+C3 z box 4, Tally 3
+C4 P-T 2026-10-29T05:53:19.276Z answer saved (004-c1-post_import.json, round trip 40.17 s; T0+40.46 s): {"company":{"state":"not_company_scoped"},"evidence":{"bytes":473251,"duration_ms":40018,"read_at":"2026-10-29T05:53:18.742Z","request_sha256":"7fac8716dacec7e65736f59f50ebe3f40f0047e21a21affa08505594c1498806","response_sha256":"105a7716cdec26b877f5e1f9c9e6ca9d3b1c9e9567a59a80af024a7ea0cd6ff9","state":"complete"},"read_at":"2026-10-29T05:52:38.723Z","result":{"approval":{"dialog_remaining_s":86,"retry_after_s":15,"state":"pending"},"attempt_recorded":false,"batch_id":"bridge-faf5d197-c8c9-4a12-8cc7-9c13808c2e5e","dispatch":{"resent":false,"state":"not_dispatched"},"previous_approval":null},"truncated":false}
+P-T+30 probe start 2026-10-29T05:53:48.949Z end 2026-10-29T05:53:49.912Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,20648,ComplyEaze Bridge - post this voucher? | visible_titled_windows,14; box a window True; z box 4, Tally 3
+P-T+50 probe start 2026-10-29T05:54:08.964Z end 2026-10-29T05:54:10.055Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,20648,ComplyEaze Bridge - post this voucher? | visible_titled_windows,14; box a window True; z box 4, Tally 3
+P-T+70 probe start 2026-10-29T05:54:28.995Z end 2026-10-29T05:54:29.953Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,20648,ComplyEaze Bridge - post this voucher? | visible_titled_windows,14; box a window True; z box 4, Tally 3
+P-T+70 shot 2026-10-29T05:54:30.091Z
+C4 taskbar button clicked ONCE 2026-10-29T05:54:30.157Z at logical (756,844) = screen tool (717,800)
+C4 probe start 2026-10-29T05:54:30.262Z end 2026-10-29T05:54:31.728Z : 3,0,0,13992,TallyPrime:9001 | visible_titled_windows,13; box a window False
+C4 the box is gone after the taskbar click: nothing more clicked
+exit 33

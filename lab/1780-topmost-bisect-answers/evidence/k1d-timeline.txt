@@ -1,0 +1,19 @@
+﻿K1d Tally window 13379766 (found by title)
+K1d trace started 2026-10-29T05:45:19.885Z pid 9748 in its own window: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-k1d.txt -Seconds 80
+K1d Tally title clicked 2026-10-29T05:45:22.050Z at logical (330,14)
+K1d-T0 2026-10-29T05:45:23.287Z: control box started hidden (pid 30624): Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-box-product.ps1 -Variant d -DelaySeconds 5 -Out <lab folder>\evidence\control-k1d.txt'; Tally title clicked at once
+K1d-T0+8 sheet probe 2026-10-29T05:45:31.316Z to 2026-10-29T05:45:33.063Z : 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14 ;; K probe 2026-10-29T05:45:33.097Z to 2026-10-29T05:45:34.682Z : 1,1,1,30624,Lab topmost control | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+K1d-T0+11 sheet probe 2026-10-29T05:45:34.771Z to 2026-10-29T05:45:36.183Z : 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14 ;; K probe 2026-10-29T05:45:36.201Z to 2026-10-29T05:45:38.131Z : 1,1,1,30624,Lab topmost control | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,14
+K1d-T0+11 shot 2026-10-29T05:45:38.438Z
+K1d box hwnd 19538074 rect 557,355,995,528; children: Button '&Yes'; Button '&No'; Button 'Cancel'; Static ''; Static 'Lab topmost control, variant d. Nothing is sent anywhere. Click No.'
+K1d point logical (263,475) = screen tool (249,450); distance from the box 294 px
+K1d click into Tally 2026-10-29T05:45:38.781Z at T0+15.5 s
+K1d C+0 sheet probe 2026-10-29T05:45:38.951Z to 2026-10-29T05:45:40.347Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,14 ;; K probe 2026-10-29T05:45:40.366Z to 2026-10-29T05:45:41.896Z : 1,1,0,30624,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,14
+K1d C+0 shot 2026-10-29T05:45:42.132Z
+K1d C+6 sheet probe 2026-10-29T05:45:44.816Z to 2026-10-29T05:45:45.778Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,14 ;; K probe 2026-10-29T05:45:45.797Z to 2026-10-29T05:45:46.884Z : 1,1,0,30624,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,14
+K1d C+6 shot 2026-10-29T05:45:47.090Z
+K1d z positions now: box 1, Tally 4
+K1d No clicked 2026-10-29T05:45:47.308Z at T0+24.03 s, logical (842,495)
+K1d box still open: False
+K1d control file: variant=d dpi_before_awareness=0 dpi_before_is_per_monitor_v2=False dpi_set=True thread_is_per_monitor_v2=True asked=2026-10-29T05:45:30.044Z answered=2026-10-29T05:45:47.331Z answer=7
+K1d .fits.txt: (no .fits.txt)

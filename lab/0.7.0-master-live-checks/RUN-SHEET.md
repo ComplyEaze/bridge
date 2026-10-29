@@ -10,7 +10,7 @@ Each part checks one change against the answer the code gives, with the code cit
 | A, B | #2089 (`247bfed3`): `trial_balance` flags a ledger whose closing is not its opening plus its debit and credit totals | `src-tauri/src/agent_trial_balance.rs`, `src-tauri/src/agent_headline.rs` |
 | A, B | #2128 (`21fe94b4`): `profit_and_loss` and `balance_sheet` refusing on such a row name its ledger and gap, give a next step, and carry the reads' evidence | `src-tauri/src/agent.rs`, `src-tauri/src/reports/statements.rs`, `src-tauri/src/tally/runtime_trial_balance.rs` |
 | C | #2129 (`089f9471`): `egress_log` returns the newest receipts that fit the response cap and counts the rest | `src-tauri/src/agent_responses.rs`, `src-tauri/src/agent.rs` |
-| D | #2136, open when this sheet was written: the next step of an `outstandings` read refused past the request deadline | `src-tauri/src/agent.rs` `outstandings_unanswered_remediation` |
+| D | #2136 (open when this sheet was written; conditional): the next step of an `outstandings` read refused past the request deadline | `src-tauri/src/agent.rs` `outstandings_unanswered_remediation` |
 
 Each EXPECT below is read from that code; none is a figure from the book. A result that differs is a record, not a pass. It decides nothing about any other tool, book or date.
 
@@ -43,11 +43,20 @@ Differences from LAB-COMMON, the stricter rule holding everywhere else:
 Licensed mode only; Education mode = STOP.
 
 ## Build
-`bridge_mcp.exe` of **master at or after `<sha>`, CI package**: the run, the artifact id, and the `.mcpb` and `bridge_mcp.exe` sha256 values are filled in by the run coordinator before the sitting. The build must contain #2089, #2128 and #2129, which master holds from `218eaba1` on. Whether it contains #2136 is recorded, not required (part D reads it either way).
+**The master Bridge CI run at or after the merge of #2129** (it must contain #2089, #2128 and #2129), its `unsigned-bundle-smoke-windows-latest` artifact, downloaded by the lab on the owner's word of 29 Oct 2026. #2136 was still open when this sheet was written. If it has merged by the sitting, take the master run at or after its merge instead, and the #2136 check below becomes required.
+
+Record the run id, its head commit (full SHA), the artifact id and its expiry, and the sha256 and bytes of the `.mcpb` and of `bridge_mcp.exe` inside it (`bin/x86_64-pc-windows-msvc/bridge_mcp.exe`). Then, in a checkout of the repository with master fetched, check that each pull request's merge commit is in that head, recording each command and its exit status:
+
+| pull request | merge commit | `git merge-base --is-ancestor <commit> <head>` |
+|---|---|---|
+| #2089 | `247bfed37f206e4134798a928c04816e151dc9c5` | exit 0 required; otherwise STOP |
+| #2128 | `21fe94b4c8d975e22a4b3e897e7fdb1bf659dd1f` | exit 0 required; otherwise STOP |
+| #2129 | `089f9471b4d621421be79cbb7810e20376a07514` | exit 0 required; otherwise STOP |
+| #2136 | its merge commit, read from the pull request if it has merged | exit 0 or 1 recorded; conditional (part D) |
 
 Record the exe's sha256 before the first call and after the last: another sha256 = STOP. Record `initialize` and `tools/list` whole. From `tools/list`, EXPECT:
 - `trial_balance`, `profit_and_loss`, `balance_sheet`, `egress_log` and `outstandings` all listed (an absent one = STOP);
-- `egress_log`'s `limit` description containing ``omitted_for_size` counts those cut for the reply`, the text #2129 added (`src-tauri/src/agent_catalog.rs:675`). Its absence means the build predates #2129: record it and skip part C.
+- `egress_log`'s `limit` description containing ``omitted_for_size` counts those cut for the reply`, the text #2129 added (`src-tauri/src/agent_catalog.rs:675`). Its absence, with #2129's ancestor check at exit 0, = STOP: the build is not what the check says.
 
 Two launches, each over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, `BRIDGE_TERMS_ACCEPTED=true` (allowed for the lab on 25 Oct 2026), `BRIDGE_AGENT_REDACTION` unset, `BRIDGE_AGENT_MAX_BYTES` and `BRIDGE_AGENT_MAX_ROWS` unset (so 200,000 bytes and 500 rows, `src-tauri/src/agent.rs:526-527`), and writes off:
 - **Launch 1** (parts A, B, D): `BRIDGE_AGENT_DATA_DIR` a new empty folder, `C:\bridge-lab\070\data`.
@@ -114,8 +123,8 @@ D2. **`outstandings`**: `company_guid` from D1, `party` `DN Party 001`, `as_of` 
 - `code` `native_outstandings_read_failed`;
 - `cause` `request_deadline_exceeded`;
 - `remediation` present.
-  - If the build contains #2136: the text of that change, beginning `Tally took longer to answer one request of its Bills Receivable or Payable report at this date than ComplyEaze Bridge waits (20 seconds)`.
-  - If not: master's text at `agent.rs:2182-2187`, beginning the same way but without `(20 seconds)`.
+  - If #2136's ancestor check exited 0: the text of that change, beginning `Tally took longer to answer one request of its Bills Receivable or Payable report at this date than ComplyEaze Bridge waits (20 seconds)`.
+  - If it exited 1, or #2136 has not merged: master's text at `agent.rs:2182-2187`, beginning the same way but without `(20 seconds)`.
 
   Record which. A different answer, such as one with figures, is recorded whole as a result. It is not repeated.
 

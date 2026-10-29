@@ -1156,8 +1156,9 @@ mod bills_report {
     /// when the pair's two answers differ.
     pub(crate) const BILLS_REPORT_REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 
+    /// Behind an `Arc`, so a client, held in many futures, grows by one pointer.
     #[derive(Clone)]
-    pub(super) struct BillsReportTransport(TallyHttpTransport);
+    pub(super) struct BillsReportTransport(Arc<TallyHttpTransport>);
 
     impl BillsReportTransport {
         /// Built beside the client's ordinary transport, on the same wire gate, retry bound
@@ -1195,19 +1196,19 @@ mod bills_report {
                 request_timeout: limit,
                 ..TransportPolicy::default()
             };
-            Ok(Self(
+            Ok(Self(Arc::new(
                 TallyHttpTransport::with_policy(config, policy)?
                     .with_wire_gate(gate, retry)
                     .with_send_observer(observer),
-            ))
+            )))
         }
 
         pub(super) fn for_operation(&self, budget: WireWaitBudget) -> Self {
-            Self(self.0.for_operation(budget))
+            Self(Arc::new(self.0.for_operation(budget)))
         }
 
         pub(super) fn with_send_admission(&self, admission: Arc<dyn SendAdmission>) -> Self {
-            Self(self.0.with_send_admission(admission))
+            Self(Arc::new(self.0.with_send_admission(admission)))
         }
 
         pub(super) async fn post(

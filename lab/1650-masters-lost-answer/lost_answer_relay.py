@@ -70,9 +70,11 @@ UNREAD_MARKERS = re.compile(r"\bACTION\s*=|<!|<\?xml.*<\?", re.IGNORECASE | re.D
 
 
 def is_read(text):
-    """Whether the request is an Export (a read): one TALLYREQUEST that is Export, and no marker of a write."""
+    """Whether the request is an Export (a read): one TALLYREQUEST that is Export, in any case, and no marker of a write.
+
+    The build sends EXPORT in capitals for some reads (seen on 29 Oct: List of Ledgers), others send Export."""
     found = TALLYREQUEST.findall(text)
-    return (len(found) == 1 and found[0].strip() == "Export" and not IMPORT.search(text)
+    return (len(found) == 1 and found[0].strip().lower() == "export" and not IMPORT.search(text)
             and not UNREAD_MARKERS.search(text) and text.lower().count("tallyrequest") == 2)
 
 
@@ -377,10 +379,12 @@ def self_test():
     read_text = ('<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE>'
                  '<ID>Bridge Agent Company High Water</ID></HEADER></ENVELOPE>')
     read = utf16(read_text)
+    read_upper = utf16(read_text.replace("<TALLYREQUEST>Export<", "<TALLYREQUEST>EXPORT<"))
     # 1. Unrelated requests are forwarded unchanged: the same bytes reach Tally, with the client's own Content-Type
     # lines and no other header but Host (and Content-Length on a POST), and the answer is the one Tally gives them.
     cases = [("GET", "/status", None, None), ("GET", "/status", None, "text/xml"),
-             ("POST", "/", read, "text/xml; charset=utf-16"), ("POST", "/", read, "text/xml"), ("POST", "/", read, None)]
+             ("POST", "/", read, "text/xml; charset=utf-16"), ("POST", "/", read, "text/xml"), ("POST", "/", read, None),
+             ("POST", "/", read_upper, "text/xml")]
     for index, (method, path, body, content_type) in enumerate(cases):
         sent = [] if content_type is None else [content_type]
         status, answer = send(method, path, body, content_type)

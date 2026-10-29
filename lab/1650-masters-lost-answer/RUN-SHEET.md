@@ -123,3 +123,5 @@ Row L, as a table of observations (each is a record, not a pass): which build ra
 - Row B: BUSY's answer is listed by size, sha256 and row count and kept on the PC, as row 19 does.
 - THE COMPANY's GUID is new for row L: before the evidence is pushed it goes into the merge gate's synthetic-UUID registry, or the evidence shows it as `<company guid>`.
 - Evidence on a new branch, `lab/1650-masters-lost-answer-answers`, with `SHA256.txt`; send the SHA to the run coordinator before pushing, and push only after the pre-push scan and the coordinator's yes.
+
+**Deviation, 29 Oct 2026.** The first sitting of row L halted at step 3: the relay refused the build's List of Ledgers read as `not_an_export` because it sends `EXPORT` in capitals, and the relay compared `Export` case-sensitively. The relay now compares case-insensitively, and its self-test forwards an upper-case read. Nothing was prepared or posted in that sitting; rerun row L from step 1 in a new recording folder.

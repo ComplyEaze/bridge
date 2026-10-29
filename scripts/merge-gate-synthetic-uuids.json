@@ -208,6 +208,14 @@
     {
       "uuid": "ddf3a557-704c-4f61-ae8d-46a3380062a1",
       "note": "company identifier of the synthetic lab company BRIDGE COST KEY LAB, created in the lab on 27 October 2026 with invented masters and two vouchers keyed by hand, as Tally returned it in read-only captures of that day (lab branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536); the voucher identifiers in the same captures are this value with a suffix"
+    },
+    {
+      "uuid": "3e616020-fd04-4260-8ab3-9c4034569df9",
+      "note": "bank-allocation identifier Tally gave the bank entry of the Payment of 15 May 2025 in the synthetic lab company BRIDGE COST KEY LAB, as it returned it in the read-only voucher capture of 27 October 2026 (lab branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536); it is the NAME of that entry's BANKALLOCATIONS.LIST"
+    },
+    {
+      "uuid": "5193df0a-eeb7-49fb-88f9-03aae16e2eeb",
+      "note": "bank-allocation identifier Tally gave the bank entry of the Journal of 16 May 2025 in the synthetic lab company BRIDGE COST KEY LAB, as it returned it in the read-only voucher capture of 27 October 2026 (lab branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536); it is the NAME of that entry's BANKALLOCATIONS.LIST"
     }
   ]
 }

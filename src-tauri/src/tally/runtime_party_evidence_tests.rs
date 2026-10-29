@@ -27,6 +27,10 @@ const EXTENT: &[u8] = include_bytes!(
 const BILLS: &[u8] = include_bytes!(
     "../../crates/bridge-tally-protocol/tests/fixtures/native/bills_receivable_aarav.xml"
 );
+/// The captured nine-ledger catalogue of the test company.
+const CATALOGUE: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+);
 
 fn captured_identity(extent: &str) -> VerifiedCompanyIdentity {
     let companies = bridge_tally_protocol::parse_companies_from_collection(extent).unwrap();
@@ -286,4 +290,72 @@ async fn the_export_sends_the_standard_request_for_a_book_past_the_mailing_bound
     // Inside the bound the export names the mailing details.
     assert_eq!(sent(219, Export).await, sent(219, WithMailingDetails).await);
     assert_ne!(sent(219, Export).await, sent(219, Standard).await);
+}
+
+/// bridge#2074: a book whose mark is past the standard bound has its ledgers counted by the
+/// catalogue before any ledger request, and the export then decides by that count. Nine ledgers
+/// at a mark of 8,000 are sent the mailing request, as a mailing read sends it; 3,309 ledgers,
+/// inside the standard bound but past the mailing one, are sent the standard request, as before.
+/// Compared by the hashes of the catalogue and the first ledger request, through the client.
+#[tokio::test]
+async fn the_export_decides_by_the_ledgers_a_catalogue_counted_for_a_marked_book() {
+    use crate::tally::connection::ComplianceRead::{
+        Standard, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Export,
+    };
+    let units = CATALOGUE.strip_prefix(&[0xff, 0xfe]).unwrap_or(CATALOGUE);
+    let captured = String::from_utf16(
+        &units
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let catalogue = |extra: u32| -> &'static [u8] {
+        let body = crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
+            &captured,
+            (0..extra).map(|index| {
+                (
+                    format!("Counted Ledger {index:05}"),
+                    format!("{:08x}", 0x3000_0000 + index),
+                )
+            }),
+        );
+        Box::leak(body.into_bytes().into_boxed_slice())
+    };
+    let few = catalogue(0);
+    let many = catalogue(3_300);
+    let sent = |served: Vec<&'static [u8]>, read| async move {
+        let (_, evidence) =
+            refusal_with(&extent_with_master_mark(8_000), read, &served, false).await;
+        evidence.request_sha256
+    };
+    // Nine ledgers: the mailing request, though the mark alone gave the standard one.
+    assert_eq!(
+        sent(vec![few, BILLS], Export).await,
+        sent(vec![few, BILLS], WithMailingDetails).await
+    );
+    assert_ne!(
+        sent(vec![few, BILLS], Export).await,
+        sent(vec![few, BILLS], Standard).await
+    );
+    // 3,309 ledgers: the standard request, byte for byte. The control: a mailing read of them
+    // sends no ledger request at all, since its parts could not hold their one parent group.
+    assert_eq!(
+        sent(vec![many, BILLS], Export).await,
+        sent(vec![many, BILLS], Standard).await
+    );
+    let (refused, _) = refusal_with(
+        &extent_with_master_mark(8_000),
+        WithMailingDetails,
+        &[many],
+        false,
+    )
+    .await;
+    assert!(
+        refused.chain().any(|cause| matches!(
+            cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
+            Some(PartyLedgerMasterSourceValidationError::ParentPartition { .. })
+        )),
+        "{refused:#}"
+    );
 }

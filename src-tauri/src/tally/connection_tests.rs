@@ -1886,6 +1886,55 @@ fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
     }
 }
 
+/// Once a book's ledgers were counted to size a whole read, the export decides by the count
+/// and the alterations beyond it: the counted ledgers at the mailing estimate, and one further
+/// mailing entry for every alteration past them, must fit the budget. A book of few ledgers
+/// and many alterations is then sent the mailing request; one whose alterations could hold more
+/// entries than the budget, or with more ledgers than the bound, keeps the standard request.
+/// Such a read is still admitted whole. No other kind of read is changed (bridge#2074).
+#[test]
+fn the_export_takes_the_mailing_details_where_the_counted_ledgers_fit_their_bound() {
+    use super::ComplianceRead::{
+        Standard, WithGstDetails, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Ask,
+    };
+    let budget = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED;
+    let per_ledger = super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED;
+    let per_entry = super::MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED;
+    let bound = super::compliance_master_ledgers_per_read(WithMailingDetails);
+    assert_eq!(bound, 3_200);
+    // With no alteration past the ledgers, the count's bound is the mark's.
+    assert_eq!(Ask.resolved_for_count(bound, bound), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_count(bound + 1, bound + 1), Standard);
+    // The issue's book: about 300 ledgers at a mark near 8,000.
+    assert_eq!(Ask.resolved_for_count(300, 8_000), WithMailingDetails);
+    // The largest mark nine ledgers are given the details for, exactly.
+    let nine = 9 + (budget - 9 * per_ledger) / per_entry;
+    assert_eq!(Ask.resolved_for_count(9, nine), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_count(9, nine + 1), Standard);
+    // 3,000 ledgers in a book near the catalogue's limit could hold more entries than fit.
+    assert_eq!(Ask.resolved_for_count(3_000, 22_857), Standard);
+    // A count is taken only for a mark past the standard bound; a read the mailing request is
+    // given is admitted whole, as the standard read was.
+    let mark = super::compliance_master_ledgers_per_read(Standard) + 1;
+    for counted in [1, 300] {
+        assert_eq!(Ask.resolved_for_count(counted, mark), WithMailingDetails);
+        assert_eq!(
+            super::admit_compliance_master_read(mark, Some(counted), WithMailingDetails).ok(),
+            Some(super::ComplianceAdmission::Admitted),
+            "count {counted}"
+        );
+        assert_eq!(
+            super::admit_compliance_master_read(mark, Some(counted), Standard).ok(),
+            Some(super::ComplianceAdmission::Admitted),
+            "count {counted}"
+        );
+    }
+    for other in [Standard, WithMailingDetails, WithGstDetails] {
+        assert_eq!(other.resolved_for_count(1, 8_000), other);
+        assert_eq!(other.resolved_for_count(bound + 1, 8_000), other);
+    }
+}
+
 /// A book read in parts is split by the read's own ledger bound; every other
 /// limit is the shared one.
 #[test]

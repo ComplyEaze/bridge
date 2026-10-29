@@ -1937,7 +1937,9 @@ fn verify_observed_company_tuple_from_companies(
 
 /// What the party/ledger master export asks Tally for: it shows each party's dated
 /// mailing details, so its request names them where the whole read fits the mailing
-/// bound and is the standard request otherwise, so a book that exported before is never
+/// bound, by the mark or by the ledgers counted to size it and the alterations beyond them
+/// (bridge#2074), and is the
+/// standard request otherwise, so a book that exported before is never
 /// refused for the mailing details (bridge#1490); the workbook says when they were not
 /// read. A grouping-decision save uses none of them and sends the standard request.
 const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =

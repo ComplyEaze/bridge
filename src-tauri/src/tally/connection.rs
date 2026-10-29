@@ -374,6 +374,13 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// before the second entry was measured.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 5_000;
 
+/// Bytes one dated mailing entry beyond a ledger's first is estimated to add to
+/// a mailing read's response (bridge#2074). UNVERIFIED: one second entry on one
+/// party grew its row by 944 bytes (TallyPrime 7.2, 2026-10-29, the figure above);
+/// 950 is that one measurement rounded up, not a bound. A longer address costs
+/// more.
+const MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED: u64 = 950;
+
 /// Bytes one ledger is estimated to add to the compliance master response when
 /// the request also names each ledger's `GSTDETAILS.LIST`
 /// ([`ComplianceRead::WithGstDetails`]). UNVERIFIED. The one capture (14
@@ -405,7 +412,9 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_00
 /// change mark puts the whole read inside the mailing bound, the standard request
 /// otherwise, so a book the standard request read before is never refused for the
 /// larger per-ledger estimate. [`Self::resolved_for_mark`] makes that choice before
-/// any ledger request is sent; no request is rendered for the unresolved kind.
+/// any ledger request is sent, and [`Self::resolved_for_count`] makes it again when
+/// the ledgers were counted to size a whole read (bridge#2074); no request is
+/// rendered for the unresolved kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
@@ -424,6 +433,36 @@ impl ComplianceRead {
         match self {
             Self::WithMailingDetailsWhereWholeReadFits => {
                 if compliance_estimate_unverified(master_mark, Self::WithMailingDetails).fits {
+                    Self::WithMailingDetails
+                } else {
+                    Self::Standard
+                }
+            }
+            other => other,
+        }
+    }
+
+    /// The kind of read a book is sent once its ledgers were counted to size a
+    /// whole read (bridge#2074): the workbook's mailing details where the counted
+    /// ledgers, each at the mailing estimate, and one further dated mailing entry
+    /// for every master alteration beyond them fit the budget; the standard
+    /// request otherwise. The count bounds the ledgers but not their entries: each
+    /// entry beyond a ledger's first came from an alteration, which the mark
+    /// counts, so the mark still bounds them. UNVERIFIED, as both figures are. A
+    /// count that fits is inside the standard bound too, so the read stays whole.
+    /// Any other kind is unchanged.
+    pub(crate) fn resolved_for_count(self, counted: u64, master_mark: u64) -> Self {
+        match self {
+            Self::WithMailingDetailsWhereWholeReadFits => {
+                let ledgers = counted.saturating_mul(
+                    COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED,
+                );
+                let entries = master_mark
+                    .saturating_sub(counted)
+                    .saturating_mul(MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED);
+                if ledgers.saturating_add(entries)
+                    <= COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED
+                {
                     Self::WithMailingDetails
                 } else {
                     Self::Standard
@@ -1786,6 +1825,8 @@ impl TallyClient {
                 .get();
             // The workbook's mailing details are given up where the mark puts the
             // whole read past the mailing bound, so nothing it read before is refused.
+            // A count taken below may resolve the kind asked for again.
+            let asked = read;
             let read = read.resolved_for_mark(master_mark);
             // Sized before any ledger request is sent (#637): by the mark when
             // it fits, otherwise by the count of a balance-free catalogue read
@@ -1914,6 +1955,13 @@ impl TallyClient {
                     expected_ledgers = Some(counted);
                 }
             }
+            // A count taken to size a whole read also says whether the workbook's
+            // mailing details fit it (bridge#2074). A read in parts keeps the kind
+            // the mark gave, so its parts are planned as before.
+            let read = match expected_ledgers {
+                Some(counted) => asked.resolved_for_count(counted, master_mark),
+                None => read,
+            };
             let group_request = render_native_group_snapshot_request(identity.display_name());
             let part_requests = match &partition {
                 None => vec![(

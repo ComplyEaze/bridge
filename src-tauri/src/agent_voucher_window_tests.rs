@@ -6373,7 +6373,14 @@ fn the_vouchers_schema_lists_the_groupings_and_the_search_criteria() {
         }
         validate_tool_arguments("vouchers", &args)
     };
-    for grouping in ["ledger", "month", "voucher_type", "group", "primary_group"] {
+    for grouping in [
+        "ledger",
+        "month",
+        "voucher_type",
+        "group",
+        "primary_group",
+        "cost_centre",
+    ] {
         assert_eq!(call(json!({"summarise_by": grouping})), Ok(()));
     }
     assert!(call(json!({"summarise_by": "groups"})).is_err());
@@ -6402,6 +6409,103 @@ async fn a_narration_search_is_refused_where_narrations_are_withheld() {
     let response = one.call(json!({"narration_contains": "WR2-N3"})).await;
     assert_eq!(refusal_of(&response)["code"], "search_narration_redacted");
     assert_eq!(one.requests(), 4);
+}
+
+/// #1231: a cost-centre summary of a window with no allocation answers with no buckets, the
+/// categories' totals empty and every entry unallocated, and its basis says that this does not
+/// mean the Cost Centres setting is off. Only this grouping carries those two fields.
+#[tokio::test]
+async fn a_cost_centre_summary_of_a_window_with_no_allocation_says_so_in_its_fields() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one.call(json!({"summarise_by": "cost_centre"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["summarised_by"], "cost_centre");
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["buckets"], json!([]));
+    assert_eq!(result["category_totals"], json!([]));
+    assert_eq!(result["entries_unallocated"]["entries"], 6);
+    assert_eq!(result["vouchers_summarised"], 3);
+    let basis = result["basis"].as_str().unwrap();
+    assert!(basis.contains("not that the company's Cost Centres setting is off"));
+    assert!(basis.contains("memorandum"));
+    let ledger = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let ledger = ledger.call(json!({"summarise_by": "ledger"})).await;
+    let ledger = result_of(&ledger);
+    assert!(ledger.get("category_totals").is_none(), "{ledger}");
+    assert!(ledger.get("entries_unallocated").is_none(), "{ledger}");
+}
+
+/// The keyed Journal capture of #1231 (BRIDGE COST KEY LAB, TallyPrime 7.2): one expense entry
+/// allocated in full under two categories, and a bank entry with none. Moved onto this file's company
+/// and window by replacing its company GUID and its date, so a derived variant of a live answer.
+fn keyed_journal() -> String {
+    captured_utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml"
+    ))
+    .replace("ddf3a557-704c-4f61-ae8d-46a3380062a1", GUID)
+    .replace("20250516", "20260816")
+}
+
+/// #1231: under `mask_parties` a cost-centre summary with populated allocations names no centre, no
+/// category and no ledger anywhere in the response, `category_totals` included, while its figures and
+/// order are the same as unmasked.
+/// Mutant run and killed: a `category_totals` name built without the party-name marker. Mutant run and
+/// NOT killed (by design, the layer is redundant): removing the explicit redaction of `category_totals`
+/// in `render_page_body`, under the whole-response pass in `redact_tool_response`, as for the buckets of
+/// `a_ledger_summary_masks_every_bucket_label_under_mask_parties`.
+#[tokio::test]
+async fn a_cost_centre_summary_masks_every_centre_category_and_ledger_under_mask_parties() {
+    let plain = OneServer::spawn(counted_vouchers_plans(keyed_journal(), keyed_journal()));
+    let plain = plain.call(json!({"summarise_by": "cost_centre"})).await;
+    let masked = OneServer::spawn_with(
+        counted_vouchers_plans(keyed_journal(), keyed_journal()),
+        Redaction::MaskParties,
+    );
+    let masked = masked.call(json!({"summarise_by": "cost_centre"})).await;
+    let (shown, hidden) = (result_of(&plain), result_of(&masked));
+    assert_eq!(shown["state"], "complete", "{shown}");
+    assert_eq!(bucket_names(&plain), ["CK South", "CK Retail"]);
+    let categories = |result: &Value| {
+        result["category_totals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["category"].clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        categories(shown),
+        [json!("Primary Cost Category"), json!("CK Region")]
+    );
+    let leaked = masked.to_string();
+    for real in [
+        "CK South",
+        "CK Retail",
+        "Primary Cost Category",
+        "CK Region",
+        "CK Expense",
+    ] {
+        assert!(
+            !leaked.contains(real),
+            "{real} appears in a masked response: {masked}"
+        );
+    }
+    for (real, shown) in categories(shown).iter().zip(categories(hidden)) {
+        assert_ne!(*real, shown, "a category total's name was not masked");
+    }
+    // Masking changes the names only.
+    for field in ["debit", "credit", "net", "entries"] {
+        for at in 0..2 {
+            assert_eq!(
+                hidden["category_totals"][at][field], shown["category_totals"][at][field],
+                "{field}"
+            );
+            assert_eq!(hidden["buckets"][at][field], shown["buckets"][at][field]);
+        }
+    }
+    assert_eq!(hidden["totals"], shown["totals"]);
+    assert_eq!(hidden["entries_unallocated"], shown["entries_unallocated"]);
 }
 
 #[tokio::test]

@@ -1,0 +1,22 @@
+1c1
+< bytes 3404 root ENVELOPE
+---
+> bytes 3402 root ENVELOPE
+6c6
+<     LEDGER '13'
+---
+>     LEDGER '0'
+14c14
+<     CURRENCY '4'
+---
+>     CURRENCY '0'
+34c34
+<     TAXUNIT '4'
+---
+>     TAXUNIT '0'
+37,38c37,38
+<     VOUCHERNUMBERSERIES '4'
+<     VOUCHER '8'
+---
+>     VOUCHERNUMBERSERIES '0'
+>     VOUCHER '0'

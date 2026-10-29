@@ -362,6 +362,46 @@
       "size": 1740
     },
     {
+      "blob": "4a2ff3afb2a26e46ad4110ba9c06412c1e9b8095",
+      "capture_id": "voucher_cost_centre_allocations_keyed_payment_request.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation at 23bca8b913f7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_payment_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "55ab4f02676e509232c833d2c8946509b50cc537cc5e06bf835b961aae29afdb",
+      "size": 1746
+    },
+    {
+      "blob": "128a96637345026c5e1cc3e833c4b1a3f45106e9",
+      "capture_id": "voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "87924f5a91974bbd333c351a97b989175f1f9bfcea4d59a331b5516b47ed81fb",
+      "size": 42960
+    },
+    {
+      "blob": "3756bc031a4fb34eb5aebbe29ad8e8254a825d6a",
+      "capture_id": "voucher_cost_centre_allocations_keyed_journal_request.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation at 23bca8b913f7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_journal_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "0daaa90c969c286a5b4e47531eb0a1305848f5299ab09f79703c8d2b2a7a4357",
+      "size": 1746
+    },
+    {
+      "blob": "227a7bb0d614d3a0869768dd7067a65611376986",
+      "capture_id": "voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "e6406e157365b11930940e8362b6e99ac181905d4b69df844519b175221ed29a",
+      "size": 43256
+    },
+    {
       "blob": "3473a00f48dd6229502aa83f52c92af58e2e394d",
       "capture_id": "masters-lab-ledger-index.request.utf16le.xml",
       "company": "BRIDGE MASTERS LAB",

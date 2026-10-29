@@ -2872,8 +2872,8 @@ fn settle_question() -> String {
 #[cfg(windows)]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
@@ -2887,9 +2887,15 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the review's box: topmost, taking the foreground, with
-                // No as the default button (#1589, #1780).
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });

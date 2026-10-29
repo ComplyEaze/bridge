@@ -1297,8 +1297,8 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
 const SETTLE_ACK_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
@@ -1312,9 +1312,15 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the review's box: topmost, taking the foreground, with
-                // No as the default button (#1589, #1780).
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2827,4 +2833,65 @@ fn only_the_approvals_holder_makes_the_totals_form() {
     ] {
         assert!(!totals_form_problems(&broken_post, &broken_approval, &broken_others).is_empty());
     }
+}
+
+/// Whether each `MessageBoxW` call in `source` names `MB_SYSTEMMODAL` among its
+/// arguments, in source order (#1780): the text from the opening parenthesis
+/// to the one that closes it.
+fn message_box_calls_are_system_modal(source: &str) -> Vec<bool> {
+    let mut calls = Vec::new();
+    let mut rest = source;
+    while let Some(at) = rest.find("MessageBoxW(") {
+        let after = &rest[at + "MessageBoxW(".len()..];
+        let mut depth = 1_usize;
+        let mut end = after.len();
+        for (index, character) in after.char_indices() {
+            match character {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = index;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        calls.push(after[..end].contains("MB_SYSTEMMODAL"));
+        rest = &after[end..];
+    }
+    calls
+}
+
+/// A Windows box opened without `MB_SYSTEMMODAL` is drawn behind Tally when the
+/// last input went to Tally seconds before it opened (#1780, #2107). Every
+/// `MessageBoxW` call of `approved_import.rs` must carry it, so a box added or
+/// changed later fails here rather than in review. The five boxes are the
+/// post's, the review's, the stop release's, the ledger creation's and the
+/// settlement's.
+#[test]
+fn every_windows_message_box_is_system_modal() {
+    let calls = message_box_calls_are_system_modal(&read("src-tauri/src/tally/approved_import.rs"));
+    assert!(
+        calls.len() >= 5,
+        "fewer MessageBoxW calls than the five known boxes: {calls:?}"
+    );
+    assert!(
+        calls.iter().all(|system_modal| *system_modal),
+        "a MessageBoxW call lacks MB_SYSTEMMODAL: {calls:?}"
+    );
+    // The check must see a missing flag.
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(null, text, title, MB_YESNOCANCEL | MB_TOPMOST)"
+        ),
+        [false]
+    );
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(null, text, title, MB_YESNOCANCEL | MB_SYSTEMMODAL) MessageBoxW(a, (b), c)"
+        ),
+        [true, false]
+    );
 }

@@ -24,30 +24,41 @@ Order: R1, R2, R3, R4, R5, R7, then R6 whenever the owner is at the PC (it may c
 
 The cut build is the Windows bundle `unsigned-bundle-smoke-windows-latest` of the Bridge CI run on master at RC COMMIT, the commit that holds the last change merged for 0.7.0; a master CI bundle may be downloaded by the lab (the owner's word of 29 Oct 2026). The lab downloads it into the new empty folder `C:\bridge-lab\rc070\build\`, checks the zip's sha256 against the artifact's digest, the `.mcpb` against `archive_sha256` and `bridge_mcp.exe` against `binary_sha256` in its `mcpb-smoke.json`, extracts the WHOLE `.mcpb` there (so the exe is `C:\bridge-lab\rc070\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe`, with `pdfium.dll` beside it), and sends the three hashes to the run coordinator. Every row runs this one exe, copied where a row says so: hash it before each row's first call and after its last; another hash = STOP.
 
+**Candidate A** (without #2158). If #2158 goes into 0.7.0, a candidate B is cut after its merge and this block is pointed at it by a new commit; nothing of candidate A carries over.
+
 ```
-RC COMMIT:   <to fill>
-CI RUN:      <to fill>    ARTIFACT: <to fill>    ZIP DIGEST: <to fill>
-MCPB SHA256: <to fill>
-EXE SHA256:  <to fill>
-VERSION:     <to fill>    (as the exe's `initialize` reports it)
+RC COMMIT:   026ba163dfcbf75d515a24d0dbbf14c5245534ec   (master, the merge of #2183)
+CI RUN:      40943637178 (Bridge CI, merge_group; master's push run 40946443186 reused its Windows bundle and built none)
+ARTIFACT:    12928034390 unsigned-bundle-smoke-windows-latest, 57,283,310 bytes, expires 5 Nov 2026
+ZIP DIGEST:  sha256:cc2ab2a4f40dec7ad2627f3987c8843c88022e45926f2be0e64bdfa3d7f26360
+MCPB SHA256: <the lab fills from its download: archive_sha256 of the artifact's mcpb-smoke.json>
+EXE SHA256:  <the lab fills from its download: binary_sha256 of the same file>
+VERSION:     <the lab fills from initialize>; EXPECT 0.6.1: the version change to 0.7.0 merges after this sitting, so the cut build still carries 0.6.1's version
 ```
 
 **In the build** (the run coordinator writes `in` or `not in` on each line, by `git merge-base --is-ancestor <merge> <RC COMMIT>`; an item merged after this sheet was written is named by its merge commit):
 
 ```
-#1650 ledger create (5fa399809):                     <to fill>
-#2166 the master-mark step of a ledger create (#2165): <to fill>
-#1967 post_import text (0bb49bdfe):                  <to fill>
-#1995 held_elsewhere step (2e3ce9af1):               <to fill>
-#1896 another change during a post (7f7f50e58):      <to fill>
-#2047 STATUS 0 floor (565ffff52):                    <to fill>
-#2105 dates in the boxes (b089e4963):                <to fill>
-#2116 dates in the boxes, follow-up (917ec73d2):     <to fill>
-#2107 boxes system-modal (621233407):                <to fill>
-#2171 ledger box shown as the post's box (1677b0b26): <to fill>
-#2149 cost-centre summary (134f58b6a):               <to fill>
-#2150 settle a batch created none, with its settle box system-modal: <to fill>
-#2158 Bills report 60 s:                             <to fill>
+#1650 ledger create (5fa399809):                          in
+#2166 the master-mark step of a ledger create (0ac16d380): in
+#1967 post_import text (0bb49bdfe):                       in
+#1995 held_elsewhere step (2e3ce9af1):                    in
+#1896 another change during a post (7f7f50e58):           in
+#2047 STATUS 0 floor (565ffff52):                         in
+#2105 dates in the boxes (b089e4963):                     in
+#2116 dates in the boxes, follow-up (917ec73d2):          in
+#2107 boxes system-modal (621233407):                     in
+#2171 ledger box shown as the post's box (1677b0b26):     in
+#2149 cost-centre summary (134f58b6a):                    in
+#2150 settle a batch created none, settle box system-modal (d018e653f): in
+#2183 the settle follow-up: seam test, pins, Import-menu warning (026ba163d): in
+#2159 CSV statement shell (6d021b1f2):                    in
+#2168 census generic over its collection (2862c210e):     in
+#2167 change-list corrections (e9836b7e4):                in
+#2163 desktop Trial Balance follow-ups (2104b0e71):       in
+#2157 sub_method note wording (7ff84385a):                in
+#2127 closing-stock limit wording (792d207ad):            in
+#2158 Bills report 60 s:                                  not in
 ```
 
 A row whose condition reads `not in` is recorded "not run: not in the build"; what that means for the tag is under "What the tag waits on".

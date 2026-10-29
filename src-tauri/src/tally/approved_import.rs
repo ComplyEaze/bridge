@@ -2739,7 +2739,7 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the post's box (`show_review`): topmost, held by
+                // As for the post's box (`show_review`): topmost with
                 // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
                 // with No as the default button (#1589, #1780).
                 MB_YESNOCANCEL
@@ -2780,7 +2780,7 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the review's box: topmost, held by MB_SYSTEMMODAL, taking
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
                 // the foreground when Windows lets it, with No as the default
                 // button (#1589, #1780).
                 MB_YESNOCANCEL
@@ -2923,7 +2923,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            // As for the post's box (`show_review`): topmost, held by
+            // As for the post's box (`show_review`): topmost with
             // MB_SYSTEMMODAL, with No as the default button (#1589, #1780).
             // This box is not shown through `box_fit`, so it is not measured
             // against the screen.

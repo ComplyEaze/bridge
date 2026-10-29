@@ -1003,7 +1003,7 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the post's box (`show_review`): topmost, held by
+                // As for the post's box (`show_review`): topmost with
                 // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
                 // with No as the default button (#1589, #1780).
                 MB_YESNOCANCEL
@@ -1059,7 +1059,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            // As for the post's box (`show_review`): topmost, held by
+            // As for the post's box (`show_review`): topmost with
             // MB_SYSTEMMODAL, with No as the default button (#1589, #1780).
             // This box is not shown through `box_fit`, so it is not measured
             // against the screen.
@@ -1215,7 +1215,7 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the review's box: topmost, held by MB_SYSTEMMODAL, taking
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
                 // the foreground when Windows lets it, with No as the default
                 // button (#1589, #1780).
                 MB_YESNOCANCEL
@@ -2042,8 +2042,8 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen("answer == IDYES", "answer != IDNO", 1),
         source.replacen(
-            "MB_YESNOCANCEL | MB_DEFBUTTON2",
-            "MB_YESNOCANCEL | MB_DEFBUTTON1",
+            REVIEW_ACK_DIALOG_WINDOWS,
+            &REVIEW_ACK_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
             1,
         ),
         // The parent shows the preview without the answer text, or shows the
@@ -2151,11 +2151,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen("\"Create ledger\"", "\"Cancel\"", 1),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
-            &MASTERS_DIALOG_WINDOWS.replacen(
-                "MB_YESNOCANCEL | MB_DEFBUTTON2",
-                "MB_YESNOCANCEL | MB_DEFBUTTON1",
-                1,
-            ),
+            &MASTERS_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
             1,
         ),
         source.replacen(

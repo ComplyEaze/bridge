@@ -1,0 +1,11 @@
+#899-P v2 Part D notes (UTC). Sheet lab/899-census-window-ladder at 5cf923fe3f7ca7d20ebbeb922f85c7eb8e20bf76 (v2): SHA256.txt 7 of 7 equal (sha256 and bytes); gen_census.py --check printed its expected line. Working folder new and empty before (v1's folder not touched).
+2026-10-29T18:40:21Z Step 0 with no company loaded: capture; one tally.exe owns 9001; /status 200. Release and licence from the title band: TallyPrime 7.2 Silver (the About screen was not opened).
+2026-10-29T18:40Z Step 1: BRIDGE CORPUS DENSE loaded alone by Down 13 from the demo row (the highlight read before Enter). Gateway captured: Current Period 1-Apr-25 to 31-Mar-26, current date 31-Mar-2026, last entry 31-Mar-26. company.txt and dates.txt written. Windows: W1 20260331 (the last-entry day), W2 20260301 to 20260331, W3 20250401 to 20260331 (as v1).
+2026-10-29T18:41:02Z Step 2: M0: V0 29900, M0 328; V0 above 2097152 no; at most 8192 no.
+Step 3: first span = the product's last span (--last): (24576, 29900], width 5324 (not below 1024, so --newest was not used).
+2026-10-29T18:41:04Z W1: 82 rows, 202614 B, 0.141 s. 18:41:07Z W2: 2542 rows, 6190254 B, 1.810 s. 18:41:13Z W3: 5324 rows, 12960794 B, 13.223 s.
+2026-10-29T18:41:31Z S2: WIDEST = W3 (FY); second span (16384, 24576], full, before the first: 8192 rows, 19925970 B, 14.776 s.
+2026-10-29T18:41:52Z R1 (W1's file, sha256 checked): 82 rows, 0.135 s, byte-equal to W1.
+2026-10-29T18:41:54Z M1: V1 29900, M1 328: equal to V0/M0.
+2026-10-29T18:42Z C10: shut from the Company menu; Select Company, none loaded; 18:42:35Z one tally.exe owns 9001; /status 200. No XML after the shut.
+Every send: a capture of Tally's window after it and GET /status 200 (0.05 to 0.06 s). The captures after W3 and S2 were looked at: the Gateway, no dialog.

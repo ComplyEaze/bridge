@@ -1970,6 +1970,26 @@
       "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
       "sha256": "8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3",
       "size": 46
+    },
+    {
+      "blob": "6f6a449957d8589fd629e253f58178d165f948e8",
+      "capture_id": "native/trial_balance_nonint_stock_ledger.utf16le.xml",
+      "company": "BRIDGE NONINT LAB",
+      "lab_ref": "branch lab/692-nonint-lab-answers at cbdc638d9537",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "90bf8a9a2039e7d78ca94c18d2a63c7e86542bdab6bfd439d13f2f62b7edf24b",
+      "size": 12314
+    },
+    {
+      "blob": "00d9eddaeeade20f8a27416b148ab15d94b21e7c",
+      "capture_id": "native/trial_balance_integrated_stock_ledger.utf16le.xml",
+      "company": "BRIDGE INTEGRATED CTRL LAB",
+      "lab_ref": "branch lab/2068-integrated-write-control-answers at c539688fd75e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5e13eee2bd16fe31bc7047ffe40942ff6b86583798a0aad7759a5a19df9f723f",
+      "size": 12314
     }
   ]
 }

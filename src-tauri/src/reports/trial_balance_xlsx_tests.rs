@@ -241,3 +241,61 @@ fn a_single_currency_export_has_one_sheet_and_its_opening_difference() {
     let workbook = sheet_text(&bytes, "xl/workbook.xml");
     assert!(!workbook.contains("Excluded ledgers"), "{workbook}");
 }
+
+/// A captured book with a keyed Closing Stock ledger (#2068), held in and taken from the export
+/// store as the desktop does.
+fn stock_ledger_workbooks() -> Vec<Vec<u8>> {
+    crate::reports::trial_balance::tests::stock_ledger_captures()
+        .into_iter()
+        .map(|(report, company)| {
+            let mut read = captured_read();
+            read.company_guid = company.into();
+            read.currency.decimal_places = 2;
+            read.totals = crate::reports::trial_balance::observed_totals(&report).unwrap();
+            read.report = report;
+            let store = crate::reports::trial_balance_store::TrialBalanceExportStore::default();
+            let id = store.insert(read).unwrap();
+            render_trial_balance_xlsx(&store.get(&id).unwrap()).unwrap()
+        })
+        .collect()
+}
+
+#[test]
+fn a_keyed_closing_stock_ledger_is_marked_in_the_workbook_with_its_gap() {
+    for bytes in stock_ledger_workbooks() {
+        let text = workbook_text(&bytes);
+        assert!(text.contains("Ledgers that do not add up"), "{text}");
+        assert!(text.contains(
+            "1 ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals"
+        ));
+        assert!(
+            text.contains(">movements_differ_by (source signed)<"),
+            "the column header"
+        );
+        // The gap is written on the Closing Stock row only, as a number in Tally's sign; the
+        // column's other cell is its header, a shared string.
+        let xml = worksheet_xml(&bytes);
+        let is_text = |cell: &str| {
+            let start = xml.find(&format!("<c r=\"{cell}\"")).unwrap();
+            xml[start..start + xml[start..].find('>').unwrap()].contains("t=\"s\"")
+        };
+        let gaps: Vec<_> = worksheet_numeric_cells(&bytes)
+            .into_iter()
+            .filter(|(cell, _)| cell.starts_with('H') && !is_text(cell))
+            .collect();
+        assert_eq!(gaps.len(), 1, "{gaps:?}");
+        assert_eq!(gaps[0].1, "400");
+    }
+}
+
+#[test]
+fn a_workbook_whose_rows_add_up_has_no_gap_line_or_column() {
+    let bytes = render_trial_balance_xlsx(&captured_read()).unwrap();
+    let text = workbook_text(&bytes);
+    assert!(!text.contains("movements_differ_by"));
+    assert!(!text.contains("Ledgers that do not add up"));
+    assert!(
+        !worksheet_xml(&bytes).contains(" r=\"H"),
+        "no eighth column"
+    );
+}

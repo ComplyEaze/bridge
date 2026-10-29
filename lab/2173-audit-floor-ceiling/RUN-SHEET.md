@@ -73,13 +73,14 @@ This item records, through ComplyEaze Bridge's own tool calls:
 - **`SHA256.txt`** has three columns (sha256, bytes, path) and does not list itself. `shasum -c` cannot read it: compare each line with Get-FileHash and the file's size.
 
 ## The builds (Phase B)
-- **BUILD-A (step B0):** candidate A, the release-candidate bundle of master `026ba163d`, CI artifact `12928034390`. The release-candidate sitting downloads it, so no second download is needed.
+- **BUILD-A (step B0):** candidate A, the release-candidate bundle of master `026ba163d`, CI artifact `12928034390`. The release-candidate sitting downloads it after the owner's OK, so no second download is needed.
   - Use its `bridge_mcp.exe`. Record its path, bytes and sha256 (Get-FileHash) before the first call and after the last; a change between them = STOP.
   - If the release-candidate sitting recorded a hash for the same file, the two must be equal, else STOP.
-- **BUILD-B (steps B1 to B3):** the bundle of a run of `ci.yml` on `fix/2173-audit-floor-ceiling`, PR #2191, at `9f264724d1f856bfb6f55041ce15c5ba201b5fd6` or a later head the run coordinator names.
-  - A draft pull request runs no bundle job, so the run is one started by hand on the branch. The run coordinator names the run, the artifact, its zip digest and the head before step B1.
-  - Check the zip's sha256 against that digest, and hash the exe as for BUILD-A.
-  - Steps B1 to B3 wait for that word.
+- **BUILD-B (steps B1 to B3):** the Windows bundle of PR #2191 at head `d01550869a4d3a6274ade2aa92b183ea039dd6ea` (branch `fix/2173-audit-floor-ceiling`).
+  - A draft pull request runs no bundle job, so this comes from workflow run `40969427288` of `ci.yml`, started by hand on the branch.
+  - The artifact is `unsigned-bundle-smoke-windows-latest`, id `12940610401`, 57,279,587 bytes, zip digest `sha256:ed9306cc1f56992b05063dffc42f04cfd2ac36b39e918ecea1ee9ec7cb491f9a`. It expires 5 Nov 2026 23:03 UTC.
+  - It is downloaded only after the owner's OK in the lab chat. Check the downloaded zip's sha256 against that digest; another = STOP. Then hash the exe as for BUILD-A.
+  - A later head of #2191 replaces this build only on the run coordinator's word, with its own run, artifact and digest.
 
 ## The environment (one ComplyEaze Bridge session per step; record each value; nothing else set)
 - `BRIDGE_TERMS_ACCEPTED=true` (the owner allowed the lab to set it on 25 Oct 2026);

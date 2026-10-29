@@ -2047,16 +2047,30 @@ mod whole_day {
     const LAB: &str = "BRIDGE TRANSFER LAB";
     const LAB_GUID: &str = "d6e4c24f-8c7a-4797-93ec-e44bdff60bc9";
 
-    macro_rules! lab {
-        ($($name:expr),+) => {
-            include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/",
-                $($name),+
-            ))
-            .as_slice()
-        };
-    }
-
+    // The committed captures, one literal path each.
+    const M_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m.request.utf16le.xml");
+    const M1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml");
+    const M2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml");
+    const D03_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.request.utf16le.xml");
+    const D03_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml");
+    const D03_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml");
+    const D03_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.request.utf16le.xml");
+    const D03_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml");
+    const D04_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.request.utf16le.xml");
+    const D04_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml");
+    const D04_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml");
+    const D04_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.request.utf16le.xml");
+    const D04_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml");
+    const D05_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.request.utf16le.xml");
+    const D05_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml");
+    const D05_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml");
+    const D05_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.request.utf16le.xml");
+    const D05_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml");
+    const D06_C1_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.request.utf16le.xml");
+    const D06_C1: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml");
+    const D06_C2: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml");
+    const D06_V_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.request.utf16le.xml");
+    const D06_V: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml");
     type Exchange = (&'static [u8], &'static [u8]);
     /// An exchange whose answer may be a scripted refusal (`None`).
     type Scripted = (&'static [u8], Option<&'static [u8]>);
@@ -2126,28 +2140,28 @@ mod whole_day {
 
     /// The reads one day needs, in the order the code sends them: the marks, the
     /// day's census, the day's vouchers.
-    macro_rules! lab_day {
-        ($day:literal) => {
-            vec![
-                (lab!("m.request.utf16le.xml"), lab!("m1.utf16le.xml")),
-                (
-                    lab!($day, "-c1.request.utf16le.xml"),
-                    lab!($day, "-c1.utf16le.xml"),
-                ),
-                (
-                    lab!($day, "-v.request.utf16le.xml"),
-                    lab!($day, "-v.utf16le.xml"),
-                ),
-            ]
-        };
+    fn day_d03() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D03_C1_REQ, D03_C1), (D03_V_REQ, D03_V)]
+    }
+
+    fn day_d04() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D04_C1_REQ, D04_C1), (D04_V_REQ, D04_V)]
+    }
+
+    fn day_d05() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D05_C1_REQ, D05_C1), (D05_V_REQ, D05_V)]
+    }
+
+    fn day_d06() -> Vec<Exchange> {
+        vec![(M_REQ, M1), (D06_C1_REQ, D06_C1), (D06_V_REQ, D06_V)]
     }
 
     fn lab_days() -> [(&'static str, Vec<Exchange>); 4] {
         [
-            ("20260403", lab_day!("d03")),
-            ("20260404", lab_day!("d04")),
-            ("20260405", lab_day!("d05")),
-            ("20260406", lab_day!("d06")),
+            ("20260403", day_d03()),
+            ("20260404", day_d04()),
+            ("20260405", day_d05()),
+            ("20260406", day_d06()),
         ]
     }
 
@@ -2206,14 +2220,14 @@ mod whole_day {
 
     #[test]
     fn each_days_two_censuses_and_both_marks_reads_are_byte_identical() {
-        assert_eq!(lab!("d03-c1.utf16le.xml"), lab!("d03-c2.utf16le.xml"));
-        assert_eq!(lab!("d04-c1.utf16le.xml"), lab!("d04-c2.utf16le.xml"));
-        assert_eq!(lab!("d05-c1.utf16le.xml"), lab!("d05-c2.utf16le.xml"));
-        assert_eq!(lab!("d06-c1.utf16le.xml"), lab!("d06-c2.utf16le.xml"));
-        assert_eq!(lab!("m1.utf16le.xml"), lab!("m2.utf16le.xml"));
+        assert_eq!(D03_C1, D03_C2);
+        assert_eq!(D04_C1, D04_C2);
+        assert_eq!(D05_C1, D05_C2);
+        assert_eq!(D06_C1, D06_C2);
+        assert_eq!(M1, M2);
         // the days are not one answer repeated
-        assert_ne!(lab!("d03-c1.utf16le.xml"), lab!("d04-c1.utf16le.xml"));
-        assert_ne!(lab!("d04-c1.utf16le.xml"), lab!("d05-c1.utf16le.xml"));
+        assert_ne!(D03_C1, D04_C1);
+        assert_ne!(D04_C1, D05_C1);
     }
 
     #[tokio::test]
@@ -2223,21 +2237,9 @@ mod whole_day {
             parse_voucher_census(&utf16(name), (day, day), None).unwrap()
         };
         let censuses = [
-            (
-                "20260403",
-                census(lab!("d03-c1.utf16le.xml"), "20260403"),
-                3,
-            ),
-            (
-                "20260404",
-                census(lab!("d04-c1.utf16le.xml"), "20260404"),
-                1,
-            ),
-            (
-                "20260405",
-                census(lab!("d05-c1.utf16le.xml"), "20260405"),
-                1,
-            ),
+            ("20260403", census(D03_C1, "20260403"), 3),
+            ("20260404", census(D04_C1, "20260404"), 1),
+            ("20260405", census(D05_C1, "20260405"), 1),
         ];
         for (day, counted, vouchers) in censuses {
             let exchanges = lab_days()
@@ -2269,8 +2271,8 @@ mod whole_day {
 
     #[tokio::test]
     async fn the_empty_day_is_read_in_full_but_is_not_said_to_be_whole() {
-        assert_eq!(lab!("d06-c1.utf16le.xml"), lab!("d06-v.utf16le.xml"));
-        let (reads, left) = read_lab(&["20260406"], lab_day!("d06")).await;
+        assert_eq!(D06_C1, D06_V);
+        let (reads, left) = read_lab(&["20260406"], day_d06()).await;
         assert_eq!(left, 0);
         assert!(reads.whole.is_empty());
         assert_eq!(
@@ -2302,9 +2304,9 @@ mod whole_day {
 
     #[tokio::test]
     async fn a_failed_read_keeps_its_day_and_the_days_after_it_are_not_tried() {
-        let mut exchanges = lab_day!("d06");
+        let mut exchanges = day_d06();
         // the 6 April read gets as far as the census; the vouchers are refused
-        exchanges.extend(lab_day!("d05"));
+        exchanges.extend(day_d05());
         let reader = Captured::of(exchanges);
         reader.0.lock().unwrap()[2].1 = None;
         let plan = plan_of(&["20260405", "20260406"]);
@@ -2358,7 +2360,7 @@ mod whole_day {
     /// parses them.
     #[test]
     fn a_partial_read_can_never_build_the_whole_day() {
-        let rows = lab_rows(lab!("d03-v.utf16le.xml"), LAB_GUID);
+        let rows = lab_rows(D03_V, LAB_GUID);
         assert_eq!(rows.len(), 3);
         // the control: everything holds
         assert!(admit("20260403", &[part("20260403", "20260403")], true, &rows).is_ok());
@@ -2406,7 +2408,7 @@ mod whole_day {
         )
         .unwrap();
         assert!(matches!(forex[0], VoucherRow::Withheld(_)));
-        let mut rows = lab_rows(lab!("d03-v.utf16le.xml"), LAB_GUID);
+        let mut rows = lab_rows(D03_V, LAB_GUID);
         rows.extend(forex);
         assert_eq!(
             admit("20260403", &[part("20260403", "20260403")], true, &rows).unwrap_err(),
@@ -2419,7 +2421,7 @@ mod whole_day {
     /// counts, and builds nothing.
     #[tokio::test]
     async fn a_real_read_whose_census_is_gone_builds_no_whole_day() {
-        let reader = Captured::of(lab_day!("d03"));
+        let reader = Captured::of(day_d03());
         let day = date("20260403");
         let mut read = read_entry_window_rows_with(
             &reader,
@@ -2526,7 +2528,7 @@ mod whole_day {
     /// ledgers. The day is the captured 4 April, a Contra between the two banks.
     #[tokio::test]
     async fn a_whole_day_makes_a_row_not_found_only_where_it_holds_no_entry_on_both_ledgers() {
-        let (reads, _) = read_lab(&["20260404"], lab_day!("d04")).await;
+        let (reads, _) = read_lab(&["20260404"], day_d04()).await;
         let name_of = |guid: &LedgerGuid| match guid.as_str() {
             "tlab-a" => Some("TLab Bank A".to_string()),
             "tlab-b" => Some("TLab Bank B".to_string()),

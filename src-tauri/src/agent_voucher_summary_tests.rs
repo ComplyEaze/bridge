@@ -1954,3 +1954,41 @@ fn a_zero_allocation_adds_nothing_and_does_not_refuse() {
     assert_eq!(cents(north_east["credit"].as_str().unwrap()), 0);
     assert_eq!(north_east["vouchers"], 1);
 }
+
+#[test]
+fn categories_of_equal_movement_keep_the_order_they_were_met_not_the_alphabetical_one() {
+    // The Journal alone: both categories hold its whole entry, so they tie, and the one met first
+    // (Primary Cost Category) sorts after the other by name.
+    let rows = cost_key_rows();
+    let summary = by_centre(&rows[1..], None).unwrap();
+    let order = summary
+        .category_totals
+        .iter()
+        .map(|row| redact_value(row.clone(), Redaction::None)["category"].clone())
+        .collect::<Vec<_>>();
+    assert_eq!(order, [json!("Primary Cost Category"), json!("CK Region")]);
+}
+
+#[test]
+fn with_allocations_of_both_signs_only_the_net_of_a_categorys_buckets_ties_to_it() {
+    let mut rows = cost_key_rows();
+    let entry = allocated_entry(&mut rows, 0);
+    entry["cost_centre_allocations"][0]["amount"] = json!("-1200.00");
+    entry["cost_centre_allocations"][1]["amount"] = json!("200.00");
+    let summary = by_centre(&rows[..1], None).unwrap();
+    let buckets = presented(&summary);
+    let sum = |field: &str| {
+        buckets
+            .iter()
+            .map(|bucket| cents(bucket[field].as_str().unwrap()))
+            .sum::<i64>()
+    };
+    let category = redact_value(summary.category_totals[0].clone(), Redaction::None);
+    // The category holds the entry once: a debit of the whole amount.
+    assert_eq!(cents(category["debit"].as_str().unwrap()), -100_000);
+    assert_eq!(cents(category["credit"].as_str().unwrap()), 0);
+    // Its buckets carry each allocation on its own side, so their sides differ from the category's
+    // and only their net equals it.
+    assert_eq!((sum("debit"), sum("credit")), (-120_000, 20_000));
+    assert_eq!(sum("net"), cents(category["net"].as_str().unwrap()));
+}

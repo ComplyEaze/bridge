@@ -1,7 +1,7 @@
 # sha256  bytes  file  (source, for a copy)
 030fd76873c0331517a34e7b659a1ff1f661c4271948a68f35d3b3f5746e012c  63  .gitattributes
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md  byte for byte from lab/0.7.0-write-pass at 493e6c0ab6ba1e226490b1919bebf97b7b75392a
-dd840e82a41a89306d03d969561caddbf3653496b1e3840b3e7db2c770bb525f  18609  README.md
+c9fc54de087d0a29f33a4024e07d6a5260456c38d2bab90c22c5b71366f41877  27958  README.md
 fa77b982b8d79006d0f59d76cf5e70e4271dc6755f50cef23f0ca53b24006832  12086  src/1650/RUN-SHEET.md  byte for byte from lab/1650-ledger-create-box-row at adae9d8cd005d0669caa1f1a24c8061c48d5dcff
 a1bd8158fbb15a89cc281aac2126ea0979db0cab3ee5c9153a88eb56840240d1  20379  src/1780h/RUN-SHEET.md  byte for byte from lab/1780-system-modal-box at 693a04f5258cb14592b197b966de5aa1e60c0572
 ba77881a146117276f563163213458ee3593692679e4823573f98daecceb6826  7381  src/1780h/requests/box-trace-early.ps1  byte for byte from lab/1780-system-modal-box at 693a04f5258cb14592b197b966de5aa1e60c0572
@@ -11,5 +11,6 @@ bf3a3338b382e96750e148acb7f8b0600eaddde4a33b86d7084fd1653b9e50bf  9982  src/1780
 77783ff7e8b02ca3d769548ed955545f779545244cbfc4ae01119d1b15a304fd  2626  src/1780h/requests/zorder-probe-k.ps1  byte for byte from lab/1780-system-modal-box at 693a04f5258cb14592b197b966de5aa1e60c0572
 3f03768e83c4f567957c52b8fda3f6f67c0f1d12c7eceeeb9cbc11a0dd4f0fcb  2405  src/1780h/requests/zorder-probe.ps1  byte for byte from lab/1780-system-modal-box at 693a04f5258cb14592b197b966de5aa1e60c0572
 82c94f6e29683444cda7aac82c27b8e80d58a28acd29beb4f2725ac58c7dc0f0  29580  src/2119/RUN-SHEET.md  byte for byte from lab/2119-bills-60s-row at c43ef6120c62ba7a480eadf3f639023e190817a4
+e97059901a448e9ebfac2f883b91de9261aad19b346c239b53123e0021f21e08  26392  src/2150/RC-SETTLE.md  byte for byte from lab/2150-rc-settle at 544a26a570590ce73f90f36cd70ccd034140a0fe
 2bd348247ae058cb3f2d9d4f47fea15507952fd67303454b99af9ea8dfba7e3b  5314  src/W1/README.md  byte for byte from lab/0.7.0-write-pass at 493e6c0ab6ba1e226490b1919bebf97b7b75392a (README.md)
 81b4d76f283d48695d90be49390e5a5eae81b583407612cfe1de1248202370c9  13763  src/W1/W1-write-pass.md  byte for byte from lab/0.7.0-write-pass at 493e6c0ab6ba1e226490b1919bebf97b7b75392a

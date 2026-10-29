@@ -1,0 +1,1 @@
+- The voucher-type masters read's note on how `sub_method` was measured now says a voucher was entered "on Tally's voucher screen" where it said "by hand"; the note only describes how the reading was taken, and its meaning is unchanged (#1709).

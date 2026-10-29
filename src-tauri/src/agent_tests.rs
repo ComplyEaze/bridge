@@ -932,6 +932,8 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "gst_status",
         "local_data_report",
         "month_register",
+        // Refuses every file with a code and returns no value of a row.
+        "parse_bank_statement_csv",
         "post_ledger_creates",
         "prepare_ledger_creates",
         "statement_tie_out",

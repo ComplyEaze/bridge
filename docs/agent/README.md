@@ -164,7 +164,8 @@ already sent to Tally: archive the whole folder by moving it, never delete
 them piecemeal. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
-bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
+bank-statement voucher proposals, and `parse_bank_statement_csv`, which checks the shape of one bank's CSV
+statement export and proposes nothing yet (#1320; below). `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
 sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
 voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
@@ -2722,6 +2723,19 @@ Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 `posted_verified` result is a readback comparison of the selected date window,
 not live-Tally qualification or a claim that every Tally configuration or
 licence mode has been qualified.
+
+### CSV statement shell (`parse_bank_statement_csv`)
+
+Takes `statement_path` (a local file, under the path rules of `parse_bank_statement`) and `controls_source`
+(`prior_statement`, `bank_ledger_in_tally` or `this_file`), and reads the file with the CSV edge reader of the
+`bridge-bank-statement` crate, which accepts one private bank's export layout and nothing else. A file the reader
+refuses is refused with its category as the error code, `statement_<category>` and `:row_N` where a row is at fault; there
+are fifteen categories, each its own code. A file that reads is still refused, as `statement_no_account_number_line`:
+whether that export prints an account number is not established, so nothing binds a file to an account and nothing is
+proposed. With `controls_source` `this_file` the refusal's `cause` reads "this_file: derived, not independent": the
+file's first and last balance close any chain of its own, so a truncated export would pass. `controls_source` is
+checked before the file is opened and ComplyEaze Bridge cannot verify the claim. The tool writes no file and returns no
+row value. Part of #1320; the account line and the proposals follow once the export's account line is measured.
 
 ### Statement tie-out (`statement_tie_out`)
 

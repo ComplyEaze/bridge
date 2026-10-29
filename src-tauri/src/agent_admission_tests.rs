@@ -103,6 +103,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "negative_ledgers",
         "negative_stock",
         "outstandings",
+        "parse_bank_statement_csv",
         "profit_and_loss",
         "purchase_register",
         "read_evidence",
@@ -1805,9 +1806,13 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// per-cost-centre summary of #1231 (about +150 in every list) and the settlement
 /// text of #1709 (about +260 in the three lists with posting on). Every budget was
 /// raised by 1,000 bytes once, for both.
+/// On 29 Oct 2026 `parse_bank_statement_csv` (#1320) added about 2,000 bytes to every
+/// list (its description, its two-field schema and its annotations). With it the lists
+/// measured 204,539, 230,042, 232,540 and 237,513 bytes, so each budget was raised to
+/// that measure plus at least 500 bytes, rounded up to a thousand.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [203_000, 229_000, 231_000, 236_000];
+const TOOL_LIST_BUDGETS: [usize; 4] = [206_000, 231_000, 234_000, 239_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

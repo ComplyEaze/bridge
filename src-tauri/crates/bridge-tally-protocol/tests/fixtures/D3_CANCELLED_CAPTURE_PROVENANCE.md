@@ -40,6 +40,26 @@ of its vouchers in Tally's own screen. It is the fixture for how a cancelled vou
 | `agent/d3-cancelled-voucher-census.utf16le.xml` | 124410 | `743dcd652b3d8470975056c07b3a4643a025866404bf902bc0a13ea6d1d541e5` |
 | `agent/d3-cancelled-import-verification.utf16le.xml` | 251982 | `95462269afc4fce07a7b746eb474e6ad6014c4034b72b523ac978c58dfbde975` |
 
+## The census spanned to the mark (#2145)
+
+Since #2145 the call sends this census spanned to the voucher mark it read, `(0, 1685]`. The replay pins that
+request, `74972264fcbc7171d14f24cc5ba403890c029ceec99429818c08b6b83a66d303`: the request above with ` AND $AlterID &gt; 0 AND $AlterID &lt;= 1685` added to its census formula and
+nothing else changed, which the code renders byte for byte. It is `requests/a-d3cancel_c2_spanned_0_1685.request.utf16le.xml`
+on the run sheet `lab/2145-spanned-census-captures` at `6a968f01`.
+
+The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026, one after the other
+(`lab/2145-spanned-census-captures-answers` at `993d96bc`). The book had moved on since this capture: its voucher
+mark read 1829. With the answers' one `CMPINFO` element (the session's object counts) removed, the recorded request's
+answer no longer equals the recorded census answer above (`BODY digest f7bfe767de3ce652d99ae202d4d29b044283cee88281f60b47c43b82e47bcb00`):
+one of the capture's 50 vouchers is no longer in it, and the other 49 carry the same ALTERIDs. No voucher lies above
+1685, and the spanned answer equals the unspanned one byte for byte
+(`313bbf812abd699ed62d28e1f671c842018696e0dd3f96b87557083642c3cf2b`, 121,964 bytes). The sitting therefore does not
+show what the spanned request answered when this capture was made. The replay keeps the recorded answer as the answer
+to the spanned request because the mark was 1685 when it was recorded, every voucher of the recorded answer is inside
+the span, and on every window of that sitting whose book had not moved the spanned answer equals the unspanned one byte
+for byte. Confidence: PARTIAL, inferred and not observed; the capture is to be recorded again with the spanned request
+(#2145).
+
 ## What it establishes
 
 - A cancelled voucher stays in the import-verification read with `ISCANCELLED` Yes, its voucher

@@ -51,6 +51,19 @@ The four distinct request bodies, by sha256, from the capture proxy's index (nei
 | voucher census | `e58e009cb88cb483f89723370fcf89fb0de3aff7db29d1bccb41757826c3dc86` |
 | import verification | `0fe49c89693f59aa011a488f86c2beb97b8f24a87cf32c2aa448e4c51f205418` |
 
+## The census spanned to the mark (#2145)
+
+Since #2145 the call sends this census spanned to the voucher mark it read, `(0, 1790]`. The replay pins that
+request, `094cb59c452fbcbebb4d9655fe4e86fa78290fd636a0fe9a9a8994b5a21b641b`: the request above with ` AND $AlterID &gt; 0 AND $AlterID &lt;= 1790` added to its census formula and
+nothing else changed, which the code renders byte for byte. It is `requests/a-l1_c2_spanned_0_1790.request.utf16le.xml`
+on the run sheet `lab/2145-spanned-census-captures` at `6a968f01`.
+
+The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026, one after the other
+(`lab/2145-spanned-census-captures-answers` at `993d96bc`). The comparison removes the answers' one `CMPINFO` element,
+which holds the session's object counts. With it removed, both answers equal the recorded census answer above
+(`BODY digest eaf4b24a00e82083a96efa50e3a5034230d704d2b3c770cdcad67f1138c54a9f`). The spanned answer is `14ec4c26b88aae70dd11fcdf8c463b5af4e9b3e35de46b38f5b7bce7065eb342` (126,938 bytes), and the replay keeps the
+recorded answer as the answer to the spanned request. Confidence: VERIFIED for this window and this mark, one sitting.
+
 ## What it establishes (read from the bytes)
 
 - The import-verification read holds **51 vouchers**, each with a distinct REMOTEID: 50 carry

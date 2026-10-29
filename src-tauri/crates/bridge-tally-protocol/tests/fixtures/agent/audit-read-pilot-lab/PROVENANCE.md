@@ -16,6 +16,10 @@ synthetic. Read-only: nothing was written to Tally.
   request the audit read sends since the census is always spanned. Its bytes are the run sheet's request
   `requests/p-audit_c2_spanned_0_68.request.utf16le.xml` on `lab/2145-spanned-census-captures` at `6a968f01`, and the test
   checks that the read renders them byte for byte.
+  The lab sent the recorded census request and this one to the same book on 30 Oct 2026
+  (`lab/2145-spanned-census-captures-answers` at `993d96bc`); with the answers' one `CMPINFO` element removed, both equal
+  `pilot-lab-audit-census.utf16le.xml`, which the replay keeps as the answer to the spanned request (spanned answer
+  `11c0077ba4a02cf6b076e56364b00928f20390db68257a65ffd25efc35e03f55`). VERIFIED for this window at the mark 68, one sitting.
 - The same book in both sittings: the company list and the marks answers of 697-S1 are byte-identical to 697-S0A's
   (`0cb23618…` and `8a0c4268…`). Those two answers are already committed as `../pilot-lab/pilot-lab-company-extent.utf16le.xml`
   and `../gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml` (the same bytes), so they are not repeated here.

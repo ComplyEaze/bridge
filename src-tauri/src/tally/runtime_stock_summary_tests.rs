@@ -498,6 +498,8 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
     let mark = edge + 1;
     let mut plans = Book::at_mark(mark).through_flags();
     plans.push(xml(empty_census_slice()));
+    // The extent read again before the census's refusal is returned.
+    pair(&mut plans, xml(extent_with_mark(mark)));
     let (result, observed) = run(plans).await;
     let error = result.err().expect("refused");
     assert!(
@@ -513,7 +515,7 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
         cause::<StockSummaryReadError>(&error).map(StockSummaryReadError::safe_code),
         Some("stock_summary_census_refused")
     );
-    assert_eq!(observed.len(), AT_FLAGS + 1);
+    assert_eq!(observed.len(), AT_FLAGS + 1 + 4);
     let census = CensusPlan::<StockItems>::new(
         mark,
         CensusLimits {
@@ -530,6 +532,156 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
     let [_, items, report] = sent_requests();
     assert!(!was_sent(&observed, &items));
     assert!(!was_sent(&observed, &report));
+}
+
+/// A census answer captured on BRIDGE STOCK LAB, its company GUID (and so every row's GUID
+/// prefix) read as the test company's, as `items()` does for the shape lab's items.
+fn stock_lab_census(name: &str) -> String {
+    let path = format!(
+        "{}/crates/bridge-tally-protocol/tests/fixtures/{name}.utf16le.xml",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    decode(&std::fs::read(path).unwrap()).replace("1edb9b05-8d35-4c0c-9959-dce655730463", GUID)
+}
+
+/// A book past the single-read mark, counted by its two censuses, then read as before through the
+/// closing extent: the census answers are the 55-item and three-group slices captured on BRIDGE
+/// STOCK LAB (#1233).
+fn counted(mark: u64, items_census: String, flags: String) -> Vec<ScenarioPlan> {
+    let book = Book {
+        flags,
+        ..Book::at_mark(mark)
+    };
+    let mut plans = book.through_flags();
+    plans.push(xml(items_census));
+    plans.push(xml(stock_lab_census(
+        "stock_group_census_slice_stock_lab_0_300_live",
+    )));
+    pair(&mut plans, xml(book.items.clone()));
+    pair(&mut plans, xml(book.report.clone()));
+    pair(&mut plans, xml(book.closing_extent.clone()));
+    plans
+}
+
+/// Past the mark the whole read was admitted for, the stock-item and stock-group censuses run,
+/// and their counts (55 items, 3 groups) admit the same item read, which ties as before.
+#[tokio::test]
+async fn a_book_past_the_mark_is_counted_then_read_whole() {
+    let mark = 875;
+    let mut plans = counted(
+        mark,
+        stock_lab_census("stock_item_census_slice_stock_lab_200_300_live"),
+        flags(),
+    );
+    let companies = xml(companies());
+    plans.extend([companies.clone(), status(), companies]);
+    let (result, observed) = run(plans).await;
+    let gate = result.map(|(read, _)| read.gate);
+    assert!(
+        matches!(gate, Ok(NativeStockGate::ValueTotalMatched { .. })),
+        "{:?}",
+        gate.err()
+    );
+    // The whole read and the two census slices, (0, 875] each.
+    assert_eq!(observed.len(), WHOLE_READ + 2);
+    let limits = CensusLimits {
+        slice_width: 4_000,
+        max_slices: 100,
+    };
+    let name = identity().display_name().to_string();
+    assert!(was_sent(
+        &observed,
+        &render_stock_item_census_slice_request(
+            &name,
+            &CensusPlan::<StockItems>::new(mark, limits)
+                .unwrap()
+                .slices()[0]
+        )
+    ));
+    assert!(was_sent(
+        &observed,
+        &bridge_tally_protocol::ledger_census::render_stock_group_census_slice_request(
+            &name,
+            &CensusPlan::<bridge_tally_protocol::ledger_census::StockGroups>::new(mark, limits)
+                .unwrap()
+                .slices()[0]
+        )
+    ));
+}
+
+/// The census with five of its 55 rows, against Tally's own count set to five: the read is
+/// admitted on five items, returns the book's eleven, and refuses on the census's count after
+/// the closing extent.
+#[tokio::test]
+async fn a_counted_read_returning_more_rows_than_the_census_refuses() {
+    let full = stock_lab_census("stock_item_census_slice_stock_lab_200_300_live");
+    let rows: Vec<_> = full
+        .match_indices("<STOCKITEM ")
+        .map(|(at, _)| at)
+        .collect();
+    assert_eq!(rows.len(), 55);
+    // Keep the first five rows: cut from the sixth row's start to the collection's end.
+    let end = full.find("</COLLECTION>").unwrap();
+    let five = format!("{}{}", &full[..rows[5]], &full[end..]);
+    let flags = replaced(
+        &flags(),
+        "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>",
+        "<NUMSTOCKITEMS TYPE=\"Number\"> 5</NUMSTOCKITEMS>",
+    );
+    let (result, observed) = run(counted(875, five, flags)).await;
+    let error = result.err().expect("refused");
+    assert!(
+        matches!(
+            cause::<StockSummaryReadError>(&error),
+            Some(StockSummaryReadError::PremiseViolated(
+                "stock_rows_exceed_census_count"
+            ))
+        ),
+        "{error:?}"
+    );
+    assert_eq!(observed.len(), AT_CLOSING_EXTENT + 2);
+}
+
+/// Tally's own count above the census refuses before any item request, and the extent is read
+/// again first, so a book that moved is reported as moved instead.
+#[tokio::test]
+async fn a_census_below_tallys_count_refuses_after_the_extent_is_read_again() {
+    let full = stock_lab_census("stock_item_census_slice_stock_lab_200_300_live");
+    let rows: Vec<_> = full
+        .match_indices("<STOCKITEM ")
+        .map(|(at, _)| at)
+        .collect();
+    let end = full.find("</COLLECTION>").unwrap();
+    let five = format!("{}{}", &full[..rows[5]], &full[end..]);
+    for (closing_mark, moved) in [(875, false), (876, true)] {
+        let mut plans = Book::at_mark(875).through_flags();
+        plans.push(xml(five.clone()));
+        pair(&mut plans, xml(extent_with_mark(closing_mark)));
+        let (result, observed) = run(plans).await;
+        let error = result.err().expect("refused");
+        if moved {
+            assert!(
+                matches!(
+                    cause::<PairedReadValidationError>(&error),
+                    Some(PairedReadValidationError::StockSummaryExtent)
+                ),
+                "{error:?}"
+            );
+        } else {
+            assert!(
+                matches!(
+                    cause::<StockSummaryReadError>(&error),
+                    Some(StockSummaryReadError::ItemCountCompanyHigher {
+                        company: 11,
+                        census: 5
+                    })
+                ),
+                "{error:?}"
+            );
+        }
+        // No group census, no item and no report request.
+        assert_eq!(observed.len(), AT_FLAGS + 1 + 4);
+    }
 }
 
 /// An empty census slice as Tally answered it on BRIDGE STOCK LAB (a slice past every item). An

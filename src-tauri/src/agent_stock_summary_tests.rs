@@ -423,8 +423,11 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "null with `partial` true whenever any item's closing value is empty",
         "written at the scale of the values it adds",
         "stock_summary_too_large",
-        "Typical stock-heavy client books refuse today",
-        "16,000,000 bytes",
+        "counted by AlterID span",
+        "not yet run live past 874",
+        "stock_summary_census_refused",
+        "stock_summary_report_too_large",
+        "stock_summary_item_count_company_higher",
         "company totals only",
         "Empty is not zero",
         "an empty closing value is returned as null and counted",
@@ -1422,6 +1425,8 @@ async fn a_book_past_the_single_read_mark_is_counted_before_any_item_request() {
     plans.push(xml(decode(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml"
     ))));
+    // The extent read again before the census's refusal is returned.
+    pair(&mut plans, xml(extents(14, mark)));
     let one = OneServer::spawn(plans);
     let refused = one.call(args(AS_OF, 0, 500, None)).await;
     let refusal = error(&refused);
@@ -1431,9 +1436,9 @@ async fn a_book_past_the_single_read_mark_is_counted_before_any_item_request() {
     assert!(refused["structuredContent"]["result"]
         .get("items")
         .is_none());
-    // Identity, then the runtime read's mode probe, identity, opening extent, flags and the one
-    // census slice: no stock item and no report request.
-    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 1);
+    // Identity, then the runtime read's mode probe, identity, opening extent, flags, the one
+    // census slice and the extent again: no stock item and no report request.
+    assert_eq!(one.requests(), 4 + 3 + 4 + 4 + 1 + 4);
 }
 
 /// A book whose census counted more items than one read holds refuses with its size, the counted

@@ -23,6 +23,7 @@ use bridge_tally_protocol::outstandings_shared::OutstandingsError;
 use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
 use bridge_tally_protocol::{
     parse_stock_group_census_slice, parse_stock_item_census_slice, StandardLedgerCatalogError,
+    MAX_STANDARD_LEDGER_IDENTITY_ROWS,
 };
 
 /// A completed observation of a company's stock at a date: its inventory
@@ -300,14 +301,17 @@ pub(crate) fn admit_counted_stock(
 }
 
 /// Counts THE COMPANY's rows of one master collection by AlterID span over `(0, mark]` (#1233),
-/// one slice at a time, each read once. Each slice's answer is added to `evidence`. The extent
-/// read after the whole stock read is what shows the book did not move meanwhile.
+/// one slice at a time, each read once. Each slice's answer is added to `evidence`. A census that
+/// found no row refuses, unless `none_is_a_count`: a book may hold no stock group, while an empty
+/// item census cannot be told from a company that is closed or absent. The extent read after the
+/// census, or after the whole stock read, is what shows the book did not move meanwhile.
 async fn count_by_span<C: CensusCollection + Copy>(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,
     mark: u64,
     render: fn(&str, &CensusSlice<C>) -> String,
     parse: fn(&str, &str, u64) -> Result<Vec<String>, StandardLedgerCatalogError>,
+    none_is_a_count: bool,
     evidence: &mut RuntimeReadEvidence,
 ) -> anyhow::Result<u64> {
     let refused = |error: bridge_tally_protocol::ledger_census::CensusError<C>| {
@@ -321,13 +325,57 @@ async fn count_by_span<C: CensusCollection + Copy>(
         *evidence = evidence
             .clone()
             .combine(RuntimeReadEvidence::single(&request, sha256, bytes));
-        // The parser only bounds what it will hold; the slice's width is enforced once, by the
-        // census.
-        let guids = parse(&body, identity.company_guid(), slice.width())
-            .map_err(|_| StockSummaryReadError::CensusRefused("stock_census_slice_invalid"))?;
+        // The parser only bounds what it will hold, as the ledger census's does; the slice's
+        // width is enforced once, by the census, under its own code.
+        let guids = parse(
+            &body,
+            identity.company_guid(),
+            MAX_STANDARD_LEDGER_IDENTITY_ROWS as u64,
+        )
+        .map_err(|_| StockSummaryReadError::CensusRefused("stock_census_slice_invalid"))?;
         census.accept(guids).map_err(refused)?;
     }
-    Ok(census.finish().map_err(refused)?.get())
+    match census.finish() {
+        Ok(count) => Ok(count.get()),
+        Err(bridge_tally_protocol::ledger_census::CensusError::CensusEmpty) if none_is_a_count => {
+            Ok(0)
+        }
+        Err(error) => Err(refused(error).into()),
+    }
+}
+
+/// Counts the stock items, then the stock groups, and admits the read on the counts
+/// ([`admit_counted_stock`]). The items alone are admitted first, so a book with more items than
+/// one read holds is refused before the group census's reads.
+async fn admit_on_census(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    mark: u64,
+    tally_items: NativeStockItemCount,
+    evidence: &mut RuntimeReadEvidence,
+) -> anyhow::Result<CountedAdmission> {
+    let items = count_by_span(
+        client,
+        identity,
+        mark,
+        render_stock_item_census_slice_request,
+        parse_stock_item_census_slice,
+        false,
+        evidence,
+    )
+    .await?;
+    admit_counted_stock(mark, items, 0, tally_items)?;
+    let groups = count_by_span(
+        client,
+        identity,
+        mark,
+        render_stock_group_census_slice_request,
+        parse_stock_group_census_slice,
+        true,
+        evidence,
+    )
+    .await?;
+    Ok(admit_counted_stock(mark, items, groups, tally_items)?)
 }
 
 impl TallyRuntime {
@@ -396,31 +444,36 @@ impl TallyRuntime {
                     let (estimate, counted) = match admit_stock_summary_size(mark) {
                         Ok(estimate) => (estimate, None),
                         Err(StockSummaryReadError::TooLarge { .. }) => {
-                            let items = count_by_span(
+                            match admit_on_census(
                                 &client,
                                 &identity,
                                 mark,
-                                render_stock_item_census_slice_request,
-                                parse_stock_item_census_slice,
-                                &mut evidence,
-                            )
-                            .await?;
-                            let groups = count_by_span(
-                                &client,
-                                &identity,
-                                mark,
-                                render_stock_group_census_slice_request,
-                                parse_stock_group_census_slice,
-                                &mut evidence,
-                            )
-                            .await?;
-                            let counted = admit_counted_stock(
-                                mark,
-                                items,
-                                groups,
                                 company_inventory.item_count,
-                            )?;
-                            (counted.items_estimate, Some(counted))
+                                &mut evidence,
+                            )
+                            .await
+                            {
+                                Ok(counted) => (counted.items_estimate, Some(counted)),
+                                // A refusal of what the census found is held until the extent is
+                                // read again: a book that moved during the census (an altered
+                                // master changes its AlterID between slices) is reported as
+                                // moved, not as what its census broke.
+                                Err(error)
+                                    if error
+                                        .chain()
+                                        .any(|cause| cause.is::<StockSummaryReadError>()) =>
+                                {
+                                    let closing_extent =
+                                        client.fetch_company_book_extent(&identity).await?;
+                                    if closing_extent != extent {
+                                        return Err(
+                                            PairedReadValidationError::StockSummaryExtent.into()
+                                        );
+                                    }
+                                    return Err(error);
+                                }
+                                Err(error) => return Err(error),
+                            }
                         }
                         Err(error) => return Err(error.into()),
                     };

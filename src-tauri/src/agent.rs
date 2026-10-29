@@ -1481,13 +1481,34 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              whole-book read of its own, on a different basis: not literal voucher \
              movement).",
         ),
-        // The stock summary read's own size refusal (`size` carries the mark).
+        // The stock summary read's own size refusal (`size` carries the mark, and the counted
+        // items when the census counted them, #1233).
         "stock_summary_too_large" => Some(
-            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
-             worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
-             so no request for stock items was sent. The mark counts masters of every kind, so \
-             a company with few stock items may be refused. A larger book refuses; retrying \
-             this call refuses again.",
+            "The company holds more stock items than one read is admitted for: with \
+             `size.counted_items`, the census counted them, and an assumed worst-case row for \
+             each is over ComplyEaze Bridge's response budget (`size.limit_bytes`; at most \
+             `size.limit_items` items), so no request for stock items was sent. A larger book \
+             refuses; retrying this call refuses again.",
+        ),
+        // #1233: the census that counts a book past the single-read mark could not finish.
+        "stock_summary_census_refused" => Some(
+            "ComplyEaze Bridge could not count the company's stock items or stock groups, so no \
+             request for stock items was sent; `error.cause` names why (a census slice holding \
+             more rows than its span, a GUID twice, no item found, or an answer that did not \
+             read). Check that the company is open in Tally and unchanged, then call again once.",
+        ),
+        // #1233: the report, sized from the counted items and groups, is over the budget.
+        "stock_summary_report_too_large" => Some(
+            "The company's stock items and stock groups together, times an assumed worst-case \
+             line of Tally's Stock Summary, are over ComplyEaze Bridge's response budget, so \
+             no stock request was sent. A larger book refuses; retrying this call refuses again.",
+        ),
+        // #1233: Tally counts more stock items than the census found.
+        "stock_summary_item_count_company_higher" => Some(
+            "Tally's own stock item count is higher than ComplyEaze Bridge counted, so a read \
+             sized from that count could be too small and none was sent. An item may have been \
+             added during the call: call again once; if it refuses again, the count cannot be \
+             trusted on this book.",
         ),
         // The Negative Stock read's own size refusal (`size` carries the mark).
         "negative_stock_too_large" => Some(

@@ -1274,10 +1274,13 @@ count (`stock_summary_item_count_company_higher`), and counts above the mark ref
 `stock_summary_bound_premise_violated`. More items are refused before any item request
 as `stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
 `limit_bytes` and `limit_master_alter_id`, and for a counted book `counted_items` and
-`limit_items`), and retrying refuses again; a report too large refuses as
+`limit_items`, `limit_master_alter_id` then carrying the same item limit), and retrying
+refuses again; a report too large refuses as
 `stock_summary_report_too_large`, and a count that could not be made as
 `stock_summary_census_refused`, with the census's own code (for example
-`stock_item_span_census_empty`) in `error.cause`. The counted path has not yet
+`stock_item_span_census_empty`, or `stock_census_slice_invalid` for a slice answer that
+did not read) in `error.cause`; a book with no stock group counts none. A refusal from the
+count is reported as `stock_summary_extent_changed` instead when the book moved meanwhile. The counted path has not yet
 run against a live book with a mark past 874. After a read, the row count and the
 response size are checked against the mark (and the count) and the admitted size, and a
 breach refuses the whole read as `stock_summary_bound_premise_violated`, unless the

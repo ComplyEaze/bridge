@@ -25,6 +25,8 @@
 
 use std::collections::BTreeMap;
 
+use bridge_tally_primitives::TallyDate;
+
 use crate::error::{AuditError, Result};
 
 pub const VENDORED: &str = include_str!("../rules/ay2026-27.s44ab.toml");
@@ -39,6 +41,12 @@ pub const SOURCE_COMMIT: &str = "e2456bcf4f163cf770945e8620e715788db0ca46";
 pub struct Rules {
     /// `[meta].version`, echoed into every result as `rules_version`.
     pub version: String,
+    /// `[meta].assessment_year`: the year the rules are for, as the engagement names it.
+    pub assessment_year: String,
+    /// `[meta].previous_year_start` and `previous_year_end`: the financial year whose books
+    /// these rules judge. [`crate::rules_for`] refuses an engagement whose period is not
+    /// inside it, which would otherwise be judged silently by this year's thresholds.
+    pub previous_year: (TallyDate, TallyDate),
     pub turnover_threshold_paise: i64,
     pub turnover_threshold_low_cash_paise: i64,
     pub cash_share_limit_bp: i64,
@@ -225,6 +233,18 @@ impl Rules {
             section("depreciation")?,
             section("due_dates")?,
         );
+        let meta_date = |key: &str| -> Result<TallyDate> {
+            match meta.get(key) {
+                Some(toml::Value::Datetime(d)) if d.date.is_some() && d.time.is_none() => {
+                    TallyDate::parse(d.to_string().replace('-', "")).map_err(|_| {
+                        AuditError::Config(format!("rules: [meta].{key} is not a date"))
+                    })
+                }
+                _ => Err(AuditError::Config(format!(
+                    "rules: [meta].{key} is not a date"
+                ))),
+            }
+        };
         let date_in = |key: &str| -> Result<String> {
             match due_dates.get(key) {
                 Some(toml::Value::Datetime(d)) if d.date.is_some() && d.time.is_none() => {
@@ -271,6 +291,15 @@ impl Rules {
                 .and_then(toml::Value::as_str)
                 .ok_or_else(|| AuditError::Config("rules: [meta].version".to_string()))?
                 .to_string(),
+            assessment_year: meta
+                .get("assessment_year")
+                .and_then(toml::Value::as_str)
+                .ok_or_else(|| AuditError::Config("rules: [meta].assessment_year".to_string()))?
+                .to_string(),
+            previous_year: (
+                meta_date("previous_year_start")?,
+                meta_date("previous_year_end")?,
+            ),
             turnover_threshold_paise: int_in(s44ab, "s44ab", "turnover_threshold_paise")?,
             turnover_threshold_low_cash_paise: int_in(
                 s44ab,

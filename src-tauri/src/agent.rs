@@ -2171,21 +2171,27 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
 
 /// The next step for a cause of `party_ledger_master_read_failed` (#2071). It is chosen only under
 /// that code, like [`outstandings_cause_remediation`]: the same cause code reaches the open-bills
-/// read, which says it in-band, and the text would be wrong for it.
+/// read, which says it in-band, and the text would be wrong for it. The code is also raised by the
+/// compliance read of `ledger_masters`, by the sales and purchase registers and by the invoice
+/// import's admission, which read the same ledger source, so the step speaks of "this read".
 ///
-/// Measured on one book (TallyPrime 7.2 Silver, a party ledger holding dollar vouchers): Tally sent
-/// the ledgers' closing balances as `<amount> @ <rate> = <base amount>` text, and the compliance
-/// read of ledger masters was refused with this cause. The parser reads no such amount (#683), so
-/// the refusal is deliberate and a retry gives it again.
+/// Measured on one book (TallyPrime 7.2 Silver, a party ledger holding dollar vouchers): Tally
+/// wrote a rupee ledger's closing balance as `$1000100.00 @ ₹ 86/$ = ₹ 86009641.25`, with no
+/// space after the symbol. The detector that sets such a row aside (`is_currency_composite`) is
+/// strict and needs a space there, as the 7.1 captures have, so the row was kept as a plain
+/// amount and the parse refused it as a foreign-currency balance, with this cause. The refusal is
+/// about a layout Bridge does not recognise yet, not about foreign currency as such: the 7.1
+/// layout is set aside by name (#551). A retry gives the same refusal.
 fn party_ledger_master_cause_remediation(cause: &str) -> Option<&'static str> {
     match cause {
         "native_foreign_currency_ledger_balance" => Some(
-            "Tally sent a ledger's balance in a foreign currency, as `<amount> @ <rate> = <base \
-             amount>` rather than a number. ComplyEaze Bridge does not read those amounts yet \
-             (#683), so this read is refused on purpose, not because the response was damaged, \
-             and no ledger was returned. Do not repeat it in a loop: it refuses again. Tell the \
-             user that this company's ledgers cannot be read here while one of them holds a \
-             foreign-currency balance, and that Tally itself shows them.",
+            "Tally wrote a ledger's balance in a foreign currency in a layout ComplyEaze Bridge \
+             does not recognise yet (`<amount> @ <rate> = <base amount>` where it expects a space \
+             after each currency symbol; #683), so this read is refused rather than guessed at, \
+             not because the response was damaged, and nothing was returned from it. Do not \
+             repeat it in a loop: it refuses again. Tell the user that this read cannot give this \
+             company's ledgers while Tally writes a balance that way, and that Tally itself \
+             shows them.",
         ),
         _ => None,
     }

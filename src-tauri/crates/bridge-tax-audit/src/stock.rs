@@ -270,7 +270,7 @@ vouchers are listed on the line count above.",
         if let Some(t) = book.tb.get(n) {
             books_open = add(books_open, t.opening_paise)?;
             books_close_tb = add(books_close_tb, t.closing_paise)?;
-            let mv = t.closing_by_movements_paise().ok_or_else(overflow)?;
+            let mv = sub(add(t.opening_paise, t.debit_paise)?, t.credit_paise)?;
             books_close_mv = add(books_close_mv, mv)?;
         }
     }

@@ -113,7 +113,7 @@ mod tests {
     use crate::book::Book;
     use std::collections::BTreeMap;
 
-    // Pinned against the reference implementation's tae.ledger_ids (computed with the Python
+    // Pinned against the reference implementation's ledger-id module (computed with the Python
     // function itself, 2026-09-19; the synthetic all-zero GUID's tag was computed with that same
     // function on 2026-09-21): guid_tag("abc") and stable_ledger_tag on a book with one
     // real ledger, "ROUND OFF"/guid "g-1", plus a name that is not a book ledger at all.
@@ -129,7 +129,7 @@ mod tests {
 
     /// The reference normalises with Python's `str.strip().lower()`, so a non-ASCII or
     /// control-character GUID must hash as it does there. Expected tags are the reference's own
-    /// (`tae.ledger_ids.guid_tag`, Python 3.13).
+    /// (its `guid_tag`, Python 3.13).
     #[test]
     fn guid_tag_strips_and_lowercases_as_python_does() {
         for (guid, want) in [

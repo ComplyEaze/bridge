@@ -1380,8 +1380,8 @@ mod tests {
             .find(|f| f.id == format!("{TEST_ID}/{name}"))
     }
 
-    /// The reference's own cases (`selftest/test_bank_reconciliation.py`'s `StatementArithmetic`
-    /// at reference `da9e2d3d`), as amounts there: each check alone marks the statement, within Re 1.
+    /// The reference's own `StatementArithmetic` cases (at reference `da9e2d3d`), as amounts
+    /// there: each check alone marks the statement, within Re 1.
     #[test]
     fn a_statement_that_does_not_add_up_explains_nothing_unmatched() {
         let two = || {

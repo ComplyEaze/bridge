@@ -288,7 +288,12 @@ fn the_walk_finds_a_planted_hit_under_each_prose_key() {
 
 #[test]
 fn no_golden_prose_uses_the_working_vocabulary() {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/golden");
+    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let dir = fixtures.join("golden");
+    let divergences = bridge_tax_audit::divergence::parse_committed(
+        &std::fs::read_to_string(fixtures.join("divergences.json")).expect("the registry reads"),
+    )
+    .expect("the registry parses");
     let mut files = 0usize;
     let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
     let mut hits = Vec::new();
@@ -299,6 +304,14 @@ fn no_golden_prose_uses_the_working_vocabulary() {
         }
         let doc: Value = serde_json::from_slice(&std::fs::read(&path).expect("a golden reads"))
             .expect("a golden is JSON");
+        // What the tests hold Rust to: the golden with its declared divergences applied, so a
+        // patched wording is scanned too.
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .expect("a golden has a name");
+        let doc = bridge_tax_audit::divergence::patched(&doc, stem, &divergences)
+            .unwrap_or_else(|e| panic!("{e}"));
         let (c, h) = scan_document(&doc);
         files += 1;
         for (key, n) in c {

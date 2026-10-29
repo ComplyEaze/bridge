@@ -2872,7 +2872,7 @@ mod tests {
         assert!(in_kerala_hc("lak\u{017F}hadweep") && !in_kerala_hc("Keralam"));
     }
 
-    /// The config readers refuse what the reference's `tae.config` readers refuse, each by its own
+    /// The config readers refuse what the reference's config readers refuse, each by its own
     /// message, and read the well-formed control.
     #[test]
     fn the_config_readers_refuse_what_the_reference_refuses() {

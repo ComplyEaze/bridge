@@ -19,30 +19,43 @@ pub fn fixtures() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
 
+/// The committed divergences from the frozen reference (`fixtures/divergences.json`).
+pub fn divergences() -> Vec<bridge_tax_audit::divergence::Divergence> {
+    let text = std::fs::read_to_string(fixtures().join("divergences.json")).unwrap();
+    bridge_tax_audit::divergence::parse_committed(&text).unwrap()
+}
+
+/// The reference's own golden under `golden/`, unpatched: only for checks of the golden itself.
+pub fn oracle_named(stem: &str) -> Value {
+    let path = fixtures().join(format!("golden/{stem}.json"));
+    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+}
+
+/// What a test must produce for `stem`: the frozen reference's golden with every declared
+/// divergence for it applied. Every comparison with Rust's output reads goldens through here.
+pub fn golden_named(stem: &str) -> Value {
+    bridge_tax_audit::divergence::patched(&oracle_named(stem), stem, &divergences())
+        .unwrap_or_else(|e| panic!("{e}"))
+}
+
 pub fn golden() -> Value {
-    let text = std::fs::read_to_string(fixtures().join("golden/synthetic.cash_44ab.json")).unwrap();
-    serde_json::from_str(&text).unwrap()
+    golden_named("synthetic.cash_44ab")
 }
 
 pub fn golden_40a3() -> Value {
-    let text = std::fs::read_to_string(fixtures().join("golden/synthetic.cash_payments_40a3.json"))
-        .unwrap();
-    serde_json::from_str(&text).unwrap()
+    golden_named("synthetic.cash_payments_40a3")
 }
 
 pub fn golden_depreciation() -> Value {
-    let text =
-        std::fs::read_to_string(fixtures().join("golden/synthetic.depreciation.json")).unwrap();
-    serde_json::from_str(&text).unwrap()
+    golden_named("synthetic.depreciation")
 }
 
 pub fn golden_financial_statements(with_report: bool) -> Value {
-    let name = if with_report {
-        "golden/synthetic.financial_statements.json"
+    golden_named(if with_report {
+        "synthetic.financial_statements"
     } else {
-        "golden/synthetic.financial_statements.noreport.json"
-    };
-    serde_json::from_str(&std::fs::read_to_string(fixtures().join(name)).unwrap()).unwrap()
+        "synthetic.financial_statements.noreport"
+    })
 }
 
 /// The committed synthetic report totals (`synthetic-report-totals.json`), exactly Rs 1 from the
@@ -56,9 +69,7 @@ pub fn synthetic_report_totals() -> ReportTotals {
 }
 
 pub fn golden_applicability_44ab() -> Value {
-    let text = std::fs::read_to_string(fixtures().join("golden/synthetic.applicability_44ab.json"))
-        .unwrap();
-    serde_json::from_str(&text).unwrap()
+    golden_named("synthetic.applicability_44ab")
 }
 
 /// The committed synthetic comparison turnover (`synthetic-turnover-inputs.json`).
@@ -77,12 +88,6 @@ pub fn engagement(read_dir: &Path, allow_unbracketed: bool) -> Engagement {
     e.read_dir = read_dir.to_path_buf();
     e.allow_unbracketed_read = allow_unbracketed;
     e
-}
-
-/// A committed golden by its file stem under `golden/`, e.g. `synthetic.trial_balance`.
-pub fn golden_named(stem: &str) -> Value {
-    let path = fixtures().join(format!("golden/{stem}.json"));
-    serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
 }
 
 pub fn run_trial_balance(read_dir: &Path, allow_unbracketed: bool) -> Result<Value> {

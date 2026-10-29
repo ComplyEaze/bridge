@@ -14278,5 +14278,245 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "DV-1",
+  "by": "author",
+  "what": "a repeated divergence id is admitted",
+  "file": "src/divergence.rs",
+  "from": "        if !seen.insert(id.clone()) {\n",
+  "to": "        if false && !seen.insert(id.clone()) {\n"
+ },
+ {
+  "id": "DV-2",
+  "by": "author",
+  "what": "issue 0 is admitted",
+  "file": "src/divergence.rs",
+  "from": "            .filter(|n| *n > 0)\n",
+  "to": "            .filter(|_| true)\n"
+ },
+ {
+  "id": "DV-3",
+  "by": "author",
+  "what": "a record that declares nothing is admitted",
+  "file": "src/divergence.rs",
+  "from": "        if expect.is_empty() && real_book_keys.is_empty() {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-4",
+  "by": "author",
+  "what": "any top-level key may be patched",
+  "file": "src/divergence.rs",
+  "from": "        if TOP_KEYS.contains(&key) {\n",
+  "to": "        if true {\n"
+ },
+ {
+  "id": "DV-5",
+  "by": "author",
+  "what": "a whole entry is added under another id",
+  "file": "src/divergence.rs",
+  "from": "                    (None, None) if value[\"id\"].as_str() == Some(id) => {\n",
+  "to": "                    (None, None) => {\n"
+ },
+ {
+  "id": "DV-6",
+  "by": "author",
+  "what": "a patch on another test's golden applies",
+  "file": "src/divergence.rs",
+  "from": "        if oracle[\"test_id\"].as_str() != Some(d.test.as_str()) {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-7",
+  "by": "author",
+  "what": "a patch equal to the oracle applies",
+  "file": "src/divergence.rs",
+  "from": "            if parsed.get(oracle) == Some(&value)\n",
+  "to": "            if false\n"
+ },
+ {
+  "id": "DV-8",
+  "by": "author",
+  "what": "a real-book run masks another test's keys",
+  "file": "src/divergence.rs",
+  "from": "        .filter(|d| d.test == test_id && only.contains(&d.id))\n",
+  "to": "        .filter(|d| only.contains(&d.id))\n"
+ },
+ {
+  "id": "DV-9",
+  "by": "author",
+  "what": "a declared real-book key is reported but not masked",
+  "file": "src/divergence.rs",
+  "from": "                .set(&mut doc, want.cloned().unwrap_or(Json::Null))\n",
+  "to": "                .set(&mut doc, got.cloned().unwrap_or(Json::Null))\n"
+ },
+ {
+  "id": "DV-10",
+  "by": "author",
+  "what": "a hash key may be patched by itself",
+  "file": "src/divergence.rs",
+  "from": "                if field.as_deref().is_some_and(|f| f.ends_with(\"_sha256_16\")) {\n",
+  "to": "                if false {\n"
+ },
+ {
+  "id": "DV-11",
+  "by": "author",
+  "what": "a field set to null is written as null, not removed",
+  "file": "src/divergence.rs",
+  "from": "                    (Some(f), Some(i)) if value.is_null() => {\n",
+  "to": "                    (Some(f), Some(i)) if false => {\n"
+ },
+ {
+  "id": "DV-12",
+  "by": "author",
+  "what": "an entry and its field may both be claimed",
+  "file": "src/divergence.rs",
+  "from": "                    let clash = whole.contains(&entry);\n",
+  "to": "                    let clash = false;\n"
+ },
+ {
+  "id": "DV-13",
+  "by": "author",
+  "what": "two records may claim one key",
+  "file": "src/divergence.rs",
+  "from": "            if claimed || !keys.insert(key.clone()) {\n",
+  "to": "            if claimed {\n"
+ },
+ {
+  "id": "DV-14",
+  "by": "author",
+  "what": "an added entry keeps the hashes its author wrote",
+  "file": "src/divergence.rs",
+  "from": "                        entry.insert(hash.to_string(), Json::String(derived));\n",
+  "to": "                        let _ = derived;\n"
+ },
+ {
+  "id": "DV-15",
+  "by": "author",
+  "what": "a wording patch leaves the old hash",
+  "file": "src/divergence.rs",
+  "from": "            if let Some(hash) = parsed.hash_key() {\n                let derived =\n",
+  "to": "            if let Some(hash) = None::<Key> {\n                let derived =\n"
+ },
+ {
+  "id": "DV-17",
+  "by": "author",
+  "what": "a whole entry on both sides may be masked",
+  "file": "src/divergence.rs",
+  "from": "            if matches!(&parsed, Key::Entry { field: None, .. }) && want.is_some() && got.is_some()\n",
+  "to": "            if false\n"
+ },
+ {
+  "id": "DV-18",
+  "by": "author",
+  "what": "an expected divergence of another test is accepted",
+  "file": "src/divergence.rs",
+  "from": "        if d.test != test_id {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-19",
+  "by": "author",
+  "what": "an expected divergence counts as shown without showing",
+  "file": "src/divergence.rs",
+  "from": "            .any(|line| line.starts_with(&format!(\"{id}: \")))\n",
+  "to": "            .any(|_| true)\n"
+ },
+ {
+  "id": "DV-20",
+  "by": "author",
+  "what": "an added entry may carry a hash of its own",
+  "file": "src/divergence.rs",
+  "from": "                if let Some(hash) = entry.keys().find(|k| k.ends_with(\"_sha256_16\")) {\n",
+  "to": "                if let Some(hash) = None::<&String> {\n"
+ },
+ {
+  "id": "DV-21",
+  "by": "author",
+  "what": "two records may declare one real-book key",
+  "file": "src/divergence.rs",
+  "from": "                    if !real_keys.insert((text_of(\"test\")?, k.to_string())) {\n",
+  "to": "                    if false {\n"
+ },
+ {
+  "id": "DV-22",
+  "by": "author",
+  "what": "a real-book run masks divergences it did not name",
+  "file": "src/divergence.rs",
+  "from": "        .filter(|d| d.test == test_id && only.contains(&d.id))\n",
+  "to": "        .filter(|d| d.test == test_id)\n"
+ },
+ {
+  "id": "DV-23",
+  "by": "author",
+  "what": "a record with real-book keys and no patch is admitted",
+  "file": "src/divergence.rs",
+  "from": "        if expect.is_empty() {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "DV-24",
+  "by": "author",
+  "what": "a whole list may be declared as a real-book key",
+  "file": "src/divergence.rs",
+  "from": "                    if matches!(&parsed, Key::Top(top) if top != \"population_note_text\") {\n",
+  "to": "                    if false {\n"
+ },
+ {
+  "id": "DV-25",
+  "by": "author",
+  "what": "a key repeated in an object is accepted",
+  "file": "src/divergence.rs",
+  "from": "            if !seen.insert(key.clone()) {\n",
+  "to": "            if false && !seen.insert(key.clone()) {\n"
+ },
+ {
+  "id": "DV-26",
+  "by": "author",
+  "what": "the registry is not checked for repeated keys",
+  "file": "src/divergence.rs",
+  "from": "    serde_json::from_str::<NoRepeatedKeys>(text).map_err(|e| format!(\"divergences: {e}\"))?;\n",
+  "to": "    let _ = serde_json::from_str::<NoRepeatedKeys>(text);\n"
+ },
+ {
+  "id": "DV-27",
+  "by": "author",
+  "what": "a nested object's repeated key is not seen",
+  "file": "src/divergence.rs",
+  "from": "            map.next_value::<Self>()?;\n",
+  "to": "            map.next_value::<de::IgnoredAny>()?;\n"
+ },
+ {
+  "id": "DV-28",
+  "by": "author",
+  "what": "a committed real-book key need not be one its patch sets",
+  "file": "src/divergence.rs",
+  "from": "            .find(|key| !d.expect.values().any(|patch| patch.contains_key(*key)))\n",
+  "to": "            .find(|key| false && !d.expect.values().any(|patch| patch.contains_key(*key)))\n"
+ },
+ {
+  "id": "DV-29",
+  "by": "author",
+  "what": "a registry without its expectations, or the reverse, is accepted",
+  "file": "src/divergence.rs",
+  "from": "    if expected.is_empty() == registry.is_none() {\n",
+  "to": "    if true {\n"
+ },
+ {
+  "id": "DV-30",
+  "by": "author",
+  "what": "a real-book run passes with a named divergence missing",
+  "file": "src/divergence.rs",
+  "from": "        self.differences.is_empty() && self.missing.is_empty()\n",
+  "to": "        self.differences.is_empty()\n"
+ },
+ {
+  "id": "DV-31",
+  "by": "author",
+  "what": "a real-book run passes with a difference left",
+  "file": "src/divergence.rs",
+  "from": "        self.differences.is_empty() && self.missing.is_empty()\n",
+  "to": "        self.missing.is_empty()\n"
  }
 ]

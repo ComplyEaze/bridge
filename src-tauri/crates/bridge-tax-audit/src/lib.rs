@@ -43,6 +43,7 @@ pub mod compare;
 pub mod counter_cheques_40a3;
 pub mod creditor_ageing_43bh;
 pub mod depreciation;
+pub mod divergence;
 pub mod documents;
 pub mod entity_269st_gap;
 pub mod error;
@@ -486,8 +487,8 @@ pub struct DepreciationConfig {
     pub opening_wdv_paise: BTreeMap<String, i64>,
     pub dep_expense_ledgers: BTreeSet<String>,
     /// `[depreciation.put_to_use_by_voucher]`, guid -> date; optional, empty when absent (no
-    /// client TOML configures this key today -- the reference engine's own `pack.py` never
-    /// passes it either -- but `depreciation.py`'s `run()` signature carries it, so this port
+    /// client TOML configures this key today -- the reference engine's own pack never
+    /// passes it either -- but the depreciation test's `run()` signature carries it, so this port
     /// does too).
     pub put_to_use_by_voucher: BTreeMap<String, TallyDate>,
 }

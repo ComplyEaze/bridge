@@ -79,7 +79,7 @@ impl TracesDocuments {
     }
 }
 
-/// A bank statement, as the reference's `adapters/bank_documents.py` reads one extraction: the
+/// A bank statement, as the reference's bank-statement reader reads one extraction: the
 /// document-level facts it carries once, and its transaction rows in the source's own order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BankStatementDoc {
@@ -130,7 +130,7 @@ pub enum BalanceField {
     Closing,
 }
 
-/// Why the reference's bank-statement reader (`adapters/bank_documents.py`) refuses a statement:
+/// Why the reference's bank-statement reader refuses a statement:
 /// the statement is well formed, but reading it would put a false sentence in front of the CA.
 /// `row` is a 0-based position in the statement's list; [`StatementRefusal::reason`] is the
 /// reader's plain-words reason, which `bank_reconciliation::refused` reports.
@@ -647,8 +647,8 @@ mod tests {
         }
     }
 
-    /// The reference reader's own selftest cases (`selftest/test_bank_documents.py` at reference
-    /// `da9e2d3d`), on the emitter's shape: each refusal by its variant, with the reader's words.
+    /// The reference reader's own selftest cases (at reference `da9e2d3d`), on the emitter's
+    /// shape: each refusal by its variant, with the reader's words.
     #[test]
     fn a_statement_the_reference_reader_refuses_is_refused_with_its_reason() {
         let one = [("2025-06-05", 100_000, Some(400_000))];

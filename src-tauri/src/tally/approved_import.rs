@@ -37,6 +37,10 @@ pub(crate) const REVIEW_BUTTON: &str = "Yes";
 /// same Yes/No/Cancel box as the review.
 #[cfg(not(windows))]
 const RELEASE_BUTTON: &str = "Release the stop";
+/// The settle dialog's positive button on a Mac (#1709). Windows shows the
+/// same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const SETTLE_BUTTON: &str = "Close the batch";
 /// What the review dialog's subprocess prints, followed by the nonce it was
 /// given, when and only when the person chose the positive button.
 const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
@@ -55,6 +59,8 @@ const MASTERS_BUTTON: &str = "Create ledger";
 const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
 /// The same for the invoice-stop release dialog, distinct from both.
 const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
+/// The same for the settle dialog (#1709), distinct from every other.
+const SETTLE_TOKEN_PREFIX: &str = "bridge-batch-settle-acknowledged:";
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -2188,17 +2194,22 @@ enum Shown {
     Post,
     Review,
     StopRelease,
+    Settle,
     /// The one-ledger dialog, always about one ledger.
     Masters,
 }
 
-/// The two kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
-/// and each has its own subprocess mode, so the invoice-stop release is never
-/// shown with the review's title or button (#1828).
+/// The kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
+/// and each has its own subprocess mode, so the invoice-stop release or a
+/// batch's settlement is never shown with the review's title or button
+/// (#1828, #1709).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReviewKind {
     Review,
     StopRelease,
+    /// A person's settlement of a batch Tally answered as creating none of
+    /// its vouchers (#1709).
+    Settle,
 }
 
 impl ReviewKind {
@@ -2206,6 +2217,7 @@ impl ReviewKind {
         match self {
             Self::Review => Shown::Review,
             Self::StopRelease => Shown::StopRelease,
+            Self::Settle => Shown::Settle,
         }
     }
 
@@ -2215,6 +2227,7 @@ impl ReviewKind {
         match self {
             Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
             Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
+            Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
         }
     }
 }
@@ -2245,6 +2258,13 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Settle => (
+            format!(
+                "close this batch in ComplyEaze Bridge for good, so that it never sends {} again",
+                these_vouchers(count)
+            ),
+            "Nothing is closed until you answer.",
+        ),
         Shown::Masters => (
             "create this ledger in Tally".into(),
             "Nothing is created until you answer.",
@@ -2270,6 +2290,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Post => post_words(count).1,
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
+        Shown::Settle => SETTLE_BUTTON.to_string(),
         Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     wrapped(
@@ -2619,6 +2640,18 @@ pub fn run_release_confirmation() -> bool {
     )
 }
 
+/// Entry point for the settle dialog's subprocess (#1709), under the same
+/// rules: its own window title and token, so a settlement is never titled a
+/// review.
+pub fn run_settle_confirmation() -> bool {
+    answer_with_token(
+        SETTLE_TOKEN_PREFIX,
+        show_settle_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
 /// Read the parent's nonce line, count line and preview from `input`, show
 /// `dialog` with that count and preview, and
 /// write the token for that nonce to `output` only when it returns true. The
@@ -2716,6 +2749,29 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
         == rfd::MessageDialogResult::Custom(RELEASE_BUTTON.into())
 }
 
+/// The settle window's title: it closes a batch and reviews no voucher, so it
+/// names neither a review nor a post (#1709).
+#[cfg(not(windows))]
+fn settle_title() -> String {
+    "ComplyEaze Bridge — close this batch".into()
+}
+
+/// The settle dialog: the acknowledgement dialog with its own title and
+/// button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    rfd::MessageDialog::new()
+        .set_title(settle_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            SETTLE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(SETTLE_BUTTON.into())
+}
+
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
 /// custom labels, so the title asks the question, with the count for a batch
 /// (#746).
@@ -2781,6 +2837,46 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows settle box's title, a question as the review's is (#1709).
+#[cfg(windows)]
+fn settle_question() -> String {
+    "ComplyEaze Bridge — close this batch for good?".into()
+}
+
+/// The Windows settle box: the review's box with its own title.
+#[cfg(windows)]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
     let answer = super::box_fit::guarded(|| {

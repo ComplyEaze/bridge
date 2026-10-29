@@ -288,6 +288,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_no_response: 1,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            settled_by_person: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -301,6 +302,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            settled_by_person: 0,
             no_dispatch_never_verified: 1
         })
     );
@@ -319,6 +321,7 @@ fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 0,
+        settled_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -877,11 +880,34 @@ fn a_reviewed_batch_is_its_own_class_of_unsettled_batch() {
         unsettled_no_response: 1,
         unsettled_binding_refused: 1,
         unsettled_reviewed: 1,
+        settled_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
     assert_eq!(journal["not_settled"], 4);
     assert_eq!(journal["not_settled_reviewed_not_attributed"], 1);
     assert_eq!(journal["not_settled_binding_refused"], 1);
+    assert_eq!(journal["not_settled_not_verified"], 1);
+}
+
+/// A batch a person settled after Tally answered that its post created none
+/// of its vouchers is reported in its own count, outside `not_settled` (#1709).
+#[test]
+fn a_settled_batch_is_reported_outside_not_settled() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 5,
+        sent_or_found: 5,
+        unsettled: 3,
+        unsettled_no_response: 1,
+        unsettled_binding_refused: 1,
+        unsettled_reviewed: 0,
+        settled_by_person: 2,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 3);
+    assert_eq!(journal["settled_by_person"], 2);
     assert_eq!(journal["not_settled_not_verified"], 1);
 }

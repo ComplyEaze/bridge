@@ -94,3 +94,12 @@ None of these 0.7.0 sheets toggles a setting only to isolate a variable. Rows 7 
 - Deviation D1 of the sheet (sends made while one unsaved voucher sits on Tally's screen) has the run coordinator's recorded yes, in the coordinator's log of 28 Oct 2026. The lab records in `notes.txt`: "D1 used with the run coordinator's recorded yes of 28 Oct".
 - The sheet defers row 17's AFTER restore and its C10 until the #1039 dialog row has finished: the refused batch, its data folder and the book are that row's input. The lab does not restore or shut row 17's company after row A; it does so only when the run coordinator says RESTORE, after the dialog row.
 - Row 19 (the #1713 row) stays last: the gateway is held for about four hours there.
+
+**Row 22, #1709 settle row S1 (added 29 Oct 2026): runs on its own data folder and build, after the rows above.**
+- The sheet is `lab/1709-settle-row` at bc6b5ea8e4484fa8ae5a27dbbcec30fc4b35577c (one row, `S1-1709-settle.md`, with its `LAB-COMMON.md` v3 copy).
+- The build: #2150 at head ed0f5fc5, Bridge CI run 40834023243, artifact 12880706328 (`unsigned-bundle-smoke-windows-latest`), `bridge_mcp.exe` sha256 e95269fb9ab2d72676902891615d733e2cb13e12cc003b483afbc0c0110d9a58.
+- The owner's go-ahead is recorded twice: in the run coordinator's chat on 29 Oct 2026, "yes download the relevant builds on lab; yes on ci bundle merge gate", and in the lab's own chat the same day, "Yes, download #2150's unsigned-bundle-smoke-windows-latest artifact from its CI run at head ed0f5fc5 and run #1709-settle."
+- THE COMPANY: BRIDGE SHAPE LAB (books from 1 April 2025), whose ledgers are listed in `lab/2018-batch-report-routes-answers` at e56a7305, answer `001-s1-ledger_masters.json`.
+- L1 = `Discount Allowed` (Indirect Expenses), L2 = `Capital A/c` (Capital Account), as that answer names them; neither is a party, bank or cash ledger.
+- The date for steps 2.1 and 2.2: 15 June 2025. At step 0 the lab reads `vouchers` for that day; if a Journal is already on it, the lab uses the next day with none and records which.
+- Not established: whether L1 or L2 is bill-wise (the build refuses a bill-wise ledger it did not approve, which would show at step 2.1, a STOP).

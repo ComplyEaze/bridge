@@ -1,0 +1,14 @@
+7f1e5d2a-0000-4000-8000-000000001781
+1
+Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to cancel. Nothing is
+created until you answer.
+
+Create ONE ledger in "BRIDGE BATCH LAB"
+Company GUID: 00000000-0000-0000-0000-000000000000
+Company number: 000000  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9001
+
+Create ledger "Lab Keyboard Suspense" under Suspense A/c
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.

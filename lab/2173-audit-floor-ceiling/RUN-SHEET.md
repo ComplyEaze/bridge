@@ -54,12 +54,14 @@ This item records, through ComplyEaze Bridge's own tool calls:
      - the census rows only as counts: census answers over 1 MiB are not kept.
    - **Its timing is Tally's own.** It reads every answer to its end with no time limit, even after ComplyEaze Bridge has given up at 20 s. Its `seconds` column is therefore Tally's real time.
    - **Self-test, before Phase B:** run `python -I read_relay.py --self-test`. EXPECT exactly `self-test: ok (7 forwarded unchanged, 12 refused, none of the refused reached Tally; rows by structure; an abandoned answer read to its end)` and exit code 0. Anything else = STOP.
-   - **Stopping it.** Stop it only when the last row of its `manifest.tsv` has a status and a seconds value, so that no answer is still being read. After a deadline that row may take minutes. Wait for it, up to 15 minutes. No row by then = STOP: leave the relay running and press no key.
+   - **Stopping it.** The relay writes a request's row only once its whole answer is read, so the manifest cannot show a request still in flight. Before stopping it, send `GET http://127.0.0.1:9012/status` THROUGH THE RELAY with `curl.exe -sS -w "%{http_code}" http://127.0.0.1:9012/status` (no `--max-time`). The relay sends one request to Tally at a time, so this one waits behind any answer still being read and returns only once Tally has answered every earlier request. Its row is then the last.
+     - EXPECT 200. Only then press Ctrl+C in the relay's console.
+     - After a deadline that wait may take minutes. Up to 15 minutes is allowed. No answer by then = STOP: leave the relay and that curl running, and press no key.
 5. **Screens.** Take a screenshot of the whole Tally window before each Phase B step's first call and before each import. A dialog or a half-entered screen = C7: STOP.
 6. **Time.** Each tool call has 15 minutes. A call with no answer by then: STOP, leave it running, press no key, send nothing more, report.
-7. **Held gateway.** After each tool call answers, send `GET /status` straight to 9001.
-   - If Tally is still building an answer ComplyEaze Bridge gave up on (the relay's last row has no seconds value yet), wait for that row first (Difference 4).
-   - Then send `GET /status`. No answer within 60 seconds = the gateway is held: STOP, leave everything running, press no key, send nothing more, report, and wait.
+7. **Held gateway.** After each tool call answers:
+   - First the relay's own status check (Difference 4, `GET http://127.0.0.1:9012/status`). It returns only once Tally has finished any answer ComplyEaze Bridge gave up on.
+   - Then `GET /status` straight to 9001. No answer within 60 seconds = the gateway is held: STOP, leave everything running, press no key, send nothing more, report, and wait.
 
 ## The requests (`requests/`, UTF-16LE with a byte-order mark; check each against `SHA256.txt` before its first send)
 - **How they were made.** Each is the text ComplyEaze Bridge's own builders render, at master `026ba163`. A throwaway test called them with THE NEW COMPANY's name and wrote their output; no byte was typed by hand.
@@ -67,6 +69,8 @@ This item records, through ComplyEaze Bridge's own tool calls:
   - `m01-ledgers`: the lab writer's own All Masters import of the two ledgers (`render_master_batch_xml` with `render_ledger_xml`, `agent_lab_import.rs`).
   - `v01` to `v13`: the lab writer's own voucher import (`render_voucher_batch_xml`), each holding whole days, at most 500 vouchers. Each voucher's narration ends with the writer's `[BRIDGE-LAB:<id>]` attribution marker, and each carries its own `REMOTEID`. `plan.tsv` lists each file's vouchers and first and last date.
 - **Sizes.** The marks answer has a READ BOUND of 16,384 bytes; each import's answer, 65,536 bytes.
+- **Encoding.** Each file is UTF-16LE with a byte-order mark. The import files' text opens with `<?xml version="1.0" encoding="UTF-8"?>`, as every import from ComplyEaze Bridge's writers does; the bytes are UTF-16 nonetheless, and the `Content-Type` C3 sends says so.
+- **`SHA256.txt`** has three columns (sha256, bytes, path) and does not list itself. `shasum -c` cannot read it: compare each line with Get-FileHash and the file's size.
 
 ## The builds (Phase B)
 - **BUILD-A (step B0):** candidate A, the release-candidate bundle of master `026ba163d`, CI artifact `12928034390`. The release-candidate sitting downloads it, so no second download is needed.
@@ -92,19 +96,19 @@ This item records, through ComplyEaze Bridge's own tool calls:
 - no password;
 - every other field as the screen offers. If the Features screen opens, accept it unchanged and record every value it shows.
 
-Take a screenshot before accepting. Load it alone. Then:
+Take a screenshot before accepting. Accept the screen with its own accept (no Escape on any screen, C7). Load the company alone. Then:
 - Send `m00-marks` (name `m-a`). EXPECT one COMPANY row named `BRIDGE AUDIT FLOOR LAB`. Record its GUID, `ALTMSTID` and `ALTVCHID` (a company with no voucher may omit `ALTVCHID`: record that).
 - Record the company number.
 
-**A2.** Send `m01-ledgers`, then `m00-marks` (`m-l`).
+**A2.** Send `m01-ledgers`. Take a screenshot of the whole Tally window (C3: a dialog = STOP, nothing further is sent). Then send `m00-marks` (`m-l`).
 - The import's answer: EXPECT `CREATED` 2, the other counters 0, and no `LINEERROR` (C4); else STOP.
 - The marks: EXPECT `ALTMSTID` above `m-a`'s by at least 2. Record it.
 
-**A3.** Take backup BK0 (Difference 3, C5). Then `m00-marks` (`m-bk`): EXPECT it byte-equal to `m-l`, or differing only inside `CMPINFO`. Any other difference = STOP before `v01`.
+**A3.** Take backup BK0 (Difference 3, C5). After the Backup screen has closed, take a screenshot of the whole Tally window. Then `m00-marks` (`m-bk`): EXPECT it byte-equal to `m-l`, or differing only inside `CMPINFO`. Any other difference = STOP before `v01`.
 
-**A4.** Send `v01` to `v13` in order. After each one:
-- `m00-marks`;
-- a screenshot of the whole Tally window, before the next request (C3).
+**A4.** Send `v01` to `v13` in order. After each one, in this order:
+- a screenshot of the whole Tally window (C3: a dialog = STOP, nothing further is sent, the marks read included);
+- `m00-marks`.
 
 For each import:
 - EXPECT `CREATED` equal to that file's count in `plan.tsv`;
@@ -113,7 +117,7 @@ For each import:
 
 EXPECT `ALTVCHID` to rise by that import's count each time. A different step is recorded, not a STOP, provided `CREATED` matched.
 
-After `v13`, the 5,960 vouchers are in. Record `ALTVCHID` as M1; it should be 5,960 if the first voucher took AlterID 1. Then C10 (shut THE NEW COMPANY).
+After `v13`, the 5,960 vouchers are in. Record `ALTVCHID` as M1; it should be 5,960 if the first voucher took AlterID 1 (not established for a new company: recorded). **M1 above 8,192 = record and report before B0**: every Phase B EXPECT on this book assumes a mark that fits one census request. Then C10 (shut THE NEW COMPANY).
 
 STOP on: any dialog (C7); any import answer that differs from its EXPECT line; a voucher import's `CREATED` that differs from `plan.tsv`. A STOP part-way leaves the imports already sent in the book. Each one is sent once in this item's life, never again (C3).
 
@@ -134,7 +138,8 @@ Before B0: the relay's self-test (Difference 4).
    - `test` = `cash_44ab`;
    - `cash_groups` = `["Cash-in-Hand"]` and `bank_groups` = `["Bank Accounts"]`.
 
-   Note the UTC time at the call and at its answer, and keep the whole answer as a file. A refusal is an answer: record its code. Do not call it again.
+   Note the UTC time at the call and at its answer, and keep the whole answer as a file. A refusal is an answer: record its code. Do not call it again in this session.
+   - **A re-run after a deadline.** After `audit_part_deadline_exceeded`, the build owes a drain that clears only when it is restarted. A re-run of the step therefore needs a new session, a new data folder, a new relay folder and the run coordinator's word, after Difference 7.
 5. Close the build's session. Then Difference 7 (the relay's last row, then `GET /status`), then stop the relay (Difference 4).
 6. Run `python -I summarise.py C:\bridge-lab\2173l\<step>\relay` and keep its output. Check it against the EXPECT lines.
 7. C10 (shut the step's company).
@@ -143,18 +148,23 @@ Before B0: the relay's self-test (Difference 4).
 |---|---|---|---|
 | B0 | BUILD-A | BRIDGE AUDIT FLOOR LAB | `2025-04-01` to `2026-03-31` |
 | B1 | BUILD-B | BRIDGE AUDIT FLOOR LAB | `2025-04-01` to `2026-03-31` |
+| B2-pre | BUILD-B | BRIDGE CORPUS DENSE | `2025-04-01` (a `vouchers` call, not the audit) |
 | B2 | BUILD-B | BRIDGE CORPUS DENSE | `2025-04-01` to `2025-06-30` |
 | B3 | BUILD-B | BRIDGE CORPUS DENSE | `2025-04-01` to `2026-03-31` |
 
 ### EXPECT (recorded; the lab judges only the STOP rules)
-**On any step,** an answer other than the step's EXPECT is recorded whole and reported before the next step. This includes:
+**On any step,** an answer other than the step's EXPECT is recorded whole and reported before the next step.
+
+**Every step's census can run past 20 s.** A full span of 8,192 rows over the dense book's year took 14.8 s and 25.0 s in two sittings. B0 and B1's single census holds 5,960 rows, and B2's first span about 7,460. So `audit_part_deadline_exceeded` is possible on B0 to B3, not only B3.
+
+The other answers include:
 - an `audit_part_deadline_exceeded`, a request ComplyEaze Bridge gave up on at 20 s. On the audit's read a slow census, trial balance, ledger or company read is reported under this code. The relay's seconds give Tally's real time.
 - an `audit_part_response_size_limit_exceeded`, an answer over 32 MiB;
 - an `audit_part_drain_required`;
 - any engine code (`C1-…` to `C11-…`, `CFG-…`, `BIND-GROUP-UNKNOWN`).
 
 **B0 (before #2191, the new book).**
-- **The answer:** a refusal, code `voucher_window_too_many_reads`.
+- **The answer:** a refusal, code `voucher_window_too_many_reads`. This build plans every part at 42 vouchers. That is 149 requests: one for 1 April, then two AlterID spans for each of the 74 days of 80. It is over 128, so the build refuses before any data part. The count is not in the answer.
 - **The census:**
   - EXPECT one census line with no span: the mark, about 5,960, fits one census request, which this build sends unspanned;
   - rows equal to M1 (5,960).
@@ -182,6 +192,9 @@ Before B0: the relay's self-test (Difference 4).
   - **The call over 240 s:** record its time. A desktop chat's host limit would then bound this read, not the read count.
 
 **B2 (after #2191, the dense quarter).**
+- **The pre-check, B2-pre, first: a step of its own.** It has its own relay folder (`C:\bridge-lab\2173l\B2pre\relay`), data folder and session, run by the step procedure above with one difference: in place of `audit_test_run`, call `vouchers` once with BRIDGE CORPUS DENSE's `company_guid`, `from` and `to` both `2025-04-01` (one day: no month question arises). Record how many vouchers the answer holds, every page. EXPECT more than 42.
+  - 42 or fewer: do NOT run B2. Record the count and report. The refusal B2 expects comes only from a first day over 42, and the read would otherwise send up to 127 data parts.
+  - Then B2 itself, with new relay and data folders and a new session.
 - **The answer:** a refusal, code `audit_window_divided_by_alterid`.
 - **The census, finished, nothing stopped:**
   - four census lines with spans (0, 8192], (8192, 16384], (16384, 24576] and (24576, 29900];

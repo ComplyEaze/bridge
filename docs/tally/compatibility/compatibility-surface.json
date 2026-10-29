@@ -376,6 +376,10 @@
       "path": "src-tauri/src/agent_bank_statement.rs"
     },
     {
+      "path": "src-tauri/src/agent_bill_trail.rs",
+      "reason": "The outstandings party detail: decides when the census and the read by the party's own ledger are sent (only after the company window needs too many reads) and what each of their results means. A defect sends a ledger-scoped request where none was meant, or reports a refusal or a partial list as the party's whole trail."
+    },
+    {
       "path": "src-tauri/src/agent_cash_flow.rs",
       "reason": "The cash_flow tool: returns the months only when their net total tied to the trial balance's cash and bank ledgers, and withholds them otherwise. A defect shows a cash movement Tally's own ledgers contradict."
     },

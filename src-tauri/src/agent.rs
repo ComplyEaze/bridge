@@ -813,6 +813,29 @@ struct ReadDetail {
     /// The ledger a group summary could not place (#1230). Shown as a party name, so `mask_parties`
     /// masks it; a group is never named (its name is in the book's groups, and only the ledger is known).
     unplaced_ledger: Option<String>,
+    /// What a party detail's refusal says about the read by the party's ledger (#1356).
+    window_scope: Option<ScopeReport>,
+}
+
+/// See [`ReadDetail::window_scope`]: whether the refusal is that of the read by the party's ledger
+/// (`ledger_scoped`) or the company window's, which stands (`whole_book`), why, and a fixed
+/// sentence. Codes and fixed text only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct ScopeReport {
+    pub(super) basis: &'static str,
+    pub(super) reason: Option<&'static str>,
+    pub(super) note: &'static str,
+}
+
+impl ScopeReport {
+    /// As the result or a refusal carries it: `reason` only when there is one.
+    pub(super) fn json(self) -> Value {
+        let mut value = json!({"basis": self.basis, "note": self.note});
+        if let Some(reason) = self.reason {
+            value["reason"] = json!(reason);
+        }
+        value
+    }
 }
 
 /// See [`ReadDetail::bill_row`].
@@ -834,6 +857,19 @@ impl ToolFailure {
             .get_or_insert_with(Box::default)
             .planned_reads = Some(reads);
         self
+    }
+
+    fn with_window_scope(mut self, report: ScopeReport) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .window_scope = Some(report);
+        self
+    }
+
+    /// The scope a refusal reports, when it reports one.
+    #[cfg(test)]
+    fn window_scope(&self) -> Option<ScopeReport> {
+        self.read_detail.as_ref()?.window_scope
     }
 
     fn with_incomplete_read(mut self, read: IncompleteRead) -> Self {
@@ -1667,6 +1703,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              exactly that sequence before parsing, so a ledger name carrying it would read back \
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
+        ),
+        // The `outstandings` party detail's read by the party's ledger returned a voucher with no
+        // line on that ledger (#1356): nothing was used, and the company window's own read had
+        // already been refused as needing too many requests.
+        "party_ledger_row_without_line" => Some(
+            "ComplyEaze Bridge read this party's vouchers by its ledger, because the company's \
+             vouchers for the window needed too many requests, and Tally returned a voucher that \
+             has no line on that ledger, so the detail used none of them. Tell the user the \
+             party's detail could not be read this way, and do not repeat the same call in a \
+             loop. A shorter window helps when a bill is named: name a `reference` that \
+             `open_bills` lists for the party, and the read starts at that bill's date.",
         ),
         // A ledger-scoped movement read returned a voucher with no line on the ledger (#485):
         // nothing was summed. The same figures are in the Trial Balance, which does not read
@@ -2643,16 +2690,18 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads, bill_row, unplaced_ledger) = read_detail
-                    .map(|detail| {
-                        (
-                            detail.incomplete_read,
-                            detail.planned_reads,
-                            detail.bill_row,
-                            detail.unplaced_ledger,
-                        )
-                    })
-                    .unwrap_or_default();
+                let (incomplete_read, planned_reads, bill_row, unplaced_ledger, window_scope) =
+                    read_detail
+                        .map(|detail| {
+                            (
+                                detail.incomplete_read,
+                                detail.planned_reads,
+                                detail.bill_row,
+                                detail.unplaced_ledger,
+                                detail.window_scope,
+                            )
+                        })
+                        .unwrap_or_default();
                 if let Some(ledger) = unplaced_ledger {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["ledger"] = party_name_value(ledger);
@@ -2677,6 +2726,11 @@ impl Server {
                             "needed_at_least": reads.needed_at_least,
                             "allowed": reads.allowed,
                         });
+                    }
+                }
+                if let Some(scope) = window_scope {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["window_scope"] = scope.json();
                     }
                 }
                 if let Some(counts) = counts {

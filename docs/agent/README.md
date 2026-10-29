@@ -3993,8 +3993,8 @@ composite voucher anywhere in the window fails it (`voucher_amount_invalid`, or
 `bill_allocation_amount_invalid` when the composite is on an allocation). The read is bounded as
 every window read is. It may send at most 128 data requests (each sent twice, as every read is, with its
 census and the company marks besides), and before anything is measured a data request holds at
-most 42 vouchers, so a window of more than 5,376 of the company's vouchers is always
-refused, and a smaller one may be when its parts measure heavier. The refusal comes before any
+most 42 vouchers, so a window of more than 5,376 of the company's vouchers is refused unless
+the party is read by its ledger (below), and a smaller one may be when its parts measure heavier. The refusal comes before any
 data request when the census shows it (the census stops as soon as it has counted more vouchers
 than the allowed requests can hold), and otherwise when a measured part does, as
 `trail_window_too_large` (name a `reference` that `open_bills` lists for the party; the read then
@@ -4010,8 +4010,31 @@ the detail is not available for that party; its vouchers can still be read with 
 allocates to (opening bills) are not counted by it, and a party with very many of them can meet
 the response size refusal (`agent_response_too_large`) instead. A reference neither the vouchers
 nor Tally's report know for the party is refused (`bill_reference_not_found`). The detail ignores
-`direction`, `top`, `offset` and `limit`; `window.company_vouchers_read` counts the company's
-vouchers in the window, not the party's. A named bill's window never starts before the books.
+`direction`, `top`, `offset` and `limit`. The detail reads the company's window, and
+`window.company_vouchers_read` counts the company's vouchers in it, not the party's. Only when that
+read is refused as needing more requests than one call may spend is the party read by its own
+ledger instead (#1356): when its vouchers carry the ledger's name as stored, the name holds only
+ASCII letters, digits and single spaces and no word a TDL formula reads as an operator (`and`,
+`or`, `not` and a few more), and no other ledger shares it but for case or spaces. That is the
+scoped window read `ledger_movement` uses, with the window read's fields (protocol reference
+section 11c.6): a census of the ledger in AlterID spans counts the party's vouchers, the planner
+divides them by date into parts, each part is admitted against the census voucher by voucher, and
+`window.party_vouchers_read` counts the party's vouchers. The detail then carries `window_scope`
+(`basis` `ledger_scoped`, `vouchers_read`, and a `note`: only the vouchers Tally lists under the
+ledger were read, and that list has been compared with a whole-book read only in windows where
+every voucher carried the ledger). Where the ledger is not read, or its read finds nothing or
+needs a day divided by AlterID (a part never observed ledger-scoped), the company window's
+refusal stands and carries `window_scope` with `basis` `whole_book` and the `reason`
+(`ledger_name_outside_scoped_alphabet`, `ledger_name_holds_formula_word`,
+`ledger_vouchers_spell_it_otherwise`, `ledger_name_shared_but_for_case`,
+`ledger_scope_plan_needs_day_split` or `ledger_scope_empty_not_established`). A refusal of the
+ledger read itself keeps its own code, with `window_scope` `basis` `ledger_scoped`: a part not
+admitted against the census (`voucher_window_part_not_admitted`, which is what a book that moved
+between the census and the read looks like), a row with no line on the ledger
+(`party_ledger_row_without_line`), or the party's own vouchers needing too many requests. The
+ledger census costs one request (sent twice, as every read is) per 8,192 of the book's AlterIDs,
+spent after the company window's census, so such a call can take about twice as long; that cost
+is unmeasured. A named bill's window never starts before the books.
 The company's two change marks are read before the statement of open bills and again after the
 voucher window, and a detail whose marks moved between them is refused as
 `voucher_window_changed_during_read` (a voucher entered or saved, a ledger renamed, or a report

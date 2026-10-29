@@ -1213,6 +1213,138 @@ fn confirmed_absent_is_a_snake_case_terminal_verdict_without_a_guid() {
     }
 }
 
+/// `posted_unattributed` as `MasterVerdict::judged` writes it: every GUID
+/// named, and the reason it is not verified.
+fn unattributed_verdict(batch: &MasterBatch) -> MasterVerdict {
+    let mut verdict = verdict_for(batch, MasterVerdictState::PostedUnattributed);
+    for item in &mut verdict.items {
+        item.reason = Some("counters_unavailable".into());
+    }
+    verdict
+}
+
+/// The state is for an answer that was lost, so it is admitted only when no
+/// answer is on file, and refused after any answer: one whose counters could
+/// not be read, and one with counters, even counters that count nothing.
+#[test]
+fn posted_unattributed_is_admitted_only_with_no_answer_on_file() {
+    let batch = batch(&batch_id());
+    let intent = journal_text(&full_records(&batch)[..2]);
+    let unattributed = line(&MasterRecord::Verdict(unattributed_verdict(&batch)));
+    assert!(read(&format!("{intent}{unattributed}")).is_ok());
+    let answered = |counters: Option<MasterCounters>| {
+        let mut response = response_for(&batch);
+        response.counters = counters;
+        line(&MasterRecord::DispatchResponse(response))
+    };
+    assert_eq!(
+        read(&format!("{intent}{}{unattributed}", answered(None))).unwrap_err(),
+        invalid(Invalid::UnattributedWithAnswer)
+    );
+    let count = |created: u64, altered: u64, errors: u64| MasterCounters {
+        created,
+        altered,
+        deleted: 0,
+        ignored: 0,
+        errors,
+        cancelled: 0,
+        exceptions: 0,
+    };
+    for counters in [
+        count(1, 0, 0),
+        count(0, 0, 0),
+        count(0, 1, 0),
+        count(1, 0, 1),
+    ] {
+        assert_eq!(
+            read(&format!(
+                "{intent}{}{unattributed}",
+                answered(Some(counters))
+            ))
+            .unwrap_err(),
+            invalid(Invalid::UnattributedWithAnswer),
+            "{counters:?}"
+        );
+    }
+}
+
+#[test]
+fn posted_unattributed_is_a_snake_case_terminal_verdict_naming_every_guid() {
+    let batch = batch(&batch_id());
+    let prefix = journal_text(&full_records(&batch)[..2]);
+    assert_eq!(
+        serde_json::to_string(&MasterVerdictState::PostedUnattributed).unwrap(),
+        "\"posted_unattributed\""
+    );
+    assert!(MasterVerdictState::PostedUnattributed.is_terminal());
+    let text = format!(
+        "{prefix}{}",
+        line(&MasterRecord::Verdict(unattributed_verdict(&batch)))
+    );
+    let journal = read(&text).unwrap();
+    let state = journal.state(&batch.batch_id).unwrap();
+    assert!(state.is_settled());
+    assert_eq!(journal.summary().not_settled, 0);
+    let mut missing = unattributed_verdict(&batch);
+    missing.items[1].guid = None;
+    assert_eq!(
+        read(&format!(
+            "{prefix}{}",
+            line(&MasterRecord::Verdict(missing))
+        ))
+        .unwrap_err(),
+        invalid(Invalid::VerifiedWithoutGuid)
+    );
+    for later in [
+        MasterVerdictState::PostedVerified,
+        MasterVerdictState::PostedUnattributed,
+        MasterVerdictState::ReconciliationRequired,
+        MasterVerdictState::MastersAfterPostUnconfirmed,
+    ] {
+        let text = format!(
+            "{prefix}{}{}",
+            line(&MasterRecord::Verdict(unattributed_verdict(&batch))),
+            line(&MasterRecord::Verdict(verdict_for(&batch, later)))
+        );
+        assert_eq!(
+            read(&text).unwrap_err(),
+            invalid(Invalid::VerdictAfterTerminal),
+            "{later:?}"
+        );
+    }
+}
+
+#[test]
+fn posted_unattributed_stops_blocking_a_new_batch_of_the_same_ledger() {
+    let (first, mut records) = dispatched_batch("Synthetic One");
+    let (_, again) = dispatched_batch("SYNTHETIC-ONE");
+    assert_eq!(
+        read(&journal_text(&[records.clone(), again.clone()].concat())).unwrap_err(),
+        MasterLedgerError::OpenDispatchOverlaps
+    );
+    records.push(MasterRecord::Verdict(unattributed_verdict(&first)));
+    assert!(read(&journal_text(&[records, again].concat())).is_ok());
+}
+
+/// A build that does not know a verdict state refuses the whole journal on a
+/// line holding it, so every master write and reconcile stops. A build from
+/// before `posted_unattributed` reads it as this one reads a state it lacks;
+/// that is why the state ships in the same release as the journal itself.
+#[test]
+fn a_reader_without_a_verdict_state_refuses_the_whole_journal() {
+    let batch = batch(&batch_id());
+    let text = format!(
+        "{}{}",
+        journal_text(&full_records(&batch)[..2]),
+        line(&MasterRecord::Verdict(unattributed_verdict(&batch)))
+    );
+    assert!(read(&text).is_ok());
+    let needle = "\"state\":\"posted_unattributed\"";
+    assert_eq!(text.matches(needle).count(), 1, "{text}");
+    let unknown = text.replace(needle, "\"state\":\"posted_somewhere_later\"");
+    assert_eq!(read(&unknown).unwrap_err(), invalid(Invalid::Parse));
+}
+
 #[test]
 fn confirmed_absent_stops_blocking_a_new_batch_of_the_same_ledger() {
     let (first, mut records) = dispatched_batch("Synthetic One");

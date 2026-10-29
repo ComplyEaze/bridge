@@ -5864,6 +5864,186 @@ async fn a_terminal_verdict_with_no_answer_on_file_is_not_reported_as_maybe_sent
     );
 }
 
+/// The book after a create whose ledger has `alter_id`.
+fn book_with_new_ledger(alter_id: u64) -> Vec<IndexedMaster> {
+    let mut book = book_after();
+    book.last_mut().unwrap().alter_id = alter_id;
+    book
+}
+
+/// A create sent, its answer lost, and a later call: the first call ends with
+/// the outcome unknown, and the reconcile reads the book as `after`.
+async fn reconcile_after_a_lost_answer(
+    after: Vec<IndexedMaster>,
+    target_mark: u64,
+) -> (Value, std::path::PathBuf, tempfile::TempDir, String) {
+    let plans = through_post(xml(created_one()).with_delivery(
+        Delivery::ResetAfterRequestProcessed {
+            delay: Duration::from_millis(0),
+        },
+    ));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let first = posting(
+        &ScriptedApproval::approving(),
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    assert_eq!(
+        error_code(&first),
+        "import_dispatch_outcome_unknown",
+        "{first}"
+    );
+    assert_eq!(create_count(&sent(simulator)), 1, "one POST on the wire");
+    assert!(state_of(directory.path(), &batch.batch_id)
+        .response
+        .is_none());
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(
+        target_mark,
+        3,
+        Some(suspense_answer()),
+    )))
+    .unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let answer = reconciling(after, later.call_tool("post_ledger_creates", args)).await;
+    assert_eq!(create_count(&sent(reads)), 0, "a reconcile never sends");
+    let path = directory.path().to_path_buf();
+    (answer, path, directory, batch.batch_id)
+}
+
+/// The answer is lost on its way, and a reconcile finds the ledger as sent,
+/// written by the first master change after the intent's mark of 7: the batch
+/// settles as `posted_unattributed`, never verified, and releases its name.
+#[tokio::test]
+async fn a_lost_answer_whose_ledger_is_the_first_change_after_the_intent_settles_unattributed() {
+    let (answer, path, _directory, batch_id) =
+        reconcile_after_a_lost_answer(book_with_new_ledger(8), 8).await;
+    let reported = result(&answer);
+    assert_eq!(reported["state"], "posted_unattributed", "{answer}");
+    assert_eq!(reported["answer_recorded"], false);
+    assert!(reported["counters"].is_null());
+    let verification = &reported["verification"];
+    assert_eq!(verification["moment"], "reconcile");
+    assert_eq!(verification["settled"], true);
+    assert_eq!(verification["guid"], NEW_GUID.to_ascii_lowercase());
+    assert_eq!(verification["checks"]["counters"], "not_checked");
+    assert_eq!(
+        verification["checks"]["first_change_after_intent"],
+        "passed"
+    );
+    assert_eq!(verification["reasons"], json!(["counters_unavailable"]));
+    assert_eq!(
+        verification["counters_note"],
+        verify::NO_ANSWER_RECORDED_NOTE
+    );
+    assert_eq!(reported["next_step"], verify::NEXT_UNATTRIBUTED);
+    assert_eq!(
+        reported["note"],
+        settled_note(MasterVerdictState::PostedUnattributed)
+    );
+    assert!(reported["note"]
+        .as_str()
+        .unwrap()
+        .contains("the create is NOT verified"));
+    assert!(reported.get("alert").is_none());
+    let state = state_of(&path, &batch_id);
+    assert!(state.is_settled());
+    assert_eq!(
+        state.verdict.as_ref().map(|verdict| verdict.state()),
+        Some(MasterVerdictState::PostedUnattributed)
+    );
+    // Reported from the journal alone afterwards, and nothing is sent.
+    let silent = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let again = server_at(silent.address(), &path);
+    let report = posting(
+        &ScriptedApproval::approving(),
+        again.call_tool("post_ledger_creates", json!({"batch_id": batch_id.clone()})),
+    )
+    .await;
+    assert_eq!(sent(silent).len(), 0);
+    let reported = result(&report);
+    assert_eq!(reported["state"], "posted_unattributed", "{report}");
+    assert_eq!(reported["journal"]["response_recorded"], false);
+    assert_ne!(reported["note"], MAY_HAVE_BEEN_SENT_NOTE);
+    assert_eq!(reported["next_step"], verify::NEXT_UNATTRIBUTED);
+}
+
+/// Tally answered without counters ComplyEaze Bridge could read, so the answer
+/// is on file and was not lost: a later reconcile that finds the ledger as
+/// sent at the first master change still does not settle it.
+#[tokio::test]
+async fn an_answer_on_file_without_counters_never_settles_unattributed() {
+    let mut plans = through_post(xml(
+        "<ENVELOPE><BODY>no counters here</BODY></ENVELOPE>".to_string()
+    ));
+    plans.extend(read_back(8, 3, Some(suspense_answer())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let first = posting_then(
+        &ScriptedApproval::approving(),
+        book_with_new_ledger(8),
+        server.call_tool("post_ledger_creates", args.clone()),
+    )
+    .await;
+    sent(simulator);
+    assert_eq!(
+        result(&first)["state"],
+        "reconciliation_required",
+        "{first}"
+    );
+    assert!(state_of(directory.path(), &batch.batch_id)
+        .response
+        .is_some());
+    let reads = SequenceSimulator::spawn(with_sentinel(reconcile_reads(
+        8,
+        3,
+        Some(suspense_answer()),
+    )))
+    .unwrap();
+    let later = server_at(reads.address(), directory.path());
+    let answer = reconciling(
+        book_with_new_ledger(8),
+        later.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    assert_eq!(create_count(&sent(reads)), 0);
+    let reported = result(&answer);
+    assert_eq!(reported["state"], "reconciliation_required", "{answer}");
+    assert_eq!(reported["verification"]["moment"], "reconcile");
+    assert_eq!(
+        reported["verification"]["checks"]["first_change_after_intent"],
+        "not_checked"
+    );
+    assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+}
+
+/// The same lost answer, with the ledger changed after the first master change
+/// (a same-name ledger made before the create, which then altered it): the
+/// batch stays open, with its own reason, and holds the name.
+#[tokio::test]
+async fn a_lost_answer_whose_ledger_changed_since_stays_open_as_altered_since_create() {
+    let (answer, path, _directory, batch_id) =
+        reconcile_after_a_lost_answer(book_with_new_ledger(9), 9).await;
+    let reported = result(&answer);
+    assert_eq!(reported["state"], "reconciliation_required", "{answer}");
+    let verification = &reported["verification"];
+    assert_eq!(verification["settled"], false);
+    assert_eq!(
+        verification["checks"]["first_change_after_intent"],
+        "failed"
+    );
+    assert_eq!(
+        verification["reasons"],
+        json!(["ledger_altered_since_create", "counters_unavailable"])
+    );
+    assert_eq!(reported["next_step"], verify::NEXT_PRESENT_NOT_VERIFIED);
+    assert!(!state_of(&path, &batch_id).is_settled());
+}
+
 #[test]
 fn the_fault_points_are_under_bare_cfg_test() {
     let ledger = include_str!("agent_master_ledger.rs");

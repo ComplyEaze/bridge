@@ -42,10 +42,19 @@
 //!   failure is closed and loud, and a fold change has to weigh it.
 //! - An intent with no terminal verdict blocks every overlapping batch. The
 //!   terminal verdicts are `posted_verified`, `posted_into_existing_master`,
-//!   `master_write_located_elsewhere` and `confirmed_absent`; the last is
-//!   decided only by a reconcile whose paired read-back shows the ledger absent
-//!   (`agent_master_verdict.rs`), and a new batch for the same ledger then needs
-//!   a new approval: nothing is ever sent again automatically.
+//!   `master_write_located_elsewhere`, `posted_unattributed` and
+//!   `confirmed_absent`; the last two are decided only by a reconcile
+//!   (`agent_master_verdict.rs`). `confirmed_absent` is given when its paired
+//!   read-back shows the ledger absent, and a new batch for the same ledger then
+//!   needs a new approval: nothing is ever sent again automatically.
+//!   `posted_unattributed` is given when no answer from Tally is on file and the
+//!   ledger was found as sent, written by the first master change after the
+//!   mark the intent recorded.
+//! - A build that predates a verdict state refuses the whole journal on a line
+//!   holding it, which stops every master write and reconcile with no repair in
+//!   the product. So a new state ships in the same release as the first build
+//!   that writes it, and `posted_unattributed` in the same release as the first
+//!   build that writes this file: no build without it has a journal to read.
 //! - After a terminal verdict the same ledgers could be sent again under a new
 //!   batch id. What stops that is the dispatch slice's absence check against the
 //!   books as they are then, made in the same queue as the send. This journal does
@@ -346,6 +355,13 @@ pub(super) enum MasterVerdictState {
     /// moved since the intent. Nothing was created; the batch is closed and is
     /// never sent again. A new batch needs a new approval.
     ConfirmedAbsent,
+    /// A reconcile of a batch with no answer from Tally on file found the
+    /// ledger as sent, every check but the counters passed, and the ledger's
+    /// `ALTERID` is the target company's mark read before the send plus one:
+    /// the first master change after that read wrote it, and none since.
+    /// Settled, never verified: with Tally's answer lost, nothing shows that
+    /// change was this create rather than a person keying the identical ledger.
+    PostedUnattributed,
 }
 
 impl MasterVerdictState {
@@ -358,7 +374,8 @@ impl MasterVerdictState {
             Self::PostedVerified
             | Self::PostedIntoExistingMaster
             | Self::MasterWriteLocatedElsewhere
-            | Self::ConfirmedAbsent => true,
+            | Self::ConfirmedAbsent
+            | Self::PostedUnattributed => true,
             Self::ReconciliationRequired | Self::MastersAfterPostUnconfirmed => false,
         }
     }
@@ -524,6 +541,10 @@ pub(super) enum Invalid {
     /// say Tally created or altered something: absence is never concluded
     /// against Tally's own count of a write.
     AbsentAgainstCounters,
+    /// A `posted_unattributed` verdict for a batch with an answer on record,
+    /// with or without counters: that state exists only for an answer that was
+    /// lost, and Tally's own answer decides one that is on file.
+    UnattributedWithAnswer,
     /// A second response for a batch: one POST, one response.
     SecondResponse,
     /// An intent recording no company mark, or none for the batch's company.
@@ -532,7 +553,7 @@ pub(super) enum Invalid {
     ZeroPreImageCount,
     /// An intent or verdict whose items are not the batch's, in order.
     ItemsMismatch,
-    /// `posted_verified` for an item with no GUID.
+    /// `posted_verified` or `posted_unattributed` for an item with no GUID.
     VerifiedWithoutGuid,
     /// `confirmed_absent` for an item that names a GUID.
     AbsentWithGuid,
@@ -779,9 +800,10 @@ impl MasterVerdict {
                 }
             }
         }
-        // The one state that says the write is whole names every item's GUID.
+        // The states that say the ledger is in the book as sent name every
+        // item's GUID.
         let all_found = match self.state {
-            MasterVerdictState::PostedVerified => true,
+            MasterVerdictState::PostedVerified | MasterVerdictState::PostedUnattributed => true,
             MasterVerdictState::ReconciliationRequired
             | MasterVerdictState::PostedIntoExistingMaster
             | MasterVerdictState::MastersAfterPostUnconfirmed
@@ -1074,6 +1096,11 @@ impl MasterJournal {
                     .is_some_and(|counters| counters.created > 0 || counters.altered > 0);
                 if verdict.state == MasterVerdictState::ConfirmedAbsent && counted_a_write {
                     return Err(MasterLedgerError::Invalid(Invalid::AbsentAgainstCounters));
+                }
+                if verdict.state == MasterVerdictState::PostedUnattributed
+                    && state.response.is_some()
+                {
+                    return Err(MasterLedgerError::Invalid(Invalid::UnattributedWithAnswer));
                 }
                 let named = verdict
                     .items

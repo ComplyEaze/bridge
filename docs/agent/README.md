@@ -2852,7 +2852,15 @@ the name absent and the company's master mark unmoved; a create that Tally
 rejected reaches it too, and it does not show that Tally will not still run a
 create that ComplyEaze Bridge stopped waiting for, so make sure Tally is idle and
 answering before a new batch is prepared, which needs a new approval),
-`masters_after_post_unconfirmed` (the book could
+`posted_unattributed` (only from a later call, when no answer from Tally to the
+create is on file (it could not be recorded, or Tally never answered): the ledger
+was found as sent, and its `ALTERID` shows it as the first master change in the
+company after ComplyEaze Bridge's last read of it before sending the create, and
+not changed since, which `verification.checks.first_change_after_intent` shows; the batch is settled and
+its name released, but it is not verified, because nothing shows that change was
+ComplyEaze Bridge's own create and not the same ledger made by someone else, and
+a create Tally still holds could run later and change the ledger again: check the
+ledger in Tally), `masters_after_post_unconfirmed` (the book could
 not be read back; call again, which only reads), plain `posted_unverified`
 (Tally answered, with any counters it gave, but the read-back could not be
 attempted, so nothing was judged; see its `next_step`, never send again, check
@@ -2892,7 +2900,12 @@ open verdict already on file in the same words is not appended again);
 `verification.verdict_record_error` is the code of why the verdict was not
 recorded; `verification.answer_record_error` is the code of why Tally's answer was
 not recorded, in the `posted_unverified` answer given when the book could not be
-read back; `verification.counters_note` says why no counters are shown; and
+read back; `verification.counters_note` says why no counters are shown; on a later call with
+no answer on file, `verification.reasons` gives `ledger_altered_since_create` when
+the ledger found was changed after the first master change that followed the last
+read before the send (or another master change came first), and
+`ledger_alter_id_not_after_intent` when it was last changed before that read;
+either keeps the batch open; and
 `verification.not_read_back` lists `bill_wise` when the ledger asked for
 bill-wise, which the read-back does not fetch. An answer made from the journal
 alone (a batch with a terminal verdict, or a book that could not be read back) has

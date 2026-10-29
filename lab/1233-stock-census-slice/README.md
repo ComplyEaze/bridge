@@ -1,0 +1,54 @@
+# Lab run sheet: a stock-item AlterID census in three slices on BRIDGE STOCK LAB (#1233). SYNTHETIC COMPANY ONLY. READS ONLY. Not for merge.
+
+About 20 minutes. `LAB-COMMON.md` in this folder (v3, sha256 `5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6`) applies in full; where this sheet and it differ, the stricter holds. Nothing is keyed, imported, backed up or restored, and no setting on Tally's screen is changed.
+
+**WHAT IT DECIDES.** `stock_summary` reads a company's stock items in one request, and admits that request only when the company's master mark (`ALTMSTID`) is at most 874. A larger book is to be read in parts: first a census of its stock items by AlterID span, then the items in parts sized by that count (#1233). #2168 added the census request as a candidate, `render_stock_item_census_slice_request`. Bridge has never sent it. This sheet sends it, byte for byte as that function renders it, and keeps the answers, so that its parser is written against captured answers.
+
+**THIS BOOK DOES NOT REACH THE SLICED READ.** THE COMPANY's mark is 292, under 874, so `stock_summary` reads it whole and never runs the census. Nothing here exercises Bridge's sliced path; it measures only Tally's answer to the census request. The sliced read through Bridge needs a synthetic book with a mark over 874 and stock items, in a later sheet.
+
+It records:
+1. whether three slices that together cover every AlterID up to the mark return each of THE COMPANY's stock items exactly once across them, and nothing else: the same GUIDs as the stock-item collection `stock_summary` reads today, as many as Tally's own `NUMSTOCKITEMS`;
+2. whether each slice returns at most as many rows as its span is wide;
+3. what a slice past every AlterID returns (taken to be an empty collection);
+4. whether each census row carries the company's GUID that its `COMPUTE` asks for, and which name elements a row carries.
+
+**THE COMPANY.** `BRIDGE STOCK LAB`, company number 100027, GUID `1edb9b05-8d35-4c0c-9959-dce655730463` (as listed in `scripts/merge-gate-synthetic-uuids.json`). The lab's read-only extent read of THE COMPANY on 29 October 2026 gave: `ALTMSTID` 292, `ALTVCHID` 4, `NUMSTOCKITEMS` 55.
+
+**THE REQUESTS** (in `requests/`; check each against `SHA256.txt` before its first send; a mismatch = STOP). Each is the UTF-16LE text, with a byte-order mark, that Bridge's own builder renders at the commit of #2168 (`ba68d92d`). They were written by a throwaway test that called the builders with THE COMPANY's name and GUID, the spans and the period below, and wrote their output; no byte was typed by hand. Each file's text was compared with its builder's source at that commit: `m-marks-S`, `k1` and `c4` (byte-identical to a slice file of the first version of this sheet) by an independent reviewer, and `c1` to `c3` by a script that fills the census builder's format string.
+- `m-marks-S.utf16le.xml` (1,640 bytes): THE COMPANY's flags, counts and marks (`render_company_inventory_flags_request`, filtered to THE COMPANY's GUID). READ BOUND 8,192 bytes.
+- `c1-stock-item-census-0-100.utf16le.xml` (1,278 bytes), `c2-stock-item-census-100-200.utf16le.xml` (1,282 bytes), `c3-stock-item-census-200-300.utf16le.xml` (1,282 bytes): a `StockItem` collection fetching `GUID`, with `BRIDGECOMPANYGUID` computed on each row, filtered by `$AlterID > a AND $AlterID <= b` for the spans (0, 100], (100, 200] and (200, 300] (`render_stock_item_census_slice_request`; the three slices of a plan for a mark of 300 in widths of 100). Together they cover every AlterID up to 300, so every AlterID up to THE MARK. A NEW SHAPE (C3). READ BOUND 400,000 bytes each: a slice holds at most 100 rows, and 100 rows at 3,902 bytes, the worst row of the ledger census (a GUID-only row carrying a 128-character name twice, `2 x (415 + 12 x 128)`), plus the envelope fit it. A GUID-only stock-item row was measured at about 530 bytes.
+- `c4-stock-item-census-400000-400010.utf16le.xml` (1,294 bytes): the same request for `$AlterID > 400000 AND $AlterID <= 400010`, past every AlterID this book holds. READ BOUND 16,384 bytes. An answer over it (Tally ignoring the filter) is itself a finding: STOP before using it, keep the file, report its size.
+- `k1-stock-items-fy.utf16le.xml` (1,258 bytes): the stock-item collection `stock_summary` sends today (`AuditStockItemsV1`), from 1 April 2025 to 31 March 2026. It is the control: the census's GUIDs are compared with its GUIDs. It is the request `stock_summary` sends for an `as_of` of 31 March 2026 only when the book starts on or before 1 April 2025 and Tally's current date is on or after 31 March 2026; step 1 checks both. READ BOUND 400,000 bytes: 55 rows at about 1.4 KB each were measured on this request's rows elsewhere, and the bound allows over five times that.
+- Request-ID check before the first send, in this folder: `python -I check-request-ids.py requests`. EXPECT `census: ok 6, skipped 0, FAIL 0`. Anything else = STOP, nothing sent.
+- Sent by curl under C3. No `bridge_mcp` call.
+
+## Steps
+0. C2 a, b and c with NO company loaded (a company already loaded = STOP). Load THE COMPANY alone by Select Company. C2 d: the MARKS read is `m-marks-S`. Record Tally's current date, the period and the last entry the Gateway shows.
+1. **The gate.** Send `m-marks-S` (name `m-a`). One COMPANY row with THE COMPANY's GUID (C4, else STOP). Record `ALTMSTID`, `ALTVCHID`, `NUMSTOCKITEMS`, `ISINVENTORYON`, `BOOKSFROM` and `LASTVOUCHERDATE`, trimmed. STOP, and send nothing further, unless ALL of these hold:
+   - `ALTMSTID` is 292, `ALTVCHID` is 4 and `NUMSTOCKITEMS` is 55 (else the book changed since the extent read, and the slices may no longer cover the mark);
+   - `ISINVENTORYON` is `Yes`;
+   - `BOOKSFROM` is on or before 1 April 2025, and the current date recorded at step 0 is on or after 31 March 2026 (else `k1` is not the request `stock_summary` would send).
+2. Send, one at a time, each saved as received with headers, size and sha256:
+   - `c1`. It is a NEW SHAPE: take a screenshot of the whole Tally window before the next request (C3). A dialog = C7.
+   - `c2`, then `c3`, then `c4`, each followed by a screenshot of the whole Tally window before the next request (another span, or a filter that matches nothing, is another outcome of the new shape).
+   - `c1` again (`c1r`), then `k1`, then `m-marks-S` again (`m-b`).
+3. **Record by parser** (C4: ROWS are the `STOCKITEM` children of `ENVELOPE/BODY/DATA/COLLECTION`; the `CMPINFO` lines are not rows). Every read is already sent by now: a result that differs from an EXPECT line is recorded and reported as the finding, not a reason to send anything else.
+   - For each of `c1`, `c2`, `c3` and `c4`: whether `DATA/COLLECTION` is present, with its attributes (for example `ISMSTDEPTYPE`, `MSTDEPTYPE`) and the `HEADER/STATUS` text if any; the number of rows; the bytes. For each row, its `GUID` and its `BRIDGECOMPANYGUID`, as sent. The set of the row's direct child element names (for example `NAME`, `LANGUAGENAME.LIST`, `GUID`, `BRIDGECOMPANYGUID`) and its attributes (`NAME`, `RESERVEDNAME`), recorded once if every row has the same set, else per row.
+   - GUIDs are compared as sent, without trimming, and without regard to case; a GUID that differs from its trimmed self is recorded as such.
+   - EXPECT each of `c1`, `c2` and `c3` to hold at most 100 rows.
+   - EXPECT `c1`, `c2` and `c3` together to hold `NUMSTOCKITEMS` (55) rows, with no `GUID` twice within a slice or across slices.
+   - EXPECT every `GUID` to begin with THE COMPANY's GUID, and every `BRIDGECOMPANYGUID` to equal it.
+   - `c4`: taken to be a present, empty collection; a bare envelope or any other answer is recorded as the result, not a failure. No zero-row stock-item answer has been captured before. Also record whether any of `c1` to `c3` was empty, and if so whether its bytes equal `c4`'s.
+   - `c1r`: EXPECT the same rows as `c1` by parser (the same GUIDs in the same order). Record whether the bytes are identical, or differ only inside `CMPINFO` (two reads of one request have differed only in its counters), or differ elsewhere (a finding).
+   - `k1`: the number of rows and the set of their `GUID`s. EXPECT 55 rows, and the set equal to the union of `c1`, `c2` and `c3` (by the rule above). Record yes or no, and any GUID found in one set and not the other.
+   - `m-b`: `ALTMSTID` and `ALTVCHID` equal to `m-a`'s, else STOP.
+   - The time each of `c1` to `c4` and `k1` took, from the send log.
+4. C10 close: Company > Shut; Select Company with none loaded; one tally.exe; 9001 LISTENING; GET /status 200.
+
+**PASS (the sheet ran)** = the gate held, every read answered whole and was recorded as above, and the marks did not move. **FAIL** = a transport failure, a count by substring, or a mark that moves during the reads.
+
+**THE FINDING it records**: on one small synthetic book, whether a census of three slices covering its mark returns THE COMPANY's stock items exactly once each, as the items collection lists them and as many as Tally's own count; whether each slice stays within its width; and what an empty slice returns.
+
+**NOT MEASURED:** Bridge's sliced read itself (this book is under the single-read limit), a book with a mark over 874, a mark above 300 for these spans, more items than one slice's width, the time per slice on a large book, an item altered or deleted during the read, and any other book.
+
+**EVIDENCE** on a NEW branch `lab/1233-stock-census-slice-answers` (C11), after the pre-push scan and the run coordinator's yes. It holds every raw answer with headers, sizes and sha256, a send log, the parser's tables, the GUID comparison and a notes file with UTC times. Screenshots stay on the lab PC, listed by name, bytes and sha256. No item name or amount from the book goes into any text line of the evidence other than the raw answers and the parser's tables.

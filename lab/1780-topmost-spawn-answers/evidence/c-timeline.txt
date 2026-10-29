@@ -1,0 +1,27 @@
+﻿C1 Tally window 13379766 (found by title)
+C1 2026-10-29T07:43:42.100Z visible windows titled with 'ComplyEaze Bridge' before the trace: 0
+C1 reader pre-armed 2026-10-29T07:43:42.396Z pid 6908: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\ctx-reader.ps1 -WaitForConfirmChild -DelaySeconds 6 -Out <lab folder>\evidence\ctx-c1.txt
+C1 trace started 2026-10-29T07:43:42.535Z pid 5344 in its own window: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-c1.txt -Seconds 150
+C1 Tally title clicked 2026-10-29T07:43:44.788Z at logical (330,14)
+T0 2026-10-29T07:43:46.057Z queued 004-c1-post_import.json
+T0+8 probe start 2026-10-29T07:43:54.007Z end 2026-10-29T07:43:55.927Z : 3,0,1,18856,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,15
+T0+13 probe start 2026-10-29T07:43:59.007Z end 2026-10-29T07:44:00.008Z : 3,0,1,18856,ComplyEaze Bridge - post this voucher? | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,15
+T0+13 shot 2026-10-29T07:44:00.419Z
+C1 trace: FIRST 2026-10-29T07:43:53.289Z box_pid=18856 || PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=14164 || PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+C2 2026-10-29T07:44:00.640Z box 10100802 rect 549,145,1003,741; text saved
+C3 point logical (263,475) = screen tool (249,450); distance from the box 286 px
+C3 click 2026-10-29T07:44:02.022Z at T0+16.03 s
+C+0 probe start 2026-10-29T07:44:02.121Z end 2026-10-29T07:44:04.271Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,18856,ComplyEaze Bridge - post this voucher? | visible_titled_windows,15
+C+0 shot 2026-10-29T07:44:04.442Z
+C+6 probe start 2026-10-29T07:44:08.039Z end 2026-10-29T07:44:09.690Z : 3,0,1,13992,TallyPrime:9001 | 4,0,0,18856,ComplyEaze Bridge - post this voucher? | visible_titled_windows,15
+C+6 shot 2026-10-29T07:44:09.839Z
+C3 z box 4, Tally 3
+C3 T0+30 2026-10-29T07:44:16.030Z: z box 4, Tally 3
+C4 taskbar button clicked ONCE 2026-10-29T07:44:16.108Z at logical (756,844) = screen tool (717,800)
+C4 probe start 2026-10-29T07:44:16.251Z end 2026-10-29T07:44:17.780Z : 4,0,0,13992,TallyPrime:9001 | 5,0,0,18856,ComplyEaze Bridge - post this voucher? | visible_titled_windows,15; box a window True
+C4 : box not above Tally (box 5, Tally 4): nothing clicked
+C4 before the taskbar click 2026-10-29T07:45:05.191Z: box open True visible True z 8, Tally z 7
+C4 taskbar button clicked ONCE 2026-10-29T07:45:05.435Z at logical (756,747) = screen tool (717,708)
+C4 probe after the taskbar click start 2026-10-29T07:45:05.572Z end 2026-10-29T07:45:06.927Z : 3,0,1,13992,TallyPrime:9001 | visible_titled_windows,13
+C4 2026-10-29T07:45:06.977Z box open False; z box -1, Tally 3
+C4 the box is gone after the taskbar click without No: one probe, one capture, nothing more clicked (2026-10-29T07:45:07.216Z)

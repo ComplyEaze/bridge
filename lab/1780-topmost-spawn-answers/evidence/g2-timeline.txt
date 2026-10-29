@@ -1,0 +1,22 @@
+﻿G2 target=control stdio=tokio kind=hidden; Tally window 13379766; runner pid 4864
+G2 trace pre-armed 2026-10-29T07:39:24.632Z pid 15628: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-g2.txt -Seconds 100
+G2 reader pre-armed 2026-10-29T07:39:25.049Z pid 3588: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\ctx-reader.ps1 -SpawnFile <lab folder>\evidence\g2.txt -DelaySeconds 6 -Out <lab folder>\evidence\ctx-g2.txt
+G2 Tally title clicked 2026-10-29T07:39:27.171Z
+G2 parent started 2026-10-29T07:39:28.178Z: Start-Process powershell -WindowStyle Hidden -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -Stdio tokio -Out <lab folder>\evidence\g2.txt -TimeoutSeconds 60 -ControlScript <lab folder>\requests\control-box-product.ps1' (pid 29240, parent this runner 4864)
+G2 Tally title clicked 2026-10-29T07:39:28.279Z
+G2-T0 2026-10-29T07:39:31.936Z from: SPAWN 2026-10-29T07:39:31.936Z child_pid=29604
+G2 spawn-parent pid 29240 image powershell.exe, its parent pid 4864 image powershell.exe
+G2-T0+8 sheet probe 2026-10-29T07:39:40.017Z to 2026-10-29T07:39:54.732Z : 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T07:39:54.789Z to 2026-10-29T07:40:00.042Z : 1,1,1,29604,Lab topmost control | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,15
+G2-T0+11 sheet probe 2026-10-29T07:40:00.277Z to 2026-10-29T07:40:02.767Z : 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T07:40:02.778Z to 2026-10-29T07:40:04.924Z : 1,1,1,29604,Lab topmost control | 4,0,0,13992,TallyPrime:9001 | visible_titled_windows,15
+G2-T0+11 shot 2026-10-29T07:40:05.336Z
+G2 box 4009008 rect 573,362,978,521
+G2 point logical (263,475) = screen tool (249,450); distance from the box 310 px
+G2 click into Tally 2026-10-29T07:40:05.956Z at T0+34.02 s
+G2 C+0 sheet probe 2026-10-29T07:40:06.231Z to 2026-10-29T07:40:08.088Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T07:40:08.105Z to 2026-10-29T07:40:10.057Z : 1,1,0,29604,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15
+G2 C+0 shot 2026-10-29T07:40:10.492Z
+G2 C+6 sheet probe 2026-10-29T07:40:11.964Z to 2026-10-29T07:40:13.522Z : 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15 ;; K probe 2026-10-29T07:40:13.537Z to 2026-10-29T07:40:15.340Z : 1,1,0,29604,Lab topmost control | 4,0,1,13992,TallyPrime:9001 | visible_titled_windows,15
+G2 C+6 shot 2026-10-29T07:40:15.622Z
+G2 z positions: box 1, Tally 4
+G2 No clicked 2026-10-29T07:40:15.934Z at T0+44.02 s, logical (834,492)
+G2 spawn file: SPAWN 2026-10-29T07:39:31.684Z parent_pid=29240 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-product.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g2.control.txt" || SPAWN 2026-10-29T07:39:31.936Z child_pid=29604 || SPAWN 2026-10-29T07:40:16.304Z pid=29604 exit_code=0 stdout_bytes_read=0 elapsed_s=44.5
+G2 control file: variant=c  asked=2026-10-29T07:39:36.613Z answered=2026-10-29T07:40:15.955Z answer=7

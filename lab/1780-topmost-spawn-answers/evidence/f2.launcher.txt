@@ -1,0 +1,4 @@
+2026-10-29T07:36:37Z launcher pid 27952 parent 2732 cwd <lab folder> keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']
+command: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -Stdio files -Out <lab folder>\evidence\f2.txt -TimeoutSeconds 60 -ChildExe <build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt
+2026-10-29T07:36:37Z started pid 2236
+2026-10-29T07:37:06Z ended exit 0 stdout 0 B

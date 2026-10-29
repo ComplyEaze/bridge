@@ -1,0 +1,144 @@
+## trace-b3b.txt
+- FIRST 2026-10-29T07:27:36.501Z box_pid=13916; first block 2026-10-29T07:27:36.582Z; blocks 1
+- PROC path=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=20672
+- PROC command_line="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-forms.ps1 -Seconds 20 
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x18e298a class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 thread=14896 owner=0 exstyle=0x00050108
+- windows of its process at the first block (2026-10-29T07:27:36.582Z): 0x18e298a WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=1 | 0xb22978 GDI+ vis=0 top=0 | 0x602118 WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=0 | 0x5f0408 .NET-BroadcastEventWindow.4.0.0.0.f5a312.0 vis=0 top=0 | 0xc2212c ConsoleWindowClass vis=1 top=0 | 0x1cf1b66 IME vis=0 top=0 | 0x16728ba MSCTFIME vis=0 top=0 | 0x246299a IME vis=0 top=0
+- windows of its process at the last block (2026-10-29T07:27:36.582Z): 0x18e298a WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=1 | 0xb22978 GDI+ vis=0 top=0 | 0x602118 WindowsForms10.Window.8.app.0.f5a312_r38_ad1 vis=1 top=0 | 0x5f0408 .NET-BroadcastEventWindow.4.0.0.0.f5a312.0 vis=0 top=0 | 0xc2212c ConsoleWindowClass vis=1 top=0 | 0x1cf1b66 IME vis=0 top=0 | 0x16728ba MSCTFIME vis=0 top=0 | 0x246299a IME vis=0 top=0
+- fg_pid None -> 25660 at 2026-10-29T07:27:36.582Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-f0.txt
+- FIRST 2026-10-29T07:34:44.229Z box_pid=15064; first block 2026-10-29T07:34:44.372Z; blocks 3
+- PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=20976
+- PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+- PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+- box hwnd=0x16b27ce class=#32770 thread=29392 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:34:44.372Z): 0x16b27ce #32770 vis=1 top=1 | 0x1b729de MSCTFIME vis=0 top=1 | 0x422cba IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:35:11.708Z): 
+- fg_pid None -> 15064 at 2026-10-29T07:34:44.372Z
+- fg_pid 15064 -> 28264 at 2026-10-29T07:35:01.171Z
+- fg_pid 28264 -> 22180 at 2026-10-29T07:35:11.708Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-f1.txt
+- FIRST 2026-10-29T07:35:46.043Z box_pid=25584; first block 2026-10-29T07:35:46.225Z; blocks 4
+- PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=2860
+- PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+- PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+- box hwnd=0x3e2040 class=#32770 thread=9736 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:35:46.225Z): 0x3e2040 #32770 vis=1 top=1 | 0x3a2c30 MSCTFIME vis=0 top=1 | 0x13c2894 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:36:13.282Z): 
+- fg_pid None -> 25584 at 2026-10-29T07:35:46.225Z
+- fg_pid 25584 -> 22688 at 2026-10-29T07:36:03.056Z
+- fg_pid 22688 -> 13992 at 2026-10-29T07:36:13.282Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-f2.txt
+- FIRST 2026-10-29T07:36:41.496Z box_pid=30536; first block 2026-10-29T07:36:41.606Z; blocks 3
+- PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=2236
+- PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+- PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+- box hwnd=0x1f502de class=#32770 thread=25096 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:36:41.606Z): 0x1f502de #32770 vis=1 top=1 | 0x1732cfe MSCTFIME vis=0 top=1 | 0x16a2806 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:37:06.457Z): 
+- fg_pid None -> 30536 at 2026-10-29T07:36:41.606Z
+- fg_pid 30536 -> 13992 at 2026-10-29T07:36:56.672Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-f3.txt
+- FIRST 2026-10-29T07:37:28.218Z box_pid=8328; first block 2026-10-29T07:37:28.418Z; blocks 4
+- PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=10188
+- PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+- PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+- box hwnd=0x19264e class=#32770 thread=29216 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:37:28.418Z): 0x19264e #32770 vis=1 top=1 | 0x630408 MSCTFIME vis=0 top=1 | 0x312ce6 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:37:53.092Z): 
+- fg_pid None -> 8328 at 2026-10-29T07:37:28.418Z
+- fg_pid 8328 -> 13992 at 2026-10-29T07:37:43.260Z
+- fg_pid 13992 -> 0 at 2026-10-29T07:37:52.863Z
+- fg_pid 0 -> 13992 at 2026-10-29T07:37:53.092Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-f4.txt
+- FIRST 2026-10-29T07:38:04.805Z box_pid=11532; first block 2026-10-29T07:38:05.071Z; blocks 4
+- PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=26776
+- PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+- PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+- box hwnd=0x1771db6 class=#32770 thread=20208 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:38:05.071Z): 0x1771db6 #32770 vis=1 top=1 | 0x6d2cfa MSCTFIME vis=0 top=1 | 0x17728ba IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:38:32.661Z): 
+- fg_pid None -> 11532 at 2026-10-29T07:38:05.071Z
+- fg_pid 11532 -> 13992 at 2026-10-29T07:38:23.050Z
+- fg_pid 13992 -> 0 at 2026-10-29T07:38:32.445Z
+- fg_pid 0 -> 13992 at 2026-10-29T07:38:32.661Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-g1.txt
+- FIRST 2026-10-29T07:38:58.206Z box_pid=3664; first block 2026-10-29T07:38:58.322Z; blocks 4
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=15332
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-product.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g1.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x1f802de class=#32770 thread=12428 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:38:58.322Z): 0x1f802de #32770 vis=1 top=1 | 0xb02848 MSCTFIME vis=0 top=1 | 0x25e2a3c IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:39:20.872Z): 
+- fg_pid None -> 3664 at 2026-10-29T07:38:58.322Z
+- fg_pid 3664 -> 4148 at 2026-10-29T07:39:11.040Z
+- fg_pid 4148 -> 13992 at 2026-10-29T07:39:20.872Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-g2.txt
+- FIRST 2026-10-29T07:39:36.863Z box_pid=29604; first block 2026-10-29T07:39:37.366Z; blocks 4
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=29240
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-product.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g2.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x3d2c30 class=#32770 thread=17604 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:39:37.366Z): 0x3d2c30 #32770 vis=1 top=1 | 0xa0269c MSCTFIME vis=0 top=1 | 0x1ae1bf6 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:40:16.195Z): 
+- fg_pid None -> 29604 at 2026-10-29T07:39:37.366Z
+- fg_pid 29604 -> 13992 at 2026-10-29T07:40:06.036Z
+- fg_pid 13992 -> 0 at 2026-10-29T07:40:16.000Z
+- fg_pid 0 -> 13992 at 2026-10-29T07:40:16.195Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-g3.txt
+- FIRST 2026-10-29T07:40:31.969Z box_pid=2240; first block 2026-10-29T07:40:32.134Z; blocks 3
+- PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=8868
+- PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-product.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g3.control.txt"
+- PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+- box hwnd=0x2612a3c class=#32770 thread=22092 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:40:32.134Z): 0x2612a3c #32770 vis=1 top=1 | 0x562ce0 MSCTFIME vis=0 top=1 | 0x10727c0 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:41:01.700Z): 
+- fg_pid None -> 2240 at 2026-10-29T07:40:32.134Z
+- fg_pid 2240 -> 13992 at 2026-10-29T07:40:46.467Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-t.txt
+- FIRST 2026-10-29T07:41:36.791Z box_pid=12456; first block 2026-10-29T07:41:36.961Z; blocks 4
+- PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=3020
+- PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+- PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+- box hwnd=0x3f2c30 class=#32770 thread=12628 owner=0 exstyle=0x00010109
+- windows of its process at the first block (2026-10-29T07:41:36.961Z): 0x3f2c30 #32770 vis=1 top=1 | 0xad2cbc MSCTFIME vis=0 top=1 | 0x10827c0 IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:42:02.780Z): 
+- fg_pid None -> 12456 at 2026-10-29T07:41:36.961Z
+- fg_pid 12456 -> 9716 at 2026-10-29T07:41:52.266Z
+- fg_pid 9716 -> 22180 at 2026-10-29T07:42:02.450Z
+- box topmost values seen: ['1']; reading 1
+
+## trace-c1.txt
+- FIRST 2026-10-29T07:43:53.289Z box_pid=18856; first block 2026-10-29T07:43:53.374Z; blocks 5
+- PROC path=<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=14164
+- PROC command_line="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+- PROC sha256=3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974 bytes=31804416
+- box hwnd=0x9a2042 class=#32770 thread=12512 owner=0 exstyle=0x00010101
+- windows of its process at the first block (2026-10-29T07:43:53.374Z): 0x9a2042 #32770 vis=1 top=0 | 0x291bfc MSCTFIME vis=0 top=1 | 0x21264e IME vis=0 top=1
+- windows of its process at the last block (2026-10-29T07:45:05.495Z): 
+- fg_pid None -> 13992 at 2026-10-29T07:43:53.374Z
+- fg_pid 13992 -> 18856 at 2026-10-29T07:43:55.987Z
+- fg_pid 18856 -> 13992 at 2026-10-29T07:44:02.100Z
+- fg_pid 13992 -> 5344 at 2026-10-29T07:44:16.172Z
+- fg_pid 5344 -> 13992 at 2026-10-29T07:45:05.495Z
+- box topmost values seen: ['0']; reading 0
+

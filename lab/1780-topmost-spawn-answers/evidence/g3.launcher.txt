@@ -1,0 +1,4 @@
+2026-10-29T07:40:25Z launcher pid 18092 parent 18148 cwd <lab folder> keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']
+command: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -Stdio tokio -Out <lab folder>\evidence\g3.txt -TimeoutSeconds 60 -ControlScript <lab folder>\requests\control-box-product.ps1
+2026-10-29T07:40:25Z started pid 8868
+2026-10-29T07:41:02Z ended exit 0 stdout 0 B

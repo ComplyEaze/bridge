@@ -1,0 +1,24 @@
+﻿WAIT seen child_pid=29604 at 2026-10-29T07:39:32.047Z
+CTX pid=29240 session=5 wow64=False in_job=True integrity_rid=0x2000 appcontainer=0 elevated=<unreadable> console_handle=0x50 std_in=0x54 std_out=0x58 std_err=0x5c startf=0x1 show_window=0 desktop=WinSta0\Default title_chars=57 cmd="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -Stdio tokio -Out <lab folder>\evidence\g2.txt -TimeoutSeconds 60 -ControlScript <lab folder>\requests\control-box-product.ps1 
+CHAIN pid=29240 <- 4864:powershell.exe <- 11136:powershell.exe <- 12260:bash.exe <- 10184:bash.exe <- 26280:bash.exe <- 22180:<desktop client>
+CTX pid=29604 session=5 wow64=False in_job=True integrity_rid=0x2000 appcontainer=0 elevated=<unreadable> console_handle=0x48 std_in=0x7c0 std_out=0x780 std_err=0x7cc startf=0x100 show_window=0 desktop=WinSta0\Default title_chars=57 cmd="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-product.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g2.control.txt"
+CHAIN pid=29604 <- 29240:powershell.exe <- 4864:powershell.exe <- 11136:powershell.exe <- 12260:bash.exe <- 10184:bash.exe <- 26280:bash.exe
+CONHOST pid=3824 parent=13776
+CONHOST pid=4644 parent=1284
+CONHOST pid=15472 parent=6720
+CONHOST pid=4384 parent=192
+CONHOST pid=17896 parent=9064
+CONHOST pid=24220 parent=30204
+CONHOST pid=27756 parent=21456
+CONHOST pid=20720 parent=19088
+CONHOST pid=3448 parent=13064
+CONHOST pid=23960 parent=22060
+CONHOST pid=2756 parent=26280
+CONHOST pid=10768 parent=22060
+CONHOST pid=6440 parent=1996
+CONHOST pid=30648 parent=30104
+CONHOST pid=5428 parent=12260
+CONHOST pid=26372 parent=15628
+CONHOST pid=12432 parent=3588
+CONHOST pid=17664 parent=29240
+NAMED_JOB_OBJECTS count=0

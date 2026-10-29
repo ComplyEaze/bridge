@@ -1,0 +1,64 @@
+The box's process (C1: the server's child; F/T: the dialog child; G: the control box), from each ctx file's CTX line for it:
+
+| field | C1 | F0 | F1 | F2 | F3 | F4 | G1 | G2 | G3 | T |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pid | 18856 | 15064 | 25584 | 30536 | 8328 | 11532 | 3664 | 29604 | 2240 | 12456 |
+| in_job | True | False | False | True | True | True | False | True | True | False |
+| integrity_rid | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 |
+| appcontainer | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| session | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 |
+| wow64 | False | False | False | False | False | False | False | False | False | False |
+| console_handle | 0x48 | 0x48 | 0x48 | 0x54 | 0x54 | 0x4c | 0x48 | 0x48 | 0x48 | 0x48 |
+| std_in | 0x2a4 | 0x7b0 | 0x7f4 | 0x7d8 | 0x7f8 | 0x7f8 | 0x7d0 | 0x7c0 | 0x7d4 | 0x82c |
+| std_out | 0x29c | 0x7e0 | 0x7a8 | 0x7dc | 0x7f0 | 0x790 | 0x7a4 | 0x780 | 0x818 | 0x830 |
+| std_err | 0x26c | 0x7b8 | 0x7c4 | 0x7fc | 0x6b0 | 0x7cc | 0x790 | 0x7cc | 0x878 | 0x68c |
+| startf | 0x100 | 0x100 | 0x100 | 0x100 | 0x100 | 0x100 | 0x100 | 0x100 | 0x100 | 0x100 |
+| show_window | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| desktop | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default |
+| title_chars | 82 | 82 | 82 | 82 | 82 | 82 | 57 | 57 | 57 | 82 |
+
+Its parent (C1: the server; F/G/T: spawn-parent.ps1's PowerShell):
+
+| field | C1 | F0 | F1 | F2 | F3 | F4 | G1 | G2 | G3 | T |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pid | 14164 | 20976 | 2860 | 2236 | 10188 | 26776 | 15332 | 29240 | 8868 | 3020 |
+| in_job | True | False | False | True | True | True | False | True | True | False |
+| integrity_rid | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 | 0x2000 |
+| appcontainer | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| session | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 | 5 |
+| wow64 | False | False | False | False | False | False | False | False | False | False |
+| console_handle | 0x48 | 0x48 | 0x60 | 0x54 | 0x54 | 0x44 | 0x48 | 0x50 | 0x48 | 0x60 |
+| std_in | 0x1c0 | 0x50 | 0x54 | 0x190 | 0x1c0 | 0x48 | 0x50 | 0x54 | 0x168 | 0x50 |
+| std_out | 0x1c8 | 0x54 | 0x58 | 0x180 | 0x1c8 | 0x54 | 0x54 | 0x58 | 0x184 | 0x54 |
+| std_err | 0x1c4 | 0x58 | 0x5c | 0x184 | 0x1c4 | 0x58 | 0x58 | 0x5c | 0x178 | 0x58 |
+| startf | 0x100 | 0x0 | 0x0 | 0x100 | 0x100 | 0x1 | 0x0 | 0x1 | 0x100 | 0x0 |
+| show_window | 0 | 1 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 |
+| desktop | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default | WinSta0\Default |
+| title_chars | 82 | 339 | 339 | 57 | 57 | 57 | 258 | 57 | 57 | 338 |
+
+Ancestry, read with the one-step name shift undone (pid image <- parent pid image ...):
+
+- C1: 18856 bridge_mcp.exe <- 14164 bridge_mcp.exe <- 12268 python.exe <- 13824 bash.exe <- 16988 bash.exe <- 17336 bash.exe <- 26280 (image not read)
+- C1: 14164 bridge_mcp.exe <- 12268 python.exe <- 13824 bash.exe <- 16988 bash.exe <- 17336 bash.exe <- 26280 <desktop client> <- 22180 (image not read)
+- C1: 12268 python.exe <- 13824 bash.exe <- 16988 bash.exe <- 17336 bash.exe <- 26280 <desktop client> <- 22180 <desktop client> <- 11384 (image not read)
+- F0: 20976 powershell.exe <- 28264 cmd.exe <- 18784 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 wininit.exe <- 892 (image not read)
+- F0: 15064 bridge_mcp.exe <- 20976 powershell.exe <- 28264 cmd.exe <- 18784 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 (image not read)
+- F1: 2860 powershell.exe <- 22688 cmd.exe <- 5056 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 wininit.exe <- 892 (image not read)
+- F1: 25584 bridge_mcp.exe <- 2860 powershell.exe <- 22688 cmd.exe <- 5056 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 (image not read)
+- F2: 2236 powershell.exe <- 27952 python.exe <- 2732 powershell.exe <- 21468 bash.exe <- 24884 bash.exe <- 21600 bash.exe <- 26280 (image not read)
+- F2: 30536 bridge_mcp.exe <- 2236 powershell.exe <- 27952 python.exe <- 2732 powershell.exe <- 21468 bash.exe <- 24884 bash.exe <- 21600 (image not read)
+- F3: 10188 powershell.exe <- 23204 python.exe <- 14428 powershell.exe <- 9872 bash.exe <- 16628 bash.exe <- 5256 bash.exe <- 26280 (image not read)
+- F3: 8328 bridge_mcp.exe <- 10188 powershell.exe <- 23204 python.exe <- 14428 powershell.exe <- 9872 bash.exe <- 16628 bash.exe <- 5256 (image not read)
+- F4: 26776 powershell.exe <- 10992 powershell.exe <- 22940 bash.exe <- 16628 bash.exe <- 5256 bash.exe <- 26280 <desktop client> <- 22180 (image not read)
+- F4: 11532 bridge_mcp.exe <- 26776 powershell.exe <- 10992 powershell.exe <- 22940 bash.exe <- 16628 bash.exe <- 5256 bash.exe <- 26280 (image not read)
+- G1: 15332 powershell.exe <- 4148 cmd.exe <- 15804 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 wininit.exe <- 892 (image not read)
+- G1: 3664 powershell.exe <- 15332 powershell.exe <- 4148 cmd.exe <- 15804 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 (image not read)
+- G2: 29240 powershell.exe <- 4864 powershell.exe <- 11136 bash.exe <- 12260 bash.exe <- 10184 bash.exe <- 26280 <desktop client> <- 22180 (image not read)
+- G2: 29604 powershell.exe <- 29240 powershell.exe <- 4864 powershell.exe <- 11136 bash.exe <- 12260 bash.exe <- 10184 bash.exe <- 26280 (image not read)
+- G3: 8868 powershell.exe <- 18092 python.exe <- 18148 powershell.exe <- 21036 bash.exe <- 12260 bash.exe <- 10184 bash.exe <- 26280 (image not read)
+- G3: 2240 powershell.exe <- 8868 powershell.exe <- 18092 python.exe <- 18148 powershell.exe <- 21036 bash.exe <- 12260 bash.exe <- 10184 (image not read)
+- T: 3020 powershell.exe <- 9716 cmd.exe <- 17724 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 wininit.exe <- 892 (image not read)
+- T: 12456 bridge_mcp.exe <- 3020 powershell.exe <- 9716 cmd.exe <- 17724 explorer.exe <- 1212 svchost.exe <- 848 services.exe <- 72 (image not read)
+
+Fields equal in all ten: integrity_rid, appcontainer, session, wow64, startf, show_window, desktop.
+Fields where C1's child differs from every cell that reads 1 (handle values aside): none.

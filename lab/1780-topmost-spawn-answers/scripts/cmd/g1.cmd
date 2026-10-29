@@ -1,0 +1,1 @@
+@powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -Stdio tokio -Out <lab folder>\evidence\g1.txt -TimeoutSeconds 60 -ControlScript <lab folder>\requests\control-box-product.ps1

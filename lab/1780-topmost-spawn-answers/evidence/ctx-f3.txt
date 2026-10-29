@@ -1,0 +1,23 @@
+﻿WAIT seen child_pid=8328 at 2026-10-29T07:37:27.910Z
+CTX pid=10188 session=5 wow64=False in_job=True integrity_rid=0x2000 appcontainer=0 elevated=<unreadable> console_handle=0x54 std_in=0x1c0 std_out=0x1c8 std_err=0x1c4 startf=0x100 show_window=0 desktop=WinSta0\Default title_chars=57 cmd=powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -Stdio tokio -Out <lab folder>\evidence\f3.txt -TimeoutSeconds 60 -ChildExe <build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt
+CHAIN pid=10188 <- 23204:powershell.exe <- 14428:python.exe <- 9872:powershell.exe <- 16628:bash.exe <- 5256:bash.exe <- 26280:bash.exe
+CTX pid=8328 session=5 wow64=False in_job=True integrity_rid=0x2000 appcontainer=0 elevated=<unreadable> console_handle=0x54 std_in=0x7f8 std_out=0x7f0 std_err=0x6b0 startf=0x100 show_window=0 desktop=WinSta0\Default title_chars=82 cmd="<build folder>\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+CHAIN pid=8328 <- 10188:bridge_mcp.exe <- 23204:powershell.exe <- 14428:python.exe <- 9872:powershell.exe <- 16628:bash.exe <- 5256:bash.exe
+CONHOST pid=3824 parent=13776
+CONHOST pid=4644 parent=1284
+CONHOST pid=15472 parent=6720
+CONHOST pid=4384 parent=192
+CONHOST pid=17896 parent=9064
+CONHOST pid=24220 parent=30204
+CONHOST pid=27756 parent=21456
+CONHOST pid=20720 parent=19088
+CONHOST pid=3448 parent=13064
+CONHOST pid=23960 parent=22060
+CONHOST pid=2756 parent=26280
+CONHOST pid=10768 parent=22060
+CONHOST pid=6440 parent=1996
+CONHOST pid=30648 parent=30104
+CONHOST pid=18548 parent=16628
+CONHOST pid=14164 parent=26128
+CONHOST pid=13152 parent=23672
+NAMED_JOB_OBJECTS count=0

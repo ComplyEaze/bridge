@@ -1,0 +1,11 @@
+﻿C10 2026-10-29T07:48:16Z
+"tally.exe","13992","Console","5","2,31,372 K"
+"bridge_mcp.exe","30204","Console","5","8,152 K"
+"bridge_mcp.exe","9064","Console","5","7,672 K"
+"bridge_mcp.exe","21456","Console","5","7,672 K"
+"bridge_mcp.exe","19088","Console","5","7,636 K"
+  TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       13992
+  TCP    [::]:9001              [::]:0                 LISTENING       13992
+status 200 51 B
+hash bridge_mcp.exe 31804416 3ca00fab5ea77314df3a34cfd22d049a5a60ecbbf14ec2b9e253bab097bad974
+hash bridge-tally.mcpb 15320736 61e52d079544b2c7dd49cb47bf08a11120b0154957e830e8a76e598970ab99c2

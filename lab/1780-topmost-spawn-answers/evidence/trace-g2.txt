@@ -1,0 +1,42 @@
+﻿START 2026-10-29T07:39:27.982Z title_part=Lab topmost control interval_ms=50 seconds=100
+FIRST 2026-10-29T07:39:36.863Z box_pid=29604
+T 2026-10-29T07:39:37.366Z fg_hwnd=0x3d2c30 fg_pid=29604 box_pid=29604 windows=3
+W 2026-10-29T07:39:37.366Z hwnd=0x3d2c30 class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=17604 owner=0 title=Lab topmost control
+W 2026-10-29T07:39:37.366Z hwnd=0xa0269c class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=17604 owner=0x1ae1bf6 owner_class=IME owner_pid=29604 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T07:39:37.366Z hwnd=0x1ae1bf6 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=17604 owner=0x3d2c30 owner_class=#32770 owner_pid=29604 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=29240
+PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-product.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g2.control.txt"
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+H 2026-10-29T07:39:51.411Z unchanged
+H 2026-10-29T07:39:52.409Z unchanged
+H 2026-10-29T07:39:53.424Z unchanged
+H 2026-10-29T07:39:54.450Z unchanged
+H 2026-10-29T07:39:55.530Z unchanged
+H 2026-10-29T07:39:56.651Z unchanged
+H 2026-10-29T07:39:57.784Z unchanged
+H 2026-10-29T07:39:58.869Z unchanged
+H 2026-10-29T07:39:59.930Z unchanged
+H 2026-10-29T07:40:00.932Z unchanged
+H 2026-10-29T07:40:01.981Z unchanged
+H 2026-10-29T07:40:03.047Z unchanged
+H 2026-10-29T07:40:04.089Z unchanged
+H 2026-10-29T07:40:05.124Z unchanged
+T 2026-10-29T07:40:06.036Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=29604 windows=3
+W 2026-10-29T07:40:06.036Z hwnd=0x3d2c30 class=#32770 visible=1 exstyle=0x00010109 topmost=1 thread=17604 owner=0 title=Lab topmost control
+W 2026-10-29T07:40:06.036Z hwnd=0xa0269c class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=17604 owner=0x1ae1bf6 owner_class=IME owner_pid=29604 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T07:40:06.036Z hwnd=0x1ae1bf6 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=17604 owner=0x3d2c30 owner_class=#32770 owner_pid=29604 owner_exstyle=0x00010109 owner_topmost=1 title=Default IME
+H 2026-10-29T07:40:07.093Z unchanged
+H 2026-10-29T07:40:08.126Z unchanged
+H 2026-10-29T07:40:09.161Z unchanged
+H 2026-10-29T07:40:10.162Z unchanged
+H 2026-10-29T07:40:11.201Z unchanged
+H 2026-10-29T07:40:12.203Z unchanged
+H 2026-10-29T07:40:13.257Z unchanged
+H 2026-10-29T07:40:14.322Z unchanged
+H 2026-10-29T07:40:15.370Z unchanged
+T 2026-10-29T07:40:16.000Z fg_hwnd=0x0 fg_pid=0 box_pid=29604 windows=0
+T 2026-10-29T07:40:16.195Z fg_hwnd=0xcc28b6 fg_pid=13992 box_pid=29604 windows=0
+H 2026-10-29T07:40:17.255Z unchanged
+H 2026-10-29T07:40:18.268Z unchanged
+GONE 2026-10-29T07:40:19.055Z
+END 2026-10-29T07:40:19.069Z

@@ -1,0 +1,4 @@
+﻿SPAWN 2026-10-29T07:38:54.576Z parent_pid=15332 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60
+SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-product.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\g1.control.txt"
+SPAWN 2026-10-29T07:38:54.905Z child_pid=3664
+SPAWN 2026-10-29T07:39:20.541Z pid=3664 exit_code=0 stdout_bytes_read=0 elapsed_s=25.8

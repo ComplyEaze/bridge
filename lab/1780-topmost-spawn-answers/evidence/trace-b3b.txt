@@ -1,0 +1,23 @@
+﻿START 2026-10-29T07:27:36.413Z title_part=Tally probe control interval_ms=50 seconds=10
+FIRST 2026-10-29T07:27:36.501Z box_pid=13916
+T 2026-10-29T07:27:36.582Z fg_hwnd=0x72212a fg_pid=25660 box_pid=13916 windows=8
+W 2026-10-29T07:27:36.582Z hwnd=0x18e298a class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 visible=1 exstyle=0x00050108 topmost=1 thread=14896 owner=0 title=Tally probe control TOPMOST
+W 2026-10-29T07:27:36.582Z hwnd=0xb22978 class=GDI+ Hook Window Class visible=0 exstyle=0x00000000 topmost=0 thread=26184 owner=0 title=GDI+ Window (powershell.exe)
+W 2026-10-29T07:27:36.582Z hwnd=0x602118 class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 visible=1 exstyle=0x00050100 topmost=0 thread=14896 owner=0 title=Tally probe control PLAIN
+W 2026-10-29T07:27:36.582Z hwnd=0x5f0408 class=.NET-BroadcastEventWindow.4.0.0.0.f5a312.0 visible=0 exstyle=0x00000000 topmost=0 thread=14896 owner=0 title=.NET-BroadcastEventWindow.4.0.0.0.f5a312.0
+W 2026-10-29T07:27:36.582Z hwnd=0xc2212c class=ConsoleWindowClass visible=1 exstyle=0x000c0110 topmost=0 thread=17900 owner=0 title=Windows PowerShell
+W 2026-10-29T07:27:36.582Z hwnd=0x1cf1b66 class=IME visible=0 exstyle=0x00000000 topmost=0 thread=26184 owner=0xb22978 owner_class=GDI+ Hook Window Class owner_pid=13916 owner_exstyle=0x00000000 owner_topmost=0 title=Default IME
+W 2026-10-29T07:27:36.582Z hwnd=0x16728ba class=MSCTFIME UI visible=0 exstyle=0x00000000 topmost=0 thread=14896 owner=0x246299a owner_class=IME owner_pid=13916 owner_exstyle=0x00000000 owner_topmost=0 title=MSCTFIME UI
+W 2026-10-29T07:27:36.582Z hwnd=0x246299a class=IME visible=0 exstyle=0x00000000 topmost=0 thread=14896 owner=0x602118 owner_class=WindowsForms10.Window.8.app.0.f5a312_r38_ad1 owner_pid=13916 owner_exstyle=0x00050100 owner_topmost=0 title=Default IME
+PROC path=C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=20672
+PROC command_line="C:\windows\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\control-forms.ps1 -Seconds 20 
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+H 2026-10-29T07:27:38.629Z unchanged
+H 2026-10-29T07:27:39.627Z unchanged
+H 2026-10-29T07:27:40.656Z unchanged
+H 2026-10-29T07:27:41.712Z unchanged
+H 2026-10-29T07:27:42.725Z unchanged
+H 2026-10-29T07:27:43.735Z unchanged
+H 2026-10-29T07:27:44.771Z unchanged
+H 2026-10-29T07:27:45.784Z unchanged
+END 2026-10-29T07:27:46.495Z

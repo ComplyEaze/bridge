@@ -1,0 +1,2 @@
+pid 13916; TOPMOST hwnd 26093962 TopMost=True; PLAIN hwnd 6299928 TopMost=False; shown 2026-10-29T07:27:33.349Z
+closed 2026-10-29T07:27:53.465Z

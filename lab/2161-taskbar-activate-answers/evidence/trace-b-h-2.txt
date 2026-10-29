@@ -1,0 +1,42 @@
+START 2026-10-29T17:44:12.094Z title_part=Lab topmost control interval_ms=50 seconds=100
+FIRST 2026-10-29T17:44:28.291Z box_pid=30500
+T 2026-10-29T17:44:28.406Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=30500 windows=3
+W 2026-10-29T17:44:28.406Z hwnd=0x752804 class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=13512 owner=0 title=Lab topmost control
+W 2026-10-29T17:44:28.406Z hwnd=0x1df202a class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=13512 owner=0x1381b1c owner_class=IME owner_pid=30500 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T17:44:28.406Z hwnd=0x1381b1c class=IME visible=0 exstyle=0x00000008 topmost=1 thread=13512 owner=0x752804 owner_class=#32770 owner_pid=30500 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=13320
+PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant h -DelaySeconds 0 -Out "<lab folder>\evidence\b-h-2.control.txt"
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+H 2026-10-29T17:44:30.223Z unchanged
+H 2026-10-29T17:44:31.215Z unchanged
+H 2026-10-29T17:44:32.242Z unchanged
+H 2026-10-29T17:44:33.278Z unchanged
+H 2026-10-29T17:44:34.296Z unchanged
+H 2026-10-29T17:44:35.299Z unchanged
+H 2026-10-29T17:44:36.353Z unchanged
+H 2026-10-29T17:44:37.392Z unchanged
+H 2026-10-29T17:44:38.420Z unchanged
+H 2026-10-29T17:44:39.455Z unchanged
+H 2026-10-29T17:44:40.478Z unchanged
+H 2026-10-29T17:44:41.527Z unchanged
+H 2026-10-29T17:44:42.586Z unchanged
+H 2026-10-29T17:44:43.611Z unchanged
+H 2026-10-29T17:44:44.672Z unchanged
+H 2026-10-29T17:44:45.709Z unchanged
+H 2026-10-29T17:44:46.736Z unchanged
+H 2026-10-29T17:44:47.768Z unchanged
+H 2026-10-29T17:44:48.833Z unchanged
+H 2026-10-29T17:44:49.871Z unchanged
+H 2026-10-29T17:44:50.924Z unchanged
+H 2026-10-29T17:44:51.947Z unchanged
+H 2026-10-29T17:44:53.027Z unchanged
+H 2026-10-29T17:44:54.033Z unchanged
+H 2026-10-29T17:44:55.033Z unchanged
+H 2026-10-29T17:44:56.056Z unchanged
+H 2026-10-29T17:44:57.085Z unchanged
+T 2026-10-29T17:44:57.569Z fg_hwnd=0x0 fg_pid=0 box_pid=30500 windows=0
+T 2026-10-29T17:44:57.668Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=30500 windows=0
+H 2026-10-29T17:44:58.750Z unchanged
+H 2026-10-29T17:44:59.785Z unchanged
+GONE 2026-10-29T17:45:00.581Z
+END 2026-10-29T17:45:00.590Z

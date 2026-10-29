@@ -1,0 +1,20 @@
+B-c runner pid 4408; Tally window 1777070; target control variant c
+B-c trace pre-armed 2026-10-29T17:45:43.174Z pid 20336: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-b-c.txt -Seconds 100
+B-c Tally title clicked (Tally in front) 2026-10-29T17:45:45.275Z
+B-c started 2026-10-29T17:45:46.288Z: explorer.exe "<lab folder>\cmd\b-c.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -ControlScript <lab folder>\requests\control-box-fixes.ps1 -ControlVariant c -Stdio tokio -Out <lab folder>\evidence\b-c.txt -TimeoutSeconds 60
+B-c Tally title clicked ONCE 2026-10-29T17:45:50.372Z (4.1 s after the start)
+B-c-T0 2026-10-29T17:45:58.042Z from: SPAWN 2026-10-29T17:45:58.042Z child_pid=8244
+B-c-T0+6 R t0p6 2026-10-29T17:46:04.076Z to 2026-10-29T17:46:07.652Z: no stderr file ;; rect file rect-b-c-t0p6.txt () ;; probe: 3,0,1,13252,TallyPrime:9001 | 4,0,0,8244,Lab topmost control | visible_titled_windows,13
+B-c K open 2026-10-29T17:46:07.738Z to 2026-10-29T17:46:10.204Z: 2026-10-29T17:46:09.855Z name=b-c-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+B-c lab view 3: 2026-10-29T17:46:15.727Z b-c-view3 done
+B-c box 5187156 rect logical 573,362,978,521; click point logical (263,475) = screen tool (249,450); distance 310 px
+B-c click into Tally 2026-10-29T17:46:15.915Z at T0+17.87 s
+B-c C+0 R c0 2026-10-29T17:46:15.935Z to 2026-10-29T17:46:19.003Z: no stderr file ;; rect file rect-b-c-c0.txt () ;; probe: 3,0,1,13252,TallyPrime:9001 | 4,0,0,8244,Lab topmost control | visible_titled_windows,13
+B-c K clicked 2026-10-29T17:46:19.052Z to 2026-10-29T17:46:21.516Z: 2026-10-29T17:46:21.061Z name=b-c-clicked dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+B-c lab view 4: 2026-10-29T17:46:27.379Z b-c-view4 done
+B-c the box was below Tally (z box 4, Tally 3): Tally minimised by ShowWindow(SW_MINIMIZE) 2026-10-29T17:46:28.587Z
+B-c No clicked 2026-10-29T17:46:28.646Z at T0+30.61 s, logical (834,492) = screen tool (791,466)
+B-c Tally restored by ShowWindow(SW_RESTORE) 2026-10-29T17:46:29.730Z
+B-c spawn file: SPAWN 2026-10-29T17:45:57.901Z parent_pid=7236 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\b-c.control.txt" || SPAWN 2026-10-29T17:45:58.042Z child_pid=8244 || SPAWN 2026-10-29T17:46:28.851Z pid=8244 exit_code=0 stdout_bytes_read=0 elapsed_s=30.9
+B-c control file: variant=c owner_created=False asked=2026-10-29T17:45:59.322Z answered=2026-10-29T17:46:28.687Z answer=7
+B-c DONE 2026-10-29T17:46:29.847Z

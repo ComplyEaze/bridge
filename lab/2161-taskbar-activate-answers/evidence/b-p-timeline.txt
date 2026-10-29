@@ -1,0 +1,18 @@
+B-p runner pid 30420; Tally window 1777070; target child variant h
+B-p trace pre-armed 2026-10-29T17:47:02.792Z pid 5280: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-b-p.txt -Seconds 100
+B-p Tally title clicked (Tally in front) 2026-10-29T17:47:04.887Z
+B-p started 2026-10-29T17:47:05.993Z: explorer.exe "<lab folder>\cmd\b-p.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -ChildExe <build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt -Stdio files -Out <lab folder>\evidence\b-p.txt -TimeoutSeconds 60
+B-p Tally title clicked ONCE 2026-10-29T17:47:10.137Z (4.16 s after the start)
+B-p-T0 2026-10-29T17:47:17.982Z from: SPAWN 2026-10-29T17:47:17.982Z child_pid=16824
+B-p-T0+6 R t0p6 2026-10-29T17:47:24.020Z to 2026-10-29T17:47:27.680Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; rect file rect-b-p-t0p6.txt () ;; probe: 1,1,1,16824,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+B-p K open 2026-10-29T17:47:27.714Z to 2026-10-29T17:47:30.222Z: 2026-10-29T17:47:29.886Z name=b-p-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+B-p lab view 3: 2026-10-29T17:47:35.657Z b-p-view3 done
+B-p box 10690608 rect logical 549,145,1003,741; click point logical (263,475) = screen tool (249,450); distance 286 px
+B-p click into Tally 2026-10-29T17:47:35.888Z at T0+17.91 s
+B-p C+0 R c0 2026-10-29T17:47:35.968Z to 2026-10-29T17:47:40.301Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; rect file rect-b-p-c0.txt () ;; probe: 1,1,0,16824,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13
+B-p K clicked 2026-10-29T17:47:40.329Z to 2026-10-29T17:47:42.207Z: 2026-10-29T17:47:41.874Z name=b-p-clicked dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+B-p lab view 4: 2026-10-29T17:47:47.573Z b-p-view4 done
+B-p No clicked 2026-10-29T17:47:47.961Z at T0+29.98 s, logical (850,709) = screen tool (806,672)
+B-p spawn file: SPAWN 2026-10-29T17:47:17.659Z parent_pid=13192 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-10-29T17:47:17.982Z child_pid=16824 || SPAWN 2026-10-29T17:47:48.179Z pid=16824 exit_code=1 stdout_bytes_read=0 elapsed_s=30.4
+B-p stderr: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true || box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+B-p DONE 2026-10-29T17:47:48.444Z

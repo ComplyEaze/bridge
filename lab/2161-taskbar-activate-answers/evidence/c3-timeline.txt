@@ -1,0 +1,21 @@
+C3 runner pid 15876; Tally window 1777070; mode C3
+C3 trace pre-armed 2026-10-29T18:01:20.298Z pid 9156: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-c3.txt -Seconds 100
+C3 Tally title clicked (Tally in front) 2026-10-29T18:01:22.418Z
+C3 started 2026-10-29T18:01:23.516Z: explorer.exe "<lab folder>\cmd\c3.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -ChildExe <build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt -Stdio files -Out <lab folder>\evidence\c3.txt -TimeoutSeconds 60
+C3 Tally title clicked ONCE 2026-10-29T18:01:27.649Z (4.15 s after the start)
+C3-T0 2026-10-29T18:01:36.075Z from: SPAWN 2026-10-29T18:01:36.075Z child_pid=14784
+C3-T0+6 R t0p6 2026-10-29T18:01:42.097Z to 2026-10-29T18:01:44.843Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T18:01:43.205Z hwnd=0x28828bc pid=14784 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,1,14784,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C3 K open 2026-10-29T18:01:44.881Z to 2026-10-29T18:01:46.964Z: 2026-10-29T18:01:46.699Z name=c3-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+C3 task list right edge 1253 (from rect-c3-t0p6.txt)
+C3 box task button located at physical (948,1055) = logical (758,844) from shots\c3-open-print.png
+C3 box 42477756 rect 549,145,1003,741
+C3 click into Tally 2026-10-29T18:01:52.128Z at T0+16.05 s at logical (948,1055)
+C3 C+0 R c0 2026-10-29T18:01:52.196Z to 2026-10-29T18:01:54.993Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T18:01:53.359Z hwnd=0x28828bc pid=14784 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,0,14784,ComplyEaze Bridge — post this voucher? | 5,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C3 R tb1-pre 2026-10-29T18:01:58.194Z to 2026-10-29T18:02:02.042Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T18:01:59.706Z hwnd=0x28828bc pid=14784 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,0,14784,ComplyEaze Bridge — post this voucher? | 5,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C3 tb1 RIGHT-click ONCE on the box's task button 2026-10-29T18:02:02.114Z at T0+26.04 s, logical (758,844) = physical (948,1055)
+C3 menu capture shots\c3-menu-full.png 2026-10-29T18:02:05.182Z; waiting for cmd\c3-menu.txt
+C3 no Close window item: one click on the blank Tally point 2026-10-29T18:02:23.538Z
+C3 C3 no Close window item: No clicked 2026-10-29T18:02:23.720Z at T0+47.65 s, logical (850,709) = screen tool (806,672)
+C3 spawn file: SPAWN 2026-10-29T18:01:35.950Z parent_pid=18096 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-10-29T18:01:36.075Z child_pid=14784 || SPAWN 2026-10-29T18:02:23.778Z pid=14784 exit_code=1 stdout_bytes_read=0 elapsed_s=47.8
+C3 stderr: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true || box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+C3 DONE 2026-10-29T18:02:24.080Z

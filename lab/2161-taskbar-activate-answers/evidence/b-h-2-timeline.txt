@@ -1,0 +1,18 @@
+B-h-2 runner pid 18156; Tally window 1777070; target control variant h
+B-h-2 trace pre-armed 2026-10-29T17:44:09.441Z pid 4424: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "Lab topmost control" -Out <lab folder>\evidence\trace-b-h-2.txt -Seconds 100
+B-h-2 Tally title clicked (Tally in front) 2026-10-29T17:44:11.548Z
+B-h-2 started 2026-10-29T17:44:12.608Z: explorer.exe "<lab folder>\cmd\b-h-2.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target control -ControlScript <lab folder>\requests\control-box-fixes.ps1 -ControlVariant h -Stdio tokio -Out <lab folder>\evidence\b-h-2.txt -TimeoutSeconds 60
+B-h-2 Tally title clicked ONCE 2026-10-29T17:44:16.714Z (4.12 s after the start)
+B-h-2-T0 2026-10-29T17:44:26.606Z from: SPAWN 2026-10-29T17:44:26.606Z child_pid=30500
+B-h-2-T0+6 R t0p6 2026-10-29T17:44:32.660Z to 2026-10-29T17:44:36.527Z: no stderr file ;; rect file rect-b-h-2-t0p6.txt () ;; probe: 1,1,0,30500,Lab topmost control | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13
+B-h-2 K open 2026-10-29T17:44:36.571Z to 2026-10-29T17:44:38.901Z: 2026-10-29T17:44:38.574Z name=b-h-2-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+B-h-2 lab view 3: 2026-10-29T17:44:44.656Z b-h-2-view3 done
+B-h-2 box 7677956 rect logical 572,362,980,521; click point logical (263,475) = screen tool (249,450); distance 309 px
+B-h-2 click into Tally 2026-10-29T17:44:44.891Z at T0+18.28 s
+B-h-2 C+0 R c0 2026-10-29T17:44:44.917Z to 2026-10-29T17:44:48.685Z: no stderr file ;; rect file rect-b-h-2-c0.txt () ;; probe: 1,1,0,30500,Lab topmost control | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13
+B-h-2 K clicked 2026-10-29T17:44:48.712Z to 2026-10-29T17:44:51.186Z: 2026-10-29T17:44:50.783Z name=b-h-2-clicked dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+B-h-2 lab view 4: 2026-10-29T17:44:57.384Z b-h-2-view4 done
+B-h-2 No clicked 2026-10-29T17:44:57.504Z at T0+30.9 s, logical (836,492) = screen tool (792,466)
+B-h-2 spawn file: SPAWN 2026-10-29T17:44:26.446Z parent_pid=13320 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant h -DelaySeconds 0 -Out "<lab folder>\evidence\b-h-2.control.txt" || SPAWN 2026-10-29T17:44:26.606Z child_pid=30500 || SPAWN 2026-10-29T17:44:57.703Z pid=30500 exit_code=0 stdout_bytes_read=0 elapsed_s=31.2
+B-h-2 control file: variant=h owner_created=False asked=2026-10-29T17:44:28.191Z answered=2026-10-29T17:44:57.509Z answer=7
+B-h-2 DONE 2026-10-29T17:44:57.906Z

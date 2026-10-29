@@ -1,0 +1,21 @@
+C1 runner pid 22752; Tally window 1777070; mode C1
+C1 trace pre-armed 2026-10-29T17:58:53.706Z pid 4424: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-c1.txt -Seconds 100
+C1 Tally title clicked (Tally in front) 2026-10-29T17:58:55.806Z
+C1 started 2026-10-29T17:58:56.841Z: explorer.exe "<lab folder>\cmd\c1.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -ChildExe <build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt -Stdio files -Out <lab folder>\evidence\c1.txt -TimeoutSeconds 60
+C1 Tally title clicked ONCE 2026-10-29T17:59:00.951Z (4.12 s after the start)
+C1-T0 2026-10-29T17:59:08.728Z from: SPAWN 2026-10-29T17:59:08.728Z child_pid=7940
+C1-T0+6 R t0p6 2026-10-29T17:59:14.754Z to 2026-10-29T17:59:17.898Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T17:59:16.033Z hwnd=0x13a1576 pid=7940 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,1,7940,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C1 K open 2026-10-29T17:59:17.936Z to 2026-10-29T17:59:20.506Z: 2026-10-29T17:59:20.171Z name=c1-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+C1 task list right edge 1250 (from rect-c1-t0p6.txt)
+C1 box task button located at physical (948,1055) = logical (758,844) from shots\c1-open-print.png
+C1 box 20583798 rect 549,145,1003,741
+C1 click into Tally 2026-10-29T17:59:24.767Z at T0+16.04 s at logical (948,1055)
+C1 C+0 R c0 2026-10-29T17:59:24.863Z to 2026-10-29T17:59:29.307Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T17:59:26.802Z hwnd=0x13a1576 pid=7940 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,0,7940,ComplyEaze Bridge — post this voucher? | 5,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C1 R tb1-pre 2026-10-29T17:59:31.436Z to 2026-10-29T17:59:34.246Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T17:59:32.603Z hwnd=0x13a1576 pid=7940 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,0,7940,ComplyEaze Bridge — post this voucher? | 5,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C1 tb1 left click ONCE on the box's task button 2026-10-29T17:59:34.294Z at T0+25.57 s, logical (758,844) = physical (948,1055)
+C1 R tb1-c0 2026-10-29T17:59:34.328Z to 2026-10-29T17:59:37.976Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T17:59:35.784Z hwnd=0x13a1576 pid=7940 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,0,7940,ComplyEaze Bridge — post this voucher? | 5,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C1 R tb1-c3 2026-10-29T17:59:38.009Z to 2026-10-29T17:59:41.578Z: stderr lines 1; last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; box: B 2026-10-29T17:59:39.512Z hwnd=0x13a1576 pid=7940 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,0,7940,ComplyEaze Bridge — post this voucher? | 5,0,0,13252,TallyPrime:9001 | visible_titled_windows,13
+C1 C1 after the taskbar click: No clicked 2026-10-29T17:59:41.743Z at T0+33.02 s, logical (850,709) = screen tool (806,672)
+C1 spawn file: SPAWN 2026-10-29T17:59:08.607Z parent_pid=13036 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-10-29T17:59:08.728Z child_pid=7940 || SPAWN 2026-10-29T17:59:41.836Z pid=7940 exit_code=1 stdout_bytes_read=0 elapsed_s=33.2
+C1 stderr: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true || box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+C1 DONE 2026-10-29T17:59:42.275Z

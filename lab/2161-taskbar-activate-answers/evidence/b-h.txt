@@ -1,0 +1,4 @@
+SPAWN 2026-10-29T17:39:03.404Z parent_pid=24404 target=control stdio=tokio creation_flags=0x400 startf=0x100 timeout_s=60
+SPAWN command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant h -DelaySeconds 0 -Out "<lab folder>\evidence\b-h.control.txt"
+SPAWN 2026-10-29T17:39:03.549Z child_pid=20004
+SPAWN 2026-10-29T17:40:03.636Z pid=20004 exit_code=killed_after_timeout stdout_bytes_read=0 elapsed_s=60.2

@@ -1,0 +1,13 @@
+2026-10-29T17:37:07.636Z name=idle dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:39:13.812Z name=b-h-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:39:25.515Z name=b-h-clicked dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:44:38.574Z name=b-h-2-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:44:50.783Z name=b-h-2-clicked dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:46:09.855Z name=b-c-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:46:21.061Z name=b-c-clicked dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:47:29.886Z name=b-p-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:47:41.874Z name=b-p-clicked dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:56:51.338Z name=c1-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T17:59:20.171Z name=c1-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T18:00:37.477Z name=c2-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-10-29T18:01:46.699Z name=c3-open dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True

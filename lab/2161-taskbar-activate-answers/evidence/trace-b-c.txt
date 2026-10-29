@@ -1,0 +1,46 @@
+START 2026-10-29T17:45:45.737Z title_part=Lab topmost control interval_ms=50 seconds=100
+FIRST 2026-10-29T17:45:59.412Z box_pid=8244
+T 2026-10-29T17:45:59.475Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=8244 windows=3
+W 2026-10-29T17:45:59.475Z hwnd=0x4f2654 class=#32770 visible=1 exstyle=0x00010101 topmost=0 thread=14912 owner=0 title=Lab topmost control
+W 2026-10-29T17:45:59.475Z hwnd=0x15e276e class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=14912 owner=0x9e268a owner_class=IME owner_pid=8244 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T17:45:59.475Z hwnd=0x9e268a class=IME visible=0 exstyle=0x00000008 topmost=1 thread=14912 owner=0x4f2654 owner_class=#32770 owner_pid=8244 owner_exstyle=0x00010101 owner_topmost=0 title=Default IME
+PROC path=C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe parent_pid=7236
+PROC command_line="C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "<lab folder>\requests\control-box-fixes.ps1" -Variant c -DelaySeconds 0 -Out "<lab folder>\evidence\b-c.control.txt"
+PROC sha256=9785001b0dcf755eddb8af294a373c0b87b2498660f724e76c4d53f9c217c7a3 bytes=455680
+H 2026-10-29T17:46:01.406Z unchanged
+H 2026-10-29T17:46:02.411Z unchanged
+H 2026-10-29T17:46:03.449Z unchanged
+H 2026-10-29T17:46:04.501Z unchanged
+H 2026-10-29T17:46:05.565Z unchanged
+H 2026-10-29T17:46:06.624Z unchanged
+H 2026-10-29T17:46:07.634Z unchanged
+H 2026-10-29T17:46:08.662Z unchanged
+H 2026-10-29T17:46:09.687Z unchanged
+H 2026-10-29T17:46:10.716Z unchanged
+H 2026-10-29T17:46:11.764Z unchanged
+H 2026-10-29T17:46:12.771Z unchanged
+H 2026-10-29T17:46:13.797Z unchanged
+H 2026-10-29T17:46:14.817Z unchanged
+H 2026-10-29T17:46:15.871Z unchanged
+H 2026-10-29T17:46:16.917Z unchanged
+H 2026-10-29T17:46:17.980Z unchanged
+H 2026-10-29T17:46:19.034Z unchanged
+H 2026-10-29T17:46:20.080Z unchanged
+H 2026-10-29T17:46:21.100Z unchanged
+H 2026-10-29T17:46:22.126Z unchanged
+H 2026-10-29T17:46:23.151Z unchanged
+H 2026-10-29T17:46:24.160Z unchanged
+H 2026-10-29T17:46:25.169Z unchanged
+H 2026-10-29T17:46:26.220Z unchanged
+H 2026-10-29T17:46:27.279Z unchanged
+T 2026-10-29T17:46:27.974Z fg_hwnd=0x4f2654 fg_pid=8244 box_pid=8244 windows=3
+W 2026-10-29T17:46:27.974Z hwnd=0x4f2654 class=#32770 visible=1 exstyle=0x00010101 topmost=0 thread=14912 owner=0 title=Lab topmost control
+W 2026-10-29T17:46:27.974Z hwnd=0x15e276e class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=14912 owner=0x9e268a owner_class=IME owner_pid=8244 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T17:46:27.974Z hwnd=0x9e268a class=IME visible=0 exstyle=0x00000008 topmost=1 thread=14912 owner=0x4f2654 owner_class=#32770 owner_pid=8244 owner_exstyle=0x00010101 owner_topmost=0 title=Default IME
+T 2026-10-29T17:46:28.748Z fg_hwnd=0x7d0028 fg_pid=23604 box_pid=8244 windows=0
+T 2026-10-29T17:46:28.999Z fg_hwnd=0x721bb2 fg_pid=20336 box_pid=8244 windows=0
+T 2026-10-29T17:46:29.616Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=8244 windows=0
+H 2026-10-29T17:46:30.650Z unchanged
+H 2026-10-29T17:46:31.668Z unchanged
+GONE 2026-10-29T17:46:31.797Z
+END 2026-10-29T17:46:31.797Z

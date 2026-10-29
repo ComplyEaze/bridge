@@ -1,0 +1,8 @@
+E 2026-10-29T17:46:17.249Z dpi_context=ok
+B 2026-10-29T17:46:17.249Z hwnd=0x4f2654 pid=8244 iconic=0 topmost=0 rect=716,453,1222,652 title=Lab topmost control
+F 2026-10-29T17:46:17.249Z hwnd=0x1b1dae pid=13252 title=TallyPrime:9001
+K 2026-10-29T17:46:17.249Z class=Shell_TrayWnd hwnd=0x20138 visible=1 rect=0,1030,1920,1080
+K 2026-10-29T17:46:17.249Z class=ReBarWindow32 hwnd=0x10184 visible=1 rect=478,1030,1307,1080
+K 2026-10-29T17:46:17.249Z class=MSTaskSwWClass hwnd=0x10188 visible=1 rect=480,1030,1261,1080
+K 2026-10-29T17:46:17.249Z class=MSTaskListWClass hwnd=0x1018a visible=1 rect=480,1030,1261,1080
+E 2026-10-29T17:46:17.249Z boxes=1

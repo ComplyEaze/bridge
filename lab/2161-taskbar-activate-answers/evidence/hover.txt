@@ -1,0 +1,19 @@
+2026-10-29T17:44:41.239Z b-h-2-view3 full screen copy shots\b-h-2-view3-full.png
+2026-10-29T17:44:43.041Z b-h-2-view3 hover 1 at physical (885,1055): shots\b-h-2-view3-hover1.png
+2026-10-29T17:44:44.642Z b-h-2-view3 hover 2 at physical (633,1055): shots\b-h-2-view3-hover2.png
+2026-10-29T17:44:53.968Z b-h-2-view4 full screen copy shots\b-h-2-view4-full.png
+2026-10-29T17:44:55.758Z b-h-2-view4 hover 1 at physical (885,1055): shots\b-h-2-view4-hover1.png
+2026-10-29T17:44:57.354Z b-h-2-view4 hover 2 at physical (633,1055): shots\b-h-2-view4-hover2.png
+2026-10-29T17:46:12.271Z b-c-view3 full screen copy shots\b-c-view3-full.png
+2026-10-29T17:46:14.084Z b-c-view3 hover 1 at physical (885,1055): shots\b-c-view3-hover1.png
+2026-10-29T17:46:15.700Z b-c-view3 hover 2 at physical (633,1055): shots\b-c-view3-hover2.png
+2026-10-29T17:46:23.810Z b-c-view4 full screen copy shots\b-c-view4-full.png
+2026-10-29T17:46:25.701Z b-c-view4 hover 1 at physical (885,1055): shots\b-c-view4-hover1.png
+2026-10-29T17:46:27.332Z b-c-view4 hover 2 at physical (633,1055): shots\b-c-view4-hover2.png
+2026-10-29T17:47:32.201Z b-p-view3 full screen copy shots\b-p-view3-full.png
+2026-10-29T17:47:34.040Z b-p-view3 hover 1 at physical (885,1055): shots\b-p-view3-hover1.png
+2026-10-29T17:47:35.627Z b-p-view3 hover 2 at physical (633,1055): shots\b-p-view3-hover2.png
+2026-10-29T17:47:44.097Z b-p-view4 full screen copy shots\b-p-view4-full.png
+2026-10-29T17:47:45.944Z b-p-view4 hover 1 at physical (885,1055): shots\b-p-view4-hover1.png
+2026-10-29T17:47:47.544Z b-p-view4 hover 2 at physical (633,1055): shots\b-p-view4-hover2.png
+2026-10-29T18:02:04.862Z c3-menu full screen copy shots\c3-menu-full.png

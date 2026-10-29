@@ -1,0 +1,13 @@
+#2161 notes (UTC). Sheet lab/2161-taskbar-activate at de2b1d15c50f8d1d51eb3b8617a5ef76a6d89fc4: SHA256.txt 10 of 10 equal. BUILD-H exe a9469795... (pdfium.dll beside it).
+2026-10-29T17:36:31Z P0: step 0 with no company loaded (one tally.exe owns 9001; /status 200). BRIDGE BATCH LAB loaded alone (filter, Enter). MARKS: one row, ALTVCHID 87, ALTMSTID 224.
+2026-10-29T17:37Z B2: box-rect-probe dpi_context=ok, boxes=0, four K lines; taskbar-capture idle: dpi=ok, tray 0,1030,1920,1080, print_window=True; screen copy, PrintWindow and the screen tool all draw six task buttons.
+2026-10-29T17:38Z B3: Tally (3,0,1); P-time 2.5 s; R-time 2.77 s. B4 recorded. B5 before: none. B6: 1780-H S9 copy: band over the button row; L2 copy: buttons drawn under a partial band.
+2026-10-29T17:38:49Z B-h: T0 17:39:03.549Z; T0+6 box open (iconic 0, topmost 1, above Tally); K open: screen copy band, PrintWindow drawn. The lab's screen-tool screenshot at the step-3 point hid ungranted windows: at C+0 (17:39:21Z) the box read iconic=1 at -40000. Click into Tally at T0+16.05 s; No at C+12 fell off-screen (clamped to Tally's title corner; Tally unchanged); the box ended at the 60 s bound (killed_after_timeout). Reported to the run lead.
+2026-10-29T17:44:09Z B-h-2 (run lead's word: no screen tool while a box is open; hover-shot.ps1 instead): T0 17:44:26.606Z; box above Tally after the click (1,1,0); band in screen copies, PrintWindow drawn; no hover thumbnail; No answer=7.
+2026-10-29T17:45:5xZ B-c: box under Tally after the click (4 vs 3); band / drawn; no thumbnail; Tally minimised, No, Tally restored; answer=7.
+2026-10-29T17:47:17Z B-p: box above Tally (1,1,0); band / drawn, the box's own button at x 948 in PrintWindow; no thumbnail; No: exit 1, stdout 0; two box-fit lines fits=true. B5 after part B: none.
+2026-10-29T17:5xZ Part C on the run lead's word, at the button located by PrintWindow. C1 run 1: locator error (x 1018, empty spot), void, files kept as c1-run1. Locator fixed.
+2026-10-29T17:59:08Z C1: click into Tally T0+16.04 s; one left click on the box's button (948,1055) at T0+25.57 s: box open, iconic 0, topmost 1, fit lines 1 at once and at +3 s; No: exit 1, stdout 0.
+2026-10-29T18:00:26Z C2: no click into Tally; T0+12 box in front (1,1,1); one left click at T0+22.59 s: box open, not minimised, fit lines 1, the foreground off the box (1,1,0); No: exit 1, stdout 0.
+2026-10-29T18:01:35Z C3: click into Tally T0+16; one right-click at T0+26.04 s: no menu in the screen copy; one click on the blank Tally point; No: exit 1, stdout 0.
+2026-10-29T18:02:27Z B5 end: none. Request files and the exe re-hashed: equal. MARKS again: 87/224 (equal to P0). 18:03Z C10: BRIDGE BATCH LAB shut; one tally.exe owns 9001; /status 200.

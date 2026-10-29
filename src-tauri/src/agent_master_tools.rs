@@ -341,6 +341,7 @@ fn verdict_state_code(state: super::master_ledger::MasterVerdictState) -> &'stat
         MasterVerdictState::MasterWriteLocatedElsewhere => "master_write_located_elsewhere",
         MasterVerdictState::ConfirmedAbsent => "confirmed_absent",
         MasterVerdictState::PostedUnattributed => "posted_unattributed",
+        MasterVerdictState::ConfirmedAbsentAfterChange => "confirmed_absent_after_change",
     }
 }
 

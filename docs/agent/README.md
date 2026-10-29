@@ -2918,6 +2918,12 @@ the name absent and the company's master mark unmoved; a create that Tally
 rejected reaches it too, and it does not show that Tally will not still run a
 create that ComplyEaze Bridge stopped waiting for, so make sure Tally is idle and
 answering before a new batch is prepared, which needs a new approval),
+`confirmed_absent_after_change` (only from a later call: its read found the name
+absent, no ledger or group that existed before changed or went missing, no ledger
+or group that was not there before the send, and the company's master mark moved
+forward since the send; whether the create ran, its ledger later deleted, or never
+ran is not known; the batch is settled and its name released, and a new batch
+needs a new approval),
 `posted_unattributed` (only from a later call, when no answer from Tally to the
 create is on file (it could not be recorded, or Tally never answered): the ledger
 was found as sent, and its `ALTERID` shows it as the first master change in the
@@ -3019,8 +3025,16 @@ Post this batch again when they are settled, and create nothing in Tally by hand
 meanwhile, because the earlier create may still be waiting in Tally and would
 overwrite it.
 
+Both absent states rest on the order Tally serves requests in: the read that finds
+the name absent is sent after the create's send ended, and Tally has been seen to
+serve such a read only after the create had run. That was seen on TallyPrime 7.2
+Silver, for ledger creates, with every request on a new connection; a connection
+ComplyEaze Bridge reuses for the create is not measured (#2176). Their answers carry
+`verification.basis` `read_after_send_order`.
+
 Later calls cannot settle these states, and their batches keep holding the name: a
-read that found the name absent while the company's master mark moved; a ledger
+read that found the name absent while the company's master mark moved back, or
+while a ledger or group appeared that was not there before the send; a ledger
 present with no counters, or with a field that differs; a ledger changed in Tally
 after its create, or created after another master change, which reads
 `ledger_altered_since_create` (its `ALTERID` is past the first change after the

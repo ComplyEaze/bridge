@@ -22,7 +22,9 @@
 //!    `master_write_located_elsewhere`;
 //! 4. on a reconcile only, the name absent under every key of the index, no pre-image
 //!    master changed or missing, no loaded company's mark moved and no counter
-//!    claiming a create: `confirmed_absent`;
+//!    claiming a create: `confirmed_absent`; the same, but with the target
+//!    company's mark moved forward and no ledger or group in the index that
+//!    the pre-image did not hold: `confirmed_absent_after_change`;
 //! 5. every check of [`Checks`] passed: `posted_verified`;
 //! 6. on a reconcile only, with no answer from Tally on file, every other
 //!    check passed and the found ledger's `ALTERID` the target company's
@@ -654,20 +656,37 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     let counters_claim_a_write = facts
         .counters
         .is_some_and(|counters| counters.created > 0 || counters.altered > 0);
-    if facts.moment == Moment::Reconcile
+    let absent_and_unchanged = facts.moment == Moment::Reconcile
         && name_absent
         && !changed
         && !missing
         && same_companies
-        && target_marks.is_some()
-        && !target_moved
-        && !counters_claim_a_write
-    {
+        && !counters_claim_a_write;
+    if absent_and_unchanged && target_marks.is_some() && !target_moved {
         return Judgement {
             state: MasterVerdictState::ConfirmedAbsent,
             guid: None,
             checks,
             reasons: vec!["not_in_book"],
+            name_absent_in_read_book: name_absent,
+            sealed: (),
+        };
+    }
+    // The mark moved since the intent: the create may have run and its ledger
+    // been deleted, or another master changed. A ledger or group the pre-image
+    // did not hold may be this create's ledger under another name, so any such
+    // master keeps the batch open; a mark that went back (a restore, replaced
+    // data) does too.
+    let moved_forward = target_marks.is_some_and(|(before, after)| after > before);
+    let master_new_since_intent = current
+        .keys()
+        .any(|guid| !facts.pre_image.contains_key(guid));
+    if absent_and_unchanged && moved_forward && !master_new_since_intent {
+        return Judgement {
+            state: MasterVerdictState::ConfirmedAbsentAfterChange,
+            guid: None,
+            checks,
+            reasons: vec!["not_in_book", "mark_moved_since_intent"],
             name_absent_in_read_book: name_absent,
             sealed: (),
         };

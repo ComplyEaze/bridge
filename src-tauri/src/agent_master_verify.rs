@@ -37,7 +37,10 @@ pub(super) const NEXT_VERIFIED: &str = "The read-back found exactly one ledger o
 pub(super) const NEXT_INTO_EXISTING: &str = "Open the company in Tally now and check the ledger of this name, its group and the ledgers around it: a ledger that existed before may have been changed. Do not retry and do not post this batch again.";
 pub(super) const NEXT_ELSEWHERE: &str = "Open Tally now and check every loaded company: the change may have landed in a company other than the one approved. Do not retry and do not post this batch again.";
 pub(super) const NEXT_UNATTRIBUTED: &str = "A later read of the book found the ledger of this name with the parent, tax fields and GSTIN as sent and no opening balance (bill-wise is not read back), and its ALTERID shows it as the first master change in this company after ComplyEaze Bridge's last read of it before sending the create, and not changed since. ComplyEaze Bridge has no answer from Tally to the create on file (it could not be recorded, or Tally never answered), so it cannot show that this change was its own create and not the same ledger made by someone else: check the ledger in Tally. That read also does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for, which would change this ledger again. This batch is closed, and nothing is sent again from it; do not post it again.";
-pub(super) const NEXT_ABSENT: &str = "A later read of the book found no ledger of this name, and the company's master mark had not moved. This batch is closed, and nothing is sent again from it. That read also fits a create that Tally rejected, and it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for. To create the ledger, first make sure Tally is idle and answering, then call prepare_ledger_creates for a new batch: it needs a new approval.";
+pub(super) const NEXT_ABSENT: &str = "A later read of the book found no ledger of this name, and the company's master mark had not moved. This batch is closed, and nothing is sent again from it. That read also fits a create that Tally rejected. It was sent after the create's send ended, and Tally has been seen to serve such a read only after the create ran, but only for requests on new connections: it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for. To create the ledger, first make sure Tally is idle and answering, then call prepare_ledger_creates for a new batch: it needs a new approval.";
+/// The read found the name absent after another master change: settled on the
+/// same basis as `NEXT_ABSENT`, with what the moved mark does not show.
+pub(super) const NEXT_ABSENT_AFTER_CHANGE: &str = "A later read of the book found no ledger of this name and no ledger or group that was not there before the create was sent, while the company's master mark had moved forward since then. Whether the create ran (and its ledger was later deleted) or never ran is not known. This batch is closed, and nothing is sent again from it. The read was sent after the create's send ended, and Tally has been seen to serve such a read only after the create ran, but only for requests on new connections: it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for. To create the ledger, first make sure Tally is idle and answering, then call prepare_ledger_creates for a new batch: it needs a new approval.";
 /// The step for a failed post whose own journal read also failed, so that
 /// whether a send was recorded is not known. A later call is the right one
 /// either way: with a send on file it only reads the book back, and with none
@@ -47,7 +50,7 @@ pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back thi
 /// The read-back found no ledger of this name, and the outcome is still open.
 /// A read that found the name absent and did not settle: nothing more can be
 /// settled now, and the name stays held.
-pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, and the outcome of this batch is not settled (see the reasons). ComplyEaze Bridge cannot settle it now: a create it sent may still be waiting in Tally. While the batch stays open, ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for, and will not create it again. Calling post_ledger_creates with this batch_id again sends nothing: it reads the book back, shows whether a ledger of this name now exists, and judges one that has appeared. Never post this batch again.";
+pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, and the outcome of this batch is not settled (see the reasons). ComplyEaze Bridge cannot settle it now: a create it sent may still be waiting in Tally. While the batch stays open, ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for, and will not create it again. Calling post_ledger_creates with this batch_id again, once Tally is idle, sends nothing: it reads the book back, shows whether a ledger of this name now exists, and judges one that has appeared. Never post this batch again.";
 /// A ledger of this name is in the book and the read-back could not verify it.
 pub(super) const NEXT_PRESENT_NOT_VERIFIED: &str = "A ledger of this name is in the book, but ComplyEaze Bridge could not verify that it is the one this batch sent (see the checks and reasons). There is nothing to create: compare the ledger in Tally with this batch by eye. Never post this batch again.";
 /// The book was not compared: the batch's company is not loaded, was renamed,
@@ -61,7 +64,8 @@ const NOTE_ALERT_EXISTING: &str =
     "ATTENTION: the read-back shows an existing master may have been changed by this create.";
 const NOTE_ALERT_ELSEWHERE: &str = "ATTENTION: the read-back shows a master mark moved in a loaded company other than the one approved.";
 const NOTE_UNATTRIBUTED: &str = "A later read of the book found the ledger as sent (bill-wise is not read back), its ALTERID showing it as the first master change in this company after ComplyEaze Bridge's last read of it before sending the create, and no ledger or group that existed before changed. No answer from Tally to the create is on file, so the create is NOT verified: nothing shows the change was ComplyEaze Bridge's own.";
-const NOTE_ABSENT: &str = "A later read of the book found no ledger of this name, no ledger or group that existed before changed and no loaded company's master mark moved since the create was recorded. A create that Tally rejected reaches this state too, and it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for.";
+const NOTE_ABSENT: &str = "A later read of the book found no ledger of this name, no ledger or group that existed before changed and no loaded company's master mark moved since the create was recorded. A create that Tally rejected reaches this state too. The read's basis is the order Tally serves requests in, seen only for requests on new connections, on TallyPrime 7.2 Silver, for ledger creates: it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for.";
+const NOTE_ABSENT_AFTER_CHANGE: &str = "A later read of the book found no ledger of this name, no ledger or group that existed before changed or went missing, and no ledger or group that was not there before the create was sent; no other loaded company's master mark moved. This company's master mark moved forward since the create was recorded, so checks.target_mark_moved reads passed: that shows a master in this company changed, not that this create ran. The read's basis is the order Tally serves requests in, seen only for requests on new connections, on TallyPrime 7.2 Silver, for ledger creates: it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for.";
 const NOTE_UNCONFIRMED: &str = "The book could not be read back, so the create is NOT verified.";
 const NOTE_RECONCILE: &str =
     "The read-back did not settle the outcome: the create is NOT verified.";
@@ -87,6 +91,7 @@ pub(super) fn settled_next_step(state: MasterVerdictState) -> &'static str {
         MasterVerdictState::MasterWriteLocatedElsewhere => NEXT_ELSEWHERE,
         MasterVerdictState::ConfirmedAbsent => NEXT_ABSENT,
         MasterVerdictState::PostedUnattributed => NEXT_UNATTRIBUTED,
+        MasterVerdictState::ConfirmedAbsentAfterChange => NEXT_ABSENT_AFTER_CHANGE,
         MasterVerdictState::MastersAfterPostUnconfirmed => NEXT_UNCONFIRMED,
         MasterVerdictState::ReconciliationRequired => NEXT_RECONCILE,
     }
@@ -131,6 +136,7 @@ pub(super) fn settled_note(state: MasterVerdictState) -> &'static str {
         MasterVerdictState::MasterWriteLocatedElsewhere => NOTE_ALERT_ELSEWHERE,
         MasterVerdictState::ConfirmedAbsent => NOTE_ABSENT,
         MasterVerdictState::PostedUnattributed => NOTE_UNATTRIBUTED,
+        MasterVerdictState::ConfirmedAbsentAfterChange => NOTE_ABSENT_AFTER_CHANGE,
         MasterVerdictState::MastersAfterPostUnconfirmed => NOTE_UNCONFIRMED,
         MasterVerdictState::ReconciliationRequired => NOTE_RECONCILE,
     }
@@ -169,6 +175,7 @@ pub(super) fn settled_alert(state: MasterVerdictState) -> Option<&'static str> {
         MasterVerdictState::PostedVerified
         | MasterVerdictState::ConfirmedAbsent
         | MasterVerdictState::PostedUnattributed
+        | MasterVerdictState::ConfirmedAbsentAfterChange
         | MasterVerdictState::MastersAfterPostUnconfirmed
         | MasterVerdictState::ReconciliationRequired => None,
     }
@@ -625,6 +632,12 @@ fn verification_result(
     {
         // The party read does not fetch ISBILLWISEON: said, not assumed.
         result["verification"]["not_read_back"] = json!(["bill_wise"]);
+    }
+    if judgement.state().is_absent() {
+        // What an absent state rests on: a read sent after the create's send
+        // ended was served after the create (the order Tally serves requests
+        // in), not the name being absent, which says only what the book holds.
+        result["verification"]["basis"] = json!("read_after_send_order");
     }
     // "alert" sorts first among the keys: the loud states lead the answer.
     if let Some(alert) = alert {

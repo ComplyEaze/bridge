@@ -1316,35 +1316,107 @@ fn right_after_a_post_a_missing_ledger_is_never_confirmed_absent() {
 }
 
 #[test]
-fn a_moved_target_mark_forbids_confirmed_absent() {
-    for (after, reasons) in [
-        (
-            8,
-            vec!["name_not_one_ledger_in_book", "counters_unavailable"],
-        ),
-        // A step a later read does not judge: no ledger of the name is found.
-        (
-            9,
-            vec!["name_not_one_ledger_in_book", "counters_unavailable"],
-        ),
-        (
-            6,
-            vec![
-                "name_not_one_ledger_in_book",
-                "target_mark_not_moved",
-                "counters_unavailable",
-            ],
-        ),
-    ] {
+fn a_mark_moved_forward_with_no_master_new_settles_as_absent_after_change() {
+    // The stuck case of #1713: the create ran and its ledger was deleted, or
+    // another master changed. The name is absent and no master is new.
+    for after in [8, 9] {
         let mut world = World::untouched(suspense());
         world.marks()[0] = mark(TARGET, after);
         let judgement = world.judge();
         assert_eq!(
             judgement.state,
-            MasterVerdictState::ReconciliationRequired,
+            MasterVerdictState::ConfirmedAbsentAfterChange,
             "{after}"
         );
-        assert_eq!(judgement.reasons, reasons, "{after}");
+        assert_eq!(
+            judgement.reasons,
+            vec!["not_in_book", "mark_moved_since_intent"],
+            "{after}"
+        );
+        assert!(judgement.guid.is_none());
+        assert!(judgement.state.is_terminal());
+    }
+    // A mark that went back (a restore, replaced data) is not settled.
+    let mut world = World::untouched(suspense());
+    world.marks()[0] = mark(TARGET, 6);
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert_eq!(
+        judgement.reasons,
+        vec![
+            "name_not_one_ledger_in_book",
+            "target_mark_not_moved",
+            "counters_unavailable",
+        ]
+    );
+}
+
+/// A ledger or group the pre-image did not hold may be this create's ledger
+/// under another name: the batch stays open, whatever else holds.
+#[test]
+fn a_master_new_since_the_intent_keeps_an_absent_name_open() {
+    for kind in [MasterKind::Ledger, MasterKind::Group] {
+        let mut world = World::untouched(suspense());
+        world.marks()[0] = mark(TARGET, 9);
+        world.masters().push(master(
+            kind,
+            crate::synthetic_guid(0x5152),
+            8,
+            &["Renamed Since"],
+        ));
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{kind:?}"
+        );
+        assert!(judgement.name_absent_in_read_book, "{kind:?}");
+    }
+}
+
+/// The other conditions of `confirmed_absent` hold for the new state too: a
+/// read straight after the post, counters that claim a write, a pre-image
+/// master changed or missing, or another company's mark moved never settle it.
+#[test]
+fn an_absent_name_after_a_change_needs_every_other_absent_condition() {
+    type Change = fn(&mut World);
+    let changes: [(&str, Change, MasterVerdictState); 5] = [
+        (
+            "straight after the post",
+            |world| world.moment = Moment::JustPosted,
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "counters claim a create",
+            |world| {
+                world.counters = Some(counters(1, 0, 0, 0));
+                world.answer_held = true;
+            },
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "a pre-image master changed",
+            |world| world.masters()[0].alter_id = 10,
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "a pre-image master missing",
+            |world| {
+                world.masters().remove(0);
+            },
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "another company's mark moved",
+            |world| world.marks()[1] = mark(other(), 4),
+            MasterVerdictState::MasterWriteLocatedElsewhere,
+        ),
+    ];
+    for (label, change, state) in changes {
+        let mut world = World::untouched(suspense());
+        world.marks()[0] = mark(TARGET, 9);
+        change(&mut world);
+        assert_eq!(world.judge().state, state, "{label}");
     }
 }
 
@@ -1502,8 +1574,9 @@ fn an_unavailable_read_back_is_not_absence() {
 fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact() {
     type Change = fn(&mut World);
     use MasterVerdictState::{
-        ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
-        PostedIntoExistingMaster, PostedUnattributed, PostedVerified, ReconciliationRequired,
+        ConfirmedAbsent, ConfirmedAbsentAfterChange, MasterWriteLocatedElsewhere,
+        MastersAfterPostUnconfirmed, PostedIntoExistingMaster, PostedUnattributed, PostedVerified,
+        ReconciliationRequired,
     };
     type Case = (
         &'static str,
@@ -1547,8 +1620,8 @@ fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact
             "absent, target mark moved",
             World::untouched(suspense()),
             |world| world.marks()[0] = mark(TARGET, 8),
-            ReconciliationRequired,
-            vec!["name_not_one_ledger_in_book", "counters_unavailable"],
+            ConfirmedAbsentAfterChange,
+            vec!["not_in_book", "mark_moved_since_intent"],
             true,
         ),
         (

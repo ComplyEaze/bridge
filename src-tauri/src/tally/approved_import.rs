@@ -2739,16 +2739,9 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // Topmost: a window the connector opens while Tally fills the
-                // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). MB_TOPMOST alone
-                // did not hold when the box opened seconds after the last input
-                // went to Tally, and setting it again once shown was ignored;
-                // MB_SYSTEMMODAL kept it, and with no owner window it disables
-                // nothing (#1780). When Windows lets it, MB_SETFOREGROUND also
-                // gives the box the foreground, so a key typed for Tally can
-                // answer it; the parent puts a first line on its text that says
-                // what Y and N do (#1780). No stays the default button.
+                // As for the post's box (`show_review`): topmost, held by
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
                 MB_YESNOCANCEL
                     | MB_DEFBUTTON2
                     | MB_ICONWARNING
@@ -2870,13 +2863,14 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // Topmost: a window the connector opens while Tally fills the
                 // screen is otherwise drawn behind it, since a background
                 // process may not take the foreground (#1589). MB_TOPMOST alone
-                // did not hold when the box opened seconds after the last input
-                // went to Tally, and setting it again once shown was ignored;
-                // MB_SYSTEMMODAL kept it, and with no owner window it disables
-                // nothing (#1780). When Windows lets it, MB_SETFOREGROUND also
-                // gives the box the foreground, so a key typed for Tally can
-                // answer it; the parent puts a first line on its text that says
-                // what Y and N do (#1780). No stays the default button.
+                // was seen not to hold when the box opened seconds after the
+                // last input went to Tally, while a stand-in box with these
+                // flags and MB_SYSTEMMODAL held it (#1780); with no owner window
+                // MB_SYSTEMMODAL disables nothing. When Windows lets it,
+                // MB_SETFOREGROUND also gives the box the foreground, so a key
+                // typed for Tally can answer it; the parent puts a first line on
+                // its text that says what Y and N do (#1780). No stays the
+                // default button.
                 MB_YESNOCANCEL
                     | MB_DEFBUTTON2
                     | MB_ICONWARNING
@@ -2913,8 +2907,8 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
 #[cfg(windows)]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     // As for the post dialog: No is the default, Escape and close are Cancel.
     if count != ONE_ITEM {
@@ -2929,11 +2923,16 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). It changes only
-            // the drawing order; No stays the default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+            // As for the post's box (`show_review`): topmost, held by
+            // MB_SYSTEMMODAL, with No as the default button (#1589, #1780).
+            // This box is not shown through `box_fit`, so it is not measured
+            // against the screen.
+            MB_YESNOCANCEL
+                | MB_DEFBUTTON2
+                | MB_ICONWARNING
+                | MB_SETFOREGROUND
+                | MB_TOPMOST
+                | MB_SYSTEMMODAL,
         ) == IDYES
     }
 }

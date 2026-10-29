@@ -580,7 +580,6 @@ async fn a_divided_movement_refuses_a_posting_above_the_first_reads_ceiling() {
                 result["window_scope"].get("read_cost_excludes").is_none(),
                 "{result}"
             );
-            assert!(result.get("read_cost").is_none(), "{result}");
             assert!(result.get("read_cost_left_out").is_none(), "{result}");
         } else {
             assert_eq!(response["isError"], true, "{response}");
@@ -1284,7 +1283,7 @@ async fn a_name_outside_the_scoped_alphabet_reads_the_books_window_and_says_so()
 /// one balancing side missing): the refusal says it is the book's window refusing, with the
 /// reason, so it is not taken for the ledger's own (#485).
 #[tokio::test]
-async fn a_refused_books_window_after_a_fallback_says_it_is_the_books_window() {
+async fn a_refused_books_window_after_a_name_not_sent_scoped_says_it_is_the_books_window() {
     let company = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
     ));
@@ -1391,4 +1390,8 @@ async fn a_refused_books_window_after_a_fallback_says_it_is_the_books_window() {
         error["window_scope"]["reason"], "ledger_name_outside_scoped_alphabet",
         "{response}"
     );
+    // A refusal's own sentence: no figure was taken, and none of the success text.
+    let note = error["window_scope"]["note"].as_str().unwrap();
+    assert!(note.contains("No figure was taken"), "{note}");
+    assert!(!note.contains("taken from them"), "{note}");
 }

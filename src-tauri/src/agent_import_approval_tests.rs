@@ -3038,7 +3038,7 @@ mod masters {
     }
 
     fn binding(item: &LedgerCreateItem) -> ApprovalBinding {
-        ApprovalBinding::masters(SHA, ORIGIN, &company(), item, PREVIEW)
+        ApprovalBinding::masters(SHA, ORIGIN, &company(), &item.clone().into(), PREVIEW)
     }
 
     fn marks() -> AgentReadRequest {
@@ -3095,7 +3095,7 @@ mod masters {
         let HeldRequest::Masters(held) = held else {
             panic!("a master approval comes back with its master request");
         };
-        assert_eq!(held.item(), &item());
+        assert_eq!(held.batch(), &item().into());
         assert_eq!(
             held.sha256(),
             bridge_tally_protocol::sha256_hex(held.xml().as_bytes())
@@ -3149,7 +3149,7 @@ mod masters {
             &line.sha256,
             line.endpoint_origin.as_deref().unwrap(),
             &company(),
-            &item(),
+            &item().into(),
             PREVIEW,
         );
         assert_ne!(voucher, masters);
@@ -3311,23 +3311,53 @@ mod masters {
             ),
             (
                 "digest",
-                ApprovalBinding::masters(&"0".repeat(64), ORIGIN, &company(), &base, PREVIEW),
+                ApprovalBinding::masters(
+                    &"0".repeat(64),
+                    ORIGIN,
+                    &company(),
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "endpoint",
-                ApprovalBinding::masters(SHA, "http://127.0.0.1:1", &company(), &base, PREVIEW),
+                ApprovalBinding::masters(
+                    SHA,
+                    "http://127.0.0.1:1",
+                    &company(),
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "company guid",
-                ApprovalBinding::masters(SHA, ORIGIN, &other_company, &base, PREVIEW),
+                ApprovalBinding::masters(
+                    SHA,
+                    ORIGIN,
+                    &other_company,
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "company name",
-                ApprovalBinding::masters(SHA, ORIGIN, &renamed_company, &base, PREVIEW),
+                ApprovalBinding::masters(
+                    SHA,
+                    ORIGIN,
+                    &renamed_company,
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "preview",
-                ApprovalBinding::masters(SHA, ORIGIN, &company(), &base, "Another preview"),
+                ApprovalBinding::masters(
+                    SHA,
+                    ORIGIN,
+                    &company(),
+                    &base.clone().into(),
+                    "Another preview",
+                ),
             ),
         ];
         for (case, fresh) in fresh_bindings {
@@ -3457,7 +3487,12 @@ mod masters {
         let scripted = ScriptedApproval::approving();
         let dialog = SCRIPTED_APPROVAL
             .scope(scripted.clone(), async {
-                PendingPostApproval::ask_masters(item(), company(), PREVIEW.to_string(), marks())
+                PendingPostApproval::ask_masters(
+                    item().into(),
+                    company(),
+                    PREVIEW.to_string(),
+                    marks(),
+                )
             })
             .await;
         approvals

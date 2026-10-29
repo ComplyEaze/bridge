@@ -248,7 +248,7 @@ impl Server {
     async fn read_master_book_back(
         &self,
         identity: &VerifiedCompanyIdentity,
-        item: &LedgerCreateItem,
+        creates: &LedgerCreateBatch,
         pre_image: &BTreeMap<String, u64>,
         call_started: std::time::Instant,
         evidence: &mut Evidence,
@@ -317,13 +317,13 @@ impl Server {
                 }
             }
         }
-        // 3. The party master of the item's parent, if there is a ledger for it
-        // to describe.
+        // 3. The party master of the batch's one parent, if there is a ledger
+        // for it to describe.
         let party = match (&masters, profile) {
             (Some(masters), Some(boundary)) => {
-                if party_read_needed(item, pre_image, masters) {
+                if party_read_needed(creates, pre_image, masters) {
                     let rows = self
-                        .read_party_rows(identity, item, boundary, evidence)
+                        .read_party_rows(identity, creates.parent(), boundary, evidence)
                         .await;
                     match rows {
                         Ok(rows) => {
@@ -357,7 +357,7 @@ impl Server {
     async fn read_party_rows(
         &self,
         identity: &VerifiedCompanyIdentity,
-        item: &LedgerCreateItem,
+        parent: &str,
         boundary: DateBoundaryProfile,
         evidence: &mut Evidence,
     ) -> Result<Vec<PartyView>, String> {
@@ -366,7 +366,7 @@ impl Server {
                 .map_err(|_| "period_invalid".to_string())?;
         let period = NativeLedgerExportPeriod::new(boundary, books_from.clone(), books_from)
             .map_err(|_| "period_unsupported".to_string())?;
-        let part = single_parent_part(item.parent()).ok_or("parent_unsupported".to_string())?;
+        let part = single_parent_part(parent).ok_or("parent_unsupported".to_string())?;
         let request = crate::agent::read_profiles::party_ledger_master_for_parent_read(
             identity.display_name(),
             &period,
@@ -402,7 +402,7 @@ impl Server {
         evidence: &mut Evidence,
         answer: PostedAnswer<'_>,
     ) -> Result<Value, String> {
-        let item = item_from_batch(&state.batch)?;
+        let creates = creates_from_batch(&state.batch)?;
         let intent = state
             .intent
             .as_ref()
@@ -427,7 +427,7 @@ impl Server {
                 let back = self
                     .read_master_book_back(
                         identity,
-                        &item,
+                        &creates,
                         pre_image.entries(),
                         call_started,
                         evidence,
@@ -436,7 +436,7 @@ impl Server {
                 let company_guid = identity.company_guid().to_ascii_lowercase();
                 let judgement = judge(
                     &Facts {
-                        item: &item,
+                        batch: &creates,
                         company_guid: &company_guid,
                         pre_image: pre_image.entries(),
                         pre_marks: intent.pre_post_master_marks(),
@@ -455,7 +455,7 @@ impl Server {
         };
         let recorded = self.record_master_verdict(state, &judgement, answer.unrecorded);
         Ok(verification_result(
-            state, &item, &judgement, status, &recorded, moment, counters,
+            state, &creates, &judgement, status, &recorded, moment, counters,
         ))
     }
 
@@ -468,7 +468,7 @@ impl Server {
         state: &BatchState,
         lease_code: &str,
     ) -> Result<Value, String> {
-        let item = item_from_batch(&state.batch)?;
+        let creates = creates_from_batch(&state.batch)?;
         let judgement = Judgement::open(
             super::verdict::OpenVerdict::MastersAfterPostUnconfirmed,
             "endpoint_dispatch_busy",
@@ -476,7 +476,7 @@ impl Server {
         let recorded = self.record_master_verdict(state, &judgement, None);
         Ok(verification_result(
             state,
-            &item,
+            &creates,
             &judgement,
             json!({"state": "not_attempted", "observation_lease": unavailable(lease_code)}),
             &recorded,
@@ -562,7 +562,7 @@ impl Server {
 /// outcomes, counters and static reasons.
 fn verification_result(
     state: &BatchState,
-    item: &LedgerCreateItem,
+    creates: &LedgerCreateBatch,
     judgement: &Judgement,
     read_back: Value,
     recorded: &Recording,
@@ -619,10 +619,19 @@ fn verification_result(
                 json!(COUNTERS_ABSENT_NOTE)
             };
     }
-    if let AdmittedLedgerKind::Party {
-        bill_wise: true, ..
-    } = item.kind()
-    {
+    if creates.len() > 1 {
+        // Each ledger's GUID in the order sent, null where none is named.
+        result["verification"]["guids"] = json!(judgement.guids());
+    }
+    if creates.items().iter().any(|item| {
+        matches!(
+            item.kind(),
+            AdmittedLedgerKind::Party {
+                bill_wise: true,
+                ..
+            }
+        )
+    }) {
         // The party read does not fetch ISBILLWISEON: said, not assumed.
         result["verification"]["not_read_back"] = json!(["bill_wise"]);
     }

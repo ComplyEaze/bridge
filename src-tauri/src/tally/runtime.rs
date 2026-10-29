@@ -4078,7 +4078,7 @@ impl TallyRuntime {
                                 },
                                 None,
                             ) => super::approved_import::QueuedAdmission::Masters {
-                                item: masters.item(),
+                                batch: masters.batch(),
                                 company: masters.company(),
                                 ledgers_first,
                                 ledgers_second,

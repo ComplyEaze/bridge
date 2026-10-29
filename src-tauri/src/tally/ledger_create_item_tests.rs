@@ -395,3 +395,78 @@ fn the_item_exposes_the_name_and_kind_it_was_built_from() {
         "Duties & Taxes"
     );
 }
+
+// --- a batch of ledgers -----------------------------------------------------
+
+fn creditor(name: &str) -> LedgerCreateItem {
+    LedgerCreateItem::new(
+        MasterName::new(name).unwrap(),
+        AdmittedLedgerKind::Party {
+            side: PartySide::SundryCreditors,
+            gstin: None,
+            bill_wise: false,
+        },
+    )
+}
+
+#[test]
+fn a_batch_refuses_empty_too_many_mixed_parents_and_names_tally_may_take_for_one() {
+    assert_eq!(
+        LedgerCreateBatch::new(Vec::new()),
+        Err(LedgerCreateBatchError::Empty)
+    );
+    let over = (0..=MAX_LEDGERS_PER_BATCH)
+        .map(|index| creditor(&format!("Creditor {index}")))
+        .collect();
+    assert_eq!(
+        LedgerCreateBatch::new(over),
+        Err(LedgerCreateBatchError::TooMany)
+    );
+    let at_the_limit = (0..MAX_LEDGERS_PER_BATCH)
+        .map(|index| creditor(&format!("Creditor {index}")))
+        .collect();
+    assert_eq!(
+        LedgerCreateBatch::new(at_the_limit).map(|batch| batch.len()),
+        Ok(MAX_LEDGERS_PER_BATCH)
+    );
+    let suspense = LedgerCreateItem::new(
+        MasterName::new("Suspense Two").unwrap(),
+        AdmittedLedgerKind::Suspense,
+    );
+    assert_eq!(
+        LedgerCreateBatch::new(vec![creditor("Creditor One"), suspense]),
+        Err(LedgerCreateBatchError::MixedParents)
+    );
+    // Case, a separator or a symbol: Tally may take them for one ledger.
+    for twin in ["creditor one", "Creditor-One", "Creditor.One"] {
+        assert_eq!(
+            LedgerCreateBatch::new(vec![creditor("Creditor One"), creditor(twin)]),
+            Err(LedgerCreateBatchError::NamesMayBeOneMaster),
+            "{twin}"
+        );
+    }
+}
+
+#[test]
+fn a_batch_renders_every_message_in_order_in_one_envelope() {
+    let items = ["Batch Alpha", "Batch Bravo", "Batch Charlie"].map(creditor);
+    let batch = LedgerCreateBatch::new(items.to_vec()).unwrap();
+    assert_eq!(batch.parent(), "Sundry Creditors");
+    let xml = batch.render_import(&lab()).xml().to_string();
+    // One envelope: its head and tail are a one-ledger request's.
+    let one = items[0].render_import(&lab()).xml().to_string();
+    let head = &one[..one.find("<TALLYMESSAGE>").unwrap()];
+    let tail = &one[one.rfind("</TALLYMESSAGE>").unwrap() + "</TALLYMESSAGE>".len()..];
+    assert!(xml.starts_with(head) && xml.ends_with(tail));
+    assert_eq!(xml.matches("<TALLYMESSAGE>").count(), 3);
+    let positions = ["Batch Alpha", "Batch Bravo", "Batch Charlie"].map(|name| {
+        xml.find(&format!("<LEDGER NAME=\"{name}\" ACTION=\"Create\">"))
+            .unwrap()
+    });
+    assert!(positions[0] < positions[1] && positions[1] < positions[2]);
+    // The digest is of these bytes.
+    assert_eq!(
+        batch.render_import(&lab()).sha256(),
+        bridge_tally_protocol::sha256_hex(xml.as_bytes())
+    );
+}

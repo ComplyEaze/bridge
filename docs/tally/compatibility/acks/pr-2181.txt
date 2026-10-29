@@ -1,0 +1,6 @@
+src-tauri/crates/bridge-tally-core/src/master_binding.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_import_approval.rs
+src-tauri/src/tally/approved_import.rs
+src-tauri/src/tally/runtime.rs
+reviewer: lamemustafa

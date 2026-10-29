@@ -1122,7 +1122,7 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
             approved,
             move |queued: QueuedAdmission<'_>| {
                 let QueuedAdmission::Masters {
-                    item,
+                    batch,
                     company,
                     ledgers_first,
                     ledgers_second,
@@ -1136,7 +1136,7 @@ async fn an_approved_master_post_sends_exactly_the_bytes_whose_digest_it_records
                 };
                 // The name and the company the recheck reads are the approved
                 // request's own.
-                assert_eq!(item, &masters_item());
+                assert_eq!(batch, &masters_item().into());
                 assert_eq!(company, &identity(&seen.2));
                 assert_eq!(ledgers_first, seen.0 .0);
                 assert_eq!(ledgers_second, seen.0 .1);

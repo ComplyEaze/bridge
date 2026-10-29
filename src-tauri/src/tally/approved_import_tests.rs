@@ -1,4 +1,5 @@
 use super::*;
+use crate::tally::ledger_create_item::LedgerCreateItem;
 
 // The production constructor of the masters kind is `confirm_masters`, which
 // asks the person first. This module also builds one without a dialog, from the
@@ -9,14 +10,15 @@ impl ApprovedImport {
     /// carrying the same seam marker. `pub(crate)` because the agent module's
     /// queue tests build the approval too.
     pub(crate) fn approved_masters_for_test(
-        item: LedgerCreateItem,
+        batch: impl Into<LedgerCreateBatch>,
         company: &VerifiedCompanyIdentity,
         company_marks_request: AgentReadRequest,
     ) -> Self {
         std::hint::black_box(test_seam::SEAM_MARKER);
         Self {
             kind: ApprovedKind::Masters(Box::new(
-                MasterAdmission::new(item, company).expect("static read profiles are admitted"),
+                MasterAdmission::new(batch.into(), company)
+                    .expect("static read profiles are admitted"),
             )),
             company_marks_request,
         }
@@ -303,7 +305,7 @@ async fn confirm_masters_under(
         .scope(
             scripted.clone(),
             ApprovedImport::confirm_masters(
-                masters_item(name),
+                masters_item(name).into(),
                 &masters_identity(),
                 LEDGER_PREVIEW,
                 marks_request(),
@@ -324,8 +326,8 @@ async fn an_approved_ledger_create_holds_the_masters_kind() {
     assert_eq!(approved.post_kind(), PostKind::Masters);
     assert_eq!(approved.voucher_count(), None);
     assert_eq!(
-        masters_of(&approved).item(),
-        &masters_item("Queue Test Suspense")
+        masters_of(&approved).batch(),
+        &masters_item("Queue Test Suspense").into()
     );
     assert_eq!(masters_of(&approved).company(), &masters_identity());
     assert_eq!(
@@ -351,7 +353,7 @@ async fn a_declined_or_unscoped_ledger_create_approves_nothing() {
     assert_eq!(declining.masters(), vec![LEDGER_PREVIEW.to_string()]);
     assert_eq!(
         ApprovedImport::confirm_masters(
-            masters_item("Queue Test Suspense"),
+            masters_item("Queue Test Suspense").into(),
             &masters_identity(),
             LEDGER_PREVIEW,
             marks_request(),
@@ -380,7 +382,12 @@ async fn the_scripted_dialogs_record_apart() {
             )
             .await
             .unwrap();
-            super::approve_masters("Create").await.unwrap();
+            super::approve_masters(MastersPrompt {
+                text: "Create",
+                count: VoucherCount::new(1).unwrap(),
+            })
+            .await
+            .unwrap();
         })
         .await;
     assert_eq!(scripted.previews(), vec!["Post".to_string()]);
@@ -396,7 +403,7 @@ async fn a_ledger_create_dialog_can_be_held_on_its_own_task() {
     let pending = SCRIPTED_APPROVAL
         .scope(scripted.clone(), async {
             PendingPostApproval::ask_masters(
-                masters_item("Queue Test Suspense"),
+                masters_item("Queue Test Suspense").into(),
                 masters_identity(),
                 LEDGER_PREVIEW.to_string(),
                 marks_request(),
@@ -416,7 +423,7 @@ async fn a_ledger_create_dialog_can_be_held_on_its_own_task() {
     let pending = SCRIPTED_APPROVAL
         .scope(declined, async {
             PendingPostApproval::ask_masters(
-                masters_item("Queue Test Suspense"),
+                masters_item("Queue Test Suspense").into(),
                 masters_identity(),
                 LEDGER_PREVIEW.to_string(),
                 marks_request(),
@@ -468,16 +475,18 @@ fn a_declined_ledger_dialog_writes_no_token() {
     assert!(output.is_empty(), "{output:?}");
 }
 
-/// The one-ledger dialog is about one item: a count of two is not the parent's
-/// shape for it, so it shows nothing and does not approve. (It returns before
-/// any window opens.)
+/// The ledger dialog is about at most the batch limit: a larger count is not
+/// the parent's shape for it, so it shows nothing and does not approve. (It
+/// returns before any window opens.)
 #[test]
-fn the_ledger_dialog_is_shown_for_one_item_only() {
-    assert!(!show_create_ledger(VoucherCount::new(2).unwrap(), "Create"));
-    assert!(!show_create_ledger(
-        VoucherCount::new(200).unwrap(),
-        "Create"
-    ));
+fn the_ledger_dialog_is_not_shown_above_the_batch_limit() {
+    // Counts the box would show are not called here: they open a real box.
+    for count in [MAX_LEDGERS_PER_BATCH + 1, 200] {
+        assert!(!show_create_ledger(
+            VoucherCount::new(count).unwrap(),
+            "Create"
+        ));
+    }
 }
 
 /// The words the person reads: the title asks the question, and the button
@@ -485,9 +494,38 @@ fn the_ledger_dialog_is_shown_for_one_item_only() {
 #[test]
 fn the_ledger_dialog_words_name_what_the_button_does() {
     assert_eq!(MASTERS_TITLE, "ComplyEaze Bridge — create one ledger?");
-    #[cfg(not(windows))]
-    {
-        assert_eq!(MASTERS_BUTTON, "Create ledger");
-        assert_ne!(MASTERS_BUTTON, "Cancel");
-    }
+    let (_, button) = masters_words(ONE_ITEM).unwrap();
+    assert_eq!(button, "Create ledger");
+    assert_ne!(button, "Cancel");
+}
+
+/// One ledger keeps the words its box was measured with; a batch is named by
+/// its count; above the batch limit no box is shown.
+#[test]
+fn the_ledger_dialog_is_worded_by_its_count() {
+    let words = |count: usize| masters_words(VoucherCount::new(count).unwrap());
+    assert_eq!(
+        words(1),
+        Some((
+            "ComplyEaze Bridge — create one ledger?".to_string(),
+            "Create ledger".to_string()
+        ))
+    );
+    assert_eq!(
+        words(3),
+        Some((
+            "ComplyEaze Bridge — create 3 ledgers?".to_string(),
+            "Create 3 ledgers".to_string()
+        ))
+    );
+    assert!(words(MAX_LEDGERS_PER_BATCH).is_some());
+    assert_eq!(words(MAX_LEDGERS_PER_BATCH + 1), None);
+    assert_eq!(
+        answer_effect(Shown::Masters, VoucherCount::new(3).unwrap()).0,
+        "create these 3 ledgers in Tally"
+    );
+    assert_eq!(
+        answer_effect(Shown::Masters, VoucherCount::new(1).unwrap()).0,
+        "create this ledger in Tally"
+    );
 }

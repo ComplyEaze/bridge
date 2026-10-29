@@ -2893,6 +2893,28 @@ answer does, as the post dialog's does), and sends the create once;
 its approval, pending and approved answers behave as `post_import`'s do. A batch
 already sent is never sent again: a later call reads the book back, or reports
 what was recorded for a batch already settled.
+`prepare_ledger_creates` also takes `ledgers`, a list of two to 10 such ledgers
+in place of `ledger` (never both). They must all be of one kind and side, so
+under one parent group, and no two of their names may differ only in case,
+spaces or symbols; otherwise nothing is saved and the call is refused
+`master_batch_mixed_parents`, `master_batch_names_may_be_one_master` or
+`master_batch_too_large`. One dialog lists every ledger, two lines each, and
+one approval sends them to Tally together, in one request. The batch is judged
+as one: `posted_verified` needs every ledger new and as sent, Tally's counters
+to show one create per ledger and nothing altered, and the company's master
+mark to have moved by exactly one per ledger (on a later call, the ledgers'
+`ALTERID`s to be the marks right after the last read before the send).
+`verification.guids` gives each ledger's GUID in the order sent. A batch whose
+answer from Tally was lost is never `posted_unattributed`; it stays
+`reconciliation_required` unless every ledger reads absent. Batches of three and
+of ten were measured in one request on TallyPrime 7.2 (one synthetic company,
+once each): each counted one create per ledger, the master mark stepped by the
+batch's size and each new ledger took the next mark value in request order. The
+dialog for a batch of more than three has not been seen on a Windows screen, so
+whether a box of ten ledgers fits it is not known. A ledger of the batch whose
+name was already taken was altered in place and took its own value in that
+order, so a write into an existing ledger does not show in the step; it shows as
+`ALTERED` and in the read-back, which answer `posted_into_existing_master`.
 With the setting off, posting off, or the retired `BRIDGE_AGENT_ENABLE_BATCH_POST`
 still set, neither tool is listed and a call to either
 is refused `master_writes_disabled`. A name that differs from an existing one

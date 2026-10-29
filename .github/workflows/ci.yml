@@ -868,7 +868,9 @@ jobs:
           "$python_command" scripts/check-mcpb-bundle.py src-tauri/target/release/bundle/bridge-tally.mcpb --output src-tauri/target/release/bundle/mcpb-smoke.json
           # bridge#1810: the Rust port runs the same checks on the same bundle, and its report must equal the
           # Python's byte for byte before the Python is retired. It is written outside the uploaded folder.
-          cargo run --locked --release --manifest-path src-tauri/Cargo.toml --example check_mcpb_bundle -- src-tauri/target/release/bundle/bridge-tally.mcpb --output "$RUNNER_TEMP/mcpb-smoke-rust.json"
+          # Built, then started directly, so the server it starts sees no environment cargo would add.
+          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --example check_mcpb_bundle
+          "src-tauri/target/release/examples/check_mcpb_bundle${{ runner.os == 'Windows' && '.exe' || '' }}" src-tauri/target/release/bundle/bridge-tally.mcpb --output "$RUNNER_TEMP/mcpb-smoke-rust.json"
           if ! cmp src-tauri/target/release/bundle/mcpb-smoke.json "$RUNNER_TEMP/mcpb-smoke-rust.json"; then
             diff src-tauri/target/release/bundle/mcpb-smoke.json "$RUNNER_TEMP/mcpb-smoke-rust.json" || true
             exit 1

@@ -180,7 +180,15 @@ fn unpack(bundle: &Bundle, limits: Limits) -> (Result<PathBuf, Failure>, tempfil
 }
 
 /// Replace every occurrence of `from` in the file with `to`, of the same length; returns how many.
-fn patch(path: &Path, from: &[u8], to: &[u8], only_last: bool) -> usize {
+#[derive(Clone, Copy)]
+enum Copies {
+    All,
+    /// A name's first copy is its local header, its last the central directory's record.
+    First,
+    Last,
+}
+
+fn patch(path: &Path, from: &[u8], to: &[u8], copies: Copies) -> usize {
     assert_eq!(from.len(), to.len());
     let mut bytes = fs::read(path).unwrap();
     let mut found: Vec<usize> = bytes
@@ -189,8 +197,12 @@ fn patch(path: &Path, from: &[u8], to: &[u8], only_last: bool) -> usize {
         .filter(|(_, window)| *window == from)
         .map(|(at, _)| at)
         .collect();
-    if only_last {
-        found.drain(..found.len().saturating_sub(1));
+    match copies {
+        Copies::All => {}
+        Copies::First => found.truncate(1),
+        Copies::Last => {
+            found.drain(..found.len().saturating_sub(1));
+        }
     }
     for at in &found {
         bytes[*at..*at + to.len()].copy_from_slice(to);
@@ -278,7 +290,7 @@ fn a_duplicate_member_name_is_refused() {
     bundle.entry(checker::PDFIUM_NOTICE).name = "LICENS@".to_string();
     let root = tempfile::tempdir().unwrap();
     let (archive, repository) = bundle.write(root.path());
-    assert_eq!(patch(&archive, b"LICENS@", b"LICENSE", false), 2);
+    assert_eq!(patch(&archive, b"LICENS@", b"LICENSE", Copies::All), 2);
     // The crate opens it but keeps one entry per name, so its count alone would call this a missing
     // member; the checker counts the central directory's records instead.
     let reader =
@@ -293,16 +305,22 @@ fn a_duplicate_member_name_is_refused() {
 
 #[test]
 fn a_local_header_that_names_another_file_is_refused() {
-    let bundle = Bundle::valid();
-    let root = tempfile::tempdir().unwrap();
-    let (archive, repository) = bundle.write(root.path());
-    // Only the central directory's copy of the name, which comes last.
-    assert_eq!(patch(&archive, b"NOTICE", b"NOTICX", true), 1);
-    assert_eq!(
-        checker::unpack_bundle(&archive, &root.path().join("unpacked"), &repository, LIMITS)
-            .map(|_| ()),
-        Err(failure("BadZipFile"))
-    );
+    // The local header names another file: Python's zipfile refuses it when it reads the member.
+    for (copies, code) in [
+        (Copies::First, "BadZipFile"),
+        // The central directory's record names another file: the member set is wrong first, as in Python.
+        (Copies::Last, "unexpected_archive_members"),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let (archive, repository) = Bundle::valid().write(root.path());
+        assert_eq!(patch(&archive, b"NOTICE", b"NOTICX", copies), 1);
+        assert_eq!(
+            checker::unpack_bundle(&archive, &root.path().join("unpacked"), &repository, LIMITS)
+                .map(|_| ()),
+            Err(failure(code)),
+            "{code}"
+        );
+    }
 }
 
 #[test]

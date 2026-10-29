@@ -355,9 +355,6 @@ pub fn unpack_bundle(
             "archive_member_is_not_regular_file",
         )?;
     }
-    // Python's zipfile refuses a member whose local header names another file when it reads it; the
-    // crate checks every local header against the central directory, and refuses overlapping members.
-    bundle.validate_header_consistency().map_err(zip_error)?;
     let manifest: Value =
         serde_json::from_slice(&read_member(&mut bundle, "manifest.json")?).map_err(json_error)?;
     let server = key(&manifest, "server")?;
@@ -381,6 +378,10 @@ pub fn unpack_bundle(
     ]);
     let present: BTreeSet<String> = names.iter().map(|name| name.to_string()).collect();
     require(present == wanted, "unexpected_archive_members")?;
+    // Python's zipfile refuses a member whose local header names another file when it reads it; the
+    // crate checks every local header against the central directory, and refuses overlapping members.
+    // Checked here, once every member is the expected one, so an unexpected name keeps Python's code.
+    bundle.validate_header_consistency().map_err(zip_error)?;
     // The icon is the file committed in packaging/mcpb, unmodified, and the manifest names it.
     require(
         opt(&manifest, "icon") == Some(&json!(ICON)),
@@ -965,7 +966,18 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
     let temporary = scratch.0.as_path();
     let destination = temporary.join("bundle");
     let (manifest, binary) = unpack_bundle(archive, &destination, repository, LIMITS)?;
-    let mut environment: Map<String, Value> = std::env::vars()
+    // Python's os.environ: names upper-cased on Windows, where they are case-insensitive, and a value
+    // that is not Unicode kept as near as a string allows.
+    let mut environment: Map<String, Value> = std::env::vars_os()
+        .map(|(name, value)| {
+            let name = name.to_string_lossy();
+            let name = if cfg!(windows) {
+                name.to_uppercase()
+            } else {
+                name.into_owned()
+            };
+            (name, value.to_string_lossy().into_owned())
+        })
         .filter(|(name, _)| {
             ![
                 "BRIDGE_AGENT_",
@@ -1122,19 +1134,18 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
         "audit_opt_in_tools_mismatch",
     )?;
     let schema = key(&replies[2], "result")?;
-    let structured = key(schema, "structuredContent")?;
-    let schema_text = text(key(
-        key(schema, "content")?
-            .get(0)
-            .ok_or_else(|| Failure("IndexError".to_string()))?,
-        "text",
-    )?)?;
-    require(
-        opt(schema, "isError") == Some(&Value::Bool(false))
-            && key(key(key(structured, "result")?, "schema")?, "type")? == "object"
-            && serde_json::from_str::<Value>(schema_text).map_err(json_error)? == *structured,
-        "voucher_schema_response_invalid",
-    )?;
+    // Each lookup after the first runs only when the one before it held, as Python's `and` chain.
+    let schema_valid = opt(schema, "isError") == Some(&Value::Bool(false)) && {
+        let structured = key(schema, "structuredContent")?;
+        key(key(key(structured, "result")?, "schema")?, "type")? == "object" && {
+            let first = key(schema, "content")?
+                .get(0)
+                .ok_or_else(|| Failure("IndexError".to_string()))?;
+            serde_json::from_str::<Value>(text(key(first, "text")?)?).map_err(json_error)?
+                == *structured
+        }
+    };
+    require(schema_valid, "voucher_schema_response_invalid")?;
     let third_line = split_lines(&output, true)
         .get(2)
         .copied()
@@ -1147,19 +1158,11 @@ pub fn smoke(archive: &Path, repository: &Path) -> Checked<Report> {
     let acceptance_raw =
         fs::read(temporary.join("data").join("terms-acceptance.jsonl")).map_err(os_error)?;
     let acceptance = split_lines(&acceptance_raw, false);
-    let first_source = acceptance
-        .first()
-        .map(|line| serde_json::from_slice::<Value>(line))
-        .transpose()
-        .map_err(json_error)?;
-    require(
-        acceptance.len() == 1
-            && first_source
-                .as_ref()
-                .and_then(|record| opt(record, "source"))
-                == Some(&json!("setting")),
-        "terms_acceptance_not_recorded",
-    )?;
+    let recorded = acceptance.len() == 1 && {
+        let record: Value = serde_json::from_slice(acceptance[0]).map_err(json_error)?;
+        opt(&record, "source") == Some(&json!("setting"))
+    };
+    require(recorded, "terms_acceptance_not_recorded")?;
     let statement_vouchers = statement_smoke(&command, &environment, temporary, repository)?;
     Ok(Report {
         archive_sha256: sha256_hex(&fs::read(archive).map_err(os_error)?),

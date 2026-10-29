@@ -494,15 +494,47 @@ is_sorted_unique() {
 # list cannot be read and parsed makes the answer indeterminate (fail closed).
 withdrawn_pins=""
 history_cache="$tmpdir/pin-history"
+# The PR's own commits, space-separated: a 404 for one of these may be the contents API lagging a push.
+pr_commit_shas=""
+# Why the last pin-list read failed, for the INDETERMINATE line below: the commit, the HTTP status and
+# the first line of the error, and how many tries were made.
+pin_read_failure=""
+# Read the pin list at one commit through the contents API into $contents_text_result. A failure that
+# a second try can cure is tried again: a server error (HTTP 5xx), a rate-limit answer (HTTP 403 or 429
+# whose error names a rate limit), or a 404 for one of the PR's own commits, pushed moments before
+# (#2179). At most 3 tries, 2 s then 4 s apart. Any other failure, or the third, fails closed.
+read_pin_list_retrying() {
+  local sha="$1" try=1 status detail transient
+  while :; do
+    read_contents_text "$sha" "$SURFACE" && return 0
+    status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
+    detail=$(head -n 1 "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | cut -c 1-160)
+    transient=0
+    case "$status" in
+      5[0-9][0-9]) transient=1 ;;
+      403|429) grep -qi 'rate limit' "$errfile" 2>/dev/null && transient=1 ;;
+      404) case " $pr_commit_shas " in *" $sha "*) transient=1 ;; esac ;;
+    esac
+    if [ "$transient" -ne 1 ] || [ "$try" -ge 3 ]; then
+      pin_read_failure="commit ${sha:0:12}, ${status:+HTTP $status, }after $try $([ "$try" -eq 1 ] && echo try || echo tries): ${detail:-no error text (the answer itself was unreadable)}"
+      return 1
+    fi
+    sleep $((try * 2))
+    try=$((try + 1))
+  done
+}
 # The sorted, unique pin paths at one commit, in the file named by $pins_at_result.
 pins_at_commit() {
   local sha="$1"
   local file="$history_cache/$sha"
   pins_at_result=""
   if ! [ -f "$file" ]; then
-    read_contents_text "$sha" "$SURFACE" || return 1
-    jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
-      <<<"$contents_text_result" >/dev/null 2>&1 || return 1
+    read_pin_list_retrying "$sha" || return 1
+    if ! jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
+      <<<"$contents_text_result" >/dev/null 2>&1; then
+      pin_read_failure="commit ${sha:0:12}: the pin list there is not a list of paths"
+      return 1
+    fi
     jq -r '.files[].path' <<<"$contents_text_result" | LC_ALL=C sort -u >"$file.tmp" || return 1
     mv "$file.tmp" "$file"
   fi
@@ -517,12 +549,13 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       if (.parents | type) == "array" and all(.parents[]; (.sha | type == "string") and (.sha | test("^[0-9a-fA-F]{40}$"))) then
         ([.sha] + [.parents[].sha]) | join(" ")
       else "NOPARENTS " + .sha end' <<<"$metadata_commits" 2>/dev/null) || commit_records="NOPARENTS unreadable"
+    pr_commit_shas=$(cut -d ' ' -f 1 <<<"$commit_records" | grep -E '^[0-9a-fA-F]{40}$' | tr '\n' ' ')
     history_status=0
     collected=""
     parents_union="$tmpdir/parents-union"
     while read -r -a record; do
       [ "${#record[@]}" -gt 0 ] || continue
-      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; break; fi
+      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; pin_read_failure="a commit's parent list could not be read"; break; fi
       pins_at_commit "${record[0]}" || { history_status=1; break; }
       own_file="$pins_at_result"
       : >"$parents_union"
@@ -534,7 +567,7 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       collected="$collected"$'\n'"$(LC_ALL=C comm -23 "$own_file" "$parents_union")"
     done <<<"$commit_records"
     if [ "$history_status" -ne 0 ]; then
-      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out"
+      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out (${pin_read_failure:-no detail recorded})"
     else
       withdrawn_pins=$(LC_ALL=C comm -23 <(path_set "$collected") <(path_set "$base_pinned") | LC_ALL=C comm -23 - <(path_set "$pinned"))
     fi

@@ -1,6 +1,6 @@
 # Windows item 1780-R6-bis v2 (DRAFT, run only if R6 / Part D reads topmost 0): the approval box owned by a hidden topmost window, under the test parent, the lab's launch and the desktop client. Answered No by mouse. (Part of #1780)
 
-WRITES to the book: NONE. Every box is answered **No, by mouse**. Posting is switched on for parts S and D only, and every `post_import` there is answered No. **No key is pressed in this row**, at any time a box exists. **No taskbar button is clicked**: the taskbar is only read.
+WRITES to the book: NONE. Every box is answered **No, by mouse**. Posting is switched on for parts S and D only, and every `post_import` there is answered No. **No key is pressed while a box exists**, except Alt, Tab and Esc in cell HA, under its own carve-out and only on the run coordinator's yes. **No taskbar button is clicked**: the taskbar is only read.
 
 ## Why
 - **Row 1780-H** (`lab/1780-system-modal-box-answers` @ 968810d4): with `MB_SYSTEMMODAL`, every box read topmost 1 under the test parent and the lab's launch.
@@ -14,6 +14,7 @@ WRITES to the book: NONE. Every box is answered **No, by mouse**. Posting is swi
   - **R1.** Is the product's box owned by a hidden topmost window: does the trace's box line read `owner` not 0, `owner_class` `Static` and `owner_topmost` 1? Does the box read topmost 1 and stay above Tally after a click into Tally, under the test parent, the lab's launch and the desktop client?
   - **R2.** Was a taskbar button added for the box? EXPECT none: an owned window has no button. Read against the idle taskbar copy, not alone.
   - **R3.** Does a mouse No still answer `import_approval_declined`, with nothing sent? Does the fit check still read the box and only the box (`fits=true`, the box's own rectangle, never exit 77 after a No)?
+  - **R4.** Is the box listed in Alt+Tab's switcher? With no taskbar button, that is the one keyboard route back to a box someone has lost. Windows may list an owned window whose owner is hidden; this is not measured.
 
 ## Who acts
 - **The lab** does every step on this synthetic company, the clicks into Tally and every No included, on the owner's standing word of 27 Oct 2026. Record each as "done by the lab on the owner's standing word of 27 Oct". Posting for parts S and D is on the owner's word of 28 Oct.
@@ -48,6 +49,10 @@ WRITES to the book: NONE. Every box is answered **No, by mouse**. Posting is swi
   - Everything that reads (the trace, the probes and the copies) is started before the cell, by a pre-armed timing helper.
   - From T0 until the box is answered or gone, no one types, presses Enter or clicks in any console.
   - Boxes are answered by mouse, at the centre of the No button.
+- **ALT+TAB carve-out (named, cell HA only, on the run coordinator's yes).**
+  - The keys allowed are Alt, Tab and Esc, in the order cell HA gives, and only while the probe just before shows Tally holding the foreground.
+  - Never Enter, Space, Y, N or any other key.
+  - None of these keys can answer the box Yes. An Esc that reached the box would be its Cancel, a decline.
 - **C2 carve-out (named).** `LAB-COMMON.md` C2 forbids ending any process. This row has two exceptions:
   - `spawn-parent.ps1` ends exactly one process: the child it started itself, by the pid and handle its own `CreateProcess` returned, if that child is still running after `-TimeoutSeconds` (60).
   - The lab stops the server launch it started itself (S8, and under WRITES OFF) by closing its own launcher, never by process name or number.
@@ -127,7 +132,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\bridge-lab\r6b\requests\s
 
    A cell reads **0** if any block shows `topmost=0` for the box, or a probe at C+0 or C+6 shows Tally above the box. Otherwise it reads **1**.
 
-Run B5 after H2.
+### Cell HA: Alt+Tab (only on the run coordinator's yes; otherwise write "HA not run")
+The recipe of H1, with these differences:
+- no click into Tally, so Tally keeps the foreground it took at the title click;
+- the C+0 and C+6 reads are replaced by the reads around step 3 below.
+
+1. **At T0+11,** the pre-armed probe must show the box topmost and Tally holding the foreground. Otherwise skip to step 5 and write "HA skipped: Tally did not hold the foreground".
+2. **At about T0+13:** press and HOLD Alt, press Tab ONCE, and keep Alt held. The switcher opens.
+3. **Read the switcher by eye**, Alt still held: write down the title of every tile, in order, and whether one reads "ComplyEaze Bridge". The lab's screenshot helper, if it is pre-armed as in row 1780-H, takes one copy now. The screen tool takes none.
+4. **With Alt still held, press Esc ONCE.** The switcher closes with no switch. Then release Alt.
+5. **Read:** one `zorder-probe-k.ps1`. Record the foreground. EXPECT Tally.
+   - If the box is in front: record "the switch was not cancelled" and press nothing more.
+6. **No** by mouse on the box's No button. EXPECT exit 1 and `stdout_bytes=0`.
+
+Record as part H's step 6, plus the switcher's tiles and step 5's foreground.
+
+Run B5 after H2 (and after HA, if run).
 
 ## Part S: a real post on BUILD-R6B under the lab's launch, answered No
 - **S0.** Back up THE COMPANY (BK0, C5) before any launch with posting on, to the new empty folder `C:\bridge-lab\r6b\bk0\`. Record its name, size and sha256.
@@ -174,13 +194,16 @@ Run B5 after H2.
 | No button added for the box against the idle copy | An owned box has no taskbar button, as expected: #2161's taskbar question does not arise. |
 | A button added | Record it: the box is still on the taskbar. |
 | The copy shows fewer buttons than the idle copy, or none | The taskbar was emptied or covered, not "no button for the box": record the cover read and do not read R2. |
+| HA: a "ComplyEaze Bridge" tile in the switcher | The owned box is listed in Alt+Tab: there is a keyboard route back to it. |
+| HA: no such tile | The owned box is not in Alt+Tab: only its place on top shows it. |
+| HA: the box answered anything but a decline, or the foreground moved to the box | Record it whole. Then STOP: the carve-out does not hold. |
 | Anything else | Record it whole and infer nothing. |
 
 **FAIL of the row:**
 - a Yes, by click or key;
 - any post;
 - a mark changed;
-- a key pressed while a box existed;
+- a key pressed while a box existed, other than cell HA's under its carve-out;
 - a taskbar click;
 - a No that answered anything other than a decline (exit other than 1 in H; a code other than `import_approval_declined` or "MODE BLOCKED" in S or D);
 - a box or process left at the end (B5);
@@ -203,7 +226,6 @@ Evidence goes on a new branch, `lab/1780-r6bis-hidden-owner-answers`. Send its h
 ## Not measured (say so in the results)
 - **The owner's destruction before its process ends.** The child exits within milliseconds of the box, and B5 and the 50 ms trace cannot separate the two. The unit test `the_box_s_owner_is_a_hidden_topmost_tool_window_until_it_is_dropped` covers it.
 - **Whether Windows activated the owner as the box closed.** The hook's skip is covered by the unit test `the_hook_does_not_measure_the_box_s_owner`. On screen, only its absence of effect is read (R3).
-- **Alt+Tab**, which needs a key while a box is open.
 - **The taskbar flash.** The owned box has no button for `Front`'s flash to reach. Whether the box is still noticed when it is refused the foreground is read only as its place on top.
 - **A box drawn under another window and sought on the taskbar**, which this fix has no button for.
 - **The other boxes on a screen:** the review, release, settlement and ledger boxes, though they share the owner code.

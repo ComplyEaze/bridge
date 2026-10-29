@@ -437,6 +437,14 @@ class MergeGateControls(unittest.TestCase):
         self.assertIn("(commit c1c1c1c1c1c1, HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
         self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
 
+    def test_a_rate_limit_that_persists_names_its_first_error_line_with_the_account_id_masked(self):
+        result, waits, calls = self.run_flaky("history-flaky-rate-limit-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        # the error's first line is blank: the next one is printed, and its long digit run is masked
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 403, after 3 tries: gh: You have exceeded a secondary rate limit for user ID <n>. (HTTP 403))", result.stdout)
+        self.assertNotIn("12345678", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3))
+
     def test_a_403_that_is_not_a_rate_limit_is_not_tried_again(self):
         self.assert_flaky_not_retried("history-flaky-403-not-a-rate-limit", "(commit c1c1c1c1c1c1, HTTP 403, after 1 try: ")
 

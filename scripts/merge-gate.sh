@@ -508,7 +508,9 @@ read_pin_list_retrying() {
   while :; do
     read_contents_text "$sha" "$SURFACE" && return 0
     status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
-    detail=$(head -n 1 "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | cut -c 1-160)
+    # The first non-blank error line, printable ASCII only, a long digit run (an account id in a
+    # rate-limit message) masked, at most 160 characters.
+    detail=$(grep -m 1 -v '^[[:space:]]*$' "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | sed -E 's/[0-9]{6,}/<n>/g' | cut -c 1-160)
     transient=0
     case "$status" in
       5[0-9][0-9]) transient=1 ;;

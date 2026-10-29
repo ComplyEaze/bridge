@@ -739,6 +739,7 @@ def state():
             "history-flaky-502-once": (c1, 1, "gh: Server Error (HTTP 502)"),
             "history-flaky-502-always": (c1, 99, "gh: Server Error (HTTP 502)"),
             "history-flaky-rate-limit-once": (c1, 1, "gh: You have exceeded a secondary rate limit. (HTTP 403)"),
+            "history-flaky-rate-limit-always": (c1, 99, "\ngh: You have exceeded a secondary rate limit for user ID 12345678. (HTTP 403)"),
             "history-flaky-404-own-commit-once": (c1, 1, "gh: Not Found (HTTP 404)"),
             "history-flaky-403-not-a-rate-limit": (c1, 99, "gh: Resource not accessible by integration (HTTP 403)"),
             "history-flaky-404-outside-the-pr": (p2, 99, "gh: Not Found (HTTP 404)"),

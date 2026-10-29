@@ -119,3 +119,10 @@ None of these 0.7.0 sheets toggles a setting only to isolate a variable. Rows 7 
 - The go-ahead: the owner's word of 29 Oct 2026 that the lab may download the builds its rows need, pull request bundles included, and the standing word of 28 Oct 2026 that the lab PC has full authority for its rows (posting on, master writes on, answering Bridge's windows).
 - Part D (the desktop client as the server's parent) needs the owner at the PC; it does not block the rest of the row.
 - The answers go to a NEW branch `lab/1780-system-modal-box-answers`, made from the sheet head.
+
+**Row 24, #2119 B row (added 29 Oct 2026): the Bills report requests' 60-second limit, on #2158's build.**
+- The sheet is `lab/2119-bills-60s-row` at c43ef6120c62ba7a480eadf3f639023e190817a4 (an independent review read it CLEAN at that head).
+- The build: #2158 at head 0b328689113f0cee94bf66f1e1bfa2e6ce96fc18, its Bridge CI bundle, artifact 12897776761 (`unsigned-bundle-smoke-windows-latest`, digest sha256:7f8bee82e601de36ac0b011a3658a8ca31b6aa712b93c1360e6914e4063b84c1). From that run's `mcpb-smoke.json`: `bridge_mcp.exe` 1ab49eaf94027628413adb621d43d79ab0570d7be6301f1afc215385c4caf646, `pdfium.dll` 79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118, `bridge-tally.mcpb` 0e72e3b5a588c885141937595a29f11a063f7e548871687eb32cbbb962bd0a9e. Check the zip against the digest and each file against these before the first call; any other hash = STOP.
+- The go-ahead: the owner's word of 29 Oct 2026 that the lab may download the builds its rows need, pull request bundles included, and the standing word of 28 Oct 2026 for the lab's rows. This row is reads only.
+- The desktop client's setup and restore are the owner's acts, as the sheet says; the lab asks him in its own chat when it reaches them, and runs the stdio steps meanwhile.
+- The answers go to a NEW branch `lab/2119-bills-60s-row-answers`, made from the sheet head.

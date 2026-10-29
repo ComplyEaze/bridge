@@ -39,7 +39,8 @@ These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests 
   `batch_id` and the preview the person will be shown (its ledger name masked under `mask_parties`). `post_ledger_creates` asks the local user in a native dialog and sends
   the create once; a batch already sent is never sent again. After the send the book is read back and one state is
   returned, `posted_verified` only when Tally's counters show one create and no alteration, the company's own master
-  mark moved, exactly one new ledger of the name exists with the parent, tax fields and GSTIN as sent, no ledger or
+  mark moved by exactly one (on a later call, the ledger is the first master change after the last read before the
+  send), exactly one new ledger of the name exists with the parent, tax fields and GSTIN as sent, no ledger or
   group that existed before changed, and no other loaded company's master mark moved (bill-wise is not read back). Measured: one ledger created and read back as `posted_verified` through the tools on a synthetic
   company (TallyPrime 7.1 Silver, 14 Oct 2026), and the approval box shown whole, declined with nothing sent, accepted
   and then answered from the journal with no second box (TallyPrime 7.2, a continuous-integration package of an earlier

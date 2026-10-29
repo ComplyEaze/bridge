@@ -55,18 +55,22 @@ I4's invisible truncation — trading a loud, correct failure for a silent wrong
 **Deviation, 29 October 2026 (owner-accepted, #2119).** The two requests of Tally's native Bills
 Receivable and Bills Payable reports have a 60-second limit; every other request keeps 20
 seconds. The ruling's premise does not carry to them: on the synthetic book measured, one of
-these answers cost about 457 bytes and 1.4 ms a bill (`lab/2119-bills-read-timing-answers`; one
-sitting, partial) against about 20,650 bytes a voucher row here. If the time keeps that rate
-(inferred), 60 seconds reaches about 43,000 bills, so the 32 MiB cap binds first only where a
-bill costs above about 768 bytes; and Bridge never parses a body over the cap
-(`ResponseTooLarge`) or shorter than its declared length (`ResponseTruncated`). A date split
-cannot bound them: Tally ignored `SVFROMDATE` in these reports when it was measured (#2119).
-Only a `NativeBillsRequest`, which only the Bills renderer makes, reaches the transport with the
-longer limit. I4 still holds: a truncation Tally declares whole is caught only when the pair's
-two answers differ. Each report is read twice, so a year-end call on that book is expected to
-take about 85 seconds (inferred), holding the endpoint's wire lock for up to 60 seconds a post,
-and it can outlast a host's limit for one tool call; the exception ships only after a lab row
-has measured a whole call through Claude Desktop.
+these answers cost about 457 bytes and 1.2 to 1.4 ms a bill
+(`lab/2119-bills-read-timing-answers`; one sitting, partial) against about 20,650 bytes a
+voucher row here. If the time keeps that rate (inferred), 60 seconds reaches about 43,000 to
+49,000 bills, so the 32 MiB cap binds first only where a bill costs above about 690 to 780
+bytes; and Bridge never parses a body over the cap (`ResponseTooLarge`) or shorter than its
+declared length (`ResponseTruncated`). A date split cannot bound them: Tally ignored
+`SVFROMDATE` in these reports when it was measured (#2119). Only a `NativeBillsRequest`, which
+only the Bills renderer makes, reaches the transport with the longer limit. I4 still holds: a
+truncation Tally declares whole is caught only when the pair's two answers differ. Each report
+is read twice, so a year-end call on that book is expected to take about 85 seconds (inferred),
+holding the endpoint's wire lock for up to 60 seconds a post, and it can outlast a host's limit
+for one tool call (Claude Desktop on macOS answered a silent 130-second call and cut a
+250-second one at 240 seconds: protocol reference §11f, PARTIAL; four Bills posts each near 60
+seconds would pass that, which only a book with far more open bills than the one measured would
+reach); the exception ships only after a lab row has measured a whole call through Claude
+Desktop.
 
 ---
 

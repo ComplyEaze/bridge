@@ -136,8 +136,12 @@ posted, how many of those are not settled (with no recorded response, or with a
 response but a latest status that is not `posted_verified`: a post Tally
 rejected stays not settled; `not_settled_binding_refused` counts the native
 posts whose binding to their own vouchers was refused, all of which stay not
-settled for good, a post Tally rejected in part or whole among them; it
-overlaps neither `not_settled_no_response` nor `not_settled_not_verified`),
+settled for good, a post Tally rejected in part or whole among them;
+`not_settled_reviewed_not_attributed` counts the native posts matched by content
+only, their binding refused or no answer from Tally recorded, that a person
+recorded checking in Tally (`acknowledge_post_review` with `doubt` set to
+`content_only`), still not settled and never verified; none of these overlaps
+`not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`),
 batches with no recorded dispatch that were never found posted
 (`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
@@ -3314,11 +3318,25 @@ that post's binding for good.
 
 A batch whose binding was refused (`post_span_binding` state `refused`) is not closed by anything ComplyEaze
 Bridge offers. A refusal is final for the batch: `verify_import` on it again reads the same unless the book
-changes (a changed book alters the vouchers' statuses, never the refusal), `acknowledge_post_review` reviews only
-a doubt beside vouchers that read back verified, and an amendment of it is unavailable
+changes (a changed book alters the vouchers' statuses, never the refusal), `acknowledge_post_review` reviews a
+doubt only beside vouchers that read back verified, and an amendment of it is unavailable
 (`import_amend_natively_posted`, as for any natively posted batch). The summary of such a post says that it cannot
 be closed or amended; its vouchers are checked in Tally. Its rows stay refused in any other batch
 (`import_txn_already_posted`), and `local_data_report` counts it as `not_settled_binding_refused`.
+After the person has checked its vouchers in Tally, `acknowledge_post_review` with `doubt` set to `content_only`
+records that they did (bridge#1039), in the same review dialog. The same holds for a native post with no answer
+from Tally recorded (`post_span_binding` state `not_bound`, code `binding_response_not_recorded`), which never
+binds either. It is admitted only while the journal holds that state and a fresh readback shows it: never for a
+binding refused as `span_identity_reused`, a book read as rolled back, a binding not yet settled or a batch that
+reads `posted_verified`. The record, in the import journal, changes nothing in Tally and no status or verdict; it
+binds no voucher, lifts no invoice stop and releases no row. `verify_import` reports it as `content_review`, with
+its own `next_step`, and `local_data_report` counts the batch as `not_settled_reviewed_not_attributed` instead.
+A later `posted_verified` of the batch, a later answer from Tally with an outcome, or a recorded rollback of the
+book voids it. A build older than this record refuses the whole import journal once one is written, as for a
+stop release: do not downgrade after recording one. Any other batch is refused before any read
+(`ack_content_review_not_content_only`; `ack_batch_not_posted` for one never sent), as is a second review while
+one stands (`ack_already_recorded`), and a readback that no longer shows the state. Nothing is written when the
+batch's records change, or a rollback is recorded, while the dialog is open (`ack_changed_while_reviewing`).
 A multi-voucher batch whose voucher mark step was not confirmed is a different case: the review of
 `acknowledge_post_review` is kept on this computer and does not change its status.
 
@@ -3347,12 +3365,13 @@ edit to one voucher of a batch in Tally before the binding is made
 (a deferred bind, or a later `verify_import`) refuses it for the whole batch,
 whose vouchers are then matched by content only. Such a batch stays
 `reconciliation_required`: the person checks its vouchers in Tally, and
-`acknowledge_post_review` does not apply to it, because it records a review only
-of a doubt beside vouchers that read back verified (closing such a batch inside
-Bridge is bridge#1039). Its `post_span_binding.summary` says when the book holds,
+`acknowledge_post_review` records no doubt review for it, because it records one
+only beside vouchers that read back verified; with `doubt` set to `content_only`
+it records that the person checked them, which settles nothing (bridge#1039). Its `post_span_binding.summary` says when the book holds,
 for each voucher it sent or for some, a voucher with the same date, voucher type
 and ledger entries that is neither cancelled nor optional, and that ComplyEaze
-Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`.
+Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`,
+or under `not_settled_reviewed_not_attributed` once a person has recorded checking it.
 `voucher_presence` cannot identify a native post's
 vouchers, because they carry no marker: one edited or re-dated in Tally can read
 `absent` there. Check a natively posted batch with `verify_import`, which finds

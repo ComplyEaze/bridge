@@ -1067,6 +1067,17 @@ pub(crate) mod test_seam {
         super::VoucherCount::new(count).unwrap()
     }
 
+    /// Whether the review dialog for `kind` holds `preview` within the box's
+    /// caps, as the real dialog measures it, for the caller's tests.
+    pub(crate) fn review_fits(
+        kind: super::ReviewKind,
+        count: super::VoucherCount,
+        preview: &str,
+    ) -> bool {
+        let shown = kind.shown();
+        super::fits_the_box(shown, count, &super::displayed_text(shown, count, preview))
+    }
+
     /// What a test decided, and every preview the post path asked it about.
     #[derive(Clone)]
     pub(crate) struct ScriptedApproval {
@@ -2274,7 +2285,7 @@ const ANSWER_WIDTH: usize = 100;
 /// Windows box needs it, to keep the box's width bounded; the Mac passes no
 /// limit, because the alert wraps its own text and a break of ours would be
 /// wrapped a second time.
-fn wrapped(text: &str, limit: usize) -> String {
+pub(crate) fn wrapped(text: &str, limit: usize) -> String {
     let (mut lines, mut width) = (String::new(), 0);
     for word in text.split(' ') {
         let length = word.chars().count();

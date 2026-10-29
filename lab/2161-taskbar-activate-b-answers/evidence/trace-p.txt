@@ -1,0 +1,51 @@
+START 2026-10-29T19:00:07.558Z title_part=ComplyEaze Bridge interval_ms=50 seconds=160
+FIRST 2026-10-29T19:00:21.636Z box_pid=4272
+T 2026-10-29T19:00:21.787Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=4272 windows=3
+W 2026-10-29T19:00:21.787Z hwnd=0x2709a2 class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=6376 owner=0 title=ComplyEaze Bridge — post this voucher?
+W 2026-10-29T19:00:21.787Z hwnd=0x6929a6 class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=6376 owner=0x8c2c30 owner_class=IME owner_pid=4272 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T19:00:21.787Z hwnd=0x8c2c30 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=6376 owner=0x2709a2 owner_class=#32770 owner_pid=4272 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+PROC path=<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=22676
+PROC command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+PROC sha256=a946979561b61f51e6dab3539d3de98fd48c8f103f61d2e3abe787acf3240c23 bytes=32463872
+T 2026-10-29T19:00:25.155Z fg_hwnd=0x2709a2 fg_pid=4272 box_pid=4272 windows=3
+W 2026-10-29T19:00:25.155Z hwnd=0x2709a2 class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=6376 owner=0 title=ComplyEaze Bridge — post this voucher?
+W 2026-10-29T19:00:25.155Z hwnd=0x6929a6 class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=6376 owner=0x8c2c30 owner_class=IME owner_pid=4272 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T19:00:25.155Z hwnd=0x8c2c30 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=6376 owner=0x2709a2 owner_class=#32770 owner_pid=4272 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+H 2026-10-29T19:00:26.162Z unchanged
+H 2026-10-29T19:00:27.206Z unchanged
+H 2026-10-29T19:00:28.255Z unchanged
+H 2026-10-29T19:00:29.280Z unchanged
+H 2026-10-29T19:00:30.325Z unchanged
+H 2026-10-29T19:00:31.321Z unchanged
+H 2026-10-29T19:00:32.386Z unchanged
+H 2026-10-29T19:00:33.429Z unchanged
+H 2026-10-29T19:00:34.444Z unchanged
+H 2026-10-29T19:00:35.495Z unchanged
+H 2026-10-29T19:00:36.519Z unchanged
+H 2026-10-29T19:00:37.532Z unchanged
+H 2026-10-29T19:00:38.567Z unchanged
+H 2026-10-29T19:00:39.600Z unchanged
+H 2026-10-29T19:00:40.619Z unchanged
+H 2026-10-29T19:00:41.643Z unchanged
+T 2026-10-29T19:00:41.713Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=4272 windows=3
+W 2026-10-29T19:00:41.713Z hwnd=0x2709a2 class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=6376 owner=0 title=ComplyEaze Bridge — post this voucher?
+W 2026-10-29T19:00:41.713Z hwnd=0x6929a6 class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=6376 owner=0x8c2c30 owner_class=IME owner_pid=4272 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T19:00:41.713Z hwnd=0x8c2c30 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=6376 owner=0x2709a2 owner_class=#32770 owner_pid=4272 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+H 2026-10-29T19:00:42.750Z unchanged
+H 2026-10-29T19:00:43.790Z unchanged
+H 2026-10-29T19:00:44.852Z unchanged
+H 2026-10-29T19:00:45.898Z unchanged
+H 2026-10-29T19:00:46.912Z unchanged
+H 2026-10-29T19:00:47.925Z unchanged
+H 2026-10-29T19:00:48.943Z unchanged
+H 2026-10-29T19:00:49.948Z unchanged
+H 2026-10-29T19:00:51.009Z unchanged
+H 2026-10-29T19:00:52.015Z unchanged
+H 2026-10-29T19:00:53.040Z unchanged
+H 2026-10-29T19:00:54.057Z unchanged
+T 2026-10-29T19:00:54.735Z fg_hwnd=0x0 fg_pid=0 box_pid=4272 windows=0
+T 2026-10-29T19:00:54.908Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=4272 windows=0
+H 2026-10-29T19:00:55.914Z unchanged
+H 2026-10-29T19:00:56.927Z unchanged
+GONE 2026-10-29T19:00:57.739Z
+END 2026-10-29T19:00:57.745Z

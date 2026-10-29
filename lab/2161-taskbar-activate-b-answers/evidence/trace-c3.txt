@@ -1,0 +1,87 @@
+START 2026-10-29T19:06:25.378Z title_part=ComplyEaze Bridge interval_ms=50 seconds=160
+FIRST 2026-10-29T19:06:38.157Z box_pid=13996
+T 2026-10-29T19:06:38.264Z fg_hwnd=0x23428ba fg_pid=13996 box_pid=13996 windows=3
+W 2026-10-29T19:06:38.264Z hwnd=0x23428ba class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=19520 owner=0 title=ComplyEaze Bridge — post this voucher?
+W 2026-10-29T19:06:38.264Z hwnd=0xac295e class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=19520 owner=0x5f2912 owner_class=IME owner_pid=13996 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T19:06:38.264Z hwnd=0x5f2912 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=19520 owner=0x23428ba owner_class=#32770 owner_pid=13996 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+PROC path=<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=9064
+PROC command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+PROC sha256=a946979561b61f51e6dab3539d3de98fd48c8f103f61d2e3abe787acf3240c23 bytes=32463872
+H 2026-10-29T19:06:39.865Z unchanged
+H 2026-10-29T19:06:40.881Z unchanged
+H 2026-10-29T19:06:41.910Z unchanged
+H 2026-10-29T19:06:42.950Z unchanged
+H 2026-10-29T19:06:43.985Z unchanged
+H 2026-10-29T19:06:45.042Z unchanged
+H 2026-10-29T19:06:46.073Z unchanged
+H 2026-10-29T19:06:47.091Z unchanged
+H 2026-10-29T19:06:48.102Z unchanged
+H 2026-10-29T19:06:49.131Z unchanged
+H 2026-10-29T19:06:50.141Z unchanged
+H 2026-10-29T19:06:51.173Z unchanged
+H 2026-10-29T19:06:52.238Z unchanged
+H 2026-10-29T19:06:53.234Z unchanged
+H 2026-10-29T19:06:54.247Z unchanged
+T 2026-10-29T19:06:54.745Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=13996 windows=3
+W 2026-10-29T19:06:54.745Z hwnd=0x23428ba class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=19520 owner=0 title=ComplyEaze Bridge — post this voucher?
+W 2026-10-29T19:06:54.745Z hwnd=0xac295e class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=19520 owner=0x5f2912 owner_class=IME owner_pid=13996 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-29T19:06:54.745Z hwnd=0x5f2912 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=19520 owner=0x23428ba owner_class=#32770 owner_pid=13996 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+H 2026-10-29T19:06:55.753Z unchanged
+H 2026-10-29T19:06:56.800Z unchanged
+H 2026-10-29T19:06:57.830Z unchanged
+H 2026-10-29T19:06:58.888Z unchanged
+H 2026-10-29T19:06:59.896Z unchanged
+H 2026-10-29T19:07:00.903Z unchanged
+H 2026-10-29T19:07:01.922Z unchanged
+H 2026-10-29T19:07:02.969Z unchanged
+H 2026-10-29T19:07:04.038Z unchanged
+H 2026-10-29T19:07:05.088Z unchanged
+H 2026-10-29T19:07:06.153Z unchanged
+H 2026-10-29T19:07:07.193Z unchanged
+H 2026-10-29T19:07:08.271Z unchanged
+H 2026-10-29T19:07:09.311Z unchanged
+H 2026-10-29T19:07:10.365Z unchanged
+H 2026-10-29T19:07:11.416Z unchanged
+H 2026-10-29T19:07:12.452Z unchanged
+H 2026-10-29T19:07:13.482Z unchanged
+H 2026-10-29T19:07:14.494Z unchanged
+H 2026-10-29T19:07:15.507Z unchanged
+H 2026-10-29T19:07:16.562Z unchanged
+H 2026-10-29T19:07:17.633Z unchanged
+H 2026-10-29T19:07:18.669Z unchanged
+H 2026-10-29T19:07:19.707Z unchanged
+H 2026-10-29T19:07:20.729Z unchanged
+H 2026-10-29T19:07:21.753Z unchanged
+H 2026-10-29T19:07:22.786Z unchanged
+H 2026-10-29T19:07:23.840Z unchanged
+H 2026-10-29T19:07:24.885Z unchanged
+H 2026-10-29T19:07:25.930Z unchanged
+H 2026-10-29T19:07:26.967Z unchanged
+H 2026-10-29T19:07:27.986Z unchanged
+H 2026-10-29T19:07:29.017Z unchanged
+H 2026-10-29T19:07:30.081Z unchanged
+H 2026-10-29T19:07:31.148Z unchanged
+H 2026-10-29T19:07:32.153Z unchanged
+H 2026-10-29T19:07:33.189Z unchanged
+H 2026-10-29T19:07:34.240Z unchanged
+H 2026-10-29T19:07:35.264Z unchanged
+H 2026-10-29T19:07:36.316Z unchanged
+H 2026-10-29T19:07:37.317Z unchanged
+H 2026-10-29T19:07:38.319Z unchanged
+H 2026-10-29T19:07:39.352Z unchanged
+H 2026-10-29T19:07:40.392Z unchanged
+H 2026-10-29T19:07:41.395Z unchanged
+H 2026-10-29T19:07:42.405Z unchanged
+H 2026-10-29T19:07:43.407Z unchanged
+H 2026-10-29T19:07:44.414Z unchanged
+H 2026-10-29T19:07:45.424Z unchanged
+H 2026-10-29T19:07:46.452Z unchanged
+H 2026-10-29T19:07:47.435Z unchanged
+H 2026-10-29T19:07:48.462Z unchanged
+H 2026-10-29T19:07:49.498Z unchanged
+T 2026-10-29T19:07:49.615Z fg_hwnd=0x0 fg_pid=0 box_pid=13996 windows=0
+T 2026-10-29T19:07:49.948Z fg_hwnd=0x1b1dae fg_pid=13252 box_pid=13996 windows=0
+H 2026-10-29T19:07:50.958Z unchanged
+H 2026-10-29T19:07:52.016Z unchanged
+GONE 2026-10-29T19:07:52.650Z
+END 2026-10-29T19:07:52.658Z

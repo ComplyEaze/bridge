@@ -1,0 +1,8 @@
+E 2026-10-29T18:58:01.385Z dpi_context=ok
+T 2026-10-29T18:58:01.385Z tray=0x20138 z=4 rect=0,1030,1920,1080
+W 2026-10-29T18:58:01.385Z z=1 above_tray=1 hwnd=0x5e2b20 class=Chrome_WidgetWin_1 pid=21516 image=<desktop client> topmost=1 exstyle=0x08080028 cloaked=0 rect=0,0,1920,1080 title=<desktop client>
+W 2026-10-29T18:58:01.385Z z=6 above_tray=0 hwnd=0x852a44 class=ApplicationFrameWindow pid=18940 image=ApplicationFrameHost.exe topmost=0 exstyle=0x00200100 cloaked=1 rect=-9,-9,1929,1039 title=Media Player
+W 2026-10-29T18:58:01.385Z z=12 above_tray=0 hwnd=0x10808 class=Windows.UI.Core.CoreWindow pid=7348 image=TextInputHost.exe topmost=0 exstyle=0x00200000 cloaked=1 rect=0,0,1920,1080 title=Microsoft Text Input Application
+W 2026-10-29T18:58:01.385Z z=14 above_tray=0 hwnd=0x1019a class=Progman pid=11384 image=explorer.exe topmost=0 exstyle=0x00000080 cloaked=0 rect=0,0,1920,1080 title=Program Manager
+P 2026-10-29T18:58:01.385Z x=762 y=1055 hwnd=0x1018a class=MSTaskListWClass root=0x20138 root_class=Shell_TrayWnd pid=11384 image=explorer.exe point_ok=1
+Z 2026-10-29T18:58:01.385Z visible_windows=14 meeting_tray=4

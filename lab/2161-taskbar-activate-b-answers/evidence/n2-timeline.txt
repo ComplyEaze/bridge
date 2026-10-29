@@ -1,0 +1,13 @@
+n2 runner pid 30316 2026-10-29T18:58:58.434Z; dpi_context=ok; Tally window 0x1b1dae; fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+trace pre-armed 2026-10-29T18:59:00.709Z pid 17156: powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-n2.txt -Seconds 40
+CLICK left tallyTitlePoint 2026-10-29T18:59:01.368Z logical (330,14) physical (412,17); +300 ms fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+Tally in front: True
+opened 2026-10-29T18:59:01.984Z: explorer.exe "<lab folder>\cmd\n2.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 30
+recorded consoles: runner pid 30316 (no window of its own: started hidden by the lab's tool); trace console pid 17156 window 0x14f1b1c; cmd console pid 14544 window 0x62043e
+CLICK left tallyTitlePoint 2026-10-29T18:59:06.002Z logical (330,14) physical (412,17); +300 ms fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+the second title click, 4.41 s after the open; Tally in front: True
+R p12 2026-10-29T18:59:14.009Z to 2026-10-29T18:59:17.866Z: no stderr file ;; rect: F 2026-10-29T18:59:14.903Z hwnd=0x1b1dae pid=13252 title=TallyPrime:9001 ;; probe: 3,0,1,13252,TallyPrime:9001 | visible_titled_windows,12 ;; cover:  
+K p12 2026-10-29T18:59:17.904Z to 2026-10-29T18:59:19.802Z: 2026-10-29T18:59:19.270Z name=n2-p12 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True ;; full copy n2-p12-full.png
+N2 buttons (PrintWindow, physical x at y 1055): 513 576 638 700 762 824 885
+trace end: END 2026-10-29T18:59:42.449Z; cmd process running: False
+n2 DONE 2026-10-29T18:59:42.613Z

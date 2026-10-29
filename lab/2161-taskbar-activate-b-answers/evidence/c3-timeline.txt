@@ -1,0 +1,35 @@
+c3 runner pid 12808 2026-10-29T19:06:22.350Z; dpi_context=ok; Tally window 0x1b1dae; fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+trace pre-armed 2026-10-29T19:06:24.827Z pid 6236 (started minimised): powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <lab folder>\evidence\trace-c3.txt -Seconds 160
+CLICK left tallyTitlePoint 2026-10-29T19:06:25.451Z logical (330,14) physical (412,17); +300 ms fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+Tally in front: True
+opened 2026-10-29T19:06:26.070Z: explorer.exe "<lab folder>\cmd\c3.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <lab folder>\requests\spawn-parent.ps1 -Target child -ChildExe <build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -InputFile <lab folder>\requests\confirm-input.txt -Stdio files -Out <lab folder>\evidence\c3.txt -TimeoutSeconds 120
+recorded consoles: runner pid 12808 (no window of its own: started hidden by the lab's tool); trace console pid 6236 window 0xb12030; cmd console pid 14892 window 0x15904b2
+minimise cmd console: it is the foreground window; nothing done
+CLICK left tallyTitlePoint 2026-10-29T19:06:30.082Z logical (330,14) physical (412,17); +300 ms fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+the second title click, 4.39 s after the open; Tally in front: True
+MINIMISED cmd console 0x15904b2 by ShowWindow(SW_MINIMIZE) 2026-10-29T19:06:30.828Z (P-min: after the second title click, the console was in front before it); iconic=1; fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+c3-T0 2026-10-29T19:06:37.915Z from: SPAWN 2026-10-29T19:06:37.915Z child_pid=13996
+R t0p6 2026-10-29T19:06:43.966Z to 2026-10-29T19:06:48.240Z: stderr lines 1 (box-fit 1); last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; rect: B 2026-10-29T19:06:45.024Z hwnd=0x23428ba pid=13996 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? | F 2026-10-29T19:06:45.024Z hwnd=0x23428ba pid=13996 title=ComplyEaze Bridge — post this voucher? ;; probe: 1,1,1,13996,ComplyEaze Bridge — post this voucher? | 4,0,0,13252,TallyPrime:9001 | visible_titled_windows,13 ;; cover:  
+K t0p6 2026-10-29T19:06:48.273Z to 2026-10-29T19:06:50.608Z: 2026-10-29T19:06:49.908Z name=c3-t0p6 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True ;; full copy c3-t0p6-full.png
+consoles at T0+6 2026-10-29T19:06:50.676Z: trace console 0xb12030 iconic=1 exists=1; cmd console 0x15904b2 iconic=1 exists=1
+buttons t0p6 (PrintWindow, physical x at y 1055): 513 576 638 700 762 824 885 948; N1's and N2's: 513 576 638 700 762 824 513 576 638 700 762 824 885; in neither N1 nor N2: 948
+box rect physical 686,181,1254,926; tallyBlankPoint logical (263,475) physical (329,594); gap 285.6 logical px
+cover check at tallyBlankPoint 2026-10-29T19:06:51.341Z to 2026-10-29T19:06:54.690Z: P 2026-10-29T19:06:54.389Z x=329 y=594 hwnd=0x1b1dae class=Ganeshji root=0x1b1dae root_class=Ganeshji pid=13252 image=tally.exe point_ok=0
+CLICK left tallyBlankPoint 2026-10-29T19:06:54.731Z logical (263,475) physical (329,594); +300 ms fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+click into Tally done: True at T0+17.21 s
+R c3 2026-10-29T19:06:58.165Z to 2026-10-29T19:07:03.161Z: stderr lines 1 (box-fit 1); last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; rect: B 2026-10-29T19:06:59.396Z hwnd=0x23428ba pid=13996 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? | F 2026-10-29T19:06:59.396Z hwnd=0x1b1dae pid=13252 title=TallyPrime:9001 ;; probe: 1,1,0,13996,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13 ;; cover:  
+K c3 2026-10-29T19:07:03.206Z to 2026-10-29T19:07:05.637Z: 2026-10-29T19:07:05.145Z name=c3-c3 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True ;; full copy c3-c3-full.png
+consoles at C+3 2026-10-29T19:07:05.667Z: trace console 0xb12030 iconic=1 exists=1; cmd console 0x15904b2 iconic=1 exists=1
+R gate1 2026-10-29T19:07:05.709Z to 2026-10-29T19:07:11.459Z: stderr lines 1 (box-fit 1); last: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true ;; rect: B 2026-10-29T19:07:07.594Z hwnd=0x23428ba pid=13996 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? | F 2026-10-29T19:07:07.594Z hwnd=0x1b1dae pid=13252 title=TallyPrime:9001 ;; probe: 1,1,0,13996,ComplyEaze Bridge — post this voucher? | 4,0,1,13252,TallyPrime:9001 | visible_titled_windows,13 ;; cover: point_ok=1 ;; P 2026-10-29T19:07:11.177Z x=948 y=1055 hwnd=0x1018a class=MSTaskListWClass root=0x20138 root_class=Shell_TrayWnd pid=11384 image=explorer.exe point_ok=1
+HOVER boxButtonPoint 2026-10-29T19:07:11.500Z logical (758,844) physical (948,1055) (no click)
+hover copy c3-gate1-hover.png 2026-10-29T19:07:13.369Z; thumbnail windows: 
+WAIT gate1 2026-10-29T19:07:13.477Z: gate: read the thumbnail in <lab folder>\shots\c3-gate1-hover.png; go = a thumbnail whose title begins with ComplyEaze Bridge
+WORD gate1 2026-10-29T19:07:49.392Z: nogo: no thumbnail for the box: the hover copy (19:07:13Z) shows no thumbnail over the button; read 19:07:49Z
+GATE gate1: no click (nogo: no thumbnail for the box: the hover copy (19:07:13Z) shows no thumbnail over the button; read 19:07:49Z)
+CLICK left noButtonPoint 2026-10-29T19:07:49.562Z logical (850,709) physical (1063,886); +300 ms fg hwnd=0x1b1dae pid=13252 image=tally.exe title=TallyPrime:9001
+No clicked (gate not met)
+spawn file: SPAWN 2026-10-29T19:06:37.824Z parent_pid=9064 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=120 || SPAWN command_line="<build folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-10-29T19:06:37.915Z child_pid=13996 || SPAWN 2026-10-29T19:07:49.794Z pid=13996 exit_code=1 stdout_bytes_read=0 elapsed_s=71.9
+stdout bytes: 0
+stderr whole: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true || box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+trace GONE/END: GONE 2026-10-29T19:07:52.650Z | END 2026-10-29T19:07:52.658Z
+c3 DONE 2026-10-29T19:07:52.978Z

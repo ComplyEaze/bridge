@@ -1,0 +1,3 @@
+B3 Tally title clicked 2026-10-29T18:58:25.697Z at logical (330,14) physical (412,17)
+zorder-probe-k 2026-10-29T18:58:29.046Z P-time 2.8 s: 3,0,1,13252,TallyPrime:9001 | visible_titled_windows,10
+box-rect-probe 2026-10-29T18:58:30.790Z R-time 1.69 s: 

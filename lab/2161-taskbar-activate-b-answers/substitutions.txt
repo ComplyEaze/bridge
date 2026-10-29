@@ -1,0 +1,48 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed (product names are written as the desktop client and the Code tab CLI):
+evidence/c1-timeline.txt: original 7770 B sha256 19218f157182d948525260b75231213752ac82f2e31e807ed9ac5a092f7907fb; 2 x -> <build folder>; 7 x -> <lab folder>
+evidence/c1.txt: original 367 B sha256 b01d799b3902e823643ebba572cd3bbc66e65e873760d5e3bec5c7b595625bf1; 1 x -> <build folder>
+evidence/c10-netstat.txt: original 8937 B sha256 d1e28abd8b50ac1fdfc9d2f9a0a021a8c2dcf02d33888d7c682fa09b92359fd9; only the port-9001 LISTENING lines kept
+evidence/c2-timeline.txt: original 5571 B sha256 4310ff99d9e33c6d1a7f1a6e109720e1dde7dd49b19eb99e3dbe9c7596ec8c83; 2 x -> <build folder>; 7 x -> <lab folder>
+evidence/c2.txt: original 368 B sha256 f4fa0c9a56cc5da369e05d7287d26e95a57c2259d94b22b8cf2cc24a6b3f5712; 1 x -> <build folder>
+evidence/c3-timeline.txt: original 6422 B sha256 30681d4f1acee4435326715ce425765b1c5ebb842657ded841afcb4492be8c61; 2 x -> <build folder>; 7 x -> <lab folder>
+evidence/c3.txt: original 369 B sha256 a8d1ad4586a2b1e8244656c93c300120eed11280120cd0cb072288315d094fdd; 1 x -> <build folder>
+evidence/cover-b2-gateway.txt: original 1109 B sha256 66d5099c5932576112872f389014c7e968e3ff48948dd2233716c9f3bfe84f25; 2 x -> <desktop client>
+evidence/cover-b2-idle.txt: original 969 B sha256 99fa0443d35cfa3b782c6498f670284b68c5c5fe9b201cbb5e72a4225794ce05; 2 x -> <desktop client>
+evidence/cover-b2-tallybutton.txt: original 1124 B sha256 4ca7f8a867dc958f27de7fd2366ef8f8f42c64925d0ef44de96bb22e929a2f29; 2 x -> <desktop client>
+evidence/cover-c1-c3.txt: original 969 B sha256 836b41b52d7b2f4d060a2e6e853435951e945576b52d65828e5adcaa03f7b6a6; 2 x -> <desktop client>
+evidence/cover-c1-click1-3s.txt: original 969 B sha256 90681f2c053d57fa100a98f82d6b42f89d8be185a2c83bc885fa935a349da7ed; 2 x -> <desktop client>
+evidence/cover-c1-click1-now.txt: original 969 B sha256 2284801805caecde31f74a97286171708d70b7c9d7adfb9e8fc351cbbfe7130a; 2 x -> <desktop client>
+evidence/cover-c1-gate1.txt: original 1124 B sha256 9e7fc0fbb79fe66b4aae3ebe4c1e51d708f216aefa8c60b3ade93e0a662922e6; 2 x -> <desktop client>
+evidence/cover-c1-pre-tally.txt: original 1109 B sha256 60c5e683beb2c367a53eb8400c31477872359bc4122a77ed7765764b82d87707; 2 x -> <desktop client>
+evidence/cover-c1-t0p6.txt: original 969 B sha256 f631c756ccc8ee9060c633d492ee1467ac1bfb79a6fe8fc67fca27575202e4a8; 2 x -> <desktop client>
+evidence/cover-c2-gate1.txt: original 1125 B sha256 497fe11a736f929e94e01c17108193ef3dc9488a5080e90df6a275715503133e; 2 x -> <desktop client>
+evidence/cover-c2-t0p12.txt: original 970 B sha256 226ad3ac713a0f77b3cc5a6a1cbb2584aafd9e4f6a8d31f79e4dfa42a9e81a8c; 2 x -> <desktop client>
+evidence/cover-c2-t0p6.txt: original 970 B sha256 519fd53ab9a196fdb37d15b3265fdb1a153e320f5fd06bf62fa1c0da0b611c04; 2 x -> <desktop client>
+evidence/cover-c3-c3.txt: original 970 B sha256 f83362d9044a866a8b754f3fdfbd836470c15fcb3251fb8ea4f2f15da2e2a27e; 2 x -> <desktop client>
+evidence/cover-c3-gate1.txt: original 1125 B sha256 b20720d9bb670cfe4ef3481b10e61a8550573822c403b01266669086fd1d9d10; 2 x -> <desktop client>
+evidence/cover-c3-pre-tally.txt: original 1110 B sha256 b5dd014570ef778a7e4398dca65a80241696c92d83e50a31c1b7e73163163bf8; 2 x -> <desktop client>
+evidence/cover-c3-t0p6.txt: original 970 B sha256 a6aa0c87a977be102e0412c37e8cf0ec2640c99a409b40513d138b225e1af40e; 2 x -> <desktop client>
+evidence/cover-n1-idle.txt: original 969 B sha256 661c5b1bd9758ff13ef93ad2f472b974ce291b38048d351484ad0a612202ff63; 2 x -> <desktop client>
+evidence/cover-n2-p12.txt: original 1170 B sha256 2fd51c97e1eac6dffa97600049d80d963f0e790fe499031a56fc8c5f4abfdb39; 2 x -> <desktop client>
+evidence/cover-p-c3.txt: original 1170 B sha256 609e3f74ccd038444a01c275243aad9ff57f94f00803602c82c608c532dd1b00; 2 x -> <desktop client>
+evidence/cover-p-pre-tally.txt: original 1310 B sha256 ae0f27f05501373fef8400b597f7febece586a1dce58edd126c81bd94911642c; 2 x -> <desktop client>
+evidence/cover-p-t0p6.txt: original 1170 B sha256 f3ad77852446783ccc199e3f115c7613f674ded87067bd774f09a03eca3fb401; 2 x -> <desktop client>
+evidence/cover-pmin-c3.txt: original 969 B sha256 734ace55be5032f126a7990159bb6bd079024ed63baa7da68678deaeff3eaf61; 2 x -> <desktop client>
+evidence/cover-pmin-pre-tally.txt: original 1109 B sha256 85b6d40e5086457e86171b1a63490e80445d32fabb6083ba98be25df2bcc397f; 2 x -> <desktop client>
+evidence/cover-pmin-t0p6.txt: original 969 B sha256 d81e5711ebdfaacd61d58543fb9a5e2efb0b30c4bd395ab9d7791384a22f9492; 2 x -> <desktop client>
+evidence/n2-timeline.txt: original 1739 B sha256 b2829eec0240ddf2824da844e18bd86b34c452fb93b52c8684f0b8fdd505f416; 3 x -> <lab folder>
+evidence/p-timeline.txt: original 5060 B sha256 d7d2b882d680b1b0e286856fe1a90895766d54c0754b0d22d084924793b9ec67; 2 x -> <build folder>; 6 x -> <lab folder>
+evidence/p.txt: original 368 B sha256 09ab6a8ab36a667bae877ab15cc54267dda5e8114c3cc46521e3a66181d92466; 1 x -> <build folder>
+evidence/p0-netstat.txt: original 8953 B sha256 cc6cee4ed93d00e50b52fd54d8f4924bfdfa17ba128f4e71b4437514bd7e8bed; only the port-9001 LISTENING lines kept
+evidence/pmin-timeline.txt: original 5304 B sha256 bbb39fe050f526859c326475564fb2b3a6fdad377f4c522343e1ab71912c079a; 2 x -> <build folder>; 6 x -> <lab folder>
+evidence/pmin.txt: original 368 B sha256 c410a71df96339aecfe9fec4cf382aae6655966a6090b83a00824f7e796d48e0; 1 x -> <build folder>
+evidence/trace-c1.txt: original 4955 B sha256 0aa2d86efc6e37a6c080a15ec46a9281398be7938b3f30ecf28a7890dc128797; 2 x -> <build folder>
+evidence/trace-c2.txt: original 3515 B sha256 a3edc97bdd28bfd6df5af7caac8d137df1a3b12e73472f4c3b56b620dc3ee85d; 2 x -> <build folder>
+evidence/trace-c3.txt: original 4663 B sha256 a626e404a3d058d286505af9f5f616bdcef6c78de86e3051487c0571764b3699; 2 x -> <build folder>
+evidence/trace-p.txt: original 3792 B sha256 085041b7bd22950c0857f76077873fe223d0e89cc96ce17c1f662a4278da3e00; 2 x -> <build folder>
+evidence/trace-pmin.txt: original 3189 B sha256 a707117524d4efd9522510f311441ba14bdbf98d34101d14d1bf56a1efdbcbb3; 2 x -> <build folder>
+scripts/cell.ps1: original 31173 B sha256 815729f153ed0ea185507a2e97940b9e2020347d457e0383d1d2219576453410; 1 x -> <build folder>; 1 x -> <lab folder>
+scripts/b3.ps1: original 1590 B sha256 eec22cb4f3035d5d975efe619cc3ed2a6881cf179d877a97dda939b86f3e5552; 1 x -> <lab folder>
+scripts/marks.ps1: original 1753 B sha256 822f25d5f400c8dff721c41c060da667bd5874df1ff57518dce6eb143e904b10; 1 x -> <lab folder>; 2 x -> stop
+scripts/leftover.ps1: original 2183 B sha256 e0603f715eb46dc911e0cef39287ab691902fdc52922700b86f4a5b5d61743fc; 1 x -> <lab folder>
+scripts/step0.ps1: original 2378 B sha256 78c8023f32a10510f6cbebfd4e6bbe3c2a58e0344ded979bca034eb713324d0e; 2 x -> <lab folder>

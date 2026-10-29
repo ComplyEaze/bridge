@@ -168,6 +168,12 @@ fn admission_plans() -> Vec<ScenarioPlan> {
     two_bank_plans()[..REFUSED_AT_ADMISSION].to_vec()
 }
 
+/// A day of a `tally_unchecked` row read after the build (#1392), refused at its
+/// first request: the row stays `tally_unchecked`.
+fn day_read_refused() -> ScenarioPlan {
+    ScenarioPlan::new(Fixture::SyntheticXml("<ENVELOPE/>".into())).with_http_status(500)
+}
+
 fn journal(directory: &Path) -> Server {
     bank_server(directory, 9)
 }
@@ -1409,6 +1415,7 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
             skip_only_plans(),
             two_bank_plans(),
             skip_only_plans(),
+            vec![day_read_refused()],
             admission_plans(),
         ]
         .concat(),
@@ -1433,7 +1440,7 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        // no day of Tally has been read, so the absence is not claimed
+        // the row's day was asked for and refused, so the absence is not claimed
         vec![open_row(skipped_row(), "tally_unchecked", None)],
         "{again}"
     );
@@ -1551,20 +1558,34 @@ async fn a_transfer_posted_inline_leaves_the_other_skip_not_established_rather_t
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
-        [skip_only_plans(), skip_only_plans(), two_bank_plans()].concat(),
+        [
+            skip_only_plans(),
+            skip_only_plans(),
+            vec![day_read_refused()],
+            two_bank_plans(),
+        ]
+        .concat(),
     );
     rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let mut b_skip = record(b_skipped(), json!("skipped"), BANK_A, "inflow", false);
     b_skip["reference"] = Value::Null;
-    rig.build(statement_v2(
-        directory.path(),
-        BANK_B,
-        window(),
-        json!([]),
-        json!([b_skip]),
-    ))
-    .await;
+    // both statements now cover the day, so the skips' day is asked for
+    let recorded = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_B,
+            window(),
+            json!([]),
+            json!([b_skip]),
+        ))
+        .await;
+    assert!(
+        open_rows(&recorded["transfers"])
+            .iter()
+            .all(|row| row["state"] == "tally_unchecked"),
+        "{recorded}"
+    );
     let built = rig
         .build(json!({"company_guid": CAPTURED_GUID,
             "vouchers": [contra_voucher(b_skipped())], "withdraw_skips": [b_skipped()]}))

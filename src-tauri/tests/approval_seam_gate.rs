@@ -1115,9 +1115,12 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // screen is otherwise drawn behind it, since a background
                 // process may not take the foreground (#1589). MB_TOPMOST alone
                 // was seen not to hold when the box opened seconds after the
-                // last input went to Tally, while a stand-in box with these
-                // flags and MB_SYSTEMMODAL held it (#1780); with no owner window
-                // MB_SYSTEMMODAL disables nothing. When Windows lets it,
+                // last input went to Tally. With MB_SYSTEMMODAL added the box
+                // held it in one lab run on Windows 10, where Tally still took a
+                // click and a key while the box was open (#1780). That run did
+                // not test what else a system-modal box changes: the taskbar
+                // showed no task buttons while it was open, cause not tested
+                // (#2161). When Windows lets it,
                 // MB_SETFOREGROUND also gives the box the foreground, so a key
                 // typed for Tally can answer it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the

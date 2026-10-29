@@ -1,0 +1,11 @@
+#899 heavy-book census span notes (UTC). Sheet lab/899-heavy-book-census-span at bb7767315d9b0f6eb2b76d0d648792e8b2b13826: SHA256.txt all equal; gen_census.py --check printed its expected line. THE BOOK is named nowhere in these files.
+2026-10-29T06:17Z Step 0 with no company loaded: capture of Tally's window (local); one tally.exe; 9001 LISTENING by it; GET /status 200 (51 B).
+2026-10-29T09:05Z The owner had loaded THE BOOK alone (from its own data folder). Gateway: THE BOOK the one company. The lab opened Tally's Change Company list (F3), chose its Select Company row and read THE BOOK's period in the Period column, then chose THE BOOK's row again (no Escape; no other company loaded). Capture of the Gateway (local).
+2026-10-29T09:08Z company.txt and dates.txt written on the lab PC (UTF-8, no byte-order mark). They exist; neither is quoted. PowerShell history off in every PowerShell the row used (send.ps1 sets it).
+2026-10-29T09:09:19Z M0: marks request 1,026 B; answer 3,458 B, exit 0, 200, time_total 0.054 s; one COMPANY row; V0 at least 2,000. V0 and M0 recorded locally only.
+2026-10-29T09:10:05Z S1: width 250 from V0/8; request 1,588 B. Answer at 09:18:12.990Z: exit 0, 200, 139,664 B = CONTENT-LENGTH, time_starttransfer 487.039 s, time_total 487.042 s. Capture: no dialog. /status 200.
+2026-10-29T09:18Z census_read.py exit 1: "the answer does not parse: unbound prefix: line 70, column 5". A stop by the sheet (file kept). The answer holds 312 UDF:-prefixed tags and no namespace declaration. A text count (diagnostic, not C4) finds 40 VOUCHER tags.
+2026-10-29T09:18Z The ladder stops: S1 took more than 20 s. S2 and S3 not sent; plan not run. Reported to the run lead at once.
+2026-10-29T09:19:10Z M1: answer 3,458 B, the same sha256 as M0; voucher and master marks equal to M0's; same company.
+2026-10-29T09:20Z C10: capture of the Gateway (local); THE BOOK shut (Alt+K, h, Enter); Select Company showed THE BOOK's data folder; Specify Path (reached with Up keys) set back to the lab's default data folder, which listed its 77 companies again. 09:20:46Z: one tally.exe; 9001 LISTENING by it; /status 200. No XML request after the shut.
+Step 9 (deletion of the requests, answers, company.txt, dates.txt, the local marks and span files and the captures) waits for the run lead's review.

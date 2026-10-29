@@ -1,0 +1,7 @@
+m0 request_bytes=1026 start=2026-10-29T09:09:19.167Z end=2026-10-29T09:09:19.958Z curl_exit=0 printed='200 3458 1026 0.018723 0.049977 0.053607' content_length=3458 bytes=3458 sha256=a4fc75b3d5287a7f1417f8e01d9d586956ddac3ebb5ed3275a82856762ab748b
+m0 GET /status 2026-10-29T09:09:24.728Z exit 0 printed 200 51
+s1 request_bytes=1588 start=2026-10-29T09:10:05.374Z end=2026-10-29T09:18:12.990Z curl_exit=0 printed='200 139664 1588 0.003474 487.039216 487.041570' content_length=139664 bytes=139664 sha256=40dd377132559bc402f1ed980adcdab8c4d17ce0a267a20b2b9d045a24a73023
+s1 GET /status 2026-10-29T09:18:16.205Z exit 0 printed 200 51
+s1 width 250 census_read exit 1: FAIL: the answer does not parse: unbound prefix: line 70, column 5
+m1 request_bytes=1026 start=2026-10-29T09:19:10.356Z end=2026-10-29T09:19:10.776Z curl_exit=0 printed='200 3458 1026 0.005389 0.010023 0.011876' content_length=3458 bytes=3458 sha256=a4fc75b3d5287a7f1417f8e01d9d586956ddac3ebb5ed3275a82856762ab748b
+m1 GET /status 2026-10-29T09:19:13.237Z exit 0 printed 200 51

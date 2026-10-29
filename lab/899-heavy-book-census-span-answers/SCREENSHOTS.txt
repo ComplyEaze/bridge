@@ -1,0 +1,8 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC (they show the book) and are deleted at step 9.
+c10-gateway.png 49622 B ab8d2416c84e0bafdaca45207edec2eeb0c3fa076192091990387809f55f817f
+c10-tally.png 72674 B ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf
+m0-after.png 49622 B ab8d2416c84e0bafdaca45207edec2eeb0c3fa076192091990387809f55f817f
+m1-after.png 49622 B ab8d2416c84e0bafdaca45207edec2eeb0c3fa076192091990387809f55f817f
+s0-tally.png 72112 B c4a056b34fb02d3e010a8324821d66ecbae932bd93f7ef467950fbeb77dcea69
+s1-after.png 49622 B ab8d2416c84e0bafdaca45207edec2eeb0c3fa076192091990387809f55f817f
+s1-gateway.png 49622 B ab8d2416c84e0bafdaca45207edec2eeb0c3fa076192091990387809f55f817f

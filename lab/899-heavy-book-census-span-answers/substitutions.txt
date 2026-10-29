@@ -1,0 +1,3 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+evidence/c10-netstat.txt: original 10087 B sha256 3b47fcb9f74237d2b2d74e36b2b6dc017eeaee71e3599c42e0bb72206ea1ca80; only the port-9001 LISTENING lines kept
+evidence/s0-netstat.txt: original 10110 B sha256 6704728c6cbbc61529e26ff34727217d7ddd3ada8fd6406a24419b732a46784b; only the port-9001 LISTENING lines kept

@@ -1,0 +1,1 @@
+No Bridge client ran in this row (raw reads by curl under C3; no build used).

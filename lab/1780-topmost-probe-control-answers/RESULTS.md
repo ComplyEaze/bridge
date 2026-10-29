@@ -38,3 +38,5 @@ In each run the probe counted 14 visible titled windows.
   - each probe's saved run (`*.run2.txt`);
   - `independent-read.txt`.
 - `notes.txt` (UTC).
+- `substitutions.txt`: the one pushed copy that differs from the lab's file (`control-forms.ps1`, its output path), with the original's bytes and sha256.
+- `client-log.txt`: no Bridge client ran in this row.

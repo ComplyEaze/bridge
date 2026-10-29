@@ -2721,8 +2721,8 @@ fn review_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
@@ -2741,14 +2741,20 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
                 // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). The flag alone
-                // did not keep the box topmost on the lab PC, so `box_fit`
-                // sets it again once the box shows (#1780). With
-                // MB_SETFOREGROUND the box also takes the foreground, so a key
-                // typed for Tally answers it; the parent puts a first line on
-                // its text that says what Y and N do (#1780). No stays the
-                // default button.
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // process may not take the foreground (#1589). MB_TOPMOST alone
+                // did not hold when the box opened seconds after the last input
+                // went to Tally, and setting it again once shown was ignored;
+                // MB_SYSTEMMODAL kept it, and with no owner window it disables
+                // nothing (#1780). When Windows lets it, MB_SETFOREGROUND also
+                // gives the box the foreground, so a key typed for Tally can
+                // answer it; the parent puts a first line on its text that says
+                // what Y and N do (#1780). No stays the default button.
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2766,8 +2772,8 @@ fn release_question() -> String {
 #[cfg(windows)]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
@@ -2781,9 +2787,15 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
                 std::ptr::null_mut(),
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the review's box: topmost, taking the foreground, with
-                // No as the default button (#1589, #1780).
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // As for the review's box: topmost, held by MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2837,8 +2849,8 @@ fn post_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
@@ -2857,14 +2869,20 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
                 // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). The flag alone
-                // did not keep the box topmost on the lab PC, so `box_fit`
-                // sets it again once the box shows (#1780). With
-                // MB_SETFOREGROUND the box also takes the foreground, so a key
-                // typed for Tally answers it; the parent puts a first line on
-                // its text that says what Y and N do (#1780). No stays the
-                // default button.
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // process may not take the foreground (#1589). MB_TOPMOST alone
+                // did not hold when the box opened seconds after the last input
+                // went to Tally, and setting it again once shown was ignored;
+                // MB_SYSTEMMODAL kept it, and with no owner window it disables
+                // nothing (#1780). When Windows lets it, MB_SETFOREGROUND also
+                // gives the box the foreground, so a key typed for Tally can
+                // answer it; the parent puts a first line on its text that says
+                // what Y and N do (#1780). No stays the default button.
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2911,10 +2929,10 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
             std::ptr::null_mut(),
             text.as_ptr(),
             title.as_ptr(),
-            // Topmost and taking the foreground, as the post's box asks
-            // (#1589). This box is not shown through `box_fit`, so nothing
-            // sets it topmost again if the flag does not hold (#1780). No
-            // stays the default button.
+            // Topmost: a window the connector opens while Tally fills the
+            // screen is otherwise drawn behind it, since a background
+            // process may not take the foreground (#1589). It changes only
+            // the drawing order; No stays the default button.
             MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
         ) == IDYES
     }

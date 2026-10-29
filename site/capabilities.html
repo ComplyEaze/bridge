@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>What it can do: ComplyEaze Bridge</title>
-<meta name="description" content="Every tool ComplyEaze Bridge 0.6.1 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the two only with posting on." />
+<meta name="description" content="Every tool ComplyEaze Bridge 0.7.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the four only with posting or master writes on." />
 <link rel="canonical" href="https://bridge.complyeaze.com/capabilities.html" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
 <meta property="og:title" content="What it can do: ComplyEaze Bridge" />
-<meta property="og:description" content="Every tool ComplyEaze Bridge 0.6.1 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the two only with posting on." />
+<meta property="og:description" content="Every tool ComplyEaze Bridge 0.7.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the four only with posting or master writes on." />
 <meta property="og:url" content="https://bridge.complyeaze.com/capabilities.html" />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
 <script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
@@ -57,24 +57,25 @@
   <section class="page-hero">
     <div class="page-hero__inner">
       <h1>What ComplyEaze&nbsp;Bridge can do</h1>
-      <p>The 32 tools release 0.6.1 offers in Claude Desktop, 31 of them with its default settings (posting off) and <code>audit_test_run</code> only when its own setting is ticked, counted by the release&rsquo;s own check of each published package (it reports 31, and 33 with posting on) and named from the source of that release, and the two that posting adds. Checked against release 0.6.1 on <time datetime="2026-10-27">27 October 2026</time>; the Releases page says which release is the latest.</p>
+      <p>The 33 tools release 0.7.0 offers in Claude Desktop, 32 of them with its default settings (posting off) and <code>audit_test_run</code> only when its own setting is ticked, counted by the release&rsquo;s own check of each published package (it reports 32, and 34 with posting on) and named from the source of that release, and the two that posting adds and the two that master writes adds. Checked against release 0.7.0 on <time datetime="2026-10-28">28 October 2026</time>; the Releases page says which release is the latest.</p>
     </div>
   </section>
 
   <div class="page-body">
     <section class="page-section">
-      <h2>The 32 tools, as installed</h2>
+      <h2>The 33 tools, as installed</h2>
       <p class="caps-lead">None of them changes your TallyPrime books. Every call adds a receipt line to a log on this computer; the log is designed to hold no figures. Whatever the assistant reads, amounts included, goes to your AI provider.</p>
       <div class="caps-scroll">
         <table class="caps-table">
           <thead><tr><th scope="col">Tool</th><th scope="col">What it reads or does</th><th scope="col">Kind</th><th scope="col">Notes</th></tr></thead>
           <tbody>
-          <tr><th scope="row"><code>audit_test_run</code></th><td>One tax-audit test run on the company&rsquo;s own books for a date range, today only the cash share of receipts and payments against the s.44AB(a) limit: figures and finding ids, with no ledger, party or voucher name</td><td>Read-only</td><td>Not offered unless its setting, Allow tax-audit test runs, is ticked, so it is not among the 31 offered by default. Books only, not a tax opinion; the period must lie in 2025-26; refused while a redaction setting is on. Replayed from synthetic books, not yet run against a live TallyPrime.</td></tr>
+          <tr><th scope="row"><code>audit_test_run</code></th><td>One tax-audit test run on the company&rsquo;s own books for a date range, today only the cash share of receipts and payments against the s.44AB(a) limit: figures and finding ids, with no ledger, party or voucher name</td><td>Read-only</td><td>Not offered unless its setting, Allow tax-audit test runs, is ticked, so it is not among the 32 offered by default. Books only, not a tax opinion; the period must lie in 2025-26; refused while a redaction setting is on. Replayed from synthetic books, not yet run against a live TallyPrime.</td></tr>
           <tr><th scope="row"><code>balance_sheet</code></th><td>The Balance Sheet for a date range, by primary group, from TallyPrime&rsquo;s Trial Balance</td><td>Read-only</td><td>A book with stock items is read only when Tally&rsquo;s own closing stock closes every gap (one synthetic book measured).</td></tr>
           <tr><th scope="row"><code>build_import_xml</code></th><td>Checks a Journal, Payment, Receipt or Contra batch and writes an import file that you import in TallyPrime yourself</td><td>Writes a file on this computer</td><td>Writes an import file and a ledger record on this computer. Writes nothing to TallyPrime.</td></tr>
           <tr><th scope="row"><code>cash_flow</code></th><td>Tally&rsquo;s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, not a cash flow statement under AS 3</td><td>Read-only</td><td>Returned only after its net total is compared with the trial balance and found equal; the split into months is Tally&rsquo;s own and is not checked; a ledger under Bank OD A/c or Bank OCC A/c with movement refuses the result (covered by tests, not seen against Tally).</td></tr>
           <tr><th scope="row"><code>company_features</code></th><td>Three settings the company&rsquo;s record in TallyPrime holds today (cost centres, GST and batch-wise stock; each yes, no or not reported) and the currency symbol</td><td>Read-only</td><td>No ledger, voucher, amount or narration. Each of the three settings equalled Tally&rsquo;s F11 screen on three synthetic books, not on your company; a setting changed inside a sitting has not been measured.</td></tr>
           <tr><th scope="row"><code>egress_log</code></th><td>The receipts ComplyEaze&nbsp;Bridge keeps of its own tool calls, with no figures</td><td>Read-only</td><td></td></tr>
+          <tr><th scope="row"><code>gst_by_counter_ledger</code></th><td>For a period, the GST the books record on ledgers under Duties &amp; Taxes, totalled per counter ledger: the one Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets ledger on a purchase, debit note, journal or payment with a supplier on it, with its GUID, the debit and credit side apart, per head; every other voucher with GST is set aside under a named reason with its own totals</td><td>Read-only</td><td>Books only: not a return figure, and it does not decide input tax credit, blocked credit or what was availed; it matches nothing against a portal. A window it cannot read whole is refused. Measured on one synthetic book of TallyPrime 7.2 Silver; Gold, a registered book, other item-invoice shapes and a window of more than 64 vouchers are not measured.</td></tr>
           <tr><th scope="row"><code>gst_status</code></th><td>Tally&rsquo;s own GSTR-1 status flags on the vouchers of one voucher type in a period of at most 93 days: for each voucher its number, date, a status (included, uncertain, excluded, not in return, cancelled, optional or post-dated) and whether a person accepted it as it stands</td><td>Read-only</td><td>No amount, party, ledger or narration. A status is Tally&rsquo;s own flag, not a judgement of ComplyEaze&nbsp;Bridge. Measured on one synthetic book of TallyPrime 7.1 Silver, where &ldquo;excluded&rdquo; has not been observed.</td></tr>
           <tr><th scope="row"><code>gst_uncertain_vouchers</code></th><td>The vouchers of one voucher type (a Sales type is what was measured), in a period of at most 93 days, that Tally marks Uncertain in its GSTR-1, and the ones a person accepted as they stand</td><td>Read-only</td><td>The party and the invoice total are returned to the assistant; <code>mask_parties</code> masks the party and not the total. Measured on one synthetic book of TallyPrime 7.1 Silver; item invoices, a registered buyer, credit notes, foreign currency and several accepts at once are not measured.</td></tr>
           <tr><th scope="row"><code>ledger_masters</code></th><td>Ledgers with their opening balances; optionally GSTIN, PAN and other party details</td><td>Read-only</td><td></td></tr>
@@ -116,10 +117,19 @@
     </section>
 
     <section class="page-section">
+      <h2>Two more, only with master writes on</h2>
+      <p class="caps-lead">A new install does not offer these, and the Claude&nbsp;Desktop extension has no setting that turns them on: they appear only when posting is on and a further setting, set by whoever installs it, is on. They create one new ledger in a company, the first write a published build makes to TallyPrime&rsquo;s masters, and the second needs you, in a ComplyEaze&nbsp;Bridge window:</p>
+      <ul class="faq-next">
+        <li><code>prepare_ledger_creates</code> reads the company&rsquo;s ledger and group names, refuses a name that already exists as a ledger, a group or an alias or that differs from one only in case, spaces or symbols, writes nothing to TallyPrime, and returns the ledger as you will be asked to approve it. The ledger is a party under Sundry Debtors or Sundry Creditors, a Suspense ledger, or a GST duty ledger whose head has been measured; it can set no opening balance or parent.</li>
+        <li><code>post_ledger_creates</code> sends the create once, after you approve it in a ComplyEaze&nbsp;Bridge window, then reads the book back and reports it posted only when exactly one new ledger of that name exists as sent and no other ledger or group changed. It was run once on a synthetic company (TallyPrime 7.1 Silver, 14&nbsp;October 2026), and its approval window on TallyPrime 7.2 from a test package of an earlier version of the change; the build of this release has not been run, and a create whose answer is lost is not measured.</li>
+      </ul>
+    </section>
+
+    <section class="page-section">
       <h2>What it does not do</h2>
       <ul class="faq-next">
         <li>File anything, or match your books with GSTR-1, GSTR-2B or GSTR-3B. The purchase and sales registers are what the books record, not a GST return.</li>
-        <li>Create ledgers or other masters, or post sales or purchase invoices or GST entries.</li>
+        <li>Create a ledger unless master writes are on (above), create any other master, or post sales or purchase invoices or GST entries.</li>
         <li>Undo or delete a voucher it has posted: you correct it in TallyPrime.</li>
         <li>Reach a TallyPrime on another computer.</li>
       </ul>

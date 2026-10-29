@@ -12,6 +12,277 @@ number of the next build is chosen when it is released.
 The version boundary between the published MIT-licensed `v0.1.0` release and
 Apache-2.0 builds from current source stays unambiguous.
 
+## [0.7.0] - <cut date>
+
+### In plain words: ComplyEaze Bridge 0.7.0, since 0.6.1 (27 Oct 2026)
+
+These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests or issues they come from. Like every build so far, it is not yet code-signed. The desktop app has no published installer, so lines about it apply only to a build from source. <check at the cut: whether Sales invoice posting stays switched off in 0.7.0, as in 0.6.1>
+
+**Should I upgrade?**
+
+- **If you read stock, statements or a ledger's movement: yes.** `stock_summary` now reads as of the last day of any month, not only 31 March, and gives the quantity of an item inside a stock group (#1233). `ledger_movement` reads only the named ledger's vouchers, so a large book no longer fails as too large for a ledger with a small share of it (#485). A Trial Balance row that does not add up is marked, and `profit_and_loss` and `balance_sheet` name its ledger and gap when they refuse (#2068, #692).
+- **If you use posting:** what Bridge writes into Tally is still only what you approve in the approval window, and the kinds of voucher it posts are the same as in 0.6.1 (Journal, Payment, Receipt and Contra). On Windows the approval boxes now stay above Tally when you click into Tally while one is open, and show dates as Tally does, for example `14-Sep-2026` (#1780, #2101). A post's answer that reported `STATUS` 0 no longer counts toward the voucher mark it proved (#2035), and a date that names no calendar day is refused in four checks (#2009).
+- **If you want Bridge to create a ledger:** it can now create one ledger at a time, through its own approval box, only when `BRIDGE_AGENT_ENABLE_MASTER_WRITES` and posting are both on. The desktop extension has no setting for the first, so a default install does not offer it (#690).
+- **Before you upgrade:** once 0.7.0 has recorded a person's check of a post matched by content only (`acknowledge_post_review` with `doubt` `content_only`), do not go back to 0.6.1: an older build refuses the whole import journal once that record is written (#1039).
+- **Everyone else:** nothing else needs doing. Install steps are the same as for 0.6.1: [installation guide](https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md); after installing, check the extension shows 0.7.0, the Terms setting is ticked and the posting setting is as you want it; quit Claude Desktop completely and reopen it.
+
+**What you can do now**
+
+- `prepare_ledger_creates` and `post_ledger_creates` create ONE new ledger in a company, the first write a published
+  build makes to Tally's masters (part of #690). They are listed only when `BRIDGE_AGENT_ENABLE_MASTER_WRITES` and posting
+  (`BRIDGE_AGENT_ENABLE_WRITES`) are both set to true; the desktop extension has no setting for the first, so a default
+  install does not offer them. The ledger is a party under Sundry Debtors or Sundry Creditors, a Suspense ledger, or a
+  GST duty ledger whose head has been measured, from typed fields; ComplyEaze Bridge builds the request itself, accepts
+  no XML, and can set no opening balance or parent. `prepare_ledger_creates` reads the company's ledger and group names,
+  refuses a name that already exists as a ledger, a group or an alias or that differs from one only in case, spaces or
+  symbols (Tally can take such a Create for the existing ledger and change it), writes nothing to Tally, and returns a
+  `batch_id` and the preview the person will be shown (its ledger name masked under `mask_parties`). `post_ledger_creates` asks the local user in a native dialog and sends
+  the create once; a batch already sent is never sent again. After the send the book is read back and one state is
+  returned, `posted_verified` only when Tally's counters show one create and no alteration, the company's own master
+  mark moved, exactly one new ledger of the name exists with the parent, tax fields and GSTIN as sent, no ledger or
+  group that existed before changed, and no other loaded company's master mark moved (bill-wise is not read back). Measured: one ledger created and read back as `posted_verified` through the tools on a synthetic
+  company (TallyPrime 7.1 Silver, 14 Oct 2026), and the approval box shown whole, declined with nothing sent, accepted
+  and then answered from the journal with no second box (TallyPrime 7.2, a continuous-integration package of an earlier
+  head of the change, 239896f8, 28 Oct 2026). Not run: a create whose answer is lost, other TallyPrime releases and editions, and the build
+  of this release. A name Tally resolves to an existing ledger is reported loudly and is not retried.
+- A ledger create with no answer from Tally on file (it could not be recorded, or Tally never answered) can now settle. A later `post_ledger_creates` call for the batch answers `posted_unattributed` when it finds the ledger as sent and the ledger's `ALTERID` shows it as the first master change in the company after ComplyEaze Bridge's last read of it before sending the create, and not changed since. That releases the ledger name the batch held. It is never `posted_verified`: with no answer from Tally on file, nothing shows the change was ComplyEaze Bridge's own create rather than the same ledger made by someone else, so the answer asks the person to check the ledger in Tally. A ledger changed since stays open with the reason `ledger_altered_since_create` (#2003).
+- `acknowledge_post_review` with `doubt` set to `content_only` records, after the native review dialog, that a person
+  checked in Tally a native post matched by content only: its binding to its own vouchers was refused, or no answer from
+  Tally was recorded. The record changes nothing in Tally and no status or verdict, binds no voucher, lifts no invoice
+  stop and releases no row; `verify_import` reports it as `content_review`, and `local_data_report` counts the batch as
+  `not_settled_reviewed_not_attributed`. A later `posted_verified`, a later answer from Tally or a rollback of the book
+  voids it. It is a new kind of import journal record: a build older than this one refuses the whole journal once one is
+  written, so do not downgrade after recording one (part of #1039).
+- `gst_by_counter_ledger` totals, for a period, the GST the books record on ledgers under Duties & Taxes per counter
+  ledger (the one Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets ledger on a purchase, debit
+  note, journal or payment with a supplier on it, named with its GUID), debit and credit side apart, per head, and sets
+  every other voucher with GST aside under a named reason with its own totals (a voucher with two such ledgers, a
+  reverse-charge or set-off journal, a sale or credit note, a tax payment with no supplier, a duty ledger not typed GST,
+  TDS or TCS, a ledger under another group). Books only: not a return figure, and no eligibility or availment decision.
+  Measured on fourteen vouchers typed on TallyPrime 7.2's screen in a synthetic book, item invoices among them. The
+  same synthetic book, after its company and one supplier were registered and December's vouchers keyed, was read with an
+  earlier build of this tool that did not yet admit Direct Expenses or Fixed Assets ledgers or name the ledger GUID: none
+  of December's six vouchers was set aside, and a supplier invoice entered twice (the same reference, date and bill) was
+  totalled twice with nothing flagged, so the answer does not detect a duplicate invoice. Gold, other releases and a
+  registered book on the build of this release are not measured (part of #1866).
+- `vouchers` takes `bank_allocations: true` to add, on each ledger entry, the bank date, instrument number and date,
+  transaction type and status of its bank allocations, each field saying whether Tally sent it absent, empty or with a
+  value; a transfer reference typed in a Contra's bank allocation is its instrument number. `status` is Tally's own
+  `STATUS` element, not a reconciliation state, and nothing returned says whether an entry is reconciled. On two
+  entries reconciled on Tally's screen with a bank date of 6 April 2026, Tally's raw answer filled the bank date and set
+  `BANKMANUALSTATUS` and `BANKRECONSTATUS` to Reconciled, while `STATUS` stayed No; this read returns the bank date but
+  neither of those two elements. The built tool has not been run against a live Tally on a reconciled entry; its parser,
+  run on the saved raw answer, read the bank date (#2006). Without the argument, answers are as
+  before. Measured on one synthetic book of five hand-keyed Contras (TallyPrime 7.2, keyed in double entry), and, for the
+  reconciled entries, by a raw read of five Contras of a second synthetic book (TallyPrime 7.2); no request changed (#1231,
+  #1392).
+- `vouchers` takes `goods_lines: true` to add, on each ledger entry of an invoice voucher, its goods lines: the stock
+  item, actual and billed quantity, rate and amount, and each godown and batch row, each field saying whether Tally sent
+  it absent, empty or with a value. An entry with a line whose batch amounts do not add up to its amount shows no lines, and says
+  why. A Stock Journal showed no lines in the one read of it (TallyPrime 7.2, not committed); a Delivery Note or Receipt Note has not been captured. Without the argument, answers
+  are as before. Measured on Sales and Purchase invoices of two synthetic books (TallyPrime 7.1, one also on 7.2); no
+  request changed (#2015).
+- `vouchers` takes `summarise_by: cost_centre` to sum a window's cost-centre allocations into one bucket per cost
+  centre under each cost category, with each category's own totals (`category_totals`: a category allocates the whole
+  entry, so categories overlap) and the entries that carry no allocation (`entries_unallocated`). An entry whose
+  allocations cannot be read, or whose allocations under one category do not add up to the entry, refuses the summary
+  (`summary_cost_centre_unreadable`, `summary_cost_centre_allocation_mismatch`). The summary does not read the company's
+  Cost Centres setting: allocations were read on a book with it off, so an empty summary means nothing was allocated in
+  the window. Measured on the saved raw answers of one synthetic book with Cost Centres on (TallyPrime 7.2): a Payment
+  allocated to two centres of one category and a Journal entry allocated in full under two categories; the summary has
+  not been run through the tool against a live TallyPrime; no request changed (#1231).
+- A party's mailing address, PIN code, state and country can now be read from Tally's dated mailing details
+  (`LEDMAILINGDETAILS.LIST`) (#1490). On the measured book (one synthetic company, TallyPrime 7.1 Silver, 12 Oct 2026) the
+  flat address, PIN code and state fields came back empty or absent for a party that held an address, and the dated list
+  held it: two address lines, the PIN code, the state, the country, the date it applies from and the mailing name.
+  `ledger_masters fields=compliance` takes `include_mailing_details` (default false): without it no request names the
+  list and no row has the key; with it each row carries the dated entries as `compliance.mailing_details`, oldest first.
+  It is refused together with `include_gst_details`, as the request naming both has not been captured. Under
+  `mask_parties` the mailing name, every address line and the flat address field are shortened like a party's name, to
+  their first two and last two characters; the PIN code, state and country are returned under every redaction mode. A
+  second mailing entry with a later date was read on TallyPrime 7.2 (one party, oldest first); three or more entries, an
+  entry with no date and other releases are not measured. The
+  registers do not read the mailing details and keep their request and their estimate.
+- The party/ledger master workbook, a local file written by the desktop app, gains five columns at its end: the mailing
+  address, PIN code and state in force on the Balances-as-of date, the date they apply from, and a status that says why
+  they are blank (no mailing details, none in force on that date, not observed, or unreadable). The workbook asks Tally
+  for the mailing details only for a book whose master-alteration mark (an upper bound on its ledgers) is at most 3,200;
+  for a larger book it sends the same request as before, every ledger's status reads not observed, and a note in the
+  workbook's header says so, so a book that exported before is never refused for the larger per-ledger estimate. For a book
+  past that mark the five columns are still there but empty, and every status reads not observed: the choice is made on
+  the mark, which counts every master alteration, so a book with few ledgers and many alterations is read without the
+  mailing details too (#1490).
+- `stock_summary` now reads stock as of the last day of any month, not only 31 March. The period runs from 1 April of that financial year, or the book's start if later; any other date is refused as `stock_summary_as_of_not_measured`, as before. On two lab books on TallyPrime 7.2, month ends inside the year matched Tally's own Stock Summary, items inside stock groups included; a voucher dated on the end date was counted on a 15 October read, and a month end with a voucher on it was not measured. A company whose financial year does not start on 1 April is still read from 1 April (part of #1233).
+- `stock_summary` now returns the closing quantity of a stock item inside a stock group. Tally's plain Stock Summary has no line for such an item, so the quantity is the item's own in the stock item list and is not compared: the item says `inside_stock_group`, with `item_list_amount` and `item_list_unit`, and is never `agreed`. On one lab book with groups three deep, each such quantity equalled Tally's Stock Summary screen with every level expanded. An item whose parent reads `Primary` without Tally's root marker now says `parent_not_resolved` and carries no quantity, and `checks.closing_quantity` is `checked_where_agreed` (part of #1233).
+- `ledger_movement` with a `ledger` now reads only that ledger's vouchers for the period, instead of every voucher in the book, so a large book no longer fails as too large for a ledger that holds a small share of it. The window is planned from a count of the ledger's vouchers, and the ledger is taken from the book's own spelling of its name. The result says how it was read (`window_scope`: `ledger_scoped`, with the vouchers read, or `whole_book` with the reason). When the ledger's name has a character the scoped read does not send or holds a word Tally's formulas read as an operator (such as "and" or "not"), when a day of its vouchers is too heavy for one read, or when the scoped read finds nothing, the whole book's vouchers for the period are read as before and the result says so. A returned voucher with no line on the ledger refuses the read. The lab has compared the scoped read with the Trial Balance for one ledger and one month only, where its debit matched; `ledger_movement` as a whole has not yet been read on a Tally with this change (part of #485).
+- The `outstandings` party detail can now answer for a party on a book whose window is too large to read. Where the read of the whole
+  company's vouchers is refused as needing too many requests, a party matched to one ledger alone, whose vouchers carry the ledger's name as
+  stored and whose name holds only ASCII letters, digits and single spaces and no TDL operator word, is counted by its own ledger and its
+  vouchers are read by that ledger in planned parts, each checked against the count voucher by voucher. Such a detail says so in
+  `window_scope` (`basis` `ledger_scoped`, with a note on what that list was compared with) and counts `party_vouchers_read`; every other
+  detail is read as before and keeps `company_vouchers_read`. Where the ledger is not read, or its read finds nothing or would need a day
+  divided by AlterID, the original refusal stands and its `window_scope` gives the reason; a refusal of the ledger read itself (a part not
+  admitted, a row with no line on the ledger) keeps its own code (part of #1356).
+- `egress_log` no longer refuses a read whose receipts are too large for one response. When the receipts asked for (they can be about 11 KiB each) would not fit the response size cap, it returns the newest whole receipts that do fit, measured on the response as it is sent, marks the answer `truncated`, and counts the receipts left out in `result.omitted_for_size`. A single receipt that alone is over the cap is still refused (`agent_response_too_large`). The result now says `order` is `newest_first`. Older receipts are still not reachable by paging (part of #2125).
+- The desktop Trial Balance and its Excel workbook now mark a ledger whose closing is not its opening plus its debit and credit totals, as the `trial_balance` answer does: the row is shown as Tally sent it with the difference beside its closing (a `movements_differ_by` column in the workbook), and the same explanation the answer gives appears above the table and in the workbook. Such a row was seen on a Closing Stock ledger whose closing balance was keyed on Tally's screen; the screen and the workbook were tested on its captured answers and not opened in the running app. A read where every ledger adds up looks as before (#2132, part of #2068).
+
+**Safer or fixed**
+
+- On Windows, the boxes that ask a person to approve a post, to record a review, to release an invoice stop or to create a ledger are now opened system-modal, to keep each above Tally when the person clicks into Tally while it is open. When a box opened a few seconds after the person's last input to Tally, Windows had not kept it on top, and one click into a maximised Tally covered it until it was brought back from the taskbar; in one lab run on Windows 10, the post and ledger-create boxes, opened system-modal, stayed above Tally after that click, and Tally still took a click and a key while a box was open; the other two boxes were not shown on a screen. In that run the taskbar showed no task buttons while a box was open; the cause was not tested (#2161). Windows 11 was not run (part of #1780).
+- The approval and review boxes now show dates in Tally's day-month-year form with the year in full, for example `14-Sep-2026` and `Books from: 1-Apr-2026`, where they showed Tally's request form `20260914`. This applies to the one-voucher, invoice and batch approval texts, the one-voucher and batch review texts, and the box that asks to create a ledger, on Windows and macOS. Only the text a person reads changes: what is sent to Tally stays `YYYYMMDD`. Each date is up to three characters longer, so a text that sat exactly at a box's size limit before may now be shown as a batch's totals, or refused, as any text over the limit is (fixes #2101).
+- A native post whose recorded answer reported `STATUS` 0 no longer counts that answer's `CREATED` toward the voucher
+  mark it proved, so whichever of the company's posts is checked next, a mark read unchanged does not record a
+  rollback for it (#2035). After the update, a rollback record that read a mark at or above such a post's pre-POST
+  mark no longer covers it: the post no longer reads `book_rolled_back` because of that record; its batch no longer
+  carries `restored` where the `transfers` section or a `withdraw_skips` refusal names it, and a held row may name
+  another batch that holds it; and the post stays unverified, as an answer reporting `STATUS` 0 always leaves it. The
+  readback in that post's own `post_import` call still reads `book_rolled_back` when the mark falls between the one
+  read before the post and the one read just after it; that post's own floor then records no rollback, though another
+  native post of the company at that Tally address can still record one in the same call. The answers the tests use are
+  written by hand: no import answer with `STATUS` 0 and a `CREATED` count has been captured from a live Tally, and the
+  native posts measured answer with a `RESPONSE` root that reports no status, so this has not been seen on a live post.
+- Four checks that accepted any eight digits as a Tally date now refuse a value that names no calendar day (for example
+  `20251340` or `20250229`): a mirror batch's requested date range, which HSN item is in force on an invoice date,
+  whether a sales ledger's GST rate is in force on an invoice date, and a company context's from and to dates. Before,
+  such a value passed and, in the HSN and rate checks, could be chosen as the item or rate in force. A batch, an invoice
+  build or a parsed export that carried an impossible date is now refused where it was accepted. No captured answer
+  holds one, and whether Tally ever sends one in these fields is not measured; tested on invented facts (fixes #2009).
+- When `post_import` or `verify_import` cannot confirm a post because the company's voucher mark moved by another amount than the
+  post created, or the post's span later held another number of vouchers, the post's summary now also says what was
+  observed and what can cause it (for example a GST return exported from Tally, an edit of one of the vouchers, or another
+  user's entry), and that ComplyEaze Bridge sent the post once and Tally reported creating each voucher once. That sentence is shown only
+  for those two refusals, never for an answer that reported `STATUS` 0 or whose counters were not clean. Measured on
+  TallyPrime 7.2, on one synthetic book each: two GSTR-1 JSON exports each raised the voucher mark by 3 without changing
+  a voucher, while one local GSTR-3B JSON export of one month left it unchanged (17 before and after) and moved no
+  voucher's alter id; a voucher saved by hand, once, inside a post's span made the mark move by 51 for 50 created, and the span
+  binding was refused. Nothing about how a post is proven changes (part of #1633).
+- The `outstandings` party detail (#1960) now reads the company's two change marks before the statement of open bills and again after
+  the voucher window, and refuses (`voucher_window_changed_during_read`, the same refusal and next step as every read
+  that brackets the book) when either moved; the voucher window no longer reads the marks a third time. Before, the statement, the ledger catalogue and the vouchers were tied by the
+  party's spelling with nothing checking that the book was the same between them, so a ledger renamed in Tally between two of
+  those reads could answer as a finding (for example no bill for the party). It adds one marks read net (two, and the window reads none of its own), and any voucher or
+  master edit in Tally during the call refuses it; run the same request again once. A change that moves neither mark is not
+  seen. Measured: a rename moves the master mark and a voucher edit moves the voucher mark (TallyPrime 7.1 Silver, 21
+  Sep 2026), but one rename that changed only a ledger's letter case moved neither mark (one book), so that kind of
+  rename is still not caught; this read has not been run against Tally.
+- Under `mask_parties`, `ledger_masters` with `fields=compliance` now masks the flat `address` of a ledger
+  (and, from the same change, every mailing address line) like a party name: before, the flat address was
+  returned as Tally sent it under every redaction mode. An address Tally returned empty stays empty. The flat
+  PIN code and state, which every compliance read returns, and the mailing entry's PIN code, state and
+  country, which are returned only when the assistant asks for the mailing details, are still not masked
+  under any mode (#1490).
+- The `vouchers` snapshot shows `voucher_alter_id`, and the audit read's manifest `alter_voucher_id`, as null,
+  not 0, when Tally's answer carries no voucher mark, which it omits for a company that has never held a
+  voucher; `ledger_masters` already showed null for the same book. A mark Tally sends, 0 included, is shown as
+  sent. Every comparison of the marks still reads an absent voucher mark as 0, so no read or post decides
+  differently (fixes #1984).
+- A `trial_balance` row whose closing is not its opening plus its debit and credit totals (an empty amount counted as zero) now carries `movements_differ_by` (the exact difference), the first line counts such ledgers and a limitation explains, and the row is returned as Tally sent it. Seen on a Closing Stock ledger whose closing balance was keyed on Tally's screen: Tally kept the opening as the closing and showed the change only in the debit total, so the closing is not necessarily the figure its statements use. Every row of the committed captures adds up, so no other ledger is flagged; `profit_and_loss` and `balance_sheet` already refuse a read where a row does not add up, by the same check (part of #2068, #692).
+- When `profit_and_loss` or `balance_sheet` refuses because a Trial Balance row does not add up, the refusal now names
+  that row's ledger and its gap, says what to tell the user, and carries the evidence of the Trial Balance and statement
+  reads already made, not only the company read (#692).
+- `balance_sheet` and `profit_and_loss` now say when Tally's own Balance Sheet does not balance: on the one book
+  measured (a stock item's opening value edited, TallyPrime 7.2) the export left out the `Difference in opening
+  balances` line Tally's screen showed, so when its lines do not sum to zero the result carries
+  `tally_balance_sheet_sides` (the credit and debit totals), the first line gives both and nothing is established;
+  the new reason `tally_balance_sheet_does_not_balance` is given when no other reason applies (#2063).
+- A refused `trial_balance` read now carries a `cause` when the Trial Balance answer could not be used (the rule it failed, such as `trial_balance_source_identity_missing` or `trial_balance_amount_invalid`), where it gave the code `trial_balance_read_failed` alone. `profit_and_loss`, `balance_sheet` and `cash_flow` show the same `cause`, and no other reason or step changes. Every `trial_balance_read_failed` refusal that has no step of its own now carries one (a timeout, an HTTP error, an oversized answer or an unusable one): it tells the assistant to report what the cause says, or that the read failed when none is named, and not to repeat the same read in a loop. The refusals that have their own codes (before the books began, a period not honoured, Education mode, the base-currency codes) keep their own text and get no step from this. On the one book with foreign-currency vouchers measured (TallyPrime 7.2), the Trial Balance was refused with no cause before this change; a build with it, read in two sittings on 29 Oct 2026, refused with the cause `trial_balance_amount_invalid` and its next step. The later change that sets TallyPrime 7.2's composite layout aside clears that cause on the book's captured answer; it has not been read on that book through the tool. A failure in the totals after the parse still names no cause (part of #2071, part of #683).
+- When a read of the company's ledgers (the compliance read of `ledger_masters`, the sales and purchase registers, or the invoice import's admission) is refused because Tally wrote a ledger's foreign-currency balance in a layout ComplyEaze Bridge does not recognise yet (`party_ledger_master_read_failed`, cause `native_foreign_currency_ledger_balance`), the refusal now says what to do: that the read is refused rather than guessed at (#683), that a retry refuses again, and to tell the user that this read cannot give the company's ledgers while Tally writes a balance that way. The refusal was seen in the lab on one TallyPrime 7.2 book, on a build without this next step; that book's layout (no space after the foreign currency symbol) is now recognised and set aside by name like the 7.1 layout, from its captured answers, not from a read through the tool. What still refuses is a layout no capture shows, such as a rate with decimals; the next step has not been seen on a live refusal (part of #2071). No request changed.
+- A ledger balance that TallyPrime 7.2 writes as a foreign-currency composite with no space after the foreign symbol is now set aside by name, as the 7.1 layout is, instead of refusing the whole read. This applies to the compliance read of `ledger_masters`, the sales and purchase registers and the invoice import's admission (which read the same ledger source), to `trial_balance` on a book with several Currency masters, where such a ledger was named as left out only for the 7.1 layout, and to `outstandings`, where on a book with several Currency masters a party whose balance is in that layout leaves every figure and is named in `mixed_currency_ledgers_excluded`, so the result is partial, as it is for the 7.1 layout (on a book with one Currency master the read refuses, as before). A voucher entry in that layout is still refused, as no 7.2 voucher answer has been captured. On the lab book the `trial_balance` parse that refused with `trial_balance_amount_invalid` now returns the plain rupee ledgers and names the four it sets aside; none of `trial_balance`, `outstandings` and `ledger_masters` has been read on that book through the tool with this change (part of #683). No request changed.
+- When a request of Tally's Bills Receivable or Payable report takes longer than the 20-second limit, `outstandings` is now refused with its own cause, `native_bills_report_deadline_exceeded`, in place of `request_deadline_exceeded`. Its next step now also says that Tally can go on building the report after the limit, so the next read of that company should wait until `tally_status` answers. Another request of the same read cut at the limit (the groups, the ledgers, the company checks) keeps `request_deadline_exceeded` and no longer gets the Bills report's next step. A call the host withdraws while the read runs now finishes the request in flight and sends nothing more to Tally. The cause was tested with a simulated Tally, and a withdrawn call was not run against a live TallyPrime (part of #2119).
+- When the `outstandings` read of Tally's Bills Receivable or Payable report is refused because one of its requests took longer than the
+  20-second limit, the refusal now names a next step from what was measured on one synthetic book of about 30,000 vouchers: about 15,000
+  open bills answered and about 22,500 and 29,900 did not, and an earlier `as_of` with fewer bills open answered there, which on
+  another book depends on the bills open then (#2119). A party detail refused by a step after its
+  party was read by its ledger (the closing marks read, a book that moved, or the detail's checks) now says so in `window_scope`, and the
+  next step for `party_ledger_row_without_line` says that only a bill trail can be narrowed by a `reference` (part of #1356).
+- When `ledger_movement` reads a ledger by its own vouchers and Tally returns a voucher with no line on that ledger, the refusal now names a next step: the figure was not released, the call is not repeated in a loop, and where Tally is not in Education mode `trial_balance` gives that ledger's opening, debit, credit and closing for the dates. When the read falls back to the whole book after a ledger-scoped attempt was sent and given up, a result that carries a `read_cost` says in `window_scope` that the block leaves that attempt out. No request changed (part of #485).
+- When `ledger_movement` reads the whole book's vouchers for a ledger instead of the ledger's own (a name the scoped read does not send, a name holding a word Tally's formulas read as an operator, a day too heavy for one scoped read, or a scoped read that found nothing) and that read is then refused, the refusal now carries `window_scope` with the reason and its own sentence (no figure was taken). Only a refusal of that read is marked; an argument or catalogue refusal is not. No request changed (part of #485).
+- A `parent` that is Tally's root is now `&#4; Primary`, the text Tally sends, in the `masters` rows (cost centres, godowns, stock groups, groups), the `stock_summary` items, the `ledger_masters`, `ledger_movement`, `gst_by_ledger` and `trial_balance` rows (the Profit & Loss A/c ledger). It was a replacement character followed by `#4; Primary`, which read as a corrupted string. A group a user named Primary is still written plain, so the two stay apart, and `gst_by_ledger` no longer masks the root under `mask_parties`. The working form that the readers compare is untouched (fixes #2070).
+- A folded twin's `parent` in an import report's `live_ledgers` is now `&#4; Primary` when it is Tally's root, the text Tally sends, where it was a replacement character followed by `#4; Primary`; a group a user named Primary is still written plain. The `vouchers` summary's `Primary` bucket label is unchanged: it is a label for the root's bucket, kept apart from a user group by the bucket's own key (part of #2070).
+
+**What works differently**
+
+- A skipped bank-statement row that no statement carries is now `tally_unchecked`, not `not_found`, in the `transfers`
+  section of a build and of a verification. `not_found` said the other account's Contra does not exist, but ComplyEaze
+  Bridge reads only the statements it built and verified: a Contra entered in Tally another way is not in its records.
+  `not_found` is now said only after a read of every voucher of the row's date in Tally finds no Contra between the two
+  accounts, and no such read exists yet, so every row that read `not_found` reads `tally_unchecked`. Its next step
+  tells the assistant to read that date's vouchers with `vouchers`, to look for a voucher of the Contra voucher class,
+  or of any other type such as a Journal or Payment, that carries the row's amount on the bank ledger the other
+  account's statement was built for, to tell the person what it found and to keep the skip; a voucher dated another
+  day or booked against another ledger is not looked for, a transfer may print on different days, and a skip is
+  withdrawn (`withdraw_skips`), on one side only, solely when the person confirms that no entry in Tally carries the
+  transfer. Reading a day sends its vouchers to the AI provider: `mask_parties` shortens party and ledger names,
+  `drop_narration` drops narrations, and neither hides amounts. A row the other account's statements do not cover stays `not_established`. Tested on invented
+  facts. No tool makes the whole-day read yet, and it has not run against a live TallyPrime. The requests it would send were run
+  by hand on TallyPrime 7.2 against one synthetic book (four days, 3 to 6 April 2026): each day's two censuses were
+  byte-identical and agreed with the vouchers answer, which held the book's five Contras and none on 6 April (part of
+  #1392).
+- The `post_import` tool text no longer tells the assistant that a row of a batch Tally rejected, or a genuinely
+  different transaction that shares a voucher's fingerprint, is entered in Tally by hand. Like the refusals' own
+  next steps, it now says that ComplyEaze Bridge cannot post that row yet and to tell the user so (#1709).
+- The desktop Journal review no longer answers a Journal too large for it by pointing to the manual workflow. It now
+  says that ComplyEaze Bridge cannot post that Journal from the review and names the next step. When the review itself
+  is too large, that is to ask the assistant to build it again with a shorter narration, or to decide whether to split
+  it into smaller Journals, each built as its own batch; when the Journal's file is larger than the review reads, a
+  shorter narration cannot help, so it says only to split it (#1709).
+- The tax-audit financial statements limitation about closing stock on books not integrated with inventory no longer calls the Stock-in-Hand ledger value "manually-entered"; it describes the balance the client recorded in the books, and its meaning is unchanged (#1709).
+- The voucher-type masters read's note on how `sub_method` was measured now says a voucher was entered "on Tally's voucher screen" where it said "by hand"; the note only describes how the reading was taken, and its meaning is unchanged (#1709).
+- The `held_elsewhere` step of the transfer section now names both outcomes of sending the batch that holds a
+  skipped row: once the skip is live, `post_import` refuses that send as `skip_row_paired_elsewhere`, and a skip
+  that was only built still lets it through, which leaves the row `posted_against_skip` once found posted (#1988).
+- The `vouchers` tool description and the agent guide say that a row's `party` is Tally's own
+  `PARTYLEDGERNAME`, which on a Receipt, Payment or Contra can name the bank or cash ledger rather than the
+  counterparty, and that the counterparty of those vouchers is read from `amounts`. The parse is unchanged
+  (fixes #1986).
+- The text about cost-centre allocations in voucher reads that 0.6.1 shipped is corrected in three places. The vouchers tool no longer says
+  that each category restates the entry's full amount and that summing rows across categories double-counts: that was not measured (only one
+  category had been captured then), so it now says the rows are not checked against the entry and not to add rows across categories,
+  each category's rows having added up to the whole entry on the one book since measured with two categories on one entry. The privacy page no longer says that an allocation in a shape the read does not recognise is not sent and not flagged: it
+  is flagged (`cost_centre_allocation_shape_unrecognised`), and the tool text, the guide and the protocol reference now list all eleven
+  reasons an entry's list can be unreadable. On an item invoice the sales or purchase ledger's entry carries the goods line: an allocation list
+  beside the goods line is read like any other and one inside it is flagged; no captured item invoice carries allocations. No request and no
+  answer changed (part of #1231).
+- The `validate_masters` description and the voucher schema's ledger field now say what the alias work already
+  returns: a `missing` or `near_miss` name that is exactly one ledger's alias carries `alias_of` and is still not
+  bound, and the twin check counts aliases, naming `through_alias` (#1688).
+- `negative_stock` now says which sign a value carries when it is present: the export's, as in the Stock Summary and the trial balance, where a debit is negative and a credit positive (the screen shows a credit as `(-)`). On the one book measured, the item at -3 Nos and a rate of 120.00 was exported with the value `360.00` on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed `(-)360.00`; the other two short items captured had no value. The sentence is in the tool text and is the second of the result's limitations; no value changes (fixes #2051, part of #1358).
+- Reading the mailing details makes the answer larger, and the read is sized for it (#1490). In the one capture (12 Oct
+  2026, TallyPrime 7.1 Silver, eight ledgers) the answer grew from 19,094 to 20,896 bytes: 948 bytes for the one party that
+  held a mailing entry and 122 bytes for each of the seven rows that carried an empty placeholder. With
+  `include_mailing_details` the read is sized at 5,000 bytes a ledger instead of 3,750, above the largest row measured (4,902
+  bytes: that party with a second dated entry, TallyPrime 7.2); it is marked unverified in the source and not measured on a
+  book of many populated parties, so a large book may be read in more parts, or refused, sooner, and a party with three
+  entries or long address lines can still be larger than the figure. A dense book reads about 950 bytes more for each party that holds an address; how
+  that compares with the 20-second read deadline is not measured.
+- The README now says what `egress_log` returns when its answer is trimmed for size: it names its order (`result.order`), counts the receipts cut for size in `result.omitted_for_size` and says they cannot be reached by this tool, and its evidence response digest hashes every receipt line the call read, which on a trimmed answer is more than the lines returned. A test pins the digest on a trimmed answer. No request or answer changed (part of #2125).
+
+**What has been run against a live TallyPrime, and what has not**
+
+- Ledger create (#690): created and read back as `posted_verified` once through the tools on a synthetic company (TallyPrime 7.1 Silver, 14 Oct 2026); the approval box shown whole, declined, accepted and answered from the journal once on a CI package of the change (TallyPrime 7.2, 28 Oct 2026). On the build of this release: <the masters row of the release-candidate sitting, to fill at the cut>. A create whose answer is lost (#2003) is not run.
+- The approval boxes opened system-modal (#1780): one lab run on Windows 10 on a CI build of the change; the post and ledger-create boxes stayed above Tally after a click into Tally. Windows 11 and the review and release boxes on a screen were not run.
+- `stock_summary` at month ends (#1233): two synthetic books on TallyPrime 7.2, one sitting each; items inside stock groups on one book with groups three deep.
+- A Trial Balance row that does not add up (#2068, #692): seen on a master build's Windows package on two synthetic books (TallyPrime 7.2, 29 Oct 2026): only the Closing Stock ledger was flagged, and the statements refused naming it and its gap. One sitting per book.
+- Refusal causes on a book with foreign-currency vouchers (#2071): the Trial Balance cause and next step were seen in two sittings on TallyPrime 7.2; the 7.2 composite layout set aside by name (#683) is read from the captured answers only, not through the tools.
+- The Bills report refusal past the 20-second limit (#2119): measured on one synthetic book of about 30,000 vouchers; the new cause was tested with a simulated Tally.
+- `vouchers` with `bank_allocations`, `goods_lines` and `summarise_by: cost_centre` (#1231, #2015): measured on saved raw answers of synthetic books; the cost-centre summary through the tool: <the release-candidate row, to fill at the cut>.
+- A ledger asked for by its alias (#1688): <the release-candidate row, to fill at the cut>.
+- Not run on a live TallyPrime for this build, with only captures or tests behind them: a post answer reporting `STATUS` 0 (#2035), an impossible calendar date (#2009), the `outstandings` party detail of a book that moved during the read (#1960), the desktop Trial Balance screen and workbook (#2132), a withdrawn `outstandings` call (#2119).
+
+**Live pass of writes:** <the live write pass of the release-candidate sitting, to fill at the cut: build, company, date and what each check showed>.
+
+**Known limits**
+
+- **Not run on a live TallyPrime for this build (unless the lines above say otherwise):** anything that writes to Tally other than the rows of the live pass of writes and the masters row, Gold, macOS, other TallyPrime releases than 7.1 and 7.2 Silver, a book of about 30,000 vouchers for posting (#1029), and the Microsoft Store install of Claude Desktop (#1584, #1459).
+- **Ledger create** makes one ledger at a time and alters none (#690). A create that Tally runs after Bridge stopped waiting is possible: in the lab Tally ran every abandoned create it was sent (#1713), so a create with no answer is never sent again.
+- **Foreign-currency books:** no read reports a foreign-currency amount; each sets such a ledger aside by name or refuses (#683).
+- **`stock_summary`** still refuses a book whose master mark is above 874, however few stock items it holds (#1233), and dates other than a month's last day.
+- **`outstandings` at a year end on a dense book:** the Bills report can take longer than the 20-second limit; the read is refused with its own cause and next step, and no figure is released (#2119).
+- **On Windows, while an approval box is open,** the taskbar may show no task buttons (#2161). The macOS alert is unchanged (#1780).
+- **The whole-day read for a skipped transfer row** is not called by any tool yet, so no row reads `not_found` (#1392).
+- **The file tested is not the file that will be tagged.** Each live row names the build it ran on; the published file is built again by the release workflow and checked after publication against the release's checksum, with no write.
+- What has been run against a real TallyPrime is listed in the README.
+
 ## [0.6.1] - 2026-10-27
 
 ### In plain words: ComplyEaze Bridge 0.6.1, since 0.6.0 (16 Oct 2026)

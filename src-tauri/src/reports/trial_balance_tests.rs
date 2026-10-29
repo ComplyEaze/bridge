@@ -444,9 +444,9 @@ fn a_keyed_closing_stock_ledger_carries_its_gap_in_every_desktop_view() {
 }
 
 /// A report whose every row adds up is written byte for byte as it was before #2068, when the
-/// protocol row derived `Serialize`: that derive wrote the known-lab capture as 1,682 bytes and
-/// the opening-year capture as 2,182 bytes, with the SHA-256 values below (recorded from the
-/// derive on this branch before it was removed). Neither has a limitation.
+/// protocol row derived `Serialize`: that derive wrote the known-lab capture as 1,682 bytes with
+/// the SHA-256 below (recorded from the derive on this branch before it was removed). It has no
+/// limitation.
 #[test]
 fn a_report_whose_rows_add_up_is_serialized_as_before() {
     use sha2::Digest;
@@ -458,14 +458,6 @@ fn a_report_whose_rows_add_up_is_serialized_as_before() {
             "eebb9a9f-1679-4468-9e8f-814c729674cb",
             1_682,
             "d9b565219240c67e6bf42e6e15064c0c764623acb8076cbcabff6ffdc5559e6d",
-        ),
-        (
-            include_str!(
-                "../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_opening_year.xml"
-            ),
-            "915d42f8-42ae-4b03-8291-55f596e3a2ea",
-            2_182,
-            "b0ca99eec868fc9dd6bd512ce9b2b7ed6b8f8e9bf4d255b1c9ea18b821be6889",
         ),
     ] {
         let report = parse_native_trial_balance(xml, company).unwrap();

@@ -10,6 +10,7 @@ use crate::gst_details::{
     GstDetailsObservation, RawGstDetailsEntry, RawGstRateDetails, RawGstStateDetails,
 };
 use crate::gst_registration::{GstRegistrationHistory, RawGstRegistrationEntry};
+use crate::mailing_details::{MailingDetailsHistory, RawMailingDetailsEntry};
 use crate::{
     attr_value, configured_reader, native_ledger_guid_has_company_prefix,
     normalized_standard_company_guid, path_eq, pop_expected_path, read_identifier_text,
@@ -55,6 +56,13 @@ pub struct PartyLedgerMasterFields {
     /// returns it.
     #[serde(default)]
     pub gst_details: GstDetailsObservation,
+    /// The dated mailing details (`LEDMAILINGDETAILS.LIST`): address lines,
+    /// PIN code, state and country (bridge#1490). Tally keeps these here while
+    /// the flat `address`, `pin_code`, `gst_pin_code` and `state` fields can
+    /// come back empty or absent. Not observed when the response carries no
+    /// such element.
+    #[serde(default)]
+    pub mailing_details: MailingDetailsHistory,
 }
 
 /// The GST duty-head classification observed on one ledger master.
@@ -616,6 +624,8 @@ fn parse_native_ledger_collection_row_with_master_fields(
     let mut gst_registrations: Option<Vec<RawGstRegistrationEntry>> = None;
     // Likewise `None` until a `GSTDETAILS.LIST` element appears.
     let mut gst_details: Option<Vec<RawGstDetailsEntry>> = None;
+    // Likewise `None` until a `LEDMAILINGDETAILS.LIST` element appears.
+    let mut mailing_details: Option<Vec<RawMailingDetailsEntry>> = None;
     loop {
         match reader.read_event()? {
             Event::Start(child) => match child
@@ -826,6 +836,10 @@ fn parse_native_ledger_collection_row_with_master_fields(
                     let entry = read_gst_registration_entry(reader, &child)?;
                     gst_registrations.get_or_insert_with(Vec::new).push(entry);
                 }
+                b"LEDMAILINGDETAILS.LIST" if retain_master_fields => {
+                    let entry = read_mailing_details_entry(reader, &child)?;
+                    mailing_details.get_or_insert_with(Vec::new).push(entry);
+                }
                 b"GSTDETAILS.LIST" if retain_master_fields => {
                     let entry = read_gst_details_entry(reader, &child)?;
                     gst_details.get_or_insert_with(Vec::new).push(entry);
@@ -854,6 +868,13 @@ fn parse_native_ledger_collection_row_with_master_fields(
                         gst_registrations
                             .get_or_insert_with(Vec::new)
                             .push(RawGstRegistrationEntry::default());
+                    }
+                }
+                b"LEDMAILINGDETAILS.LIST" => {
+                    if retain_master_fields {
+                        mailing_details
+                            .get_or_insert_with(Vec::new)
+                            .push(RawMailingDetailsEntry::default());
                     }
                 }
                 b"PARENT" => {
@@ -1010,6 +1031,9 @@ fn parse_native_ledger_collection_row_with_master_fields(
     if let Some(raw) = gst_details {
         master_fields.gst_details = GstDetailsObservation::from_raw(raw);
     }
+    if let Some(raw) = mailing_details {
+        master_fields.mailing_details = MailingDetailsHistory::from_raw(raw);
+    }
     Ok(ParsedNativeLedgerCollectionRow {
         ledger,
         fields: master_fields,
@@ -1070,6 +1094,141 @@ fn read_gst_registration_entry(
         }
     }
     Ok(entry)
+}
+
+/// One `LEDMAILINGDETAILS.LIST` element: its date, name, address lines, state,
+/// country and PIN code. Text is read as every sibling master field is (trimmed;
+/// empty is absent). `ADDRESS` lines are kept in document order and a blank one
+/// is dropped. Other children, and text, are consumed and not kept: they count as
+/// content and set `other_content_skipped`.
+fn read_mailing_details_entry(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> anyhow::Result<RawMailingDetailsEntry> {
+    let list_name = element.name().as_ref().as_bytes().to_vec();
+    let mut entry = RawMailingDetailsEntry::default();
+    // Which single fields (and `ADDRESS.LIST`) were seen, empty or not: a
+    // second sighting is a repeat even when the first carried no text.
+    let mut seen = [false; 6];
+    let field_index = |name: &[u8]| match name.to_ascii_uppercase().as_slice() {
+        b"APPLICABLEFROM" => Some(0),
+        b"MAILINGNAME" => Some(1),
+        b"STATE" => Some(2),
+        b"COUNTRY" => Some(3),
+        b"PINCODE" => Some(4),
+        b"ADDRESS.LIST" => Some(5),
+        _ => None,
+    };
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) => {
+                entry.has_content = true;
+                match field_index(child.name().as_ref().as_bytes()) {
+                    Some(index) => {
+                        let repeated = std::mem::replace(&mut seen[index], true);
+                        if index == 5 {
+                            let (lines, skipped) = read_mailing_address_lines(reader, &child)?;
+                            entry.other_content_skipped |= skipped;
+                            if repeated {
+                                entry.repeated_field = true;
+                            } else {
+                                entry.address_lines = lines;
+                            }
+                        } else {
+                            let value = read_mailing_scalar(reader, child.name())?;
+                            if repeated {
+                                // A defect of this ledger's history, not of the read.
+                                entry.repeated_field = true;
+                            } else {
+                                *[
+                                    &mut entry.applicable_from,
+                                    &mut entry.mailing_name,
+                                    &mut entry.state,
+                                    &mut entry.country,
+                                    &mut entry.pin_code,
+                                ][index] = value;
+                            }
+                        }
+                    }
+                    None => {
+                        entry.other_content_skipped = true;
+                        let child_name = child.name().as_ref().to_owned();
+                        reader.read_to_end(QName(&child_name).to_owned())?;
+                    }
+                }
+            }
+            Event::Empty(child) => {
+                entry.has_content = true;
+                if let Some(index) = field_index(child.name().as_ref().as_bytes()) {
+                    if std::mem::replace(&mut seen[index], true) {
+                        entry.repeated_field = true;
+                    }
+                }
+            }
+            Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
+            Event::Eof => return Err(crate::RowCutOff.into()),
+            // Text, a reference or CDATA directly in the list is content the parser does not
+            // read: it is flagged, so a list holding only that is not taken for a placeholder.
+            Event::Text(text) if !text.trim().is_empty() => {
+                entry.has_content = true;
+                entry.other_content_skipped = true;
+            }
+            Event::GeneralRef(_) | Event::CData(_) => {
+                entry.has_content = true;
+                entry.other_content_skipped = true;
+            }
+            _ => {}
+        }
+    }
+    Ok(entry)
+}
+
+/// One mailing scalar's text, trimmed, empty as absent, as the sibling master
+/// fields read theirs; markup nested inside it fails the whole read instead of
+/// becoming part of an address line (`read_optional_text` would keep it as text).
+fn read_mailing_scalar(
+    reader: &mut Reader<&[u8]>,
+    name: QName<'_>,
+) -> anyhow::Result<Option<String>> {
+    let text = read_verbatim_text(reader, name)?;
+    let trimmed = text.trim();
+    Ok((!trimmed.is_empty()).then(|| trimmed.to_owned()))
+}
+
+/// The `ADDRESS` lines of one `ADDRESS.LIST`, in document order, and whether
+/// anything else was in it. A blank line is dropped; any other child, and any
+/// text directly in the list, is consumed and not kept (the flag is true).
+fn read_mailing_address_lines(
+    reader: &mut Reader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> anyhow::Result<(Vec<String>, bool)> {
+    let list_name = element.name().as_ref().as_bytes().to_vec();
+    let mut lines = Vec::new();
+    let mut skipped = false;
+    loop {
+        match reader.read_event()? {
+            Event::Start(child) => {
+                if child
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(b"ADDRESS")
+                {
+                    lines.extend(read_mailing_scalar(reader, child.name())?);
+                } else {
+                    skipped = true;
+                    let child_name = child.name().as_ref().to_owned();
+                    reader.read_to_end(QName(&child_name).to_owned())?;
+                }
+            }
+            Event::End(end) if end.name().as_ref().as_bytes() == list_name.as_slice() => break,
+            Event::Eof => return Err(crate::RowCutOff.into()),
+            Event::Text(text) if !text.trim().is_empty() => skipped = true,
+            Event::GeneralRef(_) | Event::CData(_) => skipped = true,
+            _ => {}
+        }
+    }
+    Ok((lines, skipped))
 }
 
 /// One element's text exactly as sent: not trimmed, entity and numeric

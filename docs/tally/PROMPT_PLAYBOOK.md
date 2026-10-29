@@ -283,6 +283,9 @@ Implement:
 2. Build `bridge.tally.ledgers/2` the same way. Delete render_vouchers,
    render_ledgers, render_ledger_canary_readback and their report-shape
    parsers once the collection profiles pass. Net diff should be negative.
+   (Note, 2026-10-28, #1570: all three are deleted, render_vouchers by #1609,
+   render_ledgers by #2102, and render_ledger_canary_readback earlier by #860,
+   without `ledgers/2`; shipped reads use native shapes.)
 3. DATE SCOPING — this is the hardest part and it is a correctness gate.
    SVFROMDATE/SVTODATE do NOT filter a collection (§8.8); the company period
    governs and out-of-period objects are invisible. Use a collection

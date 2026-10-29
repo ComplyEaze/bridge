@@ -1502,7 +1502,7 @@ fn the_safety_sentences_a_tool_relies_on_stay_in_its_description() {
         .expect("extension description");
     for phrase in [
         "goes to your AI provider",
-        "can only shorten party and ledger names and bank account numbers or drop narrations",
+        "can only shorten party and ledger names, bank account numbers and ledger address lines, or drop narrations",
     ] {
         assert!(
             extension.contains(phrase),
@@ -1776,13 +1776,23 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// every conversation; raising a budget is argued in the pull request that
 /// needs it. Each must also stay under the control-message ceiling, or
 /// tools/list would answer `agent_response_too_large` and leave the server
-/// without tools. Each was set to its list's size plus the margin the full list
-/// then had under its single budget (18,752 bytes), rounded up to a thousand:
-/// none was raised, and each keeps at least that margin. The master-writes list
-/// has a budget of its own: the two ledger tools add about 4,700 bytes to the
-/// full list, so its budget is the full list's plus the margin the full list now
-/// has under its own (about 4,000 bytes), rounded up to a thousand.
-const TOOL_LIST_BUDGETS: [usize; 4] = [200_000, 223_000, 225_000, 230_000];
+/// without tools. Each was first set to its list's size plus the margin the full
+/// list then had under its single budget (18,752 bytes), rounded up to a thousand.
+/// That rule no longer describes the budgets: the master-writes list got a budget
+/// of its own (the two ledger tools add about 4,700 bytes to the full list), and
+/// later changes used the margins up (on master of 28 Oct 2026 they were 2,569,
+/// 545, 47 and 322 bytes). Six open pull requests then added description text
+/// together: the goods lines of invoice vouchers (#2038, +2,043 bytes in every
+/// list), the Balance Sheet text (#2067, +740), the reserved-root parent text
+/// (#2076, +374; #2081 repeats it), the text of the review of a native post
+/// matched by content (#2082, +126 in the extension default and +937 in the other
+/// lists) and the Trial Balance closing-value text (#2089, +428). Master with all
+/// of them merged together measures 201,142, 226,977, 229,475 and 234,200 bytes.
+/// On 28 Oct 2026 every budget was set once to that measured size plus at least
+/// 500 bytes, rounded up to a thousand, so that the six do not each need a raise.
+/// A budget is a ceiling, not a size: the lists grow only as changes merge, and
+/// the next change that needs more says so in its own pull request.
+const TOOL_LIST_BUDGETS: [usize; 4] = [202_000, 228_000, 230_000, 235_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

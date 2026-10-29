@@ -577,7 +577,10 @@ fn render_review_text(
             .map(quoted)
             .unwrap_or_else(|| "voucher".into()),
         quoted(company_name),
-        quoted(row.date.as_str()),
+        // A date read from Tally shows in Tally's day-month-year form (#2101); one that is
+        // not a date stays quoted, like every other value read from Tally.
+        bridge_tally_core::TallyDate::parse(row.date.as_str())
+            .map_or_else(|_| quoted(row.date.as_str()), |date| date.shown()),
         shown(&row.voucher_number),
         row.alter_id.map(|id| id.to_string()).unwrap_or_else(|| "(none)".into()),
         batch_id,
@@ -728,8 +731,13 @@ fn batch_review_preview(
     text.push("Not shown here: narrations, voucher numbers and types.".into());
     text.push(format!(
         "Dates: {} to {}  ALTERIDs: {} to {}",
-        dates.clone().min().unwrap_or("(none)"),
-        dates.max().unwrap_or("(none)"),
+        dates
+            .clone()
+            .min()
+            .map_or_else(|| "(none)".into(), post::shown_date),
+        dates
+            .max()
+            .map_or_else(|| "(none)".into(), post::shown_date),
         alter_ids
             .clone()
             .min()

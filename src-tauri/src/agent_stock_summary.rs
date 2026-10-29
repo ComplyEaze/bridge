@@ -379,12 +379,12 @@ fn inventory_basis(integrated: NativeFlag) -> String {
 fn stock_row(item: &NativeStockItem) -> Value {
     let mut row = json!(item);
     mark_party_field(&mut row, "name");
-    if item
-        .parent
-        .as_deref()
-        .is_some_and(|parent| !bridge_tally_protocol::is_tally_reserved_root(parent))
-    {
-        mark_party_field(&mut row, "parent");
+    match item.parent.as_deref() {
+        Some(parent) if bridge_tally_protocol::is_tally_reserved_root(parent) => {
+            row["parent"] = json!(bridge_tally_protocol::tally_root_as_sent(parent));
+        }
+        Some(_) => mark_party_field(&mut row, "parent"),
+        None => {}
     }
     row
 }
@@ -421,7 +421,7 @@ fn stock_frame(
             ONE_PERIOD_MEASURED,
             "A company split by year, whose sibling companies share its GUID, is refused (`company_flags_not_one_row`)",
             "Small books only: a book whose master-alteration mark is over the admitted size is refused before any item is read",
-            "Under mask_parties an item's `name` and `parent` are masked, because stock-item and stock-group names are free text that can carry a customer's or supplier's name; Tally's reserved root as a parent is left as it is, and `guid` is not masked",
+            "Under mask_parties an item's `name` and `parent` are masked, because stock-item and stock-group names are text a person types, which can carry a customer's or supplier's name; Tally's reserved root as a parent is shown as `&#4; Primary` and is not masked, and `guid` is not masked",
         ],
     })
 }

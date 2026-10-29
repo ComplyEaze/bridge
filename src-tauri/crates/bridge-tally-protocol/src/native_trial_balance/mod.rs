@@ -34,6 +34,58 @@ pub struct NativeTrialBalanceRow {
     pub closing: NativeTrialBalanceAmount,
 }
 
+/// Whether a row's closing is its opening plus its debit and credit totals (§5.6).
+///
+/// Tally holds a ledger's closing and its movements as separate fields, and on
+/// every captured Trial Balance they agree for every ledger but one kind: a
+/// Closing Stock ledger whose closing balance was keyed on Tally's screen keeps
+/// its opening as `TBALCLOSING` and shows the keyed change only in
+/// `DEBITTOTALS` (two synthetic TallyPrime 7.2 books, one integrated with
+/// inventory and one not). The row is reported as it was sent; this says only
+/// that its own columns do not add up.
+///
+/// An empty amount is taken as zero here, and only here and in the statements:
+/// the check can flag or refuse a read but never produces a figure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NativeTrialBalanceMovements {
+    Tie,
+    /// `closing - (opening + debit + credit)`, exactly, in Tally's sign, at the
+    /// largest number of decimal places among the row's amounts.
+    Differ(String),
+}
+
+impl NativeTrialBalanceRow {
+    pub fn movements(&self) -> NativeTrialBalanceMovements {
+        use bridge_tally_primitives::exact_arithmetic::ExactDecimalAccumulator;
+        let amounts = [&self.opening, &self.debit, &self.credit, &self.closing];
+        let mut gap = ExactDecimalAccumulator::default();
+        let mut places = 0;
+        for (index, amount) in amounts.into_iter().enumerate() {
+            if let NativeTrialBalanceAmount::Present(value) = amount {
+                places = places.max(value.as_str().split_once('.').map_or(0, |(_, f)| f.len()));
+                // The closing is added; the opening and both movements are taken off it.
+                if index == 3 {
+                    gap.add(value.as_str());
+                } else {
+                    gap.subtract(value.as_str());
+                }
+            }
+        }
+        if gap.is_zero() {
+            return NativeTrialBalanceMovements::Tie;
+        }
+        let mut text = gap.canonical_string();
+        let have = text.split_once('.').map_or(0, |(_, f)| f.len());
+        if have < places {
+            if have == 0 {
+                text.push('.');
+            }
+            text.push_str(&"0".repeat(places - have));
+        }
+        NativeTrialBalanceMovements::Differ(text)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeTrialBalance {
     pub rows: Vec<NativeTrialBalanceRow>,
@@ -57,6 +109,17 @@ pub enum NativeTrialBalanceError {
     InvalidAmount,
     InvalidResponse(&'static str),
     TallyReportedFailure,
+}
+
+impl NativeTrialBalanceError {
+    /// The reason a refusal names, as the other native reports' errors do.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::InvalidAmount => "trial_balance_amount_invalid",
+            Self::InvalidResponse(code) => code,
+            Self::TallyReportedFailure => "trial_balance_tally_reported_failure",
+        }
+    }
 }
 
 impl fmt::Display for NativeTrialBalanceError {

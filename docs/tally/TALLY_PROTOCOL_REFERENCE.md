@@ -156,9 +156,21 @@ base revision.
 <a id="82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book"></a>
 
 [8.2g Cost-centre allocations on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book)
+<a id="82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-28-tallyprime-72-two-synthetic-books"></a>
+
+[8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-28-tallyprime-72-two-synthetic-books)
+<a id="82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-12-tallyprime-71-one-synthetic-book"></a>
+
+[8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-28-tallyprime-72-two-synthetic-books)
+<a id="82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books"></a>
+
+[8.2i Goods lines on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books)
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
+<a id="84-a-partys-dated-mailing-details-are-in-ledmailingdetailslist-which-the-fetch-must-name--verified-2026-10-12-tallyprime-71-one-synthetic-book"></a>
+
+[8.4 A party's dated mailing details are in `LEDMAILINGDETAILS.LIST`, which the `FETCH` must name — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#84-a-partys-dated-mailing-details-are-in-ledmailingdetailslist-which-the-fetch-must-name--verified-2026-10-12-tallyprime-71-one-synthetic-book)
 <a id="9-writes-import"></a>
 
 [9. Writes (import)](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#9-writes-import)
@@ -360,6 +372,9 @@ base revision.
 <a id="11c5-live-evidence-2026-09-21"></a>
 
 [11c.5 Live evidence, 2026-09-21](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21)
+<a id="11c6-one-ledgers-vouchers-can-be-read-alone-with-the-same-spans--verified-once-2026-10-28-tallyprime-72-silver-one-synthetic-book"></a>
+
+[11c.6 One ledger's vouchers can be read alone, with the same spans — **VERIFIED once, 2026-10-28; TallyPrime 7.2 Silver, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c6-one-ledgers-vouchers-can-be-read-alone-with-the-same-spans--verified-once-2026-10-28-tallyprime-72-silver-one-synthetic-book)
 <a id="11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred"></a>
 
 [11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred)

@@ -1,0 +1,148 @@
+# fixture: voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml
+# parser: parse_agent_rows(SHAPE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(6),
+        "amounts": Array [
+            Object {
+                "amount": String("-3200.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Power Charges"),
+            },
+            Object {
+                "amount": String("3200.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Cash"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250424"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000006"),
+        "is_invoice": Bool(false),
+        "master_id": String("6"),
+        "narration": String("SHAPELAB-A-payment-cash"),
+        "optional": Bool(false),
+        "party": String("Cash"),
+        "post_dated": Bool(false),
+        "voucher_number": String("3"),
+        "voucher_type": String("Payment"),
+    },
+    Object {
+        "alter_id": Number(58),
+        "amounts": Array [
+            Object {
+                "amount": String("23600.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("23600.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Chem Supplier 2"),
+            },
+            Object {
+                "amount": String("-20000.00"),
+                "bill_allocations": Array [],
+                "goods_lines": Array [
+                    Object {
+                        "actual_quantity": Object {
+                            "state": String("value"),
+                            "value": String("666.667 Kgs"),
+                        },
+                        "amount": Object {
+                            "state": String("value"),
+                            "value": String("-20000.00"),
+                        },
+                        "batches": Array [
+                            Object {
+                                "actual_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("300.000 Kgs"),
+                                },
+                                "amount": Object {
+                                    "state": String("value"),
+                                    "value": String("-9000.00"),
+                                },
+                                "batch": Object {
+                                    "state": String("value"),
+                                    "value": String("H-2504-A"),
+                                },
+                                "billed_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("300.000 Kgs"),
+                                },
+                                "godown": Object {
+                                    "state": String("value"),
+                                    "value": String("Main Location"),
+                                },
+                            },
+                            Object {
+                                "actual_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("366.667 Kgs"),
+                                },
+                                "amount": Object {
+                                    "state": String("value"),
+                                    "value": String("-11000.00"),
+                                },
+                                "batch": Object {
+                                    "state": String("value"),
+                                    "value": String("H-2504-B"),
+                                },
+                                "billed_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("366.667 Kgs"),
+                                },
+                                "godown": Object {
+                                    "state": String("value"),
+                                    "value": String("Factory Floor"),
+                                },
+                            },
+                        ],
+                        "billed_quantity": Object {
+                            "state": String("value"),
+                            "value": String("666.667 Kgs"),
+                        },
+                        "rate": Object {
+                            "state": String("value"),
+                            "value": String("30.00/Kgs"),
+                        },
+                        "stock_item": String("Hydrochloric Acid 33pc"),
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Purchase - Local"),
+            },
+            Object {
+                "amount": String("-1800.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("CGST"),
+            },
+            Object {
+                "amount": String("-1800.00"),
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("State Tax"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250424"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000003a"),
+        "is_invoice": Bool(true),
+        "master_id": String("58"),
+        "narration": String("SHAPELAB-B6-two-batches"),
+        "optional": Bool(false),
+        "party": String("Chem Supplier 2"),
+        "post_dated": Bool(false),
+        "voucher_number": String("21"),
+        "voucher_type": String("Purchase"),
+    },
+])

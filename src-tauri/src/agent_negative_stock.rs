@@ -26,6 +26,13 @@ fn quantity_json(quantity: &NativeQuantityRead) -> Value {
     }
 }
 
+/// The sign a listed value carries (#2051). Measured on one synthetic book: the item at -3 Nos and
+/// a rate of 120.00 is exported with the value 360.00 on TallyPrime 7.1 and on 7.2, and Tally's
+/// Negative Stock screen showed (-)360.00 on 7.2 (the screen was not read on 7.1). Of the three
+/// short rows captured, this is the only one that carries a value. Protocol reference sections
+/// 12a.13 (the wire rule, and a sign that flips as an item trades) and 12a.16 (this measurement).
+const NEGATIVE_STOCK_VALUE_SIGN: &str = "When a value is present it keeps the sign Tally's export carries, as in the Stock Summary and the trial balance: a debit is negative and a credit is positive, and the screen shows a credit as (-) and a debit unsigned. On the one book measured, the item at -3 Nos and a rate of 120.00 was exported with the value 360.00, a credit, on TallyPrime 7.1 and on 7.2, and the 7.2 screen showed (-)360.00; the other two short items captured had no value. The sign of a value can change as an item trades (protocol reference sections 12a.13 and 12a.16)";
+
 impl Server {
     pub(super) async fn negative_stock(&self, args: &Value) -> Result<ToolOutcome, ToolFailure> {
         let guid = required_string(args, "company_guid")?;
@@ -79,6 +86,7 @@ impl Server {
             "verification": VERIFICATION,
             "limitations": [
                 "This is Tally's own Negative Stock list, returned as it is. Being listed is not a finding that the quantity is below zero: on one book Tally also listed items of positive quantity whose closing value was a credit, so read each item's quantity as printed. The rule by which Tally lists an item is not established and is not derived here",
+                NEGATIVE_STOCK_VALUE_SIGN,
                 "A rate or value Tally printed empty is returned empty and is not zero; on one book the rate and value were empty on an item listed for a window ending mid-year",
                 "On the one book read to a mid-year date the quantity was as at the window's end, not the book's end. Windows that do not start on 1 April, cross a financial year or end after 31 March were not measured",
                 "An empty answer is returned as not established and does not say that no item is negative: Tally's empty answer cannot be told from a report that was not rendered (on a book with stock items and none short it was an empty envelope)",

@@ -281,8 +281,8 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
     }
 }
 
-/// One table-driven check, across the app crate's two remaining request
-/// families (`tdl_engine` and `agent_read_profiles`'s windowed voucher
+/// One table-driven check, across the app crate's remaining request family
+/// that takes a company name (`agent_read_profiles`'s windowed voucher
 /// requests), that a company name carrying every reserved XML character
 /// round-trips through `escape_text` unchanged (bridge#832): the rendered
 /// request parses as well-formed XML and `SVCURRENTCOMPANY` decodes back to
@@ -290,17 +290,11 @@ fn decoded_svcurrentcompany(xml: &str) -> String {
 #[test]
 fn company_name_round_trips_through_xml_parsing_across_app_crate_renderer_families() {
     const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
-    let requests: Vec<(&str, String)> = vec![
-        (
-            "tally::tdl_engine::ledgers_request",
-            crate::tally::tdl_engine::ledgers_request(NAME),
-        ),
-        (
-            "agent_read_profiles::render_agent_vouchers",
-            render_agent_vouchers(NAME, &tally_date("20260901"), &tally_date("20260902"), None)
-                .expect("company name is a valid XML value"),
-        ),
-    ];
+    let requests: Vec<(&str, String)> = vec![(
+        "agent_read_profiles::render_agent_vouchers",
+        render_agent_vouchers(NAME, &tally_date("20260901"), &tally_date("20260902"), None)
+            .expect("company name is a valid XML value"),
+    )];
     for (label, request) in requests {
         assert_eq!(
             decoded_svcurrentcompany(&request),
@@ -799,6 +793,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "Supplier Two",
         "PAN Holder",
         "Entry Ledger",
+        "Mailing Firm",
         "Cost Centre One",
         "Cost Category One",
     ];
@@ -822,7 +817,7 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         ),
         (
             "ledger_masters",
-            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder"}))}]}),
+            json!({"items":[{"name":party_name("Customer One"),"compliance":mark_compliance_party_names(json!({"name_on_pan":"PAN Holder","bank_account_holder_name":"PAN Holder","bank_details":"PAN Holder","address":"Mailing Firm","mailing_details":{"observation":"entries","entries":[{"applicable_from":"20260401","mailing_name":"Mailing Firm","address_lines":["C/o Mailing Firm","1 Test Street"],"pin_code":"560001","state":"Karnataka","country":"India","other_content_skipped":false}]}}))}]}),
         ),
         (
             "ledger_movement",

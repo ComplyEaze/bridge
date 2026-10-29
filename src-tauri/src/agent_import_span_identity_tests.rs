@@ -709,6 +709,24 @@ fn sent_journals() -> Vec<ImportVoucher> {
     ]
 }
 
+/// #2062: the cancel candidate of each captured request (Payment, Receipt and
+/// Contra; Journal) is that request with only each voucher's `ACTION` changed.
+#[test]
+fn the_cancel_candidate_of_each_captured_request_changes_only_its_actions() {
+    let journal_ids = JOURNAL_IMPORT
+        .split("REMOTEID=\"")
+        .skip(1)
+        .map(|rest| Uuid::parse_str(&rest[..36]).unwrap())
+        .collect::<Vec<_>>();
+    for (vouchers, ids) in [
+        (sent(), captured_remote_ids()),
+        (sent_journals(), journal_ids),
+    ] {
+        let pairs = vouchers.iter().zip(ids).collect::<Vec<_>>();
+        super::super::cancel::tests::assert_cancel_changes_only_the_action(COMPANY, &pairs);
+    }
+}
+
 #[test]
 fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
     let ids = JOURNAL_IMPORT

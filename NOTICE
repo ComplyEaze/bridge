@@ -46,6 +46,60 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
+OpenSSL
+Copyright 1995-2026 The OpenSSL Project Authors
+
+Every build of Bridge for a target other than macOS compiles OpenSSL 3.6.3 from
+source and links it statically, because SQLCipher (above) uses it for its
+cryptography; the only non-macOS build Bridge ships is the Windows one. The
+source is the openssl-src crate, version 300.6.1+3.6.3. The macOS build uses
+SQLCipher's CommonCrypto provider and does not include OpenSSL. OpenSSL is
+distributed under the Apache License, Version 2.0, the same licence as Bridge;
+its text is in the LICENSE file of this distribution. The OpenSSL source has no
+NOTICE file of its own. Some files in its crypto, engines and include
+directories carry other licence terms in their own headers, which apply to those
+files as the headers state: alternative BSD-style licences (for example the
+directory sources crypto/LPdir_*.c, the X.509 sources crypto/x509/v3_pci.c and
+v3_pcia.c, and assembler sources for RISC-V and LoongArch), a 2-clause BSD
+licence stated by the SPARC T4 assembler sources, the CRYPTOGAMS licence under
+which Andy Polyakov's assembler modules (among them
+engines/asm/e_padlock-x86*.pl) are also available, and public-domain notices on
+some reference code. Read the file headers in the openssl-src crate for any one
+file. The source files of the OpenSSL library (crypto, ssl and providers) state
+the following copyright holders, in addition to The OpenSSL Project Authors:
+
+  Oracle and/or its affiliates (2002-2019)
+  Intel Corporation (2012-2025)
+  Siemens AG (2015-2022)
+  Nokia (2005-2020)
+  Cryptography Research, Inc. (2014-2016)
+  Ribose Inc. (2017)
+  IBM Corp. (2018-2025)
+  Google Inc. (2011)
+  Akamai Technologies (2004-2014)
+  CloudFlare, Inc. (2015)
+  Red Hat, Inc. (2019)
+  BaishanCloud (2017)
+  Cavium Networks Ltd. (2016)
+  NTT (Nippon Telegraph and Telephone Corporation) (2006)
+  KISA (Korea Information Security Agency) (2007)
+  National Security Research Institute (2017)
+  Kungliga Tekniska Högskolan (2004)
+  Network Resonance, Inc. (2006) and RTFM, Inc. (2011)
+  EdelKey Project (2004)
+  Richard Levitte (2004-2018)
+  Christoph Müllner (2023)
+  Jerry Shih (2023)
+  Phoebe Chen (2023)
+  Julian Zhu (2025)
+  Hongren (Zenithal) Zheng (2022)
+  Samuel Neves (2012)
+  Andy Polyakov (2008)
+  Jean-Philippe Aumasson (2012-2016)
+  Daniel J. Bernstein (2012-2014)
+  Patrick Powell (1995)
+
+-------------------------------------------------------------------------------
 PDFium
 Copyright 2014 The PDFium Authors
 

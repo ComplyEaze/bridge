@@ -206,6 +206,17 @@ fn party_name_value(value: String) -> Value {
     serde_json::to_value(party_name(value)).unwrap_or_default()
 }
 
+/// A row's `parent`, shown as Tally sent the root (`tally_root_as_sent`). Call it on the
+/// row an answer carries, never on one a later step reads back: some listings walk the
+/// group chain from the held row's parent, which must stay the decoders' form.
+fn show_root_parent(row: &mut Value) {
+    let Some(Value::String(parent)) = row.get("parent") else {
+        return;
+    };
+    let shown = bridge_tally_protocol::tally_root_as_sent(parent).into_owned();
+    row["parent"] = Value::String(shown);
+}
+
 fn mark_party_field(value: &mut Value, field: &str) {
     let Some(object) = value.as_object_mut() else {
         return;
@@ -216,9 +227,42 @@ fn mark_party_field(value: &mut Value, field: &str) {
     object.insert(field.to_string(), party_name_value(name));
 }
 
+/// Marks a text field only when it holds text: an address Tally returned empty
+/// stays empty, not "…".
+fn mark_party_field_if_text(value: &mut Value, field: &str) {
+    let has_text = value
+        .get(field)
+        .and_then(Value::as_str)
+        .is_some_and(|text| !text.is_empty());
+    if has_text {
+        mark_party_field(value, field);
+    }
+}
+
 fn mark_compliance_party_names(mut compliance: Value) -> Value {
     for field in ["name_on_pan", "bank_account_holder_name", "bank_details"] {
         mark_party_field(&mut compliance, field);
+    }
+    // The flat address and every mailing address line can repeat the party's
+    // name (a "C/o" or a firm name on its first line), so they are masked like
+    // the name (#1490). The PIN code, state and country stay readable.
+    mark_party_field_if_text(&mut compliance, "address");
+    // A mailing entry's `mailing_name` is the party's name as Tally prints it on its
+    // address block (#1490): masked like the row's own name, or it would carry it out.
+    if let Some(entries) = compliance
+        .pointer_mut("/mailing_details/entries")
+        .and_then(Value::as_array_mut)
+    {
+        for entry in entries {
+            mark_party_field(entry, "mailing_name");
+            if let Some(lines) = entry.get_mut("address_lines").and_then(Value::as_array_mut) {
+                for line in lines {
+                    if let Some(text) = line.as_str().filter(|text| !text.is_empty()) {
+                        *line = party_name_value(text.to_string());
+                    }
+                }
+            }
+        }
     }
     compliance
 }
@@ -238,6 +282,96 @@ fn mark_entry_party_names(entry: &mut Value) {
             mark_party_field(allocation, "category");
         }
     }
+    // A goods line's item, godown and batch, for the reason the masters tool masks item and
+    // godown names: a supplier-named item or a job-work godown can carry a party's name, and
+    // a batch name is whatever text was typed (#2015).
+    if let Some(lines) = entry.get_mut("goods_lines").and_then(Value::as_array_mut) {
+        for line in lines {
+            mark_party_field(line, "stock_item");
+            if let Some(batches) = line.get_mut("batches").and_then(Value::as_array_mut) {
+                for batch in batches {
+                    for field in ["godown", "batch"] {
+                        if let Some(state) = batch.get_mut(field) {
+                            mark_party_field(state, "value");
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Whether an answer that returns a voucher's entries shows their bank allocations (#1231).
+/// Only `vouchers` called with `bank_allocations: true` shows them; the parse always reads them,
+/// for the readers inside ComplyEaze Bridge that use them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BankAllocationsShown {
+    Withheld,
+    Shown,
+}
+
+impl BankAllocationsShown {
+    /// From the `bank_allocations` argument: absent or false withholds them.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "bank_allocations")? {
+            Some(true) => Self::Shown,
+            Some(false) | None => Self::Withheld,
+        })
+    }
+}
+
+/// An entry as an answer that did not ask for bank allocations shows it: without them.
+fn withhold_entry_bank_allocations(entry: &mut Value) {
+    if let Some(entry) = entry.as_object_mut() {
+        entry.remove("bank_allocations");
+        entry.remove("bank_allocations_unreadable");
+    }
+}
+
+/// A voucher's entries without their bank allocations, unless `shown` asks for them.
+fn present_voucher_bank_allocations(mut voucher: Value, shown: BankAllocationsShown) -> Value {
+    if shown == BankAllocationsShown::Withheld {
+        if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
+            entries.iter_mut().for_each(withhold_entry_bank_allocations);
+        }
+    }
+    voucher
+}
+
+/// Whether an answer that returns a voucher's entries shows their goods lines (#2015).
+/// Only `vouchers` called with `goods_lines: true` shows them; the parse always reads them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum GoodsLinesShown {
+    Withheld,
+    Shown,
+}
+
+impl GoodsLinesShown {
+    /// From the `goods_lines` argument: absent or false withholds them.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "goods_lines")? {
+            Some(true) => Self::Shown,
+            Some(false) | None => Self::Withheld,
+        })
+    }
+}
+
+/// An entry as an answer that did not ask for goods lines shows it: without them.
+fn withhold_entry_goods_lines(entry: &mut Value) {
+    if let Some(entry) = entry.as_object_mut() {
+        entry.remove("goods_lines");
+        entry.remove("goods_lines_unreadable");
+    }
+}
+
+/// A voucher's entries without their goods lines, unless `shown` asks for them.
+fn present_voucher_goods_lines(mut voucher: Value, shown: GoodsLinesShown) -> Value {
+    if shown == GoodsLinesShown::Withheld {
+        if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
+            entries.iter_mut().for_each(withhold_entry_goods_lines);
+        }
+    }
+    voucher
 }
 
 fn mark_voucher_party_names(mut voucher: Value) -> Value {
@@ -679,6 +813,29 @@ struct ReadDetail {
     /// The ledger a group summary could not place (#1230). Shown as a party name, so `mask_parties`
     /// masks it; a group is never named (its name is in the book's groups, and only the ledger is known).
     unplaced_ledger: Option<String>,
+    /// What a party detail's refusal says about the read by the party's ledger (#1356).
+    window_scope: Option<ScopeReport>,
+}
+
+/// See [`ReadDetail::window_scope`]: whether the refusal is that of the read by the party's ledger
+/// (`ledger_scoped`) or the company window's, which stands (`whole_book`), why, and a fixed
+/// sentence. Codes and fixed text only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct ScopeReport {
+    pub(super) basis: &'static str,
+    pub(super) reason: Option<&'static str>,
+    pub(super) note: &'static str,
+}
+
+impl ScopeReport {
+    /// As the result or a refusal carries it: `reason` only when there is one.
+    pub(super) fn json(self) -> Value {
+        let mut value = json!({"basis": self.basis, "note": self.note});
+        if let Some(reason) = self.reason {
+            value["reason"] = json!(reason);
+        }
+        value
+    }
 }
 
 /// See [`ReadDetail::bill_row`].
@@ -700,6 +857,19 @@ impl ToolFailure {
             .get_or_insert_with(Box::default)
             .planned_reads = Some(reads);
         self
+    }
+
+    fn with_window_scope(mut self, report: ScopeReport) -> Self {
+        self.read_detail
+            .get_or_insert_with(Box::default)
+            .window_scope = Some(report);
+        self
+    }
+
+    /// The scope a refusal reports, when it reports one.
+    #[cfg(test)]
+    fn window_scope(&self) -> Option<ScopeReport> {
+        self.read_detail.as_ref()?.window_scope
     }
 
     fn with_incomplete_read(mut self, read: IncompleteRead) -> Self {
@@ -1005,6 +1175,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(negative_ledgers.code());
         }
+        if let Some(trial_balance) = cause
+            .downcast_ref::<bridge_tally_protocol::native_trial_balance::NativeTrialBalanceError>()
+        {
+            return Some(trial_balance.code());
+        }
         if let Some(check) =
             cause.downcast_ref::<crate::reports::cash_flow::CashFlowCheckError>()
         {
@@ -1194,6 +1369,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "ledger_masters_gst_details_requires_compliance" => Some(
             "`include_gst_details` adds each ledger's dated GST rate details, which only \
              fields=compliance reads. Pass fields=compliance, or drop `include_gst_details`.",
+        ),
+        "ledger_masters_mailing_details_requires_compliance" => Some(
+            "`include_mailing_details` adds each ledger's dated mailing details (address \
+             lines, PIN code, state, country), which only fields=compliance reads. Pass \
+             fields=compliance, or drop `include_mailing_details`.",
+        ),
+        "ledger_masters_mailing_details_with_gst_details_not_captured" => Some(
+            "`include_mailing_details` and `include_gst_details` were both asked for. The \
+             request that names both has not been captured from a real Tally, so ComplyEaze \
+             Bridge does not send it. Ask for one of them, then the other in a second call.",
         ),
         // A cause, reached through `ledger_export_invalid` (#675).
         "foreign_currency_ledger_balance" => Some(
@@ -1518,6 +1703,27 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              exactly that sequence before parsing, so a ledger name carrying it would read back \
              as different text and could never be confirmed as posted. Rename the ledger to \
              drop that sequence and resubmit.",
+        ),
+        // The `outstandings` party detail's read by the party's ledger returned a voucher with no
+        // line on that ledger (#1356): nothing was used, and the company window's own read had
+        // already been refused as needing too many requests.
+        "party_ledger_row_without_line" => Some(
+            "ComplyEaze Bridge read this party's vouchers by its ledger, because the company's \
+             vouchers for the window needed too many requests, and Tally returned a voucher that \
+             has no line on that ledger, so the detail used none of them. Tell the user the \
+             party's detail could not be read this way, and do not repeat the same call in a \
+             loop. A shorter window helps when a bill is named: name a `reference` that \
+             `open_bills` lists for the party, and the read starts at that bill's date.",
+        ),
+        // A ledger-scoped movement read returned a voucher with no line on the ledger (#485):
+        // nothing was summed. The same figures are in the Trial Balance, which does not read
+        // vouchers.
+        "ledger_scope_row_without_line" => Some(
+            "ComplyEaze Bridge read this ledger's vouchers by the ledger, and Tally returned a \
+             voucher that has no line on that ledger, so it summed nothing and released no \
+             figure. Tell the user the ledger's movement could not be read this way, and do not \
+             repeat the same call in a loop. For the ledger's opening, debit, credit and closing \
+             over the same dates, use trial_balance, which does not read vouchers.",
         ),
         // A cause, reached through `voucher_window_part_not_admitted`. Since
         // #985 a window read whole is admitted against the census that sized
@@ -1937,6 +2143,16 @@ fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
         })
 }
 
+/// The next step for a Trial Balance read that was refused and has none of its own. It is
+/// tried after the code's, the cause's and the unanswered reason's (Tally not reachable), so
+/// none of those is hidden behind it. The cause (when the refusal has one) says which rule or
+/// check failed; the step does not claim a retry is pointless, because a cause such as a
+/// changed book is not.
+const TRIAL_BALANCE_READ_FAILED_REMEDIATION: &str = "No Trial Balance figures were returned for \
+    this window. Tell the user what the cause says (when the refusal names none, that the Trial \
+    Balance could not be read), and that no figure was derived. Do not repeat this same read in \
+    a loop; another window or another read is a different request and is the user's call.";
+
 /// The next step for a cause of `native_outstandings_read_failed` (bridge#1091). It is chosen
 /// only under that code: the same cause codes reach other tools through `?` sites that never
 /// read the Bills report, and the text below would be wrong for them. A refusal is whole:
@@ -2347,6 +2563,8 @@ impl Server {
                     .or_else(|| {
                         unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
                     })
+                    .or((code == "trial_balance_read_failed")
+                        .then_some(TRIAL_BALANCE_READ_FAILED_REMEDIATION))
                 {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["remediation"] = json!(remediation);
@@ -2472,16 +2690,18 @@ impl Server {
                 }
                 // The partial read's own reason, under the same budget rule:
                 // a few codes, kept beside the refusal's code.
-                let (incomplete_read, planned_reads, bill_row, unplaced_ledger) = read_detail
-                    .map(|detail| {
-                        (
-                            detail.incomplete_read,
-                            detail.planned_reads,
-                            detail.bill_row,
-                            detail.unplaced_ledger,
-                        )
-                    })
-                    .unwrap_or_default();
+                let (incomplete_read, planned_reads, bill_row, unplaced_ledger, window_scope) =
+                    read_detail
+                        .map(|detail| {
+                            (
+                                detail.incomplete_read,
+                                detail.planned_reads,
+                                detail.bill_row,
+                                detail.unplaced_ledger,
+                                detail.window_scope,
+                            )
+                        })
+                        .unwrap_or_default();
                 if let Some(ledger) = unplaced_ledger {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["ledger"] = party_name_value(ledger);
@@ -2506,6 +2726,11 @@ impl Server {
                             "needed_at_least": reads.needed_at_least,
                             "allowed": reads.allowed,
                         });
+                    }
+                }
+                if let Some(scope) = window_scope {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["window_scope"] = scope.json();
                     }
                 }
                 if let Some(counts) = counts {

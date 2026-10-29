@@ -707,6 +707,11 @@ Tally, or a failed rewrite leaves the read path with neither implementation work
 A unit satisfies only its own scope. The Phase 2 exit criterion is met when A–D are all
 complete.
 
+**Note (2026-10-28, #1570):** Unit C's deletions happened without the collection replacement
+this plan assumed. `render_vouchers` went with `vouchers_v2` (#1609), and `render_ledgers` with
+`ledgers_v1` (#2102), because no shipped build sent either. `render_ledger_canary_readback` is no
+longer in the tree. Shipped reads use native Tally shapes. The plan text above is unchanged.
+
 **Design inputs established live on 2026-07-29:**
 
 1. **Response shape.** A collection export returns `ENVELOPE > HEADER(VERSION, STATUS) > BODY > DESC(CMPINFO) + DATA > COLLECTION > VOUCHER|LEDGER`. It carries `STATUS=1`, so the export-side invariant is preserved rather than relaxed. The existing report-shape parsers (`ENVELOPE > BODY > LEDGER`) do not match and must be replaced, not adapted.

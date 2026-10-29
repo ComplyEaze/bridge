@@ -1,0 +1,6 @@
+# Captures; they stay on the lab PC. sha256, bytes, name.
+d760f4cd5fa1a79514b84431d7d0ff9e0c8ecbc3f9f7b52996689eb9fe8eb216  44262  c10-gateway.png
+867e9f17cc2d057121a4c914a3d9a6feabdb9b7d4b1c214834c929b9a9e266dc  72685  c10-no-company.png
+d760f4cd5fa1a79514b84431d7d0ff9e0c8ecbc3f9f7b52996689eb9fe8eb216  44262  d3-after.png
+f572f3ea2dda43f8bc67585c878f46a65044ec0132eb74100add524ac25e3a04  45331  p0-gateway-loaded.png
+ab36f3425c8c83b6a6dc21daa897a739f86b9b0a593b3adbaeeecf35a29b57cf  72674  s0-select-company.png

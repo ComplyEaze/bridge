@@ -1463,32 +1463,59 @@ fn the_bills_remediation_is_chosen_only_under_the_outstandings_code() {
     );
 }
 
-/// A Bills report request held past the request limit, or answered past the size cap (#1356,
-/// measured at a year-end date on a dense book): the next step does not invite a retry loop and
-/// names the one narrower read, an earlier `as_of`. Only under the outstandings code: the same
-/// transport causes reach every other read.
+/// A Bills report request held past the request limit (#1356, measured at a year-end date on a
+/// dense book) reaches the response as an unanswered reason, not a typed cause. Rendered as the
+/// assistant receives it, the refusal names a next step that does not invite a retry loop and
+/// names the one narrower read, an earlier `as_of`. The same timeout under another tool's code
+/// does not get that step.
 #[test]
 fn a_bills_report_past_the_request_limit_is_not_retried_in_a_loop() {
-    for cause in ["request_deadline_exceeded", "response_size_limit_exceeded"] {
-        let text = remediation_for("native_outstandings_read_failed", Some(cause))
-            .expect("the cause has a next step under outstandings");
-        assert!(
-            text.contains("Do not repeat the same call in a loop"),
-            "{text}"
+    let directory = tempfile::tempdir().unwrap();
+    let server = Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let refused = |tool: &str, code: &str| {
+        let failure = ToolFailure::from_runtime(
+            code,
+            anyhow::Error::new(bridge_tally_transport::TallyTransportError::RequestTimedOut),
         );
-        assert!(
-            text.contains("an earlier `as_of` reads fewer open bills"),
-            "{text}"
-        );
-        assert!(!text.contains("call outstandings once more"), "{text}");
-        assert_eq!(refusal_remediation(cause), None, "{cause}");
-        // Another tool's code with the same cause gets none of the Bills advice.
-        assert_eq!(
-            remediation_for("trial_balance_read_failed", Some(cause)),
-            None,
-            "{cause}"
-        );
-    }
+        let response =
+            server.finish_tool_response(tool, &json!({}), chrono::Utc::now(), Err(failure));
+        response.value["structuredContent"]["result"]["error"].clone()
+    };
+    let error = refused("outstandings", "native_outstandings_read_failed");
+    assert_eq!(error["code"], "native_outstandings_read_failed", "{error}");
+    assert_eq!(error["cause"], "request_deadline_exceeded", "{error}");
+    let text = error["remediation"].as_str().expect("a next step");
+    assert!(
+        text.contains("Do not repeat the same call in a loop"),
+        "{text}"
+    );
+    assert!(
+        text.contains("an earlier `as_of` reads fewer open bills"),
+        "{text}"
+    );
+    // Another tool's read past the same limit does not get the Bills report's step.
+    let other = refused("trial_balance", "trial_balance_read_failed");
+    assert_eq!(other["cause"], "request_deadline_exceeded", "{other}");
+    assert!(
+        !other["remediation"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Bills"),
+        "{other}"
+    );
 }
 
 /// The next step for a party ledger row without its line (#1356) says that only a bill trail can

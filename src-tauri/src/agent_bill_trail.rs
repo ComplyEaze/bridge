@@ -1151,8 +1151,44 @@ impl Server {
                 }
             }
         };
+        self.finish_party_detail(
+            identity,
+            company,
+            as_of,
+            &from,
+            &resolved,
+            &party,
+            (kind, reference),
+            (open_bills, unallocated),
+            limits.rows,
+            opening,
+            (rows, count_key == "party_vouchers_read"),
+            evidence,
+        )
+        .await
+    }
+
+    /// The steps of a party detail after its vouchers were read (#945, #1356): the closing marks
+    /// read and the check that the book did not move, then the detail built from the rows. When
+    /// the rows were read by the party's ledger (`by_ledger`), the result says so in
+    /// `window_scope`, and so does a refusal from any of these steps.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn finish_party_detail(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &TallyCompany,
+        as_of: &TallyDate,
+        from: &TallyDate,
+        resolved: &LedgerMatch,
+        party: &str,
+        (kind, reference): (DetailKind, Option<&str>),
+        (open_bills, unallocated): (&[OpenBillRow], &[UnallocatedParty]),
+        max_rows: usize,
+        opening: CompanyMarks,
+        (rows, by_ledger): (Vec<Value>, bool),
+        mut evidence: Evidence,
+    ) -> Result<(Value, Evidence), ToolFailure> {
         // A refusal after the party was read by its ledger says so, as the ledger read's own do.
-        let by_ledger = count_key == "party_vouchers_read";
         let scoped = |failure: ToolFailure| {
             if by_ledger {
                 failure.with_window_scope(LEDGER_SCOPED_LATER_REFUSAL)
@@ -1176,25 +1212,30 @@ impl Server {
         let vouchers_read = rows.len();
         let rows = validate_then_filter_voucher_rows(rows, from.as_str(), as_of.as_str(), None)
             .map_err(|code| late(ToolFailure::from(code)))?;
-        let entries = entries_for_party(&rows, &party)
+        let entries = entries_for_party(&rows, party)
             .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
-        let party_json = redact_value(party_name_value(party.clone()), self.settings.redaction);
+        let party_json = redact_value(party_name_value(party.to_string()), self.settings.redaction);
         let mut window = json!({"from": from, "to": as_of});
+        let count_key = if by_ledger {
+            "party_vouchers_read"
+        } else {
+            "company_vouchers_read"
+        };
         window[count_key] = json!(vouchers_read);
         let mut detail = party_detail(
             kind,
-            &party,
+            party,
             &party_json,
             reference,
             &entries,
             open_bills,
             unallocated,
             vouchers_read,
-            limits.rows,
+            max_rows,
         )
         .map_err(|refusal| late(ToolFailure::from(refusal.0.to_string())))?;
         detail["party"] = party_json;
-        detail["ledger_match"] = ledger_match_json(&resolved, &party, self.settings.redaction);
+        detail["ledger_match"] = ledger_match_json(resolved, party, self.settings.redaction);
         // The bills are matched on the spelling the vouchers carry. When that is
         // not the ledger's own name, what Tally's outstandings reports call the
         // ledger is not established, so an answer that found nothing may be a

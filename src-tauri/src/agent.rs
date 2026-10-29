@@ -2132,6 +2132,24 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
     }
 }
 
+/// The next step for an `outstandings` read of Tally's Bills report that no response answered
+/// in time (#1356). One request was held past the transport's 20-second limit: measured on a
+/// dense book at a year-end date, where the report grows with the bills open at the date. Only
+/// under the outstandings code, after the code's and the typed cause's own steps; the same
+/// unanswered reason reaches every other read, where this advice would be wrong.
+fn outstandings_unanswered_remediation(reason: &str) -> Option<&'static str> {
+    match reason {
+        "request_deadline_exceeded" => Some(
+            "Tally took longer to answer one request of its Bills Receivable or Payable report at \
+             this date than ComplyEaze Bridge waits, so no figures were returned. On a large book \
+             that report grows with the bills open at the date. Do not repeat the same call in a \
+             loop: tell the user, and say that an earlier `as_of` reads fewer open bills, which \
+             is their call.",
+        ),
+        _ => None,
+    }
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -2182,16 +2200,6 @@ fn outstandings_cause_remediation(cause: &str) -> Option<&'static str> {
              returned. When the refusal carries a `bill_row`, it names the report and the row \
              in the order Tally sent them, which may not be the order on screen. Do not retry; \
              tell the user what the cause says.",
-        ),
-        // One request of the Bills report was held past the transport's 20-second limit, or
-        // answered past its size cap (#1356 measured the first on a dense book at a year-end
-        // date). The report grows with the bills open at the date.
-        "request_deadline_exceeded" | "response_size_limit_exceeded" => Some(
-            "Tally's Bills Receivable or Payable report at this date took longer to answer, or \
-             was larger, than one request ComplyEaze Bridge sends may take, so no figures were \
-             returned. On a large book it grows with the bills open at the date. Do not repeat \
-             the same call in a loop: tell the user, and say that an earlier `as_of` reads \
-             fewer open bills, which is their call.",
         ),
         "native_tally_reported_failure" => Some(
             "Tally answered the Bills report request with a failure, so no figures were returned. \
@@ -2571,6 +2579,15 @@ impl Server {
                 if let Some(remediation) = refusal_remediation(&code)
                     .or_else(|| repair.map(ArgumentRepair::remediation))
                     .or_else(|| remediation_for(&code, cause))
+                    .or_else(|| {
+                        (code == "native_outstandings_read_failed")
+                            .then(|| {
+                                unanswered.and_then(|unanswered| {
+                                    outstandings_unanswered_remediation(unanswered.0)
+                                })
+                            })
+                            .flatten()
+                    })
                     .or_else(|| {
                         unanswered.and_then(|unanswered| unanswered_remediation(unanswered.0))
                     })

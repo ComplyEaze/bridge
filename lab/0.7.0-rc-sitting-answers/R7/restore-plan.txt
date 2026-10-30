@@ -1,0 +1,8 @@
+R7 step 4 restore plan (C6), written before the restore, on the run lead's RESTORE word given in advance.
+Folder: <LAB_DIR>\bk0 (holds one file only)
+File: TDBK1800_<company number>.001, 28,230 B, sha256 e2525730e877a1fde54fb301e7f892f5001bbcd037b4adea03d2586854f36d1b; the Restore list must show it dated 30-Oct-26 at 12:32 pm.
+Company: BRIDGE LINE BREAK LAB, GUID 224e7f8c-a0aa-45ce-889a-ad4b7fdbe852
+Restore Data Path: Tally's data folder (as the screen shows it)
+Steps: shut THE COMPANY; Data > Backup & Restore > Restore; source Specify Path, the bk0 folder; THE COMPANY only; screenshot before accepting.
+Two prompts expected and the only ones answered: "Accept ?" = Yes; "Company data folder (<number>) already exists ... Replace" = Replace.
+After: load THE COMPANY alone; screenshots; MARKS (ledger_masters) first: EXPECT M0' 212 and V0 2 and step 0's ledger rows; L's Alter form shows no alias (read, not saved).

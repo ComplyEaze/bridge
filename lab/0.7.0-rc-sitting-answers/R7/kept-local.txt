@@ -1,0 +1,3 @@
+Files kept on the lab PC, by size and sha256 (company-folder listings; backups named with the company number shown as <company number>):
+evidence/restore-company-listing-after.txt 1540 B abff31e93155130025da9fafd41bf6321c243c4c5e96d7b34714eb6ee510932e
+evidence/restore-company-listing-before.txt 1605 B cd447a7b7a0046193980785a74bf92f7212f3c7f7dd9dcef3387d0f3872acfb8

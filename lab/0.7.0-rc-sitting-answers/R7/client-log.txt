@@ -1,0 +1,14 @@
+2026-10-30T07:01:38Z exe sha256 576cc0c5aab4e72c43c05799116d76a29429c595a86dd54834d841c551f50d7c ok; launch-env.json sha256 e533eb966cb5db4c1f793899cc6264604dd2b2e0e189b961ef312a70fef4efb9; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-30T07:01:38Z launched pid 22968; stderr to server-stderr-20261030T070138Z.log
+2026-10-30T07:01:38Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+2026-10-30T07:01:50Z 000-s0-tools-list.json tool=list secs=0.013 isError=None error=None saved_sha256=b5ead26c604906f105cc3ee281137fc111ede5437d4313eca6e6ab7ac0277928
+2026-10-30T07:01:51Z 001-s0-list-companies.json tool=list_companies secs=0.075 isError=False error=None saved_sha256=98409ce56f82f009e073d6d581f3df88ffb93708bf5dbd1f231af4bcb23d6011
+2026-10-30T07:01:53Z 002-s0-marks.json tool=ledger_masters secs=0.765 isError=False error=None saved_sha256=f4fc9ebf7ee5900b89dc732184b71892808e896cd313fc6db668549003162352
+2026-10-30T07:02:03Z 003-s0-groups.json tool=masters secs=0.692 isError=False error=None saved_sha256=b9262d50987dc907e1292d7cde85f200f14e1b4745d57ad665ce171708adaa52
+2026-10-30T07:03:01Z 004-s1-marks.json tool=ledger_masters secs=0.805 isError=False error=None saved_sha256=4ab853378ac2865d9a9ac48586a24ee28c4f4db133ea23b48359bb9bc0c1257d
+2026-10-30T07:04:16Z 005-s1-marks-after.json tool=ledger_masters secs=0.751 isError=False error=None saved_sha256=2ca34600843ab14df2f7a615638fa2347c36898124ef0268f502de56dde63ada
+2026-10-30T07:04:18Z 006-s2-validate.json tool=validate_masters secs=0.650 isError=False error=None saved_sha256=0743167d02456cff2f33aea5446f102c8f0e864d41dfbea99b90baf03b790e64
+2026-10-30T07:04:19Z 007-s3-marks.json tool=ledger_masters secs=0.736 isError=False error=None saved_sha256=ecdab37e4231eacd3fd937388a2bbd79ce08a9a75c06926f64019da12bdaaa88
+2026-10-30T07:04:21Z 008-s3-egress-log.json tool=egress_log secs=0.065 isError=False error=None saved_sha256=c6d93bb672fca146f1cab877fd2d4b66082356324ba69d6a56d79805c431a18a
+2026-10-30T07:07:32Z 009-s4-marks.json tool=ledger_masters secs=0.787 isError=False error=None saved_sha256=df86191c81db2bee4a6efe1b88c8bde90076d9e3757f873a4b1f64f8f140a1f7
+2026-10-30T07:08:19Z session ended; server pid 22968 exit code 0

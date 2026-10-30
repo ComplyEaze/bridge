@@ -1,0 +1,9 @@
+# sha256  bytes  file  (LAB-COMMON.md: byte for byte from lab/0.7.0-rc-sitting; templates/a07-vouchers-shape-20250424.xml: the fixture voucher_goods_lines_two_godowns_shape_lab_request.utf16le.xml)
+d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+da30198c274f1140e20baac43bd6b207027285069ba13de3586cdcd77b9ee613  16155  RUN-SHEET.md
+b12d504b2b87ff0c7bc3b280f9b10e497ab75d3a58e28c0e716aa484642e73cb  3030  gen_requests.py
+47cf36c300a5cc31297033dba27c6233729e93d3ad6e17d72022e73d28352d9c  1740  templates/a07-vouchers-shape-20250424.xml
+fb40408cab217740697f7125422b81dd7d85d02a81dfaa46d81c54e951c05e84  1758  requests/r-a07-20250610.utf16le.xml
+2f45dbb34e11ee4090d7866672519f651999b3322ab8d082f594c573fbe8de9f  1758  requests/r-a07-20250611.utf16le.xml
+655bfddfb48ef6ae9f32d4af831345515c6833b0cb2203c1d953fb429cfc99ac  1758  requests/r-a07-20250612.utf16le.xml

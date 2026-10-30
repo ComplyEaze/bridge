@@ -19,7 +19,7 @@ answer with no CMPINFO says so, since its BODY digest is then of the whole text.
 that every VOUCHER row's ALTERID is at most M.
 
 Exit 0: parsed, and with M every row is inside the span. Exit 1: with M, a row lies above it (listed). Exit 2: an
-error, never a result: wrong arguments, or the file cannot be read, does not parse, has a root other than ENVELOPE,
+error, never a result: wrong arguments (COMPANY_GUID not a lower-case GUID, M not a number), or the file cannot be read, does not parse, has a root other than ENVELOPE,
 more than one CMPINFO, no COLLECTION, a row of another company, or a VOUCHER row without a GUID or with an ALTERID that
 is not a number of ASCII digits.
 """
@@ -32,6 +32,7 @@ FORBIDDEN_RAW = re.compile('[\x00-\x08\x0b\x0c\x0e-\x1f]')
 FORBIDDEN_REF = re.compile(r'&#(?:x0*(?:[0-8bBcCeEfF]|1[0-9a-fA-F])|0*(?:[0-8]|1[124-9]|2[0-9]|3[01]));')
 CMPINFO = re.compile(r'<CMPINFO>.*?</CMPINFO>', re.S)
 DIGITS = re.compile('[0-9]+')
+GUID = re.compile('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
 
 class Refused(Exception):
@@ -44,7 +45,8 @@ def field(row, name):
 
 
 def main():
-    if len(sys.argv) not in (3, 4) or (len(sys.argv) == 4 and not DIGITS.fullmatch(sys.argv[3])):
+    if (len(sys.argv) not in (3, 4) or not GUID.fullmatch(sys.argv[2])
+            or (len(sys.argv) == 4 and not DIGITS.fullmatch(sys.argv[3]))):
         print(__doc__)
         return 2
     path, company = sys.argv[1], sys.argv[2]

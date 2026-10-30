@@ -92,10 +92,11 @@ loaded (except a held gateway, rule above), and no later part is run without the
 3. Tally licensed; Educational mode = STOP (C1). Record the release and licence mode only.
 4. The answers go to `C:/bridge-lab/2145R/answers/` (absent or empty before, else STOP), one folder per part (`A`, `P`,
    `B1`, `B2`, ...).
-5. The data path Tally's Select Company screen shows (Tally's own data folder) is recorded, with a screenshot, the first
-   time that screen is open (Part A step 1). The lab is left on it.
+5. The data path Tally's Select Company screen shows (Tally's own data folder) is recorded, with a screenshot, at the
+   sitting's first visit to that screen (Part A step 1 when Part A runs). A later sitting records it the same way and
+   compares it with the first sitting's note: a difference = STOP. The lab is left on it.
 
-## Part 0: the backups of BRIDGE AMEND LAB (no request, nothing loaded, nothing changed)
+## Part 0: the backups of BRIDGE AMEND LAB (no request, nothing changed; step 1 before Part A, steps 2 and 3 after Part A step 1)
 1. In PowerShell, list every Tally backup file under the lab folder:
    `Get-ChildItem -Path C:\bridge-lab -Recurse -File -Filter 'TDBK*' -ErrorAction Stop | Select-Object FullName,Length,LastWriteTime | Format-List`
    then `$?` on its own line, both recorded; do the same for any other folder the lab's own notes name as holding
@@ -155,11 +156,13 @@ book Part A read is not touched. B1 is the first backup named, B2 the second, an
    - **(1676, 229)**, the payment as recorded: `company-list`, `b-0403_census_spanned_0_1676`, `a-0403_verification`;
    - **(1685, 232)**, the batch after the cancel as recorded: `company-list`, `b-0401_census_spanned_0_1685`, `a-0401_verification`;
    - **anything else**: record it, and nothing more is sent to this copy. That is a result, not a STOP.
-6. As Part A steps 3 and 4.
-7. Shut the copy (Shut Company). Change Select Company's data path back to Tally's own data folder (recorded in Part A
-   step 1), screenshot it, and load nothing. Then the next backup named, from step 2, or close.
+6. As Part A step 3. Then a screenshot of the whole Tally window, then `a-marks` again: EXPECT the marks of step 5. A
+   difference = record it and STOP.
+7. Shut the copy (Shut Company). Change Select Company's data path back to Tally's own data folder (as recorded before
+   the sitting), screenshot it, and load nothing. Then the next backup named, from step 2, or close.
 **A STOP in Part B** follows C8, and its route back, once the run coordinator says to end, also sets Select Company's
-data path back to Tally's own data folder before C10.
+data path back to Tally's own data folder before C10. Until the run coordinator answers, nothing is sent and nothing is
+loaded, whichever data path Select Company is on.
 
 ## EXPECT
 For each answer, once it is written, run `python -I summarise2145r.py ANSWER COMPANY_GUID [M]`, with THE COMPANY's GUID

@@ -50,6 +50,9 @@ def check_files(folder):
             print("FAIL SHA256.txt line: %r" % line)
             continue
         digest, size, path = parts
+        if path in seen:
+            fail += 1
+            print("FAIL SHA256.txt lists %s twice" % path)
         seen.add(path)
         path = os.path.join(HERE, path)
         try:
@@ -108,6 +111,9 @@ def main():
         return 2
     folder = sys.argv[1]
     file_fail = check_files(folder)
+    if os.path.realpath(folder) != os.path.realpath(os.path.join(HERE, "requests")):
+        file_fail += 1
+        print("FAIL the folder checked is not this sheet's requests/ folder, whose hashes SHA256.txt holds")
     ok = fail = 0
     bodies = {}
     for key in REQUESTS:

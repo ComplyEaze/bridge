@@ -1,0 +1,3 @@
+relay: 127.0.0.1:9012 -> 127.0.0.1:9001, reads only, recording into <LAB_DIR>\B2\relay; Ctrl+C to stop
+
+<LAB_DIR>\sheet>

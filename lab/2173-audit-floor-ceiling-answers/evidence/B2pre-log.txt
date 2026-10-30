@@ -1,0 +1,34 @@
+# B2pre build B exe <BUILD-B folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe bytes 32716288 sha256 bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446 (expected bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446); environment {"BRIDGE_TERMS_ACCEPTED": "true", "BRIDGE_TALLY_HOST": "127.0.0.1", "BRIDGE_TALLY_PORT": "9012", "BRIDGE_AGENT_ENABLE_TAX_AUDIT": "true", "BRIDGE_AGENT_DATA_DIR": "<LAB_DIR>\\B2pre\\data"}
+2026-10-30T13:45:22.567Z relay console started before this runner from PowerShell (Start-Process cmd.exe, working directory <LAB_DIR>\sheet, /k python -I read_relay.py --listen-port 9012 --record <LAB_DIR>\B2pre\relay); cmd pid 5344
+2026-10-30T13:45:25.323Z relay python pid 15832; its console reads:
+relay: 127.0.0.1:9012 -> 127.0.0.1:9001, reads only, recording into <LAB_DIR>\B2pre\relay; Ctrl+C to stop
+2026-10-30T13:45:29.344Z client started pid 9692; 2026-10-30T13:45:25Z exe sha256 bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446 ok; launch-env.json sha256 83df3a9bab9a9cc9b6b23702f309baa5ba5c3ad10122ce6fba0581f3baacf078; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_TAX_AUDIT', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False | 2026-10-30T13:45:25Z launched pid 9716; stderr to server-stderr-20261030T134525Z.log | 2026-10-30T13:45:25Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+000-list_companies.json: called 2026-10-30T13:45:29.346Z answered 2026-10-30T13:45:29.761Z wall 0.422 s round trip 0.097 s isError False size 1568 sha256 c74797ba422f05f9af3f4db0c49d53b5e4142f9b85eac374fc38ba5e2d340c2e
+  {"companies": [{"books_from": "20250401", "company_number": "<redacted: company number>", "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "identity_state": "verified_tuple", "missing_field": null, "name": "BRIDGE CORPUS DENSE"}]}
+001-tally_status.json: called 2026-10-30T13:45:29.764Z answered 2026-10-30T13:45:30.383Z wall 0.625 s round trip 0.08 s isError False size 1821 sha256 a55a48c0eecfa143ae94080efc9e24a9fa64dadb3168fb2a337ae938fa5289dc
+  {"education_mode": false, "endpoint": "http://127.0.0.1:9012", "license_tier": "silver", "loaded_companies": [{"books_from": "20250401", "company_number": "<redacted: company number>", "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "name": "BRIDGE CORPUS DENSE"}], "product": "TallyPrime", "refusal_reason": null, "release": "7.2", "today": "20261030"}
+002-vouchers-p0.json: called 2026-10-30T13:45:30.383Z answered 2026-10-30T13:45:37.444Z wall 7.063 s round trip 6.631 s isError False size 117761 sha256 8764ef807ea5d54014cb5d4a7e24f8f967cd1d0d4256595bee85bc9bbf60ef31
+  page 0: rows 82 total 82 next_offset None error None
+  B2pre: vouchers on 2025-04-01: 82
+2026-10-30T13:45:37.805Z session closed: client exit 0; 2026-10-30T13:45:37Z session ended; server pid 9716 exit code 0
+2026-10-30T13:45:37.847Z relay status through the relay: printed "200" exit 0 in 0.03 s
+2026-10-30T13:45:37.877Z GET /status straight to 9001: printed "200 51" exit 0 in 0.03 s
+2026-10-30T13:45:40.870Z Ctrl+C sent to the relay console (ctrlc exit 0); relay python still running: False; console tail:
+relay: 127.0.0.1:9012 -> 127.0.0.1:9001, reads only, recording into <LAB_DIR>\B2pre\relay; Ctrl+C to stop
+<LAB_DIR>\sheet>
+summarise.py exit 0:
+requests: 59 (forwarded 59)
+census: #18 20250401-20250401 span (0, 8192] rows 82 bytes 200536 seconds 0.187
+census: #20 20250401-20250401 span (0, 8192] rows 82 bytes 200536 seconds 0.078
+census: #24 20250401-20250401 span (8192, 16384] rows 0 bytes 3022 seconds 0.063
+census: #26 20250401-20250401 span (8192, 16384] rows 0 bytes 3022 seconds 0.078
+census: #30 20250401-20250401 span (16384, 24576] rows 0 bytes 3022 seconds 0.078
+census: #32 20250401-20250401 span (16384, 24576] rows 0 bytes 3022 seconds 0.078
+census: #36 20250401-20250401 span (24576, 29900] rows 0 bytes 3022 seconds 0.078
+census: #38 20250401-20250401 span (24576, 29900] rows 0 bytes 3022 seconds 0.078
+census total: 8 requests, rows 164
+data parts: 4; first part rows 42; most rows 42; most bytes 1430724; slowest 0.250 s; total rows 164; mean bytes per row 34069
+marks: 4
+over: none
+
+# B2pre exe sha256 after: bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446

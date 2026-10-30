@@ -1,0 +1,9 @@
+requests: 44 (forwarded 44)
+census: #33 20250401-20250630 span (0, 8192] rows 7432 bytes 18020860 seconds 5.156
+census: #36 20250401-20250630 span (8192, 16384] rows 0 bytes 3022 seconds 2.766
+census: #39 20250401-20250630 span (16384, 24576] rows 0 bytes 3022 seconds 2.500
+census: #42 20250401-20250630 span (24576, 29900] rows 0 bytes 3022 seconds 2.313
+census total: 4 requests, rows 7432
+data parts: 0
+marks: 2
+over: none

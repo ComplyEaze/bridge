@@ -1,0 +1,28 @@
+# B3 build B exe <BUILD-B folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe bytes 32716288 sha256 bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446 (expected bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446); environment {"BRIDGE_TERMS_ACCEPTED": "true", "BRIDGE_TALLY_HOST": "127.0.0.1", "BRIDGE_TALLY_PORT": "9012", "BRIDGE_AGENT_ENABLE_TAX_AUDIT": "true", "BRIDGE_AGENT_DATA_DIR": "<LAB_DIR>\\B3\\data"}
+2026-10-30T13:48:34.687Z relay console started before this runner from PowerShell (Start-Process cmd.exe, working directory <LAB_DIR>\sheet, /k python -I read_relay.py --listen-port 9012 --record <LAB_DIR>\B3\relay); cmd pid 10788
+2026-10-30T13:48:37.396Z relay python pid 15364; its console reads:
+relay: 127.0.0.1:9012 -> 127.0.0.1:9001, reads only, recording into <LAB_DIR>\B3\relay; Ctrl+C to stop
+2026-10-30T13:48:41.438Z client started pid 30196; 2026-10-30T13:48:37Z exe sha256 bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446 ok; launch-env.json sha256 965c55337ccd1fea1e7de73dad3a6951bff041a96286ebc0c97a734030805b5e; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_TAX_AUDIT', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False | 2026-10-30T13:48:37Z launched pid 26656; stderr to server-stderr-20261030T134837Z.log | 2026-10-30T13:48:37Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+000-list_companies.json: called 2026-10-30T13:48:41.439Z answered 2026-10-30T13:48:42.260Z wall 0.828 s round trip 0.082 s isError False size 1569 sha256 e75af476c6b0e181afa41654f82c332da29e05580bae125fb2c11f825547f921
+  {"companies": [{"books_from": "20250401", "company_number": "<redacted: company number>", "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "identity_state": "verified_tuple", "missing_field": null, "name": "BRIDGE CORPUS DENSE"}]}
+001-tally_status.json: called 2026-10-30T13:48:42.260Z answered 2026-10-30T13:48:42.872Z wall 0.610 s round trip 0.071 s isError False size 1823 sha256 270d87f3a1571f6b3d2d4510d857d2c563855f4d3279b4c02d69482254de50d0
+  {"education_mode": false, "endpoint": "http://127.0.0.1:9012", "license_tier": "silver", "loaded_companies": [{"books_from": "20250401", "company_number": "<redacted: company number>", "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "name": "BRIDGE CORPUS DENSE"}], "product": "TallyPrime", "refusal_reason": null, "release": "7.2", "today": "20261030"}
+2026-10-30T13:48:42.874Z audit_test_run called with {"company_guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "from": "2025-04-01", "to": "2026-03-31", "test": "cash_44ab", "cash_groups": ["Cash-in-Hand"], "bank_groups": ["Bank Accounts"]}
+002-audit_test_run.json: called 2026-10-30T13:48:42.875Z answered 2026-10-30T13:49:21.086Z wall 38.218 s round trip 37.601 s isError True size 1647 sha256 b5512e66f246f0711b1b1c62ca817c5f3570811ed6bfb369c6d5e88f45ab9bba
+  audit answer: error code voucher_window_too_many_reads; result keys ['error']; {"error": {"code": "voucher_window_too_many_reads", "message": "ComplyEaze Bridge refused this operation."}}
+2026-10-30T13:49:21.268Z session closed: client exit 0; 2026-10-30T13:49:21Z session ended; server pid 26656 exit code 0
+2026-10-30T13:49:21.317Z relay status through the relay: printed "200" exit 0 in 0.05 s
+2026-10-30T13:49:21.374Z GET /status straight to 9001: printed "200 51" exit 0 in 0.06 s
+2026-10-30T13:49:24.406Z Ctrl+C sent to the relay console (ctrlc exit 0); relay python still running: False; console tail:
+relay: 127.0.0.1:9012 -> 127.0.0.1:9001, reads only, recording into <LAB_DIR>\B3\relay; Ctrl+C to stop
+<LAB_DIR>\sheet>
+summarise.py exit 0:
+requests: 38 (forwarded 38)
+census: #33 20250401-20260331 span (0, 8192] rows 8192 bytes 19864620 seconds 14.906
+census: #36 20250401-20260331 span (8192, 16384] rows 8192 bytes 19915128 seconds 12.828
+census total: 2 requests, rows 16384
+data parts: 0
+marks: 2
+over: none
+
+# B3 exe sha256 after: bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446

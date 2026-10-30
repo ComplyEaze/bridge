@@ -1,0 +1,13 @@
+requests: 59 (forwarded 59)
+census: #18 20250401-20250401 span (0, 8192] rows 82 bytes 200536 seconds 0.187
+census: #20 20250401-20250401 span (0, 8192] rows 82 bytes 200536 seconds 0.078
+census: #24 20250401-20250401 span (8192, 16384] rows 0 bytes 3022 seconds 0.063
+census: #26 20250401-20250401 span (8192, 16384] rows 0 bytes 3022 seconds 0.078
+census: #30 20250401-20250401 span (16384, 24576] rows 0 bytes 3022 seconds 0.078
+census: #32 20250401-20250401 span (16384, 24576] rows 0 bytes 3022 seconds 0.078
+census: #36 20250401-20250401 span (24576, 29900] rows 0 bytes 3022 seconds 0.078
+census: #38 20250401-20250401 span (24576, 29900] rows 0 bytes 3022 seconds 0.078
+census total: 8 requests, rows 164
+data parts: 4; first part rows 42; most rows 42; most bytes 1430724; slowest 0.250 s; total rows 164; mean bytes per row 34069
+marks: 4
+over: none

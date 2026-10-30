@@ -1,0 +1,12 @@
+Files kept on the lab PC, by size and sha256 (company numbers shown as <company number>):
+backups/bk0/TDBK1800_<company number>.001 23701 B e507d4af8bd4e849f5effe97a73cf16c3054d5bddc0bdefb8d6e0f8577523643
+B0/data/agent-egress.jsonl 6701 B 9be6903da920be140bc54b0dbe4759039f1c944924888a4df4c13bdfcc00caed
+B0/data/terms-acceptance.jsonl 90 B a1db99a7080e2041b768fb34e1e398daf78a719007374a22564c0b436394eac9
+B1/data/agent-egress.jsonl 7800 B aee9c03bb5a42826230e8e5934c4ff96d62d3fcba98e617e47f78b6320e16516
+B1/data/terms-acceptance.jsonl 90 B 97bac09b16f72a955c06f6c55720674e619deeaf814403ac2efb2d957194fd46
+B2pre/data/agent-egress.jsonl 8436 B 9b6fc4681919a1b90e2d34abb670509625e83c43347d7f6927b09fe07256581e
+B2pre/data/terms-acceptance.jsonl 90 B cacc9410bf120e0e3591a914a88d6c97a7242635734888201edddc66426eda9a
+B2/data/agent-egress.jsonl 7167 B 7de2ba4e7dcdeb5766fe2d6a1ac29ddbad8917f2382577c3bddb92c618b6851f
+B2/data/terms-acceptance.jsonl 90 B 9ea9b1be400f0512f5d0bbdd8d6b776fcd22baca9df975e1c120528106b826be
+B3/data/agent-egress.jsonl 7013 B 148485043953558d4ee8e3fc606e896920007ceac7ed9016ef0dfccafc18d1f6
+B3/data/terms-acceptance.jsonl 90 B c2527791cca4e24b4014152397d11cda35633b5e32c2581636c9f68c3a2aebaa

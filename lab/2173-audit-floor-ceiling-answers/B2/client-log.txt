@@ -1,0 +1,7 @@
+2026-10-30T13:46:53Z exe sha256 bf5a210616291ab89856dddd4f2c2cc8b785eb23449a74320f7bc2702579a446 ok; launch-env.json sha256 9a7448ae280e9087237d7962fbc4b805236e23ed430b8386d47912235591f854; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_TAX_AUDIT', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-30T13:46:53Z launched pid 9432; stderr to server-stderr-20261030T134653Z.log
+2026-10-30T13:46:53Z initialized {'name': 'bridge-tally', 'version': '0.6.1'}
+2026-10-30T13:46:56Z 000-list_companies.json tool=list_companies secs=0.113 isError=False error=None saved_sha256=56ae786aa7192608f4e7deb9cbe074b5bd6ef4d0a7bee3d20dcf04eb715f9900
+2026-10-30T13:46:57Z 001-tally_status.json tool=tally_status secs=0.077 isError=False error=None saved_sha256=69dbf2dbf47f59838e7c3d6f3c3739980e850378779518d122df06d97ec0df55
+2026-10-30T13:47:18Z 002-audit_test_run.json tool=audit_test_run secs=20.756 isError=True error=None saved_sha256=03b39bc752848a2ae4fd62ee908440675a02bc13bf3fe5387b596802b7868703
+2026-10-30T13:47:19Z session ended; server pid 9432 exit code 0

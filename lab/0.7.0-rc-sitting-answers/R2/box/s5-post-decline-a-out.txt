@@ -1,0 +1,2 @@
+007-s5-post-decline-a.json secs=0.071 isError=True rpcError=None
+{"company":{"state":"not_company_scoped"},"evidence":{"bytes":0,"duration_ms":8,"read_at":"2026-10-30T06:40:41.663Z","reason_code":"argument_unknown","request_sha256":"32cd9045ad40b1735d208b98206ef860a7cc9cef1feb5805b8a0bbf398b976a5","response_sha256":"27b97736da45dc41d851d71282f715373fdd0d75b59fe5ed07dd35171bcb5250","state":"partial"},"read_at":"2026-10-30T06:40:41.655Z","result":{"error":{"code":"argument_unknown","message":"ComplyEaze Bridge refused this operation."}},"truncated":false}

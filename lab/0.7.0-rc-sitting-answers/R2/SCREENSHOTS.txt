@@ -1,0 +1,11 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/c10-tally.png 72697 B 65888420aee4c9c395596abeffe8a3ca7eab61962b58e788c7fcb3b3935fc518
+shots/s0-tally.png 45730 B 44e972303430c538e76538db73c5478dd297895047b2d043ca046cc756276f74
+shots/s1-company-creation.png 40017 B 1acac6de008ea640621da9ef8cd6d30b400b1fcf5a4a6a111a624173acba361b
+shots/s1-features.png 82137 B 4ece1066f3bcc7652194056a82365572cb78bbbd4b99704f7fa8b53a5dc6066f
+shots/s2-bk1-backup-screen.png 42297 B 74a046b7e559bfb5b4a8cb699466a94e00c796644b4664860d22881c3246ceda
+shots/s6-after-create.png 45730 B 44e972303430c538e76538db73c5478dd297895047b2d043ca046cc756276f74
+box/s5-decline-nobox.png 389797 B 5db14148eb030c24a0c581abf7b7a0c3a77b1fef1a379d0ead6fcb6a7b015ca0
+box/s5b-decline-open.png 376056 B 4be04b05804d90ec8f2c7f132291d214da66ab69e5524c084fc94c65f74a3841
+box/s6-accept-open.png 380455 B 05ccb20f7e509bc6cac26c2696fcfca126f05e1afdbefc6304837b31bf35480a
+box/s7b-journal-nobox.png 383826 B 280c020f5126aeaf3b51f88bbfeb02c7335ed45ba30b68ab8fb3044fc7cbf47b

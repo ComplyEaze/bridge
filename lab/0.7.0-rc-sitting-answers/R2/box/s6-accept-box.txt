@@ -1,0 +1,25 @@
+2026-10-30T06:43:21.528Z watch start: tally window 0x7e26a4; see within 25 s; answer by 100 s
+2026-10-30T06:43:23.045Z BOX SEEN 0x19b1576 pid 13300 title 'ComplyEaze Bridge — create one ledger?' class #32770
+2026-10-30T06:43:23.127Z rect 688,342,1252,764 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 3 (lower = nearer the top); above tally True
+2026-10-30T06:43:23.177Z foreground 0x19b1576 pid 13300 bridge_mcp title 'ComplyEaze Bridge — create one ledger?'
+2026-10-30T06:43:23.195Z child Button rect 901,708,1001,741 text: &Yes
+2026-10-30T06:43:23.211Z child Button rect 1011,708,1111,741 text: &No
+2026-10-30T06:43:23.229Z child Button rect 1121,708,1221,741 text: Cancel
+2026-10-30T06:43:23.245Z child Static rect 725,413,765,453 text: 
+2026-10-30T06:43:23.263Z child Static rect 775,413,1203,662 text: Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to cancel. Nothing is
+created until you answer.
+
+Create ONE ledger in "BRIDGE LEDGERBOX CUT LAB"
+Company GUID: <company guid>
+Company number: <redacted: company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9001
+
+Create ledger "LBox Suspense" under Suspense A/c
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.
+2026-10-30T06:43:23.762Z capture s6-accept-open.png 1920x1080 380455 B sha256 05ccb20f7e509bc6cac26c2696fcfca126f05e1afdbefc6304837b31bf35480a
+2026-10-30T06:43:23.826Z WAITING for <LAB_DIR>\box\s6-accept.answer
+2026-10-30T06:43:31.691Z before click: foreground 0x19b1576 pid 13300 bridge_mcp title 'ComplyEaze Bridge — create one ledger?'
+2026-10-30T06:43:31.776Z CLICKED Yes at 951,724 (physical) 2026-10-30T06:43:31.722Z; seen-to-click 8.7 s
+2026-10-30T06:43:32.686Z after click: box visible False; foreground 0x7e26a4 pid 20032 tally title 'TallyPrime:9001'

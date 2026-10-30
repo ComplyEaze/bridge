@@ -339,7 +339,13 @@ async fn a_post_that_never_reached_tally_leaves_the_record_clear() {
         Arc::new(Gate(Arc::clone(&shared))),
         WireRetryPolicy::DEFAULT,
     )
-    .with_drain(POLICY);
+    // A refused connection, not a cut: the probe's deadline must admit the
+    // refusal itself, which a Windows host reports only after retrying the
+    // connect for about 2 s (the measured policy's 5 s does).
+    .with_drain(DrainPolicy {
+        probe_deadline: DrainPolicy::MEASURED.probe_deadline,
+        ..POLICY
+    });
     let error = transport
         .post_xml_decoded("<E />".into())
         .await

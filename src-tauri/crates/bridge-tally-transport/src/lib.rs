@@ -703,7 +703,7 @@ impl TallyHttpTransport {
         let result = async {
             #[expect(
                 clippy::disallowed_methods,
-                reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+                reason = "the drain probe (#2142): the transport's own GET /status, under the wire lock already held, through the same client, endpoint check and status response reader as every send, and observed as a status send in the egress receipt; loopback only, canonical_loopback_origin refuses any other host before a request is built"
             )]
             let response = self
                 .client

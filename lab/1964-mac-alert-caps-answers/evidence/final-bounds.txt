@@ -1,0 +1,12 @@
+A4c final: panel x=626 y=168 w=520 h=310 layer=8
+A4c final: panels=1
+A4d final: panel x=626 y=168 w=520 h=310 layer=8
+A4d final: panels=1
+A4e final: panel x=626 y=168 w=520 h=326 layer=8
+A4e final: panels=1
+A5 final: panel x=626 y=168 w=520 h=470 layer=8
+A5 final: panels=1
+A6 final: panel x=626 y=168 w=520 h=470 layer=8
+A6 final: panels=1
+A7 final: panel x=626 y=168 w=520 h=600 layer=8
+A7 final: panels=1

@@ -1,0 +1,4 @@
+screen frame=0,0,1512,982 visible_top_left=0,33,1512,865 scale=2.0
+panel x=593 y=131 w=586 h=674 layer=8
+panels=1
+bounds_exit=0 try=1

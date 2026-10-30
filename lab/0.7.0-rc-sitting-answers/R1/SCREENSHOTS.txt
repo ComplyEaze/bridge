@@ -1,0 +1,11 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/c10-tally.png 72697 B 65888420aee4c9c395596abeffe8a3ca7eab61962b58e788c7fcb3b3935fc518
+shots/s0-bk1-backup-screen.png 42318 B 192d00bce32059444b79c2dcb491a89d58bf54e59733aea7f86cb88a1e67c2d8
+shots/s0-tally.png 45437 B 8e74b518dcfe1a36c9631a34ada1f29afee4aa0f917d4238524fa798822bf2ed
+shots/s1-gateway.png 45437 B 8e74b518dcfe1a36c9631a34ada1f29afee4aa0f917d4238524fa798822bf2ed
+shots/s1-ledger-bank-b.png 41574 B 7ed9ca625ed539b59c8a2fbb813a0f8eadbb3d9652759ee31fcad7e53af83b0e
+shots/s6-after-post.png 45437 B 8e74b518dcfe1a36c9631a34ada1f29afee4aa0f917d4238524fa798822bf2ed
+shots/s7-gateway-after-restore.png 45437 B 8e74b518dcfe1a36c9631a34ada1f29afee4aa0f917d4238524fa798822bf2ed
+shots/s7-restore-screen.png 40348 B 1f1aaf0e130229171e740e2d25ad9336470230e9283f772419152df9068aa996
+box/s5-postA-nobox.png 373191 B 61e6b33709522f1027427313e365a79b91d4266b289b39fa1df7c481260d7860
+box/s6-postB-open.png 409053 B 701a8e6d8434dd15fd95a530072263eaff0b428629728c71bb90f579114543ed

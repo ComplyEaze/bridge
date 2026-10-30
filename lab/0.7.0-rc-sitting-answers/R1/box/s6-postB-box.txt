@@ -1,0 +1,38 @@
+2026-10-30T06:25:26.900Z watch start: tally window 0x7e26a4; see within 25 s; answer by 100 s
+2026-10-30T06:25:34.274Z BOX SEEN 0x622050 pid 7444 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-10-30T06:25:34.488Z rect 688,143,1252,964 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 3 (lower = nearer the top); above tally True
+2026-10-30T06:25:34.539Z foreground 0x622050 pid 7444 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-10-30T06:25:34.557Z child Button rect 901,908,1001,941 text: &Yes
+2026-10-30T06:25:34.573Z child Button rect 1011,908,1111,941 text: &No
+2026-10-30T06:25:34.580Z child Button rect 1121,908,1221,941 text: Cancel
+2026-10-30T06:25:34.599Z child Static rect 725,214,765,254 text: 
+2026-10-30T06:25:34.610Z child Static rect 775,214,1203,862 text: Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Receipt in "BRIDGE TIE OUT LAB 3"
+Company GUID: 9c97970c-e25d-4348-9740-6ddb1caaa56d
+Company number: <redacted: company number>  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9001
+Date: 30-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: below the dashes)
+
+Dr 400.00  "Union Bank"
+Cr 400.00  "Suspense"
+
+Total debit: 400  Total credit: 400
+Checked in Tally: every Dr ledger is bank/cash; every Cr ledger holds no money.
+Batch: bridge-441df17e-ea85-4e39-81a0-837ab298fe8d
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+Below the dashes: the reference on one line, then the narration in 2 parts.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration (1): "CLG A10000008 from SILVER OAK MUTUAL | Lab UBI 7788 | 30-Sep-2026 | UNIDENTIFIED - "
+Narration (2): "reallocate from Suspense"
+2026-10-30T06:25:35.046Z capture s6-postB-open.png 1920x1080 409053 B sha256 701a8e6d8434dd15fd95a530072263eaff0b428629728c71bb90f579114543ed
+2026-10-30T06:25:35.065Z WAITING for <LAB_DIR>\box\s6-postB.answer
+2026-10-30T06:25:44.879Z before click: foreground 0x622050 pid 7444 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-10-30T06:25:44.964Z CLICKED Yes at 951,924 (physical) 2026-10-30T06:25:44.924Z; seen-to-click 10.7 s
+2026-10-30T06:25:45.873Z after click: box visible False; foreground 0x7e26a4 pid 20032 tally title 'TallyPrime:9001'

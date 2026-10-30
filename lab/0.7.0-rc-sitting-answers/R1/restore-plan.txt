@@ -1,0 +1,8 @@
+R1 step 7.1 restore plan (C6), written before the restore.
+Folder: <LAB_DIR>\backups\BK1 (holds one file only)
+File: TDBK1800_<redacted: company number>.001, 32,143 B, sha256 fbf0df6b0aa4e85ac51a36767ba6d832232fe788fa7f893fef0f3064975535cc; the Restore list must show it dated 30-Oct-26 at 11:50 am.
+Company: BRIDGE TIE OUT LAB 3, number <redacted: company number>, GUID 9c97970c-e25d-4348-9740-6ddb1caaa56d
+Restore Data Path: <Tally data folder> (Tally's data folder)
+Steps: shut THE COMPANY (Company > Shut); Data > Backup & Restore > Restore; Restore Data Path = the data folder; source = Specify Path, the BK1 folder; select THE COMPANY only; screenshot before accepting.
+Two prompts expected and the only ones answered: "Accept ?" = Yes; "Company data folder (<redacted: company number>) already exists ... Skip ... Replace ..." = Replace.
+After: load THE COMPANY alone; screenshot of the whole Tally window and of the Gateway; then MARKS first, list_companies, ledger_movement as step 0, ledger_masters (every page).

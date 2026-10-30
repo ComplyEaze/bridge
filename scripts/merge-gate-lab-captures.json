@@ -2330,6 +2330,66 @@
       "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937",
       "size": 948
+    },
+    {
+      "blob": "e67d71f48860dabc780f0e2c16d13104fab81699",
+      "capture_id": "pilot-lab-ledger-rates-guid.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/1331-scoped-masters-answers at 1deab810a90f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the ledger-filter round",
+      "sha256": "572c8cc30a68fdc15025992f0e13761c99ed04894ab237624623c5e261375e7f",
+      "size": 2756
+    },
+    {
+      "blob": "70990360d8fcf65fbd4c9ec5c7cbbc25746e0784",
+      "capture_id": "pilot-lab-ledger-rates-guid.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/1331-scoped-masters-answers at 1deab810a90f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the ledger-filter round",
+      "sha256": "e69970019c5f606775b339fc98de50c626be99a2cc1f9aeeef02569842681922",
+      "size": 19730
+    },
+    {
+      "blob": "bb481daa7bb4b8d897d94e10a79b8a773bc8c75f",
+      "capture_id": "pilot-lab-ledger-rates-guid-one-absent.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/1331-scoped-masters-answers at 1deab810a90f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-one-absent.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the ledger-filter round",
+      "sha256": "9a5105c521e48c1e549e9292a9e229a008d21292a0584ef5b2bbec4b5292c27d",
+      "size": 2756
+    },
+    {
+      "blob": "fb641c9e885164a842717243784a87ae78a5b245",
+      "capture_id": "pilot-lab-ledger-rates-guid-one-absent.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/1331-scoped-masters-answers at 1deab810a90f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-one-absent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the ledger-filter round",
+      "sha256": "59850a0677472bbf352e4706dff3e98bc758e8844b98eabff386db4e5dc757cf",
+      "size": 17282
+    },
+    {
+      "blob": "c292ebf312f8044fb36a1b1cc51388568eef625f",
+      "capture_id": "pilot-lab-ledger-rates-guid-none.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/1331-scoped-masters-answers at 1deab810a90f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-none.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the ledger-filter round",
+      "sha256": "46b20305ca7633e0f7a84f2abc169c259ebdb2efd90dfce35467346c0dfd9d9a",
+      "size": 2284
+    },
+    {
+      "blob": "72206268cf31e60998fb2da68e227f14b84f0511",
+      "capture_id": "pilot-lab-ledger-rates-guid-none.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/1331-scoped-masters-answers at 1deab810a90f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-none.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md, the ledger-filter round",
+      "sha256": "6e9e95e8dc9645f69e0794b10a9aac68daff14b259c9f5ba7abad57a75a52c6f",
+      "size": 2994
     }
   ]
 }

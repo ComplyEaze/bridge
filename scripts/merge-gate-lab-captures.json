@@ -2390,6 +2390,76 @@
       "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "31a5b8979f1bed4e52698183ceebf8760763e0c41c33c56a1f3b6e3a718b12a6",
       "size": 6296
+    },
+    {
+      "blob": "f238772b15d1e4aa4758cdebeeef644616fb3eca",
+      "capture_id": "builtin_godown_closing_stock_summary_exploded_fy_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-godown-closing-answers at ed1ddac03038",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_closing_stock_summary_exploded_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6566c8f06a11ff70ed96e75b0e807403ea5b87dafdfd91e87b6413d80fcfe52f",
+      "size": 818
+    },
+    {
+      "blob": "251a7293a50833b2844db90d37b8beb0c889123a",
+      "capture_id": "builtin_godown_closing_stock_summary_to_20250831_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-godown-closing-answers at ed1ddac03038",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_closing_stock_summary_to_20250831_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "f6a50582342ace0da0245ee8f110aba2db5299db1d653f7f0313aba31037b55f",
+      "size": 2312
+    },
+    {
+      "blob": "daa041f80d70958b7d2abe9c48b21cda72a8f0ea",
+      "capture_id": "builtin_godown_closing_godown_summary_to_20250831_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-godown-closing-answers at ed1ddac03038",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_closing_godown_summary_to_20250831_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a34ec53c0dc74adce3247964c7753b1ae807dab3f1ad36e032c130a677f31ba6",
+      "size": 936
+    },
+    {
+      "blob": "53870ce50c96200834fb84cc7d0dc68c1bfec461",
+      "capture_id": "builtin_godown_closing_stock_summary_exploded_to_20250831_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-godown-closing-answers at ed1ddac03038",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_closing_stock_summary_exploded_to_20250831_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4cf5e405100259931ff252710ed16d1c820350c99ede3b582eb054e0a045a898",
+      "size": 7610
+    },
+    {
+      "blob": "a74428751aa0cff8d2cbe51ffd81fa1dcf6b7365",
+      "capture_id": "builtin_godown_closing_stock_summary_fy_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-godown-closing-answers at ed1ddac03038",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_closing_stock_summary_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d8bf288082b5bfedf9ca63b0f461a55ee4b8a82b8900e167a1fe329e426d9ffb",
+      "size": 2312
+    },
+    {
+      "blob": "ae1761cd4b46234113ecf28227711dd8df461dd4",
+      "capture_id": "builtin_godown_closing_godown_summary_fy_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-godown-closing-answers at ed1ddac03038",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_closing_godown_summary_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a942e3ed5319e09b8bd149bc6ca81c357341bc8cecc91694b41fc273cbdb3b2a",
+      "size": 936
+    },
+    {
+      "blob": "6f8d0787852abefc29612c9187b21b5b5deb667c",
+      "capture_id": "builtin_godown_closing_stock_summary_exploded_fy_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-godown-closing-answers at ed1ddac03038",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_closing_stock_summary_exploded_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d680f038a4747775a487f94cb9942e72020ff64f8176db786136ffb0c09607a2",
+      "size": 8106
     }
   ]
 }

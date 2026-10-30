@@ -407,15 +407,15 @@ copy by that copy. `package_copies` is what shows that the second copy exists,
 and a terminal outside Claude Desktop does not see that copy as part of the
 folder. The report does not record which side ran it; run from inside Claude
 Desktop on that computer, `package_copies` and the data folder's file locations
-both named the second folder, so such a run cannot tell whether
-`%LOCALAPPDATA%\Bridge\agent` also exists. Check both folders before you archive
-or delete. **Not measured:** ComplyEaze Bridge as Claude Desktop starts the
-extension (the measured copies carried no package identity, yet Windows
-redirected their files); a copy outside Claude Desktop running first; another
-Claude Desktop version; Windows 11; this build, its file locations once both
-folders exist (the lab read them with a probe making the same Windows call), and
-`package_copies`, which lists `%LOCALAPPDATA%\Packages`, on a real computer. On
-that
+would both name the second folder (inferred from the lab's probe, not from a run
+of this report), so such a run cannot tell whether `%LOCALAPPDATA%\Bridge\agent`
+also exists. Check both folders before you archive or delete. **Not measured:**
+ComplyEaze Bridge as Claude Desktop starts the extension (the measured copies
+carried no package identity, yet Windows redirected their files); a copy outside
+Claude Desktop running first; another Claude Desktop version; Windows 11; this
+build, its file locations once both folders exist (the lab read them with a
+probe making the same Windows call), and `package_copies`, which lists
+`%LOCALAPPDATA%\Packages`, on a real computer. On that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).

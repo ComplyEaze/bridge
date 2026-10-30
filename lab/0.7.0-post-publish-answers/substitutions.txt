@@ -1,0 +1,9 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+answers/001-tally-status.json: original 1823 B sha256 affcaff9c7d1d43ec695d0ec14e1583972b262de6eabf98006c603e60b749365 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/002-list-companies.json: original 1569 B sha256 2846bfc71250fc0320f1e296d5b1fe6ccd61ff1470f4a8b9521ea14e23432bb6 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/003-ledger-masters.json: original 32039 B sha256 dfb8291bb4f2c11525b237278dec2bdb4a8318048923da3df68eff42112eec23 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+l2/answers/000-ledger-masters.json: original 32039 B sha256 7611209172f82e24dcf0fec5e52c40ea32193633b517e2a9aa331567ac936319 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+scripts/client.py: original 4864 B sha256 6a2b2e397c62c0ca6fd870b07a03bf594a443ee0964745dd9222c856bcf25e35 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> lab-client; 4 x -> stop
+scripts/unpack.py: original 794 B sha256 0308b9d695013841569eaab68bab5360a65c87fca1859c154a0f34358a842335 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/launch-env-l1.json: original 174 B sha256 e8c7010526fdae31d5df3812c9658185d971f612eec77a80fd6c22e207d97959 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/launch-env-l2.json: original 174 B sha256 43130e880e024595b78ad67df1ecbe4000d6245adede9205dccda3f50fc4d4f3 (kept on the lab PC); 1 x -> <LAB_DIR>

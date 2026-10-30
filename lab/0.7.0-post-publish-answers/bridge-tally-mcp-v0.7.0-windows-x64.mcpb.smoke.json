@@ -1,0 +1,22 @@
+{
+  "archive_sha256": "291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec",
+  "binary_sha256": "48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d",
+  "platform": "win32",
+  "archive_entries": 9,
+  "legal_resources": 5,
+  "pdfium_library_sha256": "79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118",
+  "statement_vouchers": 6,
+  "server_version": "0.7.0",
+  "response_ids": [
+    1,
+    2,
+    3
+  ],
+  "response_bytes": 231310,
+  "default_tool_count": 33,
+  "opt_in_tool_count": 35,
+  "opt_in_stderr_bytes": 0,
+  "egress_receipts": 2,
+  "stderr_bytes": 0,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

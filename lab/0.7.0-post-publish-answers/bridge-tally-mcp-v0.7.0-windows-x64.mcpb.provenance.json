@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "release_tag": "mcp-v0.7.0",
+  "channel": "preview-unsigned",
+  "platform": "windows-x64",
+  "asset_name": "bridge-tally-mcp-v0.7.0-windows-x64.mcpb",
+  "sha256": "291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec",
+  "source_sha": "fcfb5ff6958a60af3d713420bf1b488089d35cdb",
+  "signing": "unsigned_preview"
+}

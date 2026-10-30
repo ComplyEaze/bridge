@@ -32,7 +32,7 @@ Named differences from LAB-COMMON:
 Licensed mode only; Education mode = STOP.
 
 ## Build
-`bridge_mcp.exe` of pull request #2204 at its head `c13a0bd0059ace7d9a4d8e638bdd85144f2596d5`, built by CI run 41013617643 dispatched on that head (the `unsigned-bundle-smoke-windows-latest` artifact, id `12959380456`, 57,442,825 bytes, zip digest `sha256:8657164578579f0d37a828cca2d86cb1b76ad59070b90d0a2cd01e36efa0aa10`). Check the downloaded zip's sha256 against that digest before unpacking; another digest = STOP. The exe's sha256 is recorded at step 0, from that artifact, and again after the last call; a different second sha256 = STOP. A later head of the pull request needs its own build and a new Build line.
+`bridge_mcp.exe` of pull request #2204 at its head `651cdfa67f15056cd9017b12589e0a010c80637d`, built by CI run 41025801031 dispatched on that head (the `unsigned-bundle-smoke-windows-latest` artifact, id `12963818564`, 58,275,049 bytes, zip digest `sha256:72284e1e536070f3d5c343265c0e20d1f4dfdce4fabd28ab4b7720dc340f0bae`). Check the downloaded zip's sha256 against that digest before unpacking; another digest = STOP. The exe's sha256 is recorded at step 0, from that artifact, and again after the last call; a different second sha256 = STOP. A later head of the pull request needs its own build and a new Build line.
 
 Run it over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, a new empty `BRIDGE_AGENT_DATA_DIR` (`C:\bridge-lab\2142live\data`, listed first: absent or empty, else STOP), `BRIDGE_TERMS_ACCEPTED=true`, and redaction unset. Writes stay off. `tools/list` must hold `list_companies`, `ledger_masters`, `outstandings` and `egress_log`; any absent = STOP.
 

@@ -2330,6 +2330,26 @@
       "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937",
       "size": 948
+    },
+    {
+      "blob": "f753edebe7af2dd82c9583fa44e22655db81e8ca",
+      "capture_id": "native/bills_payable_forex_settled_empty_closing.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/2071-forex-rerun-answers at 0d7eb0bf5cae",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/bills_payable_forex_settled_empty_closing.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b5a4bd6e0ea384076feba7c1157630a6fe0d2c09af00fc29444d845d470b6320",
+      "size": 476
+    },
+    {
+      "blob": "60f837b644d2abf8d7c1e5f5012654b4e4c34435",
+      "capture_id": "native/bills_receivable_forex_rerun.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/2071-forex-rerun-answers at 0d7eb0bf5cae",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/bills_receivable_forex_rerun.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "52114c9c1cd98a95e9b41c7bd7b022eb2d080ba2c212d0bdb9f02d3899ef7ab1",
+      "size": 500
     }
   ]
 }

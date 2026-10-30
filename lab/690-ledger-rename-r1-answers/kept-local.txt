@@ -1,0 +1,6 @@
+Files kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+evidence/z1-company-listing-after.txt 1540 B 34a984988e883725652920819ceb847e5cd26d5047a725eca5a771343875d010
+evidence/z1-company-listing-before.txt 1604 B 68a20512c30abf9d9fb81ebf81411bdc9daf1a620ff2e433dbede5b7d2d821fc
+evidence/z3-company-listing-after.txt 1540 B ae537063dae43cd6f14e093e0a852c43f46db490790d78a5dff4d610e8cc1a37
+evidence/z3-company-listing-before.txt 1604 B 0d87affc4ca2312f2ef69f3c3859597f18ab413e07c0f606da666c66b052c044
+bk0/TDBK1800_<company number>.001 23613 B 866a052b44abf8584405ececa26869f740a68160ad50fee2b6e858fe5e4e3194

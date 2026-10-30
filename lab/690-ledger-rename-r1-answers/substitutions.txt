@@ -1,0 +1,11 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+evidence/b0-bridge-processes.txt: original 796 B sha256 a2bfb513dfbe07f7225b6827409d291998cc73d2dc4a63b6b55b8c2caaef6312 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/b0-netstat.txt: original 10083 B sha256 57a18500ef0e1c474cb8f5e9fcbbfb7657a5ebb14c9a782ffe6d60e87fd9ae69 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/b3-bridge-processes.txt: original 796 B sha256 3f65c5212d953de8769ab812efb27395b4ebaf34e64e38bb423440f746ae58a7 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/b3-netstat.txt: original 10077 B sha256 65bfc73d9335efbd19d3aeda4af550be6fe00c13ec451f2cd455eca11609adf0 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/s0-bridge-processes.txt: original 796 B sha256 b4773a4cc50548b038fc55d5ec70e3bdf95b9ffb8272b39b0432c428895190c7 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/s0-netstat.txt: original 9560 B sha256 4b775ac7b73987162adbdf4fc532e311af60cff90fd9801a7c6d7cb0e546e5d5 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/z5-bridge-processes.txt: original 796 B sha256 7584d94c51818427feff8322d75763a9eaaaed96d545908ea42c0ce96d0f05fc (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/z5-netstat.txt: original 9852 B sha256 4cc8fab913323ee7c4e503cf2440faaf5867b7e62582f38add7d6662ec25ab70 (kept on the lab PC); only the port-9001 LISTENING lines kept
+notes.txt: original 7991 B sha256 ba6a7d2998998a16385fcad9f5ce5e4ffbbc0e46bc8dc39a012aa9b5c56f07ae (kept on the lab PC); the company number replaced in 1 place(s); 1 x -> <LAB_DIR>
+scripts/r1.py: original 9393 B sha256 982d625c5232b506613e667a8399a0ca75b51928da4c8c5727545bd7d5248ed5 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop

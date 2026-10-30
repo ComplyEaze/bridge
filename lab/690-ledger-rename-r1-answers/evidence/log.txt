@@ -1,0 +1,83 @@
+S1-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:46:33.780Z answered 2026-10-30T07:46:33.839Z 0.063 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+S1-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:46:33.867Z answered 2026-10-30T07:46:33.964Z 0.094 s curl_exit 0 printed "200 6924" CONTENT-LENGTH 6924 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+S1: C4 dropped before parsing: {'ref U+0004': 1}
+S1-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:46:33.979Z answered 2026-10-30T07:46:34.063Z 0.079 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+S1: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+S1 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; S1 names held: []
+N1 setup-create-2.utf16le.xml (1348 B, sha256 bb1f3b29a141670846156b2b68c4ad1e93cea4a951dde3fe96b16ecdb308ee9e) sent 2026-10-30T07:46:42.236Z answered 2026-10-30T07:46:42.573Z 0.344 s curl_exit 0 printed "200 538" CONTENT-LENGTH 538 bytes 538 sha256 9cca0f382ec8c2448cdebb3b2fafb9f6d1aaad12600867ddec73a36a401b7320
+N1 counters {"CREATED": "2", "ALTERED": "0", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+N2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:46:53.162Z answered 2026-10-30T07:46:53.404Z 0.219 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 b3d62ebe95e34465299552fa768cdadff19ea78cb039c01418769ff8686369df
+N2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:46:53.417Z answered 2026-10-30T07:46:53.727Z 0.297 s curl_exit 0 printed "200 9500" CONTENT-LENGTH 9500 bytes 9500 sha256 a544eae95a834d120dce9c126b2168b45990f34eb9347cd42912e760d9c37738
+N2: C4 dropped before parsing: {'ref U+0004': 1}
+N2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:46:53.739Z answered 2026-10-30T07:46:53.836Z 0.110 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 a154a1a96ccb426735ebc43d8d4ea8b0030f7a248286d7722d49c53257c0e887
+N2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+N2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '210', 'altvchid': ''}; ledgers 5, groups 28; S1 names held: ['R1 Guard X', 'R1 Guard Y']
+   ledger 000000cf row NAME 'R1 Guard X' RESERVEDNAME '' own 'R1 Guard X' lists [{"languageid": "0", "names": ["R1 Guard X"]}] ALTERID 209 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R1 Guard Y' RESERVEDNAME '' own 'R1 Guard Y' lists [{"languageid": "0", "names": ["R1 Guard Y"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against S1: ledgers added [('000000cf', 'R1 Guard X'), ('000000d0', 'R1 Guard Y')]; gone []; ALTERID moved []
+   against S1: groups added []; gone []; ALTERID moved []
+   against S1: ALTMSTID 208 -> 210; ALTVCHID '' -> ''
+M1 r1m-filled.utf16le.xml (1212 B, sha256 02f1dc53fa7a2405b17b0b99d9f170f09e2edff1f5cd4e21deb66b6c8c068a26) sent 2026-10-30T07:47:11.041Z answered 2026-10-30T07:47:11.359Z 0.312 s curl_exit 0 printed "200 538" CONTENT-LENGTH 538 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+M1 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+M2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:47:20.914Z answered 2026-10-30T07:47:21.002Z 0.078 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 7af2ccaade5f10524e983b52ce3a03cb66d8d68c48e404f28e00363a0c8464ff
+M2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:47:21.010Z answered 2026-10-30T07:47:21.092Z 0.078 s curl_exit 0 printed "200 9512" CONTENT-LENGTH 9512 bytes 9512 sha256 a6ef65a21ae5822938f9aae45e55b8b172e70f72ccc9b68c3ee3561200d95e83
+M2: C4 dropped before parsing: {'ref U+0004': 1}
+M2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:47:21.097Z answered 2026-10-30T07:47:21.181Z 0.094 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 057a13025e2486dbb808538bde8b89781112cfcb6c52f49668e31a7a9470eeec
+M2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+M2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '211', 'altvchid': ''}; ledgers 5, groups 28; S1 names held: ['R1 Guard X2', 'R1 Guard Y']
+   ledger 000000d0 row NAME 'R1 Guard Y' RESERVEDNAME '' own 'R1 Guard Y' lists [{"languageid": "0", "names": ["R1 Guard Y"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000cf row NAME 'R1 Guard X2' RESERVEDNAME '' own 'R1 Guard X2' lists [{"languageid": "1033", "names": ["R1 Guard X2"]}] ALTERID 211 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against N2: ledgers added []; gone []; ALTERID moved [('000000cf', '209', '211')]
+   against N2: groups added []; gone []; ALTERID moved []
+   against N2: ALTMSTID 210 -> 211; ALTVCHID '' -> ''
+A1 r1a-filled.utf16le.xml (1212 B, sha256 bb28015eda6b94a9487a7f183b9c95f437035afa2bb61a32cdb5b0b5e4356a7a) sent 2026-10-30T07:47:31.270Z answered 2026-10-30T07:47:31.576Z 0.312 s curl_exit 0 printed "200 538" CONTENT-LENGTH 538 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+A1 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+A2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:47:41.122Z answered 2026-10-30T07:47:41.462Z 0.328 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 02e0c98b3494666b5f385b6c82b59d8ef03a5fb05cb23e409568b3f6ccdb4db0
+A2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:47:41.475Z answered 2026-10-30T07:47:41.629Z 0.156 s curl_exit 0 printed "200 9524" CONTENT-LENGTH 9524 bytes 9524 sha256 151fb2b68672f2ed19240c92be1113e2e4562ba121af99e6beb355586cfb56f6
+A2: C4 dropped before parsing: {'ref U+0004': 1}
+A2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:47:41.641Z answered 2026-10-30T07:47:41.734Z 0.078 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 7e88e0ccf2fa24f8df1c38db702b27d3d043a008c1af585a5abae8212e8c9dde
+A2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+A2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '212', 'altvchid': ''}; ledgers 5, groups 28; S1 names held: ['R1 Guard X2', 'R1 Guard Y2']
+   ledger 000000cf row NAME 'R1 Guard X2' RESERVEDNAME '' own 'R1 Guard X2' lists [{"languageid": "1033", "names": ["R1 Guard X2"]}] ALTERID 211 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R1 Guard Y2' RESERVEDNAME '' own 'R1 Guard Y2' lists [{"languageid": "1033", "names": ["R1 Guard Y2"]}] ALTERID 212 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against M2: ledgers added []; gone []; ALTERID moved [('000000d0', '210', '212')]
+   against M2: groups added []; gone []; ALTERID moved []
+   against M2: ALTMSTID 211 -> 212; ALTVCHID '' -> ''
+Z2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:49:43.684Z answered 2026-10-30T07:49:43.780Z 0.094 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+Z2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:49:43.791Z answered 2026-10-30T07:49:43.902Z 0.110 s curl_exit 0 printed "200 6924" CONTENT-LENGTH 6924 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+Z2: C4 dropped before parsing: {'ref U+0004': 1}
+Z2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:49:43.914Z answered 2026-10-30T07:49:44.022Z 0.110 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+Z2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+Z2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; S1 names held: []
+   against S1: ledgers added []; gone []; ALTERID moved []
+   against S1: groups added []; gone []; ALTERID moved []
+   against S1: ALTMSTID 208 -> 208; ALTVCHID '' -> ''
+B1 r0c-alter-missing.utf16le.xml (1124 B, sha256 942da071b57d86d8d3f7d5eecddd1ab71e54df040a50539d9d0b89d9eddf5a7d) sent 2026-10-30T07:51:53.924Z answered 2026-10-30T07:51:54.284Z 0.344 s curl_exit 0 printed "200 632" CONTENT-LENGTH 632 bytes 632 sha256 51027fb16d8882cc91e2ceda85471708085449a6de2437c7a956ad9787ed69c1
+B1 counters {"CREATED": "0", "ALTERED": "0", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "1", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR ["Group Name not given!"]
+B2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:52:06.398Z answered 2026-10-30T07:52:06.481Z 0.062 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+B2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:52:06.481Z answered 2026-10-30T07:52:06.572Z 0.079 s curl_exit 0 printed "200 6924" CONTENT-LENGTH 6924 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+B2: C4 dropped before parsing: {'ref U+0004': 1}
+B2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:52:06.586Z answered 2026-10-30T07:52:06.687Z 0.094 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+B2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+B2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; S1 names held: []
+   against Z2: ledgers added []; gone []; ALTERID moved []
+   against Z2: groups added []; gone []; ALTERID moved []
+   against Z2: ALTMSTID 208 -> 208; ALTVCHID '' -> ''
+B6-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:56:21.045Z answered 2026-10-30T07:56:21.126Z 0.078 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+B6-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:56:21.138Z answered 2026-10-30T07:56:21.226Z 0.094 s curl_exit 0 printed "200 6924" CONTENT-LENGTH 6924 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+B6: C4 dropped before parsing: {'ref U+0004': 1}
+B6-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:56:21.232Z answered 2026-10-30T07:56:21.323Z 0.094 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+B6: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+B6 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; S1 names held: []
+   against B2: ledgers added []; gone []; ALTERID moved []
+   against B2: groups added []; gone []; ALTERID moved []
+   against B2: ALTMSTID 208 -> 208; ALTVCHID '' -> ''
+Z4-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T07:58:12.431Z answered 2026-10-30T07:58:12.512Z 0.062 s curl_exit 0 printed "200 3318" CONTENT-LENGTH 3318 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+Z4-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T07:58:12.519Z answered 2026-10-30T07:58:12.647Z 0.125 s curl_exit 0 printed "200 6924" CONTENT-LENGTH 6924 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+Z4: C4 dropped before parsing: {'ref U+0004': 1}
+Z4-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T07:58:12.647Z answered 2026-10-30T07:58:12.780Z 0.125 s curl_exit 0 printed "200 54280" CONTENT-LENGTH 54280 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+Z4: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+Z4 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; S1 names held: []
+   against S1: ledgers added []; gone []; ALTERID moved []
+   against S1: groups added []; gone []; ALTERID moved []
+   against S1: ALTMSTID 208 -> 208; ALTVCHID '' -> ''

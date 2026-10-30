@@ -1,0 +1,18 @@
+{
+ "label": "N1",
+ "file": "setup-create-2.utf16le.xml",
+ "counters": {
+  "CREATED": "2",
+  "ALTERED": "0",
+  "DELETED": "0",
+  "COMBINED": "0",
+  "IGNORED": "0",
+  "ERRORS": "0",
+  "CANCELLED": "0",
+  "EXCEPTIONS": "0",
+  "LASTMID": "0",
+  "LASTVCHID": "0"
+ },
+ "lineerror": [],
+ "root": "RESPONSE"
+}

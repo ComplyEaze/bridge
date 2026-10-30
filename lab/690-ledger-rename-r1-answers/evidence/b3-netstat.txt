@@ -1,0 +1,6 @@
+command: netstat -ano 2>&1
+time: 2026-10-30T07:54:04.188Z
+exit: 0
+TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       28316
+TCP    [::]:9001              [::]:0                 LISTENING       28316
+(pushed copy: only the LISTENING lines on port 9001; the full output had 37 LISTENING lines)

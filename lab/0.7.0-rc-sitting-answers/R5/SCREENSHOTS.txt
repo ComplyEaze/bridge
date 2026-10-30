@@ -1,0 +1,3 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/c10-tally.png 72697 B 65888420aee4c9c395596abeffe8a3ca7eab61962b58e788c7fcb3b3935fc518
+shots/s0-tally.png 45477 B 722d169a3ab6640c12caa54a8206682657acd52152413c3344f0ad8853711ebb

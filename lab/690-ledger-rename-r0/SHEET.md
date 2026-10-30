@@ -39,9 +39,14 @@ BRIDGE LEDGERBOX CI LAB, licensed TallyPrime 7.2 Silver, loaded alone, as in L0 
   - An exit code other than 0, a status other than 200, or an empty answer = the request failed. That is a STOP; it
     is never read as an answer with no counters.
   - A request that reaches `--max-time`: take a screenshot of Tally, then STOP.
-- Read each answer with an XML parser, never by eye or by grep. The answers are UTF-16LE without a byte-order mark.
-  Where an answer carries `&#4;`, replace that reference with nothing before parsing, and record that it was there.
-  Any other parse failure = STOP. Keep every answer file byte for byte.
+- Read each answer with an XML parser, never by eye or by grep, as LAB-COMMON C4 (v3, the copy on
+  `lab/1713-settle-order`) says. Decode it as UTF-16LE, with or without a byte-order mark. Before parsing, drop ONLY
+  the characters XML forbids, whether raw or as references: 0 to 8, 11, 12 and 14 to 31. KEEP 9, 10 and 13, since a
+  name may end in a line break. Record which ones an answer carried and where (the group read's `PARENTSTRUCTURE`
+  carries raw 3 and the reference 4, for example). An answer that still does not parse = STOP. Keep every answer
+  file byte for byte: the dropping is done on a copy for reading only.
+  - Changed 30 Oct 2026, after the first S1 stopped on a raw 3 in the group read: the sheet named only `&#4;`. The
+    rule is now C4's. Requests and every STOP rule are unchanged.
 - Before sending, check each request file's SHA-256 against `SHA256.txt`; a mismatch = STOP. The one file with a
   placeholder, `r0h-guid-template.utf16le.xml`, is filled only by `fill_r0h.py` (step H0), never by hand.
 - **"Named"** in this sheet means a ledger's own name: the first `NAME` of the first `NAME.LIST` under its first

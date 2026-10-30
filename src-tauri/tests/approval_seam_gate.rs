@@ -1429,28 +1429,25 @@ const DISPLAYED_TEXT: &str = r#"fn displayed_text(shown: Shown, count: VoucherCo
 }"#;
 
 const MAC_ALERT_CHECK: &str = r#"#[cfg(not(windows))]
-fn wrapped_lines(text: &str) -> usize {
-    text.lines()
-        .map(|line| line.chars().count().div_ceil(MAC_WRAP_CHARS).max(1))
-        .sum()
-}
+fn alert_top(screen: ScreenSpan) -> f64 {
+    ALERT_TOP_FROM_SCREEN_TOP
+        .max(screen.visible_top + ALERT_TOP_BELOW_VISIBLE_TOP)
+        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)
+}"#;
 
-/// Whether the Mac alert shows `text` whole on the smallest supported screen
-/// (#1780).
-#[cfg(not(windows))]
-fn fits_the_alert(text: &str) -> bool {
-    wrapped_lines(text) <= MAC_WRAPPED_LINES
-}
+const MAC_ALERT_FITS: &str = r#"#[cfg(not(windows))]
+fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
+    text_height.is_finite()
+        && text_height >= 0.0
+        && alert_top(screen) + ALERT_CHROME + text_height + ALERT_SLACK <= screen.visible_bottom
+}"#;
 
-/// Ends the dialog child before anything is shown when the Mac alert could
-/// not show `text` whole (#1780), with the status the parent reads as a box
-/// that did not fit the screen, as a Windows box that does not fit ends
-/// (`box_fit`). The parent then refuses the text as too large, and a batch's
-/// next ask shows its totals only (#1832).
-#[cfg(not(windows))]
+const MAC_ALERT_EXIT: &str = r#"#[cfg(not(windows))]
 fn exit_unless_the_alert_fits(text: &str) {
-    if !fits_the_alert(text) {
-        std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT);
+    match measured_alert(text) {
+        Some((height, screen)) if alert_fits(height, screen) => {}
+        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
+        None => std::process::exit(0),
     }
 }"#;
 
@@ -2009,7 +2006,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 45] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 47] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2024,11 +2021,14 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 45] = [
     (ANSWER_TEXT, 1),
     (ANSWER_TEXT_WINDOWS, 1),
     (DISPLAYED_TEXT, 1),
-    // The Mac alert's count of wrapped lines, with which each Mac dialog ends
-    // its child unshown when its text would not fit (#1780, option (c)). Its
-    // two figures are the calibration row's, so they are not pinned here; the
-    // five calls are in the dialogs' own pins.
+    // The Mac alert's measured check, with which each Mac dialog ends its child
+    // unshown when its text would run past the screen (#1780, option (c2)): where
+    // its top is taken to sit, the comparison, and the exit. Its figures are the
+    // lab rows', so they are not pinned here; the five calls are in the dialogs'
+    // own pins.
     (MAC_ALERT_CHECK, 1),
+    (MAC_ALERT_FITS, 1),
+    (MAC_ALERT_EXIT, 1),
     (FITS_THE_BOX, 1),
     (POST_DIALOG_WINDOWS, 1),
     (REVIEW_ACK_DIALOG, 1),
@@ -2145,10 +2145,12 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // its title, dialog and button on a Mac. #1709: the same for the settle
     // window.
     ("#[cfg(windows)]", 12),
-    // #1780's Mac caps: the two figures, the count, the check, the child's
-    // exit, and the count's test.
-    ("#[cfg(not(windows))]", 23),
-    ("cfg", 49),
+    // #1780's Mac check (c2): the seven measured figures, the screen span,
+    // where the top sits, the comparison, the child's exit and their two tests;
+    // and four `cfg(target_os = "macos")` items (the text's height, the screen,
+    // the two together, and the height's test) with one other-platform arm.
+    ("#[cfg(not(windows))]", 30),
+    ("cfg", 61),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2224,10 +2226,10 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
-        // A Mac dialog stops counting its alert's lines, the count passes
-        // every text, counts a line once whatever its length, or ends the
-        // child with a status the parent does not read as a box that did not
-        // fit (#1780, option (c)).
+        // A Mac dialog stops measuring its alert, or the measure drops the
+        // lowest top, the slack or the visible bottom, shows an alert it could
+        // not measure, or ends the child with a status the parent does not read
+        // as a box that did not fit (#1780, option (c2)).
         source.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
         replace_last(&source, "    exit_unless_the_alert_fits(preview);\n", ""),
         source.replacen(
@@ -2245,15 +2247,13 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
             1,
         ),
+        source.replacen("        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)\n", "", 1),
+        source.replacen(" + ALERT_SLACK <= screen.visible_bottom", " <= screen.visible_bottom", 1),
+        source.replacen("<= screen.visible_bottom", "<= screen.height", 1),
+        source.replacen("        None => std::process::exit(0),", "        None => {}", 1),
         source.replacen(
-            "wrapped_lines(text) <= MAC_WRAPPED_LINES",
-            "wrapped_lines(text) <= usize::MAX",
-            1,
-        ),
-        source.replacen(".div_ceil(MAC_WRAP_CHARS).max(1)", ".min(1).max(1)", 1),
-        source.replacen(
-            "std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT);",
-            "std::process::exit(0);",
+            "        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),",
+            "        Some(_) => std::process::exit(0),",
             1,
         ),
         // The parent stops reading a box that did not fit as a refusal, or

@@ -1973,7 +1973,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "The approval text for this invoice does not fit in one native dialog, so it \
              cannot be approved or posted, and no file was written. Ask the user to shorten \
              the narration or reference, then build the invoice again; on a Mac, whose dialog \
-             must fit a 13-inch screen whole, posting it in ComplyEaze Bridge on a Windows PC \
+             must fit the screen whole, posting it in ComplyEaze Bridge on a Windows PC \
              also works. Do not offer to import it by hand.",
         ),
         "invoice_post_not_enabled" => Some(

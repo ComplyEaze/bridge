@@ -160,6 +160,10 @@ pub(crate) struct InvoiceReadPlan {
     /// for a book over the master mark.
     pub(crate) ledger_count: AgentReadRequest,
     pub(crate) rates: AgentReadRequest,
+    /// Each ledger the rates request names, by lower-case GUID, with the parent
+    /// the plan's catalogue gave it (#1331). The request names ledgers by GUID,
+    /// so it is unchanged when one is regrouped; this is how the queue tells.
+    pub(crate) ledger_parents: Vec<(String, String)>,
     pub(crate) voucher_types: AgentReadRequest,
     pub(crate) number: AgentReadRequest,
     /// The same read for the invoice the journal held as the number's control.

@@ -816,35 +816,46 @@ pub(super) fn parse_company_registration(
 /// the lab answered them on 12 Oct 2026 on the unrestricted request (lab
 /// request set W16, the `pilot-lab-ledger-rates-hsn` fixture;
 /// `GSTTYPEOFSUPPLY` and `GSTAPPLICABLE` are for the code warnings that
-/// follow). Since #1331 the code sends the restricted request
-/// (`render_ledger_rates_request_for_parents`); §9.16, "the rates request the
+/// follow). Since #1331 the code sends the request restricted to the named ledgers
+/// (`render_ledger_rates_request_for_ledgers`); §9.16, "the rates request the
 /// code sends", says what the lab has and has not answered of it. `window` is
 /// the financial year's start and the invoice date, as the request that was
 /// measured carried them (a ledger's rate rows came back whole; whether the
 /// window changes them was not tried).
 #[cfg(test)]
 fn render_ledger_rates_request(company: &str, window: (&TallyDate, &TallyDate)) -> String {
-    render_ledger_rates(company, window, None)
+    render_ledger_rates(
+        company,
+        window,
+        bridge_tally_protocol::native_outstandings::parent_filter_parts(None),
+    )
 }
 
-/// [`render_ledger_rates_request`] restricted to the ledgers under one
-/// [`ParentPart`]'s parents, through the same `SYSTEM` formula and `FILTERS`
-/// element the compliance listing's parts carry (#679, #1331). The fetch list
-/// is the unfiltered request's, unchanged.
-pub(in crate::agent) fn render_ledger_rates_request_for_parents(
+/// [`render_ledger_rates_request`] restricted to the ledgers one
+/// [`LedgerGuidPart`](bridge_tally_protocol::ledger_guid_part::LedgerGuidPart)
+/// names, through the same `SYSTEM` formula and `FILTERS` element a parent
+/// part's request carries (#1331). The fetch list is the unfiltered request's,
+/// unchanged. The lab answered it with exactly the named ledgers' rows, each
+/// byte-identical to the same ledger's row of the parent-filtered answer, at
+/// 18, 10,018 and 20,018 ledgers (`lab/1331-scoped-masters-answers`, 31 Oct
+/// 2026).
+pub(in crate::agent) fn render_ledger_rates_request_for_ledgers(
     company: &str,
     window: (&TallyDate, &TallyDate),
-    part: &bridge_tally_protocol::parent_partition::ParentPart,
+    part: &bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
 ) -> String {
-    render_ledger_rates(company, window, Some(part))
+    render_ledger_rates(
+        company,
+        window,
+        bridge_tally_protocol::native_outstandings::ledger_guid_filter_parts(part),
+    )
 }
 
 fn render_ledger_rates(
     company: &str,
     window: (&TallyDate, &TallyDate),
-    part: Option<&bridge_tally_protocol::parent_partition::ParentPart>,
+    (formula, filters): (String, String),
 ) -> String {
-    let (formula, filters) = bridge_tally_protocol::native_outstandings::parent_filter_parts(part);
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME=\"List of Ledgers\" ISMODIFY=\"Yes\"><FETCH>NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST, GSTDETAILS.LIST, RATEOFTAXCALCULATION, ROUNDINGMETHOD, ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),

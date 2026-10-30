@@ -2721,10 +2721,16 @@ const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on t
      pin what each parse returns; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_PARENT_FILTER: &str =
     "an answer of the pilot lab's parent-filter round (10 Oct 2026), \
-     with no row here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
-     src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_scope_tests.rs, \
-     and the replay in src/agent_import_post_e2e_tests.rs) pin what each parse returns; \
-     pilot-lab/PROVENANCE.md says what it is";
+     with no row here: the code no longer sends the parent filter (since #1331 the rate read \
+     names the invoice's ledgers by GUID), and the file is kept as the evidence the protocol \
+     reference cites; the whole-book answer is still served by \
+     src/agent_import_invoice_admission_tests.rs; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_LEDGER_FILTER: &str = "an answer of the pilot lab's ledger-filter round \
+     (31 Oct 2026), with no row here: the app crate's invoice code parses it \
+     (src/agent_import_invoice_wire.rs, src/agent_import_invoice_scope.rs) and its tests \
+     (src/agent_import_invoice_scope_tests.rs, and `rates_cut_to` in \
+     src/agent_import_tests.rs) pin what each parse returns; the file is the answer whole as \
+     received; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_SCOPED_HSN: &str = "an answer of the pilot lab read on 21 Oct 2026, with no row \
      here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_admission_tests.rs, \
@@ -2878,6 +2884,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml",
         PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.utf16le.xml",
+        PILOT_LAB_LEDGER_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-one-absent.utf16le.xml",
+        PILOT_LAB_LEDGER_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-none.utf16le.xml",
+        PILOT_LAB_LEDGER_FILTER,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-whole-10oct.utf16le.xml",

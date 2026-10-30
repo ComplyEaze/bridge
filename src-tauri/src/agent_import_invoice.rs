@@ -32,7 +32,7 @@ pub(super) use wire::HsnWarning;
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request_for_parents,
+    render_invoice_readback_request, render_ledger_rates_request_for_ledgers,
     render_voucher_types_request, VoucherTypeGuid,
 };
 
@@ -1158,17 +1158,18 @@ pub(super) fn queued_invoice_for<'a>(
 /// part of it is a function of the invoice and the clock alone (the company,
 /// the date the listing is read as of, and each request, the ledger count's
 /// among them) apart from the number's control, which is the journal's, and the
-/// rates request, which is also a function of the catalogue: it names the
-/// parents of the ledgers the invoice names (#1331). A plan that differs in the
+/// rates request and its ledgers' parents, which are also functions of the
+/// catalogue: the request names the invoice's ledgers by GUID, and the plan
+/// records the parent the catalogue gave each (#1331). A plan that differs in the
 /// company or in any other request is a wiring fault. A listing date that is
 /// not the queue's day is not a fault but a clock that moved since the plan
 /// (midnight fell between the last re-read before the queue, which made the
 /// plan, and the queue's judgement; midnight while the dialog was open does
 /// not), a control that moved since the plan is a change,
-/// and so is a rates request that differs when every request the
-/// invoice alone decides is equal (a named ledger regrouped, or its group
-/// renamed, since the plan's catalogue was read): each is named by its own
-/// cause. The precheck is the invoice module's own function; the judge decides
+/// and so is a rates request or a ledger's parent that differs when every
+/// request the invoice alone decides is equal (a named ledger replaced under
+/// its name, regrouped, or its group renamed, since the plan's catalogue was
+/// read): each is named by its own cause. The precheck is the invoice module's own function; the judge decides
 /// again whatever it answered.
 pub(super) fn fit_plan(
     wanted: &InvoiceReadPlan,
@@ -1180,6 +1181,7 @@ pub(super) fn fit_plan(
         precheck: _,
         ledger_count,
         rates,
+        ledger_parents,
         voucher_types,
         number,
         number_control,
@@ -1207,7 +1209,7 @@ pub(super) fn fit_plan(
             field: "number_control",
         });
     }
-    if *rates != carried.rates {
+    if *rates != carried.rates || *ledger_parents != carried.ledger_parents {
         return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
             field: "ledger_scope",
         });
@@ -2093,10 +2095,9 @@ impl InvoiceJudge<'_> {
             .collect()
     }
 
-    /// The rate read asks only for the ledgers under the parents of the
-    /// ledgers this invoice names. The scope is planned from the catalogue the
-    /// caller has just read, so every refusal of it comes before any request
-    /// to Tally (#1331).
+    /// The rate read asks only for the ledgers this invoice names, by the GUID
+    /// the catalogue the caller has just read gave each, so every refusal of
+    /// the scope comes before any request to Tally (#1331).
     fn scope(&self) -> Result<scope::InvoiceLedgerScope, Verdict> {
         scope::InvoiceLedgerScope::from_catalogue(self.catalogue.catalog(), &self.named())
             .map_err(refusing)
@@ -2190,6 +2191,7 @@ impl InvoiceJudge<'_> {
             precheck: queued_precheck,
             ledger_count: self.request(Need::LedgerCount)?,
             rates: self.request(Need::Rates)?,
+            ledger_parents: self.scope()?.parents(),
             voucher_types: self.request(Need::VoucherTypes)?,
             number: self.request(Need::Number)?,
             number_control: self.number_control_request()?,

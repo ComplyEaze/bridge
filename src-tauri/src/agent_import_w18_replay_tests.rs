@@ -56,6 +56,12 @@ fn w18_request_sha256(letter: char) -> &'static str {
         // fixtures/agent/pilot-lab-w18/PROVENANCE.md).
         'L' => "b0c02fc724502e10dc23a9d6b430c9cbb20c191df948082f06fab9d7e4c8f9bc",
         'P' => "41b2de3ed4488e5943d25fe36b2c2727f397ca01bae4082d7af36f787bb4b4b5",
+        // The rates read names the invoice's ledgers by GUID (#1331), and this
+        // invoice names `BRIDGE Svc 4D 5%` where `BP/26-27/0010` names
+        // `BRIDGE Svc 998313 5%`: the request the lab answered on 31 Oct 2026
+        // (`pilot-lab-ledger-rates-guid.request`) with only its GUIDs changed to
+        // these six ledgers' (DERIVED: not sent with these GUIDs).
+        'Q' => "a7ced791a7af67b3bcda6de614970891ebfb1ff82da8b9a580fafc6e12b654b2",
         other => pilot_request_sha256(other),
     }
 }

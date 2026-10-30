@@ -31,9 +31,11 @@ RC COMMIT:   026ba163dfcbf75d515a24d0dbbf14c5245534ec   (master, the merge of #2
 CI RUN:      40943637178 (Bridge CI, merge_group; master's push run 40946443186 reused its Windows bundle and built none)
 ARTIFACT:    12928034390 unsigned-bundle-smoke-windows-latest, 57,283,310 bytes, expires 5 Nov 2026
 ZIP DIGEST:  sha256:cc2ab2a4f40dec7ad2627f3987c8843c88022e45926f2be0e64bdfa3d7f26360
-MCPB SHA256: <the lab fills from its download: archive_sha256 of the artifact's mcpb-smoke.json>
-EXE SHA256:  <the lab fills from its download: binary_sha256 of the same file>
-VERSION:     <the lab fills from initialize>; EXPECT 0.6.1: the version change to 0.7.0 merges after this sitting, so the cut build still carries 0.6.1's version
+MCPB SHA256: ec689fd7a664c9d36146648f5839c9d1487cc2d18ba3d5bcd14681e0b8a33bb8   (bridge-tally.mcpb, 15,592,800 bytes)
+EXE SHA256:  576cc0c5aab4e72c43c05799116d76a29429c595a86dd54834d841c551f50d7c
+VERSION:     0.6.1 (initialize: bridge-tally 0.6.1, protocol 2025-06-18), as expected: the version change to 0.7.0 merges after this sitting
+MCPB SMOKE:  33 default tools, 35 opt-in
+DOWNLOAD:    by the lab on the owner's OK typed in the lab's chat; the zip, the .mcpb and the exe each matched the hash above
 ```
 
 **In the build** (the run coordinator writes `in` or `not in` on each line, by `git merge-base --is-ancestor <merge> <RC COMMIT>`; an item merged after this sheet was written is named by its merge commit):

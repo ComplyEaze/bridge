@@ -1004,6 +1004,7 @@ fn each_dialog_answers_with_its_own_token() {
 /// must change this gate. This pins text, not the platform's behaviour.
 const REVIEW_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(review_title(count))
         .set_description(preview)
@@ -1060,6 +1061,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     if count != ONE_ITEM {
         return false;
     }
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(MASTERS_TITLE)
         .set_description(preview)
@@ -1117,6 +1119,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
@@ -1230,6 +1233,7 @@ fn release_question() -> String {
 /// The invoice-stop release dialogs (#1828), pinned as the review's are.
 const RELEASE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(release_title())
         .set_description(preview)
@@ -1290,6 +1294,7 @@ fn settle_question() -> String {
 /// The settle dialogs (#1709), pinned as the release's are.
 const SETTLE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(settle_title())
         .set_description(preview)
@@ -1420,6 +1425,32 @@ const DISPLAYED_TEXT: &str = r#"fn displayed_text(shown: Shown, count: VoucherCo
             format!("{statement}\n\n{answer}\n\n{rest}")
         }
         _ => format!("{answer}\n\n{preview}"),
+    }
+}"#;
+
+const MAC_ALERT_CHECK: &str = r#"#[cfg(not(windows))]
+fn wrapped_lines(text: &str) -> usize {
+    text.lines()
+        .map(|line| line.chars().count().div_ceil(MAC_WRAP_CHARS).max(1))
+        .sum()
+}
+
+/// Whether the Mac alert shows `text` whole on the smallest supported screen
+/// (#1780).
+#[cfg(not(windows))]
+fn fits_the_alert(text: &str) -> bool {
+    wrapped_lines(text) <= MAC_WRAPPED_LINES
+}
+
+/// Ends the dialog child before anything is shown when the Mac alert could
+/// not show `text` whole (#1780), with the status the parent reads as a box
+/// that did not fit the screen, as a Windows box that does not fit ends
+/// (`box_fit`). The parent then refuses the text as too large, and a batch's
+/// next ask shows its totals only (#1832).
+#[cfg(not(windows))]
+fn exit_unless_the_alert_fits(text: &str) {
+    if !fits_the_alert(text) {
+        std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT);
     }
 }"#;
 
@@ -1978,7 +2009,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 45] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1993,6 +2024,11 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
     (ANSWER_TEXT, 1),
     (ANSWER_TEXT_WINDOWS, 1),
     (DISPLAYED_TEXT, 1),
+    // The Mac alert's count of wrapped lines, with which each Mac dialog ends
+    // its child unshown when its text would not fit (#1780, option (c)). Its
+    // two figures are the calibration row's, so they are not pinned here; the
+    // five calls are in the dialogs' own pins.
+    (MAC_ALERT_CHECK, 1),
     (FITS_THE_BOX, 1),
     (POST_DIALOG_WINDOWS, 1),
     (REVIEW_ACK_DIALOG, 1),
@@ -2109,8 +2145,10 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // its title, dialog and button on a Mac. #1709: the same for the settle
     // window.
     ("#[cfg(windows)]", 12),
-    ("#[cfg(not(windows))]", 17),
-    ("cfg", 43),
+    // #1780's Mac caps: the two figures, the count, the check, the child's
+    // exit, and the count's test.
+    ("#[cfg(not(windows))]", 23),
+    ("cfg", 49),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2186,6 +2224,38 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
+        // A Mac dialog stops counting its alert's lines, the count passes
+        // every text, counts a line once whatever its length, or ends the
+        // child with a status the parent does not read as a box that did not
+        // fit (#1780, option (c)).
+        source.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
+        replace_last(&source, "    exit_unless_the_alert_fits(preview);\n", ""),
+        source.replacen(
+            "fn show_review(count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_review(count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "wrapped_lines(text) <= MAC_WRAPPED_LINES",
+            "wrapped_lines(text) <= usize::MAX",
+            1,
+        ),
+        source.replacen(".div_ceil(MAC_WRAP_CHARS).max(1)", ".min(1).max(1)", 1),
+        source.replacen(
+            "std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT);",
+            "std::process::exit(0);",
+            1,
+        ),
         // The parent stops reading a box that did not fit as a refusal, or
         // the dialog stops measuring its box (#1832).
         source.replacen(

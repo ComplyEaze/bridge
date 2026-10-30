@@ -2109,6 +2109,40 @@ pub(crate) mod test_seam {
         }
     }
 
+    /// The Mac alert holds [`super::MAC_WRAPPED_LINES`] lines of at most
+    /// [`super::MAC_WRAP_CHARS`] characters (#1780): a text of exactly that is
+    /// shown, and one more character or one more line refuses it. The dialog
+    /// child's exit, `exit_unless_the_alert_fits`, asks exactly this check,
+    /// and the seam gate pins that it does.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_alert_holds_its_wrapped_lines_and_no_more() {
+        let wide = super::MAC_WRAP_CHARS;
+        assert_eq!(super::wrapped_lines(""), 0);
+        assert_eq!(super::wrapped_lines("x"), 1);
+        assert_eq!(super::wrapped_lines(&"x".repeat(wide)), 1);
+        assert_eq!(super::wrapped_lines(&"x".repeat(wide + 1)), 2);
+        assert_eq!(super::wrapped_lines(&"x".repeat(2 * wide)), 2);
+        assert_eq!(super::wrapped_lines(&"x".repeat(2 * wide + 1)), 3);
+        assert_eq!(super::wrapped_lines("x\n\nx"), 3);
+        // Each line on its own: a long line, an empty one and a full one.
+        let mixed = format!("{}\n\n{}", "x".repeat(2 * wide + 1), "x".repeat(wide));
+        assert_eq!(super::wrapped_lines(&mixed), 3 + 1 + 1);
+        // The boundary in whole lines: 37 full lines are shown, 38 are not.
+        let lines = |count: usize| vec!["x".repeat(wide); count].join("\n");
+        assert!(super::fits_the_alert(&lines(super::MAC_WRAPPED_LINES)));
+        assert!(!super::fits_the_alert(&lines(super::MAC_WRAPPED_LINES + 1)));
+        // A line counts by its characters, not its bytes.
+        assert_eq!(super::wrapped_lines(&"₹".repeat(wide)), 1);
+        let full = vec!["x".repeat(wide); super::MAC_WRAPPED_LINES].join("\n");
+        assert_eq!(super::wrapped_lines(&full), super::MAC_WRAPPED_LINES);
+        assert!(super::fits_the_alert(&full));
+        assert!(!super::fits_the_alert(&format!("{full}x")));
+        assert!(super::fits_the_alert(&format!("{full}\n")));
+        assert!(!super::fits_the_alert(&format!("{full}\n\n")));
+        assert!(!super::fits_the_alert(&format!("{full}\nx")));
+    }
+
     /// The Mac alert wraps its own text, so the parent does not break the
     /// answer text: it is one line, shown whole and first (a break of ours
     /// would be wrapped again by the alert and leave a ragged second row).
@@ -2374,7 +2408,8 @@ fn answer_reserve() -> (usize, usize) {
 /// at that width, or the Mac alert's one line, which the alert wraps itself).
 /// The parent measures what is shown, so a text that does not fit
 /// is refused before a window opens, never cut. A stop release has no caps
-/// beyond the byte limit.
+/// beyond the byte limit. A Mac's dialog child also counts the alert's own
+/// lines before it shows it, [`exit_unless_the_alert_fits`].
 fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
     if shown == Shown::StopRelease {
         return true;
@@ -2727,10 +2762,52 @@ fn review_title(count: VoucherCount) -> String {
     }
 }
 
+// What the Mac alert holds on the smallest supported screen, a 13.3-inch Mac
+// at 1440 x 900 points, about 792 of them visible under the menu bar and an
+// 84-point Dock: 37 lines of its text, each at most 31 characters, within 780
+// points (#1780). UNVERIFIED: the alert's 11-point font, its 228-point text
+// width and its 260 points of title, icon and buttons are estimates; row
+// 1964-M's calibration cells (`lab/1964-mac-alert-caps`) measure them, and
+// these two figures move with it.
+#[cfg(not(windows))]
+const MAC_WRAP_CHARS: usize = 31;
+#[cfg(not(windows))]
+const MAC_WRAPPED_LINES: usize = 37;
+
+/// How many lines `text` takes in the Mac alert, which wraps each line itself
+/// and has no scroll (#1780): a line counts once for every
+/// [`MAC_WRAP_CHARS`] characters it holds, and an empty line counts once.
+#[cfg(not(windows))]
+fn wrapped_lines(text: &str) -> usize {
+    text.lines()
+        .map(|line| line.chars().count().div_ceil(MAC_WRAP_CHARS).max(1))
+        .sum()
+}
+
+/// Whether the Mac alert shows `text` whole on the smallest supported screen
+/// (#1780).
+#[cfg(not(windows))]
+fn fits_the_alert(text: &str) -> bool {
+    wrapped_lines(text) <= MAC_WRAPPED_LINES
+}
+
+/// Ends the dialog child before anything is shown when the Mac alert could
+/// not show `text` whole (#1780), with the status the parent reads as a box
+/// that did not fit the screen, as a Windows box that does not fit ends
+/// (`box_fit`). The parent then refuses the text as too large, and a batch's
+/// next ask shows its totals only (#1832).
+#[cfg(not(windows))]
+fn exit_unless_the_alert_fits(text: &str) {
+    if !fits_the_alert(text) {
+        std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT);
+    }
+}
+
 /// The acknowledgement dialog. It posts nothing, so neither its title nor its
 /// button may read as approving a post.
 #[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(review_title(count))
         .set_description(preview)
@@ -2754,6 +2831,7 @@ fn release_title() -> String {
 /// title and button. It posts nothing either.
 #[cfg(not(windows))]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(release_title())
         .set_description(preview)
@@ -2777,6 +2855,7 @@ fn settle_title() -> String {
 /// button. It posts nothing either.
 #[cfg(not(windows))]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(settle_title())
         .set_description(preview)
@@ -2938,6 +3017,7 @@ fn post_words(count: VoucherCount) -> (String, String) {
 
 #[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
@@ -3017,6 +3097,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     if count != ONE_ITEM {
         return false;
     }
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(MASTERS_TITLE)
         .set_description(preview)

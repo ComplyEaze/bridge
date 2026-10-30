@@ -1972,8 +1972,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "invoice_review_too_large" => Some(
             "The approval text for this invoice does not fit in one native dialog, so it \
              cannot be approved or posted, and no file was written. Ask the user to shorten \
-             the narration or reference, then build the invoice again; do not offer to import \
-             it by hand.",
+             the narration or reference, then build the invoice again; on a Mac, whose dialog \
+             must fit a 13-inch screen whole, posting it in ComplyEaze Bridge on a Windows PC \
+             also works. Do not offer to import it by hand.",
         ),
         "invoice_post_not_enabled" => Some(
             "An invoice is posted by post_import and in no other way, and voucher posting is \

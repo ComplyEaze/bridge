@@ -152,11 +152,12 @@ pub(crate) enum BuiltInReport {
     NegativeLedgers,
     NegativeStock,
     StockSummary,
+    GodownSummary,
 }
 
 impl BuiltInReport {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 9] = [
+    pub(crate) const ALL: [Self; 10] = [
         Self::BalanceSheet,
         Self::ProfitAndLoss,
         Self::SalesRegister,
@@ -166,6 +167,7 @@ impl BuiltInReport {
         Self::NegativeLedgers,
         Self::NegativeStock,
         Self::StockSummary,
+        Self::GodownSummary,
     ];
 
     /// The report name Tally's gateway accepts. Plain ASCII words, so the
@@ -185,6 +187,8 @@ impl BuiltInReport {
             // Accepted by Tally in a live capture, 6 Oct 2026.
             Self::NegativeStock => "Negative Stock",
             Self::StockSummary => "Stock Summary",
+            // The title of Tally's own godown-wise report, accepted in a live capture, 28 Oct 2026.
+            Self::GodownSummary => "Godown Summary",
         }
     }
 }

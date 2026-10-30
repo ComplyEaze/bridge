@@ -62,7 +62,7 @@ The lab sent the recorded request and the spanned one to the same book on 30 Oct
 (`lab/2145-spanned-census-captures-answers` at `993d96bc`). The comparison removes the answers' one `CMPINFO` element,
 which holds the session's object counts. With it removed, both answers equal the recorded census answer above
 (`BODY digest eaf4b24a00e82083a96efa50e3a5034230d704d2b3c770cdcad67f1138c54a9f`). The spanned answer is `14ec4c26b88aae70dd11fcdf8c463b5af4e9b3e35de46b38f5b7bce7065eb342` (126,938 bytes), and the replay keeps the
-recorded answer as the answer to the spanned request. Confidence: VERIFIED for this window and this mark, one sitting.
+recorded answer as the answer to the spanned request. Confidence: PARTIAL, one sitting, as the lab graded it.
 
 ## What it establishes (read from the bytes)
 

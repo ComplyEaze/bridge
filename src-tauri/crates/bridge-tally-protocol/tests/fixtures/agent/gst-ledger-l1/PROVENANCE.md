@@ -59,7 +59,7 @@ else changed, which the code renders byte for byte (`requests/g-DDnov_c2_spanned
 `lab/2145-spanned-census-captures` at `6a968f01`). The lab sent each day's recorded request and its spanned one to the same
 book on 30 Oct 2026 (`lab/2145-spanned-census-captures-answers` at `993d96bc`). The comparison removes the
 answers' one `CMPINFO` element (the session's object counts); with it removed, both answers equal the recorded census answer
-of that day, so the replay keeps the recorded answer as the answer to the spanned request. Confidence: VERIFIED for these 14
+of that day, so the replay keeps the recorded answer as the answer to the spanned request. Confidence: PARTIAL, these 14
 days at the mark 64, one sitting.
 
 | Day | Spanned request (sha256, pinned) | Spanned answer (sha256) |

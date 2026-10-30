@@ -123,8 +123,8 @@ Silver (licensed), its voucher mark then 4:
   census sent unspanned in that sitting answered the same bytes.
 
 The census was read four weeks after the call, when the book's voucher mark had moved from 3 to 4,
-outside the span. The replay therefore pairs a census and a window read in different sittings. Confidence: VERIFIED that the code renders the request the lab sent and that its answer is the
-one above; that the census answered so on 2 Oct 2026 is inferred from the span, not observed.
+outside the span. The replay therefore pairs a census and a window read in different sittings. The replay checks that the code renders the request the lab sent. Confidence in the answer: PARTIAL, one
+sitting; that the census answered so on 2 Oct 2026 is inferred from the span, not observed.
 
 ## Not settled
 

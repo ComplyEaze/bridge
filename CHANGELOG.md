@@ -16,7 +16,7 @@ Apache-2.0 builds from current source stays unambiguous.
 
 ### In plain words: ComplyEaze Bridge 0.7.0, since 0.6.1 (27 Oct 2026)
 
-These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests or issues they come from. Like every build so far, it is not yet code-signed. The desktop app has no published installer, so lines about it apply only to a build from source. <check at the cut: whether Sales invoice posting stays switched off in 0.7.0, as in 0.6.1>
+These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests or issues they come from. Like every build so far, it is not yet code-signed. The desktop app has no published installer, so lines about it apply only to a build from source. Sales invoice posting is not available in 0.7.0, whatever the posting setting: a Sales invoice is refused before anything is sent until the checks its lab rehearsal left owed are done (#2162), so the lines about invoices apply only once it is offered.
 
 **Should I upgrade?**
 
@@ -287,10 +287,11 @@ These changes are in ComplyEaze Bridge 0.7.0. Most lines name the pull requests 
 **Known limits**
 
 - **Not run on a live TallyPrime for this build (unless the lines above say otherwise):** anything that writes to Tally other than the rows of the live pass of writes and the masters row, Gold, macOS, other TallyPrime releases than 7.1 and 7.2 Silver, a book of about 30,000 vouchers for posting (#1029), and the Microsoft Store install of Claude Desktop (#1584, #1459).
+- **Sales invoice posting** is not available in 0.7.0, whatever the posting setting: a Sales invoice is refused before anything is sent (#2162).
 - **Ledger create** makes one ledger at a time and alters none (#690). A create that Tally runs after Bridge stopped waiting is possible: in the lab Tally ran every abandoned create it was sent (#1713), so a create with no answer is never sent again.
 - **Foreign-currency books:** no read reports a foreign-currency amount; each sets such a ledger aside by name or refuses (#683).
 - **`stock_summary`** still refuses a book whose master mark is above 874, however few stock items it holds (#1233), and dates other than a month's last day.
-- **`outstandings` at a year end on a dense book:** the Bills report can take longer than the 20-second limit; the read is refused with its own cause and next step, and no figure is released (#2119).
+- **`outstandings` at a year end on a dense book:** the Bills report can take longer than the 20-second limit; the read is refused with its own cause and next step, and no figure is released (#2119). A longer limit for these two requests is not in this release.
 - **On Windows, while an approval box is open,** the taskbar may show no task buttons (#2161). The macOS alert is unchanged (#1780).
 - **The whole-day read for a skipped transfer row** is not called by any tool yet, so no row reads `not_found` (#1392).
 - **The file tested is not the file that will be tagged.** Each live row names the build it ran on; the published file is built again by the release workflow and checked after publication against the release's checksum, with no write.

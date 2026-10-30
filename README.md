@@ -46,8 +46,8 @@ Not yet code-signed.
 **Get it:** the [Download page](https://bridge.complyeaze.com/download.html)
 lists the current file for each operating system; compare yours with its `.sha256` file as
 [the install guide](./docs/agent/INSTALL.md#for-it-staff) says (that shows the file arrived whole, not who made it).
-On Windows, ComplyEaze Bridge also needs Microsoft's Visual C++ Redistributable (x64); the install guide has
-Microsoft's download link. ComplyEaze Bridge does not
+On Windows, ComplyEaze Bridge also needs Microsoft's Visual C++ Redistributable (x64); the install guide's
+[Before you start](./docs/agent/INSTALL.md#before-you-start) has Microsoft's download link. ComplyEaze Bridge does not
 update itself, so look for a newer version on the
 [releases page](https://github.com/ComplyEaze/bridge/releases).
 
@@ -137,7 +137,7 @@ The Claude Desktop extension has no setting for master writes. When posting is o
   When you turn posting on, each post waits for your approval in a separate
   ComplyEaze Bridge window (for a batch, its summary). On Windows that window
   also takes the keyboard: in a test of the published 0.6.0 (a full-screen Tally,
-  one screen, #1780) a typed n declined it and a typed y approved it, so when you
+  one screen, [#1780](https://github.com/ComplyEaze/bridge/issues/1780)) a typed n declined it and a typed y approved it, so when you
   ask for a post, stop typing in Tally until you have answered it with the mouse.
   No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time

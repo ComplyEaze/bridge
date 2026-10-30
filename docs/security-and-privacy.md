@@ -538,7 +538,7 @@ The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge
 — approve one voucher" with the buttons Cancel and Post voucher. On Windows it
 is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel, and
 No is the default. Only the positive button approves. On Windows the window
-also takes the keyboard (#1780). In tests on Windows 10 with TallyPrime 7.1 full
+also takes the keyboard ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)). In tests on Windows 10 with TallyPrime 7.1 full
 screen and one screen, each tried once, a Down arrow moved its buttons on the
 0.6.0 release candidate, and on the published 0.6.0 a typed n declined it and a
 typed y approved it, so a key typed for Tally can answer it. When you ask for a post, stop typing in Tally

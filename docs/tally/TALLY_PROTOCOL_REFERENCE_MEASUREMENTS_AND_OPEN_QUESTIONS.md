@@ -1725,6 +1725,24 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **What Bridge does with it.** The `stock_items` kind of `masters` returns each item's two lists as observations (entries sorted by date, `unreadable` with a defect, or `not_observed`), choosing no code and no rate for a date. A Tally `ERROR` or `LINEERROR` at any depth of a list, markup inside a value and a cut-off list refuse the read; an undated or invalid-dated entry, a repeated field, two different entries on one date, a rate that is not a plain decimal, a credit flag other than Yes or No and a repeated state or duty-head row fail that item's list only.
 - **Not measured:** a state row other than `Any`, slab rates, a GST rate keyed on a stock group or on the company, an HSN code keyed on the company, an item that defers to a coded group (whether it inherits the code), a nested group, another release, a larger book, a zero-row stock-item answer, a client book.
 
+### 12a.23 Stock Query by item name gives an item's closing quantity per godown and batch
+
+**PARTIAL: VERIFIED 2026-10-28 on one synthetic book, TallyPrime 7.2**, one request at a time, reads only, the marks unchanged before and after. Fixtures and their sizes and hashes: `crates/bridge-tally-protocol/tests/fixtures/stock-query/PROVENANCE.md`. Counts were taken by parsing the XML, not by searching the text.
+
+- **The request (verified).** The built-in report envelope the Stock Summary is sent in (§12a.1), with `ID` `Stock Query` and one more static variable after the period's, `STOCKITEMNAME`, the item's name escaped once as XML text. Without it, with `SVSTOCKITEM` in its place, with an unknown variable, or with a name Tally does not know, the answer is the same 46-byte empty envelope (`<ENVELOPE></ENVELOPE>`).
+- **The answer (verified).** A flat `ENVELOPE`. First, zero or more last-purchase groups of six elements in this order: `STQPURCDATE`, `STQPURCPARTY`, `STQPURCVCHQTY`, `STQPURCVCHRATE`, `STQPURCVCHDISC`, `STQPURCVCHAMOUNT`, or last-sale groups: `STQSALESDATE`, `STQSALESVCHNO` (which holds the party), `STQSALESVCHQTY`, `STQSALESVCHRATE`, `STQSALESVCHDISC`, `STQSALESVCHAMOUNT`. No capture holds both kinds, so their order relative to each other is not measured, and Bridge reads them in either order. Then one `STQGODOWNNAME`, `STQBATCHNAME`, `STQGODOWNQTY` triple per godown and batch holding stock at the period end.
+  - One item carried five purchase groups; whether Tally caps their number is not measured.
+- **The lines (verified on eleven items).**
+  - They follow the period end: at the opening day only the opening quantities came, and no group.
+  - At the year end, each of the eleven items' lines summed to its closing on Tally's own Stock Summary and matched Tally's screen. At 1 April and 1 May 2025 (a later sitting, not among these fixtures), five items' lines equalled the stock-item collection's `CLOSINGBALANCE` (§12a.13) at the same date.
+  - Stock not kept in a named batch is the batch `Primary Batch`.
+  - A quantity is `<number> <unit>` in the item's base unit, with the item's own decimals (`150.000 Kgs`, `25 Nos`, `100 Box`), signed as stock is (`-50.000 Kgs`, `-13 Nos`).
+  - An item with no stock at the period end answers the same empty envelope as an unknown name (reported by the sitting; no such answer is among the fixtures, whose empty answers are the unknown name and the bare request).
+- **No value.** No line carries a value, rate, expiry or manufacturing date; the only amounts are the groups' voucher amounts.
+- **Names (verified, a later sitting, captures not yet fixtures).** Names with `&`, `(`, `)`, `'`, `"`, `%`, `/`, `,` and `-` were selected when escaped once, and the raw and entity forms of `'` and `"` answered alike (`lab/2018-stock-query-names-units-dates-answers` at `86ea5211`). An item with an alternate unit is written in its base unit only (`lab/2018-alternate-unit-row-answers` at `88616807`). Bridge's builder admits letters, digits and single spaces only, until those captures are fixtures.
+- **What Bridge does with it.** `native_stock_query` renders the request for one item and reads the answer into its lines, skipping the groups. No read sends it yet.
+- **Not measured:** another release, a book that is not batch-wise, a period end other than the year end and the opening day, more than five purchase groups, a full stop or leading, trailing or doubled spaces in a name, and a value for a batch.
+
 ## 13. Open questions
 
 | Question | Why it matters |
@@ -1790,4 +1808,5 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-21 | §12a.21: the Profit and Loss of an integrated inventory book with `Less: Closing Stock` as a `PLSUBAMT` leaf, the Balance Sheet without a stock leaf, no Gross Profit leaf, on four committed captures of one synthetic licensed 7.1 Silver book; a second book with opening stock reported by the lab, not committed. |
 | 2026-10-26 | §11c.4: the empty-window corroboration by census marked PARTIAL after one live run on TallyPrime 7.2 Silver (`lab/1240-empty-window-live-answers`, `ce849cc6`): the same answers, the request counts as predicted except one window that sent fewer. |
 | 2026-10-27 | §12a.13: items inside stock groups nested three deep on one synthetic TallyPrime 7.2 Silver book: the item collection lists every depth, `NUMSTOCKITEMS` counts them, the plain report has a line only for what sits under the root, and each nested row's quantity equals Tally's Stock Summary screen with every level expanded. VERIFIED on that book |
+| 2026-10-28 | §12a.23: Stock Query by item name on one synthetic TallyPrime 7.2 Silver book: the request, the answer's groups and godown, batch and quantity lines, which summed to each item's closing; the empty answer for an unknown name. PARTIAL |
 | 2026-10-29 | §12a.13: period ends inside the year on two synthetic TallyPrime 7.2 Silver books (30 September and 31 May; 31 August and 30 September, nested groups included), and a voucher dated on the end date counted by both sources. PARTIAL |

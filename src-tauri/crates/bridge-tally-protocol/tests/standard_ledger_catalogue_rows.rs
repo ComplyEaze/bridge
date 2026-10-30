@@ -270,8 +270,9 @@ fn a_name_nested_in_another_child_of_the_list_is_not_the_stored_name() {
 
 // ---- Aliases (#1688) ---------------------------------------------------------------------------------
 //
-// The capture holds no alias, so every aliased state below is the committed `ROUND OFF` row with its list
-// edited by these tests: constructed, not captured (the real captures are on lab branches, not in this tree).
+// The `ROUND OFF` capture holds no alias, so every aliased state in this section is that row with its list
+// edited by these tests: constructed, not captured. They reach shapes no capture holds (an unusable or a
+// repeated alias). Tally's own answers with aliases are tested in the section after it (`alias-lab-1688`).
 
 /// The `(carrying ledger, alias)` pairs the catalogue holds for `xml`.
 fn shape_lab_aliases(xml: &str) -> Vec<(String, String)> {

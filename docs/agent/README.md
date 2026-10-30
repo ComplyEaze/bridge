@@ -2820,18 +2820,38 @@ deadlocks.
 - **No cause is given.** Uncleared cheques, deposits in transit, a missing entry,
   a repeated entry and the wrong bank ledger look alike; the reading says so,
   prescribes no remedy and checks the bank ledger only.
-- **Not yet proved against a live book.** The tool-level tests replay captured
-  responses with one value changed in memory, and the dated ledger read the tool
-  relies on is the one described in protocol reference section 5.5. Their
-  proposals files are written by hand, except in the round-trip test, whose file
-  is written by the code the parse uses. One run by an outside contributor on two
-  synthetic companies (TallyPrime 7.1 Silver, 10 October 2026) is only partly
-  recorded, in the pull request: the import summary was not captured and no raw
-  answers are kept. A statement whose last day is the end of a financial year is
-  still to be run, and so is a window of whole calendar months: the book's
-  position read at a month's first day and the day after its last has been
-  measured on some ledgers and dates (protocol reference section 5.5), not on a
-  bank ledger in the middle of its year or after its last voucher.
+- **Run against a live book.** Every row of one run passed on 30 October 2026
+  (licensed TallyPrime 7.2 Silver, one synthetic company, the published 0.7.0
+  Windows package):
+  - A window ending in the middle of a month answered `not_established`
+    (`window_not_whole_calendar_months`) with no amount, after the company check
+    alone: four requests and no ledger read.
+  - Whole calendar months of a bank ledger in the middle of its year tied, with a
+    second bank ledger in the book. Tally's own trial balance at each month end,
+    and its Ledger display over the two months, agreed with the statement. An
+    entry keyed off the statement showed as a closing gap and a change of its own
+    amount, with the opening still tied.
+  - A statement whose first and last rows fall in the middle of a month was read
+    at its first row's date and the day after its last: a voucher dated the day
+    before the first row counted in the opening, one dated the day after the last
+    row stayed out of the closing, and a twin of one row showed as its amount.
+  - ComplyEaze Bridge's own post of that statement's vouchers (`post_import`,
+    `posted_verified`) then tied at `after_post`, and `before_build` run again
+    answered `file_already_partly_posted` for the closing and the change rather
+    than counting the batch twice.
+
+  Two earlier runs were on TallyPrime 7.1 Silver: one by an outside contributor
+  on two synthetic companies (10 October 2026), only partly recorded in the pull
+  request, and one on 14 October 2026 (whole months before and after a hand
+  import, and reads after the ledger's last voucher). The tool-level tests replay
+  captured responses with one value changed in memory, and the dated ledger read
+  the tool relies on is the one described in protocol reference section 5.5.
+  Their proposals files are written by hand, except in the round-trip test, whose
+  file is written by the code the parse uses. Not measured: a statement whose last
+  day is the end of a financial year, a book of 1,000 or more vouchers,
+  Educational mode, a voucher posted inside the window during the reads, another
+  bank's statement layout, and Gold. Evidence: `RESULTS.md` on the lab branch
+  `lab/1211-tie-out-evidence-answers` at `7760d367`.
 
 ## Approved voucher posting
 

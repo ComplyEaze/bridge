@@ -111,7 +111,7 @@ fixture's own hash differs and is the one in the table below.
 
 The call above sent no voucher census. A register now sends one for a small book too (#1029), spanned
 to the voucher mark the call read, `(0, 3]` (#2145), so the replay adds that read. Both of its files
-are from run sheet 2145-C, read only, on 30 Oct 2026 (UTC), against the same book on TallyPrime 7.2
+are from the 2145-C run sheet, read only, on 30 Oct 2026 (UTC), against the same book on TallyPrime 7.2
 Silver (licensed), its voucher mark then 4:
 
 - `stock_lab_taxed_day_voucher_census_spanned_request.utf16le.xml` is the sheet's request

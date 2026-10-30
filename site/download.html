@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Download ComplyEaze Bridge, the local TallyPrime MCP server for Claude</title>
-<meta name="description" content="Download the ComplyEaze Bridge extension for Claude Desktop, for Windows x64 and Apple Silicon Macs. Not yet code-signed; your computer may warn you." />
+<meta name="description" content="Download the ComplyEaze Bridge extension for Claude Desktop, for Windows x64 and Apple Silicon Macs. Not yet code-signed." />
 <link rel="canonical" href="https://bridge.complyeaze.com/download.html" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
 <meta property="og:title" content="Download ComplyEaze Bridge, the local TallyPrime MCP server for Claude" />
-<meta property="og:description" content="Download the ComplyEaze Bridge extension for Claude Desktop, for Windows x64 and Apple Silicon Macs. Not yet code-signed; your computer may warn you." />
+<meta property="og:description" content="Download the ComplyEaze Bridge extension for Claude Desktop, for Windows x64 and Apple Silicon Macs. Not yet code-signed." />
 <meta property="og:url" content="https://bridge.complyeaze.com/download.html" />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
 <script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
@@ -59,7 +59,7 @@
       <h1>Download ComplyEaze Bridge</h1>
       <p>
         A Claude&nbsp;Desktop extension that connects Claude to TallyPrime on your computer.
-        For Windows&nbsp;x64 and Apple&nbsp;Silicon Macs. Not yet code-signed; your computer may warn you.
+        For Windows&nbsp;x64 and Apple&nbsp;Silicon Macs. Not yet code-signed.
       </p>
     </div>
   </section>
@@ -93,7 +93,7 @@
       <ul class="before-list">
         <li>ComplyEaze Bridge is still being developed and may contain errors. Try it first on a test company, and take a backup before you turn posting on.</li>
         <li>Posting is off by default in a new install. If you already have an older release installed, it may keep its own settings, posting included: read <a href="#older-release">If you already have an older release</a> below before you install. There is no tool to undo or delete a posted voucher; you correct it in Tally. A post can still land in a company renamed after the last check, and a replaced ledger is not always noticed. The approval window for a post covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. The <a href="https://github.com/ComplyEaze/bridge#readme">README</a> gives these limits in full.</li>
-        <li>Each download has a matching <code>.sha256</code> file on the same release, linked under its button. Compare it with your download before opening the package: on Windows, in Command Prompt, type <code>cd Downloads</code> and then run <code>certutil -hashfile &quot;&lt;file&gt;&quot; SHA256</code>; on a Mac, in Terminal, type <code>cd Downloads</code> and then run <code>shasum -a 256 &quot;&lt;file&gt;&quot;</code> (put your downloaded file&rsquo;s name in place of <code>&lt;file&gt;</code>, brackets included, and keep the quotes: a file downloaded twice can get a name with &ldquo;(1)&rdquo; in it, which needs them). Check that the 64-character code it prints matches the code at the start of the <code>.sha256</code> file (open that file in Notepad or TextEdit).</li>
+        <li>Each download has a matching <code>.sha256</code> file on the same release, linked under its button. Compare it with your download before opening the package: on Windows, in Command Prompt, type <code>cd Downloads</code> and then run <code>certutil -hashfile &quot;&lt;file&gt;&quot; SHA256</code>; on a Mac, in Terminal, type <code>cd Downloads</code> and then run <code>shasum -a 256 &quot;&lt;file&gt;&quot;</code> (put your downloaded file&rsquo;s name in place of <code>&lt;file&gt;</code>, brackets included, and keep the quotes: a file downloaded twice can get a name with &ldquo;(1)&rdquo; in it, which needs them). Check that the 64-character code it prints matches the code at the start of the <code>.sha256</code> file (open that file in Notepad or TextEdit). This check shows the file arrived whole; it does not show who made it, because the file is not yet code-signed.</li>
         <li>ComplyEaze&nbsp;Bridge does not update itself. Look for a newer version on the <a href="https://github.com/ComplyEaze/bridge/releases">releases page</a> on GitHub: its name starts with &ldquo;ComplyEaze Bridge MCP&rdquo;.</li>
         <li>Tally must be running on the same computer as Claude&nbsp;Desktop.</li>
         <li>On Windows, ComplyEaze&nbsp;Bridge also needs Microsoft&rsquo;s Visual C++ Redistributable (x64). Many programs install it, so you may already have it; if you do not, or are not sure, the <a href="https://github.com/ComplyEaze/bridge/blob/master/docs/agent/INSTALL.md">installation guide</a> has Microsoft&rsquo;s download link, and you install it before you add ComplyEaze&nbsp;Bridge to Claude&nbsp;Desktop.</li>

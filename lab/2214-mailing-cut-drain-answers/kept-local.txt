@@ -1,0 +1,17 @@
+Files kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+answers/024-M4.json 3643540 B d3c58b2cda5d973a481d1021d90074865bce027cdceb312a7d070ab44e11d0ae
+answers/028-M5.json 5162149 B 4a2e7998bb1689b159ca5c1e9f8cb1bbd1f7e013fbd8ca6240f28c264dd809d2
+answers/030-M5-p1.json 2097993 B 8a4a3f99f9dd2290c1ca54ac3da7f0a225e077d35b140b427d97033ba5a1953b
+answers/034-M6.json 5162154 B 7fa856974da5e1ed2475125e4b3fbc813df404b07e7bd0252b4298399d503398
+answers/036-M6-p1.json 5151859 B ea4960a85ca59d6fa59bbfeab0d196738bf520a7244fbba1bf34a6db7059b607
+answers/038-M6-p2.json 4175105 B 3474cca78d00088d1dea952755548bd040b87228f7235270f1ca4e96e6ce6481
+answers-creates/_last.answer 3394 B 566be20d6ab91d0faba27f68f4b57bb7e3106c8afd08f6fd19a1181652d2442a
+answers-creates/_last.headers 134 B a8c6fe9f6545175fb5e08b9ee53ba543601c0436c80c231f7b009d73e5c8ccf0
+raw/004-D5.xml 37644610 B 605c90c490eb9f2a693c6013cf93ae9a14c1eed573e7e60430c8346f36fb6876
+evidence/close-tally-folder-after-restore-listing.txt 1504 B 0709085fa09c160d56008f511044659d7fb8a92c9a37cf05da0a778787b7b433
+evidence/close-tally-folder-before-restore-listing.txt 1589 B ef6f9914749a65541a87fb5c36e5e83aa4b11563ce805f6818ad64af5ad9abaf
+evidence/s0-tally-folder-before-listing.txt 1504 B 13757ca14898a6c98a58e3ebbfcc50339b5fcfd48ce73c4d11d1bf8fc407823a
+data/agent-egress.jsonl 185869 B a643bd23547a1e7ee582d58597243cc29c990c7310dddccb18f1d00c4465177b
+data/terms-acceptance.jsonl 90 B a4e8e1726e666eed968d072fff4e1c7cd70a0585b554cb7f35a31cfe23698d40
+bk/TDBK1800_<company number>.001 57180 B 44389982161ca633d169a0c681b8b4277ad7bf07fff1cfdf62646301e333af64
+requests/: the 201 creates, each equal to the sheet requests-manifest.txt (bytes and sha256)

@@ -1,0 +1,1 @@
+gen_requests: ok (21 requests, each the Stock Summary request with only the ID, the period end and at most one variable changed, as its name says)

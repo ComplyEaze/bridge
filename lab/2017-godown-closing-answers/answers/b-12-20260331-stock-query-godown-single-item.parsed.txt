@@ -1,0 +1,3 @@
+b-12-20260331-stock-query-godown-single-item (parse6):
+  top-level element names (3): STQGODOWNNAME STQBATCHNAME STQGODOWNQTY
+  godown 'Factory Floor'; batch 'Primary Batch'; quantity '15 Nos'

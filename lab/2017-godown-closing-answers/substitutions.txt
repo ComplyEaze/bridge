@@ -1,0 +1,41 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+evidence/s0-c2-netstat.txt: original 11161 B sha256 5addb3f761c4eb0ba2a50601f11e136e43fd2b9986665de75e4f80cc439f2ccb (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/s13-c2-netstat.txt: original 9736 B sha256 e59a60f74e75c5d4a362fa3dffc72f3b532bb3c0a27068e8afde081aab0f4e67 (kept on the lab PC); only the port-9001 LISTENING lines kept
+bridge/001-list-companies.json: original 1563 B sha256 85dd234428ee4628f5201e5cabb782ef5a351ae7ea484dd1a423429e55a05821 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/002-marks-s1-M0V0.json: original 83725 B sha256 d9971e9cb4b99b6f9d82d67286769bb2fff04c0a5e724405a22def7c3b92beba (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/003-s2-godowns.json: original 4054 B sha256 e26f1152bdd88269634d097c9ee0ce677ed4498c80286ccd7e841ebb2bd59378 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/004-s2-ss-20260331.json: original 20095 B sha256 a47ba1f640407ec18c3bd1bfd6b9862c00e2cd4e4fe316a9ba2ccaaf7b754f0d (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/005-s2-ss-20250831.json: original 20095 B sha256 290217f614066e4b3febdcaf8fb0342dac8c1b4a39ba31fc26f87094a0d20044 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/006-marks-s3-before.json: original 83726 B sha256 c32129bc635416aa26fb839f8a470b6941af3286de622ac421dd9341ae0e8179 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/007-marks-s3-after.json: original 83726 B sha256 45aa2797ea631507bcb076679b46ca3c80b339b8e2d8b11e5e2b45b9fc89dab5 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/008-marks-s6-after-bk1.json: original 83727 B sha256 b2cbba5a892c59a4416c6a647bb5ada6e687090fb07d631c8a6701276fc74010 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/009-marks-s7-1.json: original 83727 B sha256 bb35e3ebeae6b9b5e0bdbf6780f9e2b1794376f072f4eecb3fafb7320053aa41 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/010-marks-s7-2.json: original 83727 B sha256 8c0ad759a1713b14abd23bb79ccf3fe7a52657fc2b90c8d4f6d27e64f06d016e (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/011-marks-s7-3.json: original 83726 B sha256 200b2153fb7196dab87c6f35b3fc7a75b691dd128e1ee9d5dc53515ac67bf1eb (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/012-marks-s7-4a.json: original 83727 B sha256 47a307a14f47bf35aeaede6b9b28ebafda0b0b9f251c6960acb7288dceb53d6a (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/013-marks-s7-4b.json: original 83727 B sha256 4e17ca07d4fddd598aa793b407502094d94f0120435dd9f7a414dbe48848e582 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/014-marks-s7-5.json: original 83727 B sha256 9ce197390ea41706ef61f6118b6ac85e853221eea8786b3eb0cd95249445f5be (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/015-marks-s7-6a.json: original 83727 B sha256 d7b28836b084640829639175d1530bfa97a5921d06fe318e0a0b345f19a83f71 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/016-marks-s7-6b.json: original 83726 B sha256 26afd7300c7c6a52857d981aa323c48aa39ea56fc0b74ca89f459db1f37ef981 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/017-s7-7-godowns.json: original 4351 B sha256 92598b6bc391aed4f3933fb6318794ee3afcc3d509088ec93d20c5efb3961a2f (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/018-marks-s8-before.json: original 83727 B sha256 fca0ac3b690268bb869641e5801478f8b76dca7651e53dd59a41e7332bfdfbe1 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/019-marks-s8-after.json: original 83727 B sha256 ee36e44638303d575da03d9d5dfc498e49535e317ef07f7e45146991fcb4a938 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/020-marks-s9-after.json: original 83727 B sha256 ac0ab4312cb522988a5a1a92fc2e6759d0c3959c6d42b6c127b1105b8cd84a56 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/021-s11-ss-20250831.json: original 21058 B sha256 a6cc26ebf648cdb74d40f1c08832266decf3edc59a7bd8d080b14cde90439218 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/022-s11-ss-20260331.json: original 21056 B sha256 d78a3dc33e8eb907a1ca244cbb07855a9428ad1b7a08cbe6189c17577720c455 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/023-s11-godowns.json: original 4351 B sha256 c490f3c9894e8578fbec474a8e541cb5c80a0f5a2a08b33fc32f091dcd1de889 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/024-s12-list-companies.json: original 1562 B sha256 a9b260a268819009a939af4b73591fe3734bba95e05014170f27f6a8106aa801 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/025-marks-s12-after-restore.json: original 83727 B sha256 e0637fe714eb96f3f4e1433dd4c95c5b3c8fdc5283f5f291fdaab442a400f9df (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/026-s12-godowns.json: original 4055 B sha256 d526578578f7ee750edf76012dce3c2e3517d607e3d3433f5158c7097f692244 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+bridge/027-marks-s12-after-raw.json: original 83726 B sha256 cb7ce98ca265b2d9c0e858ecd29309a2e10aea6066ee5a6b3061b1901c8cd12e (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+evidence/srv-launch-env.json: original 153 B sha256 ed228342a34744de40c9eaf30748ab05b0c0d318f141e0bd967c5620dec7e7ec (kept on the lab PC); 1 x -> <LAB_DIR>
+notes.txt: original 38180 B sha256 7716968f5e6b9fcf7d998a727e733ad9d1b36270285c7b17137edce412cb89fe (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> stop; 1 x -> run lead
+restore-plan.txt: original 1435 B sha256 9522045e5d280fd1a9d572532a97bc7bc516ddb363710e4013a71985a119eda2 (kept on the lab PC); 1 x -> run lead
+scripts/tm.py: original 1476 B sha256 8832303105adda1c3f8fea871f1eb47fe76e07ea421f69ecc077a1432aae1acf (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/rawa.py: original 3848 B sha256 c8540501fecf797e80088220ffa8a6d96a04e25bf7d6afa1fa0c5f348ed35c4d (kept on the lab PC); 1 x -> <LAB_DIR>; 4 x -> stop
+scripts/parse5.py: original 3671 B sha256 c4147c77abfb6e099f66126e31b871b2b67ffe5563687dbeac32352e974af3c4 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/parse6.py: original 5376 B sha256 d48413f611484b88e29f4a97142c08b3efa3530b8702c08427d83ff60b9729e6 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/call.py: original 1823 B sha256 7914e2776145b2fb4370e9395aad7363d8ca603d3ca2a00b30d3daab21097c69 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+scripts/client.py: original 4761 B sha256 287f2d11d547ba99bb225ebaec59a9f767603abbbd9e5bcf531b7a581a31bcab (kept on the lab PC); 1 x -> lab-client; 4 x -> stop
+scripts/c2.py: original 1224 B sha256 fc826f7e2e91551bc28d36ad5ab00389dfea44d3aa8845f6b0618d987ec539e2 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/cap.py: original 744 B sha256 037154f6e7e88ad95cbfd432e4e7ccac4dc2a3a0045d27408cb9b9779862475a (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>

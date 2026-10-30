@@ -1,0 +1,22 @@
+b-09-20260331-stock-summary-explode (parse6):
+  top-level element names (34): DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO SSBATCHNAME DSPSTKINFO DSPACCNAME DSPSTKINFO SSBATCHNAME DSPSTKINFO SSBATCHNAME DSPSTKINFO SSBATCHNAME DSPSTKINFO
+  TOP   'Finished Kits': qty (empty); rate (empty); amount 18750.00
+  CHILD 'Cleaning Kit A': qty 12 Nos; rate 1562.50; amount 18750.00
+  TOP   'Packaging': qty (empty); rate (empty); amount 14500.00
+  CHILD 'Carton Box Small': qty 100 Box; rate 25.00; amount 2500.00
+  CHILD 'HDPE Drum 50L': qty 40 Nos; rate 300.00; amount 12000.00
+  TOP   'Raw Chemicals': qty (empty); rate (empty); amount -30249.99
+  CHILD 'Caustic Soda Flakes': qty 400.000 Kgs; rate 2.50; amount -1000.00
+  CHILD 'Hydrochloric Acid 33pc': qty 816.667 Kgs; rate 18.98; amount -15500.00
+  CHILD 'Soda Ash Light': qty 1300.000 Kgs; rate 14.42; amount -18749.99
+  CHILD 'Sulphuric Acid 98pc': qty 100.000 Kgs; rate 50.00; amount 5000.00
+  CHILD 'Zero Stock Item': qty -50.000 Kgs; rate (empty); amount (empty)
+  TOP   'Godown Single Item': qty 15 Nos; rate 10.00; amount -150.00
+      sub-line batch '(empty)' godown 'Factory Floor': qty 15 Nos; rate 10.00; amount -150.00
+      1 sub-lines; their amounts sum to -150.00 (line amount -150.00)
+  TOP   'Godown Split Item': qty 50 Nos; rate 11.16; amount -558.00
+      sub-line batch '(empty)' godown 'Factory Floor': qty 8 Nos; rate 11.00; amount -88.00
+      sub-line batch '(empty)' godown 'Godown Lab C': qty 20 Nos; rate 12.50; amount -250.00
+      sub-line batch '(empty)' godown 'Main Location': qty 22 Nos; rate 10.00; amount -220.00
+      3 sub-lines; their amounts sum to -558.00 (line amount -558.00)
+  lines 13; sum of the TOP line amounts (wire sign) 2292.01

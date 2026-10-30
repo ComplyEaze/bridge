@@ -1,0 +1,8 @@
+b-07-20260331-stock-summary (parse6):
+  top-level element names (10): DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO
+  'Finished Kits': qty (empty); rate (empty); amount 18750.00
+  'Packaging': qty (empty); rate (empty); amount 14500.00
+  'Raw Chemicals': qty (empty); rate (empty); amount -30249.99
+  'Godown Single Item': qty 15 Nos; rate 10.00; amount -150.00
+  'Godown Split Item': qty 50 Nos; rate 11.16; amount -558.00
+  lines 5; sum of the line amounts (wire sign) 2292.01

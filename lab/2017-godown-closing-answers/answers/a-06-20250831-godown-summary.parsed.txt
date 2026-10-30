@@ -1,0 +1,5 @@
+a-06-20250831-godown-summary:
+  top-level element names (4): DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO
+  'Factory Floor': qty 316.667 Kgs; rate 34.74; amount -11000.00
+  'Main Location': qty (empty); rate (empty); amount 14000.01
+  lines 2; sum of the line amounts (wire sign) 3000.01

@@ -1,0 +1,1 @@
+make_report_request: ok (the Stock Summary request is reproduced byte for byte; only ID, company and dates change)

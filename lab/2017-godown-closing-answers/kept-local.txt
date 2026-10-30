@@ -1,0 +1,5 @@
+Kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+bk1/TDBK1800_<company number>.001 102253 B 8fa3e3a40b380632bc483ccd286063ba225ac710c766272d0f8cc96b14732bb7
+listing-company-before.txt (C6: the company data folder, names, sizes and times) 1396 B ac870a66ed328fb4ca5729afc59c8b04eaf43b0e508ee461642a17ae8b9d8d8f
+listing-company-after.txt (C6: the company data folder, names, sizes and times) 1045 B 044ed74d932b5299d70ab6854e62a3106169a7e4fdd0bcc7afd82acc244650aa
+notes-2017.before-insert.txt (the notes before the step 0 header and the step 1, 2, 3 and 6 lines were added from the kept records) 35588 B 9ab86a38e7ec5ab7f1cfaa24323e0bcdf31e34ebf888e246c036726c647d25e2

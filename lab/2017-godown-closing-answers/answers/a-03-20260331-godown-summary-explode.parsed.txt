@@ -1,0 +1,9 @@
+a-03-20260331-godown-summary-explode:
+  top-level element names (12): DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO
+  TOP   'Factory Floor': qty 316.667 Kgs; rate 34.74; amount -11000.00
+  CHILD 'Raw Chemicals': qty 316.667 Kgs; rate 34.74; amount -11000.00
+  TOP   'Main Location': qty (empty); rate (empty); amount 14000.01
+  CHILD 'Finished Kits': qty 12 Nos; rate 1562.50; amount 18750.00
+  CHILD 'Packaging': qty (empty); rate (empty); amount 14500.00
+  CHILD 'Raw Chemicals': qty 2250.000 Kgs; rate 8.56; amount -19249.99
+  lines 6; sum of the TOP line amounts (wire sign) 3000.01

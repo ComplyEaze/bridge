@@ -1,0 +1,4 @@
+b-05-20250831-stock-query-godown-split-item (parse6):
+  top-level element names (6): STQGODOWNNAME STQBATCHNAME STQGODOWNQTY STQGODOWNNAME STQBATCHNAME STQGODOWNQTY
+  godown 'Main Location'; batch 'Primary Batch'; quantity '30 Nos'
+  godown 'Godown Lab C'; batch 'Primary Batch'; quantity '20 Nos'

@@ -1,0 +1,13 @@
+b-10-20260331-godown-summary-explode (parse6):
+  top-level element names (20): DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO DSPACCNAME DSPSTKINFO
+  TOP   'Factory Floor': qty (empty); rate (empty); amount -11238.00
+  CHILD 'Raw Chemicals': qty 316.667 Kgs; rate 34.74; amount -11000.00
+  CHILD 'Godown Single Item': qty 15 Nos; rate 10.00; amount -150.00
+  CHILD 'Godown Split Item': qty 8 Nos; rate 11.00; amount -88.00
+  TOP   'Main Location': qty (empty); rate (empty); amount 13530.01
+  CHILD 'Godown Lab C': qty 20 Nos; rate 12.50; amount -250.00
+  CHILD 'Finished Kits': qty 12 Nos; rate 1562.50; amount 18750.00
+  CHILD 'Packaging': qty (empty); rate (empty); amount 14500.00
+  CHILD 'Raw Chemicals': qty 2250.000 Kgs; rate 8.56; amount -19249.99
+  CHILD 'Godown Split Item': qty 22 Nos; rate 10.00; amount -220.00
+  lines 10; sum of the TOP line amounts (wire sign) 2292.01

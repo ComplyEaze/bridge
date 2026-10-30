@@ -3,8 +3,10 @@
 One read of each request that `verify_import` sends for the D3 batch (`D3_BATCH_CAPTURE_PROVENANCE.md`) and for the
 WA1 payment (`WA1_PAYMENT_CAPTURE_PROVENANCE.md`), on the synthetic company `BRIDGE AMEND LAB` as it stood on 30 Oct 2026,
 with each census spanned to the voucher mark the call reads (#2145). The captures of 26 Sep 2026 hold only the unspanned
-census, and an answer captured for it may not stand in for the spanned one (#899); a backup of the book from those days
-was looked for and not found, so these answers are of the book as it is now.
+census, and an answer captured for it may not stand in for the spanned one (#899). The lab looked for a backup of the
+book from those days: it found one, taken on 12 Oct 2026, and restored it into a folder of its own, where it read the
+marks of the book today, 1829 / 245, so it holds no recorded state. That no other backup holds one is the lab's account,
+not a measurement. These answers are therefore of the book as it is now.
 
 ## Provenance
 

@@ -1,12 +1,12 @@
-//! `Server::purchase_register` against a scripted transport replaying the bytes of one live run.
+//! The registers against a scripted transport replaying the bytes of live runs.
 //!
-//! The responses are Tally's own bytes from one read of the disposable GST lab book (2025-09-03,
-//! one Purchase voucher); the three company-listing responses are trimmed to the target book's
-//! row (see the PROVENANCE table beside the fixtures). The scripted order is the one recorded on
-//! the wire. That record holds only the unspanned census, so the two tests that pin every
-//! request's fingerprint replay the same call recorded again on BRIDGE PILOT LAB with its census
-//! spanned (#2145, `pilot-lab-register/PROVENANCE.md`): a change to the order or shape of
-//! Bridge's reads fails there.
+//! The register call's own tests replay one call on BRIDGE PILOT LAB for 4 to 5 August 2026,
+//! recorded with its census spanned (#2145, `pilot-lab-register/PROVENANCE.md`). The scripted order
+//! and every request's fingerprint are the recorded ones, so a change to the order or shape of
+//! Bridge's reads fails here. The empty-window tests serve the masters answers of an earlier
+//! record of the same call (`register-e2e/PROVENANCE.md`), with its census and window answers
+//! replaced by Tally's own empty collection. The STOCK LAB, sales and note days replay their own
+//! calls, each beside its provenance.
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -135,16 +135,6 @@ fn plan(kind: Kind, body: String) -> ScenarioPlan {
         .with_framing(ResponseFraming::ContentLength)
 }
 
-fn recorded_plans() -> Vec<ScenarioPlan> {
-    RECORDED_ORDER
-        .chars()
-        .map(|letter| {
-            let kind = Kind::of(letter);
-            plan(kind, body_of(kind))
-        })
-        .collect()
-}
-
 fn server_for(
     simulator: &SequenceSimulator,
     directory: &std::path::Path,
@@ -173,7 +163,7 @@ async fn run(plans: Vec<ScenarioPlan>, from_to: (&str, &str)) -> (Value, usize) 
     let response = server
         .call_tool(
             "purchase_register",
-            json!({"company_guid": COMPANY_GUID, "from": from_to.0, "to": from_to.1}),
+            json!({"company_guid": PILOT_GUID, "from": from_to.0, "to": from_to.1}),
         )
         .await;
     // Not every scripted answer is used when a read refuses early, so the count is what the
@@ -185,11 +175,11 @@ async fn run(plans: Vec<ScenarioPlan>, from_to: (&str, &str)) -> (Value, usize) 
 
 #[tokio::test]
 async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_masters_again() {
-    let (response, requests) = run(recorded_plans(), ("20250903", "20250903")).await;
+    let (response, requests) = run(pilot_plans(), ("20260804", "20260805")).await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
-    // The recorded read sent a voucher census (the `n` requests) and the window's one voucher
-    // was admitted against it, so the window is `complete` by the rule `vouchers` uses (#1031).
+    // The recorded read sent a voucher census (the `n` requests) and the window's vouchers were
+    // admitted against it, so the window is `complete` by the rule `vouchers` uses (#1031).
     assert_eq!(result["state"], "complete");
     assert!(result["reason"].is_null(), "{result}");
     assert_eq!(
@@ -200,12 +190,15 @@ async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_mast
         response["structuredContent"]["evidence"]["reason_code"].is_null(),
         "{response}"
     );
-    assert_eq!(result["total"], 1);
-    assert_eq!(result["vouchers_observed"], 1);
-    assert_eq!(result["items"][0]["status"], "complete");
-    assert_eq!(result["items"][0]["party_group"], "Sundry Creditors");
-    assert_eq!(result["items"][0]["tax_in_books"][0]["head"], "cgst");
-    assert_eq!(result["ledger_masters_observed"], 43);
+    // The two Purchases are listed; the sale is not a purchase register's row.
+    assert_eq!(result["total"], 2, "{result}");
+    assert_eq!(result["vouchers_observed"], 3, "{result}");
+    for item in result["items"].as_array().unwrap() {
+        assert_eq!(item["status"], "complete", "{item}");
+        assert_eq!(item["party_group"], "Sundry Creditors", "{item}");
+        assert_eq!(item["tax_in_books"][0]["head"], "cgst", "{item}");
+    }
+    assert_eq!(result["ledger_masters_observed"], 18, "{result}");
     assert_eq!(
         requests,
         RECORDED_ORDER.len(),
@@ -285,7 +278,7 @@ async fn the_requests_sent_are_the_recorded_ones_in_the_recorded_order() {
 
 /// Every occurrence of the company-marks response, with the voucher mark moved by one.
 fn marks_with_moved_voucher_mark() -> String {
-    let body = body_of(Kind::Marks);
+    let body = pilot_body_of(Kind::Marks);
     let start = body.find("<ALTVCHID").unwrap();
     let open_end = start + body[start..].find('>').unwrap() + 1;
     let close = open_end + body[open_end..].find('<').unwrap();
@@ -295,14 +288,14 @@ fn marks_with_moved_voucher_mark() -> String {
 
 #[tokio::test]
 async fn a_voucher_mark_that_moved_while_the_window_was_read_refuses_and_releases_no_rows() {
-    let mut plans = recorded_plans();
+    let mut plans = pilot_plans();
     let moved = marks_with_moved_voucher_mark();
     for (position, letter) in RECORDED_ORDER.chars().enumerate() {
         if letter == 'm' {
             plans[position] = plan(Kind::Marks, moved.clone());
         }
     }
-    let (response, requests) = run(plans, ("20250903", "20250903")).await;
+    let (response, requests) = run(plans, ("20260804", "20260805")).await;
     assert_eq!(response["isError"], true, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(
@@ -328,17 +321,20 @@ async fn a_duty_head_changed_between_the_two_masters_reads_refuses_and_releases_
     // The marks cannot be trusted alone (whether a head change moves them is unmeasured), so
     // the masters are read again: the second listing names another head for the first ledger
     // that carries one, under the same marks.
-    let mut plans = recorded_plans();
+    let mut plans = pilot_plans();
     let first_marks = RECORDED_ORDER.find('m').unwrap();
-    let altered =
-        body_of(Kind::LedgersCompliance).replacen(">CGST</GSTDUTYHEAD>", ">IGST</GSTDUTYHEAD>", 1);
-    assert_ne!(altered, body_of(Kind::LedgersCompliance));
+    let altered = pilot_body_of(Kind::LedgersCompliance).replacen(
+        ">CGST</GSTDUTYHEAD>",
+        ">IGST</GSTDUTYHEAD>",
+        1,
+    );
+    assert_ne!(altered, pilot_body_of(Kind::LedgersCompliance));
     for (position, letter) in RECORDED_ORDER.chars().enumerate() {
         if letter == 'L' && position > first_marks {
             plans[position] = plan(Kind::LedgersCompliance, altered.clone());
         }
     }
-    let (response, requests) = run(plans, ("20250903", "20250903")).await;
+    let (response, requests) = run(plans, ("20260804", "20260805")).await;
     assert_eq!(response["isError"], true, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(
@@ -354,9 +350,9 @@ async fn a_duty_head_changed_between_the_two_masters_reads_refuses_and_releases_
 
 #[tokio::test]
 async fn a_window_whose_dates_the_caller_did_not_ask_for_is_refused() {
-    // The recorded answer is for 2025-09-03; asking for another day makes Tally's answer a
-    // window it did not honour (and changes the request, so the order is not asserted).
-    let (response, _) = run(recorded_plans(), ("20250910", "20250910")).await;
+    // The recorded answer is for 4 to 5 August 2026; asking for another day makes Tally's
+    // answer a window it did not honour (and changes the request, so the order is not asserted).
+    let (response, _) = run(pilot_plans(), ("20260810", "20260810")).await;
     assert_eq!(response["isError"], true, "{response}");
     assert!(
         response["structuredContent"]["result"]
@@ -368,22 +364,22 @@ async fn a_window_whose_dates_the_caller_did_not_ask_for_is_refused() {
 
 #[tokio::test]
 async fn the_servers_redaction_setting_masks_the_party_and_every_ledger_of_a_real_response() {
-    let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+    let simulator = SequenceSimulator::spawn(pilot_plans()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_for(&simulator, directory.path(), Redaction::MaskParties);
     let response = server
         .call_tool(
             "purchase_register",
-            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+            json!({"company_guid": PILOT_GUID, "from": "20260804", "to": "20260805"}),
         )
         .await;
     assert_eq!(response["isError"], false, "{response}");
     let text = response["structuredContent"]["result"].to_string();
     for name in [
-        "SYN Supplier Intra (M2)",
-        "Input CGST",
-        "Input SGST",
-        "Purchase - Goods",
+        "BRIDGE Supplier RJ",
+        "BRIDGE CGST 2.5%",
+        "BRIDGE SGST 2.5%",
+        "BRIDGE Purchase Svc 5%",
     ] {
         assert!(!text.contains(name), "{name} survived masking: {text}");
     }
@@ -392,21 +388,21 @@ async fn the_servers_redaction_setting_masks_the_party_and_every_ledger_of_a_rea
 
 #[tokio::test]
 async fn the_servers_redaction_setting_masks_what_the_sales_register_lists() {
-    // Read as a sales register, the recorded day's Purchase is listed apart with the ledger names
-    // it touches; with parties masked none of them may survive, and unmasked they are there.
+    // Read as a sales register, the window's two Purchases are listed apart with the ledger
+    // names they touch; with parties masked none of them may survive, and unmasked they are there.
     for (redaction, expect_names) in [(Redaction::None, true), (Redaction::MaskParties, false)] {
-        let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+        let simulator = SequenceSimulator::spawn(pilot_plans()).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = server_for(&simulator, directory.path(), redaction);
         let response = server
             .call_tool(
                 "sales_register",
-                json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+                json!({"company_guid": PILOT_GUID, "from": "20260804", "to": "20260805"}),
             )
             .await;
         assert_eq!(response["isError"], false, "{response}");
         let text = response["structuredContent"]["result"].to_string();
-        for name in ["Input CGST", "Input SGST"] {
+        for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
             assert_eq!(text.contains(name), expect_names, "{name}: {text}");
         }
         let _ = simulator.finish();

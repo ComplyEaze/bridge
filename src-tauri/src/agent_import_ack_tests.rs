@@ -722,13 +722,12 @@ fn dispatched_batch(server: &Server) -> ImportLedgerLine {
     line
 }
 
-/// A single Payment Bridge posted, captured (fixtures `wa1-payment-*`, one
-/// `verify_import`): its debit reads back from Tally as `-1.00`, with the
-/// trailing zeros the post dialog showed.
+/// A single Payment Bridge posted: its post's journal and saved file are the
+/// fixtures `wa1-payment-*`, beside one `verify_import` of 26 Sep 2026.
 const WA1_BATCH: &str = "bridge-78ce4328-9c2a-4827-8584-821d6d656b40";
 
-/// That readback, in the captured order, as [`d3_batch_readback`] reads the
-/// batch's.
+/// One `verify_import` of that payment on the book as it is now, read on
+/// 30 Oct 2026 (fixtures `amend-now-*`), in the order the 26 Sep call sent.
 fn wa1_payment_readback() -> Vec<ScenarioPlan> {
     let extent = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-extent.utf16le.xml"
@@ -759,9 +758,8 @@ fn wa1_payment_readback() -> Vec<ScenarioPlan> {
 /// the capture of 30 Oct 2026 (`amend-now-*`).
 const WA1_CENSUS: &str = "25bc466bb18f857973c144c8e8c93ba88c435a79ee17db6a5839a5c54159e5dc";
 
-/// The sha256 of each request that capture carried, in the same order; `None`
-/// for the status probe. The extent and high-water requests are the d3
-/// capture's too.
+/// The sha256 of each request that call sends, in the same order; `None` for
+/// the status probe. The extent and high-water requests are the batch's too.
 fn wa1_payment_requests() -> Vec<Option<&'static str>> {
     "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
         .chars()
@@ -1310,10 +1308,12 @@ fn d3_server(simulator: &SequenceSimulator, directory: &std::path::Path) -> Serv
 }
 
 /// A person asks to review the doubted 50-voucher batch on the book as it is now
-/// (fixtures `amend-now-*`, read back on 30 Oct 2026): since the post, one of
-/// its vouchers was cancelled in Tally and another deleted. A batch review
-/// admits only a batch whose every voucher reads back once, matched and not
-/// cancelled, so it is refused before any dialog and nothing is recorded.
+/// (fixtures `amend-now-*`, read back on 30 Oct 2026): since the post, D3-003
+/// was cancelled in Tally and D3-005 deleted. A batch review admits only a
+/// batch whose verification is `posted_verified`, every voucher read back once,
+/// matched and not cancelled; D3-003 (not effective) and D3-005 (not found)
+/// would each refuse it alone. So it is refused before any dialog and nothing
+/// is recorded.
 /// (Read back on 26 Sep 2026, before those changes, the review bound all fifty;
 /// that capture holds only the unspanned census, so it no longer answers the
 /// call, #2145.) The step doubt is a local record written here; every Tally

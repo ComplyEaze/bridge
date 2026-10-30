@@ -199,6 +199,7 @@ mod tests {
             "----",
             "\u{2014}\u{2014}\u{2014}\u{2014}",
             "\u{2500}\u{2500}\u{2500}\u{2500}",
+            "\u{257F}\u{257F}\u{257F}\u{257F}",
             "-\u{2212}-\u{2013}",
             "(1)",
             "(12)",
@@ -211,9 +212,41 @@ mod tests {
                 "{inner:?}"
             );
         }
-        for inner in ["---", "(a1)", "( 1)", "(1", "1)", "-- --"] {
+        // Empty brackets, and an opening quotation mark (Initial_Punctuation,
+        // not an opening bracket) before a number.
+        for inner in ["---", "(a1)", "( 1)", "(1", "1)", "-- --", "()", "\u{ab}1)"] {
             assert!(split(&long(inner), 30).is_ok(), "{inner:?}");
         }
+    }
+
+    #[test]
+    fn the_cap_counts_the_value_itself_and_refuses_from_one_character_over() {
+        let at_cap = "word ".repeat(MOST_CHARS / 5);
+        assert_eq!(at_cap.chars().count(), MOST_CHARS);
+        assert_eq!(split(&at_cap, 50).unwrap().concat(), at_cap);
+        let over = format!("{at_cap}x");
+        assert_eq!(split(&over, 50), Err(VoucherTextRefusal::DoesNotFit));
+        // Under the cap as typed and over it quoted: each `"` quotes as two
+        // characters, and the value is still shown, in parts.
+        let quotes = "a\" ".repeat(500);
+        assert!(quotes.chars().count() < MOST_CHARS && quoted_chars(&quotes) > MOST_CHARS);
+        assert_eq!(split(&quotes, 50).unwrap().concat(), quotes);
+    }
+
+    #[test]
+    fn a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read() {
+        let text = format!("{}----", "word ".repeat(MOST_CHARS / 5));
+        assert_eq!(split(&text, 50), Err(VoucherTextRefusal::DoesNotFit));
+    }
+
+    #[test]
+    fn only_a_space_splits_a_value() {
+        // A tab would fit the first part's width; no space does.
+        let text = "ab\tcdefgh ij";
+        assert_eq!(
+            VoucherText::of(text, 0, |k| if k == 1 { 6 } else { 20 }),
+            Err(VoucherTextRefusal::DoesNotFit)
+        );
     }
 
     #[test]

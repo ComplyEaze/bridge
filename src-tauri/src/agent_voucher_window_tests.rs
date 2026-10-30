@@ -863,8 +863,11 @@ fn the_census_request_is_an_admitted_light_collection_export() {
 
 const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 /// A page that asked for neither bank allocations nor goods lines.
-const WITHHELD: (BankAllocationsShown, GoodsLinesShown) =
-    (BankAllocationsShown::Withheld, GoodsLinesShown::Withheld);
+const WITHHELD: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown) = (
+    BankAllocationsShown::Withheld,
+    GoodsLinesShown::Withheld,
+    GstDetailsShown::Withheld,
+);
 
 fn mark_xml(guid: &str, altvchid: &str) -> String {
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{guid}</GUID>{altvchid}<ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")

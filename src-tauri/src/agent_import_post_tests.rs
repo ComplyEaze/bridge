@@ -5329,6 +5329,57 @@ fn a_dialog_text_without_a_recorded_ledgers_mark_is_refused() {
     // The mark on another line does not stand in for this ledger's own.
     let elsewhere = marked.replace("On Account  \"Expense\"", "On Account  \"Rent\"");
     assert_eq!(seal(elsewhere).unwrap_err(), ON_ACCOUNT_UNMARKED);
+    // The refusal's code, as the caller is told it.
+    assert_eq!(ON_ACCOUNT_UNMARKED, "import_review_on_account_unmarked");
+    // The legend counts only as a line of its own, and the marked name only
+    // at the end of its line.
+    let legend_inside = marked.replace(ON_ACCOUNT_LEGEND, &format!("x {ON_ACCOUNT_LEGEND}"));
+    assert_eq!(seal(legend_inside).unwrap_err(), ON_ACCOUNT_UNMARKED);
+    let name_inside = marked.replace("On Account  \"Expense\"", "On Account  \"Expense\" x");
+    assert_eq!(seal(name_inside).unwrap_err(), ON_ACCOUNT_UNMARKED);
+}
+
+/// A recorded ledger whose name no dialog may show cannot be found marked in
+/// any text, so the text is refused, even when every other mark and the
+/// legend are there.
+#[test]
+fn a_recorded_ledger_whose_name_cannot_be_shown_refuses_the_text() {
+    let (mut line, endpoint) = batch();
+    approve_on_account(&mut line, &["Expense", "Cash"]);
+    let marked = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    for voucher in &mut line.vouchers {
+        for entry in &mut voucher.entries {
+            if entry.ledger == "Expense" {
+                entry.ledger = "Expense\u{7}".into();
+            }
+        }
+    }
+    approve_on_account(&mut line, &["Expense\u{7}", "Cash"]);
+    assert!(ReviewLedgerName::parse("Expense\u{7}").is_err());
+    assert_eq!(
+        OnAccountMarks::of(&line).seal(&line, marked).err(),
+        Some(ON_ACCOUNT_UNMARKED.to_string())
+    );
+}
+
+/// Every voucher of a batch is checked for its marked ledgers, not only the
+/// first: a ledger approved On Account that only a later voucher names must
+/// still be marked.
+#[test]
+fn a_batch_text_is_refused_when_a_later_vouchers_recorded_ledger_is_unmarked() {
+    let (mut line, endpoint) = batch_of_every_type();
+    approve_on_account(&mut line, &["Party B"]);
+    assert!(line.vouchers[0]
+        .entries
+        .iter()
+        .all(|entry| entry.ledger != "Party B"));
+    let marked = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(marked.contains("On Account  \"Party B\""), "{marked}");
+    let unmarked = marked.replace("On Account  \"Party B\"", "\"Party B\"");
+    assert_eq!(
+        OnAccountMarks::of(&line).seal(&line, unmarked).err(),
+        Some(ON_ACCOUNT_UNMARKED.to_string())
+    );
 }
 
 /// A batch that carries the On Account legend withholds, on its voucher
@@ -5350,6 +5401,16 @@ fn a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it() {
     ] {
         assert_eq!(reads_like_the_legend(text), matched, "{text:?}");
         assert!(!reads_like_a_dialog_line(text), "{text:?}");
+    }
+    // A word character before "on" is a letter or digit in any script, or
+    // `_`; any whitespace, a no-break space among it, separates the words.
+    for (text, matched) in [
+        ("x_on account: 1", false),
+        ("caf\u{e9}on account: 1", false),
+        ("on\u{a0}account: 1", true),
+        ("on account\u{a0}: 1", true),
+    ] {
+        assert_eq!(reads_like_the_legend(text), matched, "{text:?}");
     }
     let (mut line, endpoint) = batch_of_every_type();
     line.vouchers[1].narration = Some("On Account: no ledger here is bill-wise".into());

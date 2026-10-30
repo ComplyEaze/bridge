@@ -12,10 +12,10 @@ f4f35ae786bfbcfb519a546d1bd652fcc244878a984b897f4344bf367dea3cfe  135  answers/r
 5e39dbce396939cf0d3a2f2446352105b3f4e5fe88469e3f0c6bbe5614eb4ec4  17480  answers/raw/c-a-03-items-to-20260331.answer.xml
 910bdf2e515590dbdcc4acd39088175abd37a3c2153d27b11d78a73fc661d6d4  135  answers/raw/c-a-03-items-to-20260331.headers.txt
 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  answers/raw/m-marks-shape-lab-2-status.body
-949da9746ad652cdf0cf8a7b6eb2cc662ec460b77c1f13619a08dbf6409fe566  4902  answers/raw/m-marks-shape-lab-2.answer.xml
+8f9c5b14c18c0ce3a90ee5a520f1f1589ee2fac076e81edbd116d17ef04994f3  4904  answers/raw/m-marks-shape-lab-2.answer.xml
 518326e8d487acfe2ff6fba2278ec75fc4460d8bd96c8a329e032b30a0870da0  134  answers/raw/m-marks-shape-lab-2.headers.txt
 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  answers/raw/m-marks-shape-lab-status.body
-949da9746ad652cdf0cf8a7b6eb2cc662ec460b77c1f13619a08dbf6409fe566  4902  answers/raw/m-marks-shape-lab.answer.xml
+8f9c5b14c18c0ce3a90ee5a520f1f1589ee2fac076e81edbd116d17ef04994f3  4904  answers/raw/m-marks-shape-lab.answer.xml
 518326e8d487acfe2ff6fba2278ec75fc4460d8bd96c8a329e032b30a0870da0  134  answers/raw/m-marks-shape-lab.headers.txt
 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800  51  answers/raw/q-r-02-stock-query-caustic-soda-flakes-status.body
 ece7ccb544e832c89e52cde0b0425ba7941ff1a8e005511c546756668b1d674f  1094  answers/raw/q-r-02-stock-query-caustic-soda-flakes.answer.xml
@@ -58,7 +58,7 @@ d8a7dc31c12c3bfb8e738af528aef6fd9a3f5cc9bd515032252a035db2058b40  154  evidence/
 fb547dfc79333dae11dc41d90f69380110cb90edb297a1f70bcfdccc192d97ee  155  evidence/s0-status.txt
 05c5595e681d00d3b1cd541548d1febae9e7d6a40fff3aea5734bd426d608c50  154  evidence/s0-tasklist.txt
 1fcb0a1cc32d12578ae7b550864f265e7211913f558a5c6d907111e4fed914b2  6509  evidence/send-log.txt
-2fafab799e67958139cb73006c3b06b038de111576509d5436bab3411973176f  314  kept-local.txt
+9231051b11049982d1062484e2bd3053a454bb42ccd26dfbd81658aa44a09e13  605  kept-local.txt
 06f6788d22bc2de6d026755bd077e3b55981705c78ab7e0de3b35f265aef4d83  1235  notes.txt
 c4ca157bbbd8e43e3e4837dd6f623f25c7c3d656f651141dd75c76b510d76ffd  1197  scripts/call.py
 9529ada2e5eaf5091788f4f45cb303810fac7bc48bbcd4751aca3c12275ed2b5  1170  scripts/capwin.ps1
@@ -69,5 +69,5 @@ ec56ca0b59f4d1fb6c2734a83f972003994d9d8ded90e3f8e3f6093700861186  147  scripts/l
 5afe83391f2919e755771b1ead0c0965d1966d99e54013d93a249fb1cdef5574  4321  scripts/send.py
 6d0dc41d77f693c120e5f69032a95fabf033018179dfc55f2227730b1caafa48  2368  scripts/step0.ps1
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  0  server-stderr-20261030T010605Z.log
-257d4d4ad39ac9237ddb2bc401345985f777f34715f822fa2c7d1ffd4d2a049b  2118  substitutions.txt
+8243acc6abbffded1ae40b05ba719eb5696ce4f5c388c12c18f4aefb1c5686dc  2566  substitutions.txt
 4b9cbccb0809cbd3b3953ee8cbda9174264a9b7920404b2d51b4da6825662720  7366  tables.md

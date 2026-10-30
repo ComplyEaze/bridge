@@ -1,4 +1,6 @@
 Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+answers/raw/m-marks-shape-lab-2.answer.xml: original 4902 B sha256 949da9746ad652cdf0cf8a7b6eb2cc662ec460b77c1f13619a08dbf6409fe566 (kept on the lab PC); COMPANYNUMBER text replaced by "redacted" in 1 place(s), UTF-16LE kept
+answers/raw/m-marks-shape-lab.answer.xml: original 4902 B sha256 949da9746ad652cdf0cf8a7b6eb2cc662ec460b77c1f13619a08dbf6409fe566 (kept on the lab PC); COMPANYNUMBER text replaced by "redacted" in 1 place(s), UTF-16LE kept
 evidence/c10-netstat.txt: original 10870 B sha256 3b586f72471e40ee2a963d2abd1ff40d030c4996dc2883d482e3eb3e217f5253; only the port-9001 LISTENING lines kept
 evidence/s0-netstat.txt: original 9316 B sha256 2f2730b1ef2dc90ad5f03ebdca598a19ffeb1064c765fcc0508738033bca1642; only the port-9001 LISTENING lines kept
 evidence/s0-none-netstat.txt: original 9168 B sha256 39eb1b4d2abd3b828fb1930008d2dcea502934afad705993987f9abc34812591; only the port-9001 LISTENING lines kept

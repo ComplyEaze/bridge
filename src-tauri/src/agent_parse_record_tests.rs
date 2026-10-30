@@ -480,6 +480,11 @@ fn rows() -> Vec<Row> {
         "parse_voucher_census(20250428)",
         |_, t| census(t, "20250428")
     ));
+    rows.push(row!(
+        "stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml",
+        "parse_voucher_census(20250421)",
+        |_, t| census(t, "20250421")
+    ));
     // Import verification and span reads (`agent_import_ack_tests.rs`,
     // `agent_import_index_tests.rs`, `agent_import_span_identity_tests.rs`).
     rows.push(row!(

@@ -3322,6 +3322,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/note-days/debit_note_day_voucher_census_response.utf16le.xml",
         APP_CENSUS,
     ),
+    (
+        "tests/fixtures/stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml",
+        APP_CENSUS,
+    ),
     // Import verification and span reads.
     (
         "tests/fixtures/agent/d3-batch-import-verification.utf16le.xml",

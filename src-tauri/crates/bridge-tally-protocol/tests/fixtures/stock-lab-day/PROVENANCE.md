@@ -1,7 +1,8 @@
 # `stock-lab-day/`: a taxed Sales item invoice, read once through `sales_register`
 
 Eighteen files from one live `sales_register` call on one synthetic company, for a day that holds
-one taxed Sales item invoice. They are here for the register tool's test:
+one taxed Sales item invoice, and two from a later read of the same day's voucher census (see
+"The voucher census" below). They are here for the register tool's test:
 `agent_register_server_tests.rs` replays the call from its sequence record, with the ledger masters,
 groups and company listings the call read, and compares the tool's row with the answer file.
 
@@ -101,8 +102,29 @@ fixture's own hash differs and is the one in the table below.
 | `stock_lab_taxed_day_ledgers_2_request.utf16le.xml` | 1284 | `6a3e975a469cafe5acfc664c4fe3c882ca45105f977560e5890a569a63928aec` | request for the ledger listing with balances, the bill-wise flag and the currency; wire bytes, UTF-16LE with a byte-order mark |
 | `stock_lab_taxed_day_ledgers_2_response.utf16le.xml` | 12870 | `cb9d0b0ef667e89b3dbeba22b61a2938d989563e16888d1ecc262b2a2039624c` | response: the ledger listing with balances, the bill-wise flag and the currency; wire bytes |
 | `stock_lab_taxed_day_sequence.json` | 30296 | `9604a8caac04a86d8007e9c5a094d875765546f8c6648ec31858207c7dac78c5` | record, not a wire capture: every request of the call in order, with hashes |
+| `stock_lab_taxed_day_voucher_census_response.utf16le.xml` | 5416 | `369aa6bbf9c87bcb2a37961fc48f8047374d7e7a0df081e08d26790385660db9` | response: the voucher census spanned to `(0, 3]` for the one day (30 Oct 2026); wire bytes |
+| `stock_lab_taxed_day_voucher_census_spanned_request.utf16le.xml` | 1518 | `26dbad9b1da94f13700260a5c5af517f2c6f54a85d16e1b1c4d541cea86cea58` | request for that census, spanned to `(0, 3]`; wire bytes, UTF-16LE with a byte-order mark |
 | `stock_lab_taxed_day_voucher_window_request.utf16le.xml` | 3088 | `32bc080b2715f9f570e65189b66e225889877fb4f056f387e9fc0979ac2a2632` | request for the class-shaped voucher window for the one day; wire bytes, UTF-16LE with a byte-order mark |
 | `stock_lab_taxed_day_voucher_window_response.utf16le.xml` | 76864 | `04d28380632caa5c02aeceda49793690e82ee21418f9a4f7b7a2b6cd6d7a3488` | response: the class-shaped voucher window for the one day; wire bytes |
+
+## The voucher census (#2145)
+
+The call above sent no voucher census. A register now sends one for a small book too (#1029), spanned
+to the voucher mark the call read, `(0, 3]` (#2145), so the replay adds that read. Both of its files
+are from run sheet 2145-C, read only, on 30 Oct 2026 (UTC), against the same book on TallyPrime 7.2
+Silver (licensed), its voucher mark then 4:
+
+- `stock_lab_taxed_day_voucher_census_spanned_request.utf16le.xml` is the sheet's request
+  `requests/s-0421_c2_spanned_0_3.request.utf16le.xml` (`lab/2145-spanned-census-captures` at
+  `6a968f01`), as sent. The replay checks that the code renders it byte for byte.
+- `stock_lab_taxed_day_voucher_census_response.utf16le.xml` is its answer
+  (`lab/2145-spanned-census-captures-answers` at `993d96bc`, `answers/S/s-0421_c2_spanned_0_3.answer.xml`),
+  wire bytes. It holds one voucher, ALTERID 3, dated 21 Apr 2025, the invoice of the window read. The same
+  census sent unspanned in that sitting answered the same bytes.
+
+The census was read four weeks after the call, when the book's voucher mark had moved from 3 to 4,
+outside the span. The replay therefore pairs a census and a window read in different sittings. Confidence: VERIFIED that the code renders the request the lab sent and that its answer is the
+one above; that the census answered so on 2 Oct 2026 is inferred from the span, not observed.
 
 ## Not settled
 

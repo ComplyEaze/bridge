@@ -1,0 +1,10 @@
+# fixture: stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml
+# parser: parse_voucher_census(20250421)
+# source: captured
+Ok([
+    CensusRow {
+        day: 2025-04-21,
+        alter_id: 3,
+        guid: "1edb9b05-8d35-4c0c-9959-dce655730463-00000003",
+    },
+])

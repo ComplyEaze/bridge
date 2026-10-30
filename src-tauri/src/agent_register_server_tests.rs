@@ -444,13 +444,16 @@ async fn replay_note_day(prefix: &str) -> (Value, Value, Vec<String>) {
 
 /// A call recorded before a register counted a small book (#1029) sent no voucher census. The
 /// register now sends one, so the record is given the six legs of that read (company, census,
-/// status, census, status, company) just before the window's own. The census answer is the
-/// window's own recorded response, so the count is derived from the rows the call returned, not
-/// written by hand, and its request is the one the code renders for the call's company and
-/// dates. A record that already holds a census is returned unchanged. A test built on it checks
-/// the register's wiring for a small book, not that Tally's count agrees with its rows: the
-/// census is the call's own data, so only a live small-book run (#1029) can show that.
-fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Value) -> Vec<Value> {
+/// status, census, status, company) just before the window's own. Its request is the one the
+/// code renders for the call's company and dates, and its answer is
+/// `{prefix}_voucher_census_response.utf16le.xml`: the lab sent that request, spanned to the
+/// mark the record read, to the same book on 30 Oct 2026 (#2145; the directory's PROVENANCE.md).
+/// A record that already holds a census is returned unchanged.
+fn with_census_a_small_book_now_sends(
+    mut requests: Vec<Value>,
+    prefix: &str,
+    arguments: &Value,
+) -> Vec<Value> {
     const STOCK_LAB_COMPANY: &str = "BRIDGE STOCK LAB";
     let census_id = "Bridge Agent Voucher Census";
     if requests
@@ -476,6 +479,7 @@ fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Valu
     .unwrap();
     let mut census = requests[window].clone();
     census["request_id"] = json!(census_id);
+    census["fixture"] = json!(format!("{prefix}_voucher_census_response.utf16le.xml"));
     census["request_sha256"] = json!(sha256_hex(
         &bridge_tally_protocol::encode_tally_xml_request_utf16le(&census_request)
     ));
@@ -537,7 +541,7 @@ async fn replay_recorded(
     let requests = with_the_spanned_census(
         directory,
         prefix,
-        with_census_a_small_book_now_sends(recorded.clone(), &sequence["arguments"]),
+        with_census_a_small_book_now_sends(recorded.clone(), prefix, &sequence["arguments"]),
     );
     let plans = requests
         .iter()

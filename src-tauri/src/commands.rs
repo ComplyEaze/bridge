@@ -423,15 +423,11 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
         "ComplyEaze Bridge withheld the party/ledger master: {}",
         mapped.message
     );
-    // A read that timed out or came back too large or unreadable, which asked
-    // for each party's mailing details too, is named as that larger read: the
-    // export decides to ask for them from estimates (bridge#2074).
-    if mailing_read_failed
-        && matches!(
-            mapped.code,
-            "tally_request_deadline_exceeded" | "response_validation_failed"
-        )
-    {
+    // A master read that asked for each party's mailing details too and timed
+    // out or came back too large is named as that larger read: the export decides
+    // to ask for them on an allowance (bridge#2074). The marker is set only for
+    // those failures, so the code does not decide it.
+    if mailing_read_failed {
         mapped
             .message
             .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
@@ -443,7 +439,7 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
 /// What a CA is told when a party/ledger master read that asked for the mailing
 /// details failed (bridge#2074).
 const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them. ComplyEaze Bridge asks for them only where it estimates the answer fits, and for this company the estimate may have been too low.";
-const MAILING_DETAILS_READ_FAILED_REMEDIATION: &str = "Retry once while nobody is editing this company in Tally. If it fails the same way again, the export will keep failing for this company: ComplyEaze Bridge cannot yet export it without the mailing addresses, so report it to ComplyEaze Bridge.";
+const MAILING_DETAILS_READ_FAILED_REMEDIATION: &str = "Do not retry the unchanged export: it sends the same larger read. Try again only after something has changed, such as Tally being less busy or this company's books being smaller; if it keeps failing, report it to ComplyEaze Bridge, which cannot yet export this company's workbook without the mailing addresses.";
 
 fn party_ledger_master_currency_admission_error(reason: &'static str) -> TallyCommandError {
     // Several Currency-master rows do not identify which row is the company's base
@@ -1963,9 +1959,9 @@ fn verify_observed_company_tuple_from_companies(
 /// mailing details, so its request names them where the whole read fits the mailing
 /// bound, by the mark or by the ledgers counted to size it and the alterations beyond them
 /// (bridge#2074), and is the
-/// standard request otherwise, so a book that exported before is never
-/// refused for the mailing details (bridge#1490); the workbook says when they were not
-/// read. A grouping-decision save uses none of them and sends the standard request.
+/// standard request otherwise (bridge#1490); the workbook says when they were not
+/// read. The count's choice is an allowance, so a counted book that exported
+/// before can now fail on the larger read, with no fall back until bridge#2214. A grouping-decision save uses none of them and sends the standard request.
 const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
     crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits;
 

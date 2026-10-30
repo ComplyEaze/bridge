@@ -68,6 +68,28 @@ async fn refusal_with(
     retained: &[&'static [u8]],
     fail_transport: bool,
 ) -> (anyhow::Error, RuntimeReadEvidence) {
+    refusal_ending_with(
+        extent,
+        read,
+        retained,
+        fail_transport.then_some(SERVICE_UNAVAILABLE),
+    )
+    .await
+}
+
+/// The answer to the request after the retained ones that ends the read: a 503, or
+/// an answer cut short of its declared length.
+const SERVICE_UNAVAILABLE: &[u8] =
+    b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+const CUT_SHORT: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/xml; charset=utf-16\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n\xff\xfe<\0E\0";
+
+async fn refusal_ending_with(
+    extent: &str,
+    read: crate::tally::connection::ComplianceRead,
+    retained: &[&'static [u8]],
+    ending: Option<&'static [u8]>,
+) -> (anyhow::Error, RuntimeReadEvidence) {
+    let fail_transport = ending.is_some();
     let identity = captured_identity(extent);
     let parsed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
         extent,
@@ -123,7 +145,7 @@ async fn refusal_with(
                 if fail_transport && index + 1 == bodies.len() {
                     assert_eq!(paired, 0);
                     assert!(headers.starts_with("POST / "));
-                    socket.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.unwrap();
+                    socket.write_all(ending.unwrap()).await.unwrap();
                     socket.shutdown().await.unwrap();
                     return evidence;
                 }
@@ -266,8 +288,8 @@ fn extent_with_master_mark(mark: u64) -> String {
 }
 
 /// The party/ledger master export (bridge#1490) sends the request a standard read sends for a book
-/// whose master-alteration mark is past the mailing bound, so nothing it read before is sized or
-/// refused by the larger estimate; within the bound it sends the mailing request. Compared by the
+/// whose master-alteration mark is past the mailing bound and whose ledgers are not counted, so
+/// such a book is not sized by the larger estimate; within the bound it sends the mailing request. Compared by the
 /// hash of the first ledger request actually sent, through the client.
 #[tokio::test]
 async fn the_export_sends_the_standard_request_for_a_book_past_the_mailing_bound() {
@@ -358,4 +380,68 @@ async fn the_export_decides_by_the_ledgers_a_catalogue_counted_for_a_marked_book
         )),
         "{refused:#}"
     );
+}
+
+/// bridge#2074: a master read the export sent with the mailing details, whose answer
+/// was cut short, is marked as that larger read, so the export can say so; the same
+/// failure of the standard read is not, nor is the mailing read's damaged answer. The
+/// read's own kind decides, after the count: the 3,309 ledgers the export asked about
+/// are sent the standard request and are not marked.
+#[tokio::test]
+async fn a_mailing_read_cut_short_is_marked_as_the_mailing_read() {
+    use crate::tally::connection::ComplianceRead::{
+        Standard, WithMailingDetailsWhereWholeReadFits as Export,
+    };
+    use crate::tally::connection::MailingDetailsReadFailed;
+    let units = CATALOGUE.strip_prefix(&[0xff, 0xfe]).unwrap_or(CATALOGUE);
+    let captured = String::from_utf16(
+        &units
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let catalogue = |extra: u32| -> &'static [u8] {
+        let body = crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
+            &captured,
+            (0..extra).map(|index| {
+                (
+                    format!("Counted Ledger {index:05}"),
+                    format!("{:08x}", 0x3000_0000 + index),
+                )
+            }),
+        );
+        Box::leak(body.into_bytes().into_boxed_slice())
+    };
+    let (few, many) = (catalogue(0), catalogue(3_300));
+    let marked = |error: &anyhow::Error| {
+        error
+            .chain()
+            .any(|cause| cause.downcast_ref::<MailingDetailsReadFailed>().is_some())
+    };
+    let cut_short = |served: &'static [u8], read| async move {
+        refusal_ending_with(
+            &extent_with_master_mark(8_000),
+            read,
+            &[served],
+            Some(CUT_SHORT),
+        )
+        .await
+        .0
+    };
+    let mailing = cut_short(few, Export).await;
+    assert!(marked(&mailing), "{mailing:#}");
+    let standard = cut_short(few, Standard).await;
+    assert!(!marked(&standard), "{standard:#}");
+    let counted_standard = cut_short(many, Export).await;
+    assert!(!marked(&counted_standard), "{counted_standard:#}");
+    // A damaged answer to the mailing read is told as itself.
+    let (damaged, _) = refusal_with(
+        &extent_with_master_mark(8_000),
+        Export,
+        &[few, BILLS],
+        false,
+    )
+    .await;
+    assert!(!marked(&damaged), "{damaged:#}");
 }

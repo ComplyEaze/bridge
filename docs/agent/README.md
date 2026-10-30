@@ -271,15 +271,18 @@ measured (4,902 bytes: a party with two short dated entries; UNVERIFIED for a po
 or longer address lines is larger), so a read holds at most 3,200 ledgers
 (the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
 refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
-repeat `include_mailing_details` on later pages. Measured on one synthetic book (TallyPrime 7.1, and 7.2 for a second dated entry on one party, oldest first); three or more entries,
-an entry with no date and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
+repeat `include_mailing_details` on later pages. Measured on one synthetic book (TallyPrime 7.1, and 7.2 for a second dated entry
+on one party, oldest first, and in lab row 2074-L for ten dated entries on one party, at about 924 bytes each beyond the
+first); an entry with no date, a book of many populated parties and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
 local file, names the mailing details only where the whole read is estimated to fit their bound: a
 master-alteration mark of at most 3,200, or, where its ledgers are counted to size the read (a mark past 4,266),
 the counted ledgers, each allowed four further mailing entries the mark may not show (one save can add several),
 with one more entry allowed for each alteration beyond them (#2074). These are allowances from one lab row, not
-bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490, so a book that exported
-before is never refused for the larger estimate; its header then says that no ledger's mailing details were
-observed and the status column reads not observed. Where it reads them it shows only the entry in force on its
+bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490; its header
+then says that no ledger's mailing details were observed and the status column reads not observed. A counted book that
+the standard request exported before can now be sent the larger mailing request and fail by its deadline or size, with
+no fall back to the standard request until #2214; the export's error then says the mailing addresses were part of the
+failed read. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,

@@ -105,8 +105,9 @@ fn party_ledger_master_openings_agree(
     Ok(master_opening.numeric_eq(balance_opening))
 }
 
-/// A failed read that asked Tally for each ledger's dated mailing details
-/// (bridge#2074), so the export can say that the larger request is what failed.
+/// A master read that asked Tally for each ledger's dated mailing details and
+/// timed out or ran too large (bridge#2074), so the export can say that the
+/// larger request is what failed.
 /// Its text is the failure's own, so every reading of the error's message is as
 /// it was; only its type marks the read.
 #[derive(Debug, thiserror::Error)]
@@ -115,9 +116,26 @@ pub(crate) struct MailingDetailsReadFailed {
     source: anyhow::Error,
 }
 
-/// Marks a failed read that asked for the mailing details, keeping the read
-/// evidence a failed pair carries at the chain's root, as
-/// [`parent_part_response_error`] does.
+/// Whether a read failed because its answer took too long or ran too large:
+/// the deadline, the response cap, or a body that ended early or could not be
+/// read. Decided by the transport's own error, not by the message.
+fn answer_ran_too_long(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<TallyTransportError>(),
+            Some(
+                TallyTransportError::RequestTimedOut
+                    | TallyTransportError::ResponseTooLarge { .. }
+                    | TallyTransportError::ResponseTruncated
+                    | TallyTransportError::ResponseReadFailed
+            )
+        )
+    })
+}
+
+/// Marks a master read that asked for the mailing details and whose answer ran
+/// too long, keeping the read evidence a failed pair carries at the chain's
+/// root, as [`parent_part_response_error`] does.
 pub(crate) fn mailing_details_read_error(error: anyhow::Error) -> anyhow::Error {
     let completed = error
         .downcast_ref::<super::runtime::RuntimeReadFailure>()
@@ -438,11 +456,13 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_00
 /// [`Self::WithMailingDetailsWhereWholeReadFits`] is what the party/ledger master
 /// workbook asks for (bridge#1490): the mailing details where the book's master
 /// change mark puts the whole read inside the mailing bound, the standard request
-/// otherwise, so a book the standard request read before is never refused for the
-/// larger per-ledger estimate. [`Self::resolved_for_mark`] makes that choice before
+/// otherwise. [`Self::resolved_for_mark`] makes that choice before
 /// any ledger request is sent, and [`Self::resolved_for_count`] makes it again when
 /// the ledgers were counted to size a whole read (bridge#2074); no request is
-/// rendered for the unresolved kind.
+/// rendered for the unresolved kind. The count's choice rests on an allowance,
+/// not a bound: a counted book that the standard request read before can now be
+/// sent the larger mailing request and fail, with no fall back to the standard
+/// one until bridge#2214.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
@@ -1854,8 +1874,8 @@ impl TallyClient {
                 .ok_or(OutstandingsError::MasterWitnessAbsent)?
                 .get();
             // The workbook's mailing details are given up where the mark puts the
-            // whole read past the mailing bound, so nothing it read before is refused.
-            // A count taken below may resolve the kind asked for again.
+            // whole read past the mailing bound. A count taken below may resolve the
+            // kind asked for again, on an allowance that is not a bound (bridge#2214).
             let asked = read;
             let read = read.resolved_for_mark(master_mark);
             // Sized before any ledger request is sent (#637): by the mark when
@@ -2072,16 +2092,10 @@ impl TallyClient {
                             None => PartyLedgerRead::Whole { expected_ledgers },
                         },
                         ledger_currency_base.as_ref(),
+                        read == ComplianceRead::WithMailingDetails,
                         &mut evidence,
                     )
-                    .await
-                    .map_err(|error| match read {
-                        ComplianceRead::WithMailingDetails
-                        | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
-                            mailing_details_read_error(error)
-                        }
-                        ComplianceRead::Standard | ComplianceRead::WithGstDetails => error,
-                    })?,
+                    .await?,
                 );
             }
             let group_pair = self
@@ -2313,6 +2327,7 @@ impl TallyClient {
     /// One master-and-balance pair of a compliance ledger read: the whole book,
     /// or one parent part of it (#679). Each response is checked against the
     /// selected company and classified before any other request is sent.
+    #[allow(clippy::too_many_arguments)]
     async fn read_party_ledger_master_part(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -2320,16 +2335,27 @@ impl TallyClient {
         balance_request: &str,
         scope: PartyLedgerRead<'_>,
         ledger_currency_base: Option<&BaseCurrencyName>,
+        names_mailing_details: bool,
         evidence: &mut RuntimeReadEvidence,
     ) -> anyhow::Result<PartyLedgerMasterPartRead> {
         let part = match scope {
             PartyLedgerRead::Part(part) => Some(part),
             PartyLedgerRead::Whole { .. } => None,
         };
+        // Only the master request names the mailing details, and only its
+        // answer's time and size depend on them (bridge#2074): a drift, a damaged
+        // answer or the balance pair is told as itself.
         let master_pair = self
             .fetch_native_report_paired(master_request.to_owned())
             .await
-            .map_err(|error| parent_part_response_error(part, error))?;
+            .map_err(|error| parent_part_response_error(part, error))
+            .map_err(|error| {
+                if names_mailing_details && answer_ran_too_long(&error) {
+                    mailing_details_read_error(error)
+                } else {
+                    error
+                }
+            })?;
         let (master_body, master_response_bytes, master_response_sha256) =
             master_pair.require_stable(PairedReadValidationError::PartyLedgerMaster)?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(

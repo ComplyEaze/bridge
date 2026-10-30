@@ -1854,11 +1854,10 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     );
 }
 
-/// The party/ledger master export asks for the mailing details only where the whole read
-/// fits their bound, so a book the standard request read before is never refused for the
-/// larger per-ledger estimate: a mark inside 3,200 is sent the mailing request, any larger
+/// By the mark alone, the party/ledger master export asks for the mailing details only where
+/// the whole read fits their bound: a mark inside 3,200 is sent the mailing request, any larger
 /// mark (a group of 3,201 to 4,266 ledgers included) the standard one, and no other kind of
-/// read is changed (#1490).
+/// read is changed (#1490). A count taken past 4,266 can choose again (bridge#2074, below).
 #[test]
 fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
     use super::ComplianceRead::{
@@ -1907,16 +1906,19 @@ fn the_export_takes_the_mailing_details_where_the_counted_ledgers_fit_their_boun
     assert_eq!(per_counted, 9_800);
     let bound = super::compliance_master_ledgers_per_read(WithMailingDetails);
     assert_eq!(bound, 3_200);
-    // With no alteration past the ledgers, a counted ledger also carries the entries the mark
-    // may not show, so the count admits fewer ledgers than the mark's bound.
-    let counted_bound = budget / per_counted;
-    assert_eq!(counted_bound, 1_632);
+    // The count is taken only past the standard bound, a mark of 4,267 at least. There a
+    // counted ledger also carries the entries the mark may not show, so the count admits at
+    // most 1,265 ledgers, far fewer than the mark's bound.
+    let first_counted_mark = super::compliance_master_ledgers_per_read(Standard) + 1;
+    assert_eq!(first_counted_mark, 4_267);
+    let counted_bound = (budget - first_counted_mark * per_entry) / (per_counted - per_entry);
+    assert_eq!(counted_bound, 1_265);
     assert_eq!(
-        Ask.resolved_for_count(counted_bound, counted_bound),
+        Ask.resolved_for_count(counted_bound, first_counted_mark),
         WithMailingDetails
     );
     assert_eq!(
-        Ask.resolved_for_count(counted_bound + 1, counted_bound + 1),
+        Ask.resolved_for_count(counted_bound + 1, first_counted_mark),
         Standard
     );
     assert_eq!(Ask.resolved_for_count(bound, bound), Standard);

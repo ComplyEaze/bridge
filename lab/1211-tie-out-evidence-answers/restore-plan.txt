@@ -1,0 +1,10 @@
+Restore plan (#1211, LAB-COMMON C6), written before the first restore; it holds for both restores (end of R2, end of R3), each on the run lead's recorded word:
+- Source folder: the lab's 1211-evidence\backups\BK1 folder (holds one file only; checked before each restore).
+- File: TDBK1800_<company number>.001, 32,143 B, sha256 fcdd9ea35de2bbad2552bb265be5827efb7269396ec52d2477037f66d7aacf95, taken 31 Oct 2026 04:13:25 local (30 Oct 22:43Z) after step 0.
+- THE COMPANY: BRIDGE TIE OUT LAB 3, number <company number>, GUID 9c97970c-e25d-4348-9740-6ddb1caaa56d.
+- Restore Data Path: Tally's data folder (TallyPrimeEditLog\data). Source: Specify Path, the backup's folder.
+- The Restore list must show BRIDGE TIE OUT LAB 3 with its number and 31-Oct-26 4:13 am; it is selected alone; End of List before Accept.
+- Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Skip ... Replace ..." = Replace.
+- A listing of the company's data folder is kept on the lab PC before and after each restore (names, sizes, times).
+- After (as the sheet says): load THE COMPANY alone; a screenshot of the whole window and of the Gateway; MARKS first (EXPECT 210 / 8, those read after BK1); list_companies as step 0; ledger_movement Union Bank 2026-07-01..2026-09-30 equal to step 0's (opening -10000.00, closing -11800); after R2 also ledger_masters every page: no row named BRIDGE Bank B.
+- Fallback: none beyond this BK1.

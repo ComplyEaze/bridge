@@ -1,0 +1,71 @@
+2026-10-30T22:40:35Z exe sha256 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d ok; launch-env.json sha256 b1c99e1eb74f5d4ead3a8072c6ccf1a54a43fb0109f6c76d2675cd87212c3d52; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_IMPORT', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-30T22:40:35Z launched pid 3568; stderr to server-stderr-20261030T224035Z.log
+2026-10-30T22:40:35Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-10-30T22:40:43Z 000-s0-tools-list.json tool=list secs=0.014 isError=None error=None saved_sha256=431de3d46b4673bf346d8bcd87d3dccf5b16f0dc7ca3946f3289a044314861a4
+2026-10-30T22:40:57Z 001-s0-list-companies.json tool=list_companies secs=0.144 isError=False error=None saved_sha256=e848ae68b96c2e813eb2a2f70f59c51fae356f91026523ce2e53dc113de718cc
+2026-10-30T22:40:59Z 002-marks-s0-M0V0.json tool=ledger_masters secs=0.810 isError=False error=None saved_sha256=878e3f2615598fc1f76152453359128a4a65132773eb14d574ca015bf26f9029
+2026-10-30T22:41:06Z 003-s0-lm-union.json tool=ledger_movement secs=6.298 isError=False error=None saved_sha256=6de9bf4b5bfb128467910b3e7b931d32dadf72597b54ea996e5aab39c085da3b
+2026-10-30T22:41:12Z 004-s0-tally-status.json tool=tally_status secs=0.107 isError=False error=None saved_sha256=c4f1ad38c21bd965c23c001396d750fb5779e093f6c12cf91ee18731e4f717e2
+2026-10-30T22:43:45Z 005-marks-bk1-after.json tool=ledger_masters secs=0.869 isError=False error=None saved_sha256=77aa1d27b4409cda8be064681fda4fdcc6152b83f6de82339195ed80809ba7af
+2026-10-30T22:44:44Z 006-r1-s1-parse.json tool=parse_bank_statement secs=1.938 isError=False error=None saved_sha256=4d9576b2a95352f570ac33f6b0126ef227ea69badbb8fd42fade139d76094c20
+2026-10-30T22:44:46Z 007-r1-s1-tie-after_post.json tool=statement_tie_out secs=0.201 isError=False error=None saved_sha256=9dbed7e0f68aad7dc6a33cfe354fbf467a7c0376f225bee8ac2e9fdc0be6aef2
+2026-10-30T22:44:47Z 008-r1-s1-egress.json tool=egress_log secs=0.156 isError=False error=None saved_sha256=6f6f35b5e8e14035c1f9af2afb0f149a55b17a9e332659ad2fe0d7b6f9c3615e
+2026-10-30T22:44:58Z 009-r1-s1-egress10.json tool=egress_log secs=0.175 isError=False error=None saved_sha256=1f612aeb070edc6e3455fbfaf87e406d3066a97dfb0ef4f30e20c2b7a1187915
+2026-10-30T22:45:31Z 010-r1-s2-parse.json tool=parse_bank_statement secs=1.018 isError=False error=None saved_sha256=070a85e5d3b4806065256e80f6d845daaa6dabf3c6a5b467c6312962d14adcfe
+2026-10-30T22:45:32Z 011-r1-s2-tie-after_post.json tool=statement_tie_out secs=0.296 isError=False error=None saved_sha256=388f9e90fcca920febf508d366c045e9e07e2d132ca59d9457dcae8d7e6b1d2d
+2026-10-30T22:45:34Z 012-r1-s2-egress.json tool=egress_log secs=0.104 isError=False error=None saved_sha256=9237d18092cf25754ea78362e6a2195ca2f61dbd31f775afa27d2e5c44fe43f8
+2026-10-30T22:45:36Z 013-r1-s3-parse.json tool=parse_bank_statement secs=0.190 isError=False error=None saved_sha256=c52543f932e02cae59e725a3943f9a51d2ef2de10101090a845a0499111af85d
+2026-10-30T22:45:39Z 014-r1-s3-tie-after_post.json tool=statement_tie_out secs=2.133 isError=False error=None saved_sha256=859732efbb9fa30adbc9be21f8fe978e16c2e30fe8bde7ab61a484e335d84fba
+2026-10-30T22:45:40Z 015-r1-s3-egress.json tool=egress_log secs=0.153 isError=False error=None saved_sha256=a62d28eec9a0f2983c6144a1e5a873268224754fb440bb0f64accce9d3d5be41
+2026-10-30T22:52:21Z 016-marks-r2-1-M1V1.json tool=ledger_masters secs=0.786 isError=False error=None saved_sha256=eca3fff2dd32f6efb9d6f3ad2bb37c69be65fde9d6d6e647986cdc5b84db6122
+2026-10-30T22:58:08Z 017-marks-r2-2-V2.json tool=ledger_masters secs=0.825 isError=False error=None saved_sha256=d250878118f09da4bf41225da7a8d1fdad96145c405a86d6c7112876aa821186
+2026-10-30T22:58:19Z 018-r2-3-jul-parse.json tool=parse_bank_statement secs=0.170 isError=False error=None saved_sha256=a826677a37d91475cd574fafc33f6d1627af553790cec97e7c198b9a84bfb554
+2026-10-30T22:58:22Z 019-r2-3-jul-tie-after_post.json tool=statement_tie_out secs=1.974 isError=False error=None saved_sha256=18e3d95625b15deb3efa587eeb830ba6ccf01fbf1a408777e17f3e8702fcfd3d
+2026-10-30T22:58:23Z 020-r2-3-jul-egress.json tool=egress_log secs=0.063 isError=False error=None saved_sha256=87b5be78bfd4ca291f9f545836219fe29a86d7384ca026e9b3c5bade5d270761
+2026-10-30T22:58:24Z 021-r2-3-aug-parse.json tool=parse_bank_statement secs=0.349 isError=False error=None saved_sha256=365b3f4a57e5b80a28827ac8e7608f2f9751dc906312ff41a97882fdcf9873d9
+2026-10-30T22:58:27Z 022-r2-3-aug-tie-after_post.json tool=statement_tie_out secs=2.019 isError=False error=None saved_sha256=4b720beb8de8b62d4ea8cc9d9589c00db91ba15e3ae56b69b3d240a849fb4bb0
+2026-10-30T22:58:28Z 023-r2-3-aug-egress.json tool=egress_log secs=0.078 isError=False error=None saved_sha256=0347a9a834a45534031c91cac8112e115631038ce9cf518d1d903c391aba013c
+2026-10-30T22:58:36Z 024-r2-4-tb-0630.json tool=trial_balance secs=1.128 isError=False error=None saved_sha256=7a3989d8d036d1d8add9c597969ff427ddada8e873e8becde05cfc5a920d6fe3
+2026-10-30T22:58:38Z 025-r2-4-tb-0731.json tool=trial_balance secs=0.764 isError=False error=None saved_sha256=bfef3dc8235e17ece599485cab5a052289758eb0f5c37073c200b2ba91658d81
+2026-10-30T22:58:40Z 026-r2-4-tb-0831.json tool=trial_balance secs=0.749 isError=False error=None saved_sha256=08b026293ef01170fa1961b60ffca4f6d25c97de14961c0499c36257b916658e
+2026-10-30T23:06:50Z 027-marks-r2-5-V5.json tool=ledger_masters secs=0.833 isError=False error=None saved_sha256=4d4a34d27835782a40f86d277ef8996501c221e4d9560250ce8a69dc4be063cd
+2026-10-30T23:07:02Z 028-r2-6-aug-parse.json tool=parse_bank_statement secs=0.175 isError=False error=None saved_sha256=8d49e5d89c1ee9ce19561b44d81d2d1dc9a1745de0b7959b1c7b675ea9fd33ad
+2026-10-30T23:07:06Z 029-r2-6-aug-tie-after_post.json tool=statement_tie_out secs=2.370 isError=False error=None saved_sha256=91230909dee9e5a2533480ac386349df73f351398e71a4fa5ed10414e75a7854
+2026-10-30T23:07:07Z 030-r2-6-aug-egress.json tool=egress_log secs=0.127 isError=False error=None saved_sha256=8e1d2a09f719d4713fdf53b39a8cbae3a7a78c2803aa0a943f36831cad883b60
+2026-10-30T23:07:09Z 031-r2-6-tb-0831.json tool=trial_balance secs=0.930 isError=False error=None saved_sha256=bd440fe918c0e80998ce22d8a433823867de882302558a23e70c4badfe1485fd
+2026-10-30T23:08:39Z 032-r2-7-tb-0815.json tool=trial_balance secs=0.822 isError=False error=None saved_sha256=17e319ab650816df9e69aa3f05ae932629ce43a2974d34018cbd2176ef8a49d4
+2026-10-30T23:08:41Z 033-marks-r2-8-M8V8.json tool=ledger_masters secs=0.840 isError=False error=None saved_sha256=31964517e2308a3c77c692b0a7a963445a85f8b2acc6caff325dad6f3a01b00f
+2026-10-30T23:13:57Z 034-marks-r2-restore.json tool=ledger_masters secs=0.872 isError=False error=None saved_sha256=7d3326831911067c30d2eaf4e0dcf9a7fd38b251611b11ddee731215b1be8ccb
+2026-10-30T23:13:58Z 035-r2-restore-list-companies.json tool=list_companies secs=0.193 isError=False error=None saved_sha256=40188ab221e2f1dfeda89bae609885626f16ab514c260fbadfa28160946c8225
+2026-10-30T23:14:03Z 036-r2-restore-lm-union.json tool=ledger_movement secs=3.847 isError=False error=None saved_sha256=6c430d6c31a0f7160432115c7094780d25819ad4d40529a426045103ac766d2c
+2026-10-30T23:14:27Z session ended; server pid 3568 exit code 0
+2026-10-30T23:14:56Z exe sha256 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d ok; launch-env.json sha256 3c8c6f62da378e162e1cca1390de97651547e4169a2b03f680af6ca9d25e93bd; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_IMPORT', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: True
+2026-10-30T23:14:56Z launched pid 27560; stderr to server-stderr-20261030T231456Z.log
+2026-10-30T23:14:56Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-10-30T23:15:05Z 037-r3-1-tools-list.json tool=list secs=0.022 isError=None error=None saved_sha256=d463785957e5eab281bb6b126101598baf059e7e95c71f201f73b562b496a3e0
+2026-10-30T23:15:07Z 038-r3-1-list-companies.json tool=list_companies secs=0.159 isError=False error=None saved_sha256=19f9d45f0c11640f8972be92c83d63fe277a0c098f1c682b454b20863adebe13
+2026-10-30T23:15:09Z 039-marks-r3-1.json tool=ledger_masters secs=0.841 isError=False error=None saved_sha256=e477dd70fa8b5466fe976f6033b3b74698d68867d722b801695ff9ca7e6f6e5d
+2026-10-30T23:15:20Z 040-r3-2-vtypes.json tool=masters secs=0.931 isError=False error=None saved_sha256=38c8c0025dcea50912bbe57f61a09f644e7c590debc5cd8430e90f41261735a7
+2026-10-30T23:22:52Z 041-marks-r3-3-V3.json tool=ledger_masters secs=0.948 isError=False error=None saved_sha256=5d10af1d5b1ba15eb4bbc780eab93f3bd9d601492620aea6916cf0533cd7fe89
+2026-10-30T23:23:08Z 042-r3-4-parse.json tool=parse_bank_statement secs=0.423 isError=False error=None saved_sha256=9ee2a7d46fe3be6c7d22e8317c9d5c1306e828d58db52a94e38de6da99dc4012
+2026-10-30T23:23:21Z 043-r3-5-tb-0902.json tool=trial_balance secs=0.991 isError=False error=None saved_sha256=9a64bd838d47f32837809430cd6ed5be81c4f376e65038b6610572362d4b037d
+2026-10-30T23:25:19Z 044-r3-6-tie-before_build.json tool=statement_tie_out secs=2.306 isError=False error=None saved_sha256=bd1cbb4cce3212846f5668576471044bf3c2ba97131806cf1b3624ae614112d0
+2026-10-30T23:25:21Z 045-r3-6-egress.json tool=egress_log secs=0.100 isError=False error=None saved_sha256=02f0b648890a4b17c11b1256230c14eb5b66b9b4bc882f39e3d53e525546838f
+2026-10-30T23:25:43Z 046-r3-7-build.json tool=build_import_xml secs=5.732 isError=False error=None saved_sha256=46ad6ba9043b4490341cbff0f3982384f9baf001d42fd81ca83cee236758342c
+2026-10-30T23:25:56Z 047-marks-r3-8-V8.json tool=ledger_masters secs=0.840 isError=False error=None saved_sha256=32338ae0e0fb3402049cf624f9608dfe78d9ae6ff079cc443e1db3f7b75ca6ee
+2026-10-30T23:30:08Z 048-r3-9-post-1.json tool=post_import secs=28.784 isError=False error=None saved_sha256=1838da836fffd9d21d1bc42c2c255c0e48deaf8fede34bca5fa011adae6d9227
+2026-10-30T23:30:39Z 049-r3-11-verify.json tool=verify_import secs=3.656 isError=False error=None saved_sha256=ba07cbd7707584e42c9f6b14f9a8d1cca9ec5f4065a9819f53e9dc19f6681d80
+2026-10-30T23:30:42Z 050-marks-r3-11.json tool=ledger_masters secs=0.858 isError=False error=None saved_sha256=b479a342792bed6b63b3e779c8862472a85c106ff531f3c09d69cf34913a4342
+2026-10-30T23:30:52Z 051-r3-12-tie-after_post.json tool=statement_tie_out secs=2.303 isError=False error=None saved_sha256=8ffe12d695fa98516352cce5b4d0408cbad4baaa7684e689f284378fe9d3c631
+2026-10-30T23:30:54Z 052-r3-12-egress.json tool=egress_log secs=0.183 isError=False error=None saved_sha256=84438983e1a7a19f22d270c617d2cfd3b19d86c436edee8e5bec7f9119c7e51e
+2026-10-30T23:30:57Z 053-r3-13-tie-before_build.json tool=statement_tie_out secs=2.273 isError=False error=None saved_sha256=f7c5fbf24682b0c0f60f9edded49f87e09af5a36fd1dc6a55365f329004f4aa5
+2026-10-30T23:30:58Z 054-r3-13-egress.json tool=egress_log secs=0.130 isError=False error=None saved_sha256=56ee887e61055f7c4a4f151576b486ed42c0abc2a4d73bf9236f8d5c8e4d2d4f
+2026-10-30T23:31:20Z 055-r3-14-tb-0928.json tool=trial_balance secs=0.887 isError=False error=None saved_sha256=f7e2f04f11d928bc86458ef8b76ba0d973ed79451985e8e601b206b3f4515a1c
+2026-10-30T23:31:26Z 056-r3-14-vouchers.json tool=vouchers secs=3.627 isError=False error=None saved_sha256=76092ac281dfd5baae38fd7317439c5bd07690948b9a6cd402a28a41a63e9de7
+2026-10-30T23:35:38Z 057-marks-r3-15.json tool=ledger_masters secs=0.887 isError=False error=None saved_sha256=2ad5c6a261e0c2363bb968c85cff56e835bb755bc24b24b0e14cc7e601e6ec47
+2026-10-30T23:35:41Z 058-r3-16-tie-after_post.json tool=statement_tie_out secs=2.289 isError=False error=None saved_sha256=85821366dda15e74a4fc06db5221ec432e208ac31257b474f0ae7015680c77cd
+2026-10-30T23:35:43Z 059-r3-16-egress.json tool=egress_log secs=0.122 isError=False error=None saved_sha256=8f1a7c229c3c8577cc692370a23add7d7fbe7b4bdc3f30c07ceccdf13a8599ed
+2026-10-30T23:41:21Z 060-marks-r3-restore.json tool=ledger_masters secs=1.002 isError=False error=None saved_sha256=58007fc3d55e5cede1f8de76b81c8758873be372e7ed5b5a3210918977be7b16
+2026-10-30T23:41:22Z 061-r3-restore-list-companies.json tool=list_companies secs=0.290 isError=False error=None saved_sha256=d13919a94f5b14429d2cba4dcd06ff9012effe20d7e490e60c9115a4e1a301d3
+2026-10-30T23:41:27Z 062-r3-restore-lm-union.json tool=ledger_movement secs=3.936 isError=False error=None saved_sha256=10034645573550865579005ec910811e87f1cb07adc7c0e4adfaf19f644dbcd4
+2026-10-30T23:41:40Z session ended; server pid 27560 exit code 0

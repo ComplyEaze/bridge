@@ -1,0 +1,5 @@
+command: curl.exe -sS -w " | %{http_code} %{size_download}" http://127.0.0.1:9001/status 2>&1
+time: 2026-10-30T22:40:15.941Z
+exit: 0
+<RESPONSE>TallyPrime Server is Running</RESPONSE>
+ | 200 51

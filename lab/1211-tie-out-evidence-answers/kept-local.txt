@@ -1,0 +1,32 @@
+Kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+backups/BK1/TDBK1800_<company number>.001 32143 B fcdd9ea35de2bbad2552bb265be5827efb7269396ec52d2477037f66d7aacf95
+STATEMENT A (the 14 October three-month PDF) 3927 B 506e05ebfb0f81d6e0fa4b0cc867bbaeae8a69d130c02615ea48a86559894fc9
+listing-company-r2-after.txt (C6: the company data folder, names, sizes and times) 948 B 5aba22b7a06fb3753575681947626a06ae8b1d8c7337965aabb4c47f20d5f0ef
+listing-company-r2-before.txt (C6: the company data folder, names, sizes and times) 1399 B 3dd6fd8ab39c38d6164ccdbe488708b6dfc53b233b041787c3f971bf44dc899a
+listing-company-r3-after.txt (C6: the company data folder, names, sizes and times) 948 B 77d5deb9fe88de5f093e8fe05c58edff755d5166f01d7c2bb4acc9d61056bbd1
+listing-company-r3-before.txt (C6: the company data folder, names, sizes and times) 1449 B c0e70c142cece79f64c4942421b75ab2aa17e90e60caaa4144c2776d1e538c95
+data/agent-import-admission.lock 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+data/agent-import-ledger.jsonl 5414 B a1a4cd88e85b2959b4af96123a2e8c10b9c6cfbd3c0affbe8ae044af3a19567b
+data/terms-acceptance.jsonl 90 B b10a63804080757f5a05ede09fa7233257b4c5dc70462decd0cc0f827daa7af8
+data/bank-statements/statement-27d67f59-9e41-4521-b36c-8dc718ea31df.json 3895 B 8da59bdbd4372308616f52c8f9bf5cf661c34c9656b5d635ad033aa1e40bca82
+data/bank-statements/statement-37db8fe5-6901-4f45-9cf3-81f251da1ca1.json 3895 B 73a9a8d8bb808174d57f8d9b5f27c37da321189ee781f095ce07e924534e9cb5
+data/bank-statements/statement-859f27d6-74e0-4161-9b48-597e36b1e4a1.json 1820 B 9a11cf8de05532ea51c6c5f0f9a3fdd32563b97ee44ca62cb9f968708aee56aa
+data/bank-statements/statement-85b187c6-f400-4a4f-b110-11cd86e70495.json 4868 B 4e56461ebcd4ec8ee2a4d35a15d27af663d0d9651844c4965b4bb3ba00167540
+data/bank-statements/statement-b8966a06-c82b-4def-9f21-4d448a66244a.json 4747 B 580a8d41444e808ce5d82e35315cd5a660089f95936667dcf34842d9158440eb
+data/bank-statements/statement-da0aa1eb-a801-4102-a39a-7d02ab2b8425.json 3907 B 6e72d54493fd837d8176ed3e32566e923cc28a6cf2dc9d394c7f481933965743
+data/bank-statements/statement-f746a591-58fe-47ab-bbd1-ff3abb063c3f.json 3907 B 71a642bcf62ba222726386f9de28e28c7e8886cbd690530087351906af0a877a
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.baseline.1.json 182 B ece94a2d369bbb3dc5e16ffaeb5fdbb73dc1d91c1f505d86e35cfc247b25181e
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.masters_check.json 227 B 78dab255d1b90a2df01286e3cd1e19b3feda6101822d16d3affb77a6e60da56e
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.masters_verdict.json 256 B 369d2771d8260db972628bd08656537e710d886c234a0e9365b21ff36ee6b831
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.proof.20261030T232942035Z.09f8e8a24daa225fb9d41819127ceed2ce408379eda0103205d550c237df02d6.json 3019 B 09f8e8a24daa225fb9d41819127ceed2ce408379eda0103205d550c237df02d6
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.proof.20261030T232942035Z.09f8e8a24daa225fb9d41819127ceed2ce408379eda0103205d550c237df02d6.md 1159 B 376cdf5f3d31252faa42b044044ed2b38193c28149d5dc18c124c983c21202a3
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.proof.20261030T233007427Z.bd6e293c9ae0206b7c576c37a7952bfaa25eb8efca0643e083d8c83ae57c917a.json 6113 B bd6e293c9ae0206b7c576c37a7952bfaa25eb8efca0643e083d8c83ae57c917a
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.proof.20261030T233007427Z.bd6e293c9ae0206b7c576c37a7952bfaa25eb8efca0643e083d8c83ae57c917a.md 1085 B 41ae6d85e725d5f1ca609dbcc74866d17107a2b42fcfc7fa631f8addb817b886
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.proof.20261030T233038965Z.f96cdf8efadfe6a19cca12952d3f818bc1ded5e45213da3e8bb2f8657ecae74c.json 5641 B f96cdf8efadfe6a19cca12952d3f818bc1ded5e45213da3e8bb2f8657ecae74c
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.proof.20261030T233038965Z.f96cdf8efadfe6a19cca12952d3f818bc1ded5e45213da3e8bb2f8657ecae74c.md 1097 B 011236dd8e096b87967ba40babf2f9f0e702b437e9afac7b6bd500d6aed59d12
+data/imports/bridge-92aaef7e-c8c7-480c-ad83-22054c3c67f7.xml 3518 B 3aa8ffb51ffb775fe21403f92211086c3339caf94a8634fb0a9309f2e427a1cf
+box/dryrun-box.txt (the post window watcher: its log holds the window text) 287 B 3e11c5e445c7ea0ba00fb5366abb7c9101ed4edd85714ad104abc49e0f5f94a6
+box/dryrun-nobox.png (the post window watcher: its log holds the window text) 340579 B e433c807aa30a9078023b11b23ac7c3d345f831986659ca9f80912b9584a1047
+box/r3-9-post-box.txt (the post window watcher: its log holds the window text) 3044 B 4b89e2aa4056f222576e9df8f08ffa7425c029fc0e59cdf99daf1da5e29788dd
+box/r3-9-post-open.png (the post window watcher: its log holds the window text) 423715 B 991227ac6481dd5ebeb8963e40e53bec122fde867e6e09a633a29f0578c92d92
+box/r3-9-post.answer (the post window watcher: its log holds the window text) 3 B 85a39ab345d672ff8ca9b9c6876f3adcacf45ee7c1e2dbd2408fd338bd55e07e

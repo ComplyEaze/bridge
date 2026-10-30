@@ -1014,7 +1014,11 @@ entry on a ledger under Duties & Taxes whose master carries a recognised GST dut
   not look, such as an item invoice of a shape not measured whose purchase ledger is in an inventory allocation), `sales_ledger_present`,
   `gst_on_both_sides` (reverse-charge and set-off journals), `other_ledgers_present` (any other group, such as Current
   Assets or Stock-in-Hand), `no_creditor_party` (such as a GST challan payment),
-  `no_counter_ledger` or `several_counter_ledgers`.
+  `no_counter_ledger`, `several_counter_ledgers`, or `repeats_a_purchase_bill`: a Purchase that would be attributed
+  but is entered against the supplier bill another Purchase in the books of the window opened for the same supplier
+  ledger, which is how a supplier invoice keyed twice reads (Tally warns that the reference was used earlier, and saves
+  it against the first copy's bill). Each listed voucher names the first copy in `repeats`; the first copy stays
+  attributed. A copy whose first is outside the window, or that is keyed with a bill of its own or none, is not seen.
 
 `counter_ledgers` gives, per ledger, its `ledger_guid` (Tally's GUID of the ledger), its predefined `group`, its `parent` (masked like a ledger name when it is a group
 the book named), `vouchers`, `debit_side_tax` (negative, as

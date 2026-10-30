@@ -655,6 +655,11 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, GST_LEDGER_LAB)
     ));
     rows.push(row!(
+        "agent/gst-ledger-l3/dec-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
         "note-days/cancelled_purchase_day_voucher_window_response.utf16le.xml",
         "parse_agent_rows(SHAPE_LAB)",
         |_, t| agent_rows(t, SHAPE_LAB)

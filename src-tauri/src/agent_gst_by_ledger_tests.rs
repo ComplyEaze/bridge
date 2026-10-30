@@ -454,3 +454,100 @@ fn a_parent_that_is_tally_root_is_shown_as_tally_sent_it_and_is_not_masked() {
         );
     }
 }
+
+/// The same book's December, read after it was registered and a supplier invoice was keyed
+/// twice (the `gst-ledger-l3` PROVENANCE table): Purchase 57 opens supplier bill GS1/P/0001,
+/// Purchase 58 repeats its reference and is entered against that bill, an optional and a
+/// cancelled Purchase, an expense Journal, and a Payment against the same bill.
+fn december() -> (MasterIndex, Vec<Value>) {
+    let masters = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/dec-L-1.utf16le.xml"
+    ));
+    let groups = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/dec-g-1.utf16le.xml"
+    ));
+    let window = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/dec-w-1.utf16le.xml"
+    ));
+    let records = parse_native_party_ledger_master_records_with_evidence(&masters, COMPANY_GUID)
+        .expect("the live master capture parses")
+        .records
+        .into_iter()
+        .map(|row| row.record)
+        .collect::<Vec<_>>();
+    let groups = GroupIndex::build(
+        parse_native_group_snapshot(&groups, COMPANY_GUID).expect("the live group capture parses"),
+    );
+    let index = MasterIndex::build(records.iter(), &groups, Vec::new()).expect("masters index");
+    let rows = parse_agent_rows(&window, COMPANY_GUID).expect("the live window parses");
+    assert_eq!(rows.len(), 6, "December's six vouchers");
+    (index, rows)
+}
+
+fn numbered<'a>(rows: &'a mut [Value], number: &str) -> &'a mut Value {
+    rows.iter_mut()
+        .find(|row| row["voucher_number"] == number)
+        .unwrap_or_else(|| panic!("no voucher {number}"))
+}
+
+#[test]
+fn a_supplier_invoice_keyed_twice_is_set_aside_once_and_names_the_first_copy() {
+    let (index, rows) = december();
+    let totals = fold(&index, &rows).unwrap();
+    let result = gst_by_ledger_result(&index, &totals, Redaction::None);
+    let goods = result["counter_ledgers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["ledger"] == "Purchase - Goods")
+        .expect("the first copy stays attributed");
+    assert_eq!(goods["vouchers"], 1, "{result}");
+    assert_eq!(
+        goods["debit_side_tax"],
+        json!({"cgst": "-900", "sgst_utgst": "-900"})
+    );
+    let set_aside = result["set_aside"].as_object().unwrap();
+    assert_eq!(
+        set_aside.keys().collect::<Vec<_>>(),
+        ["repeats_a_purchase_bill"]
+    );
+    let repeat = &set_aside["repeats_a_purchase_bill"];
+    assert_eq!(repeat["vouchers"], 1);
+    assert_eq!(
+        repeat["debit_side_tax"],
+        json!({"cgst": "-900", "sgst_utgst": "-900"})
+    );
+    let listed = &repeat["listed"]["listed"][0];
+    assert_eq!(listed["voucher_number"], "58", "{repeat}");
+    assert_eq!(listed["repeats"]["voucher_number"], "57", "{repeat}");
+    assert_eq!(listed["repeats"]["date"], "20251202");
+    // The optional and the cancelled copies stay apart, the Payment has no GST, and the
+    // Journal lands on its expense ledger, as before.
+    assert_eq!(result["vouchers_cancelled_optional_or_post_dated"], 2);
+    assert_eq!(result["vouchers_without_gst_entry"], 1);
+    assert_eq!(result["vouchers_observed"], 6);
+}
+
+#[test]
+fn a_bill_opened_only_by_a_purchase_outside_the_books_makes_no_repeat() {
+    let (index, mut rows) = december();
+    numbered(&mut rows, "57")["optional"] = json!(true);
+    let totals = fold(&index, &rows).unwrap();
+    assert!(totals.set_aside.is_empty(), "{:?}", totals.set_aside);
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 1);
+}
+
+#[test]
+fn the_same_bill_name_of_another_supplier_ledger_makes_no_repeat() {
+    let (index, mut rows) = december();
+    let repeat = numbered(&mut rows, "58");
+    let entries = repeat["amounts"].as_array_mut().unwrap();
+    let party = entries
+        .iter_mut()
+        .find(|entry| entry["ledger"] == "SYN GS1 Supplier B")
+        .unwrap();
+    party["ledger"] = json!("SYN GS1 Supplier");
+    let totals = fold(&index, &rows).unwrap();
+    assert!(totals.set_aside.is_empty(), "{:?}", totals.set_aside);
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2);
+}

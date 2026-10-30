@@ -6351,3 +6351,45 @@ fn only_a_post_refusal_that_sent_nothing_carries_its_codes_next_step() {
     attach_next_step(&mut payload, None, nothing_sent);
     assert!(payload["result"]["error"].get("next_step").is_none());
 }
+
+/// #2142: a drain the post's admission reads meet is not counted against the
+/// call's ceiling, so the ceiling and the most one call can spend draining stay
+/// under the host's limit of about 60 s (#485, #703).
+#[test]
+fn a_drain_keeps_a_post_under_the_host_limit() {
+    let worst = bridge_tally_transport::DrainPolicy::MEASURED.worst_per_call();
+    assert_eq!(worst, std::time::Duration::from_secs(11));
+    assert!(approval::CALL_CEILING + worst < std::time::Duration::from_secs(60));
+}
+
+/// #2142: a post refused before its attempt while Tally drains is told when to
+/// try again and what to do, by its own code.
+#[test]
+fn a_draining_refusal_before_the_attempt_names_its_own_next_step() {
+    for (code, retry, step) in [
+        (
+            "tally_endpoint_draining",
+            10,
+            DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+        ),
+        (
+            "tally_endpoint_needs_attention",
+            30,
+            NEEDS_ATTENTION_BEFORE_ATTEMPT_NEXT_STEP,
+        ),
+        ("tally_endpoint_busy", 5, BUSY_BEFORE_ATTEMPT_NEXT_STEP),
+    ] {
+        let payload = reconciliation_failure_payload("batch", Some(false), None, code);
+        let error = &payload["result"]["error"];
+        assert_eq!(error["code"], code);
+        assert_eq!(error["retry_after_s"], retry, "{error}");
+        assert_eq!(error["next_step"], step, "{error}");
+    }
+    // After a post was sent, a draining readback keeps the verify step.
+    let payload =
+        reconciliation_failure_payload("batch", Some(true), None, "tally_endpoint_draining");
+    assert_eq!(
+        payload["result"]["error"]["next_step"],
+        BUSY_AFTER_POST_NEXT_STEP
+    );
+}

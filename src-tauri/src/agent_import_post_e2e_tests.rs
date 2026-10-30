@@ -2072,6 +2072,103 @@ async fn refused_busy_at_lease_send(lease_send: usize) {
     );
 }
 
+/// #2142: a post whose own lock finds Tally still draining after a cut request
+/// is refused before its intent, like a busy lock: nothing recorded or sent,
+/// the approval lapsed, and the next step names the drain.
+#[tokio::test]
+async fn a_draining_endpoint_at_the_posts_own_lock_refuses_before_the_intent() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    // The POST is the last of the plans: its lock is the one found owed.
+    let post_send = plans.len() - 1;
+    plans.truncate(post_send);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends(vec![post_send]),
+    );
+    let (line, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "tally_endpoint_draining",
+        "{response}"
+    );
+    assert_eq!(result["error"]["retry_after_s"], 10, "{response}");
+    assert_eq!(
+        result["error"]["next_step"],
+        super::DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert_eq!(observed.len(), post_send, "no POST was sent: {response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+}
+
+/// #2142: a batch post whose marks readback finds Tally draining, and again on
+/// its one retry, records the drain as the readback's cause; the verdict stays
+/// a doubt.
+#[tokio::test]
+async fn a_batch_post_whose_readback_found_tally_draining_names_it_in_its_doubt() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    let readback = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends(vec![readback, readback + 1]),
+    );
+    let (line, args) = saved_batch_of_two(&server);
+    let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let response = super::MARKS_READS
+        .scope(
+            std::sync::Arc::clone(&reads),
+            SCRIPTED_APPROVAL.scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            ),
+        )
+        .await;
+    // Read once, then once more after the refusal's own wait.
+    assert_eq!(reads.lock().unwrap().len(), 2, "{response}");
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["post_location"]["after_read_failure"], "tally_endpoint_draining",
+        "{response}"
+    );
+    // The readback, refused twice, sent no marks read; the post's later steps
+    // still read on.
+    assert!(observed.len() > readback, "{response}");
+    let imports = server.imports_dir().unwrap();
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{}.batch_step_doubt.json", line.batch_id))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(doubt["cause"], "tally_endpoint_draining", "{doubt}");
+    assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
+}
+
 #[tokio::test]
 async fn a_busy_wire_lock_at_the_queues_binding_marks_read_refuses_before_the_intent() {
     refused_busy_at_lease_send(3).await;

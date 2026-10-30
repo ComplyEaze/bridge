@@ -18,15 +18,19 @@ pub struct DrainPolicy {
     pub probe_deadline: Duration,
     /// A probe answered within this counts as quick.
     pub quick_below: Duration,
-    /// Quick probes in a row that clear the debt.
+    /// Quick probes in a row that clear the debt. As many probes in a row
+    /// answered whole but slowly clear it too, so a host that answers every
+    /// request slowly is held at most that many refused calls; nothing about
+    /// such a host has been measured.
     pub quick_in_a_row: u8,
     /// The least time from one probe's end to the next probe, across every
     /// process.
     pub spacing: Duration,
     /// The most probes one post sends before it is refused.
     pub probes_per_call: u8,
-    /// Owed for longer than this, a refusal names something that may need a
-    /// person, such as a dialog on Tally's screen.
+    /// Probes that were not quick for longer than this, the refusal after one
+    /// names something that may need a person, such as a dialog on Tally's
+    /// screen.
     pub attention_after: Duration,
 }
 
@@ -60,9 +64,12 @@ impl DrainPolicy {
 pub(crate) enum Probe {
     /// Answered whole within `quick_below`.
     Quick,
-    /// Answered slowly, cut by its deadline, or answered with anything but a
-    /// whole answer: Tally may still be working.
-    Slow,
+    /// Answered whole, but not within `quick_below`: Tally had finished by
+    /// then, or answers every request slowly.
+    AnsweredSlowly,
+    /// Cut by its deadline, or ended without a whole answer: Tally may still be
+    /// working.
+    Cut,
     /// Nothing listens on the port: no work can remain, so nothing is owed.
     Unreachable,
 }
@@ -73,6 +80,17 @@ impl DrainPolicy {
     /// again while Tally works.
     pub(crate) const fn retry_after_slow(self) -> Duration {
         self.spacing.saturating_mul(5)
+    }
+
+    /// The most one call can spend on a drain before it posts or is refused:
+    /// quick probes and the pauses between them, then one probe cut by its
+    /// deadline.
+    pub const fn worst_per_call(self) -> Duration {
+        let before_last = self.probes_per_call.saturating_sub(1) as u32;
+        self.quick_below
+            .saturating_add(self.spacing)
+            .saturating_mul(before_last)
+            .saturating_add(self.probe_deadline)
     }
 
     /// What a call refused as needing attention is told to wait.

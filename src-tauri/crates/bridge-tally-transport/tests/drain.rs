@@ -99,10 +99,21 @@ const POLICY: DrainPolicy = DrainPolicy {
 };
 
 fn owed(quick: u8, last_probe_ms: Option<u64>) -> DrainDebt {
+    owed_slow(quick, 0, last_probe_ms, None)
+}
+
+fn owed_slow(
+    quick: u8,
+    slow: u8,
+    last_probe_ms: Option<u64>,
+    slow_since_ms: Option<u64>,
+) -> DrainDebt {
     DrainDebt::Owed {
         since_ms: T0,
         quick,
+        slow,
         last_probe_ms,
+        slow_since_ms,
     }
 }
 
@@ -252,7 +263,10 @@ async fn a_slow_probe_refuses_the_post_at_once_and_resets_the_count() {
         .await
         .unwrap_err();
     assert_eq!(draining(&error), 10_000);
-    assert_eq!(debt(&shared), owed(0, Some(T0 + 2_000)));
+    assert_eq!(
+        debt(&shared),
+        owed_slow(0, 1, Some(T0 + 2_000), Some(T0 + 2_000))
+    );
     assert_eq!(sent(simulator), ["/status", "/status"]);
 }
 
@@ -266,7 +280,7 @@ async fn a_probe_cut_by_its_own_deadline_refuses_the_post() {
         .await
         .unwrap_err();
     assert_eq!(draining(&error), 10_000);
-    assert_eq!(debt(&shared), owed(0, Some(T0)));
+    assert_eq!(debt(&shared), owed_slow(0, 0, Some(T0), Some(T0)));
     assert_eq!(sent(simulator), ["/status"]);
 }
 
@@ -334,10 +348,11 @@ async fn a_last_probe_ahead_of_the_clock_counts_as_elapsed() {
 }
 
 #[tokio::test]
-async fn a_drain_owed_past_the_attention_time_is_refused_as_needing_attention() {
+async fn probes_not_quick_for_past_the_attention_time_are_refused_as_needing_attention() {
     let simulator =
         SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(150))]).unwrap();
-    let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
+    // The run of probes that were not quick began at T0.
+    let (transport, shared) = transport(&simulator, owed_slow(0, 1, None, Some(T0)), Some(POLICY));
     shared.now.store(T0 + 121_000, Ordering::SeqCst);
     let error = transport
         .post_xml_decoded("<E />".into())
@@ -439,7 +454,7 @@ async fn the_import_path_refuses_an_owed_drain_at_once_with_no_probe() {
     let simulator = SequenceSimulator::spawn(vec![status(), xml()]).unwrap();
     let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
     let error = transport.acquire_wire_lock().await.err().unwrap();
-    assert_eq!(draining(&error), 2_000);
+    assert_eq!(draining(&error), 10_000);
     assert_eq!(debt(&shared), owed(0, None));
     assert_eq!(shared.held.load(Ordering::SeqCst), 0);
     assert!(sent(simulator).is_empty());
@@ -503,4 +518,105 @@ async fn without_a_drain_policy_a_post_ignores_the_record() {
     transport.post_xml_decoded("<E />".into()).await.unwrap();
     assert_eq!(debt(&shared), owed(0, None));
     assert_eq!(sent(simulator), ["/", "/"]);
+}
+
+/// A debt left long ago, on a Tally long since idle, clears on its quick probes:
+/// its age alone never makes it need a person.
+#[tokio::test]
+async fn an_old_debt_on_an_idle_tally_clears_on_quick_probes() {
+    let simulator = SequenceSimulator::spawn(vec![status(), status(), status(), xml()]).unwrap();
+    let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
+    shared.now.store(T0 + 30 * 60_000, Ordering::SeqCst);
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/status", "/status", "/status", "/"]);
+}
+
+/// A record left in flight by a process that crashed a day ago meets a probe
+/// cut while Tally works: that is draining, never needing a person.
+#[tokio::test]
+async fn a_stale_in_flight_record_never_needs_attention_on_its_first_slow_probe() {
+    let simulator =
+        SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(900))]).unwrap();
+    let (transport, shared) = transport(
+        &simulator,
+        DrainDebt::InFlight { since_ms: T0 },
+        Some(POLICY),
+    );
+    shared.now.store(T0 + 24 * 3_600_000, Ordering::SeqCst);
+    let error = transport
+        .post_xml_decoded("<E />".into())
+        .await
+        .unwrap_err();
+    assert_eq!(draining(&error), 10_000);
+    let _ = sent(simulator);
+}
+
+/// A call refused for the spacing sent no probe, so it is draining whatever the
+/// record's age, never needing a person.
+#[tokio::test]
+async fn a_refusal_for_the_spacing_never_needs_attention() {
+    let simulator = SequenceSimulator::spawn(vec![status()]).unwrap();
+    let now = T0 + 200_000;
+    let (transport, shared) = transport(
+        &simulator,
+        owed_slow(0, 1, Some(now - 500), Some(T0)),
+        Some(POLICY),
+    );
+    shared.now.store(now, Ordering::SeqCst);
+    let error = transport
+        .post_xml_decoded("<E />".into())
+        .await
+        .unwrap_err();
+    assert_eq!(draining(&error), 1_500);
+    assert!(sent(simulator).is_empty());
+}
+
+/// A host whose `/status` answers whole but slowly every time is held at most
+/// three probes: the third answered in a row clears the debt and the post goes.
+#[tokio::test]
+async fn three_probes_answered_slowly_in_a_row_clear_a_slow_host() {
+    let simulator =
+        SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(150)), xml()]).unwrap();
+    let (transport, shared) = transport(&simulator, owed_slow(0, 2, None, Some(T0)), Some(POLICY));
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/status", "/"]);
+}
+
+/// A probe cut by its deadline breaks the run of slow answers: only answers in
+/// a row clear a slow host.
+#[tokio::test]
+async fn a_cut_probe_breaks_a_run_of_slow_answers() {
+    let simulator =
+        SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(900))]).unwrap();
+    let (transport, shared) = transport(&simulator, owed_slow(0, 2, None, Some(T0)), Some(POLICY));
+    transport
+        .post_xml_decoded("<E />".into())
+        .await
+        .unwrap_err();
+    assert_eq!(debt(&shared), owed_slow(0, 0, Some(T0), Some(T0)));
+    let _ = sent(simulator);
+}
+
+/// A lock taken for an import and dropped unsent (a refusal under the lock)
+/// clears the record it armed: nothing was sent, so nothing is owed.
+#[tokio::test]
+async fn an_import_lock_dropped_unsent_leaves_nothing_owed() {
+    let simulator = SequenceSimulator::spawn(vec![xml()]).unwrap();
+    let (transport, shared) = transport(&simulator, DrainDebt::Clear, Some(POLICY));
+    let held = transport.acquire_wire_lock().await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::InFlight { since_ms: T0 });
+    drop(held);
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(shared.held.load(Ordering::SeqCst), 0);
+    assert!(sent(simulator).is_empty());
+}
+
+#[test]
+fn a_call_drains_for_at_most_its_worst_case() {
+    assert_eq!(
+        DrainPolicy::MEASURED.worst_per_call(),
+        Duration::from_secs(11)
+    );
 }

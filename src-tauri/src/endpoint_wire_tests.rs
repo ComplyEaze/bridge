@@ -231,6 +231,7 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
         retry: WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap(),
         drain: None,
         busy_at: None,
+        owe_at: None,
     });
     let _other = gate(&root, &endpoint).try_acquire().unwrap();
     fn busy<T>(result: anyhow::Result<T>) -> bool {
@@ -384,7 +385,9 @@ fn the_drain_record_is_one_file_in_the_last_root_beside_its_lock() {
     let owed = DrainDebt::Owed {
         since_ms: 7,
         quick: 2,
+        slow: 1,
         last_probe_ms: Some(9),
+        slow_since_ms: Some(8),
     };
     held.record(owed).unwrap();
     assert_eq!(held.debt(), Ok(owed));
@@ -436,7 +439,9 @@ fn an_unreadable_drain_record_is_owed() {
                 Ok(DrainDebt::Owed {
                     since_ms: 42,
                     quick: 0,
-                    last_probe_ms: None
+                    slow: 0,
+                    last_probe_ms: None,
+                    slow_since_ms: None
                 })
             ),
             "{text:?}"

@@ -108,6 +108,51 @@ pub(crate) struct WireGateConfig {
     /// whose every try is refused busy (#869).
     #[cfg(test)]
     busy_at: Option<Arc<BusyAt>>,
+    /// Test only: the sends, counted as for `busy_at`, before each of which
+    /// the drain record is found owed and probed just now (#2142).
+    #[cfg(test)]
+    owe_at: Option<Arc<OweAt>>,
+}
+
+/// Counts the sends granted so far, and finds the drain owed before each of
+/// the chosen ones.
+#[cfg(test)]
+pub(crate) struct OweAt {
+    sends: Vec<usize>,
+    granted: std::sync::atomic::AtomicUsize,
+}
+
+/// The file lock, except that the chosen sends find the drain record owed with
+/// a probe sent just now, as another process that had just probed a draining
+/// Tally would leave it.
+#[cfg(test)]
+struct OweAtGate {
+    inner: FileWireGate,
+    owe: Arc<OweAt>,
+}
+
+#[cfg(test)]
+impl TallyWireGate for OweAtGate {
+    fn try_acquire(&self) -> Result<Box<dyn WireLockHeld>, WireRefusal> {
+        use std::sync::atomic::Ordering;
+        let held = self.inner.try_acquire()?;
+        let send = self.owe.granted.fetch_add(1, Ordering::SeqCst);
+        if self.owe.sends.contains(&send) {
+            let now = self.now_ms();
+            held.record(DrainDebt::Owed {
+                since_ms: now,
+                quick: 0,
+                slow: 0,
+                last_probe_ms: Some(now),
+                slow_since_ms: None,
+            })?;
+        }
+        Ok(held)
+    }
+
+    fn pause(&self, delay: Duration) -> WirePause {
+        self.inner.pause(delay)
+    }
 }
 
 /// Counts the sends granted so far, and refuses every try of one of them.
@@ -157,6 +202,8 @@ impl Default for WireGateConfig {
             drain: None,
             #[cfg(test)]
             busy_at: None,
+            #[cfg(test)]
+            owe_at: None,
         }
     }
 }
@@ -189,6 +236,13 @@ impl WireGateConfig {
     pub(crate) fn gate_for(&self, endpoint: &TallyEndpointConfig) -> Arc<dyn TallyWireGate> {
         let file = FileWireGate::new(self.root.clone(), endpoint.clone());
         #[cfg(test)]
+        if let Some(owe) = &self.owe_at {
+            return Arc::new(OweAtGate {
+                inner: file,
+                owe: owe.clone(),
+            });
+        }
+        #[cfg(test)]
         if let Some(busy) = &self.busy_at {
             return Arc::new(BusyAtGate {
                 inner: file,
@@ -208,6 +262,19 @@ impl WireGateConfig {
         }));
         self.retry =
             WireRetryPolicy::new(Duration::from_millis(1), total).expect("a test wire policy");
+        self
+    }
+
+    /// Test only: drain by the measured policy, and find the drain owed, with a
+    /// probe sent just now, before each of `sends` (0-based, over every client
+    /// of the runtime), so each of them is refused as draining with no probe.
+    #[cfg(test)]
+    pub(crate) fn owe_at_sends(mut self, sends: Vec<usize>) -> Self {
+        self.drain = Some(DrainPolicy::MEASURED);
+        self.owe_at = Some(Arc::new(OweAt {
+            sends,
+            granted: std::sync::atomic::AtomicUsize::new(0),
+        }));
         self
     }
 
@@ -258,7 +325,9 @@ enum DebtRecord {
     Owed {
         since_ms: u64,
         quick: u8,
+        slow: u8,
         last_probe_ms: Option<u64>,
+        slow_since_ms: Option<u64>,
     },
 }
 
@@ -278,7 +347,7 @@ fn read_debt(path: &Path, now_ms: u64) -> Result<DrainDebt, WireRefusal> {
         fields(match record {
             DebtRecord::Clear => 1,
             DebtRecord::InFlight { .. } => 2,
-            DebtRecord::Owed { .. } => 4,
+            DebtRecord::Owed { .. } => 6,
         })
     });
     Ok(match parsed.ok_or(()) {
@@ -287,17 +356,23 @@ fn read_debt(path: &Path, now_ms: u64) -> Result<DrainDebt, WireRefusal> {
         Ok(DebtRecord::Owed {
             since_ms,
             quick,
+            slow,
             last_probe_ms,
+            slow_since_ms,
         }) => DrainDebt::Owed {
             since_ms,
             quick,
+            slow,
             last_probe_ms,
+            slow_since_ms,
         },
         // Unreadable is owed: the cost is a probe.
         Err(_) => DrainDebt::Owed {
             since_ms: now_ms,
             quick: 0,
+            slow: 0,
             last_probe_ms: None,
+            slow_since_ms: None,
         },
     })
 }
@@ -310,11 +385,15 @@ fn write_debt(path: &Path, debt: DrainDebt) -> Result<(), WireRefusal> {
         DrainDebt::Owed {
             since_ms,
             quick,
+            slow,
             last_probe_ms,
+            slow_since_ms,
         } => DebtRecord::Owed {
             since_ms,
             quick,
+            slow,
             last_probe_ms,
+            slow_since_ms,
         },
     };
     let bytes = serde_json::to_vec(&record).map_err(|_| WireRefusal::Unavailable)?;

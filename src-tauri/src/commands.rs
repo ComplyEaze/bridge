@@ -149,15 +149,15 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
             "Tally is still finishing an earlier request that was stopped for time.",
             "safe",
             false,
-            "Try again in a few seconds. Only a status check was sent to Tally.",
+            "Try again in a few seconds. This request was not sent to Tally.",
         ),
         WireRefusal::NeedsAttention { .. } => tally_command_error(
             "tally_endpoint_needs_attention",
             "Operation",
-            "Tally has not answered promptly for a long time after an earlier request was stopped for time.",
+            "Tally has not answered promptly for more than two minutes after an earlier request was stopped for time.",
             "after_change",
             false,
-            "Look at Tally's screen for a message waiting for an answer, then try again. Only a status check was sent to Tally.",
+            "Look at Tally's screen for a message waiting for an answer, then try again. This request was not sent to Tally.",
         ),
         WireRefusal::Unavailable => tally_command_error(
             "tally_endpoint_lock_unavailable",

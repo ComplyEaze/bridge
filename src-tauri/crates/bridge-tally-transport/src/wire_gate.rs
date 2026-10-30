@@ -71,8 +71,9 @@ pub enum WireRefusal {
     /// working on it, and `GET /status` has not yet answered quickly enough
     /// times since (#2142). Retryable after `retry_after_ms`.
     Draining { retry_after_ms: u64 },
-    /// As [`Self::Draining`], for longer than a drain was measured to last:
-    /// something on Tally's side, such as a dialog, may need a person.
+    /// As [`Self::Draining`], when no probe has answered quickly for longer
+    /// than a drain was measured to last: something on Tally's side, such as a
+    /// dialog, may need a person.
     NeedsAttention { retry_after_ms: u64 },
 }
 
@@ -108,12 +109,16 @@ pub enum DrainDebt {
     /// holder finds its sender gone (the lock is released only after a send
     /// ends), so it is owed.
     InFlight { since_ms: u64 },
-    /// A post was cut at `since_ms`; `quick` probes in a row since answered
-    /// quickly, the last at `last_probe_ms`.
+    /// A post was cut at `since_ms`. Since then `quick` probes in a row
+    /// answered quickly, or `slow` in a row answered whole but slowly; the
+    /// last probe was sent at `last_probe_ms`, and the current run of probes
+    /// that were not quick began at `slow_since_ms`.
     Owed {
         since_ms: u64,
         quick: u8,
+        slow: u8,
         last_probe_ms: Option<u64>,
+        slow_since_ms: Option<u64>,
     },
 }
 

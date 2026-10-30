@@ -1024,9 +1024,29 @@ const MAX_IDENTITY_WINDOW_DAYS: usize = 31;
 /// values, which can be names from the book: the values are in the exchange this tool persists on
 /// the lab machine.
 fn purchase_identity_differences(agent: &[Value], narrow: &[Value]) -> Vec<Value> {
+    // The opt-in entry details a `vouchers` call can ask for (bank allocations, goods lines, GST
+    // details) are not part of the identity compared: the narrow read never asks for them.
+    let identity_only = |row: &Value| {
+        let mut row = row.clone();
+        if let Some(entries) = row["amounts"].as_array_mut() {
+            for entry in entries.iter_mut().filter_map(Value::as_object_mut) {
+                for key in [
+                    "bank_allocations",
+                    "bank_allocations_unreadable",
+                    "goods_lines",
+                    "goods_lines_unreadable",
+                    "gst_details",
+                    "gst_details_unreadable",
+                ] {
+                    entry.remove(key);
+                }
+            }
+        }
+        row
+    };
     let by_guid = |rows: &[Value]| {
         rows.iter()
-            .filter_map(|row| Some((row["guid"].as_str()?.to_string(), row.clone())))
+            .filter_map(|row| Some((row["guid"].as_str()?.to_string(), identity_only(row))))
             .collect::<BTreeMap<_, _>>()
     };
     let (agent, narrow) = (by_guid(agent), by_guid(narrow));
@@ -2333,6 +2353,32 @@ ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,ALLLEDGERENTRIES.BILLALLOCATIONS.*,";
         assert!(!found
             .iter()
             .any(|item| item.to_string().contains("SYN GS1")));
+    }
+
+    /// An entry's opt-in details on the agent read are not a difference: the narrow read never
+    /// asks for them (#2027).
+    #[test]
+    fn purchase_identity_differences_ignore_opt_in_entry_details() {
+        let row = |guid: &str| json!({"guid": guid, "amounts": [{"ledger": "Purchase - Goods", "amount": "-10000.00"}]});
+        let narrow = vec![row("g-1")];
+        let mut agent = narrow.clone();
+        for (key, value) in [
+            ("gst_details", json!({"rates": []})),
+            (
+                "gst_details_unreadable",
+                json!("gst_details_rates_too_many"),
+            ),
+            ("bank_allocations", json!([])),
+            ("goods_lines", json!([])),
+        ] {
+            agent[0]["amounts"][0][key] = value;
+        }
+        assert!(purchase_identity_differences(&agent, &narrow).is_empty());
+        agent[0]["amounts"][0]["amount"] = json!("-9000.00");
+        assert_eq!(
+            purchase_identity_differences(&agent, &narrow),
+            vec![json!({"guid": "g-1", "field": "amounts"})]
+        );
     }
 
     #[test]

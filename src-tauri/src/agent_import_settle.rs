@@ -190,6 +190,22 @@ pub(super) fn asks_for_settlement(next_step: Option<&str>) -> bool {
         .is_some_and(|line| line.contains("call acknowledge_post_review with doubt not_created"))
 }
 
+/// In `verify_import`'s result for a batch a person settled, each voucher line
+/// that still asks for the settlement gets the settled next step; every other
+/// line is kept. A result with no settlement is left as it is.
+pub(super) fn settle_voucher_next_steps(result: &mut Value) {
+    if !result["person_settlement"].is_object() {
+        return;
+    }
+    if let Some(rows) = result["vouchers"].as_array_mut() {
+        for row in rows {
+            if asks_for_settlement(row["next_step"].as_str()) {
+                row["next_step"] = json!(NEXT_STEP);
+            }
+        }
+    }
+}
+
 /// The binding summary of a settled batch, in place of the open one.
 pub(super) const SUMMARY: &str = "A person settled this batch after Tally reported that its post \
     created none of its vouchers: ComplyEaze Bridge never sends them again.";
@@ -198,7 +214,8 @@ pub(super) const NEXT_STEP: &str =
     "A person settled this batch in ComplyEaze Bridge's own dialog, saying \
     each voucher is in the book or will not be posted. It is closed and counted as settled, but \
     not marked posted, and its rows are never built or posted again. If a voucher is wanted in the \
-    book and is not there, it can only be entered in Tally.";
+    book and is not there, it can only be entered in Tally; do not import its file through \
+    Tally's Import menu.";
 
 impl Server {
     /// The tool `acknowledge_post_review` with `doubt` set to `not_created`.

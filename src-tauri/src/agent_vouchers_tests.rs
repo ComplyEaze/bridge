@@ -76,6 +76,7 @@ fn described(marks: CompanyMarks) -> Value {
             selector: None,
             search: None,
             summary: None,
+            gst_details: GstDetailsShown::Withheld,
         },
         marks,
         Arc::new(Vec::new()),

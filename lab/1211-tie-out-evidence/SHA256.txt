@@ -1,0 +1,5 @@
+# sha256  bytes  file  (LAB-COMMON.md: byte for byte from lab/0.7.0-rc-sitting; statement/make-mid-month-statement.py loads scripts/generate-bank-statement-fixtures.py at the parent of c9e0ba21 from beside itself)
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+9b088635b80a67622c841bbad5275cacb731c30224a7a37f10824cb38e9c4c83  21425  RUN-SHEET.md
+703558f64e8fe4383dbc9d70d6c561deeacb507e8751d86aabb042eb7546ca46  3352  statement/make-mid-month-statement.py
+33609063f8d64e2d3136081f1a175343011434befff4f319a33d6f905d2c650a  2482  statement/ubi-1211-r3.pdf

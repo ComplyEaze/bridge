@@ -27,16 +27,16 @@ use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator}
 
 /// The synthetic book the stock captures came from. Its GUID is replaced by the
 /// test double's company, so a captured collection binds to it.
-const CAPTURE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+pub(super) const CAPTURE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 /// The only date stock has been measured at: the end of the financial year the
 /// captures were taken over, 20250401 to 20260331.
-const AS_OF: &str = "20260331";
-const TODAY: &str = "20260930";
+pub(super) const AS_OF: &str = "20260331";
+pub(super) const TODAY: &str = "20260930";
 /// The test company's books start here. The captured extent says 20260401, which
 /// would put the captures' period before the books; its row in the companies
 /// list and its extent are moved a year back together, as the identity bracket
 /// compares them.
-const BOOKS_FROM: &str = "20250401";
+pub(super) const BOOKS_FROM: &str = "20250401";
 
 /// `text` with the test company's `BOOKSFROM` moved to [`BOOKS_FROM`], inside
 /// that company's own row only.
@@ -58,16 +58,16 @@ fn with_books_from(text: String) -> String {
     )
 }
 
-fn companies() -> String {
+pub(super) fn companies() -> String {
     with_books_from(captured_companies())
 }
 
-fn extents() -> String {
+pub(super) fn extents() -> String {
     with_books_from(captured_extents())
 }
 
 /// The test company as its identity bracket verifies it.
-fn identity() -> VerifiedCompanyIdentity {
+pub(super) fn identity() -> VerifiedCompanyIdentity {
     let companies = parse_companies_from_collection(&companies()).unwrap();
     let row = companies
         .iter()
@@ -96,7 +96,7 @@ fn report() -> String {
     ))
 }
 
-fn flags() -> String {
+pub(super) fn flags() -> String {
     decode(include_bytes!(
         "../../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml"
     ))
@@ -133,7 +133,7 @@ fn extent_with_mark(mark: u64) -> String {
 }
 
 /// The mode probe, the identity bracket and the opening extent.
-fn opening(extent: String) -> Vec<ScenarioPlan> {
+pub(super) fn opening(extent: String) -> Vec<ScenarioPlan> {
     let companies = xml(companies());
     let mut plans = vec![status(), companies.clone(), companies];
     pair(&mut plans, xml(extent));
@@ -237,11 +237,11 @@ async fn run(plans: Vec<ScenarioPlan>) -> Outcome {
     run_at(plans, AS_OF, TODAY).await
 }
 
-fn cause<T: std::error::Error + 'static>(error: &anyhow::Error) -> Option<&T> {
+pub(super) fn cause<T: std::error::Error + 'static>(error: &anyhow::Error) -> Option<&T> {
     error.chain().find_map(|cause| cause.downcast_ref::<T>())
 }
 
-fn body_hash(request: &str) -> String {
+pub(super) fn body_hash(request: &str) -> String {
     sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
         request,
     ))

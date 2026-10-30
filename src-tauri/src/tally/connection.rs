@@ -1110,7 +1110,7 @@ fn named_past_the_cap(
 /// A paired or bracketed read observed movement in the endpoint's data. This
 /// is response validation, not an endpoint failure: Tally answered, but
 /// Bridge must withhold the unstable result.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
 pub(crate) enum PairedReadValidationError {
     #[error("Tally native ledger collection changed between paired reads")]
     NativeLedgerCollection,
@@ -1161,6 +1161,10 @@ pub(crate) enum PairedReadValidationError {
     StockSummaryCollection,
     #[error("Tally company book changed during stock summary read")]
     StockSummaryExtent,
+    #[error("Tally stock collection changed between paired reads beside Stock Query")]
+    StockByBatchCollection,
+    #[error("Tally company book changed during the stock-by-batch read")]
+    StockByBatchExtent,
     #[error("Tally's own month-wise register changed between paired reads")]
     MonthRegister,
     #[error("Tally company book changed during the month-wise register read")]
@@ -1210,6 +1214,8 @@ impl PairedReadValidationError {
             Self::MonthRegisterExtent => "month_register_extent_changed",
             Self::StockSummaryCollection => "stock_summary_collection_changed",
             Self::StockSummaryExtent => "stock_summary_extent_changed",
+            Self::StockByBatchCollection => "stock_by_batch_collection_changed",
+            Self::StockByBatchExtent => "stock_by_batch_extent_changed",
             Self::NativeNegativeStock => "native_negative_stock_changed",
             Self::NegativeStockExtent => "negative_stock_extent_changed",
             Self::NativeGodownSummary => "native_godown_summary_changed",
@@ -1957,6 +1963,25 @@ impl TallyClient {
         request_xml: String,
     ) -> anyhow::Result<(String, usize, String)> {
         self.post_xml_with_encoded_bytes(request_xml).await
+    }
+
+    /// One Stock Query for one item (#2018), read once under `response_max_bytes` for this send:
+    /// an answer past it is the transport's `ResponseTooLarge`, never a cut-short text. Not paired:
+    /// the extent read around the item reads stands in for a second read, as for a census slice.
+    /// Returns the text, its encoded bytes and their SHA-256.
+    pub(crate) async fn fetch_stock_query(
+        &self,
+        request_xml: String,
+        response_max_bytes: usize,
+    ) -> anyhow::Result<(String, usize, String)> {
+        let response = self
+            .http
+            .post_xml_decoded_within(request_xml, response_max_bytes)
+            .await?;
+        let encoded_bytes = response.encoded_bytes();
+        let encoded_sha256 = response.encoded_sha256().to_string();
+        self.record_observed_encoding(response.encoding());
+        Ok((response.into_text(), encoded_bytes, encoded_sha256))
     }
 
     /// Discovers companies through Tally's documented `Company` collection

@@ -3,8 +3,8 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) and 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) were
-published after the pull requests named here; this page was not read again at either tag. Seven
+page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026), 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) and 0.7.0 (tag `mcp-v0.7.0`, 30 October 2026) were
+published after the pull requests named here; this page was not read again at any of those tags. Seven
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -272,8 +272,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       is flagged as in a shape the read does not recognise. No captured item
       invoice carries allocations, so where Tally prints them there is not
       measured.
-    - Bank allocations of a voucher's ledger entries (in source and not yet in a
-      published build), only when `vouchers` is asked for them with
+    - Bank allocations of a voucher's ledger entries (added in release 0.7.0),
+      only when `vouchers` is asked for them with
       `bank_allocations: true`: for each allocation, at most eight per entry, its
       bank date, instrument number and date, transaction type and status. The
       payee, bank, branch and account details an allocation can carry are not
@@ -281,8 +281,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       stays as it is: it is sent under every setting, as the voucher's own
       reference is. An entry whose allocations cannot be read whole says so with
       a reason and sends none of them.
-    - Goods lines of a voucher's ledger entries (in source and not yet in a
-      published build), only when `vouchers` is asked for them with
+    - Goods lines of a voucher's ledger entries (added in release 0.7.0),
+      only when `vouchers` is asked for them with
       `goods_lines: true`: for each line of an invoice voucher, the stock item,
       quantities, rate and amount, and each godown and batch row with its
       quantities and amount. Item, godown and batch names are masked under

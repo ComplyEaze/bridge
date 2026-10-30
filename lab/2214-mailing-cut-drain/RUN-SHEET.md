@@ -131,6 +131,7 @@ Licensed mode only; Education mode = STOP.
 ## Part R: at rest
 - **R1.** STANDARD, twice, 120 s apart. EXPECT `total` 11 and marks 224 / 87 each time.
   - **The threshold** is the larger of twice the slower call's seconds and the slower plus 2 s.
+  - **The post threshold** is the larger of twice the slower call's slower master post `held_ms` and that plus 2,000 ms.
   - Record the master post's `held_ms` each time.
   - Copy the drain record. EXPECT none, or `{"state":"clear"}`.
 - **R2.** MAILING once. Record its master post's `held_ms` and response bytes.
@@ -181,7 +182,7 @@ If L7 is reached with no cut, Part D is not run: record that, and go to Part C.
   - Then, after each refusal's `retry_after_s`, STANDARD again, recorded the same way. At most 20 calls or 3 minutes in all; past that, STOP.
 - **D3. The read admitted.** For the first STANDARD call that answers, record:
   - **the gap:** from D1's end to this call's end. The three quick probes that cleared the debt can span calls (the record's `answered` count carries over), so also give, from the refused calls' trails and each drain record copy, when `answered` first read 1, 2 and 3;
-  - **its master post's `held_ms`,** against R1's threshold;
+  - **its master posts' `held_ms`,** against R1's post threshold. The call's own seconds are recorded but not held to R1's threshold: an admitted call first sends three status probes 2 s apart, which add about 4 s (measured in `lab/2142-drain-live-answers`);
   - **whether it is whole:**
     - `total` equal to S_n's;
     - every row equal to S_n's, each whole row compared as parsed JSON (the tool's `snapshot` block left out);
@@ -189,7 +190,7 @@ If L7 is reached with no cut, Part D is not run: record that, and go to Part C.
   - The drain record after it: EXPECT `{"state":"clear"}`.
 - **D4. Repeat once.** Wait 120 s, then M_n again: EXPECT the cut again. Then D1 to D3 again.
 - **D5. The whole answer's time.**
-  - **Before the read:** once the drain record is clear and a STANDARD call has answered within the threshold, send `mailing-master` by curl (named exception 2). Leave out `--max-filesize`, and set no client timeout.
+  - **Before the read:** once the drain record is clear and a STANDARD call with no status probe in its trail has answered within the threshold, send `mailing-master` by curl (named exception 2). Leave out `--max-filesize`, and set no client timeout.
   - **Record:**
     - curl's exit code, status and bytes;
     - `CONTENT-LENGTH`;

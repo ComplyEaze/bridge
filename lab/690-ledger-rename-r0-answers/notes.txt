@@ -1,0 +1,11 @@
+#690 R0 notes (UTC). Sheet lab/690-ledger-rename-r0 at edb22bfef24bb6d4ff0309d6d5456e0083c083d7: SHEET.md sha256 b31f8549...; SHA256.txt 15 of 15 equal.
+2026-10-30T00:50Z S0 with no company loaded: one tally.exe (PID 13252) owns 9001; /status 200. TallyPrime 7.2 Silver.
+2026-10-30T00:51Z BRIDGE LEDGERBOX CI LAB (100092) loaded alone by its filter. BK0 by Tally's Backup (Specify Path, Select Loaded Company, Accept Yes): TDBK1800_100092.001 23613 B sha256 d8037fad..., 00:52:01Z.
+2026-10-30T00:52:23Z S1: the marks answer stopped the lab helper's reader (CMPINFO's empty COMPANY); reader fixed. 00:52:40Z S1 again: the groups answer did not parse (raw U+0003); stop by the sheet's rule; reported. Nothing written.
+2026-10-30T00:54Z The run lead's yes: C4 for parsing answers only. 00:54:23Z S1 fresh: M0 208; 3 ledgers, 28 groups; no R0 name.
+00:54:34Z C1: EXCEPTIONS 1 "Group Name not given!". C2: nothing added, nothing moved.
+00:55Z N1: CREATED 5. N2: five added, ALTMSTID 213. A1/A2, B1/B2, P1/P2: ALTERED 1 each, GUID kept, mark +1. E1/E2: alias added. E3/E4: the alias dropped. F1/F2 (00:56:19Z): case-only, row NAME kept the old case.
+00:56:3xZ G1: Ctrl+Q: Tally closed at once (no Yes prompt). 00:57:01Z started (PID 26300); the demo company it loaded on start was shut; THE COMPANY loaded alone; no repair prompt; "(e) Data exceptions exist" shown. G2: D's row NAME now R0 CASE D.
+00:58Z D1: ERRORS 1 "Ledger 'R0 Taken B' already exists!"; D2 unchanged. H0: fill_r0h.py with D's GUID (...d3): 1222 B da25624a...; H1: EXCEPTIONS 1 "Group Name not given!"; H2: D unchanged.
+00:59Z Z1: THE COMPANY shut; BK0 restored (Specify Path to the BK0 folder; the company only; Accept Yes; Replace); reloaded alone. Z2: GUIDs and ALTERIDs of S1 exactly, ALTMSTID 208, no R0 name.
+01:00:49Z C10: shut; none loaded; one tally.exe (PID 26300) owns 9001; /status 200.

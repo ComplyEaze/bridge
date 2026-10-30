@@ -1,0 +1,20 @@
+{
+ "label": "D1",
+ "file": "r0d-rename-onto-taken.utf16le.xml",
+ "counters": {
+  "CREATED": "0",
+  "ALTERED": "0",
+  "DELETED": "0",
+  "COMBINED": "0",
+  "IGNORED": "0",
+  "ERRORS": "1",
+  "CANCELLED": "0",
+  "EXCEPTIONS": "0",
+  "LASTMID": "0",
+  "LASTVCHID": "0"
+ },
+ "lineerror": [
+  "Ledger 'R0 Taken B' already exists!"
+ ],
+ "root": "RESPONSE"
+}

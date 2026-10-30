@@ -1,0 +1,253 @@
+{
+ "label": "G2",
+ "company": {
+  "name": "BRIDGE LEDGERBOX CI LAB",
+  "guid": "5848d0ca-ed85-4c97-ab20-e045893a9803",
+  "altmstid": "219",
+  "altvchid": ""
+ },
+ "ledgers": {
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001f": {
+   "row_name": "Cash",
+   "reservedname": "",
+   "own_name": "Cash",
+   "lists": [
+    {
+     "languageid": "1033",
+     "names": [
+      "Cash"
+     ]
+    }
+   ],
+   "alterid": "32",
+   "parent": "Cash-in-Hand",
+   "isbillwiseon": "No"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-000000ce": {
+   "row_name": "LBox Suspense",
+   "reservedname": "",
+   "own_name": "LBox Suspense",
+   "lists": [
+    {
+     "languageid": "0",
+     "names": [
+      "LBox Suspense"
+     ]
+    }
+   ],
+   "alterid": "208",
+   "parent": "Suspense A/c",
+   "isbillwiseon": "No"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001e": {
+   "row_name": "Profit & Loss A/c",
+   "reservedname": "Profit & Loss A/c",
+   "own_name": "Profit & Loss A/c",
+   "lists": [
+    {
+     "languageid": "1033",
+     "names": [
+      "Profit & Loss A/c"
+     ]
+    }
+   ],
+   "alterid": "31",
+   "parent": " Primary",
+   "isbillwiseon": "No"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d2": {
+   "row_name": "R0 Alias C2",
+   "reservedname": "",
+   "own_name": "R0 Alias C2",
+   "lists": [
+    {
+     "languageid": "1033",
+     "names": [
+      "R0 Alias C2"
+     ]
+    }
+   ],
+   "alterid": "218",
+   "parent": "Sundry Creditors",
+   "isbillwiseon": "No"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d3": {
+   "row_name": "R0 CASE D",
+   "reservedname": "",
+   "own_name": "R0 CASE D",
+   "lists": [
+    {
+     "languageid": "1033",
+     "names": [
+      "R0 CASE D"
+     ]
+    }
+   ],
+   "alterid": "219",
+   "parent": "Sundry Creditors",
+   "isbillwiseon": "No"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d4": {
+   "row_name": "R0 Plain E2",
+   "reservedname": "",
+   "own_name": "R0 Plain E2",
+   "lists": [
+    {
+     "languageid": "1033",
+     "names": [
+      "R0 Plain E2"
+     ]
+    }
+   ],
+   "alterid": "216",
+   "parent": "Sundry Creditors",
+   "isbillwiseon": "No"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d0": {
+   "row_name": "R0 Rename A",
+   "reservedname": "",
+   "own_name": "R0 Rename A",
+   "lists": [
+    {
+     "languageid": "1033",
+     "names": [
+      "R0 Rename A"
+     ]
+    }
+   ],
+   "alterid": "215",
+   "parent": "Sundry Creditors",
+   "isbillwiseon": "No"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-000000d1": {
+   "row_name": "R0 Taken B",
+   "reservedname": "",
+   "own_name": "R0 Taken B",
+   "lists": [
+    {
+     "languageid": "0",
+     "names": [
+      "R0 Taken B"
+     ]
+    }
+   ],
+   "alterid": "210",
+   "parent": "Sundry Creditors",
+   "isbillwiseon": "No"
+  }
+ },
+ "groups": {
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000016": {
+   "name": "Bank Accounts",
+   "alterid": "23"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000b": {
+   "name": "Bank OD A/c",
+   "alterid": "12"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000007": {
+   "name": "Branch / Divisions",
+   "alterid": "8"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000001": {
+   "name": "Capital Account",
+   "alterid": "2"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000015": {
+   "name": "Cash-in-Hand",
+   "alterid": "22"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000006": {
+   "name": "Current Assets",
+   "alterid": "7"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000003": {
+   "name": "Current Liabilities",
+   "alterid": "4"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000012": {
+   "name": "Deposits (Asset)",
+   "alterid": "19"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001a": {
+   "name": "Direct Expenses",
+   "alterid": "27"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000019": {
+   "name": "Direct Incomes",
+   "alterid": "26"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000e": {
+   "name": "Duties & Taxes",
+   "alterid": "15"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000004": {
+   "name": "Fixed Assets",
+   "alterid": "5"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001c": {
+   "name": "Indirect Expenses",
+   "alterid": "29"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000001b": {
+   "name": "Indirect Incomes",
+   "alterid": "28"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000005": {
+   "name": "Investments",
+   "alterid": "6"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000013": {
+   "name": "Loans & Advances (Asset)",
+   "alterid": "20"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000002": {
+   "name": "Loans (Liability)",
+   "alterid": "3"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000008": {
+   "name": "Misc. Expenses (ASSET)",
+   "alterid": "9"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000f": {
+   "name": "Provisions",
+   "alterid": "16"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000018": {
+   "name": "Purchase Accounts",
+   "alterid": "25"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000a": {
+   "name": "Reserves & Surplus",
+   "alterid": "11"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000017": {
+   "name": "Sales Accounts",
+   "alterid": "24"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000c": {
+   "name": "Secured Loans",
+   "alterid": "13"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000011": {
+   "name": "Stock-in-Hand",
+   "alterid": "18"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000010": {
+   "name": "Sundry Creditors",
+   "alterid": "17"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000014": {
+   "name": "Sundry Debtors",
+   "alterid": "21"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-00000009": {
+   "name": "Suspense A/c",
+   "alterid": "10"
+  },
+  "5848d0ca-ed85-4c97-ab20-e045893a9803-0000000d": {
+   "name": "Unsecured Loans",
+   "alterid": "14"
+  }
+ }
+}

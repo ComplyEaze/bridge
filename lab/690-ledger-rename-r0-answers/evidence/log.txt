@@ -1,0 +1,194 @@
+S1-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:52:23.290Z answered 2026-10-30T00:52:23.364Z 0.063 s curl_exit 0 status 200 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+stop: S1: 2 COMPANY rows
+NOTE 2026-10-30T00:52:35Z: the stop at S1 was the lab helper's reader (it took CMPINFO's empty COMPANY as a row); by structure the marks answer holds one COMPANY row (byte-equal to L0b's A0 marks). Reader fixed to the COLLECTION's children; S1 read again (reads only).
+S1-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:52:40.702Z answered 2026-10-30T00:52:40.769Z 0.063 s curl_exit 0 status 200 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+S1-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:52:40.803Z answered 2026-10-30T00:52:40.898Z 0.093 s curl_exit 0 status 200 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+S1: 1 "&#4;" reference(s) removed before parsing
+S1-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:52:40.920Z answered 2026-10-30T00:52:41.023Z 0.109 s curl_exit 0 status 200 bytes 54280 sha256 7658e77e4d80e4b39a2660c891d8e0243250e3e6dd6deedd6f5bb384798f0995
+S1: 30 "&#4;" reference(s) removed before parsing
+stop: S1: the answer does not parse (not well-formed (invalid token): line 56, column 36)
+NOTE 2026-10-30T00:54:17Z: S1 stopped: the groups answer carries raw U+0003 characters (the sheet removes only &#4;). The run lead's word (about 01:00 UTC): parse answers by LAB-COMMON C4 (drop only the characters XML forbids, record them; answers kept byte for byte); restart from a fresh S1.
+S1-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:54:23.848Z answered 2026-10-30T00:54:23.902Z 0.062 s curl_exit 0 status 200 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+S1-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:54:23.916Z answered 2026-10-30T00:54:23.996Z 0.078 s curl_exit 0 status 200 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+S1: C4 dropped before parsing: {'ref U+0004': 1}
+S1-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:54:24.002Z answered 2026-10-30T00:54:24.086Z 0.094 s curl_exit 0 status 200 bytes 54280 sha256 7658e77e4d80e4b39a2660c891d8e0243250e3e6dd6deedd6f5bb384798f0995
+S1: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+S1 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; R0 names held: []
+C1 r0c-alter-missing.utf16le.xml (1124 B, sha256 942da071b57d86d8d3f7d5eecddd1ab71e54df040a50539d9d0b89d9eddf5a7d) sent 2026-10-30T00:54:34.232Z answered 2026-10-30T00:54:34.561Z 0.328 s curl_exit 0 status 200 bytes 632 sha256 51027fb16d8882cc91e2ceda85471708085449a6de2437c7a956ad9787ed69c1
+C1 counters {"CREATED": "0", "ALTERED": "0", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "1", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR ["Group Name not given!"]
+C2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:54:43.578Z answered 2026-10-30T00:54:43.641Z 0.063 s curl_exit 0 status 200 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+C2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:54:43.648Z answered 2026-10-30T00:54:43.723Z 0.063 s curl_exit 0 status 200 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+C2: C4 dropped before parsing: {'ref U+0004': 1}
+C2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:54:43.730Z answered 2026-10-30T00:54:43.812Z 0.078 s curl_exit 0 status 200 bytes 54280 sha256 7658e77e4d80e4b39a2660c891d8e0243250e3e6dd6deedd6f5bb384798f0995
+C2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+C2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; R0 names held: []
+   against S1: ledgers added []; gone []; ALTERID moved []
+   against S1: groups added []; gone []; ALTERID moved []
+   against S1: ALTMSTID 208 -> 208; ALTVCHID '' -> ''
+N1 setup-create-5.utf16le.xml (2350 B, sha256 fc86055f1dfe64f1c1b95244739d62e7d2965305c8e63013dfa6ccf214db599d) sent 2026-10-30T00:54:54.922Z answered 2026-10-30T00:54:55.597Z 0.672 s curl_exit 0 status 200 bytes 538 sha256 52785e33be5cdaf57ef6a50e1ce752cc2a3551a5257bb94ecf8b05063779c769
+N1 counters {"CREATED": "5", "ALTERED": "0", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+N2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:54:56.210Z answered 2026-10-30T00:54:56.295Z 0.078 s curl_exit 0 status 200 bytes 3318 sha256 a18cebc1d7ad4dbe1f08f53bed8011b26633a7852d87424301cc5dd16542a64c
+N2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:54:56.308Z answered 2026-10-30T00:54:56.395Z 0.078 s curl_exit 0 status 200 bytes 13364 sha256 90760c8a6853b7256c0700be95599c4fde754147071ace812a2099529db37dba
+N2: C4 dropped before parsing: {'ref U+0004': 1}
+N2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:54:56.406Z answered 2026-10-30T00:54:56.492Z 0.094 s curl_exit 0 status 200 bytes 54280 sha256 fcecb881e2981594474dd3135ca09ed0f5f6960a8cb42f0d108b65b3de783989
+N2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+N2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '213', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C', 'R0 Case D', 'R0 Plain E', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "0", "names": ["R0 Rename A"]}] ALTERID 209 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C' RESERVEDNAME '' own 'R0 Alias C' lists [{"languageid": "0", "names": ["R0 Alias C"]}] ALTERID 211 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 Case D' RESERVEDNAME '' own 'R0 Case D' lists [{"languageid": "0", "names": ["R0 Case D"]}] ALTERID 212 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E' RESERVEDNAME '' own 'R0 Plain E' lists [{"languageid": "0", "names": ["R0 Plain E"]}] ALTERID 213 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against C2: ledgers added [('000000d0', 'R0 Rename A'), ('000000d1', 'R0 Taken B'), ('000000d2', 'R0 Alias C'), ('000000d3', 'R0 Case D'), ('000000d4', 'R0 Plain E')]; gone []; ALTERID moved []
+   against C2: groups added []; gone []; ALTERID moved []
+   against C2: ALTMSTID 208 -> 213; ALTVCHID '' -> ''
+A1 r0a-rename.utf16le.xml (1100 B, sha256 7768fafd1dedd5ac26f0a28bd07592c8201402e9c3fc474c8d2edac2ae4be8c5) sent 2026-10-30T00:55:12.847Z answered 2026-10-30T00:55:13.603Z 0.766 s curl_exit 0 status 200 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+A1 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+A2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:55:14.289Z answered 2026-10-30T00:55:14.393Z 0.094 s curl_exit 0 status 200 bytes 3318 sha256 5df350599f2d27347ef4feccad060feba48e717585786aec0b089b419fb45369
+A2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:55:14.400Z answered 2026-10-30T00:55:14.844Z 0.438 s curl_exit 0 status 200 bytes 13376 sha256 7288f435d195cd74a2a3f98fe5ff64b5ee59507a731a00c1ab9900c702638c1f
+A2: C4 dropped before parsing: {'ref U+0004': 1}
+A2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:55:14.860Z answered 2026-10-30T00:55:15.027Z 0.171 s curl_exit 0 status 200 bytes 54280 sha256 a4e9e88dbdff2b2e474096641ea17ce6ac701921debf3c5a7c1b2bd2c2a68aad
+A2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+A2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '214', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C', 'R0 Case D', 'R0 Plain E', 'R0 Rename A2', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C' RESERVEDNAME '' own 'R0 Alias C' lists [{"languageid": "0", "names": ["R0 Alias C"]}] ALTERID 211 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 Case D' RESERVEDNAME '' own 'R0 Case D' lists [{"languageid": "0", "names": ["R0 Case D"]}] ALTERID 212 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E' RESERVEDNAME '' own 'R0 Plain E' lists [{"languageid": "0", "names": ["R0 Plain E"]}] ALTERID 213 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A2' RESERVEDNAME '' own 'R0 Rename A2' lists [{"languageid": "1033", "names": ["R0 Rename A2"]}] ALTERID 214 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against N2: ledgers added []; gone []; ALTERID moved [('000000d0', '209', '214')]
+   against N2: groups added []; gone []; ALTERID moved []
+   against N2: ALTMSTID 213 -> 214; ALTVCHID '' -> ''
+B1 r0b-rename-back.utf16le.xml (1100 B, sha256 a670d562c5d679399912b26f66a7a12235eecea2c9d5bda9e459aafeb83a2a6c) sent 2026-10-30T00:55:28.979Z answered 2026-10-30T00:55:29.401Z 0.421 s curl_exit 0 status 200 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+B1 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+B2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:55:29.913Z answered 2026-10-30T00:55:30.054Z 0.141 s curl_exit 0 status 200 bytes 3318 sha256 c31992422e8d67f868e62dec5128e451f173b60226b304e6bd34193e11a67c71
+B2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:55:30.068Z answered 2026-10-30T00:55:30.199Z 0.125 s curl_exit 0 status 200 bytes 13372 sha256 3505efd50f03ee336352913b8b420c0d7dd2c3242e4fd058bf599c675f5d2b24
+B2: C4 dropped before parsing: {'ref U+0004': 1}
+B2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:55:30.217Z answered 2026-10-30T00:55:30.356Z 0.141 s curl_exit 0 status 200 bytes 54280 sha256 9a642583c64ba7c618e4b0d986bf0e884a14a1b66d008cc562d42016fb9d041a
+B2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+B2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '215', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C', 'R0 Case D', 'R0 Plain E', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C' RESERVEDNAME '' own 'R0 Alias C' lists [{"languageid": "0", "names": ["R0 Alias C"]}] ALTERID 211 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 Case D' RESERVEDNAME '' own 'R0 Case D' lists [{"languageid": "0", "names": ["R0 Case D"]}] ALTERID 212 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E' RESERVEDNAME '' own 'R0 Plain E' lists [{"languageid": "0", "names": ["R0 Plain E"]}] ALTERID 213 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against A2: ledgers added []; gone []; ALTERID moved [('000000d0', '214', '215')]
+   against A2: groups added []; gone []; ALTERID moved []
+   against A2: ALTMSTID 214 -> 215; ALTVCHID '' -> ''
+P1 r0p-plain-rename.utf16le.xml (1096 B, sha256 f2a0e3ca94df2903d7c3e518022b188506639d2ae7ed3e60a36743992f5cd88e) sent 2026-10-30T00:55:43.903Z answered 2026-10-30T00:55:44.507Z 0.594 s curl_exit 0 status 200 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+P1 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+P2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:55:45.902Z answered 2026-10-30T00:55:46.198Z 0.297 s curl_exit 0 status 200 bytes 3318 sha256 19cabfff44097f496c08d18299c80ef497e9a5635a789990cf4b99735046c1f3
+P2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:55:46.213Z answered 2026-10-30T00:55:46.486Z 0.266 s curl_exit 0 status 200 bytes 13384 sha256 c32d4ed854a412847bc4eacd05669b27821186ab3725491ab6f4aa1d9ffd9ccf
+P2: C4 dropped before parsing: {'ref U+0004': 1}
+P2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:55:46.504Z answered 2026-10-30T00:55:46.630Z 0.125 s curl_exit 0 status 200 bytes 54280 sha256 83fac0d902d4358b17d27aa06dbef40d7955881c4cb880ee6b309247a8c33092
+P2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+P2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '216', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C', 'R0 Case D', 'R0 Plain E2', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C' RESERVEDNAME '' own 'R0 Alias C' lists [{"languageid": "0", "names": ["R0 Alias C"]}] ALTERID 211 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 Case D' RESERVEDNAME '' own 'R0 Case D' lists [{"languageid": "0", "names": ["R0 Case D"]}] ALTERID 212 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E2' RESERVEDNAME '' own 'R0 Plain E2' lists [{"languageid": "1033", "names": ["R0 Plain E2"]}] ALTERID 216 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against B2: ledgers added []; gone []; ALTERID moved [('000000d4', '213', '216')]
+   against B2: groups added []; gone []; ALTERID moved []
+   against B2: ALTMSTID 215 -> 216; ALTVCHID '' -> ''
+E1 r0e-add-alias.utf16le.xml (1152 B, sha256 6e22bd2c19bab49dac276625e310f91c4e0dbaf6b870eaa921792c7a6d2bae88) sent 2026-10-30T00:55:57.181Z answered 2026-10-30T00:55:57.655Z 0.453 s curl_exit 0 status 200 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+E1 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+E2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:55:58.172Z answered 2026-10-30T00:55:58.253Z 0.078 s curl_exit 0 status 200 bytes 3318 sha256 47d152b2b29b4c094700134759752fe8e689046af03d6f16ffa0fc368817ed8d
+E2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:55:58.265Z answered 2026-10-30T00:55:58.377Z 0.109 s curl_exit 0 status 200 bytes 13468 sha256 adf2692d47fbdc7428e1eab3a5780ba7912996e26dfe93887a4c90bfd70157aa
+E2: C4 dropped before parsing: {'ref U+0004': 1}
+E2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:55:58.392Z answered 2026-10-30T00:55:58.481Z 0.094 s curl_exit 0 status 200 bytes 54280 sha256 51987af362fef48a66b32bd263f9d022663d47354cf21095ed04b90938e3828c
+E2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+E2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '217', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C', 'R0 Alias C Other', 'R0 Case D', 'R0 Plain E2', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 Case D' RESERVEDNAME '' own 'R0 Case D' lists [{"languageid": "0", "names": ["R0 Case D"]}] ALTERID 212 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E2' RESERVEDNAME '' own 'R0 Plain E2' lists [{"languageid": "1033", "names": ["R0 Plain E2"]}] ALTERID 216 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C' RESERVEDNAME '' own 'R0 Alias C' lists [{"languageid": "1033", "names": ["R0 Alias C", "R0 Alias C Other"]}] ALTERID 217 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against P2: ledgers added []; gone []; ALTERID moved [('000000d2', '211', '217')]
+   against P2: groups added []; gone []; ALTERID moved []
+   against P2: ALTMSTID 216 -> 217; ALTVCHID '' -> ''
+E3 r0e-rename-aliased.utf16le.xml (1096 B, sha256 b4478ff91603d020a290d0b92116c4bb481450097a6c35f7e710fc7c20723905) sent 2026-10-30T00:56:08.172Z answered 2026-10-30T00:56:08.504Z 0.328 s curl_exit 0 status 200 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+E3 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+E4-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:56:08.910Z answered 2026-10-30T00:56:08.980Z 0.079 s curl_exit 0 status 200 bytes 3320 sha256 9672b0b194ff948c64213b5954516a0f7b8136646b75dd60fc76f8cee26e0c47
+E4-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:56:08.988Z answered 2026-10-30T00:56:09.094Z 0.109 s curl_exit 0 status 200 bytes 13398 sha256 56f3f52c8e744f5d3e858669940fb6f19ec100768c30a8fda6d8cd0f5e027a3a
+E4: C4 dropped before parsing: {'ref U+0004': 1}
+E4-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:56:09.107Z answered 2026-10-30T00:56:09.186Z 0.078 s curl_exit 0 status 200 bytes 54282 sha256 2947cdbad8e77d346f348e5414cd5052045cce6ea125623a8d12383e227b02e7
+E4: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+E4 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '218', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C2', 'R0 Case D', 'R0 Plain E2', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 Case D' RESERVEDNAME '' own 'R0 Case D' lists [{"languageid": "0", "names": ["R0 Case D"]}] ALTERID 212 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E2' RESERVEDNAME '' own 'R0 Plain E2' lists [{"languageid": "1033", "names": ["R0 Plain E2"]}] ALTERID 216 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C2' RESERVEDNAME '' own 'R0 Alias C2' lists [{"languageid": "1033", "names": ["R0 Alias C2"]}] ALTERID 218 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against E2: ledgers added []; gone []; ALTERID moved [('000000d2', '217', '218')]
+   against E2: groups added []; gone []; ALTERID moved []
+   against E2: ALTMSTID 217 -> 218; ALTVCHID '' -> ''
+F1 r0f-case-only.utf16le.xml (1090 B, sha256 d2897737bb3af3334809e88a088c5339436f986815828a88ecd02839d7c2070b) sent 2026-10-30T00:56:18.517Z answered 2026-10-30T00:56:18.811Z 0.297 s curl_exit 0 status 200 bytes 538 sha256 a373b08c8c891b2608c663ed2b11c83979e6908299f9c1088426c246412b1901
+F1 counters {"CREATED": "0", "ALTERED": "1", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR []
+F2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:56:19.263Z answered 2026-10-30T00:56:19.326Z 0.062 s curl_exit 0 status 200 bytes 3320 sha256 8b393ff2b3897e53d0955f17e45a70388a33f9ffd1866420ca853fcfa22fa6bf
+F2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:56:19.343Z answered 2026-10-30T00:56:19.420Z 0.078 s curl_exit 0 status 200 bytes 13406 sha256 95230988ad18197327f0ce33497e5a5a32543e055f26d43f7ea9f56c7b8fed39
+F2: C4 dropped before parsing: {'ref U+0004': 1}
+F2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:56:19.438Z answered 2026-10-30T00:56:19.554Z 0.125 s curl_exit 0 status 200 bytes 54282 sha256 856401595f12e76c7737c7f0abb426837f87c5cdeebf3d20b446576cb0bec045
+F2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+F2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '219', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C2', 'R0 CASE D', 'R0 Case D', 'R0 Plain E2', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E2' RESERVEDNAME '' own 'R0 Plain E2' lists [{"languageid": "1033", "names": ["R0 Plain E2"]}] ALTERID 216 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C2' RESERVEDNAME '' own 'R0 Alias C2' lists [{"languageid": "1033", "names": ["R0 Alias C2"]}] ALTERID 218 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 Case D' RESERVEDNAME '' own 'R0 CASE D' lists [{"languageid": "1033", "names": ["R0 CASE D"]}] ALTERID 219 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against E4: ledgers added []; gone []; ALTERID moved [('000000d3', '212', '219')]
+   against E4: groups added []; gone []; ALTERID moved []
+   against E4: ALTMSTID 218 -> 219; ALTVCHID '' -> ''
+G2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:58:05.686Z answered 2026-10-30T00:58:05.828Z 0.140 s curl_exit 0 status 200 bytes 3318 sha256 97005da2742126595a4785217253a246303b7390106aebd0ced37d2fc849583c
+G2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:58:05.843Z answered 2026-10-30T00:58:05.928Z 0.078 s curl_exit 0 status 200 bytes 13404 sha256 d79e1e7936ac43ac555376da6695bc35130fe591835b35d8f45fb9ee37e802b4
+G2: C4 dropped before parsing: {'ref U+0004': 1}
+G2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:58:05.944Z answered 2026-10-30T00:58:06.030Z 0.093 s curl_exit 0 status 200 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+G2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+G2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '219', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C2', 'R0 CASE D', 'R0 Plain E2', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E2' RESERVEDNAME '' own 'R0 Plain E2' lists [{"languageid": "1033", "names": ["R0 Plain E2"]}] ALTERID 216 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C2' RESERVEDNAME '' own 'R0 Alias C2' lists [{"languageid": "1033", "names": ["R0 Alias C2"]}] ALTERID 218 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 CASE D' RESERVEDNAME '' own 'R0 CASE D' lists [{"languageid": "1033", "names": ["R0 CASE D"]}] ALTERID 219 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against F2: ledgers added []; gone []; ALTERID moved []
+   against F2: groups added []; gone []; ALTERID moved []
+   against F2: ALTMSTID 219 -> 219; ALTVCHID '' -> ''
+D1 r0d-rename-onto-taken.utf16le.xml (1096 B, sha256 713cdfb328ef4078a12ffb7ecfd22ab5a8567838fe9b20c5dd08f0c552fcbbf6) sent 2026-10-30T00:58:19.204Z answered 2026-10-30T00:58:19.507Z 0.297 s curl_exit 0 status 200 bytes 680 sha256 8b03196e13919001768221d7f140ad3c1cf83ca990a47cc3c6ff31ebbf838816
+D1 counters {"CREATED": "0", "ALTERED": "0", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "1", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR ["Ledger 'R0 Taken B' already exists!"]
+D2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:58:20.100Z answered 2026-10-30T00:58:20.183Z 0.094 s curl_exit 0 status 200 bytes 3318 sha256 97005da2742126595a4785217253a246303b7390106aebd0ced37d2fc849583c
+D2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:58:20.197Z answered 2026-10-30T00:58:20.312Z 0.110 s curl_exit 0 status 200 bytes 13404 sha256 d79e1e7936ac43ac555376da6695bc35130fe591835b35d8f45fb9ee37e802b4
+D2: C4 dropped before parsing: {'ref U+0004': 1}
+D2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:58:20.330Z answered 2026-10-30T00:58:20.472Z 0.141 s curl_exit 0 status 200 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+D2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+D2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '219', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C2', 'R0 CASE D', 'R0 Plain E2', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E2' RESERVEDNAME '' own 'R0 Plain E2' lists [{"languageid": "1033", "names": ["R0 Plain E2"]}] ALTERID 216 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C2' RESERVEDNAME '' own 'R0 Alias C2' lists [{"languageid": "1033", "names": ["R0 Alias C2"]}] ALTERID 218 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 CASE D' RESERVEDNAME '' own 'R0 CASE D' lists [{"languageid": "1033", "names": ["R0 CASE D"]}] ALTERID 219 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against G2: ledgers added []; gone []; ALTERID moved []
+   against G2: groups added []; gone []; ALTERID moved []
+   against G2: ALTMSTID 219 -> 219; ALTVCHID '' -> ''
+H1 r0h-filled.utf16le.xml (1222 B, sha256 da25624a092f89787c131a682c3b3067a567f9e9b6fe18daae232f8f5925e90b) sent 2026-10-30T00:58:42.125Z answered 2026-10-30T00:58:42.409Z 0.281 s curl_exit 0 status 200 bytes 632 sha256 51027fb16d8882cc91e2ceda85471708085449a6de2437c7a956ad9787ed69c1
+H1 counters {"CREATED": "0", "ALTERED": "0", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "1", "LASTMID": "0", "LASTVCHID": "0"} LINEERROR ["Group Name not given!"]
+H2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T00:58:42.857Z answered 2026-10-30T00:58:42.915Z 0.046 s curl_exit 0 status 200 bytes 3318 sha256 97005da2742126595a4785217253a246303b7390106aebd0ced37d2fc849583c
+H2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T00:58:42.924Z answered 2026-10-30T00:58:42.991Z 0.063 s curl_exit 0 status 200 bytes 13404 sha256 d79e1e7936ac43ac555376da6695bc35130fe591835b35d8f45fb9ee37e802b4
+H2: C4 dropped before parsing: {'ref U+0004': 1}
+H2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T00:58:43.004Z answered 2026-10-30T00:58:43.090Z 0.094 s curl_exit 0 status 200 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+H2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+H2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '219', 'altvchid': ''}; ledgers 8, groups 28; R0 names held: ['R0 Alias C2', 'R0 CASE D', 'R0 Plain E2', 'R0 Rename A', 'R0 Taken B']
+   ledger 000000d1 row NAME 'R0 Taken B' RESERVEDNAME '' own 'R0 Taken B' lists [{"languageid": "0", "names": ["R0 Taken B"]}] ALTERID 210 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d0 row NAME 'R0 Rename A' RESERVEDNAME '' own 'R0 Rename A' lists [{"languageid": "1033", "names": ["R0 Rename A"]}] ALTERID 215 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d4 row NAME 'R0 Plain E2' RESERVEDNAME '' own 'R0 Plain E2' lists [{"languageid": "1033", "names": ["R0 Plain E2"]}] ALTERID 216 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d2 row NAME 'R0 Alias C2' RESERVEDNAME '' own 'R0 Alias C2' lists [{"languageid": "1033", "names": ["R0 Alias C2"]}] ALTERID 218 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   ledger 000000d3 row NAME 'R0 CASE D' RESERVEDNAME '' own 'R0 CASE D' lists [{"languageid": "1033", "names": ["R0 CASE D"]}] ALTERID 219 PARENT 'Sundry Creditors' ISBILLWISEON 'No'
+   against D2: ledgers added []; gone []; ALTERID moved []
+   against D2: groups added []; gone []; ALTERID moved []
+   against D2: ALTMSTID 219 -> 219; ALTVCHID '' -> ''
+Z2-marks marks.utf16le.xml (990 B, sha256 f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b) sent 2026-10-30T01:00:16.601Z answered 2026-10-30T01:00:16.672Z 0.078 s curl_exit 0 status 200 bytes 3318 sha256 83dda085fa6458885d77378e429d558fce672472c618e9dc0f176fa45647fc42
+Z2-ledgers ledgers.utf16le.xml (2242 B, sha256 67d4cbaa8e3c8d672588195ebcb38f6e4a9a64849e018422caae5f8cd29f3a2a) sent 2026-10-30T01:00:16.681Z answered 2026-10-30T01:00:16.752Z 0.062 s curl_exit 0 status 200 bytes 6924 sha256 a27a54e8b31b584ed31792e7ee5fdcd71b85f84c6e629ac502ec9719597bde72
+Z2: C4 dropped before parsing: {'ref U+0004': 1}
+Z2-groups groups.utf16le.xml (1080 B, sha256 71cd8821ec298000ebead92e02b9f9edbea1a8e0052dfe83c83fa523fbac5194) sent 2026-10-30T01:00:16.761Z answered 2026-10-30T01:00:16.854Z 0.094 s curl_exit 0 status 200 bytes 54280 sha256 af2a2d64983ab27b0225c106b9ebac128f7923cb0446dd7d6ba92c127072cc22
+Z2: C4 dropped before parsing: {'ref U+0004': 30, 'raw U+0003': 82}
+Z2 read: company {'name': 'BRIDGE LEDGERBOX CI LAB', 'guid': '5848d0ca-ed85-4c97-ab20-e045893a9803', 'altmstid': '208', 'altvchid': ''}; ledgers 3, groups 28; R0 names held: []
+   against S1: ledgers added []; gone []; ALTERID moved []
+   against S1: groups added []; gone []; ALTERID moved []
+   against S1: ALTMSTID 208 -> 208; ALTVCHID '' -> ''

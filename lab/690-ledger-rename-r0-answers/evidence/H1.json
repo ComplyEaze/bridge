@@ -1,0 +1,20 @@
+{
+ "label": "H1",
+ "file": "r0h-filled.utf16le.xml",
+ "counters": {
+  "CREATED": "0",
+  "ALTERED": "0",
+  "DELETED": "0",
+  "COMBINED": "0",
+  "IGNORED": "0",
+  "ERRORS": "0",
+  "CANCELLED": "0",
+  "EXCEPTIONS": "1",
+  "LASTMID": "0",
+  "LASTVCHID": "0"
+ },
+ "lineerror": [
+  "Group Name not given!"
+ ],
+ "root": "RESPONSE"
+}

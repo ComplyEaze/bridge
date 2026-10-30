@@ -1,0 +1,4 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+bk0-screen.png 41867 B 628274fcdd15d8e541f76c45e52dbce787033dde28639a81ee715f9880fe0f7d
+c10-tally.png 72708 B 130723ffe6ee170e95e66df835c45dfd816624bd39b60221a989bd83d16feef5
+s0-none-tally.png 72708 B 130723ffe6ee170e95e66df835c45dfd816624bd39b60221a989bd83d16feef5

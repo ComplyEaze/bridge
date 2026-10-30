@@ -471,6 +471,9 @@ base revision.
 <a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
 
 [12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)
+<a id="12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost"></a>
+
+[12a.24 The Godown Summary gives godown totals, and the exploded Stock Summary values a root item per godown at that godown's own cost](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

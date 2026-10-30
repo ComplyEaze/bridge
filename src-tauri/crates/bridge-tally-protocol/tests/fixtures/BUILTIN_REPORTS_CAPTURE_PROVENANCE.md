@@ -1,6 +1,6 @@
 # `builtin_cash_flow_*`, `builtin_negative_ledgers_*`, `builtin_unknown_report_*` — provenance
 
-Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analysis, Negative Stock and Negative Ledgers reports, and of its answer to a report name it does not have, requested by report name (protocol reference §12a.1's envelope). Every response file is a live capture, never hand-written. Only Cash Flow, Funds Flow, Negative Stock, the Negative Ledgers answers (empty, and with two ledgers) and the unknown-name refusal are read by a parser and its tests; the Sales Register and Ratio Analysis files are kept as the evidence for protocol reference §12a.16, and no code reads them yet.
+Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analysis, Negative Stock and Negative Ledgers reports, and of its answer to a report name it does not have, requested by report name (protocol reference §12a.1's envelope). Every response file is a live capture, never hand-written. Only Cash Flow, Funds Flow, Negative Stock, the Negative Ledgers answers (empty, and with two ledgers), the unknown-name refusal and the closing-stock-by-godown answers (the Godown Summary, and the Stock Summary plain and with the explode flag, from 2026-10-28 on) are read by a parser and its tests; the Sales Register and Ratio Analysis files are kept as the evidence for protocol reference §12a.16, and no code reads them yet.
 
 ## Provenance
 
@@ -119,7 +119,7 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 - **Book:** `BRIDGE SHAPE LAB` (synthetic; the same company as the stock fixtures), with two godowns directly under the root, `Main Location` and `Factory Floor`, and eleven stock items in three stock groups.
 - **What the capture shows:**
   - The Stock Summary's grammar: top-level `DSPACCNAME` (one `DSPDISPNAME`) and `DSPSTKINFO` (one `DSPSTKCL` holding `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`), one pair per godown, and no line for a stock group or an item.
-  - `Factory Floor`: `316.667 Kgs`, `34.74`, `-11000.00`. `Main Location`: quantity and rate present and empty (its items are in several units), `14000.01`.
+  - `Factory Floor`: `316.667 Kgs`, `34.74`, `-11000.00`. `Main Location`: quantity and rate present and empty (the godown holds items in several units; the cause is not measured, and a stock group whose items were all in one unit was empty too), `14000.01`.
   - The two amounts sum to `3000.01`, the total of the Stock Summary read in the same sitting, whose answer is byte-equal to `stock_summary_report_shape_lab_fy_live` (STOCK_CAPTURE_PROVENANCE.md). Tally's Godown Summary screen showed the same lines with the signs reversed, as the Stock Summary's screen does.
 - **Not established:** a godown under another godown, a period end other than the year end, the report with the explode flag, any value per item per godown, a book that is not batch-wise, and any other release.
 
@@ -127,3 +127,25 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | --- | ---: | --- | --- |
 | `builtin_godown_summary_shape_lab_fy_request.utf16le.xml` | 760 | `27ccda23a554946b16097fe004c58161d0d718ddb03d4aebf2008d38cd3a5e46` | request, Godown Summary, 2025-04-01 to 2026-03-31, on the shape lab |
 | `builtin_godown_summary_shape_lab_fy_live.utf16le.xml` | 968 | `92c3908ffe3916e5a7f9a86e7a4f84c912a77c926e3a1e4ab2f76f808ca67e01` | Godown Summary, two godown lines (read by `parse_native_stock_summary_report`) |
+
+## Added 2026-10-30: closing stock by godown after keying (#2017)
+
+- **Date and instance:** 2026-10-30, 21:31 to 22:29 UTC, TallyPrime 7.2 Silver, licensed, on Windows, attended, one request at a time. Every answer was HTTP 200 with a `CONTENT-LENGTH` equal to its bytes, and no dialog appeared. The answers are BOM-less UTF-16LE exactly as received; the request is UTF-16LE with a BOM.
+- **Sender:** a lab script (not `bridge_mcp`) sending the committed Stock Summary request with only the report ID, the period end, or the one added variable `<EXPLODEFLAG>Yes</EXPLODEFLAG>` changed, each pinned by SHA-256 before it was sent. Tests assert that the exploded request equals `render_native_stock_summary_exploded_request`, and that the Godown Summary request equals `render_native_godown_summary_request`. Evidence: `lab/2017-godown-closing-answers` at `ed1ddac03038` (sheet `lab/2017-godown-closing` at `6afef5d9`).
+- **Book:** `BRIDGE SHAPE LAB` as for the 2026-10-28 capture, with these changes keyed on Tally's screens after a backup, and removed by restoring that backup afterwards (the marks returned to 292 and 112, and the 2026-10-28 answers were sent again and came back byte-equal):
+  - a godown `Godown Lab C` under `Main Location`;
+  - `Godown Split Item`, directly under the root, opening 30 Nos at 10.00 in `Main Location` and 20 Nos at 12.50 in `Godown Lab C`;
+  - `Godown Single Item`, directly under the root, opening 15 Nos at 10.00 in `Factory Floor`;
+  - one Stock Journal dated 15 September 2025 moving 8 Nos of the split item from `Main Location` to `Factory Floor` at 11.00.
+- **What the captures show** (protocol reference §12a.24): the Godown Summary has a line only for the two godowns under the root, and `Main Location`'s amount holds `Godown Lab C`'s; the godown amounts sum to the Stock Summary total at each date; the exploded Stock Summary follows each root item with one `SSBATCHNAME` (`SSBATCH` empty, `SSGODOWN`) and `DSPSTKINFO` per godown, each godown valued at its own cost, and these values add up to the item's line; an item inside a stock group has none. The Part A answers of the same sitting, before the keying, were byte-equal to the 2026-10-28 files and are not committed again.
+- **Not established:** a batch-wise item under the root (every `SSBATCH` was empty), an item inside a stock group by godown with a value, a godown two levels down, another book or release.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `builtin_godown_closing_stock_summary_exploded_fy_request.utf16le.xml` | 818 | `6566c8f06a11ff70ed96e75b0e807403ea5b87dafdfd91e87b6413d80fcfe52f` | request, Stock Summary with `EXPLODEFLAG` Yes, 2025-04-01 to 2026-03-31 |
+| `builtin_godown_closing_godown_summary_to_20250831_live.utf16le.xml` | 936 | `a34ec53c0dc74adce3247964c7753b1ae807dab3f1ad36e032c130a677f31ba6` | Godown Summary to 31 Aug 2025: `Factory Floor` -11150.00, `Main Location` 13450.01, both quantities empty |
+| `builtin_godown_closing_stock_summary_to_20250831_live.utf16le.xml` | 2312 | `f6a50582342ace0da0245ee8f110aba2db5299db1d653f7f0313aba31037b55f` | Stock Summary to 31 Aug 2025: three groups and the two new root items, sum 2300.01 |
+| `builtin_godown_closing_stock_summary_exploded_to_20250831_live.utf16le.xml` | 7610 | `4cf5e405100259931ff252710ed16d1c820350c99ede3b582eb054e0a045a898` | exploded Stock Summary to 31 Aug 2025: the split item in two godowns |
+| `builtin_godown_closing_godown_summary_fy_live.utf16le.xml` | 936 | `a942e3ed5319e09b8bd149bc6ca81c357341bc8cecc91694b41fc273cbdb3b2a` | Godown Summary to 31 Mar 2026: `Factory Floor` -11238.00, `Main Location` 13530.01 |
+| `builtin_godown_closing_stock_summary_fy_live.utf16le.xml` | 2312 | `d8bf288082b5bfedf9ca63b0f461a55ee4b8a82b8900e167a1fe329e426d9ffb` | Stock Summary to 31 Mar 2026: sum 2292.01, the split item at 50 Nos and -558.00 |
+| `builtin_godown_closing_stock_summary_exploded_fy_live.utf16le.xml` | 8106 | `d680f038a4747775a487f94cb9942e72020ff64f8176db786136ffb0c09607a2` | exploded Stock Summary to 31 Mar 2026: the split item in three godowns, each at its own cost |

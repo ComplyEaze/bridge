@@ -210,8 +210,33 @@ pub(crate) fn render_built_in_report_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
+    render_report_envelope(report, company, period, "")
+}
+
+/// The same envelope with Tally's explode flag after the dates, the one
+/// variable measured on a built-in report (§12a.13, §12a.24). Only the Stock
+/// Summary is sent this way.
+pub(crate) fn render_exploded_stock_summary_request(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+) -> String {
+    render_report_envelope(
+        BuiltInReport::StockSummary,
+        company,
+        period,
+        "<EXPLODEFLAG>Yes</EXPLODEFLAG>",
+    )
+}
+
+/// `flag` is one of the two fixed texts above, never a run-time value.
+fn render_report_envelope(
+    report: BuiltInReport,
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+    flag: &'static str,
+) -> String {
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>{flag}</STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
         id = report.id(),
         company = xml_escape(company),
         from = period.from().as_str(),

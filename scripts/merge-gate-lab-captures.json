@@ -2330,6 +2330,26 @@
       "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937",
       "size": 948
+    },
+    {
+      "blob": "760027a788a1595ea9199c4aadbc306768bf926c",
+      "capture_id": "builtin_godown_summary_shape_lab_fy_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-2018-stock-by-godown-batch-answers at 5b79306504fb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_summary_shape_lab_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "27ccda23a554946b16097fe004c58161d0d718ddb03d4aebf2008d38cd3a5e46",
+      "size": 760
+    },
+    {
+      "blob": "bd189828193accf8c1c216695bf6b25684767d05",
+      "capture_id": "builtin_godown_summary_shape_lab_fy_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2017-2018-stock-by-godown-batch-answers at 5b79306504fb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/builtin_godown_summary_shape_lab_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see BUILTIN_REPORTS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "92c3908ffe3916e5a7f9a86e7a4f84c912a77c926e3a1e4ab2f76f808ca67e01",
+      "size": 968
     }
   ]
 }

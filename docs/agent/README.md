@@ -1128,7 +1128,8 @@ Gold and other releases.
 ### Stock by godown and batch (`stock_by_batch`)
 
 Use `stock_by_batch` with `company_guid`, `as_of` (a month's last day, as for `stock_summary`) and
-`items` (1 to 20 stock item GUIDs, each once, as `stock_summary` returns them) for Tally's own Stock Query
+`items` (1 to 20 stock item GUIDs, each once, as `stock_summary` returns them; 20 is a chosen limit, since
+each item is one request sent after the last) for Tally's own Stock Query
 of each item: its quantity in each godown and batch at `as_of`. Quantities only: the report carries no
 value, rate, expiry or manufacturing date, and its last-purchase and last-sale groups are not returned.
 
@@ -1141,7 +1142,7 @@ or `no_movement` (the empty answer beside no closing at all, which does not say 
 Tally sends the same empty answer for an item with no stock, one that never moved and a name it does
 not know, so it is never read as zero on its own. An item can also be `item_not_found`,
 `name_unmeasured` (its name holds a character no capture showed Stock Query selecting by, so nothing
-is sent for it), `refused` with `code` (the answer could not be read, or was over the per-item limit:
+is sent for it), `refused` with `code` (the answer could not be read, or was over 262,144 bytes:
 `stock_query_answer_too_large`; the other items are still read), `not_read` with `code` (the send failed
 or timed out) or `not_sent`. A failed send stops the reads: the result is `partial`, `stopped` names
 the code, and the book was not checked for change after the items already read.
@@ -1150,8 +1151,15 @@ the code, and the book was not checked for change after the items already read.
 not Tally's Godown Summary. Godown and batch names are compared as sent, so two that differ only in case
 are two. No line is compared with any voucher: a Stock Journal moves stock between godowns without an
 invoice goods line. `batch_wise` is the company's setting; with it off every line reads `Primary Batch`.
-The read uses `stock_summary`'s bracket and its admission of the stock items (and so its size codes);
-a book that changed refuses as `stock_by_batch_extent_changed`. Measured on TallyPrime 7.2 on one
+The 262,144-byte limit is a choice, not a measurement: the largest answer measured is 3,152 bytes,
+and an item's lines grow with the godowns and batches that hold its stock, which no other read bounds.
+
+The read uses `stock_summary`'s bracket and its admission of the stock items, under this tool's own
+codes: `stock_by_batch_too_large` (with `size`), `stock_by_batch_census_refused`,
+`stock_by_batch_item_count_company_higher` and `stock_by_batch_bound_premise_violated` (each with
+`error.cause`), `stock_by_batch_as_of_not_measured`, `stock_by_batch_as_of_before_books`,
+`stock_by_batch_as_of_in_future`, `stock_by_batch_education_unqualified` and `stock_not_enabled`. A
+book that changed refuses as `stock_by_batch_extent_changed`. Measured on TallyPrime 7.2 on one
 synthetic book.
 
 ### Stock by godown (`stock_by_godown`)

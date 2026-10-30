@@ -79,7 +79,7 @@ mod stock_summary_tests;
 mod stock_by_batch;
 #[cfg(test)]
 pub(crate) use stock_by_batch::STOCK_QUERY_ANSWER_MAX_BYTES;
-pub(crate) use stock_by_batch::{StockByBatchItem, StockByBatchRead};
+pub(crate) use stock_by_batch::{StockByBatchItem, StockByBatchRead, StockByBatchReadError};
 
 #[cfg(test)]
 #[path = "runtime_stock_by_batch_tests.rs"]

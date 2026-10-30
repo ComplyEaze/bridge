@@ -26,6 +26,53 @@ use bridge_tally_transport::TallyTransportError;
 /// that item as `stock_query_answer_too_large`; the reads go on. PARTIAL: one book, one release.
 pub(crate) const STOCK_QUERY_ANSWER_MAX_BYTES: usize = 256 * 1024;
 
+/// A refusal of the stock-by-batch read under its own code. The period and the stock-item
+/// admission are `stock_summary`'s and refuse as [`StockSummaryReadError`]; a person must not be
+/// shown that tool's name for this one's refusal, so the shared error is carried here, and it is
+/// deliberately not this error's `source`: nothing that walks the chain finds a
+/// `stock_summary_*` code through it. Its data (a size, a census cause) is read through `.0`.
+#[derive(Debug)]
+pub(crate) struct StockByBatchReadError(pub(crate) StockSummaryReadError);
+
+impl StockByBatchReadError {
+    pub(crate) fn safe_code(&self) -> &'static str {
+        match self.0 {
+            StockSummaryReadError::EducationUnqualified => "stock_by_batch_education_unqualified",
+            StockSummaryReadError::NotEnabled => "stock_not_enabled",
+            StockSummaryReadError::AsOfBeforeBooks => "stock_by_batch_as_of_before_books",
+            StockSummaryReadError::AsOfInFuture => "stock_by_batch_as_of_in_future",
+            StockSummaryReadError::PeriodNotHonoured => "stock_by_batch_period_not_honoured",
+            // The report is stock_summary's alone; its size refusal cannot come from this read.
+            StockSummaryReadError::TooLarge { .. }
+            | StockSummaryReadError::TooManyItems { .. }
+            | StockSummaryReadError::ReportTooLarge { .. } => "stock_by_batch_too_large",
+            StockSummaryReadError::ItemCountCompanyHigher { .. } => {
+                "stock_by_batch_item_count_company_higher"
+            }
+            StockSummaryReadError::CensusRefused(_) => "stock_by_batch_census_refused",
+            StockSummaryReadError::PremiseViolated(_) => "stock_by_batch_bound_premise_violated",
+        }
+    }
+}
+
+impl std::fmt::Display for StockByBatchReadError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.safe_code())
+    }
+}
+
+impl std::error::Error for StockByBatchReadError {}
+
+/// A shared refusal as this read's own. Each is raised at the top of its error, never under a
+/// context, so a top-level downcast finds every one; a runtime test holds that for the refusals
+/// a book can reach.
+fn own_refusal(error: anyhow::Error) -> anyhow::Error {
+    match error.downcast::<StockSummaryReadError>() {
+        Ok(shared) => StockByBatchReadError(shared).into(),
+        Err(error) => error,
+    }
+}
+
 /// What became of one requested item, in the order asked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum StockByBatchItem {
@@ -262,7 +309,7 @@ impl TallyRuntime {
                     })
                 }
                 .await;
-                result.map_err(|error| with_read_evidence(error, evidence))
+                result.map_err(|error| with_read_evidence(own_refusal(error), evidence))
             }
         })
         .await

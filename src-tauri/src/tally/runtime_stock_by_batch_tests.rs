@@ -4,18 +4,95 @@
 //! extent (4) and identity and mode again (3). The items are the 30 October sitting's collection
 //! at the year end (`c-a-03`), and the Stock Query answers are the committed year-end answers
 //! that sitting repeated byte for byte (`stock-query/PROVENANCE.md`).
-use super::stock_by_batch::STOCK_QUERY_ANSWER_MAX_BYTES;
-use super::stock_summary::stock_summary_period;
-use super::stock_summary_tests::{
-    body_hash, cause, companies, extents, flags, identity, opening, AS_OF, BOOKS_FROM,
-    CAPTURE_GUID, TODAY,
+use super::stock_by_batch::{StockByBatchReadError, STOCK_QUERY_ANSWER_MAX_BYTES};
+use super::stock_summary::{stock_summary_period, StockSummaryReadError};
+use super::trial_balance_tests::{
+    companies as captured_companies, config, decode, education, extents as captured_extents, pair,
+    status, xml, GUID,
 };
-use super::trial_balance_tests::{config, decode, pair, status, xml, GUID};
 use super::*;
 use bridge_tally_protocol::native_stock_by_batch::{GodownSubtotal, StockQueryTie};
 use bridge_tally_protocol::native_stock_query::{render_stock_query_request, MeasuredItemName};
 use bridge_tally_protocol::native_stock_summary::StockSummaryAsOf;
 use tally_protocol_simulator::{Delivery, ObservedRequest, ScenarioPlan, SequenceSimulator};
+
+/// The synthetic book the captures came from; its GUID is replaced by the test double's company.
+const CAPTURE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
+const AS_OF: &str = "20260331";
+const TODAY: &str = "20260930";
+/// The captured extent starts the books a year after the captures' period; the test company's
+/// row in the companies list and its extent are moved back together, as the identity bracket
+/// compares them (as `runtime_stock_summary_tests` does).
+const BOOKS_FROM: &str = "20250401";
+
+/// `text` with the test company's `BOOKSFROM` moved to [`BOOKS_FROM`], in its own row only.
+fn with_books_from(text: String) -> String {
+    let from = "<BOOKSFROM TYPE=\"Date\">20260401</BOOKSFROM>";
+    let at = text.find(GUID).expect("the test company is listed");
+    let start = text[..at].rfind("<COMPANY ").unwrap();
+    let end = at + text[at..].find("</COMPANY>").unwrap();
+    let row = &text[start..end];
+    assert_eq!(row.matches(from).count(), 1);
+    format!(
+        "{}{}{}",
+        &text[..start],
+        row.replace(
+            from,
+            &format!("<BOOKSFROM TYPE=\"Date\">{BOOKS_FROM}</BOOKSFROM>")
+        ),
+        &text[end..]
+    )
+}
+
+fn companies() -> String {
+    with_books_from(captured_companies())
+}
+
+fn extents() -> String {
+    with_books_from(captured_extents())
+}
+
+/// The test company as its identity bracket verifies it.
+fn identity() -> VerifiedCompanyIdentity {
+    let companies = parse_companies_from_collection(&companies()).unwrap();
+    let row = companies
+        .iter()
+        .find(|row| row.guid.as_deref() == Some(GUID))
+        .unwrap();
+    VerifiedCompanyIdentity::from_observed_companies(
+        row.name.clone(),
+        crate::tally::test_company_guid(GUID),
+        row.company_number.clone().unwrap(),
+        row.books_from.clone().unwrap(),
+        &companies,
+    )
+    .unwrap()
+}
+
+fn flags() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_shape_lab_live.utf16le.xml"
+    ))
+    .replace(CAPTURE_GUID, GUID)
+}
+
+/// The mode probe, the identity bracket and the opening extent.
+fn opening(extent: String) -> Vec<ScenarioPlan> {
+    let companies = xml(companies());
+    let mut plans = vec![status(), companies.clone(), companies];
+    pair(&mut plans, xml(extent));
+    plans
+}
+
+fn cause<T: std::error::Error + 'static>(error: &anyhow::Error) -> Option<&T> {
+    error.chain().find_map(|cause| cause.downcast_ref::<T>())
+}
+
+fn body_hash(request: &str) -> String {
+    sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
+        request,
+    ))
+}
 
 const SODA_ASH: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010e";
 const CAUSTIC_SODA: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346-0000010c";
@@ -52,7 +129,11 @@ fn bound(guid: &str) -> String {
 }
 
 fn through_items(items: String) -> Vec<ScenarioPlan> {
-    let mut plans = opening(extents());
+    through_items_at(extents(), items)
+}
+
+fn through_items_at(extent: String, items: String) -> Vec<ScenarioPlan> {
+    let mut plans = opening(extent);
     pair(&mut plans, xml(flags()));
     pair(&mut plans, xml(items));
     plans
@@ -271,4 +352,91 @@ async fn an_answer_refused_or_past_the_limit_refuses_that_item_and_the_reads_go_
         ]
     );
     assert_eq!(tie(&read.items[3]).code(), "tied");
+}
+
+/// Every refusal the shared admission and period can give is this read's own code: a person is
+/// never shown stock_summary's name for a stock_by_batch refusal.
+#[test]
+fn no_shared_refusal_is_shown_under_stock_summarys_name() {
+    for shared in [
+        StockSummaryReadError::EducationUnqualified,
+        StockSummaryReadError::NotEnabled,
+        StockSummaryReadError::AsOfBeforeBooks,
+        StockSummaryReadError::AsOfInFuture,
+        StockSummaryReadError::PeriodNotHonoured,
+        StockSummaryReadError::TooLarge {
+            master_alter_id: 1,
+            estimated_bytes: 1,
+            limit_bytes: 1,
+            limit_master_alter_id: 1,
+        },
+        StockSummaryReadError::TooManyItems {
+            master_alter_id: 1,
+            counted_items: 1,
+            estimated_bytes: 1,
+            limit_bytes: 1,
+            limit_items: 1,
+        },
+        StockSummaryReadError::ReportTooLarge {
+            counted_lines: 1,
+            estimated_bytes: 1,
+            limit_bytes: 1,
+        },
+        StockSummaryReadError::ItemCountCompanyHigher {
+            company: 2,
+            census: 1,
+        },
+        StockSummaryReadError::CensusRefused("stock_census_slice_invalid"),
+        StockSummaryReadError::PremiseViolated("stock_rows_exceed_master_mark"),
+    ] {
+        let own = StockByBatchReadError(shared);
+        let code = own.safe_code();
+        assert!(!code.contains("stock_summary"), "{code}");
+        assert!(
+            code.starts_with("stock_by_batch_") || code == "stock_not_enabled",
+            "{code}"
+        );
+        assert_eq!(own.to_string(), code);
+        // Not reachable through the chain: nothing finds the shared code under this one.
+        assert!(std::error::Error::source(&own).is_none());
+    }
+}
+
+/// Raised in the read, each reaches the caller as this read's own: the shared one is nowhere in
+/// the chain. Education mode refuses before the company; rows past the master mark refuse after
+/// the closing extent, with no Stock Query sent.
+#[tokio::test]
+async fn a_shared_refusal_reaches_the_caller_under_this_reads_code() {
+    let (result, observed) = run(
+        vec![status(), xml(education(&companies()))],
+        &[CAUSTIC_SODA],
+    )
+    .await;
+    let error = result.err().expect("education mode refuses");
+    assert_eq!(
+        cause::<StockByBatchReadError>(&error).map(StockByBatchReadError::safe_code),
+        Some("stock_by_batch_education_unqualified")
+    );
+    assert!(cause::<StockSummaryReadError>(&error).is_none());
+    assert_eq!(observed.len(), 2);
+
+    // The capture's book holds 11 items; a mark of 5 admits the read, and the rows break it.
+    let at_mark = |mark: u64| {
+        extents().replace(
+            "<ALTMSTID TYPE=\"Number\"> 224</ALTMSTID>",
+            &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>"),
+        )
+    };
+    let mut plans = through_items_at(at_mark(5), items());
+    pair(&mut plans, xml(at_mark(5)));
+    let (result, observed) = run(plans, &[CAUSTIC_SODA]).await;
+    let error = result.err().expect("rows past the mark refuse");
+    let own = cause::<StockByBatchReadError>(&error).expect("this read's own refusal");
+    assert_eq!(own.safe_code(), "stock_by_batch_bound_premise_violated");
+    assert!(matches!(
+        own.0,
+        StockSummaryReadError::PremiseViolated("stock_rows_exceed_master_mark")
+    ));
+    assert!(cause::<StockSummaryReadError>(&error).is_none());
+    assert_eq!(observed.len(), AT_ITEMS + 4);
 }

@@ -189,7 +189,9 @@ impl Server {
         let guid = required_string(args, "company_guid")?;
         // Before any read: a date or a list that cannot be honoured costs no Tally request.
         let as_of = normalized_date(required_string(args, "as_of")?)?;
-        let as_of = StockSummaryAsOf::new(as_of).map_err(|error| error.code().to_string())?;
+        // The month-end rule is stock_summary's; its refusal is named for this tool.
+        let as_of = StockSummaryAsOf::new(as_of)
+            .map_err(|_| "stock_by_batch_as_of_not_measured".to_string())?;
         let items = item_guids(args, MAX_STOCK_BY_BATCH_ITEMS)?
             .ok_or_else(|| "argument_invalid:items".to_string())?;
         let (company, identity, prior) = self.verified_company(guid).await?;

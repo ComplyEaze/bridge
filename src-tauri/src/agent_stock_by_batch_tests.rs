@@ -77,8 +77,19 @@ fn companies() -> ScenarioPlan {
 }
 
 fn extents() -> ScenarioPlan {
-    xml(with_books_from(include_str!(
+    extents_at(224)
+}
+
+/// The captured extents with this company's master mark at `mark` (captured: 224).
+fn extents_at(mark: u64) -> ScenarioPlan {
+    let captured = include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+    );
+    let element = "<ALTMSTID TYPE=\"Number\"> 224</ALTMSTID>";
+    assert_eq!(captured.matches(element).count(), 1);
+    xml(with_books_from(&captured.replace(
+        element,
+        &format!("<ALTMSTID TYPE=\"Number\"> {mark}</ALTMSTID>"),
     )))
 }
 
@@ -299,7 +310,7 @@ async fn a_list_or_date_that_cannot_be_honoured_is_refused_before_any_read() {
         ),
         (
             json!({"company_guid": GUID, "as_of": "20260330", "items": [item(HCL)]}),
-            "stock_summary_as_of_not_measured",
+            "stock_by_batch_as_of_not_measured",
         ),
     ] {
         let (server, _directory) = server_at(9, Redaction::None);
@@ -311,6 +322,42 @@ async fn a_list_or_date_that_cannot_be_honoured_is_refused_before_any_read() {
             "{args}"
         );
     }
+}
+
+/// A refusal of the stock-item admission it shares with stock_summary reaches the person under
+/// this tool's own code, with its cause and remediation, and nowhere names stock_summary. A mark
+/// of 5 admits the read, and the book's 11 rows break it.
+#[tokio::test]
+async fn a_shared_refusal_is_shown_under_this_tools_name() {
+    let mut plans = Vec::new();
+    pair(&mut plans, companies());
+    plans.extend([status(), companies(), companies()]);
+    pair(&mut plans, extents_at(5));
+    pair(&mut plans, xml(flags()));
+    pair(
+        &mut plans,
+        xml(
+            fixture("stock-query/c-a-03-items-to-20260331.answer.utf16le.xml")
+                .replace(CAPTURE_GUID, GUID),
+        ),
+    );
+    pair(&mut plans, extents_at(5));
+    let (server, simulator, _directory) = server(plans, Redaction::None);
+    let response = server
+        .call_tool(
+            "stock_by_batch",
+            json!({"company_guid": GUID, "as_of": AS_OF, "items": [item(HCL)]}),
+        )
+        .await;
+    assert_eq!(response["isError"], true, "{response}");
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "stock_by_batch_bound_premise_violated");
+    assert_eq!(error["cause"], "stock_rows_exceed_master_mark");
+    assert!(
+        !response.to_string().contains("stock_summary"),
+        "{response}"
+    );
+    assert_eq!(simulator.finish().unwrap().len(), 4 + 3 + 4 + 4 + 4 + 4);
 }
 
 /// The published bound on `items` is the code's, and so is the answer limit the description

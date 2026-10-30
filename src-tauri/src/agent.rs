@@ -1008,6 +1008,20 @@ fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
     })
 }
 
+/// The stock-item read's refusal, from either stock tool: `stock_by_batch` carries the shared
+/// one inside its own error, under its own codes, so its size and cause are read through it.
+fn stock_item_read_refusal<'a>(
+    cause: &'a (dyn std::error::Error + 'static),
+) -> Option<&'a crate::tally::runtime::StockSummaryReadError> {
+    cause
+        .downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        .or_else(|| {
+            cause
+                .downcast_ref::<crate::tally::runtime::StockByBatchReadError>()
+                .map(|error| &error.0)
+        })
+}
+
 fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
     error.chain().find_map(|cause| {
         if let Some(crate::tally::runtime::MastersReadError::TooLarge {
@@ -1030,7 +1044,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
             estimated_bytes,
             limit_bytes,
             limit_master_alter_id,
-        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        }) = stock_item_read_refusal(cause)
         {
             return Some(ReadSize {
                 master_alter_id: *master_alter_id,
@@ -1046,7 +1060,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
             estimated_bytes,
             limit_bytes,
             limit_items,
-        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        }) = stock_item_read_refusal(cause)
         {
             return Some(ReadSize {
                 master_alter_id: *master_alter_id,
@@ -1250,7 +1264,7 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if let Some(
             crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)
             | crate::tally::runtime::StockSummaryReadError::CensusRefused(reason),
-        ) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        ) = stock_item_read_refusal(cause)
         {
             return Some(reason);
         }
@@ -1542,7 +1556,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // The stock summary read's own size refusal (`size` carries the mark, and the counted
         // items when the census counted them, #1233).
-        "stock_summary_too_large" => Some(
+        "stock_summary_too_large" | "stock_by_batch_too_large" => Some(
             "The company holds more stock items than one read is admitted for: with \
              `size.counted_items`, the census counted them, and an assumed worst-case row for \
              each is over ComplyEaze Bridge's response budget (`size.limit_bytes`; at most \
@@ -1550,7 +1564,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              refuses; retrying this call refuses again.",
         ),
         // #1233: the census that counts a book past the single-read mark could not finish.
-        "stock_summary_census_refused" => Some(
+        "stock_summary_census_refused" | "stock_by_batch_census_refused" => Some(
             "ComplyEaze Bridge could not count the company's stock items or stock groups, so no \
              request for stock items was sent; `error.cause` names why (a census slice holding \
              more rows than its span, a GUID twice, no item found, or an answer that did not \
@@ -1566,7 +1580,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              no stock request was sent. A larger book refuses; retrying this call refuses again.",
         ),
         // #1233: Tally counts more stock items than the census found.
-        "stock_summary_item_count_company_higher" => Some(
+        "stock_summary_item_count_company_higher" | "stock_by_batch_item_count_company_higher" => Some(
             "Tally's own stock item count is higher than ComplyEaze Bridge counted, so a read \
              sized from that count could be too small and none was sent. An item may have been \
              added during the call: call again once; if it refuses again, the count cannot be \
@@ -1617,6 +1631,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
             "stock_summary reads only an `as_of` that is the last day of a month, and no \
+             request was sent. Ask for the last day of that month, or of another month; \
+             retrying the same date refuses again.",
+        ),
+        // The stock-by-batch read's date refusal: it costs no Tally request.
+        "stock_by_batch_as_of_not_measured" => Some(
+            "stock_by_batch reads only an `as_of` that is the last day of a month, and no \
              request was sent. Ask for the last day of that month, or of another month; \
              retrying the same date refuses again.",
         ),
@@ -2540,6 +2560,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::MastersReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::StockByBatchReadError>()
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {

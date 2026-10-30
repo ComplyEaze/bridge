@@ -52,6 +52,7 @@ pub mod native_negative_ledgers;
 pub mod native_negative_stock;
 pub mod native_outstandings;
 pub mod native_statement_reports;
+pub mod native_stock_by_batch;
 pub mod native_stock_query;
 pub mod native_stock_summary;
 pub mod native_trial_balance;

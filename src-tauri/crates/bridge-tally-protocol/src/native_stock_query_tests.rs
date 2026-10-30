@@ -739,8 +739,8 @@ fn captured_item_names() -> Vec<(String, String)> {
 #[test]
 fn the_admitted_punctuation_is_exactly_the_captured_punctuation() {
     let named = captured_item_names();
-    // The twenty requests that name an item: a request the folder lost would not fail quietly.
-    assert_eq!(named.len(), 20);
+    // The twenty-two requests that name an item: a request the folder lost would not fail quietly.
+    assert_eq!(named.len(), 22);
     let names: Vec<String> = named.into_iter().map(|(_, name)| name).collect();
     let captured: std::collections::BTreeSet<char> = names
         .iter()

@@ -145,6 +145,18 @@ const BUILDER_REQUESTS: &[(&str, &str, &str, &str)] = &[
         "20250401",
         "20260331",
     ),
+    (
+        "q-r-13-stock-query-zero-stock-item-to-20250401",
+        "Zero Stock Item",
+        "20250401",
+        "20250401",
+    ),
+    (
+        "q-r-04-stock-query-cleaning-kit-b",
+        "Cleaning Kit B",
+        "20250401",
+        "20260331",
+    ),
 ];
 
 /// Every captured request naming an item is the builder's rendering, byte for byte, as the
@@ -803,6 +815,8 @@ fn the_collection_requests_are_the_stock_reads_bytes() {
         ("a-02-items-to-20250501", "20250501"),
         ("a-03-items-to-20260331", "20260331"),
         ("w-01-items-to-20260331", "20260331"),
+        ("c-a-01-items-to-20250401", "20250401"),
+        ("c-a-03-items-to-20260331", "20260331"),
     ] {
         let range = ValidatedDateRange::new("20250401", to).unwrap();
         let rendered = ReadOnlyProfile::AuditStockItemsV1 {

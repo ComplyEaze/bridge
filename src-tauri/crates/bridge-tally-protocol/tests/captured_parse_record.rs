@@ -679,6 +679,32 @@ const ROWS: &[Row] = &[
         parser: "parse_native_stock_items",
         parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
     },
+    // One sitting's empty Stock Query answers beside the collection at the same dates: the
+    // zero-stock and no-movement cases of the stock_by_batch tool (#2018)
+    Row {
+        fixture: "tests/fixtures/stock-query/q-r-13-stock-query-zero-stock-item-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/q-r-04-stock-query-cleaning-kit-b.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/c-a-01-items-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/c-a-03-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
     // tests/simulator_corpus.rs, src/agent_tests.rs (an empty collection's export status)
     Row {
         fixture: "tests/fixtures/agent/native-bank-allocation-status.utf16le.xml",

@@ -53,6 +53,7 @@ If any item has changed it since, record what the notes say and STOP. The coordi
 - **Sub-forms.** This is the first item invoice on this book since it was registered. The Receipt Details and Party Details sub-forms that 628-C0 met for a registered supplier are accepted as offered, left blank where 628-C0 left them blank, with a screenshot of each. Any other sub-form or prompt (a GST Details or HSN prompt among them), or a warning that the reference "has been used earlier", is C7: press no key.
 - **Before every accept** (Ctrl+A), take a screenshot of the whole screen.
 - **Leaving without saving:** Ctrl+Q, only after a screenshot shows the screen's title. Never Escape on a master or voucher screen, and never Ctrl+Q or Escape at the Gateway (C7).
+- **Back to the Gateway after each Ctrl+A** (steps 4 and 5): take a screenshot, press Escape once and take a screenshot, then press Escape once more and take a screenshot, which must show the Gateway. On the 1688 row, Tally went from the list after the accept to Master Alteration's List of Masters on the first Escape, and reached the Gateway only on the second. If a screenshot already shows the Gateway, press nothing more: never Escape at the Gateway itself. A screen other than these = STOP.
 - **If Tally fills a tax or round-off amount by itself,** that is, any non-empty amount on a tax or round-off line the operator has not typed (a line that opens empty or as 0.00 is not one): accept nothing. Take a screenshot, leave the voucher unsaved with Ctrl+Q, record "Tally computed an amount", key nothing further, and go to step 9. GS1-L1's item invoices opened their tax lines empty.
 - **The only prompts answered** are each screen's own accept, and the two prompts C6 quotes. Any other box is C7.
 
@@ -71,7 +72,7 @@ The working folder is `C:\bridge-lab\1866-l4\`, with evidence in `C:\bridge-lab\
 3. **Backup** BK-1866L4 by C5. Then MARKS (ms0).
 4. **The ledger.** On Tally's Ledger Creation screen, create `GS1 Round Off`, group Indirect Expenses.
    - Leave every other field as the screen opens it. If the screen offers a "Type of Ledger", leave it at its default; if that default is not "Not Applicable", screenshot it, leave the screen unsaved with Ctrl+Q after a screenshot of its title, read MARKS (EXPECT M 228), and STOP. A ledger typed for invoice rounding would let Tally fill the amount itself.
-   - Take a screenshot, then Ctrl+A.
+   - Take a screenshot, then Ctrl+A, then back to the Gateway as Keying says.
    - Then MARKS: EXPECT M +1 and V unchanged.
 5. **The invoice.** On Tally's Purchase voucher screen, in Item Invoice mode, dated **7 December 2025**:
    - **Party:** `SYN GS1 Supplier B`, supplier invoice number `GS1/P/0005`, dated 7 December 2025.
@@ -80,7 +81,7 @@ The working folder is `C:\bridge-lab\1866-l4\`, with evidence in `C:\bridge-lab\
    - **Round-off:** `GS1 Round Off`, 0.48 typed in the Amount column, which adds to the total. Leave Rate (%) empty: GS1-L1's freight line, typed in Rate (%) first, was computed by Tally. A minus amount would lower the total.
    - **Total:** Tally's total must read 5,900.00, the party's Cr, with one bill allocation, New Ref `GS1/P/0005`, 5,900.00. If Tally's default for the allocation is Agst Ref or On Account, change it to New Ref, as GS1-L1 did.
    - If the voucher screen shows any other total, or will not balance: screenshot, leave it unsaved with Ctrl+Q, and STOP.
-   - Take a screenshot, then Ctrl+A. Then MARKS: EXPECT V +1 and M unchanged.
+   - Take a screenshot, then Ctrl+A, then back to the Gateway as Keying says. Then MARKS: EXPECT V +1 and M unchanged.
 6. **Look only.** Take a screenshot of the Day Book for 7 December 2025: EXPECT the one Purchase.
 7. **Relay on** (as above).
    - **7a.** Call `list_companies`. EXPECT THE COMPANY with the GUID GS1-L1 recorded.

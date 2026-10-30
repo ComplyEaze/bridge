@@ -416,6 +416,23 @@ fn no_path_is_in_the_json_unless_asked() {
         names_the_path(&shown.to_string(), Path::new(&path)),
         "{shown}"
     );
+    // no journal, no journal_path; once there is one, it is shown by its own
+    // location, since Windows places each file on its own (#1459)
+    assert!(shown.get("journal_path").is_none(), "{shown}");
+    write(&root.join("agent-import-ledger.jsonl"), &journal(true));
+    let with_journal = to_json(&build(root, &[]), SystemTime::now(), Some((root, &[root])));
+    let journal_shown = user_visible_path(&root.join("agent-import-ledger.jsonl"));
+    assert_eq!(
+        with_journal["journal_path"],
+        journal_shown.display_string(),
+        "{with_journal}"
+    );
+    assert_eq!(
+        with_journal["journal_path_state"],
+        journal_shown.state(),
+        "{with_journal}"
+    );
+    assert_ne!(journal_shown.state(), "unresolved", "{with_journal}");
 }
 
 fn server_over(directory: &Path) -> crate::agent::Server {

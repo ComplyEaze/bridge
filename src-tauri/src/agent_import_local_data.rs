@@ -545,6 +545,15 @@ pub(super) fn to_json(
         // install of Claude Desktop does not exist outside the package (#1459).
         // Its `_state` says how it was obtained.
         user_visible_path(folder).put_into(&mut value, "folder_path");
+        // Windows places each new file on its own, so once the real folder also
+        // exists the folder resolves there while a journal the package created
+        // stays in the package's copy (measured on a Store install, #1584's lab
+        // sheet). The journal is the file a person most needs, so it is shown
+        // by its own location.
+        if !matches!(report.journal, Journal::Absent) {
+            user_visible_path(&folder.join("agent-import-ledger.jsonl"))
+                .put_into(&mut value, "journal_path");
+        }
         // the first, as before; every one, in the order the locks are taken
         if let Some(first) = locks.first() {
             user_visible_path(first).put_into(&mut value, "lock_folder_path");

@@ -391,17 +391,26 @@ reports for that file, with a `path_state` beside it that says whether Windows
 reported it; there it named the second folder, and a process outside Claude
 Desktop opened the file there with the same sha256. The command-line report
 (`bridge_mcp --local-data-report --show-paths`) prints each folder as built (the
-Windows location in the table above, unless you set another data folder), the
-folders its files are in as Windows reports each file (`folder_file_locations`
-and `lock_folder_file_locations`; two folders there mean its files are split
-between them), and the import journal's own location (`journal_path`). It does
-not print a folder where Windows reports the folder itself to be: once both
-folders existed, Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that
-also showed the second folder's files. Check both folders before you archive or
-delete. **Not measured:** ComplyEaze Bridge as Claude Desktop starts the
-extension (the measured copies carried no package identity, yet Windows
-redirected their files); a copy outside Claude Desktop running first; another
-Claude Desktop version; this build. On that
+Windows location in the table above, unless you set another data folder); beside
+it, where the files directly in that folder are as Windows reports each file
+(`folder_file_locations` and `lock_folder_file_locations`, read from the first
+64 files by name, with how many were read of how many); the import journal's own
+location (`journal_path`); and, on Windows, each copy of the data folder inside
+a Store app's package that exists (`package_copies`). It does not print a folder
+where Windows reports the folder itself to be: once both folders existed,
+Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed the
+second folder's files. Seen from inside Claude Desktop, every file then named
+the second folder, and from outside, every file named
+`%LOCALAPPDATA%\Bridge\agent`, so each side's file locations show only the copy
+that side counts, and a file with the same name in both copies only by the copy
+that side reads; `package_copies` is what shows that the second copy exists, and
+a terminal outside Claude Desktop does not see that copy as part of the folder.
+Check both folders before you archive or delete. **Not measured:** ComplyEaze
+Bridge as Claude Desktop starts the extension (the measured copies carried no
+package identity, yet Windows redirected their files); a copy outside Claude
+Desktop running first; another Claude Desktop version; this build, and its file
+locations once both folders exist (the lab read them with a probe making the
+same Windows call). On that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).

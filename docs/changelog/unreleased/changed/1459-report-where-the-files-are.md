@@ -1,4 +1,4 @@
-- `bridge_mcp --local-data-report --show-paths` also prints, beside each folder, the folders its files are in as Windows
-  reports each file, and the import journal's own location, so on a Microsoft Store install of Claude Desktop it shows
-  where the files really are, including when they are split between Claude Desktop's own copy of the folder and
-  `%LOCALAPPDATA%\Bridge\agent` (#1459).
+- `bridge_mcp --local-data-report --show-paths` also prints, beside each folder, where its files are as Windows reports
+  each file, the import journal's own location and, on Windows, each copy of the data folder inside a Store app's package
+  that exists, so on a Microsoft Store install of Claude Desktop it shows where the counted files really are and that a
+  second copy of the folder exists (#1459).

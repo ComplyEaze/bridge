@@ -777,6 +777,16 @@ pub(super) struct DetailLimits {
     pub(super) window: WindowReadLimits,
 }
 
+impl DetailLimits {
+    /// The limits a party detail is read under: the entry-wildcard window's
+    /// own, refused for its read count at the default figure, so a window too
+    /// large for that falls back to the party's ledger (#1356, #2173).
+    pub(super) const PRODUCTION: Self = Self {
+        rows: MAX_DETAIL_ROWS,
+        window: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+    };
+}
+
 /// The window read refused as needing more data requests than one call may
 /// spend (`voucher_window_too_many_reads`), told as the detail's own refusal:
 /// each call has a different next step, so each has its own code, with the
@@ -1029,10 +1039,7 @@ impl Server {
             reference,
             open_bills,
             unallocated,
-            DetailLimits {
-                rows: MAX_DETAIL_ROWS,
-                window: WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
-            },
+            DetailLimits::PRODUCTION,
             opening,
         )
         .await

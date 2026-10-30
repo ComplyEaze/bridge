@@ -1,0 +1,24 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+answers/001-a1-basic.json: original 4691 B sha256 8da3609516ae378e3e6018bfb245ec87624b41b88f4659132cfbd9f84da31de5 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/002-a1-Rpre.json: original 27055 B sha256 df58681e56265168776587f5f637844697a66d6d34e944e814b1d4152439f3ee (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/003-a2b-R0.json: original 29063 B sha256 2db3bff1da6df0bb12aa8695c072ca1afaac5667d62a505a2de46589eb96d78c (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/004-a3-Ra.json: original 29492 B sha256 2b3c437c8a872f42b5ce2e677105bc306ec29e2f8b709f64c8cba96af1b28728 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/005-a3-R1.json: original 33392 B sha256 81e53ab8c4af6c98dbb52309a7608d925486a54d156b88e5f57e8b58ea889f52 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/006-a4b-R1b.json: original 37524 B sha256 2920f3d6c216de61b4c9ed21a4d3282e1f74d33f7f0a2dea99636386a1ec9b7d (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/007-a5a-read.json: original 37527 B sha256 af512f59d1ae4047f753121ddc9ebd65a09ad7b257023d957362b1051b383896 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/008-a6-R2.json: original 37531 B sha256 cf003bf638397d735c49590df68f60a88b5b83e145e849ca06d3b963e4bf298b (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+answers/009-close-basic.json: original 4690 B sha256 5def75d2631706465ae60cf7319b9c644b21035ab58372eebcd555aef47576ac (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser (nested JSON text re-serialised)
+evidence/c10-bridge-processes.txt: original 796 B sha256 afe78896f1e6094e59680d9e192431ec1a5bb58052e7cf2c625bc0af5242552c (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/c10-netstat.txt: original 10974 B sha256 7256ce957f1140bb6b9e2edd352ed4a952cc0f8efaff0123cf87f853a6c85091 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/p0-bridge-processes.txt: original 796 B sha256 17ae135805e7dfb9526a84d2f137865465d88f8f75e75e8b47a2ab4ca15b24af (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/p0-netstat.txt: original 9560 B sha256 4ad91463ab3dc73d8c5899fd0181e17c59f024b4c57ffb8f9a9b96d4a8a28702 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/w0-bridge-processes.txt: original 796 B sha256 34082bf716e59e97274a153a04e7a15a4481874cf2ddaba29bb2e5377521afa0 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/w0-netstat.txt: original 47167 B sha256 a23377216dfb1cddcd6a48c7cf8cb6bb429be154db61f605cb1a9d9151f96283 (kept on the lab PC); only the port-9001 LISTENING lines kept
+notes.txt: original 10553 B sha256 c5da4ee197040f98fba058b6043da9cfa4169b24dcd59575c84f8648f94e8797 (kept on the lab PC); 2 x -> <LAB_DIR>; 2 x -> run lead
+RESULTS.md: original 4652 B sha256 0574fff37d7193adfae2cc72d975e3ef8125a5ab6b5a6413e4aab3fc988cf2ef (kept on the lab PC); 1 x -> run lead
+scripts/client.py: original 4822 B sha256 4f59cf2667d9e03d27bff4858b5377791c330965e96928f535338e890c52ff9e (kept on the lab PC); 1 x -> <BUILD-2188 folder>; 1 x -> lab-client; 4 x -> stop
+scripts/lm.py: original 2320 B sha256 9f5959edf1939398bc97dca26cc777b44452d8db7e2c70bdeadcb305565eba53 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab tools>
+scripts/a5.py: original 6519 B sha256 45b1f2f9731e62d49ddd74a2d41357bc1512652b5ae1b6a3c88bef9bc96cbdf4 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> <lab tools>
+scripts/c3.py: original 9413 B sha256 64fa8f29b3476ba534cba154cdd37dab74639a34e50336dc8a70f94e8e8b37ff (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+scripts/mk.sh: original 468 B sha256 8d5cf67dfc2747572d66810accb754b158e579e8a6edc0dbb3ab5815ac5545f8 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>
+scripts/launch-env.json: original 201 B sha256 ff812cbbaec3dd9b6202053ed76bcdc286e2ff818eece8ef9260dfcb8bf86706 (kept on the lab PC); 1 x -> <LAB_DIR>

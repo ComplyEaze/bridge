@@ -1,0 +1,7 @@
+command: Get-CimInstance Win32_Process (bridge_mcp.exe, with each parent)
+time: 2026-10-30T08:03:14.126Z
+exit: 0
+bridge_mcp.exe pid 17588 parent 18680 <desktop client> (a desktop entry on the staged build master-fd6f7c0d)
+bridge_mcp.exe pid 13772 parent 18680 <desktop client> (the installed extension of the desktop client)
+bridge_mcp.exe pid 384 parent 18680 <desktop client> (the installed extension of the desktop client)
+bridge_mcp.exe pid 6668 parent 18680 <desktop client> (a desktop entry on the staged build master-fd6f7c0d)

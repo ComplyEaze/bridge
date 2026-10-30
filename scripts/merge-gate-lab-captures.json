@@ -2390,6 +2390,46 @@
       "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "31a5b8979f1bed4e52698183ceebf8760763e0c41c33c56a1f3b6e3a718b12a6",
       "size": 6296
+    },
+    {
+      "blob": "4210040d0e781d73cd7f9d56971ced96cc24c367",
+      "capture_id": "alias-lab-1688/k3-cv2.utf16le.xml",
+      "company": "BRIDGE ALIAS LAB",
+      "lab_ref": "branch lab/1688-ledger-aliases-answers at aa49368177ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml",
+      "seed_basis": "synthetic lab book keyed on screen and by import; see agent/alias-lab-1688/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "fd9314ed146070992a87122d9bddf96a1fa00700497a6f7ae1f8c1b6116cb395",
+      "size": 9346
+    },
+    {
+      "blob": "140e713a755e32f7962e2bcbf75c0a9a360157c0",
+      "capture_id": "alias-lab-1688/i1-cat.utf16le.xml",
+      "company": "BRIDGE ALIAS LAB",
+      "lab_ref": "branch lab/1688-ledger-aliases-answers at aa49368177ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/i1-cat.utf16le.xml",
+      "seed_basis": "synthetic lab book keyed on screen and by import; see agent/alias-lab-1688/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6e0fdfbb72b43e59ebc38ae490c70033826aa18ed27de81233c6d582d8f828a6",
+      "size": 11158
+    },
+    {
+      "blob": "d9b4909a7f38e1e70a86deb57997a79575e3124d",
+      "capture_id": "alias-lab-1688/i1-cv2.utf16le.xml",
+      "company": "BRIDGE ALIAS LAB",
+      "lab_ref": "branch lab/1688-ledger-aliases-answers at aa49368177ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml",
+      "seed_basis": "synthetic lab book keyed on screen and by import; see agent/alias-lab-1688/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "38bec50a2716de56368a93619218f9fb6a0795b3c87d1a03a4944a4e74083759",
+      "size": 11908
+    },
+    {
+      "blob": "1510f579967e00de2573228d8d6aabc16beda22f",
+      "capture_id": "alias-lab-1688/i1-idx.utf16le.xml",
+      "company": "BRIDGE ALIAS LAB",
+      "lab_ref": "branch lab/1688-ledger-aliases-answers at aa49368177ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/i1-idx.utf16le.xml",
+      "seed_basis": "synthetic lab book keyed on screen and by import; see agent/alias-lab-1688/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d577b6afe35b085142d080502c1140faa06651b7c4bfe8ae361686011b239637",
+      "size": 12520
     }
   ]
 }

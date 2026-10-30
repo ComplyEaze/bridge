@@ -220,6 +220,10 @@
     {
       "uuid": "5193df0a-eeb7-49fb-88f9-03aae16e2eeb",
       "note": "bank-allocation identifier Tally gave the bank entry of the Journal of 16 May 2025 in the synthetic lab company BRIDGE COST KEY LAB, as it returned it in the read-only voucher capture of 27 October 2026 (lab branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536); it is the NAME of that entry's BANKALLOCATIONS.LIST"
+    },
+    {
+      "uuid": "021bda0c-b1b1-44c8-8279-5212ce87c9c7",
+      "note": "company identifier of the synthetic lab company BRIDGE ALIAS LAB, keyed on Tally's screen for a lab item on 21 Oct 2026 and used again for the ledger aliases row of 30 Oct 2026: the LEDGER rows of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/*.utf16le.xml carry it as their company identifier and as the prefix of every ledger identifier"
     }
   ]
 }

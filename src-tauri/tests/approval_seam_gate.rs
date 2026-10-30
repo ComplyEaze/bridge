@@ -722,6 +722,7 @@ fn dialog_mode_problems(lib: &str) -> Vec<String> {
         "Some(\"--confirm-review\") => agent::run_review_confirmation,",
         "Some(\"--confirm-masters\") => agent::run_masters_confirmation,",
         "Some(\"--confirm-release\") => agent::run_release_confirmation,",
+        "Some(\"--confirm-settle\") => agent::run_settle_confirmation,",
     ] {
         if lib.matches(arm).count() != 1 {
             problems.push(format!("expected exactly one `{arm}`"));
@@ -740,6 +741,12 @@ fn each_dialog_mode_runs_its_own_dialog() {
     );
     assert_ne!(release_as_review, lib);
     assert!(!dialog_mode_problems(&release_as_review).is_empty());
+    let settle_as_release = lib.replace(
+        "agent::run_settle_confirmation,",
+        "agent::run_release_confirmation,",
+    );
+    assert_ne!(settle_as_release, lib);
+    assert!(!dialog_mode_problems(&settle_as_release).is_empty());
     let swapped = lib
         .replace("agent::run_confirmation as fn() -> bool,", "SWAP,")
         .replace(
@@ -864,6 +871,16 @@ const MASTERS_ENTRY: &str = "pub fn run_masters_confirmation() -> bool {
     )
 }";
 
+/// The settle child's whole entry point, as [`POST_ENTRY`] (#1709).
+const SETTLE_ENTRY: &str = "pub fn run_settle_confirmation() -> bool {
+    answer_with_token(
+        SETTLE_TOKEN_PREFIX,
+        show_settle_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}";
+
 /// The release child's whole entry point, as [`POST_ENTRY`] (#1828).
 const RELEASE_ENTRY: &str = "pub fn run_release_confirmation() -> bool {
     answer_with_token(
@@ -887,13 +904,19 @@ const RELEASE_ENTRY: &str = "pub fn run_release_confirmation() -> bool {
 /// rename; the lib.rs mode arms, pinned above, are still the only way in.
 fn dialog_token_problems(source: &str) -> Vec<String> {
     let mut problems = Vec::new();
-    for entry in [POST_ENTRY, REVIEW_ENTRY, RELEASE_ENTRY, MASTERS_ENTRY] {
+    for entry in [
+        POST_ENTRY,
+        REVIEW_ENTRY,
+        RELEASE_ENTRY,
+        SETTLE_ENTRY,
+        MASTERS_ENTRY,
+    ] {
         if source.matches(entry).count() != 1 {
             problems.push(format!("expected exactly one `{entry}`"));
         }
     }
-    if source.matches("answer_with_token(").count() != 5 {
-        problems.push("expected the four entry points and the definition only".into());
+    if source.matches("answer_with_token(").count() != 6 {
+        problems.push("expected the five entry points and the definition only".into());
     }
     problems
 }
@@ -930,6 +953,17 @@ fn each_dialog_answers_with_its_own_token() {
             &RELEASE_ENTRY.replace(
                 "show_release_acknowledgement,",
                 "show_review_acknowledgement,",
+            ),
+        ),
+        source.replace(
+            SETTLE_ENTRY,
+            &SETTLE_ENTRY.replace("SETTLE_TOKEN_PREFIX", "REVIEW_TOKEN_PREFIX"),
+        ),
+        source.replace(
+            SETTLE_ENTRY,
+            &SETTLE_ENTRY.replace(
+                "show_settle_acknowledgement,",
+                "show_release_acknowledgement,",
             ),
         ),
         source.replace(POST_ENTRY, &POST_ENTRY.replace("show_review,", "|_, _| true,")),
@@ -1052,25 +1086,33 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     }
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // As for the post's box (`show_review`): topmost with
-            // MB_SYSTEMMODAL, with No as the default button (#1589, #1780).
-            // This box is not shown through `box_fit`, so it is not measured
-            // against the screen.
-            MB_YESNOCANCEL
-                | MB_DEFBUTTON2
-                | MB_ICONWARNING
-                | MB_SETFOREGROUND
-                | MB_TOPMOST
-                | MB_SYSTEMMODAL,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832). Through `guarded` it is also
+    // brought to the front once it appears, as the post's box is: its first
+    // line tells the person to press Y or N, and in one lab run on Windows 10
+    // MB_SETFOREGROUND alone did not give it the keyboard when it opened
+    // seconds after the last input went to Tally (#1780).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
 }"#;
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
@@ -1233,6 +1275,66 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }"#;
 
+/// The settle window's own title and Windows question (#1709): neither may
+/// name a review or a post.
+const SETTLE_TITLE: &str = r#"#[cfg(not(windows))]
+fn settle_title() -> String {
+    "ComplyEaze Bridge — close this batch".into()
+}"#;
+
+const SETTLE_QUESTION: &str = r#"#[cfg(windows)]
+fn settle_question() -> String {
+    "ComplyEaze Bridge — close this batch for good?".into()
+}"#;
+
+/// The settle dialogs (#1709), pinned as the release's are.
+const SETTLE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    rfd::MessageDialog::new()
+        .set_title(settle_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            SETTLE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(SETTLE_BUTTON.into())
+}"#;
+
+const SETTLE_ACK_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and no parent HWND is borrowed.
+        unsafe {
+            MessageBoxW(
+                std::ptr::null_mut(),
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}"#;
+
 /// Which subprocess mode and token each kind of acknowledgement uses (#1828):
 /// a release shown in the review's mode would be titled a review again, and one
 /// answered with the review's token could be answered by the review dialog.
@@ -1240,6 +1342,7 @@ const REVIEW_KIND_CHILD: &str = r#"    fn child(self) -> (&'static str, &'static
         match self {
             Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
             Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
+            Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
         }
     }"#;
 
@@ -1271,6 +1374,13 @@ const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCoun
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Settle => (
+            format!(
+                "close this batch in ComplyEaze Bridge for good, so that it never sends {} again",
+                these_vouchers(count)
+            ),
+            "Nothing is closed until you answer.",
+        ),
         Shown::Masters => (
             "create this ledger in Tally".into(),
             "Nothing is created until you answer.",
@@ -1285,6 +1395,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Post => post_words(count).1,
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
+        Shown::Settle => SETTLE_BUTTON.to_string(),
         Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     wrapped(
@@ -1854,6 +1965,9 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the post's box (#1832).
+        Ok(answer) if answer.box_did_not_fit => Err("master_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1. A clean exit without the
         // token is an executable that is not this dialog.
@@ -1864,7 +1978,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 38] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -1944,6 +2058,7 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 38] = [
     ),
     (CONFIRM_MASTERS_WITH, 1),
     ("const RELEASE_BUTTON: &str = \"Release the stop\";", 1),
+    ("const SETTLE_BUTTON: &str = \"Close the batch\";", 1),
     // Each token's value, so no two modes can share one (#1828).
     (
         "const REVIEW_TOKEN_PREFIX: &str = \"bridge-review-acknowledged:\";",
@@ -1961,10 +2076,18 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 38] = [
         "const MASTERS_TOKEN_PREFIX: &str = \"bridge-create-ledger:\";",
         1,
     ),
+    (
+        "const SETTLE_TOKEN_PREFIX: &str = \"bridge-batch-settle-acknowledged:\";",
+        1,
+    ),
     (RELEASE_TITLE, 1),
     (RELEASE_QUESTION, 1),
     (RELEASE_ACK_DIALOG, 1),
     (RELEASE_ACK_DIALOG_WINDOWS, 1),
+    (SETTLE_TITLE, 1),
+    (SETTLE_QUESTION, 1),
+    (SETTLE_ACK_DIALOG, 1),
+    (SETTLE_ACK_DIALOG_WINDOWS, 1),
     (REVIEW_KIND_CHILD, 1),
 ];
 
@@ -1983,10 +2106,11 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // The one-ledger dialog added one Windows dialog, one non-Windows dialog
     // and the non-Windows button; #1780's follow-up, the Mac one-line answer
     // text test. #1828: the release window's question and box on Windows, and
-    // its title, dialog and button on a Mac.
-    ("#[cfg(windows)]", 10),
-    ("#[cfg(not(windows))]", 14),
-    ("cfg", 38),
+    // its title, dialog and button on a Mac. #1709: the same for the settle
+    // window.
+    ("#[cfg(windows)]", 12),
+    ("#[cfg(not(windows))]", 17),
+    ("cfg", 43),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2077,6 +2201,11 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "",
             1,
         ),
+        source.replacen(
+            "        Ok(answer) if answer.box_did_not_fit => Err(\"master_review_too_large\".into()),\n",
+            "",
+            1,
+        ),
         source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
         replace_last(&source, "super::box_fit::guarded(|| {", "(|| {"),
         source.replacen(
@@ -2159,7 +2288,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
-            &MASTERS_DIALOG_WINDOWS.replacen(") == IDYES", ") != IDNO", 1),
+            &MASTERS_DIALOG_WINDOWS.replacen("answer == IDYES", "answer != IDNO", 1),
             1,
         ),
         // The one-ledger dialog's title reads as the post's, or its count
@@ -2300,6 +2429,30 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen(
             RELEASE_ACK_DIALOG_WINDOWS,
             &discard_answer(RELEASE_ACK_DIALOG_WINDOWS),
+            1,
+        ),
+        // The settle dialogs discard their answer, read as the decline, are
+        // titled a review, or are shown in the review's mode (#1709).
+        source.replacen(SETTLE_ACK_DIALOG, &discard_answer(SETTLE_ACK_DIALOG), 1),
+        source.replacen(
+            SETTLE_ACK_DIALOG_WINDOWS,
+            &discard_answer(SETTLE_ACK_DIALOG_WINDOWS),
+            1,
+        ),
+        source.replacen("\"Close the batch\"", "\"Cancel\"", 1),
+        source.replacen(
+            "\"ComplyEaze Bridge — close this batch\".into()",
+            "\"ComplyEaze Bridge — record that you reviewed one voucher\".into()",
+            1,
+        ),
+        source.replacen(
+            "Self::Settle => (\"--confirm-settle\", SETTLE_TOKEN_PREFIX),",
+            "Self::Settle => (\"--confirm-review\", REVIEW_TOKEN_PREFIX),",
+            1,
+        ),
+        source.replacen(
+            SETTLE_ACK_DIALOG_WINDOWS,
+            &SETTLE_ACK_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
             1,
         ),
         // A release reads as the decline, is titled a review, or is shown in the
@@ -2696,4 +2849,184 @@ fn only_the_approvals_holder_makes_the_totals_form() {
     ] {
         assert!(!totals_form_problems(&broken_post, &broken_approval, &broken_others).is_empty());
     }
+}
+
+/// `source` with each comment, string literal and character literal replaced
+/// by one space, so that a word or a parenthesis inside one is not read as
+/// code. Raw and byte strings are literals too; a lifetime such as `'a` is code.
+fn code_only(source: &str) -> String {
+    let chars: Vec<char> = source.chars().collect();
+    let identifier = |at: usize| chars[at].is_alphanumeric() || chars[at] == '_';
+    let mut out = String::with_capacity(source.len());
+    let mut at = 0;
+    while at < chars.len() {
+        let character = chars[at];
+        let next = chars.get(at + 1).copied();
+        if character == '/' && next == Some('/') {
+            while at < chars.len() && chars[at] != '\n' {
+                at += 1;
+            }
+            out.push(' ');
+            continue;
+        }
+        if character == '/' && next == Some('*') {
+            let mut depth = 0_usize;
+            while at < chars.len() {
+                if chars[at] == '/' && chars.get(at + 1) == Some(&'*') {
+                    depth += 1;
+                    at += 2;
+                } else if chars[at] == '*' && chars.get(at + 1) == Some(&'/') {
+                    depth -= 1;
+                    at += 2;
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    at += 1;
+                }
+            }
+            out.push(' ');
+            continue;
+        }
+        let raw_prefix = character == 'r'
+            && (at == 0
+                || !identifier(at - 1)
+                || (chars[at - 1] == 'b' && (at == 1 || !identifier(at - 2))));
+        if raw_prefix {
+            let mut quote = at + 1;
+            while chars.get(quote) == Some(&'#') {
+                quote += 1;
+            }
+            if chars.get(quote) == Some(&'"') {
+                let hashes = quote - at - 1;
+                let mut end = quote + 1;
+                while end < chars.len()
+                    && !(chars[end] == '"'
+                        && (1..=hashes).all(|offset| chars.get(end + offset) == Some(&'#')))
+                {
+                    end += 1;
+                }
+                at = end + 1 + hashes;
+                out.push(' ');
+                continue;
+            }
+        }
+        if character == '"' {
+            at += 1;
+            while at < chars.len() && chars[at] != '"' {
+                at += if chars[at] == '\\' { 2 } else { 1 };
+            }
+            at += 1;
+            out.push(' ');
+            continue;
+        }
+        if character == '\'' {
+            if next == Some('\\') {
+                let mut end = at + 3;
+                while end < chars.len() && chars[end] != '\'' {
+                    end += 1;
+                }
+                at = end + 1;
+                out.push(' ');
+                continue;
+            }
+            if chars.get(at + 2) == Some(&'\'') {
+                at += 3;
+                out.push(' ');
+                continue;
+            }
+        }
+        out.push(character);
+        at += 1;
+    }
+    out
+}
+
+/// Whether each `MessageBoxW` call in `source` names `MB_SYSTEMMODAL` among its
+/// arguments, in source order (#1780): the code from the opening parenthesis
+/// to the one that closes it. Comments and literals are not code, so a flag
+/// named only in a comment does not count.
+fn message_box_calls_are_system_modal(source: &str) -> Vec<bool> {
+    let code = code_only(source);
+    let mut calls = Vec::new();
+    let mut rest = code.as_str();
+    while let Some(at) = rest.find("MessageBoxW(") {
+        let after = &rest[at + "MessageBoxW(".len()..];
+        let mut depth = 1_usize;
+        let mut end = after.len();
+        for (index, character) in after.char_indices() {
+            match character {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = index;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        calls.push(after[..end].contains("MB_SYSTEMMODAL"));
+        rest = &after[end..];
+    }
+    calls
+}
+
+/// A Windows box opened without `MB_SYSTEMMODAL` is drawn behind Tally when the
+/// last input went to Tally seconds before it opened (#1780, #2107). Every
+/// `MessageBoxW` call of `approved_import.rs` must carry it, so a box added or
+/// changed later fails here rather than in review. The five boxes are the
+/// post's, the review's, the stop release's, the ledger creation's and the
+/// settlement's.
+#[test]
+fn every_windows_message_box_is_system_modal() {
+    let calls = message_box_calls_are_system_modal(&read("src-tauri/src/tally/approved_import.rs"));
+    assert!(
+        calls.len() >= 5,
+        "fewer MessageBoxW calls than the five known boxes: {calls:?}"
+    );
+    assert!(
+        calls.iter().all(|system_modal| *system_modal),
+        "a MessageBoxW call lacks MB_SYSTEMMODAL: {calls:?}"
+    );
+    // The check must see a missing flag.
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(null, text, title, MB_YESNOCANCEL | MB_TOPMOST)"
+        ),
+        [false]
+    );
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(null, text, title, MB_YESNOCANCEL | MB_SYSTEMMODAL) MessageBoxW(a, (b), c)"
+        ),
+        [true, false]
+    );
+    // A flag named only in a comment or a literal is not the flag: each of
+    // the five boxes names it in a comment as well.
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(\n    null,\n    text,\n    // MB_SYSTEMMODAL keeps it above Tally\n    MB_YESNOCANCEL | MB_TOPMOST,\n)"
+        ),
+        [false]
+    );
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(null, \"MB_SYSTEMMODAL\", r#\"MB_SYSTEMMODAL\"#, /* MB_SYSTEMMODAL */ MB_TOPMOST)"
+        ),
+        [false]
+    );
+    // A parenthesis inside a literal does not end the call, and a call named
+    // only in a comment is not a call.
+    assert_eq!(
+        message_box_calls_are_system_modal("MessageBoxW(null, \")\", ')', MB_SYSTEMMODAL)"),
+        [true]
+    );
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "// MessageBoxW(null, t, c, MB_TOPMOST)\nlet a: &'a str = x;"
+        ),
+        Vec::<bool>::new()
+    );
 }

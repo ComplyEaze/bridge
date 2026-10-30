@@ -86,6 +86,8 @@ mod post;
 pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
 #[path = "agent_import_content_review.rs"]
 mod content_review;
+#[path = "agent_import_settle.rs"]
+mod settle;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
@@ -809,6 +811,17 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     };
     let mut summary = summary.to_string();
+    summary.push_str(&post_span_summary_tails(&report));
+    report["summary"] = json!(summary);
+    report
+}
+
+/// What follows the first line of a binding's summary: the examples that name
+/// what can make the check refuse (#1633), and the restore that reached other
+/// posts of the company (#1050). Each starts with a space, so a first line of
+/// any kind takes them as they are, and a settlement's line keeps them.
+fn post_span_summary_tails(report: &Value) -> String {
+    let mut summary = String::new();
     // A refusal by the mark's step or the span's count says what was observed
     // and what can do that, as examples, after the line that says what to
     // check (#1633).
@@ -837,8 +850,13 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
             " This check also found the company's books restored from a backup after other posts of it, and recorded that: verify {posts} again, and check their vouchers in Tally."
         ));
     }
-    report["summary"] = json!(summary);
-    report
+    summary
+}
+
+/// The summary of a binding whose batch a person settled (#1709): the settled
+/// line, then what follows any first line (see [`post_span_summary_tails`]).
+fn settled_post_span_summary(binding: &Value) -> String {
+    format!("{}{}", settle::SUMMARY, post_span_summary_tails(binding))
 }
 
 /// How one verification attributes a native post by its own span, and what it
@@ -2416,6 +2434,19 @@ impl Server {
                     proof["content_review"] = content_review::report(reviewed);
                 }
             }
+            // A person's standing settlement of this batch after Tally answered
+            // that its post created none of its vouchers (#1709), on the same
+            // rule. It changes no verdict, only the binding's summary line.
+            if dispatched && self.import_person_settlement(&line.batch_id) == Ok(true) {
+                proof["person_settlement"] = settle::report();
+                if proof["post_span_binding"].is_object() {
+                    // The settled line replaces the first line only: what can
+                    // make the check refuse and the restore that reached other
+                    // posts of the company still follow it (#1633, #1050).
+                    proof["post_span_binding"]["summary"] =
+                        json!(settled_post_span_summary(&proof["post_span_binding"]));
+                }
+            }
             *observed_rows = Some(observed.rows.clone());
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": proof});
             if dispatched {
@@ -2435,6 +2466,9 @@ impl Server {
                     );
                 }
             }
+            // Each voucher's own line no longer asks for a settlement it has
+            // (#1709). Set after the finalisers above, which write the lines.
+            settle::settle_voucher_next_steps(&mut payload["result"]);
             let status = final_verification_status(
                 dispatched.then(|| &payload["result"]["dispatch"]),
                 &result,

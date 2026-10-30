@@ -192,10 +192,14 @@ request is predicted over a budget well below the cap.
    - Otherwise, a **census** of the window: one row per voucher carrying only `GUID`, `ALTERID` and
      `DATE` (the §12.7 witness fetch), **every census request bounded before it is sent**. A date
      range can hold every voucher the book has, so a date census is bounded only by the mark itself:
-     a book whose mark fits one census is counted in **one date census of the window**. A larger
-     book is counted in **AlterID spans across `(0, mark]`, each also narrowed to the window's
-     dates**, and each bounded by construction because AlterIDs are distinct. The spans are produced
-     one at a time, and a mark needing more than 256 of them is refused before any census is sent.
+     every census is an **AlterID span across `(0, mark]`, narrowed to the window's dates**, and
+     bounded by construction because AlterIDs are distinct. A book whose mark fits one census is
+     counted in the one span `(0, mark]`; a larger book in spans of the census's capacity. The one
+     span keeps a voucher saved after the mark was read out of the count (#2145). On five synthetic
+     books, the spanned answer of each window whose book had not moved since its record was
+     byte-equal to the unspanned one, `CMPINFO` aside (VERIFIED, 28 and 30 Oct 2026, one sitting
+     each). The spans are produced one at a time, and a mark needing more than 256 of them is
+     refused before any census is sent.
    - **A census is sized against the whole transport cap,** not the half-budget: 8,192 rows at the
      planning figure of 4 KiB a row. The half-budget exists to absorb the error in an *estimated*
      data part; a census span's row count is fixed by construction, so its only uncertainty is the

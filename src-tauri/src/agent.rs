@@ -1875,7 +1875,8 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "tally_endpoint_draining" => Some(
             "Tally was still busy with an earlier request that was stopped for time, so this \
              request was not sent. Call again after retry_after_s seconds; the same request is \
-             safe to repeat, and a different read would only wait behind the same work.",
+             safe to repeat, and a different read would only wait behind the same work. It \
+             clears by itself within 10 minutes of the earlier request.",
         ),
         "import_post_window_not_bounded" => Some(
             "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \

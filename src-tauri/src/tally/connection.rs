@@ -1286,7 +1286,8 @@ impl TallyClient {
         // documented third-party XML contract. Never gate the POST probe or
         // authoritative product metadata on this unauthenticated heuristic.
         // The one exception is the drain after a cut post (#2142), which holds
-        // the next post until `/status` answers quickly: two lab rows measured
+        // the next post until `/status` has answered three times in a row,
+        // whatever its answer, and at most 10 minutes: two lab rows measured
         // that `/status` waits while Tally works on a cut read, and that a data
         // read sent after three quick probes answered at its rest speed
         // (`bridge_tally_transport::DrainPolicy::MEASURED`).

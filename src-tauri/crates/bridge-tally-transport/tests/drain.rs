@@ -1,6 +1,6 @@
 //! The drain after a cut post (#2142): a post that may have left Tally working
 //! leaves the endpoint owing a drain, and the next post sends `GET /status`
-//! first, posting only once enough probes in a row answered quickly.
+//! first, posting only once three probes in a row have answered.
 //!
 //! The gate here keeps the drain record in memory and its clock in a counter
 //! that each pause moves on, so spacing is exact; every send goes to the
@@ -200,6 +200,7 @@ fn the_measured_policy_is_pinned() {
     assert_eq!(measured.spacing, Duration::from_secs(2));
     assert_eq!(measured.probes_per_call, 3);
     assert_eq!(measured.retry_after(), Duration::from_secs(10));
+    assert_eq!(measured.clear_after, Duration::from_secs(600));
     assert_eq!(
         WireRefusal::Draining { retry_after_ms: 1 }.safe_code(),
         "tally_endpoint_draining"
@@ -470,7 +471,8 @@ async fn without_a_drain_policy_a_post_ignores_the_record() {
 async fn an_old_debt_on_an_idle_tally_clears_on_quick_probes() {
     let simulator = SequenceSimulator::spawn(vec![status(), status(), status(), xml()]).unwrap();
     let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
-    shared.now.store(T0 + 30 * 60_000, Ordering::SeqCst);
+    // Nine minutes on: old, but inside the ten before it clears by itself.
+    shared.now.store(T0 + 9 * 60_000, Ordering::SeqCst);
     transport.post_xml_decoded("<E />".into()).await.unwrap();
     assert_eq!(debt(&shared), DrainDebt::Clear);
     assert_eq!(sent(simulator), ["/status", "/status", "/status", "/"]);
@@ -562,4 +564,101 @@ async fn answers_of_any_speed_in_a_row_clear_the_debt() {
     transport.post_xml_decoded("<E />".into()).await.unwrap();
     assert_eq!(debt(&shared), DrainDebt::Clear);
     assert_eq!(sent(simulator), ["/status", "/status", "/status", "/"]);
+}
+
+/// A probe answered with a status other than 2xx, quickly, is Tally answering:
+/// `/status` is not part of Tally's documented contract, so its answer counts
+/// whatever it is.
+#[tokio::test]
+async fn a_quick_probe_answered_with_an_error_status_counts_as_an_answer() {
+    let simulator = SequenceSimulator::spawn(vec![status().with_http_status(500), xml()]).unwrap();
+    let (transport, shared) = transport(&simulator, owed(2, None), Some(POLICY));
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/status", "/"]);
+}
+
+/// A probe answered in another content type and encoding than a status answer
+/// is Tally answering too.
+#[tokio::test]
+async fn a_probe_answered_in_another_encoding_counts_as_an_answer() {
+    let simulator = SequenceSimulator::spawn(vec![xml(), xml()]).unwrap();
+    let (transport, shared) = transport(&simulator, owed(2, None), Some(POLICY));
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/status", "/"]);
+}
+
+/// A debt older than any drain clears on the next post without a probe, on the
+/// post path and the import path alike: the escape for a `/status` that never
+/// answers in time.
+#[tokio::test]
+async fn a_debt_older_than_ten_minutes_clears_without_a_probe() {
+    let simulator = SequenceSimulator::spawn(vec![xml(), xml()]).unwrap();
+    let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
+    shared.now.store(T0 + 600_001, Ordering::SeqCst);
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    *shared.debt.lock().unwrap() = DrainDebt::InFlight { since_ms: T0 };
+    let held = transport.acquire_wire_lock().await.unwrap();
+    held.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/", "/"]);
+}
+
+/// A post Tally answered with an error status owes nothing: a whole head came
+/// back, so Tally had finished it.
+#[tokio::test]
+async fn a_post_answered_with_an_error_status_owes_nothing() {
+    let simulator = SequenceSimulator::spawn(vec![xml().with_http_status(500)]).unwrap();
+    let (transport, shared) = transport(&simulator, DrainDebt::Clear, Some(POLICY));
+    assert_eq!(
+        transport
+            .post_xml_decoded("<E />".into())
+            .await
+            .unwrap_err(),
+        TallyTransportError::HttpStatus { status: 500 }
+    );
+    assert_eq!(
+        history(&shared),
+        [DrainDebt::InFlight { since_ms: T0 }, DrainDebt::Clear]
+    );
+    let _ = sent(simulator);
+}
+
+/// A second process, sharing only the record, drains the debt the first left.
+#[tokio::test]
+async fn a_second_process_drains_the_debt_the_first_left() {
+    let simulator = SequenceSimulator::spawn(vec![
+        xml().with_delivery(Delivery::SlowHeaders(Duration::from_millis(900))),
+        status(),
+        status(),
+        status(),
+        xml(),
+    ])
+    .unwrap();
+    let (first, shared) = transport(&simulator, DrainDebt::Clear, Some(POLICY));
+    assert_eq!(
+        first.post_xml_decoded("<E />".into()).await.unwrap_err(),
+        TallyTransportError::RequestTimedOut
+    );
+    // Tally (here the simulator) finishes the cut post before the second
+    // process arrives.
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    let second = TallyHttpTransport::with_policy(
+        TallyEndpointConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        },
+        TransportPolicy::default(),
+    )
+    .unwrap()
+    .with_wire_gate(
+        Arc::new(Gate(Arc::clone(&shared))),
+        WireRetryPolicy::DEFAULT,
+    )
+    .with_drain(POLICY);
+    second.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/", "/status", "/status", "/status", "/"]);
 }

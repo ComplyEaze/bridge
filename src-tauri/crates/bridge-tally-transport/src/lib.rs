@@ -633,6 +633,12 @@ impl TallyHttpTransport {
                 } => (since_ms, answered, last_probe_ms),
             };
             let now = self.wire.now_ms();
+            if now.saturating_sub(since_ms) > millis(policy.clear_after) {
+                // Older than any drain: a `/status` that never answers in
+                // time, not a busy Tally. Clear it, and post.
+                held.record(DrainDebt::Clear).map_err(refused)?;
+                return Ok(held);
+            }
             // A time ahead of this clock counts as elapsed.
             let wait = last_probe_ms
                 .filter(|&last| last <= now)
@@ -714,11 +720,34 @@ impl TallyHttpTransport {
         .await;
         flight.finish();
         self.observe_result(SendKind::Status, None, started, &result, answered_decoded);
-        match result {
-            Ok(_) if started.elapsed() < policy.quick_below => drain::Probe::Quick,
-            Ok(_) => drain::Probe::Slow,
-            Err(TallyTransportError::ConnectionFailed) => drain::Probe::Unreachable,
-            Err(_) => drain::Probe::Cut,
+        let answered = match result {
+            Ok(_) => true,
+            Err(error) => match error {
+                TallyTransportError::ConnectionFailed => return drain::Probe::Unreachable,
+                // No response within the deadline, or none at all.
+                TallyTransportError::RequestTimedOut
+                | TallyTransportError::RequestFailed
+                | TallyTransportError::ResponseTruncated
+                | TallyTransportError::ResponseReadFailed => false,
+                // A response this crate refuses is still Tally answering.
+                TallyTransportError::HttpStatus { .. }
+                | TallyTransportError::ResponseTooLarge { .. }
+                | TallyTransportError::UnsupportedContentEncoding
+                | TallyTransportError::InvalidEncoding { .. } => true,
+                // A probe never meets these: it is built here, sent once, and
+                // not gated.
+                TallyTransportError::EndpointInvalid { .. }
+                | TallyTransportError::PolicyInvalid { .. }
+                | TallyTransportError::ClientInitializationFailed
+                | TallyTransportError::RequestTooLarge { .. }
+                | TallyTransportError::WireRefused { .. }
+                | TallyTransportError::SendWithdrawn => false,
+            },
+        };
+        match (answered, started.elapsed() < policy.quick_below) {
+            (true, true) => drain::Probe::Quick,
+            (true, false) => drain::Probe::Slow,
+            (false, _) => drain::Probe::Cut,
         }
     }
 
@@ -805,8 +834,15 @@ impl TallyHttpTransport {
         // An owed drain refuses at once: this caller cannot wait on a probe
         // between its own checks (#2142).
         if let Some(policy) = self.drain {
+            let now = self.wire.now_ms();
             let refusal = match held.debt() {
                 Ok(DrainDebt::Clear) => None,
+                Ok(DrainDebt::InFlight { since_ms } | DrainDebt::Owed { since_ms, .. })
+                    if now.saturating_sub(since_ms) > millis(policy.clear_after) =>
+                {
+                    // As in a post's drain: older than any drain, it clears.
+                    held.record(DrainDebt::Clear).err()
+                }
                 Ok(DrainDebt::InFlight { .. } | DrainDebt::Owed { .. }) => {
                     Some(WireRefusal::Draining {
                         retry_after_ms: millis(policy.retry_after()),

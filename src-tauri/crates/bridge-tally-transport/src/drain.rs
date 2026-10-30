@@ -27,6 +27,10 @@ pub struct DrainPolicy {
     pub spacing: Duration,
     /// The most probes one post sends before it is refused.
     pub probes_per_call: u8,
+    /// A debt older than this is cleared on the next post, without probes:
+    /// the escape for a Tally whose `/status` never answers within the
+    /// deadline though it is not busy.
+    pub clear_after: Duration,
 }
 
 impl DrainPolicy {
@@ -40,12 +44,16 @@ impl DrainPolicy {
     /// - each data read sent after three quick probes, 2 s apart, answered
     ///   within its at-rest threshold (four times). A read after fewer, or after
     ///   answers slower than 1 s, was not measured.
+    ///
+    /// The 10 minutes before a debt clears by itself is not measured: about 24
+    /// times the longest drain seen.
     pub const MEASURED: Self = Self {
         probe_deadline: Duration::from_secs(5),
         quick_below: Duration::from_secs(1),
         answers_in_a_row: 3,
         spacing: Duration::from_secs(2),
         probes_per_call: 3,
+        clear_after: Duration::from_secs(600),
     };
 
     /// What a refused call is told to wait: the drain measured 8.9 s to 25.4 s
@@ -69,12 +77,14 @@ impl DrainPolicy {
 /// How one drain probe ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Probe {
-    /// Answered whole within `quick_below`.
+    /// Answered within `quick_below`: a whole response, or a response head
+    /// this crate refuses (a status other than 2xx, another content type or
+    /// charset), since `/status` is not part of Tally's documented contract and
+    /// any answer shows Tally has finished its work.
     Quick,
-    /// Answered whole within the deadline, but not within `quick_below`.
+    /// Answered within the deadline, but not within `quick_below`.
     Slow,
-    /// Cut by its deadline, or ended without a whole answer: Tally may still be
-    /// working.
+    /// Cut by its deadline, or no response at all: Tally may still be working.
     Cut,
     /// Nothing listens on the port: no work can remain, so nothing is owed.
     Unreachable,
@@ -84,15 +94,25 @@ pub(crate) enum Probe {
 /// Every error is named, so a new one is decided here before it compiles.
 pub(crate) const fn owes_drain(error: &TallyTransportError) -> bool {
     match error {
-        // Sent, or perhaps sent, and not answered whole.
+        // Sent, or perhaps sent, and not answered: Tally may still be working
+        // on it, or still sending an answer cut short.
         TallyTransportError::RequestTimedOut
         | TallyTransportError::RequestFailed
-        | TallyTransportError::HttpStatus { .. }
-        | TallyTransportError::ResponseTooLarge { .. }
+        | TallyTransportError::ResponseTooLarge {
+            declared_by_peer: false,
+            ..
+        }
         | TallyTransportError::ResponseTruncated
-        | TallyTransportError::ResponseReadFailed
+        | TallyTransportError::ResponseReadFailed => true,
+        // Tally answered with a whole head (a status, a declared length, a
+        // content type or encoding): it had finished the work.
+        TallyTransportError::HttpStatus { .. }
+        | TallyTransportError::ResponseTooLarge {
+            declared_by_peer: true,
+            ..
+        }
         | TallyTransportError::UnsupportedContentEncoding
-        | TallyTransportError::InvalidEncoding { .. } => true,
+        | TallyTransportError::InvalidEncoding { .. } => false,
         // Nothing reached Tally.
         TallyTransportError::EndpointInvalid { .. }
         | TallyTransportError::PolicyInvalid { .. }

@@ -452,7 +452,6 @@ fn an_unreadable_drain_record_is_owed() {
 fn every_wire_refusal_that_passes_by_waiting_names_its_retry() {
     assert_eq!(wire_retry_after_s("tally_endpoint_busy"), Some(5));
     assert_eq!(wire_retry_after_s("tally_endpoint_draining"), Some(10));
-    assert_eq!(wire_retry_after_s("tally_endpoint_needs_attention"), None);
     assert_eq!(wire_retry_after_s("tally_endpoint_lock_unavailable"), None);
     assert_eq!(wire_retry_after_s("request_deadline_exceeded"), None);
 }

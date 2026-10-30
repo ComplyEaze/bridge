@@ -2048,7 +2048,7 @@ const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port wa
 
 /// The same, when Tally was still busy with an earlier request cut for time
 /// (#2142): nothing was posted, and the approval has lapsed.
-const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
 /// What a caller does when the port was busy and whether the post was sent
 /// could not be observed.

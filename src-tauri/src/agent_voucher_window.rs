@@ -2214,11 +2214,13 @@ pub(super) enum WindowCount {
 /// Count `window` with a census of its own and send no data part (#1240). A
 /// caller that needs only to know whether, and on which days, the window holds
 /// vouchers has what it needs from the census: its rows carry each voucher's
-/// day. Nothing is admitted against the count. A count taken in one request is
-/// one observation, as a window read whole is; a count divided into several
-/// spans is bracketed as a divided window read is: both company marks are read
-/// again after the last census request, and marks that moved refuse it
-/// ([`WINDOW_CHANGED_DURING_READ`]).
+/// day. Nothing is admitted against the count. Every count is bracketed as a
+/// divided window read is: both company marks are read again after the last
+/// census request, and marks that moved refuse it
+/// ([`WINDOW_CHANGED_DURING_READ`]). A count taken in one request is bracketed
+/// too: its census is spanned to the mark read before it (#2145), so a voucher
+/// saved after that read lies outside the span, and only the marks read again
+/// can show it.
 pub(super) async fn count_window_only<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
@@ -2275,7 +2277,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     let mut closing = None;
     if let Some(opened) = opening {
         // The count of the census that was sent, not one derived again from the marks.
-        if census_requests > 1 {
+        if census_requests >= 1 {
             let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
                 .await
                 .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
@@ -2548,11 +2550,15 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// hold every voucher the book has. So every census is an AlterID span across
 /// `(0, mark]`, narrowed to the window's dates and bounded by construction
 /// because AlterIDs are distinct: one span `(0, mark]` for a book whose mark
-/// fits one census, spans of `capacity` for a larger one. A single census is
-/// spanned too, so a voucher saved after the mark was read cannot raise it past
-/// the mark (#2145; byte-equal to the unspanned census wherever both were read
-/// live). The spans are produced one at a time, and a mark needing more of them
-/// than [`MAX_CENSUS_READS`] is refused before any is.
+/// fits one census, spans of `capacity` for a larger one, and none for a book
+/// that has never held a voucher. A single census is spanned too, so a voucher
+/// saved after the mark was read cannot raise its count past the mark (#2145;
+/// byte-equal to the unspanned census in every window live whose unspanned
+/// census held no row above the mark). A voucher saved between the marks read
+/// and a whole read's census therefore lies outside the span: a part that
+/// returns it is refused as [`PART_CENSUS_MISMATCH`], as on a divided read, and
+/// the read fails safe. The spans are produced one at a time, and a mark
+/// needing more of them than [`MAX_CENSUS_READS`] is refused before any is.
 ///
 /// The cost is a census count proportional to the book, not the window: a
 /// mark of 250,000 is 31 census requests however short the window. That is a
@@ -2570,7 +2576,8 @@ pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans
         after: 0,
         high_water,
         capacity,
-        done: false,
+        // A book that has never held a voucher has nothing to count.
+        done: high_water == 0,
     })
 }
 

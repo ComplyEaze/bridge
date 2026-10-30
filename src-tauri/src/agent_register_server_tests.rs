@@ -860,8 +860,12 @@ fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
 /// The recorded purchase read with the window's census and window answers spliced out for
 /// Tally's own empty collection (a committed capture of an empty collection, not a capture of an
 /// empty-window call), followed by the empty-window corroboration the register then makes: a
-/// census of the wider window (paired; no window read, #1240) and the company's voucher mark.
-const EMPTY_WINDOW_TAIL: &str = "ensnseemsmse";
+/// census of the wider window (paired; no window read, #1240), the company marks read again
+/// after it (#2145), and the company's voucher mark.
+const EMPTY_WINDOW_TAIL: &str = "ensnseemsmseemsmse";
+
+/// The tail's legs before the company's voucher-mark read: the census and the marks read again.
+const EMPTY_WINDOW_TAIL_BEFORE_THE_MARK: usize = 12;
 
 /// The company-marks response with the voucher mark set to zero: a book with no vouchers.
 fn marks_with_voucher_mark_zero() -> String {
@@ -872,8 +876,9 @@ fn marks_with_voucher_mark_zero() -> String {
     format!("{}0{}", &body[..open_end], &body[close..])
 }
 
-/// `corroborating_marks` answers the voucher-mark read of the corroboration (the tail's `m`s);
-/// the recorded marks when `None`.
+/// `corroborating_marks` answers the voucher-mark read of the corroboration (the tail's last
+/// `m`s); the recorded marks when `None`. The marks read again after the census are the
+/// recorded ones, so the book did not move during the read.
 async fn empty_window_register(corroborating_marks: Option<String>) -> Value {
     let empty = ScenarioPlan::new(Fixture::SyntheticXml(utf16(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
@@ -889,7 +894,10 @@ async fn empty_window_register(corroborating_marks: Option<String>) -> Value {
             let kind = Kind::of(letter);
             if matches!(kind, Kind::Census | Kind::Window) {
                 empty.clone()
-            } else if kind == Kind::Marks && position >= recorded && corroborating_marks.is_some() {
+            } else if kind == Kind::Marks
+                && position >= recorded + EMPTY_WINDOW_TAIL_BEFORE_THE_MARK
+                && corroborating_marks.is_some()
+            {
                 plan(kind, corroborating_marks.clone().unwrap())
             } else {
                 plan(kind, body_of(kind))

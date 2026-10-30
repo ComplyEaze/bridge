@@ -196,10 +196,13 @@ request is predicted over a budget well below the cap.
      bounded by construction because AlterIDs are distinct. A book whose mark fits one census is
      counted in the one span `(0, mark]`; a larger book in spans of the census's capacity. The one
      span keeps a voucher saved after the mark was read out of the count (#2145). On five synthetic
-     books, the spanned answer of each window whose book had not moved since its record was
-     byte-equal to the unspanned one, `CMPINFO` aside (VERIFIED, 28 and 30 Oct 2026, one sitting
-     each). The spans are produced one at a time, and a mark needing more than 256 of them is
-     refused before any census is sent.
+     books, in every window whose unspanned census held no row above the mark, the spanned answer
+     was byte-equal to the unspanned one (PARTIAL: one sitting each, 28 and 30 Oct 2026). A
+     voucher saved between the marks read and the census is outside the span, so it is caught
+     elsewhere: a part of a whole read that returns it is refused as a census mismatch, and a
+     count-only read reads the marks again after its census, one request or several, and refuses
+     marks that moved. The spans are produced one at a time, and a mark needing more than 256 of
+     them is refused before any census is sent.
    - **A census is sized against the whole transport cap,** not the half-budget: 8,192 rows at the
      planning figure of 4 KiB a row. The half-budget exists to absorb the error in an *estimated*
      data part; a census span's row count is fixed by construction, so its only uncertainty is the

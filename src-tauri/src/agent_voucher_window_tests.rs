@@ -2255,14 +2255,17 @@ fn a_book_whose_mark_fits_one_census_is_counted_in_one_span_to_its_mark_and_a_la
             },
         ]
     );
-    // An empty book is the empty span; it is never sent, since a mark of zero
-    // sends no census (`skips_census`).
+    // A book that has never held a voucher has no span, and its plan no request;
+    // a mark of zero sends no census anyway (`skips_census`).
+    assert_eq!(census_spans(0, capacity).unwrap().count(), 0);
     assert_eq!(
-        census_spans(0, capacity).unwrap().collect::<Vec<_>>(),
-        [AlterIdSpan {
-            after: 0,
-            through: 0
-        }]
+        CensusPlan::new(
+            0,
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard)
+        )
+        .unwrap()
+        .requests(),
+        0
     );
 }
 
@@ -3979,13 +3982,20 @@ async fn call_vouchers_over(plans: Vec<ScenarioPlan>) -> Value {
     response
 }
 
+/// The mark of the counted book of [`empty_window_over_a_counted_book`], read again
+/// unchanged.
+fn steady_mark() -> u64 {
+    WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity()
+}
+
 /// The `vouchers` tool over a counted book whose window is empty, then the
 /// empty-window corroboration (#1240): its own census of the window widened by
-/// a day each side, whose answer is `corroboration_census`, and, when that
-/// holds no voucher, the company's mark. Returns the response and the requests
-/// Bridge sent.
+/// a day each side, whose answer is `corroboration_census`, the marks read again
+/// after it, which read `closing_mark`, and, when the census holds no voucher,
+/// the company's mark. Returns the response and the requests Bridge sent.
 async fn empty_window_over_a_counted_book(
     corroboration_census: String,
+    closing_mark: u64,
 ) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>) {
     let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
     let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
@@ -3993,9 +4003,11 @@ async fn empty_window_over_a_counted_book(
     // the window's census and its read: both empty
     plans.extend(paired(&xml_plan(empty_collection())));
     plans.extend(paired(&xml_plan(empty_collection())));
-    // the corroboration's census of the widened window, then the mark when it holds nothing
+    // the corroboration's census of the widened window, the marks read again after it
+    // (#2145), then the mark when it holds nothing
     let holds_nothing = corroboration_census == empty_collection();
     plans.extend(paired(&xml_plan(corroboration_census)));
+    plans.extend(paired(&mark(closing_mark)));
     if holds_nothing {
         plans.extend(paired(&mark(limits.census_capacity())));
     }
@@ -4052,8 +4064,11 @@ fn widened_census_reads(sent: &[tally_protocol_simulator::ObservedRequest]) -> u
 /// the widened window and no read of that window's vouchers.
 #[tokio::test]
 async fn an_empty_window_beside_a_voucher_is_corroborated_by_a_census_alone() {
-    let (response, sent) =
-        empty_window_over_a_counted_book(relabelled(&vouchers_kept(1), &[(1, "20260731")])).await;
+    let (response, sent) = empty_window_over_a_counted_book(
+        relabelled(&vouchers_kept(1), &[(1, "20260731")]),
+        steady_mark(),
+    )
+    .await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{response}");
     assert_eq!(
@@ -4066,9 +4081,9 @@ async fn an_empty_window_beside_a_voucher_is_corroborated_by_a_census_alone() {
         "one paired census of the widened window"
     );
     assert_eq!(widened_window_reads(&sent), 0);
-    // 4 prelude legs, then the marks, the window's census, the window and the
-    // corroboration's census, each a pair of 6.
-    assert_eq!(sent.len(), 4 + 4 * 6);
+    // 4 prelude legs, then the marks, the window's census, the window, the
+    // corroboration's census and the marks read again after it, each a pair of 6.
+    assert_eq!(sent.len(), 4 + 5 * 6);
 }
 
 /// #1240: a voucher inside the window that the window's own census did not
@@ -4076,8 +4091,11 @@ async fn an_empty_window_beside_a_voucher_is_corroborated_by_a_census_alone() {
 /// read, not the first read's count again.
 #[tokio::test]
 async fn the_corroborations_census_is_its_own_read() {
-    let (response, sent) =
-        empty_window_over_a_counted_book(relabelled(&vouchers_kept(1), &[(1, "20260815")])).await;
+    let (response, sent) = empty_window_over_a_counted_book(
+        relabelled(&vouchers_kept(1), &[(1, "20260815")]),
+        steady_mark(),
+    )
+    .await;
     assert_eq!(
         response["structuredContent"]["result"]["error"]["code"], "window_contradicted",
         "{response}"
@@ -4201,16 +4219,36 @@ async fn a_small_books_corroboration_reports_the_marks_it_had_to_take() {
 }
 
 /// #1240: nothing in the widened window leaves it `empty_uncorroborated`
-/// after the census and the company's mark; before, the same book also paid
-/// for a read of the widened window's vouchers.
+/// after the census, the marks read again after it and the company's mark;
+/// before, the same book also paid for a read of the widened window's vouchers.
 #[tokio::test]
 async fn an_empty_widened_window_costs_a_census_and_the_mark() {
-    let (response, sent) = empty_window_over_a_counted_book(empty_collection()).await;
+    let (response, sent) =
+        empty_window_over_a_counted_book(empty_collection(), steady_mark()).await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{response}");
     assert_eq!(result["reason"], "empty_uncorroborated", "{response}");
     assert_eq!(widened_census_reads(&sent), 2);
     assert_eq!(widened_window_reads(&sent), 0);
+    assert_eq!(sent.len(), 4 + 6 * 6);
+}
+
+/// #2145: a voucher saved inside the window after the first read took the company's
+/// marks lies above them, so the corroboration's census, spanned to those marks, does
+/// not count it, though it is one request. The marks read again after that census have
+/// moved, and the read is refused rather than labelled `empty_uncorroborated`.
+#[tokio::test]
+async fn a_voucher_saved_after_the_marks_were_read_refuses_a_single_census_corroboration() {
+    let (response, sent) =
+        empty_window_over_a_counted_book(empty_collection(), steady_mark() + 1).await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
+        "{response}"
+    );
+    assert_eq!(widened_census_reads(&sent), 2, "one census request, paired");
+    assert_eq!(widened_window_reads(&sent), 0);
+    // 4 prelude legs, the marks, the window's census, the window, the corroboration's
+    // census and the marks read again: nothing after the refusal.
     assert_eq!(sent.len(), 4 + 5 * 6);
 }
 

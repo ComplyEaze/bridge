@@ -471,6 +471,9 @@ base revision.
 <a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
 
 [12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)
+<a id="12a23-stock-query-by-item-name-gives-an-items-closing-quantity-per-godown-and-batch"></a>
+
+[12a.23 Stock Query by item name gives an item's closing quantity per godown and batch](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a23-stock-query-by-item-name-gives-an-items-closing-quantity-per-godown-and-batch)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

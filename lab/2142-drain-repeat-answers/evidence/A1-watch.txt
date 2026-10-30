@@ -1,0 +1,2 @@
+2026-10-30T01:15:22.519Z w000 baseline
+2026-10-30T01:15:42.093Z probe.py pid 4588 has exited: watch ends

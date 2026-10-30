@@ -1,0 +1,12 @@
+{"utc": "2026-10-30T01:19:17.679+00:00", "t": 0.016, "event": "read_sent", "command": ["curl.exe", "--max-time", "20", "-sS", "-w", "%{http_code} %{size_download} %{time_total}", "--data-binary", "@requests/r-4-receivable-20260331.utf16le.xml", "-H", "Content-Type: text/xml; charset=utf-16", "-D", "<lab folder>\\answers\\B5-read-headers.txt", "http://127.0.0.1:9001", "-o", "<lab folder>\\answers\\B5-read-answer.xml"], "pid": 4616, "read_sent_t": 0.0}
+{"utc": "2026-10-30T01:19:37.741+00:00", "t": 20.079, "event": "read_ended", "exit": 28, "printed": "000 0 20.009366", "stderr": "curl: (28) Operation timed out after 20009 milliseconds with 0 bytes received", "read_end_t": 20.009}
+{"utc": "2026-10-30T01:19:37.744+00:00", "t": 20.079, "event": "first_probe_due", "after_read_end_s": 1.0, "due_t": 21.079}
+{"utc": "2026-10-30T01:19:38.748+00:00", "t": 21.079, "event": "probe_sent", "n": 1, "after_read": true}
+{"utc": "2026-10-30T01:19:49.621+00:00", "t": 31.954, "event": "probe_ended", "n": 1, "exit": 0, "printed": "200 51 10.791490", "stderr": "", "after_read": true}
+{"utc": "2026-10-30T01:19:51.622+00:00", "t": 33.954, "event": "probe_sent", "n": 2, "after_read": true}
+{"utc": "2026-10-30T01:19:51.665+00:00", "t": 34.0, "event": "probe_ended", "n": 2, "exit": 0, "printed": "200 51 0.003788", "stderr": "", "after_read": true}
+{"utc": "2026-10-30T01:19:53.675+00:00", "t": 36.016, "event": "probe_sent", "n": 3, "after_read": true}
+{"utc": "2026-10-30T01:19:53.708+00:00", "t": 36.047, "event": "probe_ended", "n": 3, "exit": 0, "printed": "200 51 0.003773", "stderr": "", "after_read": true}
+{"utc": "2026-10-30T01:19:55.718+00:00", "t": 38.047, "event": "probe_sent", "n": 4, "after_read": true}
+{"utc": "2026-10-30T01:19:55.753+00:00", "t": 38.094, "event": "probe_ended", "n": 4, "exit": 0, "printed": "200 51 0.003114", "stderr": "", "after_read": true}
+{"utc": "2026-10-30T01:19:57.761+00:00", "t": 40.094, "event": "end", "reason": "quick_in_a_row_after_read"}

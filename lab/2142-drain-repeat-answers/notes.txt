@@ -1,0 +1,12 @@
+#2142 drain repeat notes (UTC). Sheet lab/2142-drain-repeat at 33d18f5e81a3c28c933c9182a81d6f1ef17d0447: SHA256.txt 5 of 5 equal; probe.py py_compile ok (pycache prefix outside the folder), read whole. The capture watcher checks each second and ends within 2 s of probe.py's exit (rule 4).
+2026-10-30T01:14:01Z Step 0 with no company loaded: one tally.exe (PID 26300) owns 9001; /status 200; exe sha256 4c9bace3... Answers and data folders absent before.
+2026-10-30T01:14:3xZ BRIDGE CORPUS DENSE loaded alone (Down 13, Enter); Gateway 1-Apr-25 to 31-Mar-26, current date 31-Mar-2026 (captured). Answers folder created empty.
+2026-10-30T01:14:53Z Step 1: the client (exe ok, version 0.6.0); tools/list; list_companies: THE COMPANY only, verified_tuple, 20250401; ledger_masters basic: M0 328, V0 29900, 0.759 s.
+2026-10-30T01:15:2xZ A1: 10 probes, exit 0.
+2026-10-30T01:15:4xZ B4R: cut at 20.01 s (exit 28); probe 1 30.03 s; exit 0, end line 01:16:26.940Z; timed ledger_masters sent 01:16:29.223Z (2.28 s): 0.764 s, 328 / 29900. Rule 6 wait; /status 200 at 01:18:36Z.
+2026-10-30T01:18:5xZ A2: 10 probes, exit 0.
+2026-10-30T01:19:1xZ B5: cut at 20.01 s; first probe due 1.0 s after; it took 10.79 s; exit 0, end line 01:19:57.761Z; timed ledger_masters sent 01:19:59.275Z (1.51 s): 0.797 s, 328 / 29900. Rule 6 wait; /status 200 at 01:22:05Z.
+2026-10-30T01:22:2xZ B6: cut at 20.01 s; first probe 9.29 s; exit 0, end line 01:23:00.679Z; timed ledger_masters sent 01:23:02.363Z (1.68 s): 0.784 s, 328 / 29900. Rule 6 wait; /status 200 at 01:25:08Z.
+2026-10-30T01:25:1xZ A3: 10 probes, exit 0.
+2026-10-30T01:25:47Z Step 8: ledger_masters basic: M4 328, V4 29900, 0.815 s. Step 9: stop file; server exit 0; error stream empty; exe sha256 equal.
+2026-10-30T01:26Z C10: Gateway captured; Company > Shut; Select Company, none loaded; 01:26:18Z one tally.exe owns 9001; /status 200. No XML after the shut.

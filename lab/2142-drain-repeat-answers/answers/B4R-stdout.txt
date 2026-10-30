@@ -1,0 +1,11 @@
+{"utc": "2026-10-30T01:15:46.573+00:00", "t": 0.016, "event": "read_sent", "command": ["curl.exe", "--max-time", "20", "-sS", "-w", "%{http_code} %{size_download} %{time_total}", "--data-binary", "@requests/r-4-receivable-20260331.utf16le.xml", "-H", "Content-Type: text/xml; charset=utf-16", "-D", "<lab folder>\\answers\\B4R-read-headers.txt", "http://127.0.0.1:9001", "-o", "<lab folder>\\answers\\B4R-read-answer.xml"], "pid": 21548, "read_sent_t": 0.0}
+{"utc": "2026-10-30T01:15:48.628+00:00", "t": 2.078, "event": "probe_sent", "n": 1, "after_read": false}
+{"utc": "2026-10-30T01:16:06.637+00:00", "t": 20.078, "event": "read_ended", "exit": 28, "printed": "000 0 20.010126", "stderr": "curl: (28) Operation timed out after 20010 milliseconds with 0 bytes received", "read_end_t": 20.01}
+{"utc": "2026-10-30T01:16:18.778+00:00", "t": 32.219, "event": "probe_ended", "n": 1, "exit": 0, "printed": "200 51 30.027887", "stderr": "", "after_read": false}
+{"utc": "2026-10-30T01:16:20.793+00:00", "t": 34.234, "event": "probe_sent", "n": 2, "after_read": true}
+{"utc": "2026-10-30T01:16:20.834+00:00", "t": 34.281, "event": "probe_ended", "n": 2, "exit": 0, "printed": "200 51 0.003257", "stderr": "", "after_read": true}
+{"utc": "2026-10-30T01:16:22.841+00:00", "t": 36.281, "event": "probe_sent", "n": 3, "after_read": true}
+{"utc": "2026-10-30T01:16:22.881+00:00", "t": 36.328, "event": "probe_ended", "n": 3, "exit": 0, "printed": "200 51 0.003943", "stderr": "", "after_read": true}
+{"utc": "2026-10-30T01:16:24.886+00:00", "t": 38.328, "event": "probe_sent", "n": 4, "after_read": true}
+{"utc": "2026-10-30T01:16:24.929+00:00", "t": 38.375, "event": "probe_ended", "n": 4, "exit": 0, "printed": "200 51 0.004962", "stderr": "", "after_read": true}
+{"utc": "2026-10-30T01:16:26.940+00:00", "t": 40.391, "event": "end", "reason": "quick_in_a_row_after_read"}

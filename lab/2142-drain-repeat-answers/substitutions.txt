@@ -1,0 +1,24 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+answers/B4R-log.jsonl: original 1882 B sha256 81189e303128598a2181bf6a5b30a47164e7dcd523797930befbb1512ad1ba50; 2 x -> <lab folder>
+answers/B4R-stdout.txt: original 1893 B sha256 ea80b7840d4a6b473264e39b695fbaa49cb4338eae22f930904b7f332e10a783; 2 x -> <lab folder>
+answers/B5-log.jsonl: original 2001 B sha256 709c06b4c2f0c592c707c0ce65d079f795dda9b2c32015ba3b49acddd628710d; 2 x -> <lab folder>
+answers/B5-stdout.txt: original 2013 B sha256 63dcd2c0e43a4f73f5256e52fdef669942c35d719d313143521fe45c1f3cd63a; 2 x -> <lab folder>
+answers/B6-log.jsonl: original 1997 B sha256 806959b53620064e3d0912e193dbbe605c7255dc4d5d87776eb8edb7152ad0aa; 2 x -> <lab folder>
+answers/B6-stdout.txt: original 2009 B sha256 7dd81aa7cdd44c235c13e788cc1cadc756c11532f87a8c0f3a22682dfaf84d63; 2 x -> <lab folder>
+evidence/blocks.txt: original 8910 B sha256 13af834cb8d69fe92fa26d621743ba30796b2e124d0ed57e56bdceb4487adc77; 30 x -> <lab folder>
+evidence/c10-netstat.txt: original 9834 B sha256 daef87a2c7a1ee0a63e83624bbdf20366a35f5b786df18a047c01f4a7f7d0984; only the port-9001 LISTENING lines kept
+evidence/s0-netstat.txt: original 10678 B sha256 e41d5f0806e23dcd06770de2feaed7f044a764ac87d79c15f4c1406bd1b1a106; only the port-9001 LISTENING lines kept
+scripts/block.ps1: original 3451 B sha256 d4376a72dca11d964f3ef4ec538f9abd65e3997ab04ff2280a53e42006d9a8b1; 4 x -> <lab folder>; 2 x -> stop
+scripts/watch.ps1: original 3198 B sha256 7254e15f2ad7c3b19ea6907568e553cc3a3b630e97d563c6010c85b4686c7060; 1 x -> <lab folder>
+scripts/client.py: original 4856 B sha256 1117b295e2e5f8ed35c96f4685ecfe2a4d1b515d19ec3ea7c6bfa5ab9557db8c; 1 x -> <build folder>; 1 x -> <lab folder>; 1 x -> lab-client; 4 x -> stop
+scripts/call.py: original 1211 B sha256 b36bfc337fc17d42cb289a8491bfe0c73be2b5d436e3ce9429f4a10b431c9b2c; 1 x -> <lab folder>
+scripts/one.py: original 938 B sha256 9f10f811db13d2b65967fa4630cc8eb6a493c74e1f5064593d0433997584e48c; 1 x -> '<lab folder>'
+scripts/step0.ps1: original 2326 B sha256 26f8c5564650c55771f45db618303d56aa7f5058d9f8548e0fddf8f0a0435882; 2 x -> <lab folder>
+scripts/launch-env.json: original 156 B sha256 bd204e112d9baa650dc561f0dd5dae3d35bd439b6a5d4320807866a081b73150; 1 x -> <lab folder>
+answers-mcp/001-list-companies.json: original 1569 B sha256 1911c4c0baabd211d4f708aac88bb795efbf4aba03ae875b52caaa711ac8c0e8 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers-mcp/002-s1-masters.json: original 32063 B sha256 50eaf5aa61239d7f870a15917031eb3eb3d3ab4f506a5c7afb92252bec907465 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers-mcp/003-B4R-masters.json: original 32063 B sha256 8eb09b1bc7be5aee52cea3d80fcf6a04fab179267605aed8e0fb56958adc9d57 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers-mcp/004-B5-masters.json: original 32063 B sha256 f4c5ebfdb2d6754d82f99c5c6bdafa379b11a73d7550867e129e1ff5a74fbd32 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers-mcp/005-B6-masters.json: original 32063 B sha256 ceacdf35ccedb922e5fa5190862e0082fb9ac03a9fc5fb0910a92376b03b530c (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers-mcp/006-s8-masters.json: original 32063 B sha256 5d717526d30928bb1e0c61134054a163740f3c8cc8c12dd57dcaa5a0bc90bde8 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+evidence/blocks.txt: company_number value replaced by "<redacted: company number>" in 3 logged call line(s)

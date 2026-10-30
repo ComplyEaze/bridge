@@ -79,6 +79,10 @@ mod stock_summary_tests;
 mod negative_stock;
 pub(crate) use negative_stock::{NegativeStockAnswer, NegativeStockReadError};
 
+#[path = "runtime_stock_by_godown.rs"]
+mod stock_by_godown;
+pub(crate) use stock_by_godown::{StockByGodownRead, StockByGodownReadError};
+
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;

@@ -873,6 +873,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             ),
         ),
         (
+            "stock_by_godown",
+            json!({"result":{"godowns":[{"godown":party_name("Customer One"),"value":"5.00"}],"root_items":[{"item":party_name("Supplier Two"),"state":"tied","godowns":[{"godown":party_name("Customer One"),"value":"5.00"}]}]}}),
+        ),
+        (
             "stock_summary",
             json!({"items":[{"name":party_name("Customer One"),"guid":"g-1","parent":party_name("Supplier Two"),"base_unit":"Box","closing":{"value":"2500.00"}}],"offset":0}),
         ),

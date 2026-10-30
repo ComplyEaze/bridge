@@ -109,6 +109,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "read_evidence",
         "sales_register",
         "statement_tie_out",
+        "stock_by_godown",
         "stock_summary",
         "tally_status",
         "trial_balance",
@@ -1813,9 +1814,14 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// Each budget went up by those 2,040 bytes and by the rise of its margin to the next
 /// thousand: 3,000, 2,000, 3,000 and 3,000 (margins 494, 991, 493 and 520 before; 1,454,
 /// 951, 1,453 and 1,480 after).
+/// On 31 Oct 2026 `stock_by_godown` (#2017), which is in the default list, added 1,422 bytes to
+/// every list: its entry is 1,421 bytes and a comma is 1. Its base measured 204,546, 230,362,
+/// 232,860 and 237,833 bytes, so with it the lists measure 205,968, 231,784, 234,282 and
+/// 239,255, over three budgets by 784, 282 and 255. Each budget went up by 1,500, leaving margins
+/// of 1,532, 716, 1,218 and 1,245.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [206_000, 231_000, 234_000, 239_000];
+const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 232_500, 235_500, 240_500];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

@@ -1,9 +1,11 @@
 //! One Sales invoice admission, and one read-back, run from the first request
 //! to the last against the scripted transport, on one book's answers only:
 //! BRIDGE PILOT LAB (the `pilot-lab` set; its PROVENANCE table is beside the
-//! fixtures). Every answer is Tally's own bytes, from three days of the book:
-//! the 9 Oct set, the company object (`O`, 12 Oct) and the rates read with the
-//! ledger catalogue it is paired with (21 Oct).
+//! fixtures). Every answer is Tally's own bytes, from three days of the book
+//! (the 9 Oct set, the company object `O` of 12 Oct and the ledger catalogue of
+//! 21 Oct), except the rates read `Q`, which is DERIVED: the lab's 21 Oct answer
+//! to the read restricted to the invoice ledgers' parents, cut to the invoice's
+//! ledgers (below).
 //!
 //! - The admission: the company list, the marks, the book extent, the
 //!   currencies, the ledger compliance listing, the paired listing, the

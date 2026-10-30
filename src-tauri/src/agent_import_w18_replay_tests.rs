@@ -110,8 +110,8 @@ fn w18_types_as_of_the_book(answer: &str) -> String {
 /// Tally's answer to one kind of read, from the W18 sittings, except the
 /// three DERIVED ones named below (`Q`, `X`, `Y`). The company list and the
 /// currencies are byte-equal to the 9 Oct answers the earlier replay already
-/// holds, and are read from there; so is the unrestricted rates listing (12 Oct
-/// 2026) that `Q` is cut from.
+/// holds, and are read from there; so is the 21 Oct 2026 answer to the rates
+/// read restricted to the invoice ledgers' parents, which `Q` is cut from.
 fn w18_plan(letter: char) -> ScenarioPlan {
     let bytes: &[u8] = match letter {
         's' => return status(),

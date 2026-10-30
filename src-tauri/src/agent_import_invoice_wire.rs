@@ -1095,14 +1095,14 @@ pub(super) fn parse_ledger_rates(
     parse_ledger_rates_and_rows(xml, company_guid, wanted).map(|(rates, _)| rates)
 }
 
-/// One row of a rate listing as the scope's coverage proof reads it: the
+/// One row of a rate listing as the scope's proof reads it: the
 /// row's `NAME` attribute, its GUID and its immediate `PARENT`, the last two
 /// as the answer wrote them (no cleaning, so the reserved root compares as the
 /// catalogue carries it).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ListedLedger {
     pub(super) name: String,
-    /// `None` when the row carries none: the coverage proof refuses it there,
+    /// `None` when the row carries none: the scope's proof refuses it there,
     /// and a rate read that asks for no proof is not stopped by it.
     pub(super) guid: Option<String>,
     pub(super) parent: Option<String>,
@@ -1128,9 +1128,11 @@ pub(super) fn parse_ledger_rates_and_rows(
         .all("COLLECTION")
         .next()
         .ok_or("invoice_read_collection_absent")?;
-    // A company always has ledgers (the invoice's own were read in the
-    // compliance listing before this one), so a listing with none is a read
-    // that went wrong, never "no ledger has a rate".
+    // The request names ledgers the catalogue of this check holds, and the
+    // compliance listing read before it holds them too, so an answer with none
+    // (the lab's answer to a filter naming no ledger of the book is a complete
+    // envelope with an empty collection) means the read went wrong or the
+    // ledgers went away since: never "no ledger has a rate". It fails closed.
     if collection.all("LEDGER").next().is_none() {
         return Err("invoice_ledger_rates_listing_empty");
     }

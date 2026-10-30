@@ -2053,8 +2053,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         | "invoice_ledger_scope_unplannable" => Some(
             "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers this invoice \
              names, by the identifier Tally gave each, and it could not name that read \
-             safely: a ledger has no group it can check the answer against (none, or one whose \
-             name holds a control character), or Tally gave it an identifier of another form. \
+             safely: a ledger has no group it can check the answer against (none, or one the \
+             ledger list could not carry: blank, over 1,024 bytes, or holding a control or \
+             invisible character), or Tally gave it an identifier of another form. \
              Where `detail` is shown it names the ledger or the cause. Nothing was written, and \
              building again gives the same refusal until the book changes. Ask the user to \
              check the group of the ledgers on the invoice in Tally, or tell them this invoice \

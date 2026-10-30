@@ -26,7 +26,9 @@ pub const LEDGER_GUID_FORMULA_NAME: &str = "BridgeInvoiceLedgers";
 pub const LEDGER_GUID_MAX_CHARS: usize = 64;
 
 /// The most GUIDs one part may name: the most terms an OR filter formula has
-/// been sent with (protocol reference section 11e, parent filters).
+/// been sent with, on parent filters of the ledger catalogue (protocol
+/// reference section 11e). A `$GUID` filter has been sent with five terms only
+/// (#1331); an invoice names a few ledgers, far under this bound.
 pub const LEDGER_GUID_PART_MAX_GUIDS: usize = 200;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

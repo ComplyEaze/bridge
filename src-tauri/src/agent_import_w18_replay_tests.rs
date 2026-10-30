@@ -61,7 +61,7 @@ fn w18_request_sha256(letter: char) -> &'static str {
         // `BRIDGE Svc 998313 5%`: the request the lab answered on 31 Oct 2026
         // (`pilot-lab-ledger-rates-guid.request`) with only its GUIDs changed to
         // these six ledgers' (DERIVED: not sent with these GUIDs).
-        'Q' => "a7ced791a7af67b3bcda6de614970891ebfb1ff82da8b9a580fafc6e12b654b2",
+        'Q' => super::super::super::tests::W18_INVOICE_GUID_RATES_SHA256,
         other => pilot_request_sha256(other),
     }
 }

@@ -71,14 +71,23 @@ fn synthetic(rows: &[(&str, &str)]) -> StandardLedgerCatalogV2 {
     let rows = rows
         .iter()
         .enumerate()
-        .map(|(index, (name, parent))| {
+        .map(|(index, (name, parent))| (*name, *parent, guid(index)))
+        .collect::<Vec<_>>();
+    synthetic_with_guids(&rows)
+}
+
+/// SYNTHETIC: a catalogue of `(name, parent, GUID)` rows.
+fn synthetic_with_guids(rows: &[(&str, &str, String)]) -> StandardLedgerCatalogV2 {
+    let rows = rows
+        .iter()
+        .map(|(name, parent, guid)| {
             format!(
                 "<LEDGER NAME=\"{}\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{}</GUID>\
                  <PARENT TYPE=\"String\">{}</PARENT><ISBILLWISEON TYPE=\"Logical\">No</ISBILLWISEON>\
                  <BRIDGECOMPANYGUID TYPE=\"String\">{PILOT_GUID}</BRIDGECOMPANYGUID>\
                  <BRIDGECOMPANYNAME TYPE=\"String\">{PILOT}</BRIDGECOMPANYNAME></LEDGER>",
                 name.replace('&', "&amp;").replace('"', "&quot;"),
-                guid(index),
+                guid,
                 parent.replace('&', "&amp;").replace('"', "&quot;"),
             )
         })
@@ -353,6 +362,40 @@ fn a_parent_no_filter_could_hold_is_read_and_compared_verbatim() {
         );
         assert!(!rendered(&scope).contains(parent), "{parent:?}");
     }
+}
+
+/// A ledger whose parent the catalogue cannot carry (here blank) has no
+/// parent the proof could compare its row with, so it names no read.
+#[test]
+fn a_ledger_whose_parent_the_catalogue_cannot_carry_is_refused() {
+    let catalogue = synthetic(&[("Customer", "   "), ("Sales", "Sales Accounts")]);
+    assert_eq!(
+        scope_of(&catalogue, &["Customer", "Sales"]).err(),
+        Some(refuse_ledger(
+            "invoice_ledger_parent_unnameable",
+            "Customer"
+        ))
+    );
+    assert!(scope_of(&catalogue, &["Sales"]).is_ok());
+}
+
+/// A GUID with a character outside the closed alphabet never reaches a
+/// request: the ledger is refused before any is made.
+#[test]
+fn a_ledger_whose_guid_is_of_another_form_is_refused() {
+    let catalogue = synthetic_with_guids(&[
+        (
+            "Customer",
+            "Sundry Debtors",
+            format!("{PILOT_GUID}-0000000z"),
+        ),
+        ("Sales", "Sales Accounts", guid(1)),
+    ]);
+    assert_eq!(
+        scope_of(&catalogue, &["Customer", "Sales"]).err(),
+        Some(refuse_ledger("invoice_ledger_guid_unnameable", "Customer"))
+    );
+    assert!(scope_of(&catalogue, &["Sales"]).is_ok());
 }
 
 #[test]

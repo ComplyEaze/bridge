@@ -371,8 +371,8 @@ fn mark_admits(mark: u64) -> bool {
 /// and still be built on: the whole compliance listing is a few kilobytes a
 /// ledger, so this keeps one read of it to a few megabytes. The listing's own
 /// size gate stays in front of it. The rate read is already narrowed to the named
-/// ledgers' parent groups (#1331); narrowing this listing the same way, so that
-/// large books can be admitted, waits for its own measurement.
+/// ledgers themselves, by GUID (#1331); reading this listing for the same
+/// ledgers, so that large books can be admitted, is the next change.
 const INVOICE_MAX_LEDGERS: u64 = 2_000;
 
 /// Why a book over the mark is refused on the company's own ledger count, or
@@ -2250,8 +2250,8 @@ impl InvoiceJudge<'_> {
             &self.named(),
         )
         .map_err(|code| Verdict::Failed(code.to_string()))?;
-        // A scoped read is believed only when its rows are exactly the
-        // catalogue's ledgers under those parents.
+        // A scoped read is believed only when its rows are exactly the named
+        // ledgers, with the catalogue's names and parents.
         scope.prove(&listed).map_err(refusing)?;
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {

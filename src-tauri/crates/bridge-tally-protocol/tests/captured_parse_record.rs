@@ -2721,8 +2721,8 @@ const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on t
      pin what each parse returns; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_PARENT_FILTER: &str =
     "an answer of the pilot lab's parent-filter round (10 Oct 2026), \
-     with no row here: the code no longer sends the parent filter (since #1331 the rate read \
-     names the invoice's ledgers by GUID), and the file is kept as the evidence the protocol \
+     with no row here: the invoice's rate read no longer sends the parent filter (since #1331 \
+     it names the invoice's ledgers by GUID), and the file is kept as the evidence the protocol \
      reference cites; the whole-book answer is still served by \
      src/agent_import_invoice_admission_tests.rs; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_LEDGER_FILTER: &str = "an answer of the pilot lab's ledger-filter round \

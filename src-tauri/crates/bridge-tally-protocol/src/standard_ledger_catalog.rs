@@ -1391,7 +1391,7 @@ fn safe_standard_ledger_parent(value: &str) -> Option<String> {
     Some(value.to_string())
 }
 
-fn unsafe_display_character(value: char) -> bool {
+pub(crate) fn unsafe_display_character(value: char) -> bool {
     value.is_control() || deceptive_display_character(value)
 }
 

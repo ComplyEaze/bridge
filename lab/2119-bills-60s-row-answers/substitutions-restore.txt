@@ -1,0 +1,3 @@
+The restore note's pushed copies that differ from the files kept on the lab PC (RESTORE.md: its times filled in), with what changed:
+scripts/restore-desktop.ps1: original 1442 B sha256 55d80f93969f8c48fceaaa08c37a6050b8af8a28aa7c6f45b4b0569718c34409; 1 x -> <lab folder>; 1 x -> <desktop config file>; 1 x -> <desktop extension settings folder>\
+scripts/restart-desktop.ps1: original 2342 B sha256 1acc50f2d36bf645c094125f704848066b481fb849dbb616c338e148b7a03244; 1 x -> <lab folder>; 1 x -> shell:AppsFolder\<desktop client AppID>; 1 x -> the desktop client; 4 x -> Get-Process <desktop client>; 5 x -> <desktop client>

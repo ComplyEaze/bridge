@@ -521,6 +521,17 @@ fn a_supplier_invoice_keyed_twice_is_set_aside_once_and_names_the_first_copy() {
     assert_eq!(listed["voucher_number"], "58", "{repeat}");
     assert_eq!(listed["repeats"]["voucher_number"], "57", "{repeat}");
     assert_eq!(listed["repeats"]["date"], "20251202");
+    let first = rows
+        .iter()
+        .find(|row| row["voucher_number"] == "57")
+        .unwrap();
+    assert_eq!(listed["repeats"]["guid"], first["guid"]);
+    // Dates, numbers and GUIDs name no party: `mask_parties` leaves the listing as it is.
+    let masked = gst_by_ledger_result(&index, &totals, Redaction::MaskParties);
+    assert_eq!(
+        masked["set_aside"]["repeats_a_purchase_bill"]["listed"],
+        repeat["listed"]
+    );
     // The optional and the cancelled copies stay apart, the Payment has no GST, and the
     // Journal lands on its expense ledger, as before.
     assert_eq!(result["vouchers_cancelled_optional_or_post_dated"], 2);
@@ -550,4 +561,110 @@ fn the_same_bill_name_of_another_supplier_ledger_makes_no_repeat() {
     let totals = fold(&index, &rows).unwrap();
     assert!(totals.set_aside.is_empty(), "{:?}", totals.set_aside);
     assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2);
+}
+
+/// Sets the one bill allocation of `number`'s supplier entry to `bill_type` against `name`.
+fn bill_of(rows: &mut [Value], number: &str, bill_type: &str, name: &str) {
+    let row = numbered(rows, number);
+    let party = row["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry["ledger"] == "SYN GS1 Supplier B")
+        .unwrap();
+    let bills = party["bill_allocations"].as_array_mut().unwrap();
+    assert_eq!(bills.len(), 1, "{bills:?}");
+    bills[0]["bill_type"] = json!(bill_type);
+    bills[0]["reference"] = json!({"kind": "named", "name": name});
+}
+
+/// Sets `number`'s entry on `ledger` to `amount`, adding the entry when it is not there.
+fn entry_of(rows: &mut [Value], number: &str, ledger: &str, amount: &str) {
+    let entries = numbered(rows, number)["amounts"].as_array_mut().unwrap();
+    match entries.iter_mut().find(|entry| entry["ledger"] == ledger) {
+        Some(entry) => entry["amount"] = json!(amount),
+        None => entries.push(json!({
+            "ledger": ledger,
+            "amount": amount,
+            "is_deemed_positive": if amount.starts_with('-') { "Yes" } else { "No" },
+            "bill_allocations": [],
+        })),
+    }
+}
+
+/// Journal 5 entered against Purchase 57's bill, with Purchase 57's tax: only a Purchase repeats
+/// a Purchase's bill, so the Journal stays on its expense ledger.
+#[test]
+fn a_journal_against_a_purchase_bill_with_its_tax_stays_attributed() {
+    let (index, mut rows) = december();
+    bill_of(&mut rows, "5", "Agst Ref", "GS1/P/0001");
+    entry_of(&mut rows, "5", "GS1 Rent", "-10000.00");
+    entry_of(&mut rows, "5", "Input CGST", "-900.00");
+    entry_of(&mut rows, "5", "Input SGST", "-900.00");
+    entry_of(&mut rows, "5", "SYN GS1 Supplier B", "11800.00");
+    let totals = fold(&index, &rows).unwrap();
+    assert_eq!(totals.ledgers["GS1 Rent"].vouchers, 1);
+    assert_eq!(
+        totals.set_aside[&SetAside::RepeatsAPurchaseBill].vouchers,
+        1
+    );
+}
+
+/// Purchase 58 with tax that differs from Purchase 57's is counted, whatever bill it is against.
+#[test]
+fn a_purchase_against_the_bill_with_other_tax_is_counted() {
+    let (index, mut rows) = december();
+    entry_of(&mut rows, "58", "Purchase - Goods", "-10200.00");
+    entry_of(&mut rows, "58", "Input CGST", "-800.00");
+    entry_of(&mut rows, "58", "Input SGST", "-800.00");
+    let totals = fold(&index, &rows).unwrap();
+    assert!(totals.set_aside.is_empty(), "{:?}", totals.set_aside);
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2);
+}
+
+/// Purchase 58 with a bill of its own beside its Agst Ref to Purchase 57's is counted.
+#[test]
+fn a_purchase_with_a_bill_of_its_own_is_counted() {
+    let (index, mut rows) = december();
+    let party = numbered(&mut rows, "58")["amounts"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|entry| entry["ledger"] == "SYN GS1 Supplier B")
+        .unwrap();
+    party["bill_allocations"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"reference": {"kind": "named", "name": "GS1/P/0009"}, "bill_type": "New Ref", "amount": "0.00"}));
+    let totals = fold(&index, &rows).unwrap();
+    assert!(totals.set_aside.is_empty(), "{:?}", totals.set_aside);
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 2);
+}
+
+/// Purchase 58 set aside for another reason keeps it: the repeat is decided after every other.
+#[test]
+fn a_repeat_set_aside_for_another_reason_keeps_that_reason() {
+    let (index, mut rows) = december();
+    entry_of(&mut rows, "58", "Purchase - Goods", "-9900.00");
+    entry_of(&mut rows, "58", "GS1 Freight Inward", "-100.00");
+    let totals = fold(&index, &rows).unwrap();
+    assert_eq!(
+        totals.set_aside.keys().copied().collect::<Vec<_>>(),
+        [SetAside::SeveralCounterLedgers]
+    );
+}
+
+/// Purchase 57 set aside for another reason opens no bill a repeat could match: Purchase 58 is
+/// counted, so the invoice's tax is not all set aside.
+#[test]
+fn a_first_copy_that_is_set_aside_makes_no_repeat() {
+    let (index, mut rows) = december();
+    entry_of(&mut rows, "57", "Purchase - Goods", "-9900.00");
+    entry_of(&mut rows, "57", "GS1 Freight Inward", "-100.00");
+    let totals = fold(&index, &rows).unwrap();
+    assert_eq!(
+        totals.set_aside.keys().copied().collect::<Vec<_>>(),
+        [SetAside::SeveralCounterLedgers]
+    );
+    assert_eq!(totals.ledgers["Purchase - Goods"].vouchers, 1);
 }

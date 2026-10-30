@@ -2390,6 +2390,166 @@
       "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "31a5b8979f1bed4e52698183ceebf8760763e0c41c33c56a1f3b6e3a718b12a6",
       "size": 6296
+    },
+    {
+      "blob": "6edab57ba8c6986983092bbb284f16cdad7e140a",
+      "capture_id": "stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture-answers at fbbdf3f2d212",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7bd4af7a4b3471909e4e6f914df601f8a273d347a485f316122a5a0ef1d83630",
+      "size": 36262
+    },
+    {
+      "blob": "2a81b9a93bb642cf0f9d7e8e1b618819f725f833",
+      "capture_id": "stock_movement_credit_note_inventory_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture at f85ed60ff87f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_credit_note_inventory_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "f97be461016a6449fea761894794305a938281a067ce18dd15106e5d1d538a3e",
+      "size": 1746
+    },
+    {
+      "blob": "da272667058d48e0dd979fb3fb104ce589d93cb0",
+      "capture_id": "stock_movement_credit_note_vouchers_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture-answers at fbbdf3f2d212",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_credit_note_vouchers_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a422ad9da84e1cd484b291f95c350e0888925020d12d9a9973dc8690e4360c0e",
+      "size": 50088
+    },
+    {
+      "blob": "b3334226db0625cb5de14f98c5d4a723faf73191",
+      "capture_id": "stock_movement_credit_note_vouchers_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture at f85ed60ff87f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_credit_note_vouchers_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a14716276f75252a17cfaaeeb5c98c1bc998a77a394fb444feb002836261ff18",
+      "size": 1740
+    },
+    {
+      "blob": "a16f3de93ddb6baf95bbf57bb212c966aebb2a3b",
+      "capture_id": "stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture-answers at a41171d8d1a9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6ffabc13d9f3faf9b9ac78505375f2508064cac6362b80efda3680f35791b8a0",
+      "size": 37356
+    },
+    {
+      "blob": "649f1b488e4e9165f87c6974e2de7166396331aa",
+      "capture_id": "stock_movement_delivery_note_inventory_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture at fc993a310215",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_delivery_note_inventory_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b89787fe6d834a8aaa1fe952fc3ca6827cd39dbf6860cb7c5c7a66b67bd4b0f6",
+      "size": 1746
+    },
+    {
+      "blob": "10987797890a051840239c3e2c4804af466080c8",
+      "capture_id": "stock_movement_delivery_note_vouchers_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture-answers at a41171d8d1a9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_delivery_note_vouchers_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "161b12649f74d3613a919751a47bd0bdc8d407a913b3a1a18db24893d1526b39",
+      "size": 49934
+    },
+    {
+      "blob": "7f884e74daa26eafe70eac0b7ce4ac8f5e8c7b06",
+      "capture_id": "stock_movement_delivery_note_vouchers_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture at fc993a310215",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_delivery_note_vouchers_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "9027b61e1d92f0945400ab59e944f024a63da055f3631ab3e2b112e4df917725",
+      "size": 1740
+    },
+    {
+      "blob": "45ba2ee2cab1b7966f70f0d8a69f59b1c8beb72f",
+      "capture_id": "stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture-answers at a41171d8d1a9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "f0506eb7b2ccb1dc832b9f5dee0ae0a07d875051d449d7330c35e2ce9d3db364",
+      "size": 37964
+    },
+    {
+      "blob": "b2f8651d556d5d59b8b6cb5a921ec26a6aaca8b1",
+      "capture_id": "stock_movement_receipt_note_inventory_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture at fc993a310215",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_receipt_note_inventory_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ef0c7878a490a80b9bde3f48c8029cd736a53d9242a6c59409536d408c2fce90",
+      "size": 1746
+    },
+    {
+      "blob": "73a4467b13b4bf3f1cb10dee63d744803453117d",
+      "capture_id": "stock_movement_receipt_note_vouchers_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture-answers at a41171d8d1a9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_receipt_note_vouchers_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "f1b52ec8d70b6039ef27ebeead0bf6de85734e8f55fca4b38b93164aed56e2a0",
+      "size": 50542
+    },
+    {
+      "blob": "338b372f215b9168ca5669173b9625f8d790fa54",
+      "capture_id": "stock_movement_receipt_note_vouchers_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-delivery-receipt-note-capture at fc993a310215",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_receipt_note_vouchers_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7bed0f954e4aed8a2f4885bb62fa4a787d64c0696f685b7056884337a602345a",
+      "size": 1740
+    },
+    {
+      "blob": "39349a9258cd5e8c65fe0fb9f63e71304d6cf53b",
+      "capture_id": "stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture-answers at fbbdf3f2d212",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "0d484496d5fa80932c484eb1e558dc05473fd6f30bf58fb70405e867335976ee",
+      "size": 36986
+    },
+    {
+      "blob": "1422ac5fb3b03f8e42f301ae8f5a5c60558d9705",
+      "capture_id": "stock_movement_stock_journal_inventory_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture at f85ed60ff87f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_stock_journal_inventory_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6311e6fbdd627d1be001a4252414ac5f7ac060bd05c181e8485ccccce525d897",
+      "size": 1746
+    },
+    {
+      "blob": "a8f07ab6feee95f82824aa2dac0a55b12aaa99e2",
+      "capture_id": "stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture-answers at fbbdf3f2d212",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b419dd9ab5eee12ea1eb7d4addea2a1c7dd97962bafba166754e2063d2317122",
+      "size": 6368
+    },
+    {
+      "blob": "8c9cd28dd644cda57731f681a8bd96972e4c3187",
+      "capture_id": "stock_movement_stock_journal_vouchers_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-movement-capture at f85ed60ff87f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_stock_journal_vouchers_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "29b26ce987b52fb28a5715d100aa26306ba55981fd2d7f891a1b4e2b2713a52e",
+      "size": 1740
     }
   ]
 }

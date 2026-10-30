@@ -24,7 +24,7 @@ Order: R1, R2, R3, R4, R5, R7, then R6 whenever the owner is at the PC (it may c
 
 The cut build is the Windows bundle `unsigned-bundle-smoke-windows-latest` of the Bridge CI run on master at RC COMMIT, the commit that holds the last change merged for 0.7.0; a master CI bundle may be downloaded by the lab (the owner's word of 29 Oct 2026). The lab downloads it into the new empty folder `C:\bridge-lab\rc070\build\`, checks the zip's sha256 against the artifact's digest, the `.mcpb` against `archive_sha256` and `bridge_mcp.exe` against `binary_sha256` in its `mcpb-smoke.json`, extracts the WHOLE `.mcpb` there (so the exe is `C:\bridge-lab\rc070\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe`, with `pdfium.dll` beside it), and sends the three hashes to the run coordinator. Every row runs this one exe, copied where a row says so: hash it before each row's first call and after its last; another hash = STOP.
 
-**Candidate A** (without #2158). If #2158 goes into 0.7.0, a candidate B is cut after its merge and this block is pointed at it by a new commit; nothing of candidate A carries over.
+**Candidate A** (without #2158). If #2158 goes into 0.7.0, a candidate B is cut after its merge and this block is pointed at it by a new commit; nothing of candidate A carries over. The owner decided on 30 Oct 2026 that #2158 moves to 0.8.0, so candidate A is the cut build.
 
 ```
 RC COMMIT:   026ba163dfcbf75d515a24d0dbbf14c5245534ec   (master, the merge of #2183)
@@ -122,7 +122,7 @@ THE DATE:      30 April 2026 (20260430): inside the books, before the lab PC's o
 MARKS WINDOW:  30 March 2026 to 31 March 2026 (two days that hold Journals; not THE DATE).
 C2 RAW MARKS:  lab confirms at step 0: the MARKS request file the lab's C2 step 0 uses, with THE COMPANY's name, its sha256 recorded at step 0.1, and GET /status by curl.exe as C2 c says.
 PART 2:        not available: no captured whole-refusal answer (the lab found no 7 Oct 2026 data folder holding one). R3 rests on Part 1; if Part 1 gives no whole refusal, the settle dialog stays covered by tests only, as #2150 says.
-GO-AHEAD:      <to fill by the run coordinator at the sitting>
+GO-AHEAD:      given by the run coordinator on the owner's decisions of 30 Oct 2026, about 12:15 IST (candidate A is the cut build; #2158 moves to 0.8.0)
 ```
 
 ## R4: the Bills report limit on the dense book (BLOCKING if #2158 is in the build)
@@ -130,7 +130,7 @@ GO-AHEAD:      <to fill by the run coordinator at the sitting>
 Runs only if `#2158` reads `in`. #2158 stays in 0.7.0 only on the owner's measurement of how long the desktop client's chat waits for one tool call on Windows, which the run coordinator records here:
 
 ```
-R4 HOST: <to fill: the desktop chat's measured limit on Windows, how and when measured, and whether steps 5 and 6 run>
+R4 HOST: not run: #2158 is not in 0.7.0 (the owner moved it to 0.8.0 on 30 Oct 2026), so its line reads `not in`, R4 is recorded "not run: not in the build", and steps 5 and 6 do not run
 ```
 
 `src/2119/RUN-SHEET.md`, a byte copy from `lab/2119-bills-60s-row` at c43ef6120c62ba7a480eadf3f639023e190817a4, which ran on #2158's own build (`lab/2119-bills-60s-row-answers` at da4015419b253cb8a40144ac35ebcc68b0686274: S1 answered in 76.9 s; the Windows Code tab host cut every call at 60 s, so that sheet's rules (d) and (e) held the limit for that host). On the release candidate it runs with these changes:
@@ -170,6 +170,7 @@ Runs only with the owner at the PC (#2107 is merged, so its line should read `in
 - **Marks, by the lab's own launch.** This launch opens no box (it makes reads only). After BK0 and before the owner's setup, the lab starts its own launch of the RC exe (writes off, data folder `C:\bridge-lab\rc070\r6\lab-data\`): `list_companies` (EXPECT BRIDGE BATCH LAB alone) and `ledger_masters` (basic): M0 and V0. It stops that launch before part D. After part D and the owner's restore, it starts it again on the same folder: `ledger_masters` (basic): EXPECT M0 and V0 (a moved mark = FAIL, as the source's "A write in the book" says), then stops it.
 - **Part D, made concrete.** Before the lab starts part D, the owner points the desktop client's ComplyEaze Bridge entry at the R6 exe with `BRIDGE_AGENT_ENABLE_WRITES` `true`, `BRIDGE_AGENT_DATA_DIR` `C:\bridge-lab\rc070\r6\data` (new, empty) and the other keys of rule 1; records the configuration's sha256 before and after; and restarts the desktop client. Then, in a new chat of the desktop client, the owner asks it to call `build_import_xml` with the content of `requests\build-1591-s1.json` as its arguments (EXPECT `voucher_count` 1, as S3), and then `post_import` with that `company_guid` and the returned `batch_id`. In that chat each tool approval is "Allow once", and only for exactly those two calls; any other call is denied and recorded. The lab pre-arms the trace and the probes as in S4 (the title click to T0 as there); the owner makes the one click into Tally at T0+16 (±2 s) as in S6, and answers **No** by mouse before T0+38. Record `exstyle`, `topmost`, the foreground and the rectangle from the trace and probes at T0+3, +8 and +13 and at C+0 and C+6, and the call's final answer (EXPECT `import_approval_declined`, nothing sent). After the lab's part D notes are written, the owner puts the entry back as it was before the setup (its sha256 equal to the one recorded before) and restarts the desktop client. Then the lab's B5 leftover check once more: EXPECT none.
 - **Reading it.** As the source sheet's table: topmost 1 in every read and the box above Tally after the click = the fix holds under the desktop client.
+- **What its result decides.** R6's result, whatever it is, does not reopen the build or hold the tag: the follow-up for the box under the desktop client (#2193) ships in 0.8.0 either way (the owner's decision of 30 Oct 2026). The result goes into the release notes and to #2193.
 - **Evidence** in `R6/` (rule 8).
 
 ## R7: a ledger asked for by its alias (#1688; not blocking)

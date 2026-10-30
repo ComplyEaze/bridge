@@ -287,6 +287,7 @@ const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const PILOT_LAB_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 const GST_LEDGER_LAB_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const NESTED_STOCK_GUID: &str = "4b6094e2-d6db-46b6-a4ad-90c283cd1b52";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
@@ -576,6 +577,30 @@ const ROWS: &[Row] = &[
         parse: |_, text| gateway(text),
     },
     Row {
+        fixture: "tests/fixtures/agent/amend-now-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/amend-now-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
         fixture: "tests/fixtures/agent/l1-reentry-company-extent.utf16le.xml",
         source: Source::Captured,
         parser: "parse_companies_from_collection",
@@ -697,6 +722,18 @@ const ROWS: &[Row] = &[
                 text,
                 "tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml",
                 REGISTER_LAB_GUID,
+            )
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_book_extent_v2(PILOT LAB)",
+        parse: |_, text| {
+            extent_v2(
+                text,
+                "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
+                PILOT_LAB_GUID,
             )
         },
     },
@@ -2081,6 +2118,12 @@ const ROWS: &[Row] = &[
         parse: |_, text| ledger_snapshot_for(text, REGISTER_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-ledgers-paired.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_for_company(PILOT LAB)",
+        parse: |_, text| ledger_snapshot_for(text, PILOT_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-P-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot_for_company(GST LEDGER LAB)",
@@ -3065,6 +3108,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/agent/amend-now-company-high-water.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
         "tests/fixtures/agent/post-span-company-high-water-after.utf16le.xml",
         APP_HIGH_WATER,
     ),
@@ -3251,6 +3298,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_CENSUS,
     ),
     (
+        "tests/fixtures/agent/amend-now-d3-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/amend-now-wa1-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
         "tests/fixtures/agent/register-e2e/native-register-e2e-census.utf16le.xml",
         APP_CENSUS,
     ),
@@ -3336,6 +3395,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VERIFICATION,
     ),
     (
+        "tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
         "tests/fixtures/agent/l1-reentry-import-verification.utf16le.xml",
         APP_VERIFICATION,
     ),
@@ -3406,6 +3473,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/register-e2e/native-register-e2e-window.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-window.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

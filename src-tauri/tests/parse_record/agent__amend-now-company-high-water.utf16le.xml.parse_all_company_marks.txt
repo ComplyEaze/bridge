@@ -1,0 +1,11 @@
+# fixture: agent/amend-now-company-high-water.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE AMEND LAB",
+        guid: "17a10910-773c-42c6-bd66-7bba9a392536",
+        vouchers: 1829,
+        masters: 245,
+    },
+])

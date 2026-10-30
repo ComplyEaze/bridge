@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml
+# parser: parse_companies_from_collection
+# source: captured
+Ok([
+    TallyCompany {
+        name: "BRIDGE PILOT LAB",
+        guid: Some(
+            "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+        ),
+        company_number: Some(
+            "100033",
+        ),
+        books_from: Some(
+            "20260401",
+        ),
+    },
+])

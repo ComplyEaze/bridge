@@ -731,16 +731,16 @@ const WA1_BATCH: &str = "bridge-78ce4328-9c2a-4827-8584-821d6d656b40";
 /// batch's.
 fn wa1_payment_readback() -> Vec<ScenarioPlan> {
     let extent = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-company-extent.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-extent.utf16le.xml"
     ));
     let high_water = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-company-high-water.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-high-water.utf16le.xml"
     ));
     let census = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-voucher-census.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-voucher-census.utf16le.xml"
     ));
     let readback = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-import-verification.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml"
     ));
     "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
         .chars()
@@ -754,12 +754,10 @@ fn wa1_payment_readback() -> Vec<ScenarioPlan> {
         .collect()
 }
 
-/// The census the payment capture recorded at the mark 1,676, sent unspanned.
-/// The call now sends it spanned, `(0, 1676]` (#2145). The lab sent that request
-/// on 30 Oct 2026 after the book had moved, and an answer captured for the
-/// unspanned census may not stand in for it (#899), so this replay stays red
-/// until the capture is recorded again with the spanned request, in 2145-R.
-const WA1_CENSUS: &str = "bad372eab88eed8009e302e573309d34aba6edf3fdb2da8a6b4bc2b1330ec7eb";
+/// The census of the payment's day as the call sends it on the book as it is
+/// now: spanned to the voucher mark it reads, `(0, 1829]` (#2145), answered from
+/// the capture of 30 Oct 2026 (`amend-now-*`).
+const WA1_CENSUS: &str = "25bc466bb18f857973c144c8e8c93ba88c435a79ee17db6a5839a5c54159e5dc";
 
 /// The sha256 of each request that capture carried, in the same order; `None`
 /// for the status probe. The extent and high-water requests are the d3
@@ -777,16 +775,29 @@ fn wa1_payment_requests() -> Vec<Option<&'static str>> {
         .collect()
 }
 
-/// The review shows each entry of the voucher exactly as the post dialog
-/// showed it for the same voucher (#730): the post dialog's lines, rendered
-/// from the post's own journal, are each a line of the review, read back from
-/// Tally's capture. Tally sent the debit as `-1.00`, so this proves the sign
-/// and the digits: a canonical negation would read `Dr 1`.
+/// The captured payment read back on 30 Oct 2026, after it was marked Optional
+/// in Tally (fixtures `amend-now-wa1-*`). A review admits only a voucher that
+/// reads back matched, not cancelled or optional, so the review is refused
+/// before any dialog and nothing is recorded. (Read back on 26 Sep 2026, before
+/// that change, the same voucher's review showed each entry as the post dialog
+/// had, #730; that capture holds only the unspanned census, so it no longer
+/// answers the call, #2145.)
 #[tokio::test]
-async fn the_review_shows_each_entry_as_the_post_dialog_did() {
-    let mut plans = wa1_payment_readback();
-    plans.extend(wa1_payment_readback());
-    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+async fn a_review_of_the_payment_marked_optional_in_tally_is_refused() {
+    let readback = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml"
+    ));
+    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-0000064e</GUID>";
+    assert_eq!(readback.matches(guid).count(), 1);
+    let start = readback[..readback.find(guid).unwrap()]
+        .rfind("<VOUCHER ")
+        .unwrap();
+    let end = start + readback[start..].find("</VOUCHER>").unwrap();
+    assert!(
+        readback[start..end].contains(r#"<ISOPTIONAL TYPE="Logical">Yes</ISOPTIONAL>"#),
+        "the payment reads back as Optional"
+    );
+    let simulator = SequenceSimulator::spawn(with_sentinel(wa1_payment_readback())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let origin =
@@ -810,13 +821,6 @@ async fn the_review_shows_each_entry_as_the_post_dialog_did() {
     for record in ["masters_check", "masters_doubt"] {
         fs::write(imports.join(format!("{WA1_BATCH}.{record}.json")), DOUBT).unwrap();
     }
-    let line = server
-        .import_ledger()
-        .unwrap()
-        .into_iter()
-        .find(|line| line.batch_id == WA1_BATCH)
-        .unwrap();
-    let post = admit_fresh_saved_voucher(&line, &server.settings.endpoint).unwrap();
     let approval = ScriptedApproval::approving();
     let response = acknowledge(
         &server,
@@ -824,30 +828,17 @@ async fn the_review_shows_each_entry_as_the_post_dialog_did() {
         approval.clone(),
     )
     .await;
-    assert!(
-        response["structuredContent"]["result"]["error"].is_null(),
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ack_readback_not_matched",
         "{response}"
     );
-    assert_eq!(approval.reviews().len(), 1, "{response}");
-    let review = &approval.reviews()[0];
-    let entries = post
-        .lines()
-        .filter(|line| line.starts_with("Dr ") || line.starts_with("Cr "))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        entries,
-        ["Dr 1.00  \"Test Expense B\"", "Cr 1.00  \"Cash\""],
-        "{post}"
-    );
-    for entry in entries {
-        assert!(
-            review.lines().any(|line| line == entry),
-            "{entry}: {review}"
-        );
-    }
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
+    assert!(!imports
+        .join(format!("{WA1_BATCH}.masters_ack.json"))
+        .exists());
     // Every request Bridge sent is the one the capture answered.
     let requests = sent(simulator);
-    let expected = [wa1_payment_requests(), wa1_payment_requests()].concat();
+    let expected = wa1_payment_requests();
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
     for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
         match expected {
@@ -1214,16 +1205,53 @@ fn d3_batch_readback() -> Vec<ScenarioPlan> {
     ])
 }
 
+/// The order of one `verify_import` of that batch as captured on 26 Sep 2026.
+const D3_ORDER: &str = "SEESESEHSHSEECSCSEEVSVSEEVSVSE";
+
+/// The order of the same call on the book as it is now: the captured order, then
+/// a status probe and the company extents once more, which the call reads
+/// because one of the batch's vouchers is no longer found.
+const D3_NOW_ORDER: &str = "SEESESEHSHSEECSCSEEVSVSEEVSVSESE";
+
+/// One `verify_import` of that batch as the book holds it now, answered from the
+/// spanned capture of 30 Oct 2026 (fixtures `amend-now-*`, one read of each
+/// request; a repeat of a request is answered as the first).
+fn d3_readback_now() -> Vec<ScenarioPlan> {
+    d3_readback_in(D3_NOW_ORDER, [
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-extent.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-high-water.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-voucher-census.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml"
+        ),
+    ])
+}
+
 /// One `verify_import` of that batch in the captured order, answered from one
 /// capture's extent, high-water, census and verification responses.
-fn d3_readback_of([extent, high_water, census, readback]: [&[u8]; 4]) -> Vec<ScenarioPlan> {
+fn d3_readback_of(responses: [&[u8]; 4]) -> Vec<ScenarioPlan> {
+    d3_readback_in(D3_ORDER, responses)
+}
+
+/// One `verify_import` of that batch in `order`, answered from one capture's
+/// extent, high-water, census and verification responses.
+fn d3_readback_in(
+    order: &str,
+    [extent, high_water, census, readback]: [&[u8]; 4],
+) -> Vec<ScenarioPlan> {
     let (extent, high_water, census, readback) = (
         captured(extent),
         captured(high_water),
         captured(census),
         captured(readback),
     );
-    "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
+    order
         .chars()
         .map(|step| match step {
             'S' => status(),
@@ -1235,19 +1263,17 @@ fn d3_readback_of([extent, high_water, census, readback]: [&[u8]; 4]) -> Vec<Sce
         .collect()
 }
 
-/// The census the 50-voucher batch's capture recorded at the mark 1,469 and the
-/// cancelled-voucher capture at 1,685, the same request sent unspanned. Each call
-/// now sends it spanned to its own mark (#2145). The lab sent both spanned
-/// requests on 30 Oct 2026, after the book had moved past both marks, and an
-/// answer captured for the unspanned census may not stand in for a spanned one
-/// (#899), so these replays stay red until both captures are recorded again
-/// with the spanned requests, in 2145-R.
-const D3_CENSUS: &str = "5a9690e84fef530985b2444a0bc66cd5784a4467571da04e31559c72c6ba11f1";
+/// The census of the batch's day as the call sends it on the book as it is now:
+/// spanned to the voucher mark it reads, `(0, 1829]` (#2145). The captures of
+/// 26 Sep 2026 hold only the unspanned census, and an answer captured for it may
+/// not stand in for the spanned one (#899), so the replays that check every
+/// request use the capture of 30 Oct 2026 (`amend-now-*`).
+const D3_CENSUS: &str = "c67e0560197126e4226c4144ba6051146f9b7f46c9ecf25671456c95baf512a5";
 
-/// The sha256 of each request that capture carried, in the same order; `None`
-/// for the status probe.
-fn d3_batch_requests() -> Vec<Option<&'static str>> {
-    "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
+/// The sha256 of each request of the call in `order`; `None` for the status
+/// probe.
+fn d3_requests(order: &str) -> Vec<Option<&'static str>> {
+    order
         .chars()
         .map(|step| match step {
             'S' => None,
@@ -1283,17 +1309,18 @@ fn d3_server(simulator: &SequenceSimulator, directory: &std::path::Path) -> Serv
     server
 }
 
-/// A person reviews the doubted 50-voucher batch through the whole path: the
-/// read, the dialog, the second read and the write. The record binds every
-/// voucher as Tally holds it, in batch order, and a later readback reports it
-/// current. The step doubt is a local record written here; every Tally
+/// A person asks to review the doubted 50-voucher batch on the book as it is now
+/// (fixtures `amend-now-*`, read back on 30 Oct 2026): since the post, one of
+/// its vouchers was cancelled in Tally and another deleted. A batch review
+/// admits only a batch whose every voucher reads back once, matched and not
+/// cancelled, so it is refused before any dialog and nothing is recorded.
+/// (Read back on 26 Sep 2026, before those changes, the review bound all fifty;
+/// that capture holds only the unspanned census, so it no longer answers the
+/// call, #2145.) The step doubt is a local record written here; every Tally
 /// response is captured, and every request sent equals the captured one.
 #[tokio::test]
-async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
-    let mut plans = d3_batch_readback();
-    plans.extend(d3_batch_readback());
-    plans.extend(d3_batch_readback());
-    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+async fn a_review_of_the_50_voucher_batch_after_a_cancel_and_a_delete_in_tally_is_refused() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_now())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = d3_server(&simulator, directory.path());
     let imports = server.imports_dir().unwrap();
@@ -1312,88 +1339,25 @@ async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
         .unwrap(),
     )
     .unwrap();
-    let args = json!({"company_guid":D3_GUID,"batch_id":D3_BATCH,"doubt":"batch_step"});
     let approval = ScriptedApproval::approving();
-
-    let response = acknowledge(&server, args.clone(), approval.clone()).await;
-    assert!(
-        response["structuredContent"]["result"]["error"].is_null(),
+    let response = acknowledge(
+        &server,
+        json!({"company_guid":D3_GUID,"batch_id":D3_BATCH,"doubt":"batch_step"}),
+        approval.clone(),
+    )
+    .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ack_readback_not_matched",
         "{response}"
     );
-    assert_eq!(approval.reviews().len(), 1, "{response}");
-    // The dialog's title names the fifty vouchers it shows (#746).
-    assert_eq!(approval.review_counts(), [50], "{response}");
-    let review = &approval.reviews()[0];
-    for shown in [
-        "Record that you reviewed 50 vouchers in \"BRIDGE AMEND LAB\"",
-        "its voucher mark moved by 51 (from 1419 to 1470); Tally reported creating 50.",
-        "Dates: 1-Apr-2026 to 1-Apr-2026  ALTERIDs: 1420 to 1469",
-        "Dr 1275  Cr 0  50 entries  \"Test Expense B\"",
-        "Dr 0  Cr 1275  50 entries  \"Cash\"",
-        "I reviewed these 50 vouchers in Tally.",
-    ] {
-        assert!(review.contains(shown), "{shown}: {review}");
-    }
-
-    // The batch record: version 2, the step doubt, every voucher in order.
-    let record: Value = serde_json::from_slice(
-        &fs::read(imports.join(format!("{D3_BATCH}.batch_step_ack.json"))).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(record["version"], 2, "{record}");
-    assert_eq!(record["doubt"], "batch_step");
-    assert_eq!(
-        record["doubt_sha256"],
-        crate::agent::sha256_hex(&serde_json::to_vec(&step).unwrap())
-    );
-    let vouchers = record["vouchers"].as_array().unwrap();
-    assert_eq!(
-        vouchers
-            .iter()
-            .map(|voucher| (
-                voucher["bridge_txn_id"].as_str().unwrap().to_string(),
-                voucher["alter_id"].as_u64().unwrap()
-            ))
-            .collect::<Vec<_>>(),
-        (1..=50)
-            .map(|index| (format!("D3-{index:03}"), 1419 + index))
-            .collect::<Vec<_>>()
-    );
+    assert!(approval.reviews().is_empty(), "no dialog: {response}");
     assert!(!imports
-        .join(format!("{D3_BATCH}.masters_ack.json"))
+        .join(format!("{D3_BATCH}.batch_step_ack.json"))
         .exists());
-
-    // A later readback keeps the batch's verdict and reports the review.
-    let verified = server
-        .call_tool(
-            "verify_import",
-            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
-        )
-        .await;
-    let result = &verified["structuredContent"]["result"];
-    assert_eq!(result["counts"]["posted_verified"], 50, "{verified}");
-    assert_eq!(
-        result["dispatch"]["state"], "reconciliation_required",
-        "{verified}"
-    );
-    assert_eq!(
-        result["operator_review"]["batch_step"]["state"], "current",
-        "{verified}"
-    );
-    assert_eq!(
-        result["operator_review"]["masters"],
-        Value::Null,
-        "{verified}"
-    );
 
     // Every request Bridge sent is the one the capture answered.
     let requests = sent(simulator);
-    let expected = [
-        d3_batch_requests(),
-        d3_batch_requests(),
-        d3_batch_requests(),
-    ]
-    .concat();
+    let expected = d3_requests(D3_NOW_ORDER);
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
     for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
         match expected {
@@ -1404,27 +1368,15 @@ async fn a_review_of_the_captured_50_voucher_batch_binds_every_voucher() {
 }
 
 /// The same batch read back after a person cancelled D3-003 in Tally's own
-/// screen (Alt+X), captured at the wire in one run (fixtures `d3-cancelled-*`).
-/// Tally keeps the cancelled voucher's number and marker but drops its ledger
-/// entries, so its content can never match the build; it must still read as
-/// cancelled, not as a content change (bridge#758).
+/// screen (Alt+X): the book as it is now, read on 30 Oct 2026 (fixtures
+/// `amend-now-*`; `d3-cancelled-*` is the same cancel read on 26 Sep 2026, before
+/// D3-005 was deleted, holding only the unspanned census, #2145). Tally keeps
+/// the cancelled voucher's number and marker but drops its ledger entries, so
+/// its content can never match the build; it must still read as cancelled, not
+/// as a content change (bridge#758).
 #[tokio::test]
 async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
-    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
-        include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml"
-        ),
-        include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml"
-        ),
-        include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-voucher-census.utf16le.xml"
-        ),
-        include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml"
-        ),
-    ])))
-    .unwrap();
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_now())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = d3_server(&simulator, directory.path());
 
@@ -1437,14 +1389,16 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
     let result = &verified["structuredContent"]["result"];
     assert_eq!(result["counts"]["posted_not_effective"], 1, "{verified}");
     assert_eq!(result["counts"]["posted_divergent"], 0, "{verified}");
-    assert_eq!(result["counts"]["posted_verified"], 49, "{verified}");
-    // The one voucher not verified is D3-003, reported as cancelled.
+    assert_eq!(result["counts"]["posted_verified"], 48, "{verified}");
+    assert_eq!(result["counts"]["not_found"], 1, "{verified}");
+    // D3-003 is reported as cancelled; D3-005, deleted since, is not found.
     assert_eq!(
         result["unverified_vouchers"],
         json!([{"bridge_txn_id":"D3-003","status":"posted_not_effective","marker":"narration_tag",
             "reason":"voucher_cancelled","diffs":[],"voucher_number":"3",
             "guid":"17a10910-773c-42c6-bd66-7bba9a392536-00000550","master_id":"1360","alter_id":1685,
-            "effective_copies_observed":{"count":0,"entries":[],"attribution":"not_established"}}]),
+            "effective_copies_observed":{"count":0,"entries":[],"attribution":"not_established"}},
+            {"bridge_txn_id":"D3-005","status":"not_found"}]),
         "{verified}"
     );
     assert_eq!(
@@ -1454,7 +1408,7 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
     let markdown = fs::read_to_string(&server.current_proof_paths(D3_BATCH)[1]).unwrap();
     assert!(
         markdown
-            .contains("Readback counts: matching 49, divergent 0, not effective 1, not found 0"),
+            .contains("Readback counts: matching 48, divergent 0, not effective 1, not found 1"),
         "{markdown}"
     );
     assert!(
@@ -1475,7 +1429,7 @@ async fn a_voucher_cancelled_in_tally_reads_not_effective_not_divergent() {
 
     // Every request Bridge sent is the one the capture answered.
     let requests = sent(simulator);
-    let expected = d3_batch_requests();
+    let expected = d3_requests(D3_NOW_ORDER);
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
     for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
         match expected {
@@ -1749,7 +1703,7 @@ async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown
 #[tokio::test]
 async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
     let readback = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml"
     ));
     let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000551</GUID>";
     assert_eq!(readback.matches(guid).count(), 1);
@@ -1790,15 +1744,15 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
         .encode_utf16()
         .flat_map(u16::to_le_bytes)
         .collect::<Vec<_>>();
-    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
+    let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_in(D3_NOW_ORDER, [
         include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-extent.utf16le.xml"
         ),
         include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-company-high-water.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-high-water.utf16le.xml"
         ),
         include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-cancelled-voucher-census.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-voucher-census.utf16le.xml"
         ),
         &derived,
     ])))
@@ -1814,7 +1768,8 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
         .await;
     let result = &verified["structuredContent"]["result"];
     assert_eq!(result["counts"]["posted_not_effective"], 2, "{verified}");
-    assert_eq!(result["counts"]["posted_verified"], 48, "{verified}");
+    assert_eq!(result["counts"]["posted_verified"], 47, "{verified}");
+    assert_eq!(result["counts"]["not_found"], 1, "{verified}");
     let unverified = result["unverified_vouchers"]
         .as_array()
         .unwrap()
@@ -1825,7 +1780,8 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
         unverified,
         [
             (Some("D3-003"), Some("voucher_cancelled")),
-            (Some("D3-004"), Some("voucher_cancelled"))
+            (Some("D3-004"), Some("voucher_cancelled")),
+            (Some("D3-005"), None)
         ],
         "{verified}"
     );
@@ -1840,7 +1796,7 @@ async fn two_cancelled_vouchers_of_one_date_and_type_are_not_duplicates() {
         "{verified}"
     );
     let requests = sent(simulator);
-    let expected = d3_batch_requests();
+    let expected = d3_requests(D3_NOW_ORDER);
     assert_eq!(requests.len(), expected.len(), "{requests:?}");
     for (index, (request, expected)) in requests.iter().zip(expected).enumerate() {
         match expected {

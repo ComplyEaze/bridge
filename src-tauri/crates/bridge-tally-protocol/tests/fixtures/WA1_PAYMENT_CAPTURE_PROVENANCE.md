@@ -48,8 +48,10 @@ Since #2145 the call sends this census spanned to the voucher mark it read, `(0,
 ` AND $AlterID &gt; 0 AND $AlterID &lt;= 1676` added to its census formula and nothing else changed, sha256
 `1d4b71cc24fe52cebb805ddf6f12442b0ae2717d381da01317e2631b5af9f748` (`requests/a-wa1_c2_spanned_0_1676.request.utf16le.xml`
 on the run sheet `lab/2145-spanned-census-captures` at `6a968f01`). This capture holds no answer to that request, and an
-answer captured for the unspanned census may not stand in for it (#899). The replay therefore still pins the recorded
-request, and fails until the capture is re-recorded spanned in 2145-R.
+answer captured for the unspanned census may not stand in for it (#899). The review test of this payment, which pins every request,
+therefore no longer reads this capture: the book was read again on 30 Oct 2026 with the census spanned
+(`AMEND_NOW_CAPTURE_PROVENANCE.md`), and that test now reads it and pins the book as it is now. This capture is kept for
+the tests that do not send the census.
 
 The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026, one after the other
 (`lab/2145-spanned-census-captures-answers` at `993d96bc`), after the book had moved on: its voucher mark read 1829. The

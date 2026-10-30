@@ -42,8 +42,10 @@ Since #2145 the call sends this capture's census spanned to the voucher mark it 
 request with ` AND $AlterID &gt; 0 AND $AlterID &lt;= 1469` added to its formula and nothing else changed, sha256
 `3ae647206cdff8225eaaa74582c87ffb8a14a3cf6f7eb37df220987f3499f6d5` (`requests/a-d3batch_c2_spanned_0_1469.request.utf16le.xml`
 on the run sheet `lab/2145-spanned-census-captures` at `6a968f01`). This capture holds no answer to that request, and an
-answer captured for the unspanned census may not stand in for it (#899). The replay therefore still pins the recorded
-request, and fails until the capture is re-recorded spanned in 2145-R.
+answer captured for the unspanned census may not stand in for it (#899). The batch review test, which pins every request,
+therefore no longer reads this capture: the book was read again on 30 Oct 2026 with the census spanned
+(`AMEND_NOW_CAPTURE_PROVENANCE.md`), and that test now reads it and pins the book as it is now. This capture is kept for
+the tests that do not send the census.
 
 The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026 (`lab/2145-spanned-census-captures-answers`
 at `993d96bc`), after the book had moved on: its voucher mark read 1829. Three of the capture's vouchers now carry ALTERIDs

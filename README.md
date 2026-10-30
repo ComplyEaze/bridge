@@ -108,7 +108,7 @@ With posting turned on in the extension, two more appear: `post_import` posts on
 after you approve it in a ComplyEaze Bridge window (for a batch, its summary), and `acknowledge_post_review` asks you, in its own window, to record that you reviewed a posted voucher
 whose ledger now points to a different master.
 
-The Claude Desktop extension has no setting for master writes. When posting is on and `BRIDGE_AGENT_ENABLE_MASTER_WRITES=true` is also set, two more appear that create one new ledger: `prepare_ledger_creates` checks the name against the company's ledgers, groups and aliases and writes nothing to Tally, and `post_ledger_creates` sends the create once after you approve it in a ComplyEaze Bridge window and reads the book back. It was run once on a synthetic company on TallyPrime 7.1 Silver; the build of this release has not been run. The [guide](docs/agent/README.md) has the limits.
+The Claude Desktop extension has no setting for master writes. When posting is on and `BRIDGE_AGENT_ENABLE_MASTER_WRITES=true` is also set, two more appear that create one new ledger: `prepare_ledger_creates` checks the name against the company's ledgers, groups and aliases and writes nothing to Tally, and `post_ledger_creates` sends the create once after you approve it in a ComplyEaze Bridge window and reads the book back. It was run once on a synthetic company on TallyPrime 7.1 Silver, and once on the release-candidate package of 0.7.0 on TallyPrime 7.2 Silver (30 October 2026). The [guide](docs/agent/README.md) has the limits.
 
 ## How it handles your books
 
@@ -297,6 +297,18 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   `audit_test_run` with its setting on, any other read. Record:
   [`lab/061-post-publish-answers`](https://github.com/ComplyEaze/bridge/tree/647a64014ce7369acc611b7adc3de63bd80df708/lab/061-post-publish-answers)
   at commit `647a64014ce7369acc611b7adc3de63bd80df708`.
+- The release-candidate package of 0.7.0 for Windows, on 30 October 2026: the CI package of master commit
+  `026ba163dfcbf75d515a24d0dbbf14c5245534ec`, which holds every code change of 0.7.0 (`bridge-tally.mcpb` SHA-256
+  `ec689fd7a664c9d36146648f5839c9d1487cc2d18ba3d5bcd14681e0b8a33bb8`, `bridge_mcp.exe` SHA-256
+  `576cc0c5aab4e72c43c05799116d76a29429c595a86dd54834d841c551f50d7c`; it reports version 0.6.1, because the version change
+  merges after it), started directly by our test client (not installed in Claude Desktop), against licensed TallyPrime 7.2
+  Silver, each row on its own synthetic company. The live pass of writes (one approved post, posted and verified, and a batch
+  refused before its approval box), one ledger create (declined with nothing sent, then created and read back as
+  `posted_verified`), the cost-centre summary of `vouchers` and a ledger asked for by its alias all passed. Not run: the
+  settle dialog on a whole refusal (Tally's period lock needs user security), the approval boxes with Claude Desktop as the
+  server's parent, the macOS package, and the published 0.7.0 file. Record:
+  [`lab/0.7.0-rc-sitting-answers`](https://github.com/ComplyEaze/bridge/tree/ed05b6ff200e4a8f5390b9482d4e73af1cf3b160/lab/0.7.0-rc-sitting-answers)
+  at commit `ed05b6ff200e4a8f5390b9482d4e73af1cf3b160`.
 - The bank-statement path through its fourth step, on a Mac, on 4 and 5 October
   2026, with that same CI-built 0.4.2 candidate (installed on 3 October; not the
   published file), against licensed TallyPrime Silver 7.1 holding the lab's own
@@ -318,8 +330,8 @@ hosted CI runners for Windows x64 and Apple Silicon Mac.
 
 ## Not in the latest release
 
-- Stock quantities of items inside a stock group, and stock reads on books with many masters of any kind; sales,
-  purchase or tax posting; creating masters; bill-wise allocation
+- Stock reads on books with many masters of any kind; sales, purchase or tax posting; creating any master but one
+  ledger at a time (which needs a setting the Claude Desktop extension does not offer); bill-wise allocation
 - TallyPrime Education mode: the trial balance, Profit and Loss, Balance Sheet, the
   cash flow, the month register, `company_features`, the stock summary and the
   `masters` read are refused; so is a read of vouchers,

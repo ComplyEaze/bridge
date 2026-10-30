@@ -4,13 +4,13 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>What it can do: ComplyEaze Bridge</title>
-<meta name="description" content="Every tool ComplyEaze Bridge 0.7.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the four only with posting or master writes on." />
+<meta name="description" content="Every tool ComplyEaze Bridge 0.7.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the four only with posting on, two of them only with master writes on as well." />
 <link rel="canonical" href="https://bridge.complyeaze.com/capabilities.html" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="ComplyEaze Bridge" />
 <meta property="og:locale" content="en_IN" />
 <meta property="og:title" content="What it can do: ComplyEaze Bridge" />
-<meta property="og:description" content="Every tool ComplyEaze Bridge 0.7.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the four only with posting or master writes on." />
+<meta property="og:description" content="Every tool ComplyEaze Bridge 0.7.0 installs: what each reads from TallyPrime or prepares on your computer, which are read-only, and the four only with posting on, two of them only with master writes on as well." />
 <meta property="og:url" content="https://bridge.complyeaze.com/capabilities.html" />
 <link rel="icon" href="brand/favicon.svg" type="image/svg+xml" />
 <script>try{if(localStorage.getItem("ce-theme")==="red"){document.documentElement.setAttribute("data-theme","red");document.querySelector('link[rel="icon"]').href="brand/favicon-red.svg"}}catch(e){}</script>
@@ -122,7 +122,7 @@
       <p class="caps-lead">A new install does not offer these, and the Claude&nbsp;Desktop extension has no setting that turns them on: they appear only when posting is on and a further setting, set by whoever installs it, is on. They create one new ledger in a company, the first write a published build makes to TallyPrime&rsquo;s masters, and the second needs you, in a ComplyEaze&nbsp;Bridge window:</p>
       <ul class="faq-next">
         <li><code>prepare_ledger_creates</code> reads the company&rsquo;s ledger and group names, refuses a name that already exists as a ledger, a group or an alias or that differs from one only in case, spaces or symbols, writes nothing to TallyPrime, and returns the ledger as you will be asked to approve it. The ledger is a party under Sundry Debtors or Sundry Creditors, a Suspense ledger, or a GST duty ledger whose head has been measured; it can set no opening balance or parent.</li>
-        <li><code>post_ledger_creates</code> sends the create once, after you approve it in a ComplyEaze&nbsp;Bridge window, then reads the book back and reports it posted only when exactly one new ledger of that name exists as sent and no other ledger or group changed. It was run once on a synthetic company (TallyPrime 7.1 Silver, 14&nbsp;October 2026), and its approval window on TallyPrime 7.2 from a test package of an earlier version of the change; the build of this release has not been run, and a create whose answer is lost is not measured.</li>
+        <li><code>post_ledger_creates</code> sends the create once, after you approve it in a ComplyEaze&nbsp;Bridge window, then reads the book back and reports it posted only when exactly one new ledger of that name exists as sent and no other ledger or group changed. It was run once on a synthetic company (TallyPrime 7.1 Silver, 14&nbsp;October 2026), and its approval window on TallyPrime 7.2 from a test package of an earlier version of the change; the release-candidate package of 0.7.0 created one ledger and read it back on TallyPrime 7.2 Silver (30&nbsp;October 2026), and a create whose answer is lost is not measured.</li>
       </ul>
     </section>
 

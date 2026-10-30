@@ -305,7 +305,7 @@ test("every page that carries a 'Checked against release' stamp carries the mani
 // The page lists what the stamped release installs. The catalog in the source is ahead of the release while a version is being
 // built: the tools it serves that no published build installs are named here, keyed by the release the page is stamped for. When the
 // stamp moves to the release that publishes them the entry is gone, so the page must list them, and until then the page must not.
-const inSourceNotPublished = { "0.6.1": ["gst_by_counter_ledger", "parse_bank_statement_csv", "post_ledger_creates", "prepare_ledger_creates"] };
+const inSourceNotPublished = {};
 test("the capabilities page names the tools the source's catalog serves, less those in no published build of the stamped release", () => {
   const source = readFileSync(new URL("../src-tauri/src/agent_catalog.rs", import.meta.url), "utf8");
   const names = region(source, "REGISTERED_TOOL_NAMES: &[&str] = &[", "];");
@@ -314,14 +314,17 @@ test("the capabilities page names the tools the source's catalog serves, less th
   assert.equal([...names.matchAll(/"[^"]*"/g)].length, registered.length, "REGISTERED_TOOL_NAMES holds a string the test did not read as a tool name: one name to a line, as `\"name\",`");
   assert.ok(registered.includes("verify_import") && registered.includes("post_import"), "the registered tool names were not read");
   const posting = ["acknowledge_post_review", "post_import"];
+  const masterWrites = ["post_ledger_creates", "prepare_ledger_creates"];
   const html = read("capabilities.html");
   const version = html.match(/Checked against release ([0-9.]+) on/)[1];
   const unpublished = inSourceNotPublished[version] ?? [];
-  const served = registered.filter((name) => !posting.includes(name) && !unpublished.includes(name)).sort();
+  const served = registered.filter((name) => !posting.includes(name) && !masterWrites.includes(name) && !unpublished.includes(name)).sort();
   const installed = [...html.matchAll(/<th scope="row"><code>([a-z0-9_]+)<\/code><\/th>/g)].map((match) => match[1]);
   assert.deepEqual([...installed].sort(), served, `the capabilities page for release ${version} and the catalog name different tools`);
   const withPosting = region(html, "<h2>Two more, only with posting on</h2>", "</section>");
   for (const name of posting) assert.ok(withPosting.includes(`<code>${name}</code>`), `${name} is missing from the posting section`);
+  const withMasterWrites = region(html, "<h2>Two more, only with master writes on</h2>", "</section>");
+  for (const name of masterWrites) assert.ok(withMasterWrites.includes(`<code>${name}</code>`), `${name} is missing from the master-writes section`);
   assert.match(html, new RegExp(`The ${installed.length} tools release`), "the page's count of installed tools is not the table's");
   // every release the page names is the one it is stamped for, so a bump that moves only the stamp fails here
   const text = visibleText(html);

@@ -3,7 +3,8 @@
 
 Run (in this folder): python -I check_requests.py requests
 
-First it checks every line of SHA256.txt (sha256, bytes, path) against the file it names, and that `requests/` holds
+First it checks every line of SHA256.txt (sha256, bytes, path, beside this script) against the file it names, that
+SHA256.txt lists exactly this folder's files and requests (any other line is a failure), and that `requests/` holds
 exactly the files REQUESTS names, no more and no fewer. Then it checks by bytes that every request decodes as UTF-16LE
 with a byte-order mark and parses as XML, and that each census request:
 - names its company once in SVCURRENTCOMPANY and its from and to dates in SVFROMDATE and SVTODATE;
@@ -35,13 +36,22 @@ OTHER = [
 REQUESTS = [key for key, *_ in CENSUS] + OTHER
 
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+LISTED = {".gitattributes", "LAB-COMMON.md", "RUN-SHEET.md", "check_requests.py", "summarise2145r.py"}
+
+
 def check_files(folder):
     ok = fail = 0
-    for line in open("SHA256.txt", encoding="utf-8"):
+    seen = set()
+    for line in open(os.path.join(HERE, "SHA256.txt"), encoding="utf-8"):
         parts = line.split()
         if len(parts) != 3:
+            fail += 1
+            print("FAIL SHA256.txt line: %r" % line)
             continue
         digest, size, path = parts
+        seen.add(path)
+        path = os.path.join(HERE, path)
         try:
             data = open(path, "rb").read()
         except OSError:
@@ -51,8 +61,11 @@ def check_files(folder):
             print("FAIL file %s" % path)
         else:
             ok += 1
-    present = set(os.listdir(folder))
     wanted = {"%s.request.utf16le.xml" % key for key in REQUESTS}
+    for path in sorted(seen ^ (LISTED | {"requests/" + name for name in wanted})):
+        fail += 1
+        print("FAIL SHA256.txt %s: %s" % ("lists an unexpected path" if path in seen else "does not list", path))
+    present = set(os.listdir(folder))
     for name in sorted(present ^ wanted):
         fail += 1
         print("FAIL %s: %s" % ("unexpected file" if name in present else "missing file", name))

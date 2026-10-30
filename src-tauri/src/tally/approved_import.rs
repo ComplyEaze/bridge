@@ -2206,12 +2206,13 @@ pub(crate) mod test_seam {
         .join("\n");
         // 28 lines, as the panel showed it; macOS's own fonts decide the last
         // line, so one line either way is allowed. The panel drew 600 points
-        // where 448 + 150 is 598; the slack absorbs the 2.
+        // where 448 + 150 is 598. This 2 and A4e's margin below share the one
+        // 16-point line of slack.
         let height = super::alert_text_height(&voucher);
         assert!((27.0 * 16.0..=29.0 * 16.0).contains(&height), "{height}");
-        // Ten lines of 46 capitals: the panel broke one of them (cell A4e), so the
-        // column is narrower than all ten; the widest of them clears 402 by only
-        // about 0.3 points, which the one line of slack absorbs.
+        // Ten lines of 46 capitals: the panel broke one of them (cell A4e). Nine of
+        // them fit, the widest of those (about 401.7 points) only about 0.3 points
+        // inside 402; the tenth (about 405.5) is the one 402 breaks.
         let capitals = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(4);
         let a4e = (0..10)
             .map(|start| &capitals[start..start + 46])

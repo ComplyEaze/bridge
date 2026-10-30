@@ -2310,8 +2310,9 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen(" + ALERT_SLACK <= screen.visible_bottom", " <= screen.visible_bottom", 1),
         source.replacen("<= screen.visible_bottom", "<= screen.height", 1),
         source.replacen("        None => std::process::exit(0),", "        None => {}", 1),
-        // The check passes on any one screen, reads only the first, takes the
-        // column as wide as Part A's A4e disproved, or measures no text.
+        // The check passes on any one screen, lets an empty list of screens
+        // through, reads only the first, takes the column as wide as Part A's
+        // A4e disproved, or measures no text.
         source.replacen(".all(|screen| alert_fits(text_height, *screen))", ".any(|screen| alert_fits(text_height, *screen))", 1),
         source.replacen("    !screens.is_empty()\n        && screens", "    screens", 1),
         source.replacen("(!screens.is_empty()).then_some(screens)", "Some(screens.into_iter().take(1).collect())", 1),

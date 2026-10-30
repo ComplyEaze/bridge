@@ -1,0 +1,50 @@
+2026-10-30T00:30:55.080Z A1 capture A1-before.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\A1-before.png
+2026-10-30T00:30:57.498Z A1 probe.py -I probe.py --block A1 --out <lab folder>\answers
+2026-10-30T00:31:28.942Z A1 capture A1-after.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\A1-after.png
+2026-10-30T00:31:28.977Z A1 probe.py exit 0; last line: {"utc": "2026-10-30T00:31:18.731+00:00", "t": 20.656, "event": "end", "reason": "rest_probes_done"}
+2026-10-30T00:31:41.896Z B1 capture B1-before.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B1-before.png
+2026-10-30T00:31:44.299Z B1 probe.py -I probe.py --block B1 --out <lab folder>\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f
+2026-10-30T00:32:46.766Z B1 capture B1-after.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B1-after.png
+2026-10-30T00:32:46.811Z B1 probe.py exit 0; last line: {"utc": "2026-10-30T00:32:26.632+00:00", "t": 41.891, "event": "end", "reason": "quick_in_a_row_after_read"}
+2026-10-30T00:33:17.899Z B1 capture B1-wait1.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B1-wait1.png
+2026-10-30T00:33:48.987Z B1 capture B1-wait2.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B1-wait2.png
+2026-10-30T00:34:20.087Z B1 capture B1-wait3.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B1-wait3.png
+2026-10-30T00:34:51.173Z B1 capture B1-wait4.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B1-wait4.png
+2026-10-30T00:34:51.223Z B1 rule 6 GET /status: exit 0 printed 200 51 0.003895
+2026-10-30T00:35:14.408Z B2 capture B2-before.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B2-before.png
+2026-10-30T00:35:16.780Z B2 probe.py -I probe.py --block B2 --out <lab folder>\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f --cut-after 20
+2026-10-30T00:36:18.946Z B2 capture B2-after.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B2-after.png
+2026-10-30T00:36:18.982Z B2 probe.py exit 0; last line: {"utc": "2026-10-30T00:36:10.930+00:00", "t": 53.75, "event": "end", "reason": "quick_in_a_row_after_read"}
+2026-10-30T00:36:20.850Z B2 timed ledger_masters sent 2026-10-30T00:36:18.993Z (the end line above is the block's end): 003-B2-masters.json 0.802s isError False ;; snapshot {"master_alter_id": 328, "voucher_alter_id": 29900, "reused": false} ;; {"company": {"books_from": "20250401", "company_number": "100012", "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "identity_state": "verified_tuple", "missing_field": null, "name": "BRIDGE CORPUS DENSE"}, "evidence": {"bytes": 285798, "duration_ms": 717, "read_at": "2026-10-30T00:36:20.343Z", "request_sha256": "951e3bfb12b3a6ddb268fe358aa4660de10d86cc03df23e35517f88fdbe58270", "response_sha256": "4bbffb9287f90f431adb9dc5f1a3dd79f2d7a4e61d18d9cbee0d6f6ea3af0971", "state": "complete"}, "read_at": "2026-10-30T00:36:19.626Z", "result": {"compliance": "not_requested", "fields": "basic", "items": [
+2026-10-30T00:36:51.895Z B2 capture B2-wait1.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B2-wait1.png
+2026-10-30T00:37:22.998Z B2 capture B2-wait2.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B2-wait2.png
+2026-10-30T00:37:54.122Z B2 capture B2-wait3.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B2-wait3.png
+2026-10-30T00:38:29.843Z B2 capture B2-wait4.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B2-wait4.png
+2026-10-30T00:38:32.794Z B2 rule 6 GET /status: exit 0 printed 200 51 0.012173
+2026-10-30T00:39:01.665Z A2 capture A2-before.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\A2-before.png
+2026-10-30T00:39:04.347Z A2 probe.py -I probe.py --block A2 --out <lab folder>\answers
+2026-10-30T00:39:37.389Z A2 capture A2-after.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\A2-after.png
+2026-10-30T00:39:37.426Z A2 probe.py exit 0; last line: {"utc": "2026-10-30T00:39:26.245+00:00", "t": 20.875, "event": "end", "reason": "rest_probes_done"}
+2026-10-30T00:39:39.805Z B3 capture B3-before.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B3-before.png
+2026-10-30T00:39:42.169Z B3 probe.py -I probe.py --block B3 --out <lab folder>\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f
+2026-10-30T00:40:44.062Z B3 capture B3-after.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B3-after.png
+2026-10-30T00:40:44.098Z B3 probe.py exit 0; last line: {"utc": "2026-10-30T00:40:23.129+00:00", "t": 40.516, "event": "end", "reason": "quick_in_a_row_after_read"}
+2026-10-30T00:41:15.420Z B3 capture B3-wait1.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B3-wait1.png
+2026-10-30T00:41:46.485Z B3 capture B3-wait2.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B3-wait2.png
+2026-10-30T00:42:17.575Z B3 capture B3-wait3.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B3-wait3.png
+2026-10-30T00:42:48.652Z B3 capture B3-wait4.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B3-wait4.png
+2026-10-30T00:42:48.700Z B3 rule 6 GET /status: exit 0 printed 200 51 0.003984
+2026-10-30T00:43:02.945Z B4 capture B4-before.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B4-before.png
+2026-10-30T00:43:05.331Z B4 probe.py -I probe.py --block B4 --out <lab folder>\answers --read requests/r-4-receivable-20260331.utf16le.xml --read-sha256 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f --cut-after 20
+2026-10-30T00:44:07.146Z B4 capture B4-after.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B4-after.png
+2026-10-30T00:44:07.195Z B4 probe.py exit 0; last line: {"utc": "2026-10-30T00:43:42.822+00:00", "t": 37.109, "event": "end", "reason": "quick_in_a_row_after_read"}
+2026-10-30T00:44:08.997Z B4 timed ledger_masters sent 2026-10-30T00:44:07.208Z (the end line above is the block's end): 004-B4-masters.json 0.801s isError False ;; snapshot {"master_alter_id": 328, "voucher_alter_id": 29900, "reused": false} ;; {"company": {"books_from": "20250401", "company_number": "100012", "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "identity_state": "verified_tuple", "missing_field": null, "name": "BRIDGE CORPUS DENSE"}, "evidence": {"bytes": 285798, "duration_ms": 729, "read_at": "2026-10-30T00:44:08.310Z", "request_sha256": "951e3bfb12b3a6ddb268fe358aa4660de10d86cc03df23e35517f88fdbe58270", "response_sha256": "4bbffb9287f90f431adb9dc5f1a3dd79f2d7a4e61d18d9cbee0d6f6ea3af0971", "state": "complete"}, "read_at": "2026-10-30T00:44:07.580Z", "result": {"compliance": "not_requested", "fields": "basic", "items": [
+2026-10-30T00:44:40.054Z B4 capture B4-wait1.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B4-wait1.png
+2026-10-30T00:45:11.645Z B4 capture B4-wait2.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B4-wait2.png
+2026-10-30T00:45:42.844Z B4 capture B4-wait3.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B4-wait3.png
+2026-10-30T00:46:14.067Z B4 capture B4-wait4.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\B4-wait4.png
+2026-10-30T00:46:14.135Z B4 rule 6 GET /status: exit 0 printed 200 51 0.004434
+2026-10-30T00:46:16.536Z A3 capture A3-before.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\A3-before.png
+2026-10-30T00:46:18.908Z A3 probe.py -I probe.py --block A3 --out <lab folder>\answers
+2026-10-30T00:46:49.759Z A3 capture A3-after.png: rect 0,0,1536,824 iconic False visible True printwindow True saved <lab folder>\shots\A3-after.png
+2026-10-30T00:46:49.798Z A3 probe.py exit 0; last line: {"utc": "2026-10-30T00:46:39.808+00:00", "t": 20.532, "event": "end", "reason": "rest_probes_done"}

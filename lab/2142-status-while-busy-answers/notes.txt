@@ -1,0 +1,13 @@
+#2142 notes (UTC). Sheet lab/2142-status-while-busy at ac1e8e5a60c7e6b20429c25a664eb5429735ea31: SHA256.txt 5 of 5 equal; probe.py py_compile ok (pycache prefix outside the folder), read whole. Rule 1: private record checked on 30 Oct 2026; no rule found; concurrent use not previously measured.
+2026-10-30T00:29:30Z Step 0 with no company loaded: one tally.exe (PID 13252) owns 9001; /status 200; exe sha256 4c9bace3... Answers and data folders absent before.
+2026-10-30T00:29:5xZ BRIDGE CORPUS DENSE loaded alone (Down 13, Enter); Gateway 1-Apr-25 to 31-Mar-26, current date 31-Mar-2026 (captured). Answers folder created empty (0 entries).
+2026-10-30T00:30:13Z Step 1: ComplyEaze Bridge started over stdio (exe ok); tools/list saved; list_companies: THE COMPANY only, verified_tuple, 20250401; ledger_masters basic: M0 328, V0 29900, 0.859 s.
+2026-10-30T00:30:57Z A1: 10 probes, exit 0.
+2026-10-30T00:31:3xZ B1: the read 200 13679490 in 33.54 s; probe 1 waited (31.57 s); exit 0. Rule 6 wait; /status 200 at 00:34:51Z.
+2026-10-30T00:35:1xZ B2: the read cut at 20.01 s (exit 28); probe 1 43.38 s; exit 0 at 00:36:10.930Z; timed ledger_masters sent 00:36:18.993Z: 0.802 s, 328 / 29900. Rule 6 wait; /status 200 at 00:38:32Z.
+2026-10-30T00:39Z A2: 10 probes, exit 0.
+2026-10-30T00:39:4xZ B3: the read 200 13679490 in 32.12 s; probe 1 waited (30.11 s); exit 0. Rule 6 wait; /status 200 at 00:42:48Z.
+2026-10-30T00:43:0xZ B4: the read cut at 20.01 s (exit 28); probe 1 26.84 s; exit 0 at 00:43:42.822Z; timed ledger_masters sent 00:44:07.208Z (24.39 s after: past 15 s): 0.801 s, 328 / 29900. Rule 6 wait; /status 200 at 00:46:14Z.
+2026-10-30T00:46:29Z A3: 10 probes, exit 0.
+2026-10-30T00:47:05Z Step 9: ledger_masters basic: M3 328, V3 29900, 0.914 s. Step 10: stop file; server exit 0; error stream empty; exe sha256 equal.
+2026-10-30T00:47:4xZ C10: Gateway captured; Company > Shut; Select Company, none loaded; one tally.exe owns 9001; /status 200. No XML after the shut.

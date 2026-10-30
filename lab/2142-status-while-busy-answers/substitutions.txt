@@ -1,0 +1,19 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+answers/B1-log.jsonl: original 1787 B sha256 b92df28419787c797d0bc210aed1b02fab435bb1124220d372889fd846fb0ba5; 2 x -> <lab folder>
+answers/B1-stdout.txt: original 1798 B sha256 d8044cc69d26abe4e93a0adc7e44b46d1ee2731f6bd17455021d5e0263e4c6e8; 2 x -> <lab folder>
+answers/B2-log.jsonl: original 1875 B sha256 5b7104357fd6f0ea6a3484c0f0a57c357bc5e0d07c01f174d76651e95385ddc3; 2 x -> <lab folder>
+answers/B2-stdout.txt: original 1886 B sha256 f0e99a537173777111b53c48cc8863c955e1733fd91e4f9ffd0ea860f5b3e5f1; 2 x -> <lab folder>
+answers/B3-log.jsonl: original 1784 B sha256 7d9a235b03cbc96b864916fa84d161f46ea37ccd99ca14c7005312b260b62254; 2 x -> <lab folder>
+answers/B3-stdout.txt: original 1795 B sha256 7b1b29cf4b18bad2b2ed200fd41d1395919a4227365f47dc40a3de22c1b3e6a2; 2 x -> <lab folder>
+answers/B4-log.jsonl: original 1876 B sha256 552741ead18085eda4b0376ac1c60acab39a74e1d91347463b5f5cc3d57b07ad; 2 x -> <lab folder>
+answers/B4-stdout.txt: original 1887 B sha256 4d91db70baeff70aab19d4d796491ad96c2a04c97878945d19f5f4bbfdd50df1; 2 x -> <lab folder>
+evidence/blocks.txt: original 9057 B sha256 d50d10f91f3e69ce42e87ed0b60284d66c865d8593f8e508f9aaead46a51e2a1; 37 x -> <lab folder>
+evidence/c10-netstat.txt: original 9983 B sha256 1a9a0674903f80dda188260ddb5e94e6a34b9af996e7bdc193de730fc4c68895; only the port-9001 LISTENING lines kept
+evidence/s0-netstat.txt: original 9099 B sha256 f347819478f09f1f44f6a4258d32014312b917e1781d5b0be504643c73d58a12; only the port-9001 LISTENING lines kept
+scripts/block.ps1: original 3413 B sha256 4ed944cb0557af1945fdef7d03a5758cdab0e666e16d114fc03cbedc87284e5d; 4 x -> <lab folder>; 3 x -> stop
+scripts/watch.ps1: original 3380 B sha256 ccf2f4e59aec878c3f530ec8a9466a692275afe893409934fb3ac9f228611fec; 1 x -> <lab folder>; 1 x -> stop
+scripts/client.py: original 4842 B sha256 440d55db00adffa71ed07dca9e61941634e1e5088e9d4930883188b263209c4a; 1 x -> <build folder>; 1 x -> <lab folder>; 1 x -> lab-client; 4 x -> stop
+scripts/call.py: original 1197 B sha256 c722532d56cc626986704e7d830a3ffd97dc6d53bfe2ae4d25014ae31dd97544; 1 x -> <lab folder>
+scripts/one.py: original 924 B sha256 2056f116e5454d625d43f7f8169e8b78c787f2237490c8eea15ef8e7b1f51b75; 1 x -> '<lab folder>'
+scripts/step0.ps1: original 2374 B sha256 6786d780ce0823bf6fbf7002ec4bdeab76395b1171284f1d8cf6ac8d97f714f5; 2 x -> <lab folder>
+scripts/launch-env.json: original 155 B sha256 e7e55c53dc3d8663ba81fff63da8024db72f658bd003402d2704d053fd2b35a3; 1 x -> <lab folder>

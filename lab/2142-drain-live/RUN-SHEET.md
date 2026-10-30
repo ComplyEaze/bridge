@@ -3,7 +3,7 @@
 Not for merge. About 30 minutes. READS ONLY: nothing is created, altered, imported or restored, and no backup is needed (C5 and C6 do not apply). `SHA256.txt` lists every other file here with its bytes; check it before step 0.
 
 ## What it decides
-The pull request for #2142 makes ComplyEaze Bridge record a post that may have left Tally working (one cut at its limit, among others) beside the port's wire lock. The next post to that port first sends `GET /status` and goes ahead only once three probes in a row, 2 s apart, have answered in under 1 s. Each probe has its own 5 s deadline. A call that meets a slow or cut probe is refused as `tally_endpoint_draining`, with `retry_after_s`, having sent no post.
+The pull request for #2142 makes ComplyEaze Bridge record a post that may have left Tally working (one cut at its limit, among others) beside the port's wire lock. The next post to that port first sends `GET /status` and goes ahead only once three probes in a row, 2 s apart, have answered within their own 5 s deadline, whatever the answer. A probe with no answer in that time starts the count again. After an answer under 1 s the same call probes again; after a slower one, or none, the call is refused as `tally_endpoint_draining`, with `retry_after_s`, having sent no post. A debt clears by itself 10 minutes after the cut request was sent.
 
 Two rows measured the behaviour this rests on with curl (`lab/2142-status-while-busy-answers`, `lab/2142-drain-repeat-answers`). This row runs it through ComplyEaze Bridge's own transport, on the pull request's own build. It must show three things, in order:
 1. **The cut, through ComplyEaze Bridge:** `outstandings` at 31 March 2026 is refused when its Bills Receivable request is cut at the 20 s request limit (`native_outstandings_read_failed`, with the cause the pull request names for a cut request). The drain record then reads owed.
@@ -23,7 +23,7 @@ Named differences from LAB-COMMON:
 1. **No raw request is sent** but C2 c's `GET /status` at step 0 and C10's at the end. Every other request is ComplyEaze Bridge's own, through its tools.
 2. **A refused call is a result, not a STOP,** when it is one of the refusals this sheet expects:
    - `outstandings` cut at its limit (step 3);
-   - `tally_endpoint_draining` or `tally_endpoint_needs_attention` (steps 4 and 5).
+   - `tally_endpoint_draining` (steps 4 and 5).
    Any other refusal is a STOP.
 3. **The drain record** is `<key>.wire.debt` beside the port's wire lock, in the shared profile root (under the user's profile, in the folder the build's `endpoint_wire` names). The operator copies it whole after each step from 2 on, and records its bytes and sha256. That is a file read on the lab PC, not a request.
 
@@ -32,7 +32,7 @@ Named differences from LAB-COMMON:
 Licensed mode only; Education mode = STOP.
 
 ## Build
-`bridge_mcp.exe` of pull request #2204, built by its own CI run 40993861371 from commit `80094118de0203b4a79b6b4e19120825edca5b18` (the `unsigned-bundle-smoke-windows-latest` artifact, id `<artifact>`). The pull request's head, `9628b45d31dae8668856aecf51811e1a3432a038`, differs from that commit only by renaming its compatibility acknowledgement, with no code change, so this build is the head's. The run coordinator writes the artifact id here once the run's bundle exists. Without it, the row is not run. The exe's sha256 is recorded at step 0, from that artifact, and again after the last call; a different second sha256 = STOP.
+`bridge_mcp.exe` of pull request #2204 at its head `c13a0bd0059ace7d9a4d8e638bdd85144f2596d5`, built by CI run 41013617643 dispatched on that head (the `unsigned-bundle-smoke-windows-latest` artifact, id `12959380456`, 57,442,825 bytes, zip digest `sha256:8657164578579f0d37a828cca2d86cb1b76ad59070b90d0a2cd01e36efa0aa10`). Check the downloaded zip's sha256 against that digest before unpacking; another digest = STOP. The exe's sha256 is recorded at step 0, from that artifact, and again after the last call; a different second sha256 = STOP. A later head of the pull request needs its own build and a new Build line.
 
 Run it over stdio with `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, a new empty `BRIDGE_AGENT_DATA_DIR` (`C:\bridge-lab\2142live\data`, listed first: absent or empty, else STOP), `BRIDGE_TERMS_ACCEPTED=true`, and redaction unset. Writes stay off. `tools/list` must hold `list_companies`, `ledger_masters`, `outstandings` and `egress_log`; any absent = STOP.
 

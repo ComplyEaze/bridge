@@ -3551,7 +3551,6 @@ pub(crate) fn tally_error_code(error: &TallyError) -> &'static str {
             "tally_endpoint_busy" => "tally_endpoint_busy",
             "tally_endpoint_draining" => "tally_endpoint_draining",
             "tally_endpoint_lock_unavailable" => "tally_endpoint_lock_unavailable",
-            "tally_endpoint_needs_attention" => "tally_endpoint_needs_attention",
             "transport_policy_invalid" => "transport_policy_invalid",
             _ => "capability_not_supported",
         },

@@ -98,22 +98,11 @@ const POLICY: DrainPolicy = DrainPolicy {
     ..DrainPolicy::MEASURED
 };
 
-fn owed(quick: u8, last_probe_ms: Option<u64>) -> DrainDebt {
-    owed_slow(quick, 0, last_probe_ms, None)
-}
-
-fn owed_slow(
-    quick: u8,
-    slow: u8,
-    last_probe_ms: Option<u64>,
-    slow_since_ms: Option<u64>,
-) -> DrainDebt {
+fn owed(answered: u8, last_probe_ms: Option<u64>) -> DrainDebt {
     DrainDebt::Owed {
         since_ms: T0,
-        quick,
-        slow,
+        answered,
         last_probe_ms,
-        slow_since_ms,
     }
 }
 
@@ -207,17 +196,13 @@ fn the_measured_policy_is_pinned() {
     let measured = DrainPolicy::MEASURED;
     assert_eq!(measured.probe_deadline, Duration::from_secs(5));
     assert_eq!(measured.quick_below, Duration::from_secs(1));
-    assert_eq!(measured.quick_in_a_row, 3);
+    assert_eq!(measured.answers_in_a_row, 3);
     assert_eq!(measured.spacing, Duration::from_secs(2));
     assert_eq!(measured.probes_per_call, 3);
-    assert_eq!(measured.attention_after, Duration::from_secs(120));
+    assert_eq!(measured.retry_after(), Duration::from_secs(10));
     assert_eq!(
         WireRefusal::Draining { retry_after_ms: 1 }.safe_code(),
         "tally_endpoint_draining"
-    );
-    assert_eq!(
-        WireRefusal::NeedsAttention { retry_after_ms: 1 }.safe_code(),
-        "tally_endpoint_needs_attention"
     );
 }
 
@@ -254,23 +239,6 @@ async fn an_answered_post_clears_a_record_left_in_flight_by_no_one_after_three_q
 }
 
 #[tokio::test]
-async fn a_slow_probe_refuses_the_post_at_once_and_resets_the_count() {
-    let simulator =
-        SequenceSimulator::spawn(vec![status(), slow_status(Duration::from_millis(150))]).unwrap();
-    let (transport, shared) = transport(&simulator, owed(1, None), Some(POLICY));
-    let error = transport
-        .post_xml_decoded("<E />".into())
-        .await
-        .unwrap_err();
-    assert_eq!(draining(&error), 10_000);
-    assert_eq!(
-        debt(&shared),
-        owed_slow(0, 1, Some(T0 + 2_000), Some(T0 + 2_000))
-    );
-    assert_eq!(sent(simulator), ["/status", "/status"]);
-}
-
-#[tokio::test]
 async fn a_probe_cut_by_its_own_deadline_refuses_the_post() {
     let simulator =
         SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(900))]).unwrap();
@@ -280,7 +248,7 @@ async fn a_probe_cut_by_its_own_deadline_refuses_the_post() {
         .await
         .unwrap_err();
     assert_eq!(draining(&error), 10_000);
-    assert_eq!(debt(&shared), owed_slow(0, 0, Some(T0), Some(T0)));
+    assert_eq!(debt(&shared), owed(0, Some(T0)));
     assert_eq!(sent(simulator), ["/status"]);
 }
 
@@ -345,30 +313,6 @@ async fn a_last_probe_ahead_of_the_clock_counts_as_elapsed() {
     transport.post_xml_decoded("<E />".into()).await.unwrap();
     assert_eq!(debt(&shared), DrainDebt::Clear);
     assert_eq!(sent(simulator), ["/status", "/"]);
-}
-
-#[tokio::test]
-async fn probes_not_quick_for_past_the_attention_time_are_refused_as_needing_attention() {
-    let simulator =
-        SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(150))]).unwrap();
-    // The run of probes that were not quick began at T0.
-    let (transport, shared) = transport(&simulator, owed_slow(0, 1, None, Some(T0)), Some(POLICY));
-    shared.now.store(T0 + 121_000, Ordering::SeqCst);
-    let error = transport
-        .post_xml_decoded("<E />".into())
-        .await
-        .unwrap_err();
-    assert!(
-        matches!(
-            error,
-            TallyTransportError::WireRefused {
-                refusal: WireRefusal::NeedsAttention { .. }
-            }
-        ),
-        "{error:?}"
-    );
-    assert_eq!(error.safe_code(), "tally_endpoint_needs_attention");
-    assert_eq!(sent(simulator), ["/status"]);
 }
 
 #[tokio::test]
@@ -532,53 +476,13 @@ async fn an_old_debt_on_an_idle_tally_clears_on_quick_probes() {
     assert_eq!(sent(simulator), ["/status", "/status", "/status", "/"]);
 }
 
-/// A record left in flight by a process that crashed a day ago meets a probe
-/// cut while Tally works: that is draining, never needing a person.
-#[tokio::test]
-async fn a_stale_in_flight_record_never_needs_attention_on_its_first_slow_probe() {
-    let simulator =
-        SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(900))]).unwrap();
-    let (transport, shared) = transport(
-        &simulator,
-        DrainDebt::InFlight { since_ms: T0 },
-        Some(POLICY),
-    );
-    shared.now.store(T0 + 24 * 3_600_000, Ordering::SeqCst);
-    let error = transport
-        .post_xml_decoded("<E />".into())
-        .await
-        .unwrap_err();
-    assert_eq!(draining(&error), 10_000);
-    let _ = sent(simulator);
-}
-
-/// A call refused for the spacing sent no probe, so it is draining whatever the
-/// record's age, never needing a person.
-#[tokio::test]
-async fn a_refusal_for_the_spacing_never_needs_attention() {
-    let simulator = SequenceSimulator::spawn(vec![status()]).unwrap();
-    let now = T0 + 200_000;
-    let (transport, shared) = transport(
-        &simulator,
-        owed_slow(0, 1, Some(now - 500), Some(T0)),
-        Some(POLICY),
-    );
-    shared.now.store(now, Ordering::SeqCst);
-    let error = transport
-        .post_xml_decoded("<E />".into())
-        .await
-        .unwrap_err();
-    assert_eq!(draining(&error), 1_500);
-    assert!(sent(simulator).is_empty());
-}
-
 /// A host whose `/status` answers whole but slowly every time is held at most
 /// three probes: the third answered in a row clears the debt and the post goes.
 #[tokio::test]
-async fn three_probes_answered_slowly_in_a_row_clear_a_slow_host() {
+async fn a_third_answer_in_a_row_clears_a_slow_host() {
     let simulator =
         SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(150)), xml()]).unwrap();
-    let (transport, shared) = transport(&simulator, owed_slow(0, 2, None, Some(T0)), Some(POLICY));
+    let (transport, shared) = transport(&simulator, owed(2, None), Some(POLICY));
     transport.post_xml_decoded("<E />".into()).await.unwrap();
     assert_eq!(debt(&shared), DrainDebt::Clear);
     assert_eq!(sent(simulator), ["/status", "/"]);
@@ -590,12 +494,12 @@ async fn three_probes_answered_slowly_in_a_row_clear_a_slow_host() {
 async fn a_cut_probe_breaks_a_run_of_slow_answers() {
     let simulator =
         SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(900))]).unwrap();
-    let (transport, shared) = transport(&simulator, owed_slow(0, 2, None, Some(T0)), Some(POLICY));
+    let (transport, shared) = transport(&simulator, owed(2, None), Some(POLICY));
     transport
         .post_xml_decoded("<E />".into())
         .await
         .unwrap_err();
-    assert_eq!(debt(&shared), owed_slow(0, 0, Some(T0), Some(T0)));
+    assert_eq!(debt(&shared), owed(0, Some(T0)));
     let _ = sent(simulator);
 }
 
@@ -619,4 +523,43 @@ fn a_call_drains_for_at_most_its_worst_case() {
         DrainPolicy::MEASURED.worst_per_call(),
         Duration::from_secs(11)
     );
+}
+
+/// An answer slower than `quick_below` still counts, but ends the call, so the
+/// call does not hold the lock for a slow host.
+#[tokio::test]
+async fn a_slow_answer_counts_but_ends_the_call() {
+    let simulator =
+        SequenceSimulator::spawn(vec![status(), slow_status(Duration::from_millis(150))]).unwrap();
+    let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
+    let error = transport
+        .post_xml_decoded("<E />".into())
+        .await
+        .unwrap_err();
+    assert_eq!(draining(&error), 10_000);
+    assert_eq!(debt(&shared), owed(2, Some(T0 + 2_000)));
+    assert_eq!(sent(simulator), ["/status", "/status"]);
+}
+
+/// Answers of any speed in a row clear the debt, whatever order the quick and
+/// slow ones come in.
+#[tokio::test]
+async fn answers_of_any_speed_in_a_row_clear_the_debt() {
+    let simulator = SequenceSimulator::spawn(vec![
+        status(),
+        slow_status(Duration::from_millis(150)),
+        status(),
+        xml(),
+    ])
+    .unwrap();
+    let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
+    let first = transport
+        .post_xml_decoded("<E />".into())
+        .await
+        .unwrap_err();
+    assert_eq!(draining(&first), 10_000);
+    shared.now.fetch_add(10_000, Ordering::SeqCst);
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/status", "/status", "/status", "/"]);
 }

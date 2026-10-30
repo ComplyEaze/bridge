@@ -6372,11 +6372,6 @@ fn a_draining_refusal_before_the_attempt_names_its_own_next_step() {
             10,
             DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
         ),
-        (
-            "tally_endpoint_needs_attention",
-            30,
-            NEEDS_ATTENTION_BEFORE_ATTEMPT_NEXT_STEP,
-        ),
         ("tally_endpoint_busy", 5, BUSY_BEFORE_ATTEMPT_NEXT_STEP),
     ] {
         let payload = reconciliation_failure_payload("batch", Some(false), None, code);
@@ -6392,4 +6387,58 @@ fn a_draining_refusal_before_the_attempt_names_its_own_next_step() {
         payload["result"]["error"]["next_step"],
         BUSY_AFTER_POST_NEXT_STEP
     );
+}
+
+/// #2142: a marks readback refused because Tally is draining is tried once more
+/// after the refusal's own wait, only when the call's ceiling has room for that
+/// wait, the retry's own drain and the rest of the post. Every read here finds
+/// the drain owed, just probed, so each is refused with nothing sent.
+#[tokio::test]
+async fn a_draining_marks_readback_is_retried_only_with_room_for_its_drain() {
+    use crate::endpoint_wire::wire_refusal;
+    use bridge_tally_transport::WireRefusal;
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = records_server(directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends((0..32).collect()),
+    );
+    let request = || {
+        crate::tally::agent_read_request::AgentReadRequest::parse(
+            super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+        )
+        .unwrap()
+    };
+    let reads_from = |call_started: Instant| {
+        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let read = MARKS_READS.scope(
+            std::sync::Arc::clone(&reads),
+            server.read_marks_after_post(request(), call_started),
+        );
+        async move {
+            let result = read.await;
+            let reads = reads.lock().unwrap().clone();
+            (result, reads)
+        }
+    };
+    let draining = |result: &anyhow::Result<String>| {
+        matches!(
+            wire_refusal(result.as_ref().expect_err("the read sends nothing")),
+            Some(WireRefusal::Draining { .. })
+        )
+    };
+    // With the whole call left: read, wait, read once more.
+    let (result, reads) = reads_from(Instant::now()).await;
+    assert!(draining(&result));
+    assert_eq!(reads.len(), 2, "one retry: {reads:?}");
+    // 25 s in: the wait and the retry would fit, but not with its drain.
+    let late = Instant::now()
+        .checked_sub(Duration::from_secs(25))
+        .unwrap_or_else(Instant::now);
+    let (result, reads) = reads_from(late).await;
+    assert!(draining(&result));
+    assert_eq!(reads, [None], "no retry");
 }

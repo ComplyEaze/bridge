@@ -1873,15 +1873,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // #2142: a post cut for time can leave Tally working on it.
         "tally_endpoint_draining" => Some(
-            "Tally is still finishing an earlier request that was stopped for time, so this \
+            "Tally was still busy with an earlier request that was stopped for time, so this \
              request was not sent. Call again after retry_after_s seconds; the same request is \
              safe to repeat, and a different read would only wait behind the same work.",
-        ),
-        "tally_endpoint_needs_attention" => Some(
-            "Tally has not answered promptly for more than two minutes after an earlier request \
-             was stopped for time, so this request was not sent. Ask the person to look at \
-             Tally's screen for a message waiting for an answer, then call again after \
-             retry_after_s seconds.",
         ),
         "import_post_window_not_bounded" => Some(
             "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \

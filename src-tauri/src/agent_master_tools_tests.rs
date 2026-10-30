@@ -6131,3 +6131,19 @@ fn the_ledger_index_seams_are_under_bare_cfg_test() {
         assert!(!source.contains(forbidden), "{forbidden}");
     }
 }
+
+/// #2142: a ledger create refused before anything is recorded because Tally is
+/// draining after a cut request says to call again with the same batch.
+#[test]
+fn a_draining_refusal_names_the_ledger_create_next_step() {
+    let step = master_next_step("tally_endpoint_draining").unwrap();
+    assert!(
+        step.starts_with("Nothing was sent: Tally was still busy"),
+        "{step}"
+    );
+    assert!(
+        step.contains("post_ledger_creates with this batch_id again"),
+        "{step}"
+    );
+    assert!(step.contains("retry_after_s"), "{step}");
+}

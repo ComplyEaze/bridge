@@ -141,10 +141,8 @@ impl TallyWireGate for OweAtGate {
             let now = self.now_ms();
             held.record(DrainDebt::Owed {
                 since_ms: now,
-                quick: 0,
-                slow: 0,
+                answered: 0,
                 last_probe_ms: Some(now),
-                slow_since_ms: None,
             })?;
         }
         Ok(held)
@@ -324,10 +322,8 @@ enum DebtRecord {
     },
     Owed {
         since_ms: u64,
-        quick: u8,
-        slow: u8,
+        answered: u8,
         last_probe_ms: Option<u64>,
-        slow_since_ms: Option<u64>,
     },
 }
 
@@ -347,7 +343,7 @@ fn read_debt(path: &Path, now_ms: u64) -> Result<DrainDebt, WireRefusal> {
         fields(match record {
             DebtRecord::Clear => 1,
             DebtRecord::InFlight { .. } => 2,
-            DebtRecord::Owed { .. } => 6,
+            DebtRecord::Owed { .. } => 4,
         })
     });
     Ok(match parsed.ok_or(()) {
@@ -355,24 +351,18 @@ fn read_debt(path: &Path, now_ms: u64) -> Result<DrainDebt, WireRefusal> {
         Ok(DebtRecord::InFlight { since_ms }) => DrainDebt::InFlight { since_ms },
         Ok(DebtRecord::Owed {
             since_ms,
-            quick,
-            slow,
+            answered,
             last_probe_ms,
-            slow_since_ms,
         }) => DrainDebt::Owed {
             since_ms,
-            quick,
-            slow,
+            answered,
             last_probe_ms,
-            slow_since_ms,
         },
         // Unreadable is owed: the cost is a probe.
         Err(_) => DrainDebt::Owed {
             since_ms: now_ms,
-            quick: 0,
-            slow: 0,
+            answered: 0,
             last_probe_ms: None,
-            slow_since_ms: None,
         },
     })
 }
@@ -384,16 +374,12 @@ fn write_debt(path: &Path, debt: DrainDebt) -> Result<(), WireRefusal> {
         DrainDebt::InFlight { since_ms } => DebtRecord::InFlight { since_ms },
         DrainDebt::Owed {
             since_ms,
-            quick,
-            slow,
+            answered,
             last_probe_ms,
-            slow_since_ms,
         } => DebtRecord::Owed {
             since_ms,
-            quick,
-            slow,
+            answered,
             last_probe_ms,
-            slow_since_ms,
         },
     };
     let bytes = serde_json::to_vec(&record).map_err(|_| WireRefusal::Unavailable)?;
@@ -471,10 +457,7 @@ pub(crate) fn wire_retry_after_s(code: &str) -> Option<u64> {
     let refusal = match code {
         "tally_endpoint_busy" => WireRefusal::Busy,
         "tally_endpoint_draining" => WireRefusal::Draining {
-            retry_after_ms: millis(DrainPolicy::MEASURED.spacing.saturating_mul(5)),
-        },
-        "tally_endpoint_needs_attention" => WireRefusal::NeedsAttention {
-            retry_after_ms: millis(DrainPolicy::MEASURED.spacing.saturating_mul(15)),
+            retry_after_ms: millis(DrainPolicy::MEASURED.retry_after()),
         },
         _ => return None,
     };

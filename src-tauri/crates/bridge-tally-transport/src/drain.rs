@@ -4,8 +4,8 @@
 //! work, and the next request waits behind it (protocol reference §11b.2). So a
 //! post that may have left Tally working owes a drain, recorded beside the
 //! endpoint's wire lock for every process. The next post first sends `GET
-//! /status`, which waits behind Tally's work, and goes ahead only once enough
-//! probes in a row have answered quickly.
+//! /status`, which waits behind Tally's work, and goes ahead only once three
+//! probes in a row have answered.
 
 use std::time::Duration;
 
@@ -14,24 +14,19 @@ use crate::TallyTransportError;
 /// How a transport drains an endpoint that owes one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DrainPolicy {
-    /// One probe's own deadline: a probe cut by it counts as slow.
+    /// One probe's own deadline. A probe answered whole within it, at any
+    /// speed, is an answer; one cut by it is not.
     pub probe_deadline: Duration,
-    /// A probe answered within this counts as quick.
+    /// After an answer within this, the call probes again; after a slower one,
+    /// which still counts, it is refused, so it does not hold the lock.
     pub quick_below: Duration,
-    /// Quick probes in a row that clear the debt. As many probes in a row
-    /// answered whole but slowly clear it too, so a host that answers every
-    /// request slowly is held at most that many refused calls; nothing about
-    /// such a host has been measured.
-    pub quick_in_a_row: u8,
+    /// Answers in a row that clear the debt; a cut probe starts the count again.
+    pub answers_in_a_row: u8,
     /// The least time from one probe's end to the next probe, across every
     /// process.
     pub spacing: Duration,
     /// The most probes one post sends before it is refused.
     pub probes_per_call: u8,
-    /// Probes that were not quick for longer than this, the refusal after one
-    /// names something that may need a person, such as a dialog on Tally's
-    /// screen.
-    pub attention_after: Duration,
 }
 
 impl DrainPolicy {
@@ -41,49 +36,26 @@ impl DrainPolicy {
     /// - a probe sent after the cut waited 9.3 s and 10.8 s while Tally's work
     ///   ran on, and the work ran 8.9 s to 25.4 s past the cut, so a 5 s probe
     ///   is cut while Tally is busy and nothing waits behind it;
-    /// - at rest a probe took 3 ms to 5 ms (median), 46 ms at most, so 1 s
-    ///   leaves a wide margin;
+    /// - at rest a probe took 3 ms to 5 ms (median), 46 ms at most;
     /// - each data read sent after three quick probes, 2 s apart, answered
-    ///   within its at-rest threshold (four times). A read after fewer was not
-    ///   measured.
-    ///
-    /// The 120 s before a refusal names a person is not measured: it is well
-    /// past the longest drain seen.
+    ///   within its at-rest threshold (four times). A read after fewer, or after
+    ///   answers slower than 1 s, was not measured.
     pub const MEASURED: Self = Self {
         probe_deadline: Duration::from_secs(5),
         quick_below: Duration::from_secs(1),
-        quick_in_a_row: 3,
+        answers_in_a_row: 3,
         spacing: Duration::from_secs(2),
         probes_per_call: 3,
-        attention_after: Duration::from_secs(120),
     };
-}
 
-/// How one drain probe ended.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Probe {
-    /// Answered whole within `quick_below`.
-    Quick,
-    /// Answered whole, but not within `quick_below`: Tally had finished by
-    /// then, or answers every request slowly.
-    AnsweredSlowly,
-    /// Cut by its deadline, or ended without a whole answer: Tally may still be
-    /// working.
-    Cut,
-    /// Nothing listens on the port: no work can remain, so nothing is owed.
-    Unreachable,
-}
-
-impl DrainPolicy {
-    /// What a call refused after a slow probe is told to wait: the drain
-    /// measured 8.9 s to 25.4 s past a cut, so a retry sooner would only probe
-    /// again while Tally works.
-    pub(crate) const fn retry_after_slow(self) -> Duration {
+    /// What a refused call is told to wait: the drain measured 8.9 s to 25.4 s
+    /// past a cut, so a retry sooner would only probe again while Tally works.
+    pub const fn retry_after(self) -> Duration {
         self.spacing.saturating_mul(5)
     }
 
     /// The most one call can spend on a drain before it posts or is refused:
-    /// quick probes and the pauses between them, then one probe cut by its
+    /// quick answers and the pauses between them, then one probe cut by its
     /// deadline.
     pub const fn worst_per_call(self) -> Duration {
         let before_last = self.probes_per_call.saturating_sub(1) as u32;
@@ -92,11 +64,20 @@ impl DrainPolicy {
             .saturating_mul(before_last)
             .saturating_add(self.probe_deadline)
     }
+}
 
-    /// What a call refused as needing attention is told to wait.
-    pub(crate) const fn retry_after_attention(self) -> Duration {
-        self.spacing.saturating_mul(15)
-    }
+/// How one drain probe ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Probe {
+    /// Answered whole within `quick_below`.
+    Quick,
+    /// Answered whole within the deadline, but not within `quick_below`.
+    Slow,
+    /// Cut by its deadline, or ended without a whole answer: Tally may still be
+    /// working.
+    Cut,
+    /// Nothing listens on the port: no work can remain, so nothing is owed.
+    Unreachable,
 }
 
 /// Whether a post that ended with `error` may have left Tally working on it.

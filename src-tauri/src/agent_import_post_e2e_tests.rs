@@ -2111,6 +2111,9 @@ async fn a_draining_endpoint_at_the_posts_own_lock_refuses_before_the_intent() {
         "{response}"
     );
     assert_eq!(result["attempt_recorded"], false, "{response}");
+    // A refusal before the intent carries no dispatch: nothing was sent.
+    assert!(result["dispatch_response"].is_null(), "{response}");
+    assert!(result.get("dispatch").is_none(), "{response}");
     assert_eq!(observed.len(), post_send, "no POST was sent: {response}");
     assert!(!String::from_utf8(journal(directory.path()))
         .unwrap()
@@ -2157,9 +2160,9 @@ async fn a_batch_post_whose_readback_found_tally_draining_names_it_in_its_doubt(
         result["post_location"]["after_read_failure"], "tally_endpoint_draining",
         "{response}"
     );
-    // The readback, refused twice, sent no marks read; the post's later steps
-    // still read on.
-    assert!(observed.len() > readback, "{response}");
+    // The readback, refused twice, sent no marks read; the post's one later
+    // read still went.
+    assert_eq!(observed.len(), readback + 1, "{response}");
     let imports = server.imports_dir().unwrap();
     let doubt: Value = serde_json::from_slice(
         &fs::read(imports.join(format!("{}.batch_step_doubt.json", line.batch_id))).unwrap(),

@@ -384,10 +384,8 @@ fn the_drain_record_is_one_file_in_the_last_root_beside_its_lock() {
     );
     let owed = DrainDebt::Owed {
         since_ms: 7,
-        quick: 2,
-        slow: 1,
+        answered: 2,
         last_probe_ms: Some(9),
-        slow_since_ms: Some(8),
     };
     held.record(owed).unwrap();
     assert_eq!(held.debt(), Ok(owed));
@@ -438,10 +436,8 @@ fn an_unreadable_drain_record_is_owed() {
                 read_debt(&path, 42),
                 Ok(DrainDebt::Owed {
                     since_ms: 42,
-                    quick: 0,
-                    slow: 0,
-                    last_probe_ms: None,
-                    slow_since_ms: None
+                    answered: 0,
+                    last_probe_ms: None
                 })
             ),
             "{text:?}"
@@ -456,10 +452,7 @@ fn an_unreadable_drain_record_is_owed() {
 fn every_wire_refusal_that_passes_by_waiting_names_its_retry() {
     assert_eq!(wire_retry_after_s("tally_endpoint_busy"), Some(5));
     assert_eq!(wire_retry_after_s("tally_endpoint_draining"), Some(10));
-    assert_eq!(
-        wire_retry_after_s("tally_endpoint_needs_attention"),
-        Some(30)
-    );
+    assert_eq!(wire_retry_after_s("tally_endpoint_needs_attention"), None);
     assert_eq!(wire_retry_after_s("tally_endpoint_lock_unavailable"), None);
     assert_eq!(wire_retry_after_s("request_deadline_exceeded"), None);
 }
@@ -533,7 +526,7 @@ async fn a_post_cut_by_one_client_holds_the_next_post_of_another() {
     let refused = client().post_xml_decoded("<E />".into()).await.unwrap_err();
     assert_eq!(refused.safe_code(), "tally_endpoint_draining");
     let after = fs::read_to_string(&path).unwrap();
-    assert!(after.contains(r#""quick":0"#), "{after}");
+    assert!(after.contains(r#""answered":0"#), "{after}");
     assert!(
         !after.contains(r#""last_probe_ms":null"#),
         "the probe was sent: {after}"

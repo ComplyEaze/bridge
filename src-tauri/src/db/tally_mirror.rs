@@ -102,7 +102,6 @@ pub(crate) const REVIEWED_TALLY_TERMINAL_CODES: &[&str] = &[
     "tally_endpoint_busy",
     "tally_endpoint_draining",
     "tally_endpoint_lock_unavailable",
-    "tally_endpoint_needs_attention",
     "transport_policy_invalid",
     "unclassified_tally_error",
     "voucher_export_invalid",

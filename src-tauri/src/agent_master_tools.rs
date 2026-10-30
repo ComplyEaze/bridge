@@ -1464,10 +1464,7 @@ fn master_next_step(code: &str) -> Option<&'static str> {
         ),
         // #2142: the lock was refused before anything was recorded or sent.
         "tally_endpoint_draining" => Some(
-            "Nothing was sent: Tally was still finishing an earlier request that was stopped for time. Call post_ledger_creates with this batch_id again after retry_after_s seconds; that call opens a new approval box.",
-        ),
-        "tally_endpoint_needs_attention" => Some(
-            "Nothing was sent: Tally has not answered promptly for a long time after an earlier request was stopped for time. Ask the person to look at Tally's screen for a message waiting for an answer, then call post_ledger_creates with this batch_id again after retry_after_s seconds.",
+            "Nothing was sent: Tally was still busy with an earlier request that was stopped for time. Call post_ledger_creates with this batch_id again after retry_after_s seconds; that call opens a new approval box.",
         ),
         "master_pre_image_remove_failed" => Some(
             "Nothing was sent. A working file of ComplyEaze Bridge for this batch could not be removed from its local folder; do not retry this batch. Call prepare_ledger_creates for a new batch.",

@@ -618,40 +618,32 @@ impl TallyHttpTransport {
             return Ok(held);
         };
         let refused = |refusal| TallyTransportError::WireRefused { refusal };
+        let draining = |retry_after_ms| refused(WireRefusal::Draining { retry_after_ms });
         let spacing_ms = millis(policy.spacing);
         let mut probes = 0;
         let mut pauses = 0;
         loop {
-            let (since_ms, quick, slow, last_probe_ms, slow_since_ms) =
-                match held.debt().map_err(refused)? {
-                    DrainDebt::Clear => return Ok(held),
-                    DrainDebt::InFlight { since_ms } => (since_ms, 0, 0, None, None),
-                    DrainDebt::Owed {
-                        since_ms,
-                        quick,
-                        slow,
-                        last_probe_ms,
-                        slow_since_ms,
-                    } => (since_ms, quick, slow, last_probe_ms, slow_since_ms),
-                };
+            let (since_ms, answered, last_probe_ms) = match held.debt().map_err(refused)? {
+                DrainDebt::Clear => return Ok(held),
+                DrainDebt::InFlight { since_ms } => (since_ms, 0, None),
+                DrainDebt::Owed {
+                    since_ms,
+                    answered,
+                    last_probe_ms,
+                } => (since_ms, answered, last_probe_ms),
+            };
             let now = self.wire.now_ms();
             // A time ahead of this clock counts as elapsed.
             let wait = last_probe_ms
                 .filter(|&last| last <= now)
                 .map_or(0, |last| (last + spacing_ms).saturating_sub(now));
-            // Nothing was probed by this call in either case, so neither says
-            // Tally needs a person. Bounded however other processes probe
-            // meanwhile.
+            // Bounded however other processes probe meanwhile.
             if probes >= policy.probes_per_call || pauses >= policy.probes_per_call {
-                return Err(refused(WireRefusal::Draining {
-                    retry_after_ms: spacing_ms,
-                }));
+                return Err(draining(spacing_ms));
             }
             if wait > 0 && probes == 0 {
                 // Another probe was sent too recently: send nothing.
-                return Err(refused(WireRefusal::Draining {
-                    retry_after_ms: wait,
-                }));
+                return Err(draining(wait));
             }
             if wait > 0 {
                 pauses += 1;
@@ -661,39 +653,32 @@ impl TallyHttpTransport {
                 continue;
             }
             probes += 1;
-            let owed = |quick, slow, last_probe_ms, slow_since_ms| DrainDebt::Owed {
+            let owed = |answered, last_probe_ms| DrainDebt::Owed {
                 since_ms,
-                quick,
-                slow,
+                answered,
                 last_probe_ms: Some(last_probe_ms),
-                slow_since_ms,
             };
             // Recorded before the probe, so a probe whose sender is killed
             // still spaces the next one.
-            held.record(owed(quick, slow, now, slow_since_ms))
-                .map_err(refused)?;
+            held.record(owed(answered, now)).map_err(refused)?;
             let probe = self.drain_probe(policy).await;
-            let (quick, slow, slow_since_ms) = match probe {
+            let answered = match probe {
                 // Nothing listens: the post fails as unreachable on its own.
                 drain::Probe::Unreachable => {
                     held.record(DrainDebt::Clear).map_err(refused)?;
                     return Ok(held);
                 }
-                drain::Probe::Quick => (quick.saturating_add(1), 0, None),
-                drain::Probe::AnsweredSlowly => {
-                    (0, slow.saturating_add(1), slow_since_ms.or(Some(now)))
-                }
-                drain::Probe::Cut => (0, 0, slow_since_ms.or(Some(now))),
+                drain::Probe::Quick | drain::Probe::Slow => answered.saturating_add(1),
+                drain::Probe::Cut => 0,
             };
-            if quick >= policy.quick_in_a_row || slow >= policy.quick_in_a_row {
+            if answered >= policy.answers_in_a_row {
                 held.record(DrainDebt::Clear).map_err(refused)?;
                 return Ok(held);
             }
-            let end = self.wire.now_ms();
-            held.record(owed(quick, slow, end, slow_since_ms))
+            held.record(owed(answered, self.wire.now_ms()))
                 .map_err(refused)?;
             if probe != drain::Probe::Quick {
-                return Err(refused(not_quick(policy, slow_since_ms, end)));
+                return Err(draining(millis(policy.retry_after())));
             }
         }
     }
@@ -731,7 +716,7 @@ impl TallyHttpTransport {
         self.observe_result(SendKind::Status, None, started, &result, answered_decoded);
         match result {
             Ok(_) if started.elapsed() < policy.quick_below => drain::Probe::Quick,
-            Ok(_) => drain::Probe::AnsweredSlowly,
+            Ok(_) => drain::Probe::Slow,
             Err(TallyTransportError::ConnectionFailed) => drain::Probe::Unreachable,
             Err(_) => drain::Probe::Cut,
         }
@@ -764,10 +749,8 @@ impl TallyHttpTransport {
         let settled = match result {
             Err(error) if drain::owes_drain(error) => DrainDebt::Owed {
                 since_ms,
-                quick: 0,
-                slow: 0,
+                answered: 0,
                 last_probe_ms: None,
-                slow_since_ms: None,
             },
             Ok(_) | Err(_) => DrainDebt::Clear,
         };
@@ -824,12 +807,10 @@ impl TallyHttpTransport {
         if let Some(policy) = self.drain {
             let refusal = match held.debt() {
                 Ok(DrainDebt::Clear) => None,
-                Ok(DrainDebt::InFlight { .. }) => Some(WireRefusal::Draining {
-                    retry_after_ms: millis(policy.spacing),
-                }),
-                Ok(DrainDebt::Owed { slow_since_ms, .. }) => {
-                    let now = self.wire.now_ms();
-                    Some(not_quick(policy, slow_since_ms, now))
+                Ok(DrainDebt::InFlight { .. } | DrainDebt::Owed { .. }) => {
+                    Some(WireRefusal::Draining {
+                        retry_after_ms: millis(policy.retry_after()),
+                    })
                 }
                 Err(refusal) => Some(refusal),
             };
@@ -1096,23 +1077,6 @@ impl Drop for InFlight<'_> {
                 "send_abandoned",
                 None,
             );
-        }
-    }
-}
-
-/// The refusal after probes that were not quick, the current run of them begun
-/// at `slow_since_ms`, at `now`: one that may need a person once that run is
-/// longer than a drain was measured to last.
-fn not_quick(policy: DrainPolicy, slow_since_ms: Option<u64>, now: u64) -> WireRefusal {
-    let long = slow_since_ms
-        .is_some_and(|since| now.saturating_sub(since) > millis(policy.attention_after));
-    if long {
-        WireRefusal::NeedsAttention {
-            retry_after_ms: millis(policy.retry_after_attention()),
-        }
-    } else {
-        WireRefusal::Draining {
-            retry_after_ms: millis(policy.retry_after_slow()),
         }
     }
 }

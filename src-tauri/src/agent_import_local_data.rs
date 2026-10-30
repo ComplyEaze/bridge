@@ -302,7 +302,7 @@ pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
         "data_folder",
         root,
         |name| match name {
-            "agent-import-ledger.jsonl" => "journal",
+            JOURNAL_FILE => "journal",
             // The skip-only file sits beside the import journal and is read with it.
             super::statement_facts::SKIPS_FILE => "journal",
             // The master write journal and its pre-image sidecars are import
@@ -388,6 +388,9 @@ fn scan_leases(report: &mut Report, root: &Path, coordination: &[&Path]) {
 
 /// The data folder could not be listed, so the journal was not looked for.
 const DATA_FOLDER_UNREADABLE: &str = "data_folder_unreadable";
+
+/// The import journal's file name in the data folder.
+const JOURNAL_FILE: &str = "agent-import-ledger.jsonl";
 /// The journal could not be opened (no permission, a link, another owner).
 const JOURNAL_UNREADABLE: &str = "journal_unreadable";
 /// The journal was opened but could not be read as a journal, twice: an I/O
@@ -418,7 +421,7 @@ fn read_journal_once(path: &Path) -> Journal {
 /// report) before it is reported. A record rolled back after a failed append may
 /// be counted once: this is a report.
 fn read_journal(root: &Path, between: impl FnOnce()) -> Journal {
-    let path = root.join("agent-import-ledger.jsonl");
+    let path = root.join(JOURNAL_FILE);
     let first = read_journal_once(&path);
     if matches!(
         first,
@@ -549,10 +552,9 @@ pub(super) fn to_json(
         // exists the folder resolves there while a journal the package created
         // stays in the package's copy (measured on a Store install, #1584's lab
         // sheet). The journal is the file a person most needs, so it is shown
-        // by its own location.
-        if !matches!(report.journal, Journal::Absent) {
-            user_visible_path(&folder.join("agent-import-ledger.jsonl"))
-                .put_into(&mut value, "journal_path");
+        // by its own location, when the folder was read and the journal is in it.
+        if matches!(report.root, Root::Present) && !matches!(report.journal, Journal::Absent) {
+            user_visible_path(&folder.join(JOURNAL_FILE)).put_into(&mut value, "journal_path");
         }
         // the first, as before; every one, in the order the locks are taken
         if let Some(first) = locks.first() {

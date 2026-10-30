@@ -379,6 +379,9 @@ fn no_path_is_in_the_json_unless_asked() {
     let path = visible.display_string();
     let state = visible.state();
     assert_ne!(state, "unresolved", "{shown}");
+    // the form a person can paste: never the verbatim prefix Windows returns
+    #[cfg(windows)]
+    assert!(!path.starts_with(r"\\?\"), "{shown}");
     assert_eq!(shown["folder_path"], path, "{shown}");
     assert_eq!(shown["folder_path_state"], state, "{shown}");
     assert_eq!(shown["lock_folder_path"], path, "{shown}");
@@ -412,6 +415,7 @@ fn no_path_is_in_the_json_unless_asked() {
         serde_json::json!([state, "unresolved"]),
         "{two}"
     );
+    // the value as printed, found in the JSON text whatever its backslashes
     assert!(
         names_the_path(&shown.to_string(), Path::new(&path)),
         "{shown}"

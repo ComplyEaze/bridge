@@ -1,0 +1,4 @@
+command: curl.exe -sS -w "%{http_code} %{size_download}" -o <file> http://127.0.0.1:9001/status
+time: 2026-10-30T11:03:39.824Z
+exit: 0
+printed: 200 51

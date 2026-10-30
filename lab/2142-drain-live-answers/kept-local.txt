@@ -1,0 +1,3 @@
+Files kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+data/agent-egress.jsonl 43092 B 6dc39ac85349128ef7867a0c9d50078a59529aa37b5b872dbff643d614d786a5
+data/terms-acceptance.jsonl 90 B 083f8708ce5b76a0cb2841165c6c70ce8df282cc490e7e1f109e4182400972a6

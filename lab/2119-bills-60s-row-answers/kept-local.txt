@@ -1,0 +1,7 @@
+Pre-fix copies of the files changed by the company-number redaction of 30 Oct 2026, kept on the lab PC, by size and sha256:
+answers/001-s1-list.json 1568 B e9b0661e5fe7ac09ae6427f0594b4c7efe1e09796052f21f073edc522c4c5ad8
+answers/002-s1-marks.json 32058 B 0976272278d174cd80de6064b1241e9a50a1ad595ba8cbe60f59b6abf9ed4bba
+answers/003-s1-outstandings.json 189120 B f7a38889c6b4c0b91d2e8932cce58acbdf540c46df6d829b2a54686e37c915bd
+answers/004-s2-marks.json 32058 B 26107d5a7752ef5126d2ce12036748bd34ab725087c8acd4d6b14008afbd0278
+answers/006-s7-marks.json 32061 B e45a7fe904456c6093664ad8fa444906ed920897931d322ebda4b8c7e5887a91
+notes.txt 8411 B 8808ce3c4f93a5e49320b94565d5d19592e792bfca9ed2bd0f98ca7d746eb860

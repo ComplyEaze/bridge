@@ -9,3 +9,11 @@ notes.txt: original 8397 B sha256 fd56290baa000b4b42dc42b704d90d61f89ca1c528864e
 scripts/s1p1.py: original 4826 B sha256 d648a37abfad33568cea1cb5a55c95a7aa1f26c15d0ddb243943f407d458f938; 1 x -> <lab folder>; 3 x -> stop
 scripts/call.py: original 1214 B sha256 bca584dac316659447c144a758af87db654ea41f909d1d132b1a0c58d3bc1b81; 1 x -> <lab folder>
 scripts/step0.ps1: original 2385 B sha256 719031d33e8ad44486dfa234733e6315c6e0bc0131644fb973d19889880c35c2; 2 x -> <lab folder>
+
+Forward fix of 30 Oct 2026 (the run lead's gate finding): THE COMPANY's company number redacted:
+answers/001-s1-list.json: pushed before this fix as 1568 B sha256 e9b0661e5fe7ac09ae6427f0594b4c7efe1e09796052f21f073edc522c4c5ad8 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers/002-s1-marks.json: pushed before this fix as 32058 B sha256 0976272278d174cd80de6064b1241e9a50a1ad595ba8cbe60f59b6abf9ed4bba (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers/003-s1-outstandings.json: pushed before this fix as 189120 B sha256 f7a38889c6b4c0b91d2e8932cce58acbdf540c46df6d829b2a54686e37c915bd (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers/004-s2-marks.json: pushed before this fix as 32058 B sha256 26107d5a7752ef5126d2ce12036748bd34ab725087c8acd4d6b14008afbd0278 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers/006-s7-marks.json: pushed before this fix as 32061 B sha256 e45a7fe904456c6093664ad8fa444906ed920897931d322ebda4b8c7e5887a91 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+notes.txt: pushed before this fix as 8411 B sha256 8808ce3c4f93a5e49320b94565d5d19592e792bfca9ed2bd0f98ca7d746eb860 (kept on the lab PC); the company number replaced by "<redacted: company number>" in 2 place(s)

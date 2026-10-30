@@ -11568,14 +11568,6 @@
   "to": "tds_read.iter().cloned().collect();"
  },
  {
-  "id": "L1259-26",
-  "by": "reviewer-opus",
-  "what": "loans_interest: charge_shaped leaves out the ledgers on nil lines (the reference reads them)",
-  "file": "src/loans_interest.rs",
-  "from": "            let counter: Vec<&str> = others_than(v, loan_ledger)\n",
-  "to": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)\n"
- },
- {
   "id": "L1259-27",
   "by": "reviewer-opus",
   "what": "loans_interest: tds_in_principal is published only where the principal vouchers' TDS does not net to nil",

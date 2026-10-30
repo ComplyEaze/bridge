@@ -1,0 +1,33 @@
+I2-out: family none; pid 17620 parent 2916
+  extra <home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml file=4de0e4283f87 sha256 88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843
+  extra <home>\AppData\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml: absent sha256 None
+  extra <home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml file=4de0e4283f87 sha256 88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843
+  R-journal: absent bytes None
+  Q-journal: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\agent-import-ledger.jsonl file=8fa4a72837ae bytes 174198
+  R-K.lock: absent
+  R-K.snapshot.lock: absent
+  R-K.wire.lock: absent
+  Q-K.lock: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock file=5f7b8ee871e7
+  Q-K.snapshot.lock: absent
+  Q-K.wire.lock: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock file=12bff026df8f
+  P-K.lock: final=\\?\<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock file=f9d34f9120c8
+  P-K.snapshot.lock: absent
+  P-K.wire.lock: final=\\?\<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock file=e9027bd0de07
+  lease_counts: {"R-leases": {"total": null, "dot_lock": 0, "snapshot_lock": 0, "wire_lock": 0, "other": 0, "error": "not listed: absent"}, "Q-leases": {"total": 2565, "dot_lock": 2522, "snapshot_lock": 38, "wire_lock": 5, "other": 0, "error": null}, "P-leases": {"total": 2370, "dot_lock": 2330, "snapshot_lock": 34, "wire_lock": 5, "other": 1, "error": null}}
+I2-in: family none; pid 20376 parent 11424
+  extra <home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml file=4de0e4283f87 sha256 88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843
+  extra <home>\AppData\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml file=4de0e4283f87 sha256 88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843
+  extra <home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\imports\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml file=4de0e4283f87 sha256 88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843
+  R-journal: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\agent-import-ledger.jsonl file=8fa4a72837ae bytes 174198
+  Q-journal: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\agent-import-ledger.jsonl file=8fa4a72837ae bytes 174198
+  R-K.lock: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock file=5f7b8ee871e7
+  R-K.snapshot.lock: absent
+  R-K.wire.lock: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock file=12bff026df8f
+  Q-K.lock: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock file=5f7b8ee871e7
+  Q-K.snapshot.lock: absent
+  Q-K.wire.lock: final=\\?\<home>\AppData\Local\Packages\<family>\LocalCache\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock file=12bff026df8f
+  P-K.lock: final=\\?\<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock file=f9d34f9120c8
+  P-K.snapshot.lock: absent
+  P-K.wire.lock: final=\\?\<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock file=e9027bd0de07
+  lease_counts: {"R-leases": {"total": 2565, "dot_lock": 2522, "snapshot_lock": 38, "wire_lock": 5, "other": 0, "error": null}, "Q-leases": {"total": 2565, "dot_lock": 2522, "snapshot_lock": 38, "wire_lock": 5, "other": 0, "error": null}, "P-leases": {"total": 2370, "dot_lock": 2330, "snapshot_lock": 34, "wire_lock": 5, "other": 1, "error": null}}
+K1b-out (before): R-journal absent bytes None; Q-journal bytes 173124

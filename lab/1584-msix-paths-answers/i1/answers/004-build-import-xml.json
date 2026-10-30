@@ -1,0 +1,129 @@
+{
+ "side": "in",
+ "server_info": {
+  "name": "bridge-tally",
+  "version": "0.7.0"
+ },
+ "server_pid": 17732,
+ "tool": "build_import_xml",
+ "arguments": {
+  "company_guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+  "vouchers": [
+   {
+    "bridge_txn_id": "lab1584-i1",
+    "date": "2025-04-01",
+    "voucher_type": "Journal",
+    "entries": [
+     {
+      "ledger": "Cash",
+      "amount": "1.00",
+      "side": "Dr"
+     },
+     {
+      "ledger": "DN Sales",
+      "amount": "1.00",
+      "side": "Cr"
+     }
+    ]
+   }
+  ]
+ },
+ "call_sent_utc": "2026-10-30T20:27:40Z",
+ "round_trip_seconds": 9.044,
+ "response": {
+  "id": 6,
+  "jsonrpc": "2.0",
+  "result": {
+   "content": [
+    {
+     "text": "{\"company\": {\"books_from\": \"20250401\", \"company_number\": \"<company_number>\", \"guid\": \"d45bc1b0-e5e3-4261-b3b2-cce3915f42d3\", \"identity_state\": \"verified_tuple\", \"missing_field\": null, \"name\": \"BRIDGE CORPUS DENSE\"}, \"evidence\": {\"bytes\": 2136040, \"duration_ms\": 8516, \"read_at\": \"2026-10-30T20:27:49.451Z\", \"request_sha256\": \"85846cb0a5dd39cd5ea2eb9756581ac08ed196ecd0d99a643899aa6f87cb2196\", \"response_sha256\": \"5e71ffcd961a006ee29eaba62b4adca5f56c44d2a02d9d047f5f75891f5250dd\", \"state\": \"complete\"}, \"read_at\": \"2026-10-30T20:27:40.935Z\", \"result\": {\"amendment\": null, \"batch_id\": \"bridge-84ee0bff-4190-434b-b073-1ac4e22ad188\", \"bill_wise_response_sha256\": [\"6d59e866b9bd7a1d4d84316c8c8a6acb692f0a65d1d97dc8deddef0db1ab83c0\"], \"endpoint_origin\": \"http://127.0.0.1:9001\", \"hsn_warnings\": [], \"identity_scheme\": \"batch_v1\", \"live_evidence\": [{\"observation\": \"synthetic_lab_readback\", \"report\": \"docs/agent/ASSESSMENT-2026-09-06.md\", \"voucher_types\": [\"Journal\"]}], \"next_step\": \"Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment. Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.\", \"observed_profile\": {\"license_tier\": \"silver\", \"mode\": \"Licensed\", \"product\": \"TallyPrime\", \"release\": \"7.2\"}, \"on_account_approved\": [], \"path\": \"<home>\\\\AppData\\\\Local\\\\Packages\\\\<family>\\\\LocalCache\\\\Local\\\\Bridge\\\\agent\\\\imports\\\\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml\", \"path_state\": \"resolved\", \"sha256\": \"88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843\", \"statement_ledger_warnings\": [], \"suspense_lines\": {\"count\": 0, \"purpose_not_confirmed\": 0, \"unidentified\": 0}, \"total_credit\": \"1\", \"total_debit\": \"1\", \"transfers\": {\"next_steps\": {}, \"open\": [], \"open_omitted\": 0, \"retired\": 0, \"skips_open\": 0, \"skips_paired\": 0, \"state\": \"computed\"}, \"verification_preflight\": {\"from\": \"20250401\", \"paired_source_bytes\": 825980, \"response_sha256\": \"cbb0f87e376a751b5486292c5fcfdee457a5fe58fa095a4457713b0ac45180f3\", \"source_rows\": 82, \"state\": \"current_window_readable\", \"to\": \"20250401\"}, \"voucher_count\": 1, \"warnings\": [\"No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), the post_import tool, which that setting adds, would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import. Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.\", \"The preflight observes the current verification window. The import or subsequent changes can make later readback exceed the source limits.\", \"Confirm the loaded company before importing. A mismatched SVCURRENTCOMPANY is verified to post into whatever company Tally has loaded, with CREATED=1 and no error, so naming a company does not aim the write. Compare the whole identity immediately before importing — endpoint origin, name, GUID, company number and books-from, all five. Not the GUID alone, because a year-end split gives the child its parent's GUID; and not the company fields alone, because a second local Tally can hold a copy of the same company and a hand import is never checked against the endpoint this batch was built from. The endpoint_origin this batch recorded is returned beside it. Prefer an instance with no other company loaded.\", \"Do not re-import or rebuild this business event if the outcome is uncertain, including a Journal. Preserve the original batch and saved file, then call verify_import for read-only reconciliation. A controlled repeat observation does not qualify unknown-outcome recovery.\", \"Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. This reads each ledger's own bill-wise setting, not the company's bill-wise feature. A hand import of the file is not checked at all.\"]}, \"truncated\": false}",
+     "type": "text"
+    }
+   ],
+   "isError": false,
+   "structuredContent": {
+    "company": {
+     "books_from": "20250401",
+     "company_number": "<company_number>",
+     "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+     "identity_state": "verified_tuple",
+     "missing_field": null,
+     "name": "BRIDGE CORPUS DENSE"
+    },
+    "evidence": {
+     "bytes": 2136040,
+     "duration_ms": 8516,
+     "read_at": "2026-10-30T20:27:49.451Z",
+     "request_sha256": "85846cb0a5dd39cd5ea2eb9756581ac08ed196ecd0d99a643899aa6f87cb2196",
+     "response_sha256": "5e71ffcd961a006ee29eaba62b4adca5f56c44d2a02d9d047f5f75891f5250dd",
+     "state": "complete"
+    },
+    "read_at": "2026-10-30T20:27:40.935Z",
+    "result": {
+     "amendment": null,
+     "batch_id": "bridge-84ee0bff-4190-434b-b073-1ac4e22ad188",
+     "bill_wise_response_sha256": [
+      "6d59e866b9bd7a1d4d84316c8c8a6acb692f0a65d1d97dc8deddef0db1ab83c0"
+     ],
+     "endpoint_origin": "http://127.0.0.1:9001",
+     "hsn_warnings": [],
+     "identity_scheme": "batch_v1",
+     "live_evidence": [
+      {
+       "observation": "synthetic_lab_readback",
+       "report": "docs/agent/ASSESSMENT-2026-09-06.md",
+       "voucher_types": [
+        "Journal"
+       ]
+      }
+     ],
+     "next_step": "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment. Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.",
+     "observed_profile": {
+      "license_tier": "silver",
+      "mode": "Licensed",
+      "product": "TallyPrime",
+      "release": "7.2"
+     },
+     "on_account_approved": [],
+     "path": "<home>\\AppData\\Local\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\imports\\bridge-84ee0bff-4190-434b-b073-1ac4e22ad188.xml",
+     "path_state": "resolved",
+     "sha256": "88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843",
+     "statement_ledger_warnings": [],
+     "suspense_lines": {
+      "count": 0,
+      "purpose_not_confirmed": 0,
+      "unidentified": 0
+     },
+     "total_credit": "1",
+     "total_debit": "1",
+     "transfers": {
+      "next_steps": {},
+      "open": [],
+      "open_omitted": 0,
+      "retired": 0,
+      "skips_open": 0,
+      "skips_paired": 0,
+      "state": "computed"
+     },
+     "verification_preflight": {
+      "from": "20250401",
+      "paired_source_bytes": 825980,
+      "response_sha256": "cbb0f87e376a751b5486292c5fcfdee457a5fe58fa095a4457713b0ac45180f3",
+      "source_rows": 82,
+      "state": "current_window_readable",
+      "to": "20250401"
+     },
+     "voucher_count": 1,
+     "warnings": [
+      "No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), the post_import tool, which that setting adds, would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import. Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.",
+      "The preflight observes the current verification window. The import or subsequent changes can make later readback exceed the source limits.",
+      "Confirm the loaded company before importing. A mismatched SVCURRENTCOMPANY is verified to post into whatever company Tally has loaded, with CREATED=1 and no error, so naming a company does not aim the write. Compare the whole identity immediately before importing — endpoint origin, name, GUID, company number and books-from, all five. Not the GUID alone, because a year-end split gives the child its parent's GUID; and not the company fields alone, because a second local Tally can hold a copy of the same company and a hand import is never checked against the endpoint this batch was built from. The endpoint_origin this batch recorded is returned beside it. Prefer an instance with no other company loaded.",
+      "Do not re-import or rebuild this business event if the outcome is uncertain, including a Journal. Preserve the original batch and saved file, then call verify_import for read-only reconciliation. A controlled repeat observation does not qualify unknown-outcome recovery.",
+      "Checked: none of the ledgers this batch names is a bill-wise ledger, as read from Tally in the ledger list during this build. ComplyEaze Bridge reads the ledger list again before posting and refuses the post (import_bill_wise_changed) if a named ledger has become bill-wise since. This reads each ledger's own bill-wise setting, not the company's bill-wise feature. A hand import of the file is not checked at all."
+     ]
+    },
+    "truncated": false
+   }
+  }
+ }
+}

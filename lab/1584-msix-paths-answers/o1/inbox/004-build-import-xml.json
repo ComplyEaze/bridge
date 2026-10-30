@@ -1,0 +1,1 @@
+{"tool": "build_import_xml", "arguments": {"company_guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3", "vouchers": [{"bridge_txn_id": "lab1584-o1", "date": "2025-04-01", "voucher_type": "Journal", "entries": [{"ledger": "Cash", "amount": "1.00", "side": "Dr"}, {"ledger": "DN Sales", "amount": "1.00", "side": "Cr"}]}]}}

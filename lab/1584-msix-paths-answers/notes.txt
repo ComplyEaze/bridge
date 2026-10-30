@@ -1,0 +1,130 @@
+1584-MSIX at 92bf3ac7 (README 2a20b592..., OUT-FIRST cb7af358...). Notes, UTC.
+0a 2026-10-30T20:23:41.8657489Z: Windows 10.0.19045 (22H2, build 19045). The run lead's message for this item is the grant. The root C:\bridge-lab\1584 already held files of a 12 Oct sitting (left untouched); the subfolders bin, run, evidence, i1, o1, c-in, c-out, e, x-out, x-in were absent and were created empty.
+0b: Tally: "tally.exe","28316","Console","5","2,62,532 K"; netstat 9001:   TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       28316 |   TCP    [::]:9001              [::]:0                 LISTENING       28316; GET /status: <RESPONSE>TallyPrime Server is Running</RESPONSE>  200 51; BRIDGE CORPUS DENSE loaded alone by Select Company (Gateway: last entry 31-Mar-26).
+0c: Get-AppxPackage *<desktop client>*: exactly one: Name <desktop client>; PackageFamilyName = F; Version 4.4212.0.0; SignatureKind Developer; InstallLocation C:\Program Files\WindowsApps\<desktop client>_4.4212.0.0_x64__<family suffix>.
+0d: bin\bridge_mcp.exe 32,705,536 B sha256 48d2f743... and bin\pdfium.dll 7,211,520 B sha256 79d4676b... copied from the 0.7.0 unpacked bundle (= PIN); probe.ps1 80a95d84..., client.py 5594101b..., hold-lock.ps1 9469e3e8... (= SHA256.txt at 92bf3ac7); ka.txt and scratch.lock written.
+0e: python = <home>\AppData\Local\Programs\Python\Python310\python.exe (under LA); run\python.txt holds it and its Q-side copy.
+Out steps: the Run box is out of reach for this session (no system-key grant; asking for one would prompt the owner), so every out step uses the WMI method (Invoke-CimMethod Win32_Process Create). K1 decides whether that method is outside.
+E: not run. The lab session's tool list holds the ComplyEaze Bridge tools, but the lab does not know that they run without a <desktop client> Desktop permission prompt.
+0f bridge_mcp.exe processes:
+
+ProcessId ParentProcessId ExecutablePath                                                                                                                                   
+--------- --------------- --------------                                                                                                                                   
+    17588           18680 C:\bridge-lab\builds\master-fd6f7c0d\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe                                                              
+    13772           18680 <home>\AppData\Roaming\<desktop client>\<desktop client> Extensions\local.mcpb.complyeaze-contributors.bridge-tally\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+      384           18680 <home>\AppData\Roaming\<desktop client>\<desktop client> Extensions\local.mcpb.complyeaze-contributors.bridge-tally\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+     6668           18680 C:\bridge-lab\builds\master-fd6f7c0d\mcpb\bin\x86_64-pc-windows-msvc\bridge_mcp.exe                                                              
+
+
+
+tasklist /apps:
+"<desktop client> (<desktop client>)","18680","3,43,860 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","16924","33,388 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","14784","1,52,912 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","28608","69,260 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","26172","71,712 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","15176","6,44,512 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","10356","1,06,784 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","26536","1,18,796 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","9380","1,17,560 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","8248","1,04,824 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","16504","1,18,924 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","25984","1,37,976 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+"<desktop client> (<desktop client>)","21584","1,16,388 K","<desktop client>_4.4212.0.0_x64__<family suffix>"
+lab shell PID 30256
+2026-10-30T20:23:57.5349998Z K1a-in (cmd /c from the lab shell): run\K1a-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side in -Step K1a -Family <family> -WriteNonce 107fe768 > C:\bridge-lab\1584\evidence\K1a-in.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\K1a-in.exit
+  exit 0 at 2026-10-30T20:24:12.4437032Z
+2026-10-30T20:24:25.1750138Z K1b-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 12632): run\K1b-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side out -Step K1b -Family <family> -WriteNonce 21f2fd7b -ExtraFile C:\bridge-lab\1584\run\python.txt > C:\bridge-lab\1584\evidence\K1b-out.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\K1b-out.exit
+  exit 0 at 2026-10-30T20:24:31.4689001Z
+2026-10-30T20:24:33.0724035Z K1c-in (cmd /c from the lab shell): run\K1c-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side in -Step K1c -Family <family> > C:\bridge-lab\1584\evidence\K1c-in.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\K1c-in.exit
+  exit 0 at 2026-10-30T20:24:40.3375006Z
+K1 (2026-10-30T20:25:23.7119001Z): nonces N1=107fe768 N2=21f2fd7b. Classification in evidence\K1-classification.txt. OUT decided on the first try with the WMI method (K1b family none; N2-out in X and not in XQ; K1c sees X\N2-out). IN: K1a package_family none, and its write N1-in was REDIRECTED (from out: XQ\N1-in present, X\N1-in absent): the combination 'family none, redirected'. KA instrument passes (same vol+id, final \\?\C:\bridge-lab\1584\ka.txt). Decision 2: inside, X\N1-in opens with final, opened and nt all naming the REAL package path (Packages\<family>\LocalCache\Local\bridge-lab-1584\...), same vol+id as XQ\N1-in from out (one file). Known folders: LocalAppData 0x44000 = 0x4000 on both sides; Profile-0x4000 = env_USERPROFILE on both sides (P rows not void). Before listing (K1b): R absent; Q present with the journal (173,124 B) and Q-K.lock, Q-K.wire.lock; P present with P-K.lock, P-K.wire.lock; R-leases absent; Q-leases 2,565 entries, P-leases 2,370.
+2026-10-30T20:25:25.5936002Z I0-in (cmd /c from the lab shell): run\I0-in.cmd =
+  C:\bridge-lab\1584\bin\bridge_mcp.exe --local-data-report --show-paths > C:\bridge-lab\1584\evidence\I0-report-in.json 2> C:\bridge-lab\1584\evidence\I0-report-in.err
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\I0-in.exit
+  exit 0 at 2026-10-30T20:25:40.6942839Z
+2026-10-30T20:26:05.8397066Z I1-in (cmd /c from the lab shell): run\I1-in.cmd =
+  <home>\AppData\Local\Programs\Python\Python310\python.exe C:\bridge-lab\1584\client.py C:\bridge-lab\1584\i1 in > C:\bridge-lab\1584\evidence\I1-in.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\I1-in.exit
+2026-10-30T20:27:34Z I1 deviation: BRIDGE CORPUS DENSE holds no ledger under Indirect Expenses or Direct Expenses (003: 123 items: Sundry Debtors 120, Cash-in-Hand 1, Sales Accounts 1, Profit & Loss A/c). On the run lead's word, option (a): A = the Cash-in-Hand ledger (Dr 1.00), B = the Sales Accounts ledger (Cr 1.00); if the build refuses that pair, option (b) on another book.
+2026-10-30T20:28:28.1839650Z I2-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 2916): run\I2-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side out -Step I2 -Family <family> -ExtraFile C:\bridge-lab\1584\i1\paths.txt > C:\bridge-lab\1584\evidence\I2-out.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\I2-out.exit
+  exit 0 at 2026-10-30T20:28:35.3769874Z
+2026-10-30T20:28:36.6005104Z I2-in (cmd /c from the lab shell): run\I2-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side in -Step I2 -Family <family> -ExtraFile C:\bridge-lab\1584\i1\paths.txt > C:\bridge-lab\1584\evidence\I2-in.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\I2-in.exit
+  exit 0 at 2026-10-30T20:28:42.3501333Z
+2026-10-30T20:29:15.0587544Z I1 (option a): 004 build_import_xml lab1584-i1 (Cash Dr 1.00, DN Sales Cr 1.00, 2025-04-01, Journal): batch_id bridge-84ee0bff-..., result.path = the Q name, path_state resolved, sha256 88573f0e...; 005 local_data_report: folder present, folder_path null (the tool prints no path), journal 38 batches; stop, exit 0. I2: from out only the Q name opens (R name absent); from in all three names open the one Q file (same vol+id); sha256 = result.sha256: outcome I-A. Journal: Q grew 173,124 -> 174,198 B; R-journal absent from out. R (real) still absent from out after I1.
+2026-10-30T20:29:16.3775279Z O0-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 12256): run\O0-out.cmd =
+  C:\bridge-lab\1584\bin\bridge_mcp.exe --local-data-report --show-paths > C:\bridge-lab\1584\evidence\O0-report-out.json 2> C:\bridge-lab\1584\evidence\O0-report-out.err
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\O0-out.exit
+  exit 0 at 2026-10-30T20:29:19.0394078Z
+2026-10-30T20:29:30.4519731Z O1-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 23832): run\O1-out.cmd =
+  <home>\AppData\Local\Programs\Python\Python310\python.exe C:\bridge-lab\1584\client.py C:\bridge-lab\1584\o1 out > C:\bridge-lab\1584\evidence\O1-out.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\O1-out.exit
+2026-10-30T20:30:21.3000619Z O2-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 18556): run\O2-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side out -Step O2 -Family <family> -ExtraFile C:\bridge-lab\1584\o1\paths.txt > C:\bridge-lab\1584\evidence\O2-out.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\O2-out.exit
+  exit 0 at 2026-10-30T20:30:28.3589142Z
+2026-10-30T20:30:29.6317933Z O2-in (cmd /c from the lab shell): run\O2-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side in -Step O2 -Family <family> -ExtraFile C:\bridge-lab\1584\o1\paths.txt > C:\bridge-lab\1584\evidence\O2-in.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\O2-in.exit
+  exit 0 at 2026-10-30T20:30:36.0545311Z
+2026-10-30T20:31:22.6508509Z C-client-in (cmd /c from the lab shell): run\C-client-in.cmd =
+  <home>\AppData\Local\Programs\Python\Python310\python.exe C:\bridge-lab\1584\client.py C:\bridge-lab\1584\c-in in > C:\bridge-lab\1584\evidence\C-client-in.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C-client-in.exit
+2026-10-30T20:31:24.8013280Z C-client-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 2328): run\C-client-out.cmd =
+  <home>\AppData\Local\Programs\Python\Python310\python.exe C:\bridge-lab\1584\client.py C:\bridge-lab\1584\c-out out > C:\bridge-lab\1584\evidence\C-client-out.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C-client-out.exit
+2026-10-30T20:31:47.1204222Z KH-hold-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 28072): run\KH-hold-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path C:\bridge-lab\1584\scratch.lock -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\KH-out-hold.log -StopFile C:\bridge-lab\1584\stop-KH-out.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\KH-hold-out.exit
+2026-10-30T20:31:52.9129377Z KH-hold-in (cmd /c from the lab shell): run\KH-hold-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path C:\bridge-lab\1584\scratch.lock -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\KH-in-hold.log -StopFile C:\bridge-lab\1584\stop-KH-in.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\KH-hold-in.exit
+  exit 3 at 2026-10-30T20:31:56.8509650Z
+2026-10-30T20:32:12.9022821Z C1s-hold-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 3124): run\C1s-hold-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\.complyeaze-bridge\coordination\native-dispatch-leases$K.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C1s-out-hold.log -StopFile C:\bridge-lab\1584\stop-C1s-out.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C1s-hold-out.exit
+2026-10-30T20:32:32.1657630Z C1s first attempt: the lab's own shell quoting dropped the backslash before the key in the holder's path (native-dispatch-leases$K.wire.lock), so the holder logged OPEN_FAILED (evidence\C1s-out-hold.log) and no call was sent. Not a measurement: the row was run again as C1s-2 with the path built by Join-Path (run\C-paths.txt).
+2026-10-30T20:32:33.8640513Z C1s-2-hold-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 20496): run\C1s-2-hold-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C1s-2-out-hold.log -StopFile C:\bridge-lab\1584\stop-C1s-2-out.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C1s-2-hold-out.exit
+2026-10-30T20:33:27.9090989Z C1s-2: the holder (pid 23956) logged START only; the runner's poll of the log collided with the holder's write (the runner got 'Permission denied' reading it), so HELD was never logged and no call was sent. Stop file written; the holder ended. Void by the lab's instrument. The runner now waits 3 s before reading a holder log and retries a busy read; C1s run again as C1s-3.
+2026-10-30T20:33:49.5259197Z C1s-3-hold-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 23984): run\C1s-3-hold-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C1s-3-out-hold.log -StopFile C:\bridge-lab\1584\stop-C1s-3-out.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C1s-3-hold-out.exit
+2026-10-30T20:34:23Z C1s-3 stands (see evidence/C-rows.txt correction).
+2026-10-30T20:34:29.4477492Z C1-hold-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 1832): run\C1-hold-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C1-out-hold.log -StopFile C:\bridge-lab\1584\stop-C1-out.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C1-hold-out.exit
+2026-10-30T20:34:49.1770255Z C2s-hold-in (cmd /c from the lab shell): run\C2s-hold-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C2s-in-hold.log -StopFile C:\bridge-lab\1584\stop-C2s-in.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C2s-hold-in.exit
+2026-10-30T20:35:07.2175295Z C2-hold-in (cmd /c from the lab shell): run\C2-hold-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C2-in-hold.log -StopFile C:\bridge-lab\1584\stop-C2-in.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C2-hold-in.exit
+2026-10-30T20:35:34.5677952Z C3-hold-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 10580): run\C3-hold-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\AppData\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C3-out-hold.log -StopFile C:\bridge-lab\1584\stop-C3-out.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C3-hold-out.exit
+2026-10-30T20:35:42.7727132Z C4-hold-in (cmd /c from the lab shell): run\C4-hold-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\AppData\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C4-in-hold.log -StopFile C:\bridge-lab\1584\stop-C4-in.txt
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C4-hold-in.exit
+2026-10-30T20:36:11.1614227Z C rows done (evidence\C-rows.txt): KH HELD/BUSY win32=33; C0 both answer; C1s-3 busy; C1 busy; C1r answers; C2s busy; C2 busy; C2r answers; C3 answers (out holds the real AppData wire lock; the in client's AppData lock is the package file); C4 answers. c-in and c-out stopped. End: no bridge_mcp.exe of this item running; nothing deleted; BRIDGE CORPUS DENSE left loaded.
+OUT-FIRST (cb7af358...): K2 = sha256('native-dispatch-port:9011') recomputed here: equal. X0 2026-10-30T20:36:33.8056241Z: @(Get-NetTCPConnection -State Listen | Where-Object LocalPort -eq 9011).Count = 0; total listeners 34
+2026-10-30T20:36:35.1596559Z X0-out (WMI Win32_Process Create, ReturnValue 0, ProcessId 20540): run\X0-out.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side out -Step X0 -Family <family> -Key 45354b5d45e8c1b4f7889a4222bf8210044f23f98a2206262f922ae6a8968313 > C:\bridge-lab\1584\evidence\X0-out.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\X0-out.exit
+  exit 0 at 2026-10-30T20:36:41.0307037Z
+2026-10-30T20:36:42.2349997Z X0-in (cmd /c from the lab shell): run\X0-in.cmd =
+  powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\probe.ps1 -Side in -Step X0 -Family <family> -Key 45354b5d45e8c1b4f7889a4222bf8210044f23f98a2206262f922ae6a8968313 > C:\bridge-lab\1584\evidence\X0-in.out 2>&1
+  echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\X0-in.exit
+  exit 0 at 2026-10-30T20:36:47.5580850Z
+2026-10-30T20:37:04.1460566Z OUT-FIRST X0: stop. The 9011 lock files are not all absent: from out, Q-K2.lock, Q-K2.wire.lock, P-K2.lock and P-K2.wire.lock are present (R-K2.* absent); from in, R-K2.lock and R-K2.wire.lock open (to the Q files) as well. Port 9011 has history, so OUT-FIRST does not run (the sheet: another port needs a sheet change). Nothing was sent to 9011; X1 to X4 not run.

@@ -1,0 +1,76 @@
+{
+  "app_files_outside_this_folder_covered": false,
+  "classes": {
+    "approval_notes": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "bank_statements": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "egress_log": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "import_files": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "journal": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "lab": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "locks": {
+      "bytes": 17,
+      "files": 2370,
+      "oldest_days": 14
+    },
+    "other": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "proofs": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "review_records": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    }
+  },
+  "entries_that_could_not_be_read": 0,
+  "entry_cap_reached": false,
+  "folder": "missing",
+  "folder_path": "<home>\\AppData\\Local\\Bridge\\agent",
+  "folders_that_could_not_be_listed": [],
+  "incomplete_reason": null,
+  "interrupted_write_folders": 0,
+  "journal": {
+    "state": "absent"
+  },
+  "lock_folder_path": "<home>\\AppData\\Local\\Bridge\\agent",
+  "lock_folder_paths": [
+    "<home>\\AppData\\Local\\Bridge\\agent",
+    "<home>\\.complyeaze-bridge\\coordination"
+  ],
+  "master_journal": {
+    "state": "absent"
+  },
+  "other_directories_not_entered": 0,
+  "special_files_not_counted": 0,
+  "symlinks_not_followed": 0
+}

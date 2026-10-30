@@ -1,0 +1,3 @@
+2026-10-30T20:35:37.1822769Z START pid=27704 mode=Exclusive path=<home>\AppData\Local\Bridge\agent\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock
+2026-10-30T20:35:37.4247134Z HELD
+2026-10-30T20:35:39.7603220Z RELEASED

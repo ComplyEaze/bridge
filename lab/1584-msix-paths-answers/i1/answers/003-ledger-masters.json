@@ -1,0 +1,800 @@
+{
+ "side": "in",
+ "server_info": {
+  "name": "bridge-tally",
+  "version": "0.7.0"
+ },
+ "server_pid": 17732,
+ "tool": "ledger_masters",
+ "arguments": {
+  "company_guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3"
+ },
+ "call_sent_utc": "2026-10-30T20:26:32Z",
+ "round_trip_seconds": 1.358,
+ "response": {
+  "id": 5,
+  "jsonrpc": "2.0",
+  "result": {
+   "content": [
+    {
+     "text": "{\"company\": {\"books_from\": \"20250401\", \"company_number\": \"<company_number>\", \"guid\": \"d45bc1b0-e5e3-4261-b3b2-cce3915f42d3\", \"identity_state\": \"verified_tuple\", \"missing_field\": null, \"name\": \"BRIDGE CORPUS DENSE\"}, \"evidence\": {\"bytes\": 285798, \"duration_ms\": 838, \"read_at\": \"2026-10-30T20:26:33.370Z\", \"request_sha256\": \"951e3bfb12b3a6ddb268fe358aa4660de10d86cc03df23e35517f88fdbe58270\", \"response_sha256\": \"4bbffb9287f90f431adb9dc5f1a3dd79f2d7a4e61d18d9cbee0d6f6ea3af0971\", \"state\": \"complete\"}, \"read_at\": \"2026-10-30T20:26:32.531Z\", \"result\": {\"compliance\": \"not_requested\", \"fields\": \"basic\", \"items\": [{\"name\": \"Cash\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Cash-in-Hand\"}, {\"name\": \"DN Party 001\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 002\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 003\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 004\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 005\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 006\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 007\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 008\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 009\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 010\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 011\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 012\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 013\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 014\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 015\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 016\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 017\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 018\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 019\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 020\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 021\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 022\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 023\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 024\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 025\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 026\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 027\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 028\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 029\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 030\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 031\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 032\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 033\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 034\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 035\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 036\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 037\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 038\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 039\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 040\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 041\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 042\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 043\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 044\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 045\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 046\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 047\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 048\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 049\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 050\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 051\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 052\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 053\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 054\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 055\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 056\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 057\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 058\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 059\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 060\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 061\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 062\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 063\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 064\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 065\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 066\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 067\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 068\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 069\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 070\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 071\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 072\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 073\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 074\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 075\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 076\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 077\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 078\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 079\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 080\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 081\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 082\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 083\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 084\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 085\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 086\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 087\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 088\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 089\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 090\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 091\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 092\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 093\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 094\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 095\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 096\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 097\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 098\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 099\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 100\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 101\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 102\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 103\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 104\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 105\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 106\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 107\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 108\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 109\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 110\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 111\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 112\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 113\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 114\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 115\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 116\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 117\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 118\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 119\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Party 120\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sundry Debtors\"}, {\"name\": \"DN Sales\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"Sales Accounts\"}, {\"name\": \"Profit & Loss A/c\", \"opening_balance\": \"0.00\", \"opening_balance_as_of\": \"20250401\", \"parent\": \"&#4; Primary\"}], \"offset\": 0, \"snapshot\": {\"id\": \"3a847669-f0e5-4d8b-b27a-daa8d0b52632\", \"master_alter_id\": 328, \"read_at\": \"2026-10-30T20:26:33.368Z\", \"reused\": false, \"voucher_alter_id\": 29900}, \"total\": 123}, \"truncated\": false}",
+     "type": "text"
+    }
+   ],
+   "isError": false,
+   "structuredContent": {
+    "company": {
+     "books_from": "20250401",
+     "company_number": "<company_number>",
+     "guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+     "identity_state": "verified_tuple",
+     "missing_field": null,
+     "name": "BRIDGE CORPUS DENSE"
+    },
+    "evidence": {
+     "bytes": 285798,
+     "duration_ms": 838,
+     "read_at": "2026-10-30T20:26:33.370Z",
+     "request_sha256": "951e3bfb12b3a6ddb268fe358aa4660de10d86cc03df23e35517f88fdbe58270",
+     "response_sha256": "4bbffb9287f90f431adb9dc5f1a3dd79f2d7a4e61d18d9cbee0d6f6ea3af0971",
+     "state": "complete"
+    },
+    "read_at": "2026-10-30T20:26:32.531Z",
+    "result": {
+     "compliance": "not_requested",
+     "fields": "basic",
+     "items": [
+      {
+       "name": "Cash",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Cash-in-Hand"
+      },
+      {
+       "name": "DN Party 001",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 002",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 003",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 004",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 005",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 006",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 007",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 008",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 009",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 010",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 011",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 012",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 013",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 014",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 015",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 016",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 017",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 018",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 019",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 020",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 021",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 022",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 023",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 024",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 025",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 026",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 027",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 028",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 029",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 030",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 031",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 032",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 033",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 034",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 035",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 036",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 037",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 038",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 039",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 040",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 041",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 042",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 043",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 044",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 045",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 046",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 047",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 048",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 049",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 050",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 051",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 052",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 053",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 054",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 055",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 056",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 057",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 058",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 059",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 060",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 061",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 062",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 063",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 064",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 065",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 066",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 067",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 068",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 069",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 070",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 071",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 072",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 073",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 074",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 075",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 076",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 077",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 078",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 079",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 080",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 081",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 082",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 083",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 084",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 085",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 086",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 087",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 088",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 089",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 090",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 091",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 092",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 093",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 094",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 095",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 096",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 097",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 098",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 099",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 100",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 101",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 102",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 103",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 104",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 105",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 106",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 107",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 108",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 109",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 110",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 111",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 112",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 113",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 114",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 115",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 116",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 117",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 118",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 119",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Party 120",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sundry Debtors"
+      },
+      {
+       "name": "DN Sales",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "Sales Accounts"
+      },
+      {
+       "name": "Profit & Loss A/c",
+       "opening_balance": "0.00",
+       "opening_balance_as_of": "20250401",
+       "parent": "&#4; Primary"
+      }
+     ],
+     "offset": 0,
+     "snapshot": {
+      "id": "3a847669-f0e5-4d8b-b27a-daa8d0b52632",
+      "master_alter_id": 328,
+      "read_at": "2026-10-30T20:26:33.368Z",
+      "reused": false,
+      "voucher_alter_id": 29900
+     },
+     "total": 123
+    },
+    "truncated": false
+   }
+  }
+ }
+}

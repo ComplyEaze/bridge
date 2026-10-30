@@ -1,0 +1,11 @@
+2026-10-30T20:26:07Z side in; client pid 17816; exe sha256 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d ok; launch-env.json sha256 f175a0bf86ac907f7ca66389112dfd8eb78a0230313c40ce2c3601d52df7d7c6; LOCALAPPDATA='<home>\\AppData\\Local' APPDATA='<home>\\AppData\\Roaming' USERPROFILE='<home>'
+2026-10-30T20:26:07Z launched pid 17732; stderr to server-stderr-20261030T202607Z.log
+2026-10-30T20:26:07Z package family: client none; server none
+2026-10-30T20:26:07Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-10-30T20:26:19Z 000-list.json tool=list secs=0.026 isError=None error=None saved_sha256=2d78db0cadca6ac512519f36fa196fcc04562d68e49712a2e9bf7b4a41f21d08
+2026-10-30T20:26:21Z 001-tally-status.json tool=tally_status secs=0.979 isError=False error=None saved_sha256=147c605b243d9c1383c65cbca928c13a23e714f56446829d19525fbd1446b3c8
+2026-10-30T20:26:23Z 002-list-companies.json tool=list_companies secs=0.974 isError=False error=None saved_sha256=4ac2634e700b495cc035b4b19199c63da50b00147259b5f9c7d3f536c5eeb21b
+2026-10-30T20:26:33Z 003-ledger-masters.json tool=ledger_masters secs=1.358 isError=False error=None saved_sha256=a7f1b0a5cd6a2859c5dfa61ee220bfe6795fe1a58be263c3041b5d1cfe0284f4
+2026-10-30T20:27:49Z 004-build-import-xml.json tool=build_import_xml secs=9.044 isError=False error=None saved_sha256=da234115c7ef49526fb9e692aa248c7893edd23439eb89989722e6579f134058
+2026-10-30T20:28:04Z 005-local-data-report.json tool=local_data_report secs=2.874 isError=False error=None saved_sha256=4a3ff2a34b30376cc48a87d43ae455a616ac8992af5c78abb404c6ad26eb8c3f
+2026-10-30T20:28:06Z session ended; server pid 17732 exit code 0

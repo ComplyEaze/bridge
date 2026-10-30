@@ -1,0 +1,85 @@
+{
+  "app_files_outside_this_folder_covered": false,
+  "classes": {
+    "approval_notes": {
+      "bytes": 212,
+      "files": 1,
+      "oldest_days": 14
+    },
+    "bank_statements": {
+      "bytes": 31750,
+      "files": 4,
+      "oldest_days": 18
+    },
+    "egress_log": {
+      "bytes": 1747508,
+      "files": 1,
+      "oldest_days": 5
+    },
+    "import_files": {
+      "bytes": 128433,
+      "files": 37,
+      "oldest_days": 18
+    },
+    "journal": {
+      "bytes": 173124,
+      "files": 1,
+      "oldest_days": 14
+    },
+    "lab": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "locks": {
+      "bytes": 17,
+      "files": 4936,
+      "oldest_days": 18
+    },
+    "other": {
+      "bytes": 90,
+      "files": 1,
+      "oldest_days": 18
+    },
+    "proofs": {
+      "bytes": 652835,
+      "files": 244,
+      "oldest_days": 18
+    },
+    "review_records": {
+      "bytes": 8991,
+      "files": 95,
+      "oldest_days": 18
+    }
+  },
+  "entries_that_could_not_be_read": 0,
+  "entry_cap_reached": false,
+  "folder": "present",
+  "folder_path": "<home>\\AppData\\Local\\Bridge\\agent",
+  "folders_that_could_not_be_listed": [],
+  "incomplete_reason": null,
+  "interrupted_write_folders": 0,
+  "journal": {
+    "batches": 37,
+    "no_dispatch_never_verified": 5,
+    "not_settled": 2,
+    "not_settled_binding_refused": 1,
+    "not_settled_no_response": 0,
+    "not_settled_not_verified": 1,
+    "not_settled_reviewed_not_attributed": 0,
+    "sent_or_found_posted": 32,
+    "settled_by_person": 0,
+    "state": "read"
+  },
+  "lock_folder_path": "<home>\\AppData\\Local\\Bridge\\agent",
+  "lock_folder_paths": [
+    "<home>\\AppData\\Local\\Bridge\\agent",
+    "<home>\\.complyeaze-bridge\\coordination"
+  ],
+  "master_journal": {
+    "state": "absent"
+  },
+  "other_directories_not_entered": 0,
+  "special_files_not_counted": 0,
+  "symlinks_not_followed": 0
+}

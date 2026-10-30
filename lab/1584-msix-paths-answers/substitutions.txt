@@ -1,0 +1,71 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+evidence/C-rows.txt: original 3303 B sha256 037b618a870c9f03a50761c9f15eb27e269ae8d8ede79581c01cf7e9ad64e3eb (kept on the lab PC); 8 x home folder -> <home>
+evidence/C1-out-hold.log: original 284 B sha256 3c659dfd9fba3376a9a7721ca3158010329363cd13d1e9695a790700125a096a (kept on the lab PC); 1 x home folder -> <home>
+evidence/C1s-2-out-hold.log: original 250 B sha256 cb405b49ad31b67f2e30dd673936896e6a0ba1f220fd88a2c553411d54b6dc3d (kept on the lab PC); 1 x home folder -> <home>
+evidence/C1s-3-out-hold.log: original 284 B sha256 b0a5dcd48341d921f7bec51ec847ee428aa5d943ee25459806d8b30c8033b2af (kept on the lab PC); 1 x home folder -> <home>
+evidence/C1s-out-hold.log: original 344 B sha256 af8da3e1dc30310a8572fd521aa09698d1d4f4498da20af9f0704dbe5f6d0018 (kept on the lab PC); 2 x home folder -> <home>
+evidence/C2-in-hold.log: original 285 B sha256 d32d2af5b2cc72c9dd84bde2df748bf5eebdd281514163af4ac24c431bfb1ef9 (kept on the lab PC); 1 x home folder -> <home>
+evidence/C2s-in-hold.log: original 285 B sha256 e63f3374f28a61cc4edb17446d77d91f4a3cb918fadb62d193a5ae9d04d2a754 (kept on the lab PC); 1 x home folder -> <home>
+evidence/C3-out-hold.log: original 280 B sha256 6bd24b84e5b355ff25f11ea6471848b18abe24e112f5d5ff6e598edac8c709de (kept on the lab PC); 1 x home folder -> <home>
+evidence/C4-in-hold.log: original 280 B sha256 c69210a192c7c0ad70a2f97c5d754b5ffbaad312995e80444c6e49229e3ff7ef (kept on the lab PC); 1 x home folder -> <home>
+evidence/I0-report-in.json: original 1935 B sha256 cfcf53d234ffa7434c2f18761b7ada78ddd735087f377177825bcb4a26f2b922 (kept on the lab PC); 4 x home folder -> <home>
+evidence/I2-in.json: original 552698 B sha256 ca70104af7d40727a90ba89cb6a8ba61e3192f8f07a17c4db40258bd5f996153 (kept on the lab PC); 439 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 438 x home folder -> <home>; 920 x home folder -> <home>; 1309 x <family>
+evidence/I2-out.json: original 285346 B sha256 a6571172c558b7f03ad29106a42e5b01231b6b6cd0e341987101b9c8765b2e75 (kept on the lab PC); 224 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 223 x home folder -> <home>; 490 x home folder -> <home>; 664 x <family>
+evidence/I2-read.txt: original 6495 B sha256 4238fdf3c811b7991ee6d19b14acc5e863c51b029867b48864a91cfce2b72f2b (kept on the lab PC); 18 vol id pair(s) -> file=<sha256(vol|id)[:12]>; 24 x home folder -> <home>; 18 x <family>
+evidence/K1-classification.txt: original 8326 B sha256 de9d6b0c9fe64fd5e818ca4124fef0bd7f495ec7a14c15b7fbc031c0e5d38e53 (kept on the lab PC); 11 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 11 x home folder -> <home>; 44 x home folder -> <home>; 22 x <family>
+evidence/K1a-in.json: original 549432 B sha256 5c1f944234a5522d45858d7d61787af43933d0cda81c484875c12cf779c6a723 (kept on the lab PC); 435 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 434 x home folder -> <home>; 910 x home folder -> <home>; 1301 x <family>
+evidence/K1b-out.json: original 284148 B sha256 500d521d1d7f3a0d4668c50cccd0d771764dddf933dd211bb8be638d8b04dc87 (kept on the lab PC); 223 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 222 x home folder -> <home>; 488 x home folder -> <home>; 657 x <family>
+evidence/K1c-in.json: original 549897 B sha256 4a814295e8f67955aa24fc2412ce4cf73a83aff12f2b84b479119e925a8a2da8 (kept on the lab PC); 436 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 435 x home folder -> <home>; 911 x home folder -> <home>; 1298 x <family>
+evidence/O0-report-out.json: original 1628 B sha256 9ad386f28e7664a7687a889063b5aba3f3580a0502ebb2c6bc980dd5147e86b7 (kept on the lab PC); 4 x home folder -> <home>
+evidence/O2-in.json: original 550940 B sha256 850e3a706cc27687e2bdb5662047cbfda366fa7a8e35382c082ea4509a1b56fd (kept on the lab PC); 438 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 437 x home folder -> <home>; 918 x home folder -> <home>; 1284 x <family>
+evidence/O2-out.json: original 291677 B sha256 e007125bfa9917fae0a4d7ac761e647aba0d44bda1df867751eb77977dceb055 (kept on the lab PC); 236 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 235 x home folder -> <home>; 514 x home folder -> <home>; 657 x <family>
+evidence/O2-read.txt: original 6258 B sha256 0c69dfc2301cb7c161e30897854ab714de456a8d25b3d289c29c39553827438a (kept on the lab PC); 19 vol id pair(s) -> file=<sha256(vol|id)[:12]>; 25 x home folder -> <home>; 11 x <family>
+out-first/evidence/X0-in.json: original 549131 B sha256 d72e2a659a7ecb378a174c7e65e601da58162fd6d2fc9773ec019419a2b6bad2 (kept on the lab PC); 436 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 435 x home folder -> <home>; 911 x home folder -> <home>; 1283 x <family>
+out-first/evidence/X0-out.json: original 289324 B sha256 d68301cc497f5f5f2fb4053feeeda497515e5b783674959aa9abed91c610ebe9 (kept on the lab PC); 233 vol|id pair(s) -> file=<sha256(vol|id)[:12]>; 232 x home folder -> <home>; 505 x home folder -> <home>; 656 x <family>
+run/C-client-in.cmd: original 240 B sha256 3580e1d9c75a3d6688acb1e998b419bfa912dfaf0bd5613dbe1513bb9046ea9d (kept on the lab PC); 1 x home folder -> <home>
+run/C-client-out.cmd: original 244 B sha256 07a1a7b7a3221fdb4733042d9bf27970586befc45d577748af7b1efd38637aa9 (kept on the lab PC); 1 x home folder -> <home>
+run/C-paths.txt: original 291 B sha256 7a8751d9a55028a438d011de8d4ab94fda18ff0f27e70bf29a75348e9fd9b6d1 (kept on the lab PC); 2 x home folder -> <home>
+run/C1-hold-out.cmd: original 444 B sha256 2e6a3fdca19f00835cad4ca74e7760d93f696819b3c96da8ea16e1640ba1ea36 (kept on the lab PC); 1 x home folder -> <home>
+run/C1s-2-hold-out.cmd: original 453 B sha256 6ce65264f1efd4640b8940c2fa9ca8841b3b73646f5b89386b05c0e85c6383e4 (kept on the lab PC); 1 x home folder -> <home>
+run/C1s-3-hold-out.cmd: original 453 B sha256 6970f141d88110a2503e111d94816c3615e121cecfc5c28f11dafd2136dcfed7 (kept on the lab PC); 1 x home folder -> <home>
+run/C1s-hold-out.cmd: original 384 B sha256 0d9ab4e0fd6746850ce36d5ccb7caf8e7d0841e64589887fe7c225c4f60f11c6 (kept on the lab PC); 1 x home folder -> <home>
+run/C2-hold-in.cmd: original 441 B sha256 74c6cb5546b2bb4a4084d6341aa8426c4c21fd48d52b827e9397f2db9050392d (kept on the lab PC); 1 x home folder -> <home>
+run/C2s-hold-in.cmd: original 444 B sha256 6d6c8de6d17fd3c53bed68e6693cec1e9095e3258bf9bb42e4cd03fa371b9e37 (kept on the lab PC); 1 x home folder -> <home>
+run/C3-hold-out.cmd: original 439 B sha256 72bfdc16f4af9a56b45fecde6fd439f42a48d35547fda0acf489552ff1455255 (kept on the lab PC); 1 x home folder -> <home>
+run/C4-hold-in.cmd: original 436 B sha256 748b8c4bb769be2af2acca01f5968e81b0f5ab4e1e65e861f47176cf9e42617a (kept on the lab PC); 1 x home folder -> <home>
+run/I1-in.cmd: original 226 B sha256 a16cde863fa419f9e17e10a00ea252506ed1eb293ea26891336e19767073d317 (kept on the lab PC); 1 x home folder -> <home>
+run/I2-in.cmd: original 293 B sha256 f734345a64d8935c3c894ff54e838787bc77c2fac8379c5f98712b416a4b873e (kept on the lab PC); 1 x <family>
+run/I2-out.cmd: original 296 B sha256 f5bb58ac1f455a7cde986ae7b5bbd568963f1e09fa864239e71247468763df2f (kept on the lab PC); 1 x <family>
+run/K1a-in.cmd: original 274 B sha256 464b02f2ce5dd863544b0155a85dd309cd86cde8539be99271f1f435ceb57c82 (kept on the lab PC); 1 x <family>
+run/K1b-out.cmd: original 322 B sha256 89f836fa4d86518e4de9094752dbc233d78db4021e19173d543166a7aa0ccad6 (kept on the lab PC); 1 x <family>
+run/K1c-in.cmd: original 253 B sha256 2acde41f8680b34f315d063f119e6009e70450e9ee4fa369a5e35a47dea8672b (kept on the lab PC); 1 x <family>
+run/O1-out.cmd: original 229 B sha256 f767c62bbfa26873805ed9cd74708bbac63ed77da4934611e2bea811fdb85eb7 (kept on the lab PC); 1 x home folder -> <home>
+run/O2-in.cmd: original 293 B sha256 6e2c0934df07caa011d37c78650801ff82f5ae9704803717c4f3aa8e18300a14 (kept on the lab PC); 1 x <family>
+run/O2-out.cmd: original 296 B sha256 1d43aabf851b7f85533ce5dc2e335da1c3118acf224217e811ce31673724249b (kept on the lab PC); 1 x <family>
+out-first/run/X0-in.cmd: original 320 B sha256 63eaddaf13e9341c8b0f58627771be877dc170a58f9d504cc58a8a2a8536ec86 (kept on the lab PC); 1 x <family>
+out-first/run/X0-out.cmd: original 323 B sha256 bf20c5d13eaf968d77cefaf4c25fa62fa830cecd3c51fe91a5ae7b3d0e089d70 (kept on the lab PC); 1 x <family>
+run/python.txt: original 181 B sha256 b9b57292373e9ce02f426398adcf52d606ba14f3d223927223e7aa76829f000f (kept on the lab PC); 2 x home folder -> <home>; 1 x <family>
+i1/client-log.txt: original 1691 B sha256 7941cf27ea9b1c84b676f39e8c1bacee235f62ec93ab089396b38e3ceaccdfa8 (kept on the lab PC); 3 x home folder -> <home>
+i1/paths.txt: original 388 B sha256 9ae1d17ce9014f09fceedfee36784c354cc4d69b6a3c7b24a335861728821637 (kept on the lab PC); 3 x home folder -> <home>; 2 x <family>
+i1/answers/001-tally-status.json: original 1837 B sha256 147c605b243d9c1383c65cbca928c13a23e714f56446829d19525fbd1446b3c8 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+i1/answers/002-list-companies.json: original 1583 B sha256 4ac2634e700b495cc035b4b19199c63da50b00147259b5f9c7d3f536c5eeb21b (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+i1/answers/003-ledger-masters.json: original 32054 B sha256 a7f1b0a5cd6a2859c5dfa61ee220bfe6795fe1a58be263c3041b5d1cfe0284f4 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+i1/answers/004-build-import-xml.json: original 10574 B sha256 da234115c7ef49526fb9e692aa248c7893edd23439eb89989722e6579f134058 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser; 2 x home folder -> <home>; 2 x <family>
+o1/client-log.txt: original 1689 B sha256 84c16d8c5083ccf0b64b8a3ff4b6a334848592756cf231fb8924ec5d4f6b5ab8 (kept on the lab PC); 3 x home folder -> <home>
+o1/paths.txt: original 341 B sha256 c4eb7774ee628bd4a0727b4bf3512291846537a09069f6edbb20cbc5b7d2c74b (kept on the lab PC); 3 x home folder -> <home>; 1 x <family>
+o1/answers/001-tally-status.json: original 1837 B sha256 6b0008f75af806a20872134997a03ee141d0ee85dd13bf9bf531b7cea06ecda4 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+o1/answers/002-list-companies.json: original 1583 B sha256 827d1b2b94a533933a63d15f847e4eb787a9a55ae8ac87e62d332dee9dfb07c4 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+o1/answers/003-ledger-masters.json: original 32054 B sha256 7dfa26b2fdfa02791bb1290a3a31ef91652e7206af753b761b58fa94c330fd6f (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+o1/answers/004-build-import-xml.json: original 10463 B sha256 ede69e907b4ee52c4ec475c87eb7526cfd8b24abcc48a3eb55b8e41b0ab553fd (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser; 2 x home folder -> <home>
+c-in/client-log.txt: original 1524 B sha256 4529d2e2d98bfb613ec5f839286202d168159f144c7cd06582158ebeed5cccfa (kept on the lab PC); 3 x home folder -> <home>
+c-in/answers/000-C0-tally-status.json: original 1837 B sha256 11e4929f51a8fa656b72ad168093a2a7c5ef495fac9a3bee676746c8c6e1ded2 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+c-in/answers/002-C1r-tally-status.json: original 1837 B sha256 30d8c2adf43e825df01b7c42c8148d98e23a41887ba23cb84219fc22cd17af09 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+c-in/answers/004-C3-tally-status.json: original 1837 B sha256 60bca1c44546ca1c9a1e0070ac57c4d1c86c68b225f71047bf38db8fc0944ec9 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+c-out/client-log.txt: original 1522 B sha256 a169d10b3b036ef26288639ab66c7a331443e2f185454207b436fac36c19335b (kept on the lab PC); 3 x home folder -> <home>
+c-out/answers/000-C0-tally-status.json: original 1837 B sha256 31d4fb15babee0ae25e98b3a23acd153f7ead075126b4e19b543b13bd6c5f931 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+c-out/answers/003-C2r-tally-status.json: original 1838 B sha256 2f2dc4a54c0e00acce72a53690123151e13b5816b6f844387894d13a7c4101ec (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+c-out/answers/004-C4-tally-status.json: original 1838 B sha256 a93e44e078b02e6f9b4eae338b880fb4241d00f81bd8911f511b29f60c93a09d (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+notes.txt: original 19174 B sha256 fb5e6a181cbd1c2ec6badc1fbc487b151fedea6c0589b9be4f3370f6cc73c3f5 (kept on the lab PC); 15 x home folder -> <home>; 9 x <family>; 13 x <family suffix>; 47 x the desktop client name -> <desktop client>; 1 x the upper-case stop word -> stop
+RESULTS.md: original 7910 B sha256 5e6644605fc9ce51a2b6679e6ed62a78860a50964b44dbd33346bdea61c5a87e (kept on the lab PC); 4 x the desktop client name -> <desktop client>
+scripts/step.ps1: original 2529 B sha256 19d4ae56341cd25556ff6dda6a9617e12741ff7f001e11289b3523a8ae19af9e (kept on the lab PC); 1 x the upper-case stop word -> stop
+scripts/paths.py: original 1023 B sha256 17b6f764c231ff8cc10c9bbffb70ea4ecd2bb54ab743c5f2dd5bf59887ce4858 (kept on the lab PC); 1 x <family>

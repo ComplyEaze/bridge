@@ -1,0 +1,2 @@
+2026-10-30T20:32:15.8839461Z START pid=16212 mode=Exclusive path=<home>\.complyeaze-bridge\coordination\native-dispatch-leases$K.wire.lock
+2026-10-30T20:32:16.4804862Z OPEN_FAILED Exception calling "Open" with "1" argument(s): "Could not find file '<home>\.complyeaze-bridge\coordination\native-dispatch-leases$K.wire.lock'."

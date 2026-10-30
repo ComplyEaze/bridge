@@ -1,0 +1,6 @@
+Kept on the lab PC (never posted; the lab1584-* batches stay built-never-posted):
+i1: built import file batch bridge-84ee0bff-4190-434b-b073-1ac4e22ad188 (bridge_txn_id lab1584-i1), sha256 88573f0ee0b2ff281b65b749011c3dc9f28274a6c0697127e58f824a07469843, at the path its probe shows; its journal line; never posted
+o1: built import file batch bridge-bbcc471d-afc2-4152-ac03-f891ae5f63d5 (bridge_txn_id lab1584-o1), sha256 843076eef2ad7b97678b03f0e183606ecec4880a06d6a3c9e0d66a9088d88d11, at the path its probe shows; its journal line; never posted
+Probe files written by K1: <LA>\bridge-lab-1584\107fe768-in.txt (redirected into the package copy) and 21f2fd7b-out.txt (real AppData).
+Lock files created by this item: the real <LA>\Bridge\agent folder (absent before O1) with its journal, imports and native-dispatch-leases\<K>.wire.lock.
+The root of the lab folder also holds files of a 12 Oct sitting, untouched and not pushed.

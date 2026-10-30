@@ -1,0 +1,2 @@
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\bridge-lab\1584\hold-lock.ps1 -Path "<home>\.complyeaze-bridge\coordination\native-dispatch-leases\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock" -Mode Exclusive -Seconds 900 -Log C:\bridge-lab\1584\evidence\C1-out-hold.log -StopFile C:\bridge-lab\1584\stop-C1-out.txt
+echo %ERRORLEVEL% > C:\bridge-lab\1584\evidence\C1-hold-out.exit

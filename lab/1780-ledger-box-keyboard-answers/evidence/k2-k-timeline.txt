@@ -1,0 +1,16 @@
+K2-K runner pid 27756; build K (<LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe); mode masters; timing early; ClickInto=False; Tally window 8267428
+K2-K trace pre-armed 2026-10-30T07:36:59.087Z pid 25532: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <LAB_DIR>\evidence\trace-k2-k.txt -Seconds 100
+K2-K pre-arm click on Tally's title 2026-10-30T07:37:01.182Z, logical (330,14) = screen tool (313,13); Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K2-K started 2026-10-30T07:37:02.434Z: explorer.exe "<LAB_DIR>\cmd\k2-k.cmd"; the .cmd holds: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\spawn-parent.ps1 -Target child -ChildExe <LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -ChildMode masters -InputFile <LAB_DIR>\requests\confirm-masters-input.txt -Stdio files -Out <LAB_DIR>\evidence\k2-k.txt -TimeoutSeconds 60 | 
+K2-K timing click on Tally's title 2026-10-30T07:37:04.002Z (1.58 s after the start), logical (330,14) = screen tool (313,13)
+K2-K-T0 2026-10-30T07:37:05.347Z from: SPAWN 2026-10-30T07:37:05.347Z child_pid=26784
+K2-K Fg at T0 seen 2026-10-30T07:37:05.419Z: Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K2-K timing click to T0: 1.35 s
+K2-K box 1321512 found 2026-10-30T07:37:05.833Z rect logical 550,274,1001,612; exstyle 0x00010108
+K2-K-T0+6 R t0p6 :: stderr 2026-10-30T07:37:11.380Z..2026-10-30T07:37:11.384Z lines 1 last 'box-fit: box=(688,342,1252,764) work=(0,0,1920,1030) fits=true' ;; rect 2026-10-30T07:37:11.395Z..2026-10-30T07:37:12.648Z -> rect-k2-k-t0p6.txt: E 2026-10-30T07:37:12.360Z dpi_context=ok | B 2026-10-30T07:37:12.360Z hwnd=0x142a28 pid=26784 iconic=0 topmost=1 rect=688,342,1252,764 title=ComplyEaze Bridge — create one ledger? | F 2026-10-30T07:37:12.360Z hwnd=0x142a28 pid=26784 title=ComplyEaze Bridge — create one ledger? | E 2026-10-30T07:37:12.360Z boxes=1 ;; zorder 2026-10-30T07:37:12.656Z..2026-10-30T07:37:13.797Z : 1,1,1,26784,ComplyEaze Bridge — create one ledger? | 4,0,0,20032,TallyPrime:9001 | visible_titled_windows,13 ;; shot k2-k-t0p6-screen.png 2026-10-30T07:37:14.018Z
+K2-K No at about T0+12: No clicked 2026-10-30T07:37:17.393Z at T0+12.05 s, logical (849,579) = screen tool (805,549)
+K2-K spawn file: SPAWN 2026-10-30T07:37:05.220Z parent_pid=4612 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-masters || SPAWN 2026-10-30T07:37:05.347Z child_pid=26784 || SPAWN 2026-10-30T07:37:17.497Z pid=26784 exit_code=1 stdout_bytes_read=0 elapsed_s=12.2
+K2-K stderr: box-fit: box=(688,342,1252,764) work=(0,0,1920,1030) fits=true
+K2-K stdout bytes: 0
+K2-K trace END seen: True 2026-10-30T07:37:20.758Z
+K2-K DONE 2026-10-30T07:37:20.775Z

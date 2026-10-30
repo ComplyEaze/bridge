@@ -1,0 +1,16 @@
+K2-H runner pid 14944; build H (<BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe); mode masters; timing early; ClickInto=False; Tally window 8267428
+K2-H trace pre-armed 2026-10-30T07:36:23.573Z pid 11908: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <LAB_DIR>\evidence\trace-k2-h.txt -Seconds 100
+K2-H pre-arm click on Tally's title 2026-10-30T07:36:25.642Z, logical (330,14) = screen tool (313,13); Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K2-H started 2026-10-30T07:36:26.718Z: explorer.exe "<LAB_DIR>\cmd\k2-h.cmd"; the .cmd holds: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\spawn-parent.ps1 -Target child -ChildExe <BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -ChildMode masters -InputFile <LAB_DIR>\requests\confirm-masters-input.txt -Stdio files -Out <LAB_DIR>\evidence\k2-h.txt -TimeoutSeconds 60 | 
+K2-H timing click on Tally's title 2026-10-30T07:36:28.324Z (1.61 s after the start), logical (330,14) = screen tool (313,13)
+K2-H-T0 2026-10-30T07:36:29.227Z from: SPAWN 2026-10-30T07:36:29.227Z child_pid=15784
+K2-H Fg at T0 seen 2026-10-30T07:36:29.322Z: Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K2-H timing click to T0: 0.9 s
+K2-H box 27273242 found 2026-10-30T07:36:29.633Z rect logical 569,296,983,592; exstyle 0x00010108
+K2-H-T0+6 R t0p6 :: stderr 2026-10-30T07:36:35.241Z..2026-10-30T07:36:35.241Z lines 0 last '' ;; rect 2026-10-30T07:36:35.253Z..2026-10-30T07:36:36.520Z -> rect-k2-h-t0p6.txt: E 2026-10-30T07:36:36.219Z dpi_context=ok | B 2026-10-30T07:36:36.219Z hwnd=0x1a0281a pid=15784 iconic=0 topmost=1 rect=711,370,1229,740 title=ComplyEaze Bridge — create one ledger? | F 2026-10-30T07:36:36.219Z hwnd=0x7e26a4 pid=20032 title=TallyPrime:9001 | E 2026-10-30T07:36:36.219Z boxes=1 ;; zorder 2026-10-30T07:36:36.526Z..2026-10-30T07:36:37.775Z : 1,1,0,15784,ComplyEaze Bridge — create one ledger? | 4,0,1,20032,TallyPrime:9001 | visible_titled_windows,13 ;; shot k2-h-t0p6-screen.png 2026-10-30T07:36:38.008Z
+K2-H No at about T0+12: No clicked 2026-10-30T07:36:41.301Z at T0+12.08 s, logical (840,562) = screen tool (796,533)
+K2-H spawn file: SPAWN 2026-10-30T07:36:29.078Z parent_pid=6908 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-masters || SPAWN 2026-10-30T07:36:29.227Z child_pid=15784 || SPAWN 2026-10-30T07:36:41.376Z pid=15784 exit_code=1 stdout_bytes_read=0 elapsed_s=12.2
+K2-H stderr: 
+K2-H stdout bytes: 0
+K2-H trace END seen: True 2026-10-30T07:36:44.778Z
+K2-H DONE 2026-10-30T07:36:44.794Z

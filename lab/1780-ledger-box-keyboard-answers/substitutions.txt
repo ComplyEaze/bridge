@@ -1,0 +1,44 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+evidence/c10-bridge-processes.txt: original 796 B sha256 f0c10b5241f6cb1b970269e705ddbb7f7b335bb91ef55d04e42ac56627d78af4 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/c10-netstat.txt: original 9406 B sha256 86f1e8b664ca0af1be37b658336a60a792291254a73a7a2f58d7be931ffe44b2 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/k1-h-timeline.txt: original 2198 B sha256 2e979044b8e2a6004052e756c2555dc95cec199165a5c1b1a6878da0d66ffaf2 (kept on the lab PC); 6 x -> <LAB_DIR>; 3 x -> <BUILD-H folder>
+evidence/k1-h.txt: original 368 B sha256 4ab10e92a93d7cde5282cf3667428643aaaf766d54e5afddd3d0835d03877d96 (kept on the lab PC); 1 x -> <BUILD-H folder>
+evidence/k1-k1-timeline.txt: original 4938 B sha256 d8670358bb0c842822b9eabfc0d0ee59ee27783e757d4562df99ae1b62e03362 (kept on the lab PC); 9 x -> <LAB_DIR>
+evidence/k1-k1.txt: original 367 B sha256 56af6665c3438e574bb5b0d9b300ea21af9571e66e982c86ba4a3e0c6f9be11a (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/k1-k2-timeline.txt: original 3060 B sha256 da6c8ba311741899325e66d6a7cffc4b264ebe16dff0b95e6c7f7cded0ed1570 (kept on the lab PC); 9 x -> <LAB_DIR>
+evidence/k1-k2.txt: original 369 B sha256 021dcde954275f3473fd5ded8883c573147a787465288e23ae6e27b92d935f57 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/k2-h-timeline.txt: original 2831 B sha256 919caf5b872908eb8a3048ce268d00f93b0044bd22153a4bee16e0006d342b9d (kept on the lab PC); 6 x -> <LAB_DIR>; 3 x -> <BUILD-H folder>
+evidence/k2-h.txt: original 368 B sha256 6d5e63152954831f58efa6f51bab7f49909febbef3fbae3c00309254d25fdb75 (kept on the lab PC); 1 x -> <BUILD-H folder>
+evidence/k2-k-timeline.txt: original 2980 B sha256 f2cb3646f0f0003e9518232649d53c75232c26b371318d017fa41240ebc69d09 (kept on the lab PC); 9 x -> <LAB_DIR>
+evidence/k2-k.txt: original 368 B sha256 f08bdd3549fb511b470fc9178e6058f05e21fc082abdc790ac0ea2ef7b93bd7a (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/k3-e1-timeline.txt: original 2996 B sha256 387c76704f391ea5d87ce7edb6a985cbd08fa8f6a164b8c34ede290f7e0e0ba3 (kept on the lab PC); 9 x -> <LAB_DIR>
+evidence/k3-e1.txt: original 369 B sha256 8610fa282eee7d0021465979271ea5fb1ef55eed261b1ed54015e502f12cfbf8 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/k3-e2-timeline.txt: original 2986 B sha256 6f1c01b920aea9bae9b47e165eec5f1b336f58310930067d9d6b5f46d482cbb8 (kept on the lab PC); 9 x -> <LAB_DIR>
+evidence/k3-e2.txt: original 366 B sha256 e3fa09506488a3c1466036e0e9d2a2c70fed1c8bd9b71e6fa456ed665c9277ee (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/k3-l1-timeline.txt: original 3052 B sha256 fe2f94089f53e1c30f5e94de3bb9eb44201003a8038c855da236ae24dd5fb455 (kept on the lab PC); 9 x -> <LAB_DIR>
+evidence/k3-l1.txt: original 369 B sha256 0a9b25c8a57345c712e9c74dfc33431e8a2a5b285388f6057be6bbe89fc434ec (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/k3-l2-timeline.txt: original 3041 B sha256 2359e2aa6249c0c21901448baa4c3145efb9f5f85d885ae936a9c3562af00302 (kept on the lab PC); 9 x -> <LAB_DIR>
+evidence/k3-l2.txt: original 366 B sha256 a02bd89aa19a23c171900cd59899fbad9e1db33b6f95d69633265d946b6cd17b (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/p0-bridge-processes.txt: original 796 B sha256 87cc4daaff564ef2b27a941b4812a9bcf68172d0a231b135d3cf5b7957d84bf5 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/p0-netstat.txt: original 10009 B sha256 252403cd5f06d25f55a130831b995f4e069ffe97c194776daf05baa59fe970b8 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/trace-k1-h.txt: original 1744 B sha256 4075cfeb8f2e2bb37e3bd012f55afeff12452477d5eacd277d05f6a4661c2cf1 (kept on the lab PC); 2 x -> <BUILD-H folder>
+evidence/trace-k1-k1.txt: original 3392 B sha256 fcbe19fd2e379164f670fc8e2aa50e4a018aa7b2bdb6aeb5852099e04cc67009 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-k1-k2.txt: original 1712 B sha256 f73cd0ee62d4fbec56920acef93350a0976888ef353e9d5fb9e2ad7851117925 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-k2-h.txt: original 1781 B sha256 26387e6f132a87f42edca1fc61d8b6621de873b36efbe5f8859f912ae33b197f (kept on the lab PC); 2 x -> <BUILD-H folder>
+evidence/trace-k2-k.txt: original 1709 B sha256 621ccf8702eef42fda332ddef04b23887edb179646e267426a4e428349191f89 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-k3-e1.txt: original 2345 B sha256 d16a3dd3e454418ae252ee95eb64c663226f857dae4f35bcceddffd09753591b (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-k3-e2.txt: original 1699 B sha256 09c05daa68e55f7a3ce1e048ef6bea231e06d42be816701767f4f9319cee8509 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-k3-l1.txt: original 1710 B sha256 58198a05f25566370a8e6c397aff03a1e8dc192362535f37cec765c2c3a22ca9 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-k3-l2.txt: original 1697 B sha256 aac3db5394cd239fc622fbc411ead70dd60b4839f2141cbc43a8cfaf8fa7c5fe (kept on the lab PC); 2 x -> <LAB_DIR>
+cmd/k1-h.cmd: original 406 B sha256 016323277549acc1de58061d23cb02522ec062b9622066b1848b7698bb81179c (kept on the lab PC); 3 x -> <LAB_DIR>; 1 x -> <BUILD-H folder>
+cmd/k1-k1.cmd: original 407 B sha256 3bca001445d12027259641a1a4ed12570fe9b2538a53e5df349d9f6d7494c219 (kept on the lab PC); 4 x -> <LAB_DIR>
+cmd/k1-k2.cmd: original 407 B sha256 62f439f9d5ece08afed7e6acbb337ba6e86b7b2dd664be3dc63dcc24c3fa4045 (kept on the lab PC); 4 x -> <LAB_DIR>
+cmd/k2-h.cmd: original 351 B sha256 3b6907e4352dc3a58cb14002082fbe5b7a831c1c1f41bc222bd1eee9f26e92a7 (kept on the lab PC); 3 x -> <LAB_DIR>; 1 x -> <BUILD-H folder>
+cmd/k2-k.cmd: original 351 B sha256 d5d41af3b82ade1e27bacb3876156675ccd8b24b857ba632ba3fefadd3664099 (kept on the lab PC); 4 x -> <LAB_DIR>
+cmd/k3-e1.cmd: original 344 B sha256 cff445837e9f72ddb3dbcdc8438b89ebf781726df98b145647d52e1b8052441b (kept on the lab PC); 4 x -> <LAB_DIR>
+cmd/k3-e2.cmd: original 344 B sha256 826e20aaa760c5147809dcbb5877f6ff80ab4fab5d5a1efa5f186ec0d9869327 (kept on the lab PC); 4 x -> <LAB_DIR>
+cmd/k3-l1.cmd: original 399 B sha256 9095747a16f3e8046aaa03744da8743699365f7a8a3c34d37a65604636369c37 (kept on the lab PC); 4 x -> <LAB_DIR>
+cmd/k3-l2.cmd: original 399 B sha256 5e0b432927ade690ecb8824cf6e872475aa81fe7a32d566edaf7670a149ea67a (kept on the lab PC); 4 x -> <LAB_DIR>
+scripts/k-cell.ps1: original 13335 B sha256 691746ec5ef4ce1550cdb2980edea224087fb11c095a254034e362ab87aa3adf (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <BUILD-H folder>
+scripts/k-cell-v1.ps1: original 13047 B sha256 3c12e2467731187fb156bac6816adca066f200dfdfd93509bd2b04b7473808d4 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <BUILD-H folder>
+scripts/leftover.ps1: original 2134 B sha256 8088470429b3cdb9a85cecb931a011c4e69a3959b15ad3037042da87416f0edf (kept on the lab PC); 1 x -> <LAB_DIR>

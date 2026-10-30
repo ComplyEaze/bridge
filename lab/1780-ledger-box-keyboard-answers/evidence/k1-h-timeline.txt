@@ -1,0 +1,16 @@
+K1-H runner pid 24124; build H (<BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe); mode masters; timing late; ClickInto=False; Tally window 8267428
+K1-H trace pre-armed 2026-10-30T07:33:47.791Z pid 17688: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <LAB_DIR>\evidence\trace-k1-h.txt -Seconds 100
+K1-H pre-arm click on Tally's title 2026-10-30T07:33:49.871Z, logical (330,14) = screen tool (313,13); Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K1-H started 2026-10-30T07:33:51.243Z: explorer.exe "<LAB_DIR>\cmd\k1-h.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\spawn-parent.ps1 -Target child -ChildExe <BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -ChildMode masters -InputFile <LAB_DIR>\requests\confirm-masters-input.txt -Stdio files -Out <LAB_DIR>\evidence\k1-h.txt -TimeoutSeconds 60 | 
+K1-H timing click on Tally's title 2026-10-30T07:33:55.321Z (4.08 s after the start), logical (330,14) = screen tool (313,13)
+K1-H-T0 2026-10-30T07:34:03.767Z from: SPAWN 2026-10-30T07:34:03.767Z child_pid=19560
+K1-H Fg at T0 seen 2026-10-30T07:34:03.878Z: Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K1-H timing click to T0: 8.45 s
+K1-H box 22030722 found 2026-10-30T07:34:04.303Z rect logical 569,296,983,592; exstyle 0x00010108
+K1-H-T0+6 
+K1-H No at about T0+12: No clicked 2026-10-30T07:34:15.881Z at T0+12.12 s, logical (840,562) = screen tool (796,533)
+K1-H spawn file: SPAWN 2026-10-30T07:34:03.564Z parent_pid=2648 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-masters || SPAWN 2026-10-30T07:34:03.767Z child_pid=19560 || SPAWN 2026-10-30T07:34:15.933Z pid=19560 exit_code=1 stdout_bytes_read=0 elapsed_s=12.3
+K1-H stderr: 
+K1-H stdout bytes: 0
+K1-H trace END seen: True 2026-10-30T07:34:19.281Z
+K1-H DONE 2026-10-30T07:34:19.293Z

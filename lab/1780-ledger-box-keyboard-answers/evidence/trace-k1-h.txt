@@ -1,0 +1,24 @@
+START 2026-10-30T07:33:50.263Z title_part=ComplyEaze Bridge interval_ms=50 seconds=100
+FIRST 2026-10-30T07:34:04.298Z box_pid=19560
+T 2026-10-30T07:34:04.354Z fg_hwnd=0x7e26a4 fg_pid=20032 box_pid=19560 windows=3
+W 2026-10-30T07:34:04.354Z hwnd=0x1502982 class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=29844 owner=0 title=ComplyEaze Bridge — create one ledger?
+W 2026-10-30T07:34:04.354Z hwnd=0x186282e class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=29844 owner=0x972cb8 owner_class=IME owner_pid=19560 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-10-30T07:34:04.354Z hwnd=0x972cb8 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=29844 owner=0x1502982 owner_class=#32770 owner_pid=19560 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+PROC path=<BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=2648
+PROC command_line="<BUILD-H folder>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-masters
+PROC sha256=a946979561b61f51e6dab3539d3de98fd48c8f103f61d2e3abe787acf3240c23 bytes=32463872
+H 2026-10-30T07:34:06.621Z unchanged
+H 2026-10-30T07:34:07.619Z unchanged
+H 2026-10-30T07:34:08.652Z unchanged
+H 2026-10-30T07:34:09.691Z unchanged
+H 2026-10-30T07:34:10.691Z unchanged
+H 2026-10-30T07:34:11.748Z unchanged
+H 2026-10-30T07:34:12.770Z unchanged
+H 2026-10-30T07:34:13.833Z unchanged
+H 2026-10-30T07:34:14.851Z unchanged
+T 2026-10-30T07:34:15.898Z fg_hwnd=0x0 fg_pid=0 box_pid=19560 windows=0
+T 2026-10-30T07:34:15.987Z fg_hwnd=0x7e26a4 fg_pid=20032 box_pid=19560 windows=0
+H 2026-10-30T07:34:16.987Z unchanged
+H 2026-10-30T07:34:18.048Z unchanged
+GONE 2026-10-30T07:34:18.911Z
+END 2026-10-30T07:34:18.915Z

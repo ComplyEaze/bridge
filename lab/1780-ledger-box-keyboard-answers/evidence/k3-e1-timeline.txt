@@ -1,0 +1,16 @@
+K3-E1 runner pid 3112; build K (<LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe); mode journal; timing early; ClickInto=False; Tally window 8267428
+K3-E1 trace pre-armed 2026-10-30T07:38:40.425Z pid 28336: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <LAB_DIR>\evidence\trace-k3-e1.txt -Seconds 100
+K3-E1 pre-arm click on Tally's title 2026-10-30T07:38:42.501Z, logical (330,14) = screen tool (313,13); Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K3-E1 started 2026-10-30T07:38:43.531Z: explorer.exe "<LAB_DIR>\cmd\k3-e1.cmd"; the .cmd holds: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\spawn-parent.ps1 -Target child -ChildExe <LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe -ChildMode journal -InputFile <LAB_DIR>\requests\confirm-input.txt -Stdio files -Out <LAB_DIR>\evidence\k3-e1.txt -TimeoutSeconds 60 | 
+K3-E1 timing click on Tally's title 2026-10-30T07:38:45.098Z (1.56 s after the start), logical (330,14) = screen tool (313,13)
+K3-E1-T0 2026-10-30T07:38:46.080Z from: SPAWN 2026-10-30T07:38:46.080Z child_pid=21548
+K3-E1 Fg at T0 seen 2026-10-30T07:38:46.162Z: Fg hwnd 0x7e26a4 pid 20032 image tally title 'TallyPrime:9001'
+K3-E1 timing click to T0: 0.98 s
+K3-E1 box 29895050 found 2026-10-30T07:38:46.593Z rect logical 549,145,1003,741; exstyle 0x00010108
+K3-E1-T0+6 R t0p6 :: stderr 2026-10-30T07:38:52.105Z..2026-10-30T07:38:52.112Z lines 1 last 'box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true' ;; rect 2026-10-30T07:38:52.125Z..2026-10-30T07:38:53.294Z -> rect-k3-e1-t0p6.txt: E 2026-10-30T07:38:53.028Z dpi_context=ok | B 2026-10-30T07:38:53.028Z hwnd=0x1c8298a pid=21548 iconic=0 topmost=1 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher? | F 2026-10-30T07:38:53.028Z hwnd=0x1c8298a pid=21548 title=ComplyEaze Bridge — post this voucher? | E 2026-10-30T07:38:53.028Z boxes=1 ;; zorder 2026-10-30T07:38:53.298Z..2026-10-30T07:38:54.454Z : 1,1,1,21548,ComplyEaze Bridge — post this voucher? | 4,0,0,20032,TallyPrime:9001 | visible_titled_windows,13 ;; shot k3-e1-t0p6-screen.png 2026-10-30T07:38:54.701Z
+K3-E1 No at about T0+12: No clicked 2026-10-30T07:38:58.157Z at T0+12.08 s, logical (850,709) = screen tool (806,672)
+K3-E1 spawn file: SPAWN 2026-10-30T07:38:45.933Z parent_pid=21400 target=child stdio=files creation_flags=0x400 startf=0x100 timeout_s=60 || SPAWN command_line="<LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal || SPAWN 2026-10-30T07:38:46.080Z child_pid=21548 || SPAWN 2026-10-30T07:38:58.203Z pid=21548 exit_code=1 stdout_bytes_read=0 elapsed_s=12.2
+K3-E1 stderr: box-fit: box=(686,181,1254,926) work=(0,0,1920,1030) fits=true
+K3-E1 stdout bytes: 0
+K3-E1 trace END seen: True 2026-10-30T07:39:01.592Z
+K3-E1 DONE 2026-10-30T07:39:01.607Z

@@ -2330,6 +2330,76 @@
       "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
       "sha256": "338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937",
       "size": 948
+    },
+    {
+      "blob": "f7d90655e3a7f815bb00c4b898e80b6aeeba6032",
+      "capture_id": "d0428_c2_spanned_0_111.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "lab branch lab/899-note-days-spanned-census-run-sheet at fdef8edf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/note-days/debit_note_day_voucher_census_spanned_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see note-days/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "0e73d2fd878bad5ca32f488d86367676e1a4842df8a20bb7ebcf7148c1a3b429",
+      "size": 1522
+    },
+    {
+      "blob": "4b105189ce5d60518a0e911b6939899ba069ef5a",
+      "capture_id": "d0429_c2_spanned_0_111.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "lab branch lab/899-note-days-spanned-census-run-sheet at fdef8edf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/note-days/credit_note_day_voucher_census_spanned_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see note-days/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7d87182578c6a8860809219dc33e40838baab177f22851f8155109a0aa517aca",
+      "size": 1522
+    },
+    {
+      "blob": "46463c53faf55f218cfd1b7d45970218fd3323af",
+      "capture_id": "d0703_c2_spanned_0_111.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "lab branch lab/899-note-days-spanned-census-run-sheet at fdef8edf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/note-days/cancelled_purchase_day_voucher_census_spanned_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see note-days/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "91d7b64727592034585cc63adf019f147e4e85c027609ca44c7b0adb7a95c284",
+      "size": 1522
+    },
+    {
+      "blob": "d12fb092ccd8921c39c8857a5fd5ef45b9296a9b",
+      "capture_id": "p-audit_c2_spanned_0_68.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2145-spanned-census-captures at 6a968f01",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-census-spanned.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-pilot-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1125182a51310f09ea6d3c4a08dd4e0d411d13f1fc34f01b89be4ea86f729e4e",
+      "size": 1520
+    },
+    {
+      "blob": "e3e3a30cc42badd693b093666893ddce6d099457",
+      "capture_id": "s-0421_c2_spanned_0_3.request.utf16le.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/2145-spanned-census-captures at 6a968f01",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-lab-day/stock_lab_taxed_day_voucher_census_spanned_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-lab-day/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "26dbad9b1da94f13700260a5c5af517f2c6f54a85d16e1b1c4d541cea86cea58",
+      "size": 1518
+    },
+    {
+      "blob": "90dfd916bb8f5c71b5df2b42447a4f8771df0004",
+      "capture_id": "s-0421_c2_spanned_0_3.answer.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/2145-spanned-census-captures-answers at 993d96bc",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-lab-day/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "369aa6bbf9c87bcb2a37961fc48f8047374d7e7a0df081e08d26790385660db9",
+      "size": 5416
+    },
+    {
+      "blob": "f630328cb2aa1386215913c920b8bbe31477aefd",
+      "capture_id": "s-0421_c2_spanned_0_3.answer.xml, parse record",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/2145-spanned-census-captures-answers at 993d96bc",
+      "path": "src-tauri/tests/parse_record/stock-lab-day__stock_lab_taxed_day_voucher_census_response.utf16le.xml.parse_voucher_census_20250421_.txt",
+      "seed_basis": "synthetic lab book; the app crate's parse record of the capture above, in the pull request that adds the capture",
+      "sha256": "5e3be6ce8646de52f89aa242209e98201e0c65cef48fc85fc7608d90ce25d11b",
+      "size": 281
     }
   ]
 }

@@ -1,0 +1,9 @@
+#2145 notes (UTC). Sheet lab/2145-spanned-census-captures at 6a968f0175bb7f0a4d7860d6d5e2068b5db3860b copied to the sheet folder; check_requests.py: files ok 48, FAIL 0; census ok 20, FAIL 0. Answers folder absent before.
+2026-10-30T00:20:39Z Part A step 0 with no company loaded: one tally.exe (PID 13252) owns 9001; /status 200.
+2026-10-30T00:21Z BRIDGE AMEND LAB (100024) loaded alone by its filter; Gateway: 1-Apr-26 to 31-Mar-27, current date 18-Jul-2026, last entry 18-Jul-26. Step 0 again at 00:21:23Z.
+2026-10-30T00:21:34Z a-marks sent; the lab helper's reader stopped on a second, empty COMPANY element (CMPINFO's). By structure: one row, THE COMPANY's GUID, ALTVCHID 1829, ALTMSTID 245. Reader fixed; part A from its marks read again.
+2026-10-30T00:22:03Z to 00:22:08Z Part A: a-marks-2, 7 census requests, a-marks-3: all 200; marks 1829 / 245 at both ends. Compare: a-l1 holds all; a-d3batch A and B do not hold (expected); a-d3cancel A and B do not hold; a-wa1 A, B and D do not hold (the spanned answer empty).
+2026-10-30T00:22:49Z Part A C10: AMEND shut; none loaded; one tally.exe owns 9001; /status 200.
+2026-10-30T00:23Z Part P: PILOT LAB (100033) loaded alone (Gateway 1-Apr-26 to 31-Mar-27, 15-Sep-2026); marks 68 / 245 both ends; p-audit holds all. C10.
+2026-10-30T00:24Z Part G: GST LEDGER LAB (100077) loaded alone (Gateway 1-Apr-25 to 31-Mar-26, 8-Dec-2025); marks 71 / 228 both ends; 14 windows hold all. C10.
+2026-10-30T00:25Z Part S: STOCK LAB (100027) loaded alone (Gateway 1-Apr-25 to 31-Mar-26, 21-Apr-2025); marks 4 / 292 both ends; s-0421 C and D hold (one row, ALTERID 3, 20250421). C10 at 00:26Z: none loaded; one tally.exe owns 9001; /status 200.

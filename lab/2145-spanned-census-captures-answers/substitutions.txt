@@ -1,0 +1,13 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+evidence/A-c10-netstat.txt: original 10804 B sha256 c705c8b98ff9b8d27de377774a4a3183fc82e50976b1b38533f64325c0fdab19; only the port-9001 LISTENING lines kept
+evidence/A-s0-netstat.txt: original 9320 B sha256 87e82ad81f4c6c9e1604e4f4c653349f5b08431179ebd58b868818bd98c820c6; only the port-9001 LISTENING lines kept
+evidence/A-s0-none-netstat.txt: original 9102 B sha256 e6c4233589a7f92473efd2ce1e13b2e937e07b07e0c60fc1181e368ced9eb80f; only the port-9001 LISTENING lines kept
+evidence/G-c10-netstat.txt: original 14353 B sha256 7ce58b4e9702038d5c8e39a4537d3da6d6b7cd800d24d634abc555901401f200; only the port-9001 LISTENING lines kept
+evidence/G-s0-netstat.txt: original 9909 B sha256 8280456146d6e19e930b2d4352682ba81c1944368821da1985a13a24c03e38d2; only the port-9001 LISTENING lines kept
+evidence/P-c10-netstat.txt: original 11097 B sha256 8d4f528036dc09c305f241923c447a31a33678d3b1a1e34d3ccc0e4614fb2a22; only the port-9001 LISTENING lines kept
+evidence/P-s0-netstat.txt: original 10726 B sha256 2c7136acc18fb909af2de011d8bcb496aa43d0e8592eefa140b31b13d7794c83; only the port-9001 LISTENING lines kept
+evidence/S-c10-netstat.txt: original 14197 B sha256 ef5d2a87ba0719a1f61f8e601f035efc419a11fdb117b459a93d4ca871838181; only the port-9001 LISTENING lines kept
+evidence/S-s0-netstat.txt: original 13909 B sha256 4b7f9f6d0d3b75dac6bf6fe014de294bd146e23e542e5a7f582ef7fd9cde8a99; only the port-9001 LISTENING lines kept
+scripts/send.py: original 4235 B sha256 3c064b89e50dc5d44498a2559c62c1be1e7d182edcc594db733bc0dce9c2a07d; 1 x -> <lab folder>; 4 x -> stop
+scripts/part.py: original 4811 B sha256 92a2d8dfb5d0d40d0b4403a67445dbac5298593467f6140a01a3f10f72f42a55; 1 x -> <lab folder>; 2 x -> stop
+scripts/step0.ps1: original 2374 B sha256 b7dbe2a0ef80d1c19ff974e53d8fe6baf90fabce19f5001c18ea407d505012d0; 2 x -> <lab folder>

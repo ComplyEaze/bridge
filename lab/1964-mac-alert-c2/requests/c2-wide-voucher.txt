@@ -1,0 +1,23 @@
+00000000-0000-4000-8000-000000000001
+1
+Click "Post voucher" to post this voucher into Tally. Click Cancel to cancel. Nothing is posted until you answer.
+
+Create ONE Payment in "Synthetic Accounts"
+Company GUID: 00000000-0000-4000-8000-000000000002
+Company number: 424242  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9001
+Date: 1-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 1.00  "Party 0"
+Cr 1.00  "Cash"
+Total debit: 1  Total credit: 1
+Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.
+Batch: bridge-00000000-0000-4000-8000-000000000001
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: "r1"
+Narration: "rent"

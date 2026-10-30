@@ -2521,6 +2521,21 @@ impl ToolFailure {
     }
 }
 
+/// Makes a tool's future in a frame of its own and boxes it. An unoptimised
+/// build gives each arm of `tool_payload`'s match a stack slot of its own for
+/// the future it awaits, so that one frame held every tool's future at once:
+/// several hundred kilobytes, under every post's deeper frames, which ran a
+/// post past a test thread's stack (#2142). A box built in the arm itself
+/// keeps the slot; one built here does not.
+fn in_own_frame<'a, F>(
+    make: impl FnOnce() -> F,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = F::Output> + Send + 'a>>
+where
+    F: std::future::Future + Send + 'a,
+{
+    Box::pin(make())
+}
+
 impl Server {
     fn new(settings: Settings) -> Self {
         let post_approvals = Arc::new(agent_import::PostApprovals::new(&settings.data_dir));
@@ -3059,23 +3074,23 @@ impl Server {
         }
         validate_tool_arguments(name, args)?;
         match name {
-            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
-            "audit_test_run" => self.audit_test_run(args).await,
-            "balance_sheet" => self.balance_sheet(args).await,
+            "acknowledge_post_review" => in_own_frame(|| self.acknowledge_post_review(args)).await,
+            "audit_test_run" => in_own_frame(|| self.audit_test_run(args)).await,
+            "balance_sheet" => in_own_frame(|| self.balance_sheet(args)).await,
             "build_import_xml" => {
                 self.import_enabled()?;
-                self.build_import_xml(args).await
+                in_own_frame(|| self.build_import_xml(args)).await
             }
-            "cash_flow" => self.cash_flow(args).await,
-            "company_features" => self.company_features(args).await,
+            "cash_flow" => in_own_frame(|| self.cash_flow(args)).await,
+            "company_features" => in_own_frame(|| self.company_features(args)).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
-            "gst_by_counter_ledger" => self.gst_by_counter_ledger(args).await,
-            "gst_status" => self.gst_status(args).await,
-            "gst_uncertain_vouchers" => self.gst_uncertain_vouchers(args).await,
-            "ledger_masters" => self.ledger_masters(args).await,
-            "ledger_movement" => self.ledger_movement(args).await,
+            "gst_by_counter_ledger" => in_own_frame(|| self.gst_by_counter_ledger(args)).await,
+            "gst_status" => in_own_frame(|| self.gst_status(args)).await,
+            "gst_uncertain_vouchers" => in_own_frame(|| self.gst_uncertain_vouchers(args)).await,
+            "ledger_masters" => in_own_frame(|| self.ledger_masters(args)).await,
+            "ledger_movement" => in_own_frame(|| self.ledger_movement(args)).await,
             "list_companies" => {
-                let (companies, evidence) = self.companies().await?;
+                let (companies, evidence) = in_own_frame(|| self.companies()).await?;
                 let flagged = companies
                     .iter()
                     .map(|company| company_json(company, &companies))
@@ -3088,27 +3103,33 @@ impl Server {
                 })
             }
             "local_data_report" => self.local_data_report().map_err(Into::into),
-            "masters" => self.masters(args).await,
-            "month_register" => self.month_register(args).await,
-            "negative_ledgers" => self.negative_ledgers(args).await,
-            "negative_stock" => self.negative_stock(args).await,
-            "outstandings" => self.outstandings(args).await,
+            "masters" => in_own_frame(|| self.masters(args)).await,
+            "month_register" => in_own_frame(|| self.month_register(args)).await,
+            "negative_ledgers" => in_own_frame(|| self.negative_ledgers(args)).await,
+            "negative_stock" => in_own_frame(|| self.negative_stock(args)).await,
+            "outstandings" => in_own_frame(|| self.outstandings(args)).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
-                self.parse_bank_statement(args).await
+                in_own_frame(|| self.parse_bank_statement(args)).await
             }
-            "parse_bank_statement_csv" => self.parse_bank_statement_csv(args).await,
-            "post_import" => self.post_import(args).await,
-            "post_ledger_creates" => self.post_ledger_creates(args).await,
-            "prepare_ledger_creates" => self.prepare_ledger_creates(args).await,
-            "profit_and_loss" => self.profit_and_loss(args).await,
-            "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
+            "parse_bank_statement_csv" => {
+                in_own_frame(|| self.parse_bank_statement_csv(args)).await
+            }
+            "post_import" => in_own_frame(|| self.post_import(args)).await,
+            "post_ledger_creates" => in_own_frame(|| self.post_ledger_creates(args)).await,
+            "prepare_ledger_creates" => in_own_frame(|| self.prepare_ledger_creates(args)).await,
+            "profit_and_loss" => in_own_frame(|| self.profit_and_loss(args)).await,
+            "purchase_register" => {
+                in_own_frame(|| self.register(register::RegisterKind::Purchase, args)).await
+            }
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
-            "sales_register" => self.register(register::RegisterKind::Sales, args).await,
-            "statement_tie_out" => self.statement_tie_out(args).await,
-            "stock_summary" => self.stock_summary(args).await,
+            "sales_register" => {
+                in_own_frame(|| self.register(register::RegisterKind::Sales, args)).await
+            }
+            "statement_tie_out" => in_own_frame(|| self.statement_tie_out(args)).await,
+            "stock_summary" => in_own_frame(|| self.stock_summary(args)).await,
             "tally_status" => {
-                let (result, evidence) = self.status().await?;
+                let (result, evidence) = in_own_frame(|| self.status()).await?;
                 Ok(ToolOutcome {
                     payload: json!({"result": result}),
                     evidence,
@@ -3116,23 +3137,27 @@ impl Server {
                     truncated: false,
                 })
             }
-            "trial_balance" => self.trial_balance(args).await,
-            "validate_masters" => self.validate_masters(args).await,
-            "verify_import" => self.verify_import(args).await,
-            "voucher_presence" => self.voucher_presence(args).await,
-            "voucher_read_cost" => self.voucher_read_cost(args).await,
+            "trial_balance" => in_own_frame(|| self.trial_balance(args)).await,
+            "validate_masters" => in_own_frame(|| self.validate_masters(args)).await,
+            "verify_import" => in_own_frame(|| self.verify_import(args)).await,
+            "voucher_presence" => in_own_frame(|| self.voucher_presence(args)).await,
+            "voucher_read_cost" => in_own_frame(|| self.voucher_read_cost(args)).await,
             "voucher_schema" => self.voucher_schema().map_err(Into::into),
-            "vouchers" => self.vouchers(args).await,
+            "vouchers" => in_own_frame(|| self.vouchers(args)).await,
             #[cfg(feature = "lab-writes")]
-            "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
+            "lab_read_inventory" => in_own_frame(|| lab::lab_read_inventory(self, args)).await,
             #[cfg(feature = "lab-writes")]
-            "lab_read_purchase_identity" => lab::lab_read_purchase_identity(self, args).await,
+            "lab_read_purchase_identity" => {
+                in_own_frame(|| lab::lab_read_purchase_identity(self, args)).await
+            }
             #[cfg(feature = "lab-writes")]
-            "lab_voucher_key_probe" => lab::lab_voucher_key_probe(self, args).await,
+            "lab_voucher_key_probe" => {
+                in_own_frame(|| lab::lab_voucher_key_probe(self, args)).await
+            }
             #[cfg(feature = "lab-writes")]
-            "lab_import_masters" => lab::lab_import_masters(self, args).await,
+            "lab_import_masters" => in_own_frame(|| lab::lab_import_masters(self, args)).await,
             #[cfg(feature = "lab-writes")]
-            "lab_import_vouchers" => lab::lab_import_vouchers(self, args).await,
+            "lab_import_vouchers" => in_own_frame(|| lab::lab_import_vouchers(self, args)).await,
             _ => Err("tool_not_found".to_string().into()),
         }
     }

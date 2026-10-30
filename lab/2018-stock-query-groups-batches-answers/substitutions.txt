@@ -1,0 +1,13 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+evidence/c10-netstat.txt: original 10870 B sha256 3b586f72471e40ee2a963d2abd1ff40d030c4996dc2883d482e3eb3e217f5253; only the port-9001 LISTENING lines kept
+evidence/s0-netstat.txt: original 9316 B sha256 2f2730b1ef2dc90ad5f03ebdca598a19ffeb1064c765fcc0508738033bca1642; only the port-9001 LISTENING lines kept
+evidence/s0-none-netstat.txt: original 9168 B sha256 39eb1b4d2abd3b828fb1930008d2dcea502934afad705993987f9abc34812591; only the port-9001 LISTENING lines kept
+scripts/send.py: original 4328 B sha256 541f81f27ca54cbfce9a7feb6a4b1802c4119dc24e24a17ab63f07385ef008d3; 1 x -> <lab folder>; 4 x -> stop
+scripts/parse2018.py: original 9948 B sha256 7c09de36cb14d7198dfe4ea5f9102c417003ec251bb57cb1a59563cd0465d2b2; 1 x -> <lab folder>
+scripts/client.py: original 4853 B sha256 27411b23b1a10e04e21c3f8e98c12de2d13cea6e9e921298d46eb6eb0470a51c; 1 x -> <build folder>; 1 x -> <lab folder>; 1 x -> lab-client; 4 x -> stop
+scripts/call.py: original 1204 B sha256 e57331605d4e10268c85254dede43be1b8b8ddc4337d18788e475686b4637d3a; 1 x -> <lab folder>
+scripts/one.py: original 931 B sha256 e3f9d3bbce33fe8357a5b68c259081f75cb19e005558b3ac8814b7065da56e1e; 1 x -> '<lab folder>'
+scripts/step0.ps1: original 2382 B sha256 3bc299307fd445cc9524d67f249cfc18f3638968b676aba7fc821a41d1f833f6; 2 x -> <lab folder>
+scripts/launch-env.json: original 156 B sha256 23622633594a01ca29e43620ffaa8e2c02fcd3848d71b43be69690c2e6b5eccc; 1 x -> <lab folder>
+answers-mcp/001-list-companies.json: original 1562 B sha256 1707bb4578a73cb6f7bf356b8443a3544fb3a028a2518987101f250b5e1ecb7e (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)
+answers-mcp/002-vouchers-p1.json: original 107712 B sha256 ef7302bf0e63387d80fb9ee9617786b06ecb1f1919847924b43b092e93426770 (kept on the lab PC); company_number replaced by "<redacted: company number>" in 2 place(s), by a JSON parser (nested JSON text re-serialised with json.dumps)

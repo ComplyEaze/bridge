@@ -1,0 +1,7 @@
+#2018 L1-L3 notes (UTC). Sheet lab/2018-stock-query-groups-batches at 8cd6fa6f6d0c7ff0ac1cdf291ea82f878049e359: SHA256.txt 15 of 15 equal; check-request-ids: census ok 3, skipped 8, FAIL 0; the 8 Stock Query requests checked by eye. Build: held master 218eaba1 (contains #2038), exe sha256 41b86dac...; the run lead's yes about 01:05Z.
+2026-10-30T01:04Z Step 0 with no company loaded: one tally.exe (PID 26300) owns 9001; /status 200.
+2026-10-30T01:05Z BRIDGE SHAPE LAB loaded alone by its filter; Gateway 1-Apr-26 to 31-Mar-27, 20-Apr-2026, last entry 20-Apr-26. Step 0 again.
+2026-10-30T01:05:2xZ Step 1 m-a: one row, ALTVCHID 112, ALTMSTID 292. Step 2: 8 Stock Query reads and 2 collection reads, all 200; each Stock Query answer byte-identical to 28 October's.
+2026-10-30T01:06:05Z Step 3: the client on 218eaba1 (version 0.6.1); tools/list (vouchers has goods_lines); list_companies; vouchers 2025-04-01..2026-03-31 goods_lines true: one page, 67 of 67, complete. Screenshot after it.
+2026-10-30T01:06:5xZ Step 4 m-b: 112 / 292, equal. Step 5 egress_log saved. Client stopped by its stop file: server exit 0, error stream empty; exe sha256 equal.
+2026-10-30T01:07:35Z C10: shut; none loaded; one tally.exe owns 9001; /status 200.

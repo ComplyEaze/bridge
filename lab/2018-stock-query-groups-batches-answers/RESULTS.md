@@ -1,0 +1,25 @@
+# Results: #2018 L1-L3, Stock Query's purchase groups, an item's batch lines, and what an empty answer means, on BRIDGE SHAPE LAB (synthetic), 30 Oct 2026 (UTC). **PASS (the sheet ran): every read answered whole, the paging sum held (one page, 67 of 67), the marks did not move. L1: the q-r-09 item has 10 invoice Purchase goods lines in the year and Stock Query returns 5 purchase groups, the 5 latest (11 to 15 April 2025): Stock Query returned the latest N, with N = 5 measured on one item. L2: for both items read on the opening day, opening line + the year's signed goods-line sum equals the year-end line, pair by pair; for the other two items one year-end line each appears in no voucher and in no opening line read here (from a source this sheet does not read). L3: an empty Stock Query answer sits beside a zero closing (the zero-stock case) for the q-r-13 item at 1 April 2025, and beside an empty closing (no stock movement) for the q-r-04 item at 31 March 2026; every Stock Query answer with lines sums to the collection's closing for the same item and date.** Item names, quantities and dates per item are in `tables.md` only.
+
+## By step
+- **Step 1 (m-a):** one COMPANY row, THE COMPANY's GUID; ALTVCHID 112, ALTMSTID 292; the flags as the parser tables give them (`ISBATCHWISEON` Yes). **Step 4 (m-b):** 112 / 292, equal.
+- **Step 2, Stock Query:** 8 requests, each 200, bytes equal to CONTENT-LENGTH, within 65,536 B; **each answer byte-identical to the same request's answer of 28 October**. Purchase groups: 5 (q-r-09), 0, 1, 1, and 0 for the four opening-day or empty reads; sales groups: 1 for q-r-03, 0 elsewhere. Godown and batch lines: 2, 2, 2, 3 at the year end; 1 and 1 on the opening day; q-r-13 and q-r-04 answered empty (46 B).
+- **Step 2, the collection:** `c-a-01` (to 1 April 2025) and `c-a-03` (to 31 March 2026), 200, within 262,144 B. CLOSINGBALANCE for every item named above: given for each, `0.000` and its unit for the q-r-13 item at 1 April 2025, empty for the q-r-04 item at both dates.
+- **Step 3, vouchers:** `tools/list`: `vouchers` has `goods_lines`. `list_companies`, then `vouchers` 2025-04-01 to 2026-03-31 with `goods_lines` true: one page, `truncated` false, `total` 67, 67 returned, `state` complete, no reason, no withheld vouchers. 16 invoice vouchers; 14 carry goods lines, each with its godown and batch rows; no `goods_lines_unreadable`. One invoice Purchase is cancelled (no goods lines); one invoice Sales carries no goods lines.
+- **Step 5:** `egress_log` saved whole.
+
+## Readings (the sheet's)
+- **L1 (more lines than groups, the groups being the latest):** 10 lines against 5 groups, the groups the 5 latest by date: Stock Query returned the latest N; **N = 5**, measured on one item.
+- **L2:** the q-r-03 and q-r-12/q-r-4 items (opening read): every (godown, batch) pair: opening + signed sum = year end, equal. The q-r-09 and q-r-02 items (no opening read): one year-end line each is in no voucher and no opening read here, recorded as "from the opening or a source this sheet does not read". For the q-r-09 item the year-end lines also hold a godown with a negative line that no goods line names.
+- **L3:** the zero-stock case (empty answer, closing `0.000`) and the no-movement case (empty answer, empty closing) both seen; no disagreement; every answer with lines equals its closing.
+
+## Checks
+- **Sheet:** `lab/2018-stock-query-groups-batches` at 8cd6fa6f6d0c7ff0ac1cdf291ea82f878049e359; `SHA256.txt` 15 of 15 equal; `check-request-ids.py requests`: `census: ok 3, skipped 8, FAIL 0`; the 8 skipped checked by eye (ID `Stock Query`, no `COLLECTION`). Each request's sha256 checked again before its send.
+- **The build (the run lead's word, about 01:05 UTC):** the lab's held master build **218eaba1b5df10dfc8953f5ae3785e4a608f041e** (on master; it contains #2038, commit 95a00b65), `bridge_mcp.exe` sha256 **41b86dac5c964b5e0106f5b392f854f4f13bf7ca181940902c796dcd24eb67bd** before the first call and after the last, `pdfium.dll` beside it; the tool list reports version 0.6.1. The other held build used tonight (609776ae, exe 4c9bace3) does not contain #2038. No download. MCP stdio, one launch, a new empty data folder, terms accepted, no redaction, writes and imports unset; server exit 0, error stream empty.
+- **Step 0** (no company loaded): one tally.exe (PID 26300) owns 9001; `/status` 200. THE COMPANY loaded alone by its name filter; the Gateway: 1-Apr-26 to 31-Mar-27, current date Monday 20-Apr-2026, last entry 20-Apr-26.
+- **C10:** Company > Shut; Select Company with none loaded; one tally.exe owns 9001; `/status` 200; the exe hashed.
+
+## Deviations
+1. The vouchers answer gives each voucher's `voucher_type` (Purchase, Sales, ...); no separate class field was present, so the class is read from the type name.
+2. Tally's PID is 26300, not the earlier sittings' 13252: Tally was restarted at 690-R0's step G1 earlier this night.
+
+**Confidence:** one sitting, one synthetic book: PARTIAL. Not measured: as the sheet lists.

@@ -1,0 +1,3 @@
+Files kept on the lab PC (the whole reads of B1 and B3, and every probe body), by size and sha256:
+answers-mcp/001-list-companies.json 1562 B 1707bb4578a73cb6f7bf356b8443a3544fb3a028a2518987101f250b5e1ecb7e
+answers-mcp/002-vouchers-p1.json 107712 B ef7302bf0e63387d80fb9ee9617786b06ecb1f1919847924b43b092e93426770

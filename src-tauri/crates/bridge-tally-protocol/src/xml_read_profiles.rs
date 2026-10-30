@@ -109,7 +109,6 @@ impl ValidatedDateRange {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadOnlyProfileId {
-    CompanyListV1,
     CompanyListV2,
     CompanyBookExtentV2,
     StandardLedgerIdentityV1,
@@ -126,7 +125,6 @@ pub enum ReadOnlyProfileId {
 impl ReadOnlyProfileId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::CompanyListV1 => "company_list_v1",
             Self::CompanyListV2 => "company_list_v2",
             Self::CompanyBookExtentV2 => "company_book_extent_v2",
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
@@ -165,7 +163,6 @@ impl ReadOnlyProfileId {
     /// slot.
     fn template(self) -> String {
         match self {
-            Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
             Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
@@ -241,56 +238,39 @@ pub fn first_spaced_function_argument(tdl: &str) -> Option<String> {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ReadOnlyProfile<'a> {
-    CompanyListV1,
     /// Tally's documented `Company` collection (`TYPE=Collection`), fetching
-    /// identity plus fixed gateway product/mode evidence. Unlike
-    /// `CompanyListV1`'s custom TDL report,
-    /// this returns the ordinary shaped `HEADER/STATUS=1` success envelope,
-    /// so it can satisfy the trust check instead of being parsed as an
-    /// unverified direct report.
+    /// identity plus fixed gateway product/mode evidence. It returns the
+    /// ordinary shaped `HEADER/STATUS=1` success envelope, so it satisfies
+    /// the trust check.
     CompanyListV2,
     /// A versioned Company collection that includes the observed company
     /// number required to distinguish year-split sibling books.
-    CompanyBookExtentV2 {
-        company: &'a ValidatedCompanyName,
-    },
+    CompanyBookExtentV2 { company: &'a ValidatedCompanyName },
     /// A narrow compatibility bootstrap for Tally responders that reject
     /// Bridge's custom report profile but accept the documented built-in
     /// `List of Ledgers` collection. Its output is parsed only for repeated
     /// computed company context; ledger data is discarded.
-    StandardLedgerIdentityV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    StandardLedgerIdentityV1 { company: &'a ValidatedCompanyName },
     /// A scoped compatibility catalog that returns only ledger names and
     /// parents after independently validating the repeated company context.
     /// It is not the custom Bridge ledger export and cannot qualify a sync.
-    StandardLedgerCatalogV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    StandardLedgerCatalogV1 { company: &'a ValidatedCompanyName },
     /// V1's request with each ledger's `ISBILLWISEON` fetched in the same row,
     /// so the import family learns which ledgers are maintained bill by bill from the
     /// catalogue read it already makes. Not for `source_draft`, presence or
     /// the voucher and bill reads, which keep V1.
-    StandardLedgerCatalogV2 {
-        company: &'a ValidatedCompanyName,
-    },
+    StandardLedgerCatalogV2 { company: &'a ValidatedCompanyName },
     /// V2's request with each ledger's `ALTERID` fetched in the same row, so a
     /// later read can tell which ledgers changed since the catalogue was taken.
     /// Request only: no response parser exists for it yet, because no V3
     /// answer has been captured from a real Tally.
-    StandardLedgerCatalogV3 {
-        company: &'a ValidatedCompanyName,
-    },
+    StandardLedgerCatalogV3 { company: &'a ValidatedCompanyName },
     /// The `company` part of a tally-read v1 read: a single-object export of
     /// the one named company. See [`AUDIT_COMPANY_FETCH`].
-    AuditCompanyObjectV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    AuditCompanyObjectV1 { company: &'a ValidatedCompanyName },
     /// The company object an invoice build reads for the company-level
     /// HSN/SAC and its settings. See [`INVOICE_COMPANY_FETCH`].
-    InvoiceCompanyHsnV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    InvoiceCompanyHsnV1 { company: &'a ValidatedCompanyName },
     /// The `ledgers` part of a tally-read v1 read, for the audit period.
     AuditLedgersV1 {
         company: &'a ValidatedCompanyName,
@@ -311,7 +291,6 @@ pub enum ReadOnlyProfile<'a> {
 impl ReadOnlyProfile<'_> {
     pub fn id(self) -> ReadOnlyProfileId {
         match self {
-            Self::CompanyListV1 => ReadOnlyProfileId::CompanyListV1,
             Self::CompanyListV2 => ReadOnlyProfileId::CompanyListV2,
             Self::CompanyBookExtentV2 { .. } => ReadOnlyProfileId::CompanyBookExtentV2,
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
@@ -332,7 +311,6 @@ impl ReadOnlyProfile<'_> {
 
     pub fn render(self) -> String {
         match self {
-            Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
             Self::CompanyBookExtentV2 { company } => {
                 render_company_book_extent_v2(company.as_str())
@@ -373,14 +351,10 @@ impl ReadOnlyProfile<'_> {
 }
 
 /// Compatibility seam for the native app's existing function signatures.
-/// These functions still expose only the three fixed read-only profiles and
+/// These functions still expose only the two fixed read-only profiles and
 /// XML-escape every dynamic value; no caller-provided XML can be dispatched.
 #[doc(hidden)]
 pub mod compatibility {
-    pub fn company_list_request() -> String {
-        super::render_company_list()
-    }
-
     pub fn standard_ledger_identity_request(company: &str) -> String {
         super::render_standard_ledger_identity(company)
     }
@@ -390,75 +364,13 @@ pub mod compatibility {
     }
 }
 
-fn render_company_list() -> String {
-    r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>Export</TALLYREQUEST>
-        <TYPE>Data</TYPE>
-        <ID>Company Report</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="Company Report">
-                        <FORMS>Company Form</FORMS>
-                        <TITLE>"Company Details"</TITLE>
-                    </REPORT>
-                    <FORM NAME="Company Form">
-                        <TOPPARTS>Company Part</TOPPARTS>
-                        <HEIGHT>100% Page</HEIGHT>
-                        <WIDTH>100% Page</WIDTH>
-                    </FORM>
-                    <PART NAME="Company Part">
-                        <TOPLINES>Company Header, Company Details</TOPLINES>
-                        <REPEAT>Company Details : CompanyCollection</REPEAT>
-                        <SCROLLED>Vertical</SCROLLED>
-                        <COMMONBORDERS>Yes</COMMONBORDERS>
-                    </PART>
-                    <LINE NAME="Company Header">
-                        <LEFTFIELDS>
-                            Company Name Header, Company GUID Header
-                        </LEFTFIELDS>
-                    </LINE>
-                    <FIELD NAME="Company Name Header"><SET>"Company Name"</SET></FIELD>
-                    <FIELD NAME="Company GUID Header"><SET>"Company GUID"</SET></FIELD>
-                    <LINE NAME="Company Details">
-                        <LEFTFIELDS>
-                            Company Name Field, Company GUID Field
-                        </LEFTFIELDS>
-                        <XMLTAG>"CompanyInfo"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="Company Name Field"><SET>$Name</SET></FIELD>
-                    <FIELD NAME="Company GUID Field"><SET>$GUID</SET></FIELD>
-                    <COLLECTION NAME="CompanyCollection">
-                        <TYPE>Company</TYPE>
-                        <FETCH>Name, GUID</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#
-    .trim()
-    .to_string()
-}
-
 /// Tally's documented `Company` collection. It returns company identity plus
 /// endpoint-wide product/mode facts from fixed, no-space `$$LicenseInfo`
 /// functions. Those facts are parsed separately so a missing capability field
 /// cannot make ordinary company discovery unavailable.
-/// Unlike `render_company_list`'s custom TDL report — which Tally answers
-/// with a bare `<ENVELOPE><COMPANYINFO>...` document carrying no
-/// `HEADER`/`STATUS` at all — a `TYPE=Collection` export returns the
-/// ordinary shaped success envelope, so its response can satisfy the same
-/// `HEADER/STATUS=1` trust check every other export profile requires.
+/// A `TYPE=Collection` export returns the ordinary shaped success envelope,
+/// so its response can satisfy the same `HEADER/STATUS=1` trust check every
+/// other export profile requires.
 // Product, mode, tier and release are observed endpoint facts; see
 // TALLY_PROTOCOL_REFERENCE.md §3.1 for the captured qualification scope.
 fn render_company_list_v2() -> String {

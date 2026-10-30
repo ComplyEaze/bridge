@@ -50,8 +50,8 @@ use bridge_tally_protocol::{
         DateBoundaryProfile, OutstandingsError,
     },
     parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
-    parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
-    parse_ledger_census_slice, parse_native_party_ledger_master_records_leaving_unparsed,
+    parse_company_gateway_capability_observation, parse_ledger_census_slice,
+    parse_native_party_ledger_master_records_leaving_unparsed,
     parse_native_party_ledger_master_structure, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
@@ -1471,16 +1471,14 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`). Unlike the legacy custom TDL
-    /// report, its response is Tally's ordinary shaped `HEADER/STATUS=1`
-    /// success envelope, so a successful parse directly satisfies the export
-    /// trust check instead of requiring the narrower, explicitly-untrusted
-    /// interactive compatibility parse.
+    /// (`ReadOnlyProfile::CompanyListV2`). Its response is Tally's ordinary
+    /// shaped `HEADER/STATUS=1` success envelope, so a successful parse
+    /// directly satisfies the export trust check.
     ///
-    /// Responders that reject the collection outright — a shaped failure, an
-    /// unrecognized shape, or anything else the collection parser cannot
-    /// read — fall back to `legacy_company_discovery_evidence`, off the happy
-    /// path but otherwise unchanged.
+    /// A responder that rejects the collection is reported from that one
+    /// answer: a shaped failure by its own reason code, anything else as
+    /// `xml_export_shape_unrecognized`. No second request is sent; the legacy
+    /// custom company report it once fell back to is gone (#1872).
     async fn company_discovery_evidence(
         &self,
         connection: &mut ConnectionStatus,
@@ -1491,55 +1489,11 @@ impl TallyClient {
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), wire_evidence)
             .await?;
-        match xml_parser::parse_companies_from_collection(&xml) {
+        Ok(match xml_parser::parse_companies_from_collection(&xml) {
             Ok(discovered) => {
                 *gateway_product_mode = parse_company_gateway_capability_observation(&xml)
                     .map(GatewayProductModeEvidence::from_observation)
                     .unwrap_or_else(|_| GatewayProductModeEvidence::unavailable());
-                connection.reachable = true;
-                if connection.error.is_some() {
-                    connection.error = Some("status_heuristic_unavailable".to_string());
-                }
-                Ok(match normalize_discovered_companies(discovered) {
-                    Ok(normalized) => {
-                        *companies = normalized;
-                        CapabilityEvidence {
-                            state: CapabilityState::Supported,
-                            confidence: EvidenceConfidence::Observed,
-                            safe_reason_code: None,
-                        }
-                    }
-                    Err(()) => CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("company_identity_invalid".to_string()),
-                    },
-                })
-            }
-            Err(_) => {
-                self.legacy_company_discovery_evidence(connection, companies, wire_evidence)
-                    .await
-            }
-        }
-    }
-
-    /// The pre-`CompanyListV2` company discovery path: the custom
-    /// `CompanyListV1` TDL report, which most Tally responders answer with a
-    /// bare `<ENVELOPE><COMPANYINFO>...` document carrying no
-    /// `HEADER`/`STATUS` at all. That bare shape is accepted only through the
-    /// narrow, explicitly-untrusted interactive discovery parse; it can never
-    /// promote `CapabilityState::Supported`.
-    async fn legacy_company_discovery_evidence(
-        &self,
-        connection: &mut ConnectionStatus,
-        companies: &mut Vec<TallyCompany>,
-        wire_evidence: &mut RuntimeReadEvidence,
-    ) -> anyhow::Result<CapabilityEvidence> {
-        let xml = self
-            .post_probe_xml(tdl_engine::company_list_request(), wire_evidence)
-            .await?;
-        Ok(match xml_parser::parse_companies(&xml) {
-            Ok(discovered) => {
                 connection.reachable = true;
                 if connection.error.is_some() {
                     connection.error = Some("status_heuristic_unavailable".to_string());
@@ -1570,17 +1524,6 @@ impl TallyClient {
                         xml_parser::export_failure_reason_code(&xml).to_string(),
                     ),
                 },
-                _ if parse_companies_for_interactive_discovery(&xml).is_ok() => {
-                    connection.reachable = true;
-                    if connection.error.is_some() {
-                        connection.error = Some("status_heuristic_unavailable".to_string());
-                    }
-                    CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("direct_company_report_untrusted".to_string()),
-                    }
-                }
                 _ => CapabilityEvidence {
                     state: CapabilityState::Unknown,
                     confidence: EvidenceConfidence::Observed,
@@ -1645,8 +1588,8 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`) rather than the legacy `CompanyListV1`
-    /// custom TDL report. Unlike the legacy report -- which one Tally instance
+    /// (`ReadOnlyProfile::CompanyListV2`), not the custom TDL company report
+    /// Bridge once sent (deleted under #1872). Unlike that report -- which one Tally instance
     /// answers with a bare, unwrapped `<COMPANYINFO>` document and another is
     /// known to simply hang on -- the collection always answers with the
     /// ordinary shaped `HEADER/STATUS=1` envelope, so `parse_companies_from_collection`

@@ -54,40 +54,34 @@ fn retained(error: &anyhow::Error) -> &RuntimeReadEvidence {
 
 #[tokio::test]
 async fn probe_failures_retain_completed_get_and_discovery_before_failed_attempt() {
-    let wrong_shape = include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/agent/native-ageing-receivable.utf16le.xml");
-    for fallback in [false, true] {
-        for framing in [
-            ResponseFraming::ContentLength,
-            ResponseFraming::Chunked { chunk_bytes: 37 },
-        ] {
-            let mut plans = vec![status()];
-            if fallback {
-                plans.push(xml(decode(wrong_shape)));
-            }
-            let mut failure = xml(companies());
-            failure.http_status = 503;
-            plans.push(failure);
-            for plan in &mut plans {
-                plan.framing = framing;
-            }
-            let bodies = responses(&plans);
-            let simulator = SequenceSimulator::spawn(plans).unwrap();
-            let error = TallyRuntime::default()
-                .probe_with_wire_evidence(config(&simulator))
-                .await
-                .unwrap_err();
-            assert!(error.chain().any(|cause| matches!(
-                cause.downcast_ref::<bridge_tally_transport::TallyTransportError>(),
-                Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 503 })
-            )));
-            let requests = simulator.finish().unwrap();
-            assert_eq!(requests.len(), if fallback { 3 } else { 2 });
-            let completed = if fallback { vec![0, 1] } else { vec![0] };
-            assert_evidence(
-                retained(&error),
-                expected_source(&requests, &bodies, &completed, false),
-            );
+    // The probe sends one company request (`CompanyListV2`) and no fallback
+    // after it (#1872), so the failed attempt is the second of two.
+    for framing in [
+        ResponseFraming::ContentLength,
+        ResponseFraming::Chunked { chunk_bytes: 37 },
+    ] {
+        let mut failure = xml(companies());
+        failure.http_status = 503;
+        let mut plans = vec![status(), failure];
+        for plan in &mut plans {
+            plan.framing = framing;
         }
+        let bodies = responses(&plans);
+        let simulator = SequenceSimulator::spawn(plans).unwrap();
+        let error = TallyRuntime::default()
+            .probe_with_wire_evidence(config(&simulator))
+            .await
+            .unwrap_err();
+        assert!(error.chain().any(|cause| matches!(
+            cause.downcast_ref::<bridge_tally_transport::TallyTransportError>(),
+            Some(bridge_tally_transport::TallyTransportError::HttpStatus { status: 503 })
+        )));
+        let requests = simulator.finish().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert_evidence(
+            retained(&error),
+            expected_source(&requests, &bodies, &[0], false),
+        );
     }
 }
 

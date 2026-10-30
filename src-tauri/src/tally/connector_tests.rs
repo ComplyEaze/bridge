@@ -1360,21 +1360,19 @@ async fn direct_company_snapshot_probe_rejects_identity_without_company_collecti
         "synthetic native groups satisfy the production identity parser"
     );
     let direct = "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>direct-guid-must-not-escape</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>";
-    // `fetch_companies` (called from `bootstrap_direct_company`, the third
+    // `fetch_companies` (called from `bootstrap_direct_company`, the second
     // POST below) now requests the native `Company` collection
     // (`ReadOnlyProfile::CompanyListV2`) rather than the legacy
     // `CompanyListV1` direct report, so its response carries that shape.
     // Its GUID must still not escape into the returned identity -- only
-    // the fourth, scoped `standard` read may do that.
+    // the third, scoped `standard` read may do that.
     let discovered = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">discovered-guid-must-not-escape</GUID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#;
     let standard = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO /></DESC><DATA><COLLECTION MSTDEPTYPE=\"Ledger\" ISMSTDEPTYPE=\"Yes\"><SyntheticLedger NAME=\"synthetic-ledger\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">ledger-guid</GUID><PARENT TYPE=\"String\">Primary</PARENT><BRIDGECOMPANYGUID TYPE=\"String\">scoped-guid</BRIDGECOMPANYGUID><BRIDGECOMPANYNAME TYPE=\"String\">Synthetic Company</BRIDGECOMPANYNAME><LANGUAGENAME.LIST><LANGUAGEID>1033</LANGUAGEID></LANGUAGENAME.LIST></SyntheticLedger></COLLECTION></DATA></BODY></ENVELOPE>";
     let (address, server) = spawn_method_routed_server(vec![
         // `TallyClient::probe` requests the trusted `Company` collection
-        // (`CompanyListV2`) first. This responder rejects it (the bare
-        // direct report has no `HEADER`/`STATUS` at all), so `probe` falls
-        // back to the legacy `CompanyListV1` report — one extra `direct`
-        // response ahead of the pre-existing legacy sequence below.
-        direct.to_string(),
+        // (`CompanyListV2`) first. This responder answers it with a bare
+        // direct report, which has no `HEADER`/`STATUS` at all, so `probe`
+        // reports the shape as unrecognized and sends no second request.
         direct.to_string(),
         discovered.to_string(),
         standard.to_string(),
@@ -1418,7 +1416,7 @@ async fn direct_company_snapshot_probe_rejects_identity_without_company_collecti
         error,
         TallyError::Protocol { code } if code == "company_identity_not_found"
     ));
-    assert_eq!(methods.len(), 5);
+    assert_eq!(methods.len(), 4);
     assert_eq!(methods[0], "GET");
     assert!(methods[1..].iter().all(|method| method == "POST"));
 }
@@ -1518,8 +1516,7 @@ async fn snapshot_start_and_end_probes_preserve_setup_review_and_read_transport_
     // `TallyClient::probe` requests the trusted `Company` collection
     // (`CompanyListV2`) first; this shape is what every `probe`/`probe_fresh`
     // POST below answers with, so the trusted path resolves the company in
-    // one request and never falls back to the legacy, explicitly-untrusted
-    // direct report.
+    // one request.
     let company_collection_xml = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20240101</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );

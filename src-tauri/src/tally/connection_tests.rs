@@ -248,19 +248,20 @@ fn party_master_opening_balance_comparison_rejects_an_unparseable_master_value()
 
 /// A `/status` read that fails is reported by the transport's own safe code (#1299): an HTTP
 /// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The probe reports it
-/// while its XML reads find no company list (a list found replaces the code with
+/// while its one company read finds no company list (a list found replaces the code with
 /// `status_heuristic_unavailable`).
 #[tokio::test]
 async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
     let failed_status =
         b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             .to_vec();
-    // Not a company list in either discovery shape.
+    // Not a company list. Nothing further is queued, so a second company
+    // request would hang and fail this test.
     let no_list = utf16_xml_response("<ENVELOPE></ENVELOPE>");
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
-        for response in [failed_status, no_list.clone(), no_list] {
+        for response in [failed_status, no_list] {
             let (mut socket, _) = listener.accept().await.unwrap();
             let request = read_complete_http_request(&mut socket).await;
             assert!(!request.is_empty());
@@ -915,9 +916,6 @@ async fn capability_probe_records_unavailable_product_mode_evidence_without_refu
             utf16_xml_response(
                 "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Capability collection unavailable</LINEERROR></DATA></BODY></ENVELOPE>",
             ),
-            utf16_xml_response(
-                "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-            ),
         ];
         for response in responses {
             let (mut socket, _) = listener.accept().await.expect("accept Tally request");
@@ -1099,14 +1097,12 @@ async fn capability_probe_does_not_promote_a_direct_company_report() {
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
     let server = tokio::spawn(async move {
-        // This responder gives the same untrusted bare direct company
-        // report regardless of what is requested: once for the `V2`
-        // collection attempt (which the collection parser rejects, since
-        // it never satisfies `HEADER/STATUS`), and once more for the
-        // `V1` fallback that follows.
+        // This responder answers the `V2` collection with an untrusted bare
+        // direct company report, which the collection parser rejects since
+        // it never satisfies `HEADER/STATUS`. Nothing further is queued, so
+        // a second company request would hang and fail this test.
         for (index, body) in [
             "<RESPONSE>LOCAL STATUS HEURISTIC UNRECOGNIZED</RESPONSE>",
-            "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
             "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
         ]
         .into_iter()
@@ -1147,7 +1143,7 @@ async fn capability_probe_does_not_promote_a_direct_company_report() {
         probe.profile.transports[&TransportId::XmlHttp]
             .safe_reason_code
             .as_deref(),
-        Some("direct_company_report_untrusted")
+        Some("xml_export_shape_unrecognized")
     );
     assert_eq!(
         probe.profile.features[&CapabilityFeatureId::CompanyRead].state,
@@ -1162,11 +1158,11 @@ async fn capability_probe_does_not_promote_a_shaped_company_failure_to_xml_suppo
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
     let server = tokio::spawn(async move {
-        // Same shaped `STATUS=0` failure for both the `V2` collection
-        // attempt and the `V1` fallback that follows it.
+        // A shaped `STATUS=0` failure for the `V2` collection, reported
+        // from that one answer: nothing further is queued, so a second
+        // company request would hang and fail this test.
         for (index, body) in [
             "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Could not find Company ''</LINEERROR></DATA></BODY></ENVELOPE>",
             "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Could not find Company ''</LINEERROR></DATA></BODY></ENVELOPE>",
         ]
         .into_iter()
@@ -1215,9 +1211,9 @@ async fn capability_probe_does_not_promote_a_shaped_company_failure_to_xml_suppo
 /// A gateway-shaped `Company` collection response with two loaded
 /// synthetic companies and the `CMPINFO` counter trap included. Proves
 /// `probe` requests `CompanyListV2` on the happy path
-/// and trusts its success without ever falling back to the legacy
-/// `CompanyListV1` report: the mock server has exactly one POST response
-/// queued, so a fallback request would hang and fail this test.
+/// and trusts its success with no second company request: the mock server
+/// has exactly one POST response queued, so another request would hang and
+/// fail this test.
 #[tokio::test]
 async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous() {
     let listener = TcpListener::bind("127.0.0.1:0")

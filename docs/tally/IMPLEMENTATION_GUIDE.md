@@ -1015,8 +1015,8 @@ anything, distinct from the connection-refused and indefinite-hang signatures se
 
 **Rule:** count rows client-side after parsing, never inside a collection. That costs nothing and
 cannot block the instance. **What enforces it:** `scripts/check-tally-request-builder-hazards.mjs`
-refuses new instances of the spaced-identifier half of I1 (one legacy profile is quarantined
-there); Unit A's collection profile has no function or compute slots, so it cannot express a
+refuses new instances of the spaced-identifier half of I1 (its pinned set of exceptions is
+empty since #1872); Unit A's collection profile has no function or compute slots, so it cannot express a
 self-reference (UNIT_A_REPORT.md). No general check covers the
 self-reference half for other builders.
 

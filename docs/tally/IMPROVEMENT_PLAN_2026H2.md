@@ -712,6 +712,11 @@ this plan assumed. `render_vouchers` went with `vouchers_v2` (#1609), and `rende
 `ledgers_v1` (#2102), because no shipped build sent either. `render_ledger_canary_readback` is no
 longer in the tree. Shipped reads use native Tally shapes. The plan text above is unchanged.
 
+**Note (2026-10-31, #1872):** `company_list_v1` (`render_company_list`) and the `tdl_engine.rs`
+`company_list_request` that wrapped it are deleted as well. The connection check sent that custom
+report only when its answer to the `Company` collection (`company_list_v2`) did not parse, and every
+read and post already required the collection. The tables in §8.9 and §8.10 are unchanged.
+
 **Design inputs established live on 2026-07-29:**
 
 1. **Response shape.** A collection export returns `ENVELOPE > HEADER(VERSION, STATUS) > BODY > DESC(CMPINFO) + DATA > COLLECTION > VOUCHER|LEDGER`. It carries `STATUS=1`, so the export-side invariant is preserved rather than relaxed. The existing report-shape parsers (`ENVELOPE > BODY > LEDGER`) do not match and must be replaced, not adapted.

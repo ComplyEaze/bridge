@@ -1,3 +1,4 @@
+71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f  requests/c-balance-whole.xml  (1284 bytes)
 c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386  requests/c-master-whole.xml  (1736 bytes)
 4d45ff27f86cca98dd39ade5995aa6d91e70b361be309957320a515fbf3d343b  requests/e-extent.xml  (1640 bytes)
 20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f  requests/g-groups.xml  (1066 bytes)
@@ -5,6 +6,7 @@ c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386  requests/c-mas
 9a5105c521e48c1e549e9292a9e229a008d21292a0584ef5b2bbec4b5292c27d  requests/g2-rates-guid-four-and-absent.xml  (2756 bytes)
 46b20305ca7633e0f7a84f2abc169c259ebdb2efd90dfce35467346c0dfd9d9a  requests/g3-rates-guid-absent-only.xml  (2284 bytes)
 d3ecd7c4cfd6ba2347766133f6c0c29c51029d8ca34a376fd257eaf63e4f8c45  requests/g4-master-guid-five.xml  (2518 bytes)
+e0be8f7e8775dd8dd7e960fdf96ac923f05c508c46041a2cc51a46ee8d5684d8  requests/g5-balance-guid-five.xml  (2066 bytes)
 d9ddd5af92fb17f8743e03ef1c49cc4b54b01b6f80bf26a021ae2c87c791de27  requests/imports/i001-debtors.xml  (191666 bytes)
 dbcefb915e2d28fa864585311fa8e8073b3d5645484d541553ae98e6257063aa  requests/imports/i002-debtors.xml  (191666 bytes)
 2be1b89363c7726ecd2463aa68730345905c54406e0849a022ca11e746ab4ed8  requests/imports/i003-debtors.xml  (191666 bytes)

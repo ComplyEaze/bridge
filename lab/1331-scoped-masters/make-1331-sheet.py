@@ -5,7 +5,8 @@ Run: python3 -I make-1331-sheet.py BASE_DIR OUT_DIR [AVOID_LIST]
 AVOID_LIST, if given, is a file of words (one per line) no ledger name may contain, in any case or
 spacing; a code that would contain one is skipped, so the names stay 20,000 and distinct.
 BASE_DIR holds the captured request files this sheet changes one filter of:
-  r02-marks.xml, r05-ledgers-compliance.xml, r07-groups.xml, r13-ledger-catalogue-v2.xml
+  r02-marks.xml, r05-ledgers-compliance.xml, r06-ledgers-paired.xml, r07-groups.xml,
+  r13-ledger-catalogue-v2.xml
   (lab/1342-capture-requests), rates-scoped-hsn.xml (the pilot-lab-ledger-rates-scoped-hsn
   request fixture) and extent-stock.xml (lab/1233-large-stock-book m-marks-S).
 Every request is UTF-16LE with a BOM, as the base files are. Only the named parts change.
@@ -76,10 +77,11 @@ def rates_parents(parents):
 
 
 master = read('r05-ledgers-compliance.xml')
+balance = read('r06-ledgers-paired.xml')
 
 
-def master_with(formula_text):
-    t = once(master, '<COLLECTION NAME="List of Ledgers"',
+def master_with(formula_text, base=None):
+    t = once(master if base is None else base, '<COLLECTION NAME="List of Ledgers"',
              '<SYSTEM TYPE="Formulae" NAME="%s">%s</SYSTEM><COLLECTION NAME="List of Ledgers"' % (FORMULA, formula_text))
     return once(t, '</COMPUTE></COLLECTION>', '</COMPUTE><FILTERS>%s</FILTERS></COLLECTION>' % FORMULA)
 
@@ -99,11 +101,13 @@ files = {
     'g2-rates-guid-four-and-absent.xml': rates_with(or_of('GUID', guids[:4] + [ABSENT_GUID])),
     'g3-rates-guid-absent-only.xml': rates_with(or_of('GUID', [ABSENT_GUID])),
     'g4-master-guid-five.xml': master_with(or_of('GUID', guids)),
+    'g5-balance-guid-five.xml': master_with(or_of('GUID', guids), balance),
     'n1-rates-name-five.xml': rates_with(or_of('Name', names)),
     'n2-rates-name-case-changed.xml': rates_with(or_of('Name', ['BRIDGE WALK-IN'])),
     'n3-rates-name-absent-only.xml': rates_with(or_of('Name', [ABSENT_NAME])),
     'p1-rates-parents-four.xml': rates,
     'c-master-whole.xml': master,
+    'c-balance-whole.xml': balance,
     'p2-rates-parents-three.xml': rates_parents(['Duties & Taxes', 'Indirect Expenses', 'Sales Accounts']),
 }
 assert files['p2-rates-parents-three.xml'] != rates

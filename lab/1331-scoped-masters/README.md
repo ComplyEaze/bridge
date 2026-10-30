@@ -3,7 +3,7 @@
 About 90 minutes. `LAB-COMMON.md` in this folder (v3, sha256 `5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6`) applies in full; where this sheet and it differ, the stricter holds. Part A is reads only. Part B backs THE COMPANY up (BK0), imports plain ledgers into it, reads, backs the grown book up (BK1, kept), and restores BK0. Nothing is keyed in Tally beyond the Backup and Restore screens and loading the company. No ComplyEaze Bridge build is used: every request is sent raw by curl.
 
 **WHAT IT DECIDES.** A Sales invoice build reads the whole ledger compliance listing at each of its checks, so the build refuses a book whose master mark is above 5,000 unless it holds at most 2,000 ledgers (#1331). The ledger-rate read is already narrowed to the parents of the invoice's ledgers, but on a book with thousands of customers the customer's own parent (Sundry Debtors) is itself too large for one read, so a parent filter does not admit such a book. This sheet measures the alternative: a filter that names the invoice's ledgers themselves. It records:
-1. **The shape.** Whether Tally answers a `$GUID = "…" OR …` filter, and a `$Name = "…" OR …` filter, on the ledger-rate request and on the compliance master request, with exactly the named ledgers, each row equal to the same ledger's row from the parent-filtered request already measured.
+1. **The shape.** Whether Tally answers a `$GUID = "…" OR …` filter, and a `$Name = "…" OR …` filter, on the ledger-rate request and on both requests of the compliance listing pair (master and balance), with exactly the named ledgers, each row equal to the same ledger's row from the parent-filtered request already measured.
 2. **A missing ledger.** How a filter naming a GUID or a name the book does not hold answers: the other rows only, and an empty collection when it names nothing that exists.
 3. **Case.** Whether `$Name` matches a name spelled with another letter case on this request.
 4. **Cost on a large book.** Bytes and seconds of each filtered read with 10,018 and 20,018 ledgers in the book, against the same read with 18. The filter is evaluated on every ledger, so its time can grow with the book even though the answer does not.
@@ -29,21 +29,23 @@ About 90 minutes. `LAB-COMMON.md` in this folder (v3, sha256 `5370c6d288cd0f54a4
   - `k-catalogue-v2.xml` (2,106 bytes): the import's ledger catalogue, the read every import check sends whole (`r13`). READ BOUND: Part A 2,000,000 bytes; at 10,018 ledgers 16,000,000 bytes; at 20,018 ledgers 32,000,000 bytes.
   - `g-groups.xml` (1,066 bytes): the group list (`r07`). READ BOUND 2,000,000 bytes.
   - `c-master-whole.xml` (1,736 bytes): the compliance master request, whole book (`r05`). READ BOUND 2,000,000 bytes. **Part A only: never sent once an import has been sent.**
+  - `c-balance-whole.xml` (1,284 bytes): the balance half of the same listing pair, whole book (`r06`); its rows carry each ledger's `CURRENCYNAME`. READ BOUND 2,000,000 bytes. **Part A only: never sent once an import has been sent.**
   - `p1-rates-parents-four.xml` (2,404 bytes): the ledger-rate request filtered to the four parents of the lab invoice, byte-identical to the committed `pilot-lab-ledger-rates-scoped-hsn.request` fixture. READ BOUND 2,000,000 bytes. **Part A only: its parents include Sundry Debtors, so it is never sent once an import has been sent.**
 - **`e-extent.xml` (1,640 bytes):** THE COMPANY's counts and marks (`NUMLEDGERS`, `NUMGROUPS`, `ALTMSTID`). It is `lab/1233-large-stock-book`'s `m-marks-S` with only the company name and GUID changed. READ BOUND 8,192 bytes.
-- **New filter shapes** (each is `p1` with only its `SYSTEM` formula and `FILTERS` name changed, or `c-master-whole` with that pair added; the fetch list and the window are unchanged):
+- **New filter shapes** (each is `p1` with only its `SYSTEM` formula and `FILTERS` name changed, or `c-master-whole` or `c-balance-whole` with that pair added; the fetch list and the window are unchanged):
   - `g1-rates-guid-five.xml`: the rate request, `$GUID = "…" OR …` naming the five ledgers.
   - `g2-rates-guid-four-and-absent.xml`: the first four of them and the GUID suffix `-0000ffff`, which no ledger of this book carries.
   - `g3-rates-guid-absent-only.xml`: only that GUID.
   - `g4-master-guid-five.xml`: the compliance master request with the `g1` filter.
+  - `g5-balance-guid-five.xml`: the balance request with the `g1` filter.
   - `n1-rates-name-five.xml`: the rate request, `$Name = "…" OR …` naming the five by their catalogue spelling.
   - `n2-rates-name-case-changed.xml`: `$Name = "BRIDGE WALK-IN"` alone (the book spells it `BRIDGE Walk-in`).
   - `n3-rates-name-absent-only.xml`: `$Name = "BRIDGE No Such Ledger"` alone.
   - `p2-rates-parents-three.xml`: `p1` without Sundry Debtors: the parent filter that stays small on the grown book, for comparing its time with `g1`.
   - READ BOUND 200,000 bytes for each of these (five rows of the rate request were about 4.4 KB each when measured).
 - **The imports, `imports/i001-debtors.xml` to `imports/i040-debtors.xml`** (191,666 bytes each): each is one "All Masters" import of 500 ledgers under `Sundry Debtors`, bill-wise off, no opening, named `Lab Scale Debtor` and a six-letter code of consonants (`BBBBBB` onward, a few codes skipped so that no name contains a word of the pre-push scan's lists; 20,000 distinct names in all, none spelled like another in any case). The ledger message is the captured Create shape of `crates/bridge-tally-protocol/src/ledger_create.rs`; the envelope is `lab/1233-large-stock-book`'s. Each WRITES and is sent ONCE in this item's life (C3). READ BOUND 65,536 bytes for each answer.
-- **Request-ID check before the first send**, in this folder: `python -I check-request-ids.py requests`. EXPECT `census: ok 14, skipped 40, FAIL 0`; the imports are skipped (check by eye that each is `Import Data`, report `All Masters`). Anything else = STOP, nothing sent.
-- **How they are sent:** by curl under C3, one at a time, with ONE difference from C3's line: the `-w` format is `"%{http_code} %{size_download} %{time_total}"`, so each send also records its seconds. Every send of a new filter shape (`g1` to `g4`, `n1` to `n3`) is followed by a screenshot of the whole Tally window before the next request (C3).
+- **Request-ID check before the first send**, in this folder: `python -I check-request-ids.py requests`. EXPECT `census: ok 16, skipped 40, FAIL 0`; the imports are skipped (check by eye that each is `Import Data`, report `All Masters`). Anything else = STOP, nothing sent.
+- **How they are sent:** by curl under C3, one at a time, with ONE difference from C3's line: the `-w` format is `"%{http_code} %{size_download} %{time_total}"`, so each send also records its seconds. Every send of a new filter shape (`g1` to `g5`, `n1` to `n3`) is followed by a screenshot of the whole Tally window before the next request (C3).
 
 **READING THE FILTERED ANSWERS** (C4 applies): for each answer, a table of its `LEDGER` rows with `NAME` (printed exactly, with its length), `GUID` and `PARENT`, and the count; the bytes and the seconds. "Equal to the control's row" means the same element paths with the same values, compared by parsing both, as #1331's capture of 10 October did; a difference is listed by element path, never by value.
 
@@ -57,7 +59,7 @@ A2. `k-catalogue-v2`: the table of every row (name, GUID, parent, bill-wise flag
 
 A3. `g-groups`: record the row count and bytes.
 
-A4. `c-master-whole` (control for `g4`), then `p1-rates-parents-four` (control for `g1` to `n3`). EXPECT `p1`'s rows to be exactly the catalogue's ledgers under the four parents.
+A4. `c-master-whole` (control for `g4`), `c-balance-whole` (control for `g5`), then `p1-rates-parents-four` (control for `g1` to `n3`). EXPECT `p1`'s rows to be exactly the catalogue's ledgers under the four parents.
 
 A5. `g1-rates-guid-five`. EXPECT exactly the five rows, each equal to the same GUID's row of `p1`, no `LINEERROR`.
 
@@ -66,6 +68,8 @@ A6. `g2-rates-guid-four-and-absent`. EXPECT exactly the four rows `-000000d0`, `
 A7. `g3-rates-guid-absent-only`. EXPECT a complete envelope whose `COLLECTION` holds no `LEDGER` row, and no `LINEERROR`. Record its bytes and sha256: this is how "nothing matched" answers, and it must be told apart from a request that failed (C3 still applies).
 
 A8. `g4-master-guid-five`. EXPECT exactly the five rows, each equal to the same GUID's row of `c-master-whole`.
+
+A8b. `g5-balance-guid-five`. EXPECT exactly the five ledgers' rows, each equal to the same NAME's row of `c-balance-whole` (the balance rows carry no GUID).
 
 A9. `n1-rates-name-five`. EXPECT the same five GUIDs as A5, each row equal to A5's.
 
@@ -94,9 +98,10 @@ B2. **Reads at 10,018 ledgers (S10)**, in this order:
 - `n1-rates-name-five`: EXPECT byte-identical to A9's.
 - `g3-rates-guid-absent-only`: EXPECT byte-identical to A7's.
 - `g4-master-guid-five`: EXPECT byte-identical to A8's.
+- `g5-balance-guid-five`: EXPECT byte-identical to A8b's.
 - `p2-rates-parents-three`: EXPECT byte-identical to A12's.
 - `m-marks`: EXPECT the marks of this step's first read.
-- **NEVER SENT from here on:** `c-master-whole` and `p1-rates-parents-four`. Each reads every ledger under Sundry Debtors, far past its bound.
+- **NEVER SENT from here on:** `c-master-whole`, `c-balance-whole` and `p1-rates-parents-four`. Each reads every ledger under Sundry Debtors, far past its bound.
 - **Gate to go on:** if the catalogue answered more than 15,000,000 bytes or took more than 30 seconds, or any read of this step took more than 120 seconds, do not send `i021` to `i040` or B4: go to B5 and record why.
 
 B3. **Imports `i021` to `i040`**, as B1.
@@ -111,10 +116,10 @@ B7. C10 close.
 
 **PASS (the sheet ran)** means: Part A answered whole and was recorded; BK0 and BK1 are recorded; every import's counters are as expected; the S10 reads (and the S20 reads, unless the B2 gate held them) answered whole and were recorded with their times; the restore check is byte-identical.
 
-**FAIL** means any of: a transport failure; a count by substring; a write sent twice; a mark that moves during the reads of one step; `c-master-whole` or `p1` sent after an import; the restore check differs.
+**FAIL** means any of: a transport failure; a count by substring; a write sent twice; a mark that moves during the reads of one step; `c-master-whole`, `c-balance-whole` or `p1` sent after an import; the restore check differs.
 
 **THE FINDING it records**, on one synthetic book:
-- whether a filter naming ledgers by GUID, and one naming them by name, answers exactly the named ledgers on the rate and the compliance master requests;
+- whether a filter naming ledgers by GUID, and one naming them by name, answers exactly the named ledgers on the rate request and on both halves of the compliance listing pair (master and balance);
 - how a filter that names a ledger the book does not hold answers;
 - whether `$Name` folds case on the rate request;
 - the bytes and seconds of those filtered reads with 18, 10,018 and 20,018 ledgers;

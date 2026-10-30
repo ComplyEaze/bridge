@@ -648,9 +648,10 @@ fn to_json_resolving(
         // Microsoft Store install's data folder exist, Windows names the real
         // folder for a view that merges it with the package's copy (#1584's lab
         // sheet). So each folder is printed as built, beside where its files
-        // are as Windows reports each file (from inside the package, the
-        // package's copy for every file seen there), and the package copies of
-        // the data folder that exist, since one side does not see the other.
+        // are as Windows reports each file (from inside the package, a file in
+        // both copies names the package's copy, a file in one copy that copy),
+        // and the package copies of the data folder that exist, since one side
+        // does not see the other.
         value["folder_path"] = json!(folder.display().to_string());
         value["folder_file_locations"] = file_locations(folder, resolve);
         if let Some(local_app_data) = local_app_data {

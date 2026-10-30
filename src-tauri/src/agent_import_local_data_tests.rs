@@ -387,8 +387,11 @@ fn no_path_is_in_the_json_unless_asked() {
         serde_json::json!({"folders": [], "files_read": 0, "files": 0}),
         "{shown}"
     );
-    // package copies are looked for only on Windows
+    // package copies are looked for only on Windows, under %LOCALAPPDATA%
+    #[cfg(not(windows))]
     assert!(shown.get("package_copies").is_none(), "{shown}");
+    #[cfg(windows)]
+    assert!(shown.get("package_copies").is_some(), "{shown}");
     assert_eq!(
         shown["lock_folder_file_locations"],
         serde_json::json!(["not_listed"]),
@@ -414,8 +417,9 @@ fn no_path_is_in_the_json_unless_asked() {
 /// #1459, #1584: a path is shown where the operating system reports each file
 /// to be, never where the folder resolves. The resolver stands in for Windows
 /// as the lab observed it inside a Store install's package once the real folder
-/// also existed: the folder names the real one, while every file seen there
-/// names the package's copy, the journal included.
+/// also existed: the folder names the real one, while a file the package's copy
+/// holds names that copy, the journal included, even where the real folder
+/// holds a file of the same name.
 #[test]
 fn a_folder_is_shown_by_where_its_files_are_not_where_it_resolves() {
     let directory = tempfile::tempdir().unwrap();

@@ -399,18 +399,23 @@ location (`journal_path`); and, on Windows, each copy of the data folder inside
 a Store app's package that exists (`package_copies`). It does not print a folder
 where Windows reports the folder itself to be: once both folders existed,
 Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed the
-second folder's files. Seen from inside Claude Desktop, every file then named
-the second folder, and from outside, every file named
-`%LOCALAPPDATA%\Bridge\agent`, so each side's file locations show only the copy
-that side counts, and a file with the same name in both copies only by the copy
-that side reads; `package_copies` is what shows that the second copy exists, and
-a terminal outside Claude Desktop does not see that copy as part of the folder.
-Check both folders before you archive or delete. **Not measured:** ComplyEaze
-Bridge as Claude Desktop starts the extension (the measured copies carried no
-package identity, yet Windows redirected their files); a copy outside Claude
-Desktop running first; another Claude Desktop version; this build, and its file
-locations once both folders exist (the lab read them with a probe making the
-same Windows call). On that
+second folder's files. Seen from inside Claude Desktop, a file both copies held
+named the second folder and a file only `%LOCALAPPDATA%\Bridge\agent` held named
+that folder; from outside, every file named `%LOCALAPPDATA%\Bridge\agent`. So a
+file in both copies is shown only by the copy that side reads, and a file in one
+copy by that copy. `package_copies` is what shows that the second copy exists,
+and a terminal outside Claude Desktop does not see that copy as part of the
+folder. The report does not record which side ran it; run from inside Claude
+Desktop on that computer, `package_copies` and the data folder's file locations
+both named the second folder, so such a run cannot tell whether
+`%LOCALAPPDATA%\Bridge\agent` also exists. Check both folders before you archive
+or delete. **Not measured:** ComplyEaze Bridge as Claude Desktop starts the
+extension (the measured copies carried no package identity, yet Windows
+redirected their files); a copy outside Claude Desktop running first; another
+Claude Desktop version; Windows 11; this build, its file locations once both
+folders exist (the lab read them with a probe making the same Windows call), and
+`package_copies`, which lists `%LOCALAPPDATA%\Packages`, on a real computer. On
+that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).

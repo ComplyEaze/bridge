@@ -2390,16 +2390,6 @@
       "seed_basis": "synthetic lab book; see stock-lab-day/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "369aa6bbf9c87bcb2a37961fc48f8047374d7e7a0df081e08d26790385660db9",
       "size": 5416
-    },
-    {
-      "blob": "f630328cb2aa1386215913c920b8bbe31477aefd",
-      "capture_id": "s-0421_c2_spanned_0_3.answer.xml, parse record",
-      "company": "BRIDGE STOCK LAB",
-      "lab_ref": "branch lab/2145-spanned-census-captures-answers at 993d96bc",
-      "path": "src-tauri/tests/parse_record/stock-lab-day__stock_lab_taxed_day_voucher_census_response.utf16le.xml.parse_voucher_census_20250421_.txt",
-      "seed_basis": "synthetic lab book; the app crate's parse record of the capture above, in the pull request that adds the capture",
-      "sha256": "5e3be6ce8646de52f89aa242209e98201e0c65cef48fc85fc7608d90ce25d11b",
-      "size": 281
     }
   ]
 }

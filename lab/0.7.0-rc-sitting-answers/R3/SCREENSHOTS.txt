@@ -1,0 +1,8 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/s0-bk0-backup-screen.png 41883 B b5d4c3d5aa2707a216df8ea9db334897a656a14f99b1a2e8680c7df441784646
+shots/s0-currencies.png 45428 B b76a4c91a82d14175c7d9a27f7fedf4ea9bb44eb0ed9e38d1afc0d74d1a43e87
+shots/s0-l1-alter.png 46952 B 7590ce503320c64d3d48e1051d403d96522d341a4558a2d0808b0b7654c4a03a
+shots/s0-l2-alter.png 47922 B ffafd3a1781c31e2871cecb84193499980aa1b9c5d039f91074650016fa41e20
+shots/s0-tally.png 45176 B feb4dde63edc3037f8d3eeec54c128489f1e4deca926b12f33d610d94b501768
+shots/s2-features-screen.png 73838 B c255e9c476b884ec56dde8d56bf3df95133e81ccf7b8af0a1ca8b719ed48f3e3
+shots/s2-security-screen.png 48252 B 470f3e05a847bc3086b5dc5256f971390cc8e66c9eaf68c8e7fd1274e82fe34a

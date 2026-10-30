@@ -604,6 +604,16 @@ empty:
 
 On each single-master book every value equals that master's NAME.
 
+**TallyPrime 7.2 writes a composite's rate with decimals of its own (PARTIAL: one synthetic book,
+one sitting, `lab/2071-forex-reads-answers`).** Dollar purchases and payments were keyed on
+`BRIDGE FOREXGROUP LAB`, every rate a whole number. Tally then wrote:
+- the Profit & Loss account's closing balance with a rate of four decimals;
+- the dollar parties' Trial Balance debit and credit totals with rates of two and four decimals.
+
+Every other composite kept a whole or empty rate. The 7.2 layout (the foreign symbol against its
+digits) is otherwise unchanged. Bridge sets such a balance aside by name and never reads its rate
+(`currency_composite::is_unspaced_currency_composite`, bridge#2228).
+
 **Adding the field changes nothing else.** On FOREX the response was otherwise byte-identical to
 the same request without it. The same holds for the native Trial Balance request
 (`TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING` plus `CURRENCYNAME`): measured on FOREX and

@@ -81,9 +81,12 @@ pub fn is_currency_composite(text: &str) -> bool {
 /// before ` = ` (the 7.1 layout has two).
 ///
 /// Admitted by shape, not by value: the foreign and the base amount have exactly two decimal
-/// places, the rate is a whole number or empty, and the symbols agree as in the other layout. A
-/// rate with decimals, a base amount written against its symbol, a second space before ` = `, or
-/// any other change in the layout is not this layout, so its caller refuses it. Shapes no capture
+/// places, the rate is empty or a decimal (digits, with at most one point and a digit after it,
+/// as the other layout admits), and the symbols agree as in the other layout. TallyPrime 7.2 wrote
+/// a rate with two and with four decimals into the lab book's balances and Trial Balance
+/// movements, though every rate keyed was a whole number (`ledger_snapshot_forex_decimal_rate`,
+/// bridge#2228). A base amount written against its symbol, a second space before ` = `, or any
+/// other change in the layout is not this layout, so its caller refuses it. Shapes no capture
 /// shows also pass, as they do the 7.1 check, and the tests pin each: an empty or zero rate with
 /// non-zero amounts, amounts of opposite signs, a zero base with a foreign value, leading zeros,
 /// and a foreign or base symbol other than `$` and the rupee symbol. A row that passes is set
@@ -108,8 +111,7 @@ pub fn is_unspaced_currency_composite(text: &str) -> bool {
     ) else {
         return false;
     };
-    rate.whole_or_empty
-        && has_two_decimals(foreign.digits)
+    has_two_decimals(foreign.digits)
         && has_two_decimals(base.digits)
         && rate.base == base.symbol
         && rate.per == foreign.symbol
@@ -164,19 +166,13 @@ fn symbol_amount(text: &str) -> Option<SymbolAmount<'_>> {
 struct RateSymbols<'a> {
     base: &'a str,
     per: &'a str,
-    /// The rate is empty or digits alone (no decimal point).
-    whole_or_empty: bool,
 }
 
 fn rate_symbols(text: &str) -> Option<RateSymbols<'_>> {
     let (base, rest) = text.split_once(' ')?;
     let (number, per) = rest.split_once('/')?;
     (is_symbol(base) && (number.is_empty() || is_ascii_decimal(number)) && is_symbol(per))
-        .then_some(RateSymbols {
-            base,
-            per,
-            whole_or_empty: number.bytes().all(|b| b.is_ascii_digit()),
-        })
+        .then_some(RateSymbols { base, per })
 }
 
 fn is_symbol(text: &str) -> bool {

@@ -382,23 +382,26 @@ On a Microsoft Store install of Claude Desktop, Windows may keep some of these
 files under
 `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`, and a
 given file can be in either place. Measured on one computer (30 October 2026,
-#1584): a file that ComplyEaze Bridge creates when started from a shell inside
-Claude Desktop's session goes to that second folder; a copy run outside Claude
-Desktop creates its files in `%LOCALAPPDATA%\Bridge\agent`; and once both copies
-have run, each keeps its own import journal. For the import file that the
+#1584), with ComplyEaze Bridge started from a shell that Claude Desktop runs:
+the files it created went to that second folder; a copy started outside Claude
+Desktop created `%LOCALAPPDATA%\Bridge\agent` and its files there; and once both
+had run, each kept its own import journal. For the import file that the
 `build_import_xml` tool reports, ComplyEaze Bridge shows the location Windows
 reports for that file, with a `path_state` beside it that says whether Windows
 reported it; there it named the second folder, and a process outside Claude
 Desktop opened the file there with the same sha256. The command-line report
-(`bridge_mcp --local-data-report --show-paths`) prints the folder and the
-journal at the location Windows reports for each, with a `_state` beside each
-path (`folder_path_state`, `journal_path_state`, `lock_folder_path_state` and
-`lock_folder_paths_state`); a folder that does not exist yet, or cannot be
-opened, is printed as built (the Windows location in the table above, unless you
-set another data folder) and marked `unresolved`. Once both folders exist, the
-folder resolves to `%LOCALAPPDATA%\Bridge\agent` while the journal of the copy
-started inside Claude Desktop's session stays in the second folder, so check the
-journal's own path. On that
+(`bridge_mcp --local-data-report --show-paths`) prints each folder as built (the
+Windows location in the table above, unless you set another data folder), the
+folders its files are in as Windows reports each file (`folder_file_locations`
+and `lock_folder_file_locations`; two folders there mean its files are split
+between them), and the import journal's own location (`journal_path`). It does
+not print a folder where Windows reports the folder itself to be: once both
+folders existed, Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that
+also showed the second folder's files. Check both folders before you archive or
+delete. **Not measured:** ComplyEaze Bridge as Claude Desktop starts the
+extension (the measured copies carried no package identity, yet Windows
+redirected their files); a copy outside Claude Desktop running first; another
+Claude Desktop version; this build. On that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).

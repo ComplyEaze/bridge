@@ -391,6 +391,42 @@ const DATA_FOLDER_UNREADABLE: &str = "data_folder_unreadable";
 
 /// The import journal's file name in the data folder.
 const JOURNAL_FILE: &str = "agent-import-ledger.jsonl";
+
+/// The lease folder under each coordination root (`endpoint_coordination`).
+const LEASES_FOLDER: &str = "native-dispatch-leases";
+
+/// Files of a folder whose locations `--show-paths` reads: the first, by name.
+/// A folder holds a few data files, or many lock files that share a folder.
+const FILE_LOCATION_SAMPLE: usize = 64;
+
+/// The folders the files directly in `folder` are in, as `resolve` reports
+/// each file (the first `FILE_LOCATION_SAMPLE` by name), each once with its
+/// state; `"not_listed"` when the folder cannot be listed, and an empty list
+/// when it holds no file.
+fn file_locations(folder: &Path, resolve: &dyn Fn(&Path) -> VisiblePath) -> serde_json::Value {
+    let Ok(entries) = fs::read_dir(folder) else {
+        return serde_json::json!("not_listed");
+    };
+    let mut files: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .map(|entry| entry.path())
+        .collect();
+    files.sort();
+    let mut seen = std::collections::BTreeSet::new();
+    let mut out = Vec::new();
+    for file in files.iter().take(FILE_LOCATION_SAMPLE) {
+        let shown = resolve(file);
+        let parent = shown
+            .path()
+            .parent()
+            .map_or_else(String::new, |parent| parent.display().to_string());
+        if seen.insert((parent.clone(), shown.state())) {
+            out.push(serde_json::json!({"path": parent, "state": shown.state()}));
+        }
+    }
+    serde_json::Value::Array(out)
+}
 /// The journal could not be opened (no permission, a link, another owner).
 const JOURNAL_UNREADABLE: &str = "journal_unreadable";
 /// The journal was opened but could not be read as a journal, twice: an I/O
@@ -476,6 +512,17 @@ pub(super) fn to_json(
     now: SystemTime,
     paths: Option<(&Path, &[&Path])>,
 ) -> serde_json::Value {
+    to_json_resolving(report, now, paths, &user_visible_path)
+}
+
+/// [`to_json`], with where a path is shown taken from `resolve` (a test passes
+/// its own, since only Windows resolves a path).
+fn to_json_resolving(
+    report: &Report,
+    now: SystemTime,
+    paths: Option<(&Path, &[&Path])>,
+    resolve: &dyn Fn(&Path) -> VisiblePath,
+) -> serde_json::Value {
     use serde_json::json;
     let root = match report.root {
         Root::Missing => "missing",
@@ -543,29 +590,28 @@ pub(super) fn to_json(
         "app_files_outside_this_folder_covered": false,
     });
     if let Some((folder, locks)) = paths {
-        // Each path as a person finds it: where Windows reports the folder, not
-        // the AppData path ComplyEaze Bridge built, which on a Microsoft Store
-        // install of Claude Desktop does not exist outside the package (#1459).
-        // Its `_state` says how it was obtained.
-        user_visible_path(folder).put_into(&mut value, "folder_path");
-        // Windows places each new file on its own, so once the real folder also
-        // exists the folder resolves there while a journal the package created
-        // stays in the package's copy (measured on a Store install, #1584's lab
-        // sheet). The journal is the file a person most needs, so it is shown
-        // by its own location, when the folder was read and the journal is in it.
+        // A folder's own final path is not trusted: once both copies of a
+        // Microsoft Store install's data folder exist, Windows names the real
+        // folder for a view that merges it with the package's copy (#1584's lab
+        // sheet). A file is in one place, so each folder is printed as built,
+        // beside the folders its files are in as Windows reports each file; two
+        // folders there mean the files are split between them.
+        value["folder_path"] = json!(folder.display().to_string());
+        value["folder_file_locations"] = file_locations(folder, resolve);
         if matches!(report.root, Root::Present) && !matches!(report.journal, Journal::Absent) {
-            user_visible_path(&folder.join(JOURNAL_FILE)).put_into(&mut value, "journal_path");
+            resolve(&folder.join(JOURNAL_FILE)).put_into(&mut value, "journal_path");
         }
         // the first, as before; every one, in the order the locks are taken
         if let Some(first) = locks.first() {
-            user_visible_path(first).put_into(&mut value, "lock_folder_path");
-            let shown: Vec<_> = locks.iter().map(|locks| user_visible_path(locks)).collect();
-            value["lock_folder_paths"] = json!(shown
+            value["lock_folder_path"] = json!(first.display().to_string());
+            value["lock_folder_paths"] = json!(locks
                 .iter()
-                .map(VisiblePath::display_string)
+                .map(|locks| locks.display().to_string())
                 .collect::<Vec<_>>());
-            value["lock_folder_paths_state"] =
-                json!(shown.iter().map(VisiblePath::state).collect::<Vec<_>>());
+            value["lock_folder_file_locations"] = json!(locks
+                .iter()
+                .map(|locks| file_locations(&locks.join(LEASES_FOLDER), resolve))
+                .collect::<Vec<_>>());
         }
     }
     value

@@ -372,32 +372,27 @@ fn no_path_is_in_the_json_unless_asked() {
     // The value, not the serialized text: on Windows the text doubles every
     // backslash of the path, so a substring check on it proves nothing.
     let shown = to_json(&report, SystemTime::now(), Some((root, &[root])));
-    // Each path is shown where the operating system reports it (#1459), with its
-    // state beside it: a folder that exists resolves (Windows) or is shown as it
-    // is (elsewhere); one that does not is shown as built and marked unresolved.
-    let visible = user_visible_path(root);
-    let path = visible.display_string();
-    let state = visible.state();
-    assert_ne!(state, "unresolved", "{shown}");
-    // the form a person can paste: never the verbatim prefix Windows returns
-    #[cfg(windows)]
-    assert!(!path.starts_with(r"\\?\"), "{shown}");
+    let path = root.display().to_string();
+    // each folder as built (#1459): its own final path is not trusted
     assert_eq!(shown["folder_path"], path, "{shown}");
-    assert_eq!(shown["folder_path_state"], state, "{shown}");
     assert_eq!(shown["lock_folder_path"], path, "{shown}");
-    assert_eq!(shown["lock_folder_path_state"], state, "{shown}");
     assert_eq!(
         shown["lock_folder_paths"],
         serde_json::json!([path]),
         "{shown}"
     );
+    // no file directly in the folder (imports is a folder); no lease folder
     assert_eq!(
-        shown["lock_folder_paths_state"],
-        serde_json::json!([state]),
+        shown["folder_file_locations"],
+        serde_json::json!([]),
         "{shown}"
     );
-    // two lock folders: the first is still lock_folder_path, both are listed in
-    // order; one not created yet is shown as built and says so
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!(["not_listed"]),
+        "{shown}"
+    );
+    // two lock folders: the first is still lock_folder_path, both are listed in order
     let second = root.join("profile");
     let two = to_json(
         &report,
@@ -410,33 +405,84 @@ fn no_path_is_in_the_json_unless_asked() {
         serde_json::json!([path, second.display().to_string()]),
         "{two}"
     );
-    assert_eq!(
-        two["lock_folder_paths_state"],
-        serde_json::json!([state, "unresolved"]),
-        "{two}"
+    assert!(names_the_path(&shown.to_string(), root), "{shown}");
+    assert!(shown.get("journal_path").is_none(), "{shown}");
+}
+
+/// #1459, #1584: a path is shown where the operating system reports each file
+/// to be, never where the folder resolves. The resolver stands in for Windows
+/// inside a Store install's package once the real folder also exists (the lab's
+/// O2 probes): the folder names the real one, while each file names the copy it
+/// is in, so the folder's files are split between the two.
+#[test]
+fn a_folder_is_shown_by_where_its_files_are_not_where_it_resolves() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("agent");
+    let locks = directory.path().join("locks");
+    write(&root.join("agent-import-ledger.jsonl"), &journal(true));
+    write(&root.join("terms-acceptance.jsonl"), b"{}\n");
+    write(&locks.join("native-dispatch-leases").join("a.lock"), b"");
+    let package = PathBuf::from("/package/agent");
+    let real = PathBuf::from("/real/agent");
+    let leases = PathBuf::from("/package/leases");
+    let resolve = |path: &Path| -> VisiblePath {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        match name.as_str() {
+            "agent-import-ledger.jsonl" => VisiblePath::Resolved(package.join(&name)),
+            "a.lock" => VisiblePath::Resolved(leases.join(&name)),
+            "terms-acceptance.jsonl" => VisiblePath::Resolved(real.join(&name)),
+            _ => VisiblePath::Resolved(real.clone()),
+        }
+    };
+    let report = build(&root, &[]);
+    let shown = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&root, &[locks.as_path()])),
+        &resolve,
     );
-    // the value as printed, found in the JSON text whatever its backslashes
-    assert!(
-        names_the_path(&shown.to_string(), Path::new(&path)),
+    assert_eq!(shown["folder_path"], root.display().to_string(), "{shown}");
+    // the journal by its own location, not the resolved folder plus its name
+    assert_eq!(
+        shown["journal_path"],
+        package
+            .join("agent-import-ledger.jsonl")
+            .display()
+            .to_string(),
         "{shown}"
     );
-    // no journal, no journal_path; once there is one, it is shown by its own
-    // location, since Windows places each file on its own (#1459)
+    assert_eq!(shown["journal_path_state"], "resolved", "{shown}");
+    // the folder's files, by name: the journal's copy first, then the real one
+    assert_eq!(
+        shown["folder_file_locations"],
+        serde_json::json!([
+            {"path": package.display().to_string(), "state": "resolved"},
+            {"path": real.display().to_string(), "state": "resolved"},
+        ]),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!([[{"path": leases.display().to_string(), "state": "resolved"}]]),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_path"],
+        locks.display().to_string(),
+        "{shown}"
+    );
+
+    // a data folder that could not be read: no journal path, whatever is there
+    let not_a_folder = root.join("agent-import-ledger.jsonl");
+    let unreadable = build(&not_a_folder, &[]);
+    assert!(matches!(unreadable.root, Root::Unreadable));
+    let shown = to_json_resolving(
+        &unreadable,
+        SystemTime::now(),
+        Some((&not_a_folder, &[locks.as_path()])),
+        &resolve,
+    );
     assert!(shown.get("journal_path").is_none(), "{shown}");
-    write(&root.join("agent-import-ledger.jsonl"), &journal(true));
-    let with_journal = to_json(&build(root, &[]), SystemTime::now(), Some((root, &[root])));
-    let journal_shown = user_visible_path(&root.join("agent-import-ledger.jsonl"));
-    assert_eq!(
-        with_journal["journal_path"],
-        journal_shown.display_string(),
-        "{with_journal}"
-    );
-    assert_eq!(
-        with_journal["journal_path_state"],
-        journal_shown.state(),
-        "{with_journal}"
-    );
-    assert_ne!(journal_shown.state(), "unresolved", "{with_journal}");
 }
 
 fn server_over(directory: &Path) -> crate::agent::Server {

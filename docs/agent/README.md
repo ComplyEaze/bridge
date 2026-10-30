@@ -4321,8 +4321,15 @@ cap as the response is really encoded, sets `truncated`, and counts the receipts
 size in `result.omitted_for_size`. This tool has no offset, so the receipts cut for size
 cannot be reached by it; a single receipt that is alone over the cap is refused
 (`agent_response_too_large`). Receipts left out by the bounded tail scan are not counted in
-`omitted_for_size`. Missing terminal newlines, invalid
-UTF-8, or invalid JSON in retained complete rows return `egress_log_incomplete`.
+`omitted_for_size`. A receipt a stopped process left cut short (a torn tail) is never read as a
+receipt (#2172). Until the next receipt is written it is reported only by its size, in
+`result.unrepaired_tail_bytes`. Writing the next receipt repairs it, by appending, never by
+removing bytes: a `#` line, then a `torn_record` marker giving the torn bytes' offset, length and
+sha256. `result.torn_records` lists the markers among the receipts read. A line that is neither a
+whole receipt nor exactly vouched for by the marker after it, or invalid UTF-8 or JSON in a
+receipt, returns `egress_log_incomplete`. The marker is a repair note, not proof against
+tampering. The same repair keeps the Terms of Use record (`terms-acceptance.jsonl`) usable: a torn
+last line there is never an acceptance, and accepting again repairs it.
 
 Verification captures the batch journal generation before readback and checks it
 under the exclusive publication lock. If another process published the same batch

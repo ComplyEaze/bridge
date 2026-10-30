@@ -3201,7 +3201,16 @@ impl Server {
         let tail = read_egress_tail(&path, take)?;
         let evidence = Evidence {
             request_sha256: sha256_hex(b"egress_log"),
-            response_sha256: sha256_json(&tail.records),
+            // The records, and any torn records and unrepaired tail returned beside them.
+            response_sha256: if tail.torn.is_empty() && tail.unrepaired_tail_bytes.is_none() {
+                sha256_json(&tail.records)
+            } else {
+                sha256_json(&json!({
+                    "records": tail.records,
+                    "torn_records": tail.torn.iter().map(|torn| (torn.offset, torn.bytes, &torn.sha256)).collect::<Vec<_>>(),
+                    "unrepaired_tail_bytes": tail.unrepaired_tail_bytes,
+                }))
+            },
             bytes: 0,
             state: "complete",
             read_at: None,
@@ -3209,7 +3218,24 @@ impl Server {
             reason_code: None,
         };
         Ok(ToolOutcome {
-            payload: json!({"result": {"records": tail.records, "order": "newest_first"}}),
+            payload: {
+                let mut result = json!({"records": tail.records, "order": "newest_first"});
+                if !tail.torn.is_empty() {
+                    result["torn_records"] = json!(tail
+                        .torn
+                        .iter()
+                        .map(|torn| json!({
+                            "offset": torn.offset,
+                            "bytes": torn.bytes,
+                            "sha256": torn.sha256,
+                        }))
+                        .collect::<Vec<_>>());
+                }
+                if let Some(bytes) = tail.unrepaired_tail_bytes {
+                    result["unrepaired_tail_bytes"] = json!(bytes);
+                }
+                json!({ "result": result })
+            },
             evidence,
             company_guid: None,
             truncated: tail.truncated,

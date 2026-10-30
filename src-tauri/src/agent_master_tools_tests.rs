@@ -4256,6 +4256,76 @@ fn a_cancelled_post_is_answered_for_nothing_sent_a_send_recorded_and_not_known()
     assert_ne!(NEXT_UNCONFIRMED, NEXT_SEND_NOT_KNOWN);
 }
 
+/// A post whose company read is cut at the request limit, as on a gateway kept busy by another
+/// call's long read (#2123), names that as its cause and says to post again once Tally is idle,
+/// through the whole tool answer: the code stays the company read's, nothing was sent and no
+/// intent was recorded.
+#[tokio::test]
+async fn a_post_whose_company_read_is_cut_at_the_limit_names_a_busy_tally() {
+    let mut plans = verified_company();
+    plans[0] = plans[0]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(Duration::from_millis(1_500)));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: Duration::from_millis(300),
+            ..Default::default()
+        },
+    );
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let response = posting(
+        &ScriptedApproval::approving(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    let observed = sent(simulator);
+    let error = &result(&response)["error"];
+    assert_eq!(error["code"], "company_collection_invalid", "{response}");
+    assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    assert_eq!(error["next_step"], NEXT_TALLY_BUSY, "{response}");
+    assert_eq!(result(&response)["attempt_recorded"], false, "{response}");
+    assert_eq!(
+        result(&response)["dispatch"]["state"],
+        "not_dispatched",
+        "{response}"
+    );
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert!(
+        !journal_text(directory.path()).contains("master_dispatch_intent"),
+        "no intent for {}",
+        batch.batch_id
+    );
+}
+
+/// A request cut at the limit is named as the cause whatever was sent, but the busy-gateway step,
+/// which says nothing was sent, is given only when the journal shows nothing sent: a cut create
+/// (a send recorded) keeps the read-back step, and a journal that could not be read keeps the
+/// step that is true either way.
+#[test]
+fn the_busy_tally_step_is_given_only_when_nothing_was_sent() {
+    let answer = |attempted: Option<bool>| {
+        let failure = ToolFailure::from_runtime(
+            "post_queue_read_failed",
+            anyhow::Error::new(bridge_tally_transport::TallyTransportError::RequestTimedOut),
+        );
+        let outcome =
+            master_failure_outcome("bridge-batch", GUID, failure, empty_evidence(), attempted);
+        outcome.payload["result"]["error"].clone()
+    };
+    let nothing_sent = answer(Some(false));
+    let send_recorded = answer(Some(true));
+    let not_known = answer(None);
+    for error in [&nothing_sent, &send_recorded, &not_known] {
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{error}");
+    }
+    assert_eq!(nothing_sent["next_step"], NEXT_TALLY_BUSY);
+    assert_eq!(send_recorded["next_step"], NEXT_UNCONFIRMED);
+    assert_eq!(not_known["next_step"], NEXT_SEND_NOT_KNOWN);
+}
+
 /// `tools/call post_ledger_creates` runs the master post, not the voucher
 /// post: an unknown batch is answered by the master tool.
 #[tokio::test]

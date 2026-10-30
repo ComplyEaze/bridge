@@ -532,6 +532,7 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
                 mark_entry_party_names(entry);
                 withhold_entry_bank_allocations(entry);
                 withhold_entry_goods_lines(entry);
+                withhold_entry_gst_details(entry);
             }
         }
     }
@@ -540,7 +541,7 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
 
 /// A side-list item names ledgers: the ones it could not place, and the Duties & Taxes ledgers
 /// the voucher touches; any of them can be named for a party.
-fn mark_register_side_item(mut item: Value) -> Value {
+pub(super) fn mark_register_side_item(mut item: Value) -> Value {
     if let Some(entries) = item
         .get_mut("unplaced_ledgers")
         .and_then(Value::as_array_mut)
@@ -549,6 +550,7 @@ fn mark_register_side_item(mut item: Value) -> Value {
             mark_entry_party_names(entry);
             withhold_entry_bank_allocations(entry);
             withhold_entry_goods_lines(entry);
+            withhold_entry_gst_details(entry);
         }
     }
     if let Some(names) = item

@@ -1153,6 +1153,15 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// A held post dialog that runs `while_pending` as it opens, on the
+        /// dialog's own task, before it waits for [`ScriptedApproval::answer`].
+        pub(crate) fn held_after(while_pending: impl Fn() + Send + Sync + 'static) -> Self {
+            Self {
+                while_pending: Some(Arc::new(while_pending)),
+                ..Self::held()
+            }
+        }
+
         /// Whether a held post dialog is still open: its task is waiting for
         /// an answer. False once the task was aborted, which closes it.
         pub(crate) fn is_waiting(&self) -> bool {

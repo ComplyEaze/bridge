@@ -375,6 +375,43 @@ fn present_voucher_goods_lines(mut voucher: Value, shown: GoodsLinesShown) -> Va
     voucher
 }
 
+/// Whether an answer that returns a voucher's entries shows their GST details (#2027): each
+/// entry's rates per duty head, taxability and type of supply. Only `vouchers` called with
+/// `include_gst_details: true` shows them; the parse always reads them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum GstDetailsShown {
+    Withheld,
+    Shown,
+}
+
+impl GstDetailsShown {
+    /// From the `include_gst_details` argument: absent or false withholds them.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "include_gst_details")? {
+            Some(true) => Self::Shown,
+            Some(false) | None => Self::Withheld,
+        })
+    }
+}
+
+/// An entry as an answer that did not ask for GST details shows it: without them.
+fn withhold_entry_gst_details(entry: &mut Value) {
+    if let Some(entry) = entry.as_object_mut() {
+        entry.remove("gst_details");
+        entry.remove("gst_details_unreadable");
+    }
+}
+
+/// A voucher's entries without their GST details, unless `shown` asks for them.
+fn present_voucher_gst_details(mut voucher: Value, shown: GstDetailsShown) -> Value {
+    if shown == GstDetailsShown::Withheld {
+        if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
+            entries.iter_mut().for_each(withhold_entry_gst_details);
+        }
+    }
+    voucher
+}
+
 fn mark_voucher_party_names(mut voucher: Value) -> Value {
     for field in ["party", "party_ledger_name"] {
         mark_party_field(&mut voucher, field);
@@ -2215,6 +2252,22 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
     }
 }
 
+/// The cause a refusal shows: its typed cause, else why no response answered its request, unless
+/// the code already says it. One rule for every renderer of a refusal, the master tools' as well
+/// (#2123), so a request cut at the limit on a busy gateway is named, not left behind the code of
+/// the operation it was part of.
+fn shown_cause(
+    code: &str,
+    cause: Option<&'static str>,
+    unanswered: Option<Unanswered>,
+) -> Option<&'static str> {
+    cause.or_else(|| {
+        unanswered
+            .map(|unanswered| unanswered.0)
+            .filter(|unanswered| *unanswered != code)
+    })
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -2728,11 +2781,7 @@ impl Server {
                 }
                 // A typed validation cause wins; otherwise a request that no
                 // response answered names why, unless the code already says it.
-                let cause = cause.or_else(|| {
-                    unanswered
-                        .map(|unanswered| unanswered.0)
-                        .filter(|unanswered| *unanswered != code)
-                });
+                let cause = shown_cause(&code, cause, unanswered);
                 // Same budget rule as `remediation`: at a deliberately small cap
                 // the refusal code must survive, so the cause is only added
                 // where there is room for it.
@@ -3239,7 +3288,16 @@ impl Server {
         let tail = read_egress_tail(&path, take)?;
         let evidence = Evidence {
             request_sha256: sha256_hex(b"egress_log"),
-            response_sha256: sha256_json(&tail.records),
+            // The records, and any torn records and unrepaired tail returned beside them.
+            response_sha256: if tail.torn.is_empty() && tail.unrepaired_tail_bytes.is_none() {
+                sha256_json(&tail.records)
+            } else {
+                sha256_json(&json!({
+                    "records": tail.records,
+                    "torn_records": tail.torn.iter().map(|torn| (torn.offset, torn.bytes, &torn.sha256)).collect::<Vec<_>>(),
+                    "unrepaired_tail_bytes": tail.unrepaired_tail_bytes,
+                }))
+            },
             bytes: 0,
             state: "complete",
             read_at: None,
@@ -3247,7 +3305,24 @@ impl Server {
             reason_code: None,
         };
         Ok(ToolOutcome {
-            payload: json!({"result": {"records": tail.records, "order": "newest_first"}}),
+            payload: {
+                let mut result = json!({"records": tail.records, "order": "newest_first"});
+                if !tail.torn.is_empty() {
+                    result["torn_records"] = json!(tail
+                        .torn
+                        .iter()
+                        .map(|torn| json!({
+                            "offset": torn.offset,
+                            "bytes": torn.bytes,
+                            "sha256": torn.sha256,
+                        }))
+                        .collect::<Vec<_>>());
+                }
+                if let Some(bytes) = tail.unrepaired_tail_bytes {
+                    result["unrepaired_tail_bytes"] = json!(bytes);
+                }
+                json!({ "result": result })
+            },
             evidence,
             company_guid: None,
             truncated: tail.truncated,

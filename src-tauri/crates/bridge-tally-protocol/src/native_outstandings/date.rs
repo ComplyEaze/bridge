@@ -60,7 +60,7 @@ const CENTURY_YEARS: u32 = 100;
 /// The window ends at `as_of`: an as-of Bills report is taken to list only
 /// bills dated on or before it (one book listed none later, bridge#1091;
 /// otherwise inferred). It begins
-/// [`OPENING_BILL_LOOKBACK_YEARS`] before `books_from`, because `BooksFrom` is
+/// `OPENING_BILL_LOOKBACK_YEARS` before `books_from`, because `BooksFrom` is
 /// not a lower bound on a bill's date (TALLY_PROTOCOL_REFERENCE §12a.10), or a
 /// hundred years
 /// before `as_of` if that is later, so the window never spans more than a
@@ -101,7 +101,7 @@ pub fn parse_native_bill_date(
 /// never the book window: a due date follows its bill by the credit period,
 /// which can run far past `as_of` (TALLY_PROTOCOL_REFERENCE §12a.3). The
 /// window starts
-/// [`DUE_DATE_LOOKBACK_YEARS`] before `bill_date` and spans exactly a hundred
+/// `DUE_DATE_LOOKBACK_YEARS` before `bill_date` and spans exactly a hundred
 /// years, so it holds at most one candidate.
 pub fn parse_native_due_date(
     raw: &str,

@@ -47,6 +47,7 @@ use super::post::{refusal_cause, refusal_code, ApprovalTarget, Entry, Pass, Step
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::agent::read_profiles::{ledger_name_index_read, native_group_snapshot_read};
+use crate::agent::shown_cause;
 use crate::tally::approved_import::{
     ApprovedImportAdmissionError, BeforeDispatchError, PendingPostApproval, PostKind,
     UnderLockRefusal,
@@ -1473,6 +1474,23 @@ fn master_next_step(code: &str) -> Option<&'static str> {
     }
 }
 
+/// The step when nothing was sent because a read before the create was cut at the request limit
+/// (#2123): what a busy gateway gives, observed while another call's long read held Tally for the
+/// whole limit. The approval this call was to use is withdrawn with the refusal, so the next call
+/// asks again.
+const NEXT_TALLY_BUSY: &str = "Nothing was sent: Tally did not answer a read made before the create within the time ComplyEaze Bridge waits for one, which is what happens while Tally is busy with another long request. Once Tally is idle and answering, call post_ledger_creates with this batch_id again; that call opens a new approval box. Do not repeat the call in a loop while Tally is busy.";
+
+/// The next step for a refusal with nothing sent whose code has none of its own, by why its
+/// request was not answered: only a read cut at the limit has one here. The steps the other tools
+/// give for an unanswered request name the endpoint in the refusal, which these refusals do not
+/// carry, so they are not borrowed.
+fn master_unanswered_next_step(reason: &str) -> Option<&'static str> {
+    match reason {
+        "request_deadline_exceeded" => Some(NEXT_TALLY_BUSY),
+        _ => None,
+    }
+}
+
 /// The refusal a name check's typed error becomes.
 fn name_check_failure(error: &anyhow::Error) -> ToolFailure {
     let code = refusal_code(error);
@@ -1523,7 +1541,7 @@ fn master_failure_outcome(
         Some(true) => "The create may have been sent to Tally. Do not send this batch again: check the company's ledgers in Tally.",
         None => "Whether the create was sent to Tally is not known: the journal could not be read just now. Check the company's ledgers in Tally.",
     }});
-    if let Some(cause) = failure.cause {
+    if let Some(cause) = shown_cause(&failure.code, failure.cause, failure.unanswered) {
         error["cause"] = json!(cause);
     }
     if let Some(after) = crate::endpoint_wire::wire_retry_after_s(&failure.code) {
@@ -1531,7 +1549,11 @@ fn master_failure_outcome(
     }
     match attempted {
         Some(false) => {
-            if let Some(next_step) = master_next_step(&failure.code) {
+            if let Some(next_step) = master_next_step(&failure.code).or_else(|| {
+                failure
+                    .unanswered
+                    .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
+            }) {
                 error["next_step"] = json!(next_step);
             }
         }

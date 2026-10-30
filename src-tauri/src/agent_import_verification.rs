@@ -740,6 +740,19 @@ pub(super) fn mark_book_rolled_back(result: &mut Value) {
     result["book_rolled_back"] = json!(true);
 }
 
+/// What a verified batch with no dispatch on record says of itself. It states
+/// only what the journal shows: a journal replaced by an older copy, or the
+/// journal of another computer, would not hold a post made elsewhere or since.
+pub(super) const NOT_SENT_BY_BRIDGE_SUMMARY: &str = "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status.";
+
+/// Beside the verdict, never instead of it, for a verified batch whose journal
+/// records no dispatch (the same record `local_data_report` counts as sent).
+/// A partly found batch is not marked.
+pub(super) fn mark_found_not_sent(result: &mut Value) {
+    result["dispatch_record"] =
+        json!({"state":"none_on_record","summary":NOT_SENT_BY_BRIDGE_SUMMARY});
+}
+
 /// Rewrites a verification of a native post that carries no tag and was not
 /// bound to its span: a voucher not found by its content is `sent_not_attributed`,
 /// never `not_found`. It was sent, so an edit in Tally (which a tag used to
@@ -1553,6 +1566,9 @@ pub(super) fn render_proof_markdown(proof: &Value) -> String {
                 .as_str()
                 .unwrap_or("unknown")
         ));
+    }
+    if proof["dispatch_record"]["state"] == "none_on_record" {
+        output.push_str("- Dispatch record: none on this computer — found in the book, not sent by ComplyEaze Bridge\n");
     }
     if let Some(code) = proof["error"]["code"].as_str() {
         output.push_str(&format!("- Error: `{code}`\n"));

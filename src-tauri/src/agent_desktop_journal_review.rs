@@ -85,7 +85,7 @@ impl DesktopJournalError {
             ),
             "import_post_requires_one_journal" => (
                 "ComplyEaze Bridge's desktop review posts one unnumbered Journal, and this saved batch is a different shape.",
-                "With Allow voucher posting on in the extension settings (off by default; Terms of Use section 9.2), ask the assistant to post this saved batch, giving it this batch's id (the file's name without .xml): it posts one voucher, or a batch of 2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras, after you approve it in a separate window, and it checks the batch again first and may refuse it. A saved invoice is posted only that way: never import its file. Any other batch may instead be imported from this file in Tally (Gateway of Tally → Import → Vouchers) and then verified. Use one route only: once you import this file, do not ask the assistant to post the batch, and once the assistant has posted it, or any batch built again from its vouchers, do not import this file; nothing checks an import against a post. The file itself is unchanged and correct.",
+                "With Allow voucher posting on in the extension settings (off by default; Terms of Use section 9.2), ask the assistant to post this saved batch, giving it this batch's id (the file's name without .xml): it posts one voucher, or a batch of 2 to 50 Journals or of 2 to 50 Payments, Receipts and Contras, after you approve it in a separate window, and it checks the batch again first and may refuse it. A saved invoice is posted only that way: never import its file. Any other batch may instead be imported from this file in Tally (Gateway of Tally → Import → Vouchers) and then verified. Use one route only. Once the assistant has posted it, or any batch built again from its vouchers, do not import this file: nothing checks an import against an earlier post. If this file is imported first, a post of the batch reads the book before asking you to approve it and refuses the batch if any of its vouchers is already there, matched by its narration tag, by date, voucher type and entries, or for an invoice by its number. The file itself is unchanged and correct.",
             ),
             "import_post_amendment_requires_file_import" => (
                 "This saved Journal amends an earlier batch, and ComplyEaze Bridge does not post amendments.",
@@ -226,6 +226,24 @@ mod tests {
         assert!(refused.remediation.contains("overwritten"));
     }
 
+    /// #2152: the one-route sentence names the check that exists (a post after
+    /// an import is refused by the post's own read of the book) and the one that
+    /// does not (an import after a post), in the order the person meets them.
+    #[test]
+    fn the_one_route_sentence_of_a_batch_the_review_cannot_post_is_pinned() {
+        let refused = DesktopJournalError::refused("import_post_requires_one_journal");
+        assert!(
+            refused.remediation.ends_with(
+                "Use one route only. Once the assistant has posted it, or any batch built again from its vouchers, do not import this file: nothing checks an import against an earlier post. If this file is imported first, a post of the batch reads the book before asking you to approve it and refuses the batch if any of its vouchers is already there, matched by its narration tag, by date, voucher type and entries, or for an invoice by its number. The file itself is unchanged and correct."
+            ),
+            "{}",
+            refused.remediation
+        );
+        assert!(!refused
+            .remediation
+            .contains("nothing checks an import against a post."));
+    }
+
     /// bridge#626: what the review says of a saved Journal that names a ledger
     /// whose name ends in a line break, whole.
     #[test]
@@ -308,11 +326,11 @@ mod tests {
             .remediation
             .contains("A saved invoice is posted only that way: never import its file."));
         assert!(refused.remediation.contains(
-            "once the assistant has posted it, or any batch built again from its vouchers, do not import this file"
+            "Once the assistant has posted it, or any batch built again from its vouchers, do not import this file"
         ));
         assert!(refused
             .remediation
-            .contains("once you import this file, do not ask the assistant to post the batch"));
+            .contains("If this file is imported first, a post of the batch reads the book"));
         // A numbered Journal keeps its number: the remediation never suggests dropping it.
         let numbered = DesktopJournalError::refused("import_post_numbered_journal_unsupported");
         assert!(numbered

@@ -315,7 +315,8 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   directly by our test client (not installed in Claude Desktop), against licensed TallyPrime 7.2 Silver with one synthetic
   company: it reported version 0.7.0, and `tally_status`, `list_companies` and `ledger_masters` answered; a second launch read
   the ledger masters again, and the company's marks had not moved. Nothing was posted. The import, posting, ledger-create and
-  tax-audit settings were unset, so it listed 30 tools; the Claude Desktop extension always turns import on, which adds
+  tax-audit settings were unset (the lab's client passes the server no `BRIDGE_` variable but the Terms, host, port and
+  data-folder ones), so it listed 30 tools; the Claude Desktop extension always turns import on, which adds
   `build_import_xml`, `parse_bank_statement` and `parse_bank_statement_csv`, the 33 of the release's smoke report. Not run:
   the macOS file, Claude Desktop, posting, ledger creation, `audit_test_run` with its setting on, any other read. Record:
   [`lab/0.7.0-post-publish-answers`](https://github.com/ComplyEaze/bridge/tree/89ef968dd482eabcb32d225b373838b84732c512/lab/0.7.0-post-publish-answers)

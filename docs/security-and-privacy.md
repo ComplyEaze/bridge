@@ -95,8 +95,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   Claude Desktop is the host, and it sends tool results to the AI provider you
   use as part of the conversation; that is the host's behaviour, which this
   repository cannot show. ComplyEaze Bridge can shorten party and ledger names,
-  bank account numbers and, from the release that includes #1490 (not 0.6.1 or
-  earlier), the address printed for a party ledger, to their first two and last two
+  bank account numbers and, from release 0.7.0 (#1490), the address printed for a
+  party ledger, to their first two and last two
   characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
@@ -116,9 +116,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
-    holder's name and the bank details; from the release that includes #1490 (not
-    0.6.1 or earlier) also the name a mailing address is printed under and the
-    address itself (each line of the mailing address, and the flat address field).
+    holder's name and the bank details; from release 0.7.0 (#1490) also the name a
+    mailing address is printed under and the address itself (each line of the mailing address, and the flat address field).
     A line is shortened to its first two and last two characters, so a house number
     or a town at either end of a line can stay readable. Every `ledger_masters` call
     with `fields=compliance` reads and returns the older flat fields (the address

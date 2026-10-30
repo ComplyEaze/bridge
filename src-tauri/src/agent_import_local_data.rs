@@ -11,6 +11,8 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use crate::local_files::visible_path::{user_visible_path, VisiblePath};
+
 /// Files and bytes of one class.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Class {
@@ -300,7 +302,7 @@ pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
         "data_folder",
         root,
         |name| match name {
-            "agent-import-ledger.jsonl" => "journal",
+            JOURNAL_FILE => "journal",
             // The skip-only file sits beside the import journal and is read with it.
             super::statement_facts::SKIPS_FILE => "journal",
             // The master write journal and its pre-image sidecars are import
@@ -386,6 +388,91 @@ fn scan_leases(report: &mut Report, root: &Path, coordination: &[&Path]) {
 
 /// The data folder could not be listed, so the journal was not looked for.
 const DATA_FOLDER_UNREADABLE: &str = "data_folder_unreadable";
+
+/// The import journal's file name in the data folder.
+const JOURNAL_FILE: &str = "agent-import-ledger.jsonl";
+
+/// The lease folder under each coordination root (`endpoint_coordination`).
+const LEASES_FOLDER: &str = "native-dispatch-leases";
+
+/// Files of a folder whose locations `--show-paths` reads: the first, by name.
+/// A folder holds a few data files, or many lock files that share a folder.
+const FILE_LOCATION_SAMPLE: usize = 64;
+
+/// The files `--show-paths` reads the locations of, from all of a folder's
+/// files: the first `FILE_LOCATION_SAMPLE` by name.
+fn file_sample(mut files: Vec<PathBuf>) -> Vec<PathBuf> {
+    files.sort();
+    files.truncate(FILE_LOCATION_SAMPLE);
+    files
+}
+
+/// Where the files directly in `folder` are, as `resolve` reports each file
+/// (the sample of [`file_sample`]): each folder once, with its state, and how
+/// many files were read of how many; `"not_listed"` when the folder cannot be
+/// listed. From inside a Store install's package this names the copy whose
+/// files the report counted; it does not show another copy (see
+/// [`package_copies`]).
+fn file_locations(folder: &Path, resolve: &dyn Fn(&Path) -> VisiblePath) -> serde_json::Value {
+    let Ok(entries) = fs::read_dir(folder) else {
+        return serde_json::json!("not_listed");
+    };
+    let files: Vec<PathBuf> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .map(|entry| entry.path())
+        .collect();
+    let total = files.len();
+    let sample = file_sample(files);
+    let mut seen = std::collections::BTreeSet::new();
+    let mut folders = Vec::new();
+    for file in &sample {
+        let shown = resolve(file);
+        let parent = shown
+            .path()
+            .parent()
+            .map_or_else(String::new, |parent| parent.display().to_string());
+        if seen.insert((parent.clone(), shown.state())) {
+            folders.push(serde_json::json!({"path": parent, "state": shown.state()}));
+        }
+    }
+    serde_json::json!({"folders": folders, "files_read": sample.len(), "files": total})
+}
+
+/// The copies of `folder` inside Store apps' packages, for a folder under
+/// `local_app_data`: `<local_app_data>\Packages\<package>\LocalCache\Local\<the
+/// rest>`, where Windows puts the new files a process inside that package
+/// creates under AppData (#1459, #2233). Each existing one, by name;
+/// `"not_under_local_app_data"` for a folder set elsewhere, `"not_listed"`
+/// when the packages folder cannot be listed.
+fn package_copies(local_app_data: &Path, folder: &Path) -> serde_json::Value {
+    let Ok(rest) = folder.strip_prefix(local_app_data) else {
+        return serde_json::json!("not_under_local_app_data");
+    };
+    let Ok(packages) = fs::read_dir(local_app_data.join("Packages")) else {
+        return serde_json::json!("not_listed");
+    };
+    let mut found: Vec<String> = packages
+        .filter_map(Result::ok)
+        .map(|package| package.path().join("LocalCache").join("Local").join(rest))
+        .filter(|copy| copy.is_dir())
+        .map(|copy| copy.display().to_string())
+        .collect();
+    found.sort();
+    serde_json::json!(found)
+}
+
+/// `%LOCALAPPDATA%`, where Store apps keep their package copies (Windows only).
+fn local_app_data() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
 /// The journal could not be opened (no permission, a link, another owner).
 const JOURNAL_UNREADABLE: &str = "journal_unreadable";
 /// The journal was opened but could not be read as a journal, twice: an I/O
@@ -416,7 +503,7 @@ fn read_journal_once(path: &Path) -> Journal {
 /// report) before it is reported. A record rolled back after a failed append may
 /// be counted once: this is a report.
 fn read_journal(root: &Path, between: impl FnOnce()) -> Journal {
-    let path = root.join("agent-import-ledger.jsonl");
+    let path = root.join(JOURNAL_FILE);
     let first = read_journal_once(&path);
     if matches!(
         first,
@@ -470,6 +557,25 @@ pub(super) fn to_json(
     report: &Report,
     now: SystemTime,
     paths: Option<(&Path, &[&Path])>,
+) -> serde_json::Value {
+    to_json_resolving(
+        report,
+        now,
+        paths,
+        &user_visible_path,
+        local_app_data().as_deref(),
+    )
+}
+
+/// [`to_json`], with where a path is shown taken from `resolve`, and the
+/// folder package copies are looked for under (a test passes its own, since
+/// only Windows resolves a path or has package copies).
+fn to_json_resolving(
+    report: &Report,
+    now: SystemTime,
+    paths: Option<(&Path, &[&Path])>,
+    resolve: &dyn Fn(&Path) -> VisiblePath,
+    local_app_data: Option<&Path>,
 ) -> serde_json::Value {
     use serde_json::json;
     let root = match report.root {
@@ -538,13 +644,32 @@ pub(super) fn to_json(
         "app_files_outside_this_folder_covered": false,
     });
     if let Some((folder, locks)) = paths {
+        // A folder's own final path is not trusted: once both copies of a
+        // Microsoft Store install's data folder exist, Windows names the real
+        // folder for a view that merges it with the package's copy (#1584's lab
+        // sheet). So each folder is printed as built, beside where its files
+        // are as Windows reports each file (from inside the package, a file in
+        // both copies names the package's copy, a file in one copy that copy),
+        // and the package copies of the data folder that exist, since one side
+        // does not see the other.
         value["folder_path"] = json!(folder.display().to_string());
+        value["folder_file_locations"] = file_locations(folder, resolve);
+        if let Some(local_app_data) = local_app_data {
+            value["package_copies"] = package_copies(local_app_data, folder);
+        }
+        if matches!(report.root, Root::Present) && !matches!(report.journal, Journal::Absent) {
+            resolve(&folder.join(JOURNAL_FILE)).put_into(&mut value, "journal_path");
+        }
         // the first, as before; every one, in the order the locks are taken
         if let Some(first) = locks.first() {
             value["lock_folder_path"] = json!(first.display().to_string());
             value["lock_folder_paths"] = json!(locks
                 .iter()
                 .map(|locks| locks.display().to_string())
+                .collect::<Vec<_>>());
+            value["lock_folder_file_locations"] = json!(locks
+                .iter()
+                .map(|locks| file_locations(&locks.join(LEASES_FOLDER), resolve))
                 .collect::<Vec<_>>());
         }
     }

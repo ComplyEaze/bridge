@@ -4742,8 +4742,8 @@ which does not both credit and debit the loan in the books population."
 
     // #1875 items 1, 2 and 5: a ledger on a nil line is no posting, as #1259 made it for the loan
     // rows. Each is a declared difference from the reference (parity spec §12, #1998): the reference
-    // still reads the nil line's ledger at these sites. Each test has its control, the same voucher
-    // without the nil line, which reads the same before and after.
+    // still reads the nil line's ledger at these sites. Each test has a control that reads the same
+    // before and after: the same voucher without the nil line, or with that line posted.
 
     fn invented_ledger(name: &str, group: &str) -> Ledger {
         Ledger {
@@ -4957,5 +4957,70 @@ which does not both credit and debit the loan in the books population."
                 "{lines:?}: {lines_out:?}"
             );
         }
+    }
+
+    /// Item 1, the other direction (a): an entry on Loan Q against Loan P's interest ledger, beside a
+    /// nil line on an expense ledger, is the misposted question's and not charge-shaped. The control
+    /// posts the expense line: then it is charge-shaped, and not a misposted entry.
+    #[test]
+    fn an_entry_against_another_loans_interest_beside_a_nil_expense_line_is_not_charge_shaped() {
+        let two_loans = "[\"Loan P\"]\nlender = \"p\"\nlender_type = \"person\"\n\
+                         interest_ledger = \"Interest P\"\n\
+                         [\"Loan Q\"]\nlender = \"q\"\nlender_type = \"person\"\n\
+                         interest_ledger = \"Interest Q\"\n";
+        let ledgers = [
+            ("Loan P", "Unsecured Loans"),
+            ("Loan Q", "Unsecured Loans"),
+            ("Interest P", "Indirect Expenses"),
+            ("Interest Q", "Indirect Expenses"),
+            ("Office Charges", "Indirect Expenses"),
+        ];
+        let read = |lines: &[(&str, i64)]| {
+            let b = book_with(vec![journal_of("c1", lines)], &ledgers);
+            let r = run_loans(&b, two_loans, &[], &[]);
+            (
+                figure(&r, &b, "clause31_expense_entry_count", "Loan Q"),
+                figure(&r, &b, "possible_misposted_interest", "Loan Q").is_some(),
+            )
+        };
+        assert_eq!(
+            read(&[
+                ("Interest P", 1_000_000),
+                ("Loan Q", -1_000_000),
+                ("Office Charges", 0)
+            ]),
+            (None, true)
+        );
+        assert_eq!(
+            read(&[
+                ("Interest P", 900_000),
+                ("Office Charges", 100_000),
+                ("Loan Q", -1_000_000),
+            ]),
+            (Some(Value::Int(1)), false)
+        );
+    }
+
+    /// Item 1, the other direction (b): an entry whose every other line is nil has no posted counter
+    /// ledger, so it is not charge-shaped. The control posts the expense line.
+    #[test]
+    fn an_entry_whose_other_lines_are_all_nil_is_not_charge_shaped() {
+        let ledgers = [
+            ("Office Charges", "Indirect Expenses"),
+            ("Interest A", "Indirect Expenses"),
+        ];
+        let count = |lines: &[(&str, i64)]| {
+            let b = book_with(vec![journal_of("n1", lines)], &ledgers);
+            let r = run_loans(&b, ONE_LOAN, &[], &[]);
+            figure(&r, &b, "clause31_expense_entry_count", "Loan A")
+        };
+        assert_eq!(
+            count(&[("Loan A", -2_500_000), ("Office Charges", 0)]),
+            None
+        );
+        assert_eq!(
+            count(&[("Loan A", -2_500_000), ("Office Charges", 2_500_000)]),
+            Some(Value::Int(1))
+        );
     }
 }

@@ -358,13 +358,25 @@ fn read_debt(path: &Path, now_ms: u64) -> Result<DrainDebt, WireRefusal> {
             answered,
             last_probe_ms,
         },
-        // Unreadable is owed: the cost is a probe.
+        // Unreadable is owed: the cost is a probe. Its age is the file's own,
+        // so a record left corrupt still clears by age.
         Err(_) => DrainDebt::Owed {
-            since_ms: now_ms,
+            since_ms: modified_ms(path).unwrap_or(now_ms),
             answered: 0,
             last_probe_ms: None,
         },
     })
+}
+
+/// When `path` was last written, in milliseconds since the Unix epoch.
+fn modified_ms(path: &Path) -> Option<u64> {
+    let since = std::fs::metadata(path)
+        .ok()?
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?;
+    u64::try_from(since.as_millis()).ok()
 }
 
 fn write_debt(path: &Path, debt: DrainDebt) -> Result<(), WireRefusal> {

@@ -662,3 +662,54 @@ async fn a_second_process_drains_the_debt_the_first_left() {
     assert_eq!(debt(&shared), DrainDebt::Clear);
     assert_eq!(sent(simulator), ["/", "/status", "/status", "/status", "/"]);
 }
+
+/// A clock set back makes a debt from the future start now: it still clears
+/// within ten minutes of this clock.
+#[tokio::test]
+async fn a_debt_from_a_clock_set_back_starts_now() {
+    let simulator =
+        SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(900)), xml()]).unwrap();
+    let future = DrainDebt::Owed {
+        since_ms: T0 + 3_600_000,
+        answered: 0,
+        last_probe_ms: None,
+    };
+    let (transport, shared) = transport(&simulator, future, Some(POLICY));
+    let error = transport
+        .post_xml_decoded("<E />".into())
+        .await
+        .unwrap_err();
+    assert_eq!(draining(&error), 10_000);
+    assert_eq!(debt(&shared), owed(0, Some(T0)));
+    // The simulator, like Tally, finishes the cut probe's answer first.
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    shared.now.store(T0 + 600_001, Ordering::SeqCst);
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/status", "/"]);
+}
+
+/// A cut probe leaves the debt's age alone: ten minutes after the cut post, the
+/// next post goes with no probe, on the post path and the import path alike.
+#[tokio::test]
+async fn a_cut_probe_leaves_the_debts_age_alone() {
+    let simulator =
+        SequenceSimulator::spawn(vec![slow_status(Duration::from_millis(900)), xml(), xml()])
+            .unwrap();
+    let (transport, shared) = transport(&simulator, owed(0, None), Some(POLICY));
+    shared.now.store(T0 + 300_000, Ordering::SeqCst);
+    transport
+        .post_xml_decoded("<E />".into())
+        .await
+        .unwrap_err();
+    assert_eq!(debt(&shared), owed(0, Some(T0 + 300_000)));
+    // The simulator, like Tally, finishes the cut probe's answer first.
+    tokio::time::sleep(Duration::from_millis(700)).await;
+    shared.now.store(T0 + 600_001, Ordering::SeqCst);
+    transport.post_xml_decoded("<E />".into()).await.unwrap();
+    *shared.debt.lock().unwrap() = owed(0, Some(T0 + 300_000));
+    let held = transport.acquire_wire_lock().await.unwrap();
+    held.post_xml_decoded("<E />".into()).await.unwrap();
+    assert_eq!(debt(&shared), DrainDebt::Clear);
+    assert_eq!(sent(simulator), ["/status", "/", "/"]);
+}

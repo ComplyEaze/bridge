@@ -46,7 +46,10 @@ impl DrainPolicy {
     ///   answers slower than 1 s, was not measured.
     ///
     /// The 10 minutes before a debt clears by itself is not measured: about 24
-    /// times the longest drain seen.
+    /// times the longest drain these rows saw, but only a little over the 523 s
+    /// one abandoned 600 s read held the gateway after its client left
+    /// (protocol reference §11b.2), so a drain that long would be cleared
+    /// shortly before it ended.
     pub const MEASURED: Self = Self {
         probe_deadline: Duration::from_secs(5),
         quick_below: Duration::from_secs(1),

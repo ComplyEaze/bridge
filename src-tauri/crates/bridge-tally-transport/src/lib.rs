@@ -633,6 +633,9 @@ impl TallyHttpTransport {
                 } => (since_ms, answered, last_probe_ms),
             };
             let now = self.wire.now_ms();
+            // A clock set back makes the debt start now, so it still clears
+            // within `clear_after` of this clock.
+            let since_ms = since_ms.min(now);
             if now.saturating_sub(since_ms) > millis(policy.clear_after) {
                 // Older than any drain: a `/status` that never answers in
                 // time, not a busy Tally. Clear it, and post.
@@ -857,8 +860,7 @@ impl TallyHttpTransport {
         }
         // Armed here, before the caller records its attempt, so a record that
         // cannot be written refuses before the attempt rather than after it. A
-        // transport dropped unsent leaves it in flight, which costs the next
-        // post its probes.
+        // transport dropped unsent clears it again (its `Drop`).
         let armed = self.arm_drain(&*held).inspect_err(|error| {
             self.observe(SendKind::Post, None, None, error.safe_code(), None);
         })?;

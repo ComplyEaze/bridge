@@ -1872,6 +1872,13 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              same request is safe to repeat.",
         ),
         // #2142: a post cut for time can leave Tally working on it.
+        "tally_endpoint_lock_unavailable" => Some(
+            "ComplyEaze Bridge could not open, read or write its local coordination files for \
+             this Tally port, so nothing was sent. Ask the person to check that ComplyEaze \
+             Bridge's folders are available and writable. If the one that cannot be read is the \
+             file ending in .wire.debt in its coordination folder, deleting that file clears \
+             it; then call again.",
+        ),
         "tally_endpoint_draining" => Some(
             "Tally was still busy with an earlier request that was stopped for time, so this \
              request was not sent. Call again after retry_after_s seconds; the same request is \

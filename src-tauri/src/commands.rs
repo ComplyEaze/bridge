@@ -157,7 +157,7 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
             "ComplyEaze Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
             "after_change",
             false,
-            "Check that ComplyEaze Bridge's Application Support folder is available and writable, then try again.",
+            "Check that ComplyEaze Bridge's Application Support folder is available and writable, then try again. If a file ending in .wire.debt in its coordination folder cannot be read, deleting that file clears it.",
         ),
     }
 }

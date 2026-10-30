@@ -431,14 +431,15 @@ fn an_unreadable_drain_record_is_owed() {
         "\u{0}\u{0}",
     ] {
         fs::write(&path, text).unwrap();
+        // Its age is the file's own, not the reader's clock.
         assert!(
             matches!(
                 read_debt(&path, 42),
                 Ok(DrainDebt::Owed {
-                    since_ms: 42,
+                    since_ms,
                     answered: 0,
                     last_probe_ms: None
-                })
+                }) if Some(since_ms) == modified_ms(&path)
             ),
             "{text:?}"
         );

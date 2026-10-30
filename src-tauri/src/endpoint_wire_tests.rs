@@ -229,6 +229,7 @@ async fn runtime_operations_in_one_call_share_one_wait_budget() {
     let runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(WireGateConfig {
         root: WireRoot::at(root.clone()),
         retry: WireRetryPolicy::new(Duration::from_millis(50), budget).unwrap(),
+        drain: None,
         busy_at: None,
     });
     let _other = gate(&root, &endpoint).try_acquire().unwrap();
@@ -359,4 +360,186 @@ fn wait_for(path: &Path) -> Result<(), String> {
         thread::sleep(Duration::from_millis(10));
     }
     Ok(())
+}
+
+// -- the drain record (#2142) -------------------------------------------------
+
+#[test]
+fn the_drain_record_is_one_file_in_the_last_root_beside_its_lock() {
+    let first = tempfile::tempdir().unwrap();
+    let shared = tempfile::tempdir().unwrap();
+    let root = WireRoot::at_all(vec![
+        first.path().to_path_buf(),
+        shared.path().to_path_buf(),
+    ]);
+    let endpoint = endpoint("127.0.0.1", 9000);
+    let held = FileWireGate::new(root.clone(), endpoint.clone())
+        .try_acquire()
+        .unwrap();
+    assert_eq!(
+        held.debt(),
+        Ok(DrainDebt::Clear),
+        "an absent record is clear"
+    );
+    let owed = DrainDebt::Owed {
+        since_ms: 7,
+        quick: 2,
+        last_probe_ms: Some(9),
+    };
+    held.record(owed).unwrap();
+    assert_eq!(held.debt(), Ok(owed));
+    let path = debt_path(&root, &endpoint).unwrap();
+    assert!(path.starts_with(shared.path()), "{path:?}");
+    assert_eq!(
+        path.file_name().unwrap().to_str().unwrap(),
+        wire_lock_path(&WireRoot::at(shared.path().to_path_buf()), &endpoint)
+            .with_extension("debt")
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+    );
+    assert!(fs::read_dir(first.path()).unwrap().all(|entry| {
+        !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .ends_with(".wire.debt")
+    }));
+    // A shorter record replaces a longer one whole.
+    held.record(DrainDebt::Clear).unwrap();
+    assert_eq!(fs::read_to_string(&path).unwrap(), r#"{"state":"clear"}"#);
+    assert_eq!(held.debt(), Ok(DrainDebt::Clear));
+    held.record(DrainDebt::InFlight { since_ms: 5 }).unwrap();
+    drop(held);
+    // Another holder, as a process replacing this one would be, reads it.
+    let again = FileWireGate::new(root, endpoint).try_acquire().unwrap();
+    assert_eq!(again.debt(), Ok(DrainDebt::InFlight { since_ms: 5 }));
+}
+
+#[test]
+fn an_unreadable_drain_record_is_owed() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("x.wire.debt");
+    for text in [
+        "",
+        "{",
+        r#"{"state":"done"}"#,
+        r#"{"state":"clear","extra":1}"#,
+        r#"{"state":"owed","since_ms":1}"#,
+        "\u{0}\u{0}",
+    ] {
+        fs::write(&path, text).unwrap();
+        assert!(
+            matches!(
+                read_debt(&path, 42),
+                Ok(DrainDebt::Owed {
+                    since_ms: 42,
+                    quick: 0,
+                    last_probe_ms: None
+                })
+            ),
+            "{text:?}"
+        );
+    }
+    let unreadable = directory.path().join("a-directory");
+    fs::create_dir(&unreadable).unwrap();
+    assert_eq!(read_debt(&unreadable, 42), Err(WireRefusal::Unavailable));
+}
+
+#[test]
+fn every_wire_refusal_that_passes_by_waiting_names_its_retry() {
+    assert_eq!(wire_retry_after_s("tally_endpoint_busy"), Some(5));
+    assert_eq!(wire_retry_after_s("tally_endpoint_draining"), Some(10));
+    assert_eq!(
+        wire_retry_after_s("tally_endpoint_needs_attention"),
+        Some(30)
+    );
+    assert_eq!(wire_retry_after_s("tally_endpoint_lock_unavailable"), None);
+    assert_eq!(wire_retry_after_s("request_deadline_exceeded"), None);
+}
+
+#[test]
+fn a_build_drains_by_the_measured_policy() {
+    // Unit tests run with no drain unless one asks; a build's default is
+    // `production_drain`.
+    assert_eq!(production_drain(), Some(DrainPolicy::MEASURED));
+    assert_eq!(WireGateConfig::default().drain(), None);
+    assert_eq!(
+        WireGateConfig::default()
+            .with_drain(DrainPolicy::MEASURED)
+            .drain(),
+        Some(DrainPolicy::MEASURED)
+    );
+}
+
+/// Two clients on one shared root, as two processes are: one client's post is
+/// cut for time, and the other then finds the drain owed. Its probe is cut by
+/// its own deadline while the simulator, serving one request at a time as Tally
+/// does, is still on the cut post, so it is refused as draining with no post
+/// sent: the probe never reached the head of the queue.
+#[tokio::test]
+async fn a_post_cut_by_one_client_holds_the_next_post_of_another() {
+    let root = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(vec![
+        xml().with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(
+            Duration::from_millis(900),
+        )),
+        ScenarioPlan::new(Fixture::ProductStatus(
+            tally_protocol_simulator::ProductStatus::TallyPrime,
+        ))
+        .with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(
+            Duration::from_millis(600),
+        )),
+    ])
+    .unwrap();
+    let endpoint = endpoint(
+        &simulator.address().ip().to_string(),
+        simulator.address().port(),
+    );
+    let policy = DrainPolicy {
+        probe_deadline: Duration::from_millis(300),
+        quick_below: Duration::from_millis(100),
+        ..DrainPolicy::MEASURED
+    };
+    let client = || {
+        TallyHttpTransport::with_policy(
+            endpoint.clone(),
+            bridge_tally_transport::TransportPolicy {
+                request_timeout: Duration::from_millis(300),
+                ..bridge_tally_transport::TransportPolicy::default()
+            },
+        )
+        .unwrap()
+        .with_wire_gate(
+            Arc::new(gate(root.path(), &endpoint)),
+            WireRetryPolicy::DEFAULT,
+        )
+        .with_drain(policy)
+    };
+    assert_eq!(
+        client().post_xml_decoded("<E />".into()).await.unwrap_err(),
+        TallyTransportError::RequestTimedOut
+    );
+    let path = debt_path(&WireRoot::at(root.path().to_path_buf()), &endpoint).unwrap();
+    assert!(fs::read_to_string(&path)
+        .unwrap()
+        .contains(r#""state":"owed""#));
+    let refused = client().post_xml_decoded("<E />".into()).await.unwrap_err();
+    assert_eq!(refused.safe_code(), "tally_endpoint_draining");
+    let after = fs::read_to_string(&path).unwrap();
+    assert!(after.contains(r#""quick":0"#), "{after}");
+    assert!(
+        !after.contains(r#""last_probe_ms":null"#),
+        "the probe was sent: {after}"
+    );
+    simulator.cancel();
+    let paths: Vec<String> = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .map(|request| request.path)
+        .collect();
+    assert_eq!(paths, ["/"]);
 }

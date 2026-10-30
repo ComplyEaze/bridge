@@ -1871,6 +1871,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              bounded wait, so nothing was sent. Call again after retry_after_s seconds; the \
              same request is safe to repeat.",
         ),
+        // #2142: a post cut for time can leave Tally working on it.
+        "tally_endpoint_draining" => Some(
+            "Tally is still finishing an earlier request that was stopped for time, so this \
+             request was not sent (only a status check was). Call again after retry_after_s \
+             seconds; the same request is safe to repeat, and a different read would only wait \
+             behind the same work.",
+        ),
+        "tally_endpoint_needs_attention" => Some(
+            "Tally has not answered promptly for a long time after an earlier request was \
+             stopped for time, so this request was not sent (only a status check was). Ask the \
+             person to look at Tally's screen for a message waiting for an answer, then call \
+             again after retry_after_s seconds.",
+        ),
         "import_post_window_not_bounded" => Some(
             "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \
              this range holds too many vouchers for one request to stay within its bound. \
@@ -2661,9 +2674,8 @@ impl Server {
                 // Retryable as it stands (#697): another Bridge window or AI
                 // client held the Tally endpoint for the whole bounded wait.
                 // A few bytes, so it is kept under any response budget.
-                if code == "tally_endpoint_busy" {
-                    error["retry_after_s"] =
-                        json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+                if let Some(after) = crate::endpoint_wire::wire_retry_after_s(&code) {
+                    error["retry_after_s"] = json!(after);
                 }
                 // Additive: `code` and `message` keep their existing shape for
                 // every refusal, and `remediation` appears only for the codes

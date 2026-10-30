@@ -1522,8 +1522,8 @@ fn master_failure_outcome(
     if let Some(cause) = failure.cause {
         error["cause"] = json!(cause);
     }
-    if failure.code == "tally_endpoint_busy" {
-        error["retry_after_s"] = json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+    if let Some(after) = crate::endpoint_wire::wire_retry_after_s(&failure.code) {
+        error["retry_after_s"] = json!(after);
     }
     match attempted {
         Some(false) => {

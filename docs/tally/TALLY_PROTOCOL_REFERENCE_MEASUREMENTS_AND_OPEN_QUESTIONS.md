@@ -94,6 +94,20 @@ client had disconnected.
 Throughout that window every other request failed — including `/status`. Because the gateway
 serialises (§1), one abandoned expensive read blocks the entire instance.
 
+**Measured since, for a shorter cut** (30 Oct 2026, `lab/2142-status-while-busy-answers` and
+`lab/2142-drain-repeat-answers`: one synthetic book, one long report read cut by the client at
+20 s, five times over two sittings; **partial**):
+- `GET /status` sent while Tally builds a long read waits until the read ends (twice).
+- After the cut, Tally's work ran on 8.9 s to 25.4 s. A `/status` sent about 1 s after the cut
+  waited 9.3 s and 10.8 s.
+- Once `/status` had answered quickly three times in a row, 2 s apart, a data read answered at
+  its at-rest speed (four times).
+
+Bridge's drain after a cut post rests on these readings (`DrainPolicy::MEASURED` in the
+transport crate). Not measured: a dropped connection, a size limit or an abandoned send in
+place of the cut; a second process sending meanwhile; other reads, books and editions; Bridge's
+own transport (the rows used curl).
+
 **Consequences:**
 
 1. **Abandoning a request frees your socket, not Tally.** There is no observed way to cancel

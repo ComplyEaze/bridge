@@ -567,6 +567,32 @@ fn a_codes_own_next_step_wins_over_the_unanswered_reasons() {
     );
 }
 
+/// #2142: a call held back while Tally drains after a cut post says what to do
+/// and when to try again, under the code itself.
+#[test]
+fn a_draining_endpoint_refusal_carries_its_step_and_retry() {
+    let (server, _directory) = server_at(9, 200_000);
+    for (code, retry) in [
+        ("tally_endpoint_draining", 10),
+        ("tally_endpoint_needs_attention", 30),
+    ] {
+        let response = server.finish_tool_response(
+            "vouchers",
+            &json!({}),
+            Utc::now(),
+            Err(ToolFailure::from(code.to_string())),
+        );
+        let error = &response.value["structuredContent"]["result"]["error"];
+        assert_eq!(error["code"], code);
+        assert_eq!(error["retry_after_s"], retry, "{error}");
+        assert_eq!(
+            error["remediation"],
+            refusal_remediation(code).unwrap(),
+            "{error}"
+        );
+    }
+}
+
 /// #2071: a refused Trial Balance takes its own step only when no other step applies. Tally
 /// not reachable keeps its step, and the Trial Balance step is the last resort, with or
 /// without a cause.

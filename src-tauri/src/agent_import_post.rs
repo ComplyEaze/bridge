@@ -2022,6 +2022,14 @@ const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its 
 /// What a caller does when the port was busy before any attempt was recorded
 /// (#869): nothing was sent, and an approval taken for this post has lapsed, so
 /// the next call asks the person again.
+/// The same, when Tally was still finishing an earlier request cut for time
+/// (#2142): nothing was posted, and the approval has lapsed.
+const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still finishing an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+
+/// The same, when that has lasted long enough that Tally may be waiting on a
+/// person (#2142).
+const NEEDS_ATTENTION_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally has not answered promptly for a long time after an earlier request was stopped for time. Ask the person to look at Tally's screen for a message waiting for an answer, then call post_import with this same batch again after retry_after_s seconds. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+
 const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
 /// The same, when whether the post was sent could not be observed.
@@ -2101,16 +2109,21 @@ fn reconciliation_failure_payload(
     if code == DESKTOP_LEDGER_LINE_BREAK {
         payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
     }
-    if code == "tally_endpoint_busy" {
-        payload["result"]["error"]["retry_after_s"] =
-            json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+    // A draining endpoint (#2142) is held back like a busy one: nothing was
+    // sent by the refused send, and the same next steps hold.
+    if let Some(after) = crate::endpoint_wire::wire_retry_after_s(code) {
+        payload["result"]["error"]["retry_after_s"] = json!(after);
         match attempted {
             Some(true) => {
                 payload["result"]["error"]["next_step"] = json!(BUSY_AFTER_POST_NEXT_STEP)
             }
             None => payload["result"]["error"]["next_step"] = json!(BUSY_UNKNOWN_ATTEMPT_NEXT_STEP),
             Some(false) => {
-                payload["result"]["error"]["next_step"] = json!(BUSY_BEFORE_ATTEMPT_NEXT_STEP)
+                payload["result"]["error"]["next_step"] = json!(match code {
+                    "tally_endpoint_draining" => DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+                    "tally_endpoint_needs_attention" => NEEDS_ATTENTION_BEFORE_ATTEMPT_NEXT_STEP,
+                    _ => BUSY_BEFORE_ATTEMPT_NEXT_STEP,
+                })
             }
         }
     }

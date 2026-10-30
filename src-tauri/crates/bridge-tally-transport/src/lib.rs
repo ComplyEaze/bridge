@@ -20,9 +20,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+mod drain;
 mod wire_gate;
+pub use drain::DrainPolicy;
 pub use wire_gate::{
-    TallyWireGate, UngatedWire, WireLockHeld, WirePause, WireRefusal, WireRetryPolicy,
+    DrainDebt, TallyWireGate, UngatedWire, WireLockHeld, WirePause, WireRefusal, WireRetryPolicy,
     WireWaitBudget, WIRE_BUSY_RETRY_AFTER, WIRE_WAIT_MAX,
 };
 
@@ -402,6 +404,9 @@ pub struct TallyHttpTransport {
     observer: Option<Arc<dyn SendObserver>>,
     /// Asked before each send starts, when its caller can withdraw (#778).
     admission: Option<Arc<dyn SendAdmission>>,
+    /// How a post drains an endpoint that owes one (#2142); without it, posts
+    /// neither read nor write the drain record.
+    drain: Option<DrainPolicy>,
 }
 
 /// A transport holding its endpoint's wire lock for exactly one send, from
@@ -411,6 +416,8 @@ pub struct TallyHttpTransport {
 pub struct WireHeldTransport<'a> {
     transport: &'a TallyHttpTransport,
     held: Box<dyn WireLockHeld>,
+    /// When its one post was armed, if the transport drains (#2142).
+    armed: Option<u64>,
 }
 
 impl WireHeldTransport<'_> {
@@ -421,11 +428,21 @@ impl WireHeldTransport<'_> {
         self,
         xml: String,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
-        let Self { transport, held } = self;
+        let Self {
+            transport,
+            held,
+            armed,
+        } = self;
         let prepared = prepare_tally_xml_request(&xml, transport.policy.xml_request_max_bytes)?;
         let url = endpoint_url(&transport.config, "/")?;
         let response = transport
-            .send_prepared_decoded(prepared, url, transport.policy.xml_response_max_bytes)
+            .send_prepared_decoded(
+                prepared,
+                url,
+                transport.policy.xml_response_max_bytes,
+                &*held,
+                Some(armed),
+            )
             .await;
         // Released only once the response has been read to its end, or the
         // send has failed.
@@ -475,7 +492,21 @@ impl TallyHttpTransport {
             wire_budget: None,
             observer: None,
             admission: None,
+            drain: None,
         })
+    }
+
+    /// Drain an endpoint after a cut post before the next post to it, under
+    /// `policy`, for this transport and its clones (#2142).
+    #[must_use]
+    pub fn with_drain(mut self, policy: DrainPolicy) -> Self {
+        self.drain = Some(policy);
+        self
+    }
+
+    /// The drain policy this transport posts under, if any.
+    pub fn drain_policy(&self) -> Option<DrainPolicy> {
+        self.drain
     }
 
     /// Tell `observer` about every send of this transport and its clones, however
@@ -547,12 +578,176 @@ impl TallyHttpTransport {
         request: Option<usize>,
     ) -> Result<Box<dyn WireLockHeld>, TallyTransportError> {
         self.refuse_unless_admitted(kind, request)?;
-        let held = self.wire_lock().await.inspect_err(|error| {
+        let held = async {
+            let held = self.wire_lock().await?;
+            match kind {
+                // Boxed: the probe loop's state stays off the stack of every
+                // post's future.
+                SendKind::Post => Box::pin(self.drained(held)).await,
+                SendKind::Status => Ok(held),
+            }
+        }
+        .await
+        .inspect_err(|error| {
             self.observe(kind, request, None, error.safe_code(), None);
         })?;
         // Dropping `held` on a refusal releases the lock unused.
         self.refuse_unless_admitted(kind, request)?;
         Ok(held)
+    }
+
+    /// With the wire lock held for a post: the lock to post under once the
+    /// endpoint owes no drain, or the refusal (#2142). An owed drain is probed
+    /// with `GET /status` under the lock, at most `probes_per_call` times and
+    /// never closer than `spacing` to the last probe of any process. A slow or
+    /// cut probe refuses at once; between quick ones the lock is released for
+    /// the pause.
+    async fn drained(
+        &self,
+        mut held: Box<dyn WireLockHeld>,
+    ) -> Result<Box<dyn WireLockHeld>, TallyTransportError> {
+        let Some(policy) = self.drain else {
+            return Ok(held);
+        };
+        let refused = |refusal| TallyTransportError::WireRefused { refusal };
+        let spacing_ms = millis(policy.spacing);
+        let mut probes = 0;
+        let mut pauses = 0;
+        loop {
+            let (since_ms, quick, last_probe_ms) = match held.debt().map_err(refused)? {
+                DrainDebt::Clear => return Ok(held),
+                DrainDebt::InFlight { since_ms } => (since_ms, 0, None),
+                DrainDebt::Owed {
+                    since_ms,
+                    quick,
+                    last_probe_ms,
+                } => (since_ms, quick, last_probe_ms),
+            };
+            let now = self.wire.now_ms();
+            // A time ahead of this clock counts as elapsed.
+            let wait = last_probe_ms
+                .filter(|&last| last <= now)
+                .map_or(0, |last| (last + spacing_ms).saturating_sub(now));
+            // Bounded however other processes probe meanwhile.
+            if probes >= policy.probes_per_call || pauses >= policy.probes_per_call {
+                return Err(refused(draining(policy, since_ms, now, spacing_ms)));
+            }
+            if wait > 0 && probes == 0 {
+                // Another probe was sent too recently: send nothing.
+                return Err(refused(draining(policy, since_ms, now, wait)));
+            }
+            if wait > 0 {
+                pauses += 1;
+                drop(held);
+                self.wire.pause(Duration::from_millis(wait)).await;
+                held = self.wire_lock().await?;
+                continue;
+            }
+            probes += 1;
+            // Recorded before the probe, so a probe whose sender is killed
+            // still spaces the next one.
+            let probing = |quick, last_probe_ms| DrainDebt::Owed {
+                since_ms,
+                quick,
+                last_probe_ms: Some(last_probe_ms),
+            };
+            held.record(probing(quick, now)).map_err(refused)?;
+            let probe = self.drain_probe(policy).await;
+            if probe == drain::Probe::Unreachable {
+                // Nothing listens: the post fails as unreachable on its own.
+                held.record(DrainDebt::Clear).map_err(refused)?;
+                return Ok(held);
+            }
+            let answered_quickly = probe == drain::Probe::Quick;
+            let quick = if answered_quickly {
+                quick.saturating_add(1)
+            } else {
+                0
+            };
+            if quick >= policy.quick_in_a_row {
+                held.record(DrainDebt::Clear).map_err(refused)?;
+                return Ok(held);
+            }
+            let end = self.wire.now_ms();
+            held.record(probing(quick, end)).map_err(refused)?;
+            if !answered_quickly {
+                let retry = millis(policy.retry_after_slow());
+                return Err(refused(draining(policy, since_ms, end, retry)));
+            }
+        }
+    }
+
+    /// One drain probe: `GET /status` under its own deadline, observed as a
+    /// status send.
+    async fn drain_probe(&self, policy: DrainPolicy) -> drain::Probe {
+        let Ok(url) = endpoint_url(&self.config, "/status") else {
+            return drain::Probe::Slow;
+        };
+        let started = std::time::Instant::now();
+        let flight = InFlight::begin(self, SendKind::Status, None, started);
+        let result = async {
+            #[expect(
+                clippy::disallowed_methods,
+                reason = "the Tally transport: loopback only, canonical_loopback_origin refuses any other host before a request is built"
+            )]
+            let response = self
+                .client
+                .get(url)
+                .header(CONTENT_TYPE, TALLY_STATUS_CONTENT_TYPE)
+                .timeout(policy.probe_deadline)
+                .send()
+                .await
+                .map_err(classify_request_error)?;
+            read_decoded_response(
+                response,
+                self.policy.status_response_max_bytes,
+                TALLY_STATUS_RESPONSE_ENCODING,
+            )
+            .await
+        }
+        .await;
+        flight.finish();
+        self.observe_result(SendKind::Status, None, started, &result, answered_decoded);
+        match result {
+            Ok(_) if started.elapsed() < policy.quick_below => drain::Probe::Quick,
+            Err(TallyTransportError::ConnectionFailed) => drain::Probe::Unreachable,
+            Ok(_) | Err(_) => drain::Probe::Slow,
+        }
+    }
+
+    /// Before a post, with its lock held: record that it is in flight, so a
+    /// sender that never settles it leaves it owed (#2142). The time it began.
+    fn arm_drain(&self, held: &dyn WireLockHeld) -> Result<Option<u64>, TallyTransportError> {
+        if self.drain.is_none() {
+            return Ok(None);
+        }
+        let since_ms = self.wire.now_ms();
+        held.record(DrainDebt::InFlight { since_ms })
+            .map_err(|refusal| TallyTransportError::WireRefused { refusal })?;
+        Ok(Some(since_ms))
+    }
+
+    /// After a post armed at `armed`: clear the record, or leave the drain
+    /// owed when Tally may still be working on it. A record that cannot be
+    /// written stays in flight, which is owed.
+    fn settle_drain<T>(
+        &self,
+        held: &dyn WireLockHeld,
+        armed: Option<u64>,
+        result: &Result<T, TallyTransportError>,
+    ) {
+        let Some(since_ms) = armed else {
+            return;
+        };
+        let settled = match result {
+            Err(error) if drain::owes_drain(error) => DrainDebt::Owed {
+                since_ms,
+                quick: 0,
+                last_probe_ms: None,
+            },
+            Ok(_) | Err(_) => DrainDebt::Clear,
+        };
+        let _ = held.record(settled);
     }
 
     /// Gate every send of this transport, and of its clones, on `gate`, trying
@@ -600,9 +795,33 @@ impl TallyHttpTransport {
             self.observe(SendKind::Post, None, None, refusal.safe_code(), None);
             refused(refusal)
         })?;
+        // An owed drain refuses at once: this caller cannot wait on a probe
+        // between its own checks (#2142).
+        if let Some(policy) = self.drain {
+            let refusal = match held.debt() {
+                Ok(DrainDebt::Clear) => None,
+                Ok(DrainDebt::InFlight { since_ms } | DrainDebt::Owed { since_ms, .. }) => {
+                    let now = self.wire.now_ms();
+                    Some(draining(policy, since_ms, now, millis(policy.spacing)))
+                }
+                Err(refusal) => Some(refusal),
+            };
+            if let Some(refusal) = refusal {
+                self.observe(SendKind::Post, None, None, refusal.safe_code(), None);
+                return Err(refused(refusal));
+            }
+        }
+        // Armed here, before the caller records its attempt, so a record that
+        // cannot be written refuses before the attempt rather than after it. A
+        // transport dropped unsent leaves it in flight, which costs the next
+        // post its probes.
+        let armed = self.arm_drain(&*held).inspect_err(|error| {
+            self.observe(SendKind::Post, None, None, error.safe_code(), None);
+        })?;
         Ok(WireHeldTransport {
             transport: self,
             held,
+            armed,
         })
     }
 
@@ -658,11 +877,14 @@ impl TallyHttpTransport {
         let content_length = body.len();
         let url = endpoint_url(&self.config, "/")?;
         let request = Some(content_length);
-        let _wire = self.wire_lock_observed(SendKind::Post, request).await?;
+        let wire = self.wire_lock_observed(SendKind::Post, request).await?;
+        let armed = self.arm_drain(&*wire)?;
         let started = std::time::Instant::now();
         let flight = InFlight::begin(self, SendKind::Post, request, started);
         let result = self.post_xml_locked(url, body, content_length).await;
         flight.finish();
+        self.settle_drain(&*wire, armed, &result);
+        drop(wire);
         self.observe_result(SendKind::Post, request, started, &result, answered_raw);
         let mut response = result?;
         response.request_body_sha256 = Some(body_sha256);
@@ -705,27 +927,40 @@ impl TallyHttpTransport {
         let prepared = prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
         let url = endpoint_url(&self.config, "/")?;
         let request = Some(prepared.body.len());
-        let _wire = self.wire_lock_observed(SendKind::Post, request).await?;
-        self.send_prepared_decoded(prepared, url, self.policy.xml_response_max_bytes)
-            .await
+        let wire = self.wire_lock_observed(SendKind::Post, request).await?;
+        self.send_prepared_decoded(
+            prepared,
+            url,
+            self.policy.xml_response_max_bytes,
+            &*wire,
+            None,
+        )
+        .await
     }
 
-    /// One send of a prepared request. The caller holds the wire lock for it
-    /// until this returns.
+    /// One send of a prepared request. The caller holds the wire lock `held`
+    /// for it until this returns.
     async fn send_prepared_decoded(
         &self,
         prepared: PreparedTallyXmlRequest,
         url: Url,
         response_max_bytes: usize,
+        held: &dyn WireLockHeld,
+        pre_armed: Option<Option<u64>>,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         let PreparedTallyXmlRequest { body, body_sha256 } = prepared;
         let content_length = body.len();
+        let armed = match pre_armed {
+            Some(armed) => armed,
+            None => self.arm_drain(held)?,
+        };
         let started = std::time::Instant::now();
         let flight = InFlight::begin(self, SendKind::Post, Some(content_length), started);
         let result = self
             .send_prepared_decoded_locked(url, body, content_length, response_max_bytes)
             .await;
         flight.finish();
+        self.settle_drain(held, armed, &result);
         self.observe_result(
             SendKind::Post,
             Some(content_length),
@@ -836,6 +1071,24 @@ impl Drop for InFlight<'_> {
             );
         }
     }
+}
+
+/// The refusal for a drain owed since `since_ms`, at `now`, to try again after
+/// `retry_ms`.
+fn draining(policy: DrainPolicy, since_ms: u64, now: u64, retry_ms: u64) -> WireRefusal {
+    if now.saturating_sub(since_ms) > millis(policy.attention_after) {
+        WireRefusal::NeedsAttention {
+            retry_after_ms: retry_ms.max(millis(policy.retry_after_attention())),
+        }
+    } else {
+        WireRefusal::Draining {
+            retry_after_ms: retry_ms,
+        }
+    }
+}
+
+fn millis(duration: Duration) -> u64 {
+    u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
 }
 
 fn answered_raw(response: &TallyHttpResponse) -> usize {

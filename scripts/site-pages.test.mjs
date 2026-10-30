@@ -373,9 +373,9 @@ test("the home page carries an at-a-glance block for the manifest's release, wit
   }
   // the limits the Download page puts on the same claims go with them, so the home page cannot say more than that page
   const squash = (value) => value.replace(/\s+/g, " ");
-  // 0.6.1 is the release whose published Windows program has a recorded run; any other version says what is true when the version is set
-  const publishedRunNeedle = version === "0.6.1"
-    ? "the program in the published Windows 0.6.1 file has had one read-only run against TallyPrime 7.2 Silver"
+  // 0.7.0 is the release whose published Windows program has a recorded run; any other version says what is true when the version is set
+  const publishedRunNeedle = version === "0.7.0"
+    ? "the program in the published Windows 0.7.0 file has had one read-only run against TallyPrime 7.2 Silver"
     : `we have not yet run the published ${version} file against TallyPrime`;
   const download = squash(visibleText(region(read("download.html"), 'id="at-a-glance"', "</section>")));
   const home = squash(text);

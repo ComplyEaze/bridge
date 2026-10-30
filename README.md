@@ -62,7 +62,7 @@ update itself, so look for a newer version on the
 - **Partly:** profit and loss and the balance sheet (a book with stock items is read only when Tally's own closing stock closes every gap, measured on one synthetic book; a book with several currencies is refused); closing stock value at a month's last day, and its closing quantity (compared with Tally's own Stock Summary for an item on a line of its own, the item list's own for an item inside a stock group), on small books, checked on two lab books; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags (one test, the cash share of receipts and payments against the s.44AB(a) limit, is off by default and not yet run against a live TallyPrime), and Tally's Funds Flow and Ratio Analysis reports.
 
-"You can ask" means it answered on the books and builds we ran it on; we have not yet run the published 0.7.0 file against TallyPrime (the program inside the published Windows x64 0.6.1 file (checked against its `.sha256` file) had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 27 October 2026, started directly by our test client rather than installed in Claude Desktop; it reported version 0.6.1, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted); the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; the program inside the published Windows x64 0.7.0 file (checked against its `.sha256` file) has had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 30 October 2026, started directly by our test client rather than installed in Claude Desktop; it reported version 0.7.0, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted; the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 **Its tools.** In name order; release 0.7.0 installs 34 of them, 33 offered by default (`audit_test_run` appears only when its setting is on). None of them changes your TallyPrime books; with posting on, two more appear, and with posting and master writes both on, two more again that create one ledger, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
@@ -309,6 +309,17 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   server's parent, the macOS package, and the published 0.7.0 file. Record:
   [`lab/0.7.0-rc-sitting-answers`](https://github.com/ComplyEaze/bridge/tree/ed05b6ff200e4a8f5390b9482d4e73af1cf3b160/lab/0.7.0-rc-sitting-answers)
   at commit `ed05b6ff200e4a8f5390b9482d4e73af1cf3b160`.
+- The published 0.7.0 file for Windows, on 30 October 2026. `bridge-tally-mcp-v0.7.0-windows-x64.mcpb` (SHA-256
+  `291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec`, equal to its `.sha256` file, smoke report and provenance
+  record; `bridge_mcp.exe` SHA-256 `48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d`), unpacked and started
+  directly by our test client (not installed in Claude Desktop), against licensed TallyPrime 7.2 Silver with one synthetic
+  company: it reported version 0.7.0, and `tally_status`, `list_companies` and `ledger_masters` answered; a second launch read
+  the ledger masters again, and the company's marks had not moved. Nothing was posted. The import, posting, ledger-create and
+  tax-audit settings were unset, so it listed 30 tools; the Claude Desktop extension always turns import on, which adds
+  `build_import_xml`, `parse_bank_statement` and `parse_bank_statement_csv`, the 33 of the release's smoke report. Not run:
+  the macOS file, Claude Desktop, posting, ledger creation, `audit_test_run` with its setting on, any other read. Record:
+  [`lab/0.7.0-post-publish-answers`](https://github.com/ComplyEaze/bridge/tree/89ef968dd482eabcb32d225b373838b84732c512/lab/0.7.0-post-publish-answers)
+  at commit `89ef968dd482eabcb32d225b373838b84732c512`.
 - The bank-statement path through its fourth step, on a Mac, on 4 and 5 October
   2026, with that same CI-built 0.4.2 candidate (installed on 3 October; not the
   published file), against licensed TallyPrime Silver 7.1 holding the lab's own
@@ -523,7 +534,7 @@ it. Before you do, know what it is and is not:
   your Tally, or in conversation inside Claude Desktop. What has been run
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
-  0.6.0 package itself has been run by us against a live TallyPrime on one day, 16 October 2026 (#1780), where it posted one Contra to a synthetic company; the program in the published Windows 0.6.1 file has had one read-only run, on 27 October 2026, and has not posted (see the 27 October 2026 entry above), and the macOS 0.6.1 file has not been run against TallyPrime; two other builds of 0.6.0, made by
+  0.6.0 package itself has been run by us against a live TallyPrime on one day, 16 October 2026 (#1780), where it posted one Contra to a synthetic company; the programs in the published Windows 0.6.1 and 0.7.0 files have each had one read-only run, on 27 and 30 October 2026, and have not posted (see those entries above), and neither release's macOS file has been run against TallyPrime; two other builds of 0.6.0, made by
   our checks from the same source, were run against TallyPrime 7.1 Silver on one Windows computer
   (see the 16 October 2026 entry above).
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.

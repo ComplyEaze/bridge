@@ -1,0 +1,6 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/model.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/wire.rs
+src-tauri/src/tally/runtime.rs
+reviewer: lamemustafa

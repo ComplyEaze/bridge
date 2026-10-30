@@ -4105,7 +4105,7 @@ async fn the_corroborations_census_is_its_own_read() {
 /// mark is just past one, is bracketed as a divided window read is: the marks
 /// are read again after its last request, and marks that moved refuse it.
 /// `closing_mark` is the mark read after the census.
-async fn empty_window_over_a_two_span_book(closing_mark: u64, hit: Option<&str>) -> Value {
+async fn empty_window_over_a_two_span_book(closing_mark: u64, hit: Option<&str>) -> (Value, usize) {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
     let opened = capacity + 1;
     let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
@@ -4121,11 +4121,8 @@ async fn empty_window_over_a_two_span_book(closing_mark: u64, hit: Option<&str>)
         Some(day) => relabelled(&vouchers_kept(1), &[(opened, day)]),
         None => empty_collection(),
     })));
+    // the marks read after it, whose voucher mark also decides an empty widened window (#2145)
     plans.extend(paired(&mark(closing_mark)));
-    if closing_mark == opened && hit.is_none() {
-        // nothing moved and the widened window is empty: the company's mark decides
-        plans.extend(paired(&mark(opened)));
-    }
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let response = server_at(simulator.address(), directory.path())
@@ -4135,22 +4132,61 @@ async fn empty_window_over_a_two_span_book(closing_mark: u64, hit: Option<&str>)
         )
         .await;
     simulator.cancel();
-    simulator.finish().unwrap();
-    response
+    let sent = simulator
+        .finish()
+        .unwrap()
+        .into_iter()
+        .filter(|request| !request.method.is_empty())
+        .count();
+    (response, sent)
 }
 
 #[tokio::test]
 async fn a_divided_corroboration_census_is_bracketed_by_the_company_marks() {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
-    let moved = empty_window_over_a_two_span_book(capacity + 3, None).await;
+    let (moved, _) = empty_window_over_a_two_span_book(capacity + 3, None).await;
     assert_eq!(
         moved["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
         "{moved}"
     );
-    let steady = empty_window_over_a_two_span_book(capacity + 1, None).await;
+    let (steady, sent) = empty_window_over_a_two_span_book(capacity + 1, None).await;
     let result = &steady["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{steady}");
     assert_eq!(result["reason"], "empty_uncorroborated", "{steady}");
+    // 4 prelude legs, then the marks, the window's census (two spans), the window, the
+    // corroboration's census (two spans) and the marks read after it, each a pair of 6. The
+    // voucher mark is not read a third time (#2145): six fewer than before.
+    assert_eq!(sent, 4 + 7 * 6);
+}
+
+/// #1240, #2145: a book that has never held a voucher (its voucher mark is 0) sends no
+/// census. The window is read whole and is empty, the corroboration reads the widened window
+/// whole and finds it empty too, and the company's voucher mark, read again at 0, makes the
+/// window `complete`, with the reason `company_has_no_vouchers`. Only this path, which counts
+/// nothing, can give that reason: a counted book's mark is above 0.
+#[tokio::test]
+async fn an_empty_window_on_a_book_with_no_vouchers_is_complete() {
+    let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
+    plans.extend(paired(&mark(0)));
+    // the window, read whole, and the corroboration's widened window, read whole: both empty
+    plans.extend(paired(&xml_plan(empty_collection())));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    // the company's voucher mark
+    plans.extend(paired(&mark(0)));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let response = server_at(simulator.address(), directory.path())
+        .call_tool(
+            "vouchers",
+            json!({"company_guid": GUID, "from": "20260801", "to": "20260831"}),
+        )
+        .await;
+    // Every scripted answer was asked for, in this order: no census was sent.
+    let sent = simulator.finish().unwrap();
+    assert_eq!(sent.len(), 4 + 4 * 6, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{response}");
+    assert_eq!(result["reason"], "company_has_no_vouchers", "{response}");
 }
 
 /// #1240: a divided census that counts a voucher on the day beside the window, with the
@@ -4160,19 +4196,19 @@ async fn a_divided_corroboration_census_is_bracketed_by_the_company_marks() {
 async fn a_divided_corroboration_census_with_a_hit_is_labelled_by_where_the_hit_is() {
     let capacity = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity();
     let steady = capacity + 1;
-    let beside = empty_window_over_a_two_span_book(steady, Some("20260731")).await;
+    let (beside, _) = empty_window_over_a_two_span_book(steady, Some("20260731")).await;
     let result = &beside["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{beside}");
     assert_eq!(
         result["reason"], "empty_window_wider_read_nonempty",
         "{beside}"
     );
-    let inside = empty_window_over_a_two_span_book(steady, Some("20260815")).await;
+    let (inside, _) = empty_window_over_a_two_span_book(steady, Some("20260815")).await;
     assert_eq!(
         inside["structuredContent"]["result"]["error"]["code"], "window_contradicted",
         "{inside}"
     );
-    let moved = empty_window_over_a_two_span_book(steady + 2, Some("20260815")).await;
+    let (moved, _) = empty_window_over_a_two_span_book(steady + 2, Some("20260815")).await;
     assert_eq!(
         moved["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
         "{moved}"

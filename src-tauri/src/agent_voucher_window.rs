@@ -2206,7 +2206,9 @@ pub(super) enum WindowCount {
     },
     /// Every voucher the window holds, counted per day, bracketed by the voucher
     /// mark read before and after. No data part was sent. `voucher_mark` is the
-    /// one read after, when it was read.
+    /// one read after, when it was read. A book is counted only when its mark is
+    /// above 0, so this mark never makes an empty window `company_has_no_vouchers`:
+    /// only [`Self::NotCounted`] can.
     Counted {
         census: WindowCensus,
         evidence: Evidence,

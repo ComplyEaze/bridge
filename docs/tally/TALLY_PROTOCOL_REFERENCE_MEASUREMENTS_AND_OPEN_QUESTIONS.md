@@ -354,8 +354,8 @@ request is predicted over a budget well below the cap.
   span, and only the voucher mark read again shows it. Before #1240 a widened read that the book needed
   in several data parts was bracketed by both marks; and a widened window whose data plan exceeded the read allowance was
   refused at planning, which no longer applies because no data part is sent (a census of several spans can
-  still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
-  window refuses the read as `window_contradicted` (a voucher mark that moved refuses it as
+  still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before, and is not bracketed. Either way a voucher in the
+  window refuses the read as `window_contradicted` (on a counted book, a voucher mark that moved refuses it as
   `voucher_window_changed_during_read` first), and otherwise the empty result is corroborated or
   reported partial by the existing empty-window control. **Confidence: PARTIAL**: one live run (26 Oct 2026,
   TallyPrime 7.2 Silver, two synthetic books; `RESULTS.md` on the branch `lab/1240-empty-window-live-answers` at
@@ -368,9 +368,10 @@ request is predicted over a budget well below the cap.
   last 32 sends. The counts that follow are from scripted doubles through the tool call, since #2145. Every
   census adds a closing marks read of six requests. For a neighbour-empty widened window the census replaces
   one paired window read, and the voucher mark read after it is also the company's mark the control decides
-  by, so the six requests of a separate marks read are not sent: the corroboration is 12 requests, the census
-  and the marks read again. With vouchers on the neighbouring days it saves every part those days would have
-  taken, less the six of the closing marks read. The saving is counted in requests; the bytes of a census and
+  by, so the six requests of a separate marks read are not sent: the corroboration is 6k + 6 requests for a
+  census of k requests, the census and the marks read again. With vouchers on the neighbouring days it saves
+  every part those days would have taken; against a widened read that would have been undivided, which sent no
+  marks read after its parts, it costs the six of the closing marks read too. The saving is counted in requests; the bytes of a census and
   of the parts it replaces were not compared.
 - **AlterID 0.** Every span starts above an exclusive lower bound of 0, so a voucher with AlterID 0
   could not be read by a divided day. None has been observed; a census row carrying AlterID 0 is

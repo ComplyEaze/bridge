@@ -1,0 +1,4 @@
+I1 IDX rows changed against I0-reads-idx:
+  021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000d2:
+    before None
+    after  ["LEDGER NAME='Lab Alias Script' GUID 021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000d2 PARENT 'Sundry Debtors' ISBILLWISEON Yes ALTERID 215 LANGUAGENAME.LIST blocks 1", "name 1: 'Lab Alias Script' (len 16) U+004C U+0061 U+0062 U+0020 U+0041 U+006C U+0069 U+0061 U+0073 U+0020 U+0053 U+0063 U+0072 U+0069 U+0070 U+0074", "name 2: 'लैब खाता' (len 8) U+0932 U+0948 U+092C U+0020 U+0916 U+093E U+0924 U+093E"]

@@ -1,0 +1,8 @@
+Restore plan (#1688 Close, LAB-COMMON C6), written before the restore, on the run lead's word for this row ("Take a new BK-1688 first, and restore at Close"):
+- Source folder: the lab's 1688\bk folder (holds one file only).
+- File: TDBK1800_<company number>.001, 24,104 B, sha256 da9289cbbcc27741b37cee21d27cab49fed63aa58f8ee59f609d9eb4f4142131, taken 31 Oct 2026 02:21 local (30 Oct 20:51Z) at S0.
+- THE COMPANY: BRIDGE ALIAS LAB, number <company number>, GUID 021bda0c-b1b1-44c8-8279-5212ce87c9c7.
+- Restore Data Path: Tally's data folder.
+- Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Skip ... Replace ..." = Replace.
+- After: load THE COMPANY alone; THE READS: MARKS = ms0 (210, ALTVCHID absent); CAT and CV2 byte-identical to r0's; IDX byte-identical to r0's or differing only where its rows do.
+- Fallback (only on the run lead's word): lab/1688-b1-alias's BK1, 24,104 B, sha256 5c1d904f....

@@ -1,0 +1,2 @@
+2026-10-30T21:05:08.562Z I1: requests/creates/create-i1.utf16le.xml (1062 B, sha256 96b852616a8a2021737df7e4e15a6522a0e1f321eab66b4fb08b20a53ff11797); answered 2026-10-30T21:05:09.232Z; curl exit 0; printed "200 3834"; CONTENT-LENGTH 3834; bytes 3834; sha256 79efd528d98ee40f7ee09d99e0131d99eb7dc3273b3fe4620d036b1acfe65567
+counters {"CREATED": "1", "ALTERED": "0", "DELETED": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0", "LASTVCHID": "0", "LASTMID": "0"}; LINEERROR []

@@ -1,0 +1,5 @@
+Kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+bk/TDBK1800_<company number>.001 24104 B da9289cbbcc27741b37cee21d27cab49fed63aa58f8ee59f609d9eb4f4142131
+evidence/p0-tasklist.txt (the full process list) 15911 B 2995f077a455dfc1aabbaeba0967794d9719717dc5674a28711a5ec29188f416
+evidence/close-tasklist.txt (the full process list) 16194 B 67050a4c9b90929cdf747d62416ab608d3b806c1d3b6bdeffe1a4d16b07158cb
+b1-cat-before.xml (lab/1688-b1-alias answer, for the P0 compare) 8516 B 3b3dab36824005bc90c0d8bed6744a620a71dbb0a3264273051239ea5066f88d

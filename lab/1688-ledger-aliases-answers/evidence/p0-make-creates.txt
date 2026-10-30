@@ -1,0 +1,12 @@
+6678ea48f5e8427cac06212529d6c860937003045db140d959bf4c33e5fedf5e  1072  requests/creates/create-i0.utf16le.xml
+96b852616a8a2021737df7e4e15a6522a0e1f321eab66b4fb08b20a53ff11797  1062  requests/creates/create-i1.utf16le.xml
+5962e38d4f722abcc1e4ef6929b8cd05a3352edbb17c8ae06e99fd5bd7868e8f  1074  requests/creates/create-i2.utf16le.xml
+0378da838f3ca0a470b8f702961eca9c71381470ba0307b26f5da19551b84102  1056  requests/creates/create-i3.utf16le.xml
+acd13200f7ab7fd470447c52d9d537faf5b796ded869f82438a24172c0c96f76  1076  requests/creates/create-i4.utf16le.xml
+the five lines equal SHA256.txt's (the script prints CRLF line ends)
+create-i0.utf16le.xml byte-identical to the committed file
+create-i1.utf16le.xml byte-identical to the committed file
+create-i2.utf16le.xml byte-identical to the committed file
+create-i3.utf16le.xml byte-identical to the committed file
+create-i4.utf16le.xml byte-identical to the committed file
+note: make_creates.py was given the folder from a bash shell, which dropped the backslashes; it wrote into sheet/scripts/<stray folder>; the five files were moved to creates/ (nothing else changed).

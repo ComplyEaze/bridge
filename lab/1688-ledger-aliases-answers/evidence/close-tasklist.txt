@@ -1,0 +1,9 @@
+"tallyscheduler.exe","16860","Services","0","19,492 K"
+"tallygatewayserver.exe","18340","Services","0","42,772 K"
+"tallyscheduler.exe","22876","Services","0","20,880 K"
+"bridge_mcp.exe","17588","Console","5","7,668 K"
+"bridge_mcp.exe","13772","Console","5","7,640 K"
+"bridge_mcp.exe","384","Console","5","7,640 K"
+"bridge_mcp.exe","6668","Console","5","7,668 K"
+"tally.exe","28316","Console","5","2,12,068 K"
+(pushed copy: only the tally and bridge lines; the full list had 326 lines)

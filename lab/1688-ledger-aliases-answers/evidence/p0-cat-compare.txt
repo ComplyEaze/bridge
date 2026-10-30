@@ -1,0 +1,2 @@
+equal outside CMPINFO: True
+['-    <COMPANY>0</COMPANY>', '+    <COMPANY>1</COMPANY>', '-    <LEDGER>0</LEDGER>', '+    <LEDGER>3</LEDGER>', '-    <CURRENCY>0</CURRENCY>', '+    <CURRENCY>1</CURRENCY>', '-    <TAXUNIT>0</TAXUNIT>', '+    <TAXUNIT>1</TAXUNIT>']

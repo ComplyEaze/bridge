@@ -1445,10 +1445,53 @@ fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
 const MAC_ALERT_EXIT: &str = r#"#[cfg(not(windows))]
 fn exit_unless_the_alert_fits(text: &str) {
     match measured_alert(text) {
-        Some((height, screen)) if alert_fits(height, screen) => {}
+        Some((height, screens)) if screens.iter().all(|screen| alert_fits(height, *screen)) => {}
         Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         None => std::process::exit(0),
     }
+}"#;
+
+const MAC_ALERT_TEXT_HEIGHT: &str = r#"#[cfg(target_os = "macos")]
+fn alert_text_height(text: &str) -> f64 {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{
+        NSFont, NSFontAttributeName, NSStringDrawingOptions, NSStringNSExtendedStringDrawing,
+    };
+    use objc2_foundation::{NSDictionary, NSSize, NSString};
+    let font = NSFont::systemFontOfSize(ALERT_FONT_POINTS);
+    // SAFETY: an AppKit constant, read once.
+    let key = unsafe { NSFontAttributeName };
+    let attributes = NSDictionary::<_, AnyObject>::from_slices(&[key], &[font.as_ref()]);
+    // SAFETY: the attributes map the font key to an `NSFont`, the type AppKit
+    // reads for it.
+    let rect = unsafe {
+        NSString::from_str(text).boundingRectWithSize_options_attributes_context(
+            NSSize::new(ALERT_TEXT_WIDTH, 1.0e7),
+            NSStringDrawingOptions::UsesLineFragmentOrigin
+                | NSStringDrawingOptions::UsesFontLeading,
+            Some(&attributes),
+            None,
+        )
+    };
+    rect.size.height.ceil()
+}"#;
+
+const MAC_ALERT_SCREENS: &str = r#"#[cfg(target_os = "macos")]
+fn alert_screens() -> Option<Vec<ScreenSpan>> {
+    let main_thread = objc2::MainThreadMarker::new()?;
+    let screens = objc2_app_kit::NSScreen::screens(main_thread)
+        .iter()
+        .map(|screen| {
+            let (frame, visible) = (screen.frame(), screen.visibleFrame());
+            let top = frame.origin.y + frame.size.height;
+            ScreenSpan {
+                height: frame.size.height,
+                visible_top: top - (visible.origin.y + visible.size.height),
+                visible_bottom: top - visible.origin.y,
+            }
+        })
+        .collect::<Vec<_>>();
+    (!screens.is_empty()).then_some(screens)
 }"#;
 
 const FITS_THE_BOX: &str = r#"fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
@@ -2006,7 +2049,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 47] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 50] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2029,6 +2072,12 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 47] = [
     (MAC_ALERT_CHECK, 1),
     (MAC_ALERT_FITS, 1),
     (MAC_ALERT_EXIT, 1),
+    (MAC_ALERT_TEXT_HEIGHT, 1),
+    (MAC_ALERT_SCREENS, 1),
+    (
+        "#[cfg(not(windows))]\nconst ALERT_TEXT_WIDTH: f64 = 402.0;",
+        1,
+    ),
     (FITS_THE_BOX, 1),
     (POST_DIALOG_WINDOWS, 1),
     (REVIEW_ACK_DIALOG, 1),
@@ -2147,7 +2196,7 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     ("#[cfg(windows)]", 12),
     // #1780's Mac check (c2): the seven measured figures, the screen span,
     // where the top sits, the comparison, the child's exit and their two tests;
-    // and four `cfg(target_os = "macos")` items (the text's height, the screen,
+    // and four `cfg(target_os = "macos")` items (the text's height, the screens,
     // the two together, and the height's test) with one other-platform arm.
     ("#[cfg(not(windows))]", 30),
     ("cfg", 61),
@@ -2251,6 +2300,12 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen(" + ALERT_SLACK <= screen.visible_bottom", " <= screen.visible_bottom", 1),
         source.replacen("<= screen.visible_bottom", "<= screen.height", 1),
         source.replacen("        None => std::process::exit(0),", "        None => {}", 1),
+        // The check passes on any one screen, reads only the first, takes the
+        // column as wide as Part A's A4e disproved, or measures no text.
+        source.replacen(".all(|screen| alert_fits(height, *screen))", ".any(|screen| alert_fits(height, *screen))", 1),
+        source.replacen("(!screens.is_empty()).then_some(screens)", "Some(screens.into_iter().take(1).collect())", 1),
+        source.replacen("const ALERT_TEXT_WIDTH: f64 = 402.0;", "const ALERT_TEXT_WIDTH: f64 = 406.0;", 1),
+        source.replacen("    rect.size.height.ceil()\n}", "    rect.size.height.ceil() * 0.0\n}", 1),
         source.replacen(
             "        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),",
             "        Some(_) => std::process::exit(0),",

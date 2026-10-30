@@ -419,19 +419,16 @@ async fn a_journal_whose_approval_window_is_too_large_says_so() {
     );
     assert_eq!(result["attempt_recorded"], false, "{result}");
     let message = result["error"]["message"].as_str().unwrap();
-    #[cfg(windows)]
-    let (opening, next) = (
-        "Nothing was sent. The approval window for this saved batch is too large to show whole",
-        "larger or less magnified screen",
+    assert!(
+        message.starts_with(
+            "Nothing was sent. The approval window for this saved batch is too large to show whole"
+        ),
+        "{message}"
     );
-    // A Mac refuses longer texts than Windows does, and says how to post one.
-    #[cfg(not(windows))]
-    let (opening, next) = (
-        "Nothing was sent. The approval window for this saved batch is too long to show whole: on a Mac",
-        "a shorter narration, or post a batch in smaller parts, or approve it in ComplyEaze Bridge on a Windows PC",
+    assert!(
+        message.contains("larger or less magnified screen"),
+        "{message}"
     );
-    assert!(message.starts_with(opening), "{message}");
-    assert!(message.contains(next), "{message}");
     assert!(!message.contains("Review the error"), "{message}");
 }
 

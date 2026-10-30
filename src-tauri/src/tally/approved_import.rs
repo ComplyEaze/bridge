@@ -2159,9 +2159,9 @@ pub(crate) mod test_seam {
     }
 
     /// AppKit lays the alert's text out as Part A saw the panel do: 16 points a
-    /// line, two lines for a 100-character prose line, and 28 lines for the
-    /// smallest one-voucher post text (row 1964-M, cells A1, A5 and A7). Measured
-    /// without a window (#1780).
+    /// line, two lines for a 100-character prose line, 28 lines for the smallest
+    /// one-voucher post text, and one of ten 46-capital lines broken (row 1964-M,
+    /// cells A1, A5, A7 and A4e). Measured without a window (#1780).
     #[cfg(target_os = "macos")]
     #[test]
     fn the_mac_alert_text_is_measured_as_the_panel_lays_it_out() {
@@ -2194,7 +2194,18 @@ pub(crate) mod test_seam {
             "Narration: \"rent\"",
         ]
         .join("\n");
-        assert_eq!(super::alert_text_height(&voucher), 28.0 * 16.0);
+        // 28 lines, as the panel showed it; macOS's own fonts decide the last
+        // line, so one line either way is allowed.
+        let height = super::alert_text_height(&voucher);
+        assert!((27.0 * 16.0..=29.0 * 16.0).contains(&height), "{height}");
+        // Ten lines of 46 capitals: the panel broke one of them (cell A4e), so the
+        // column is narrower than all ten.
+        let capitals = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(4);
+        let a4e = (0..10)
+            .map(|start| &capitals[start..start + 46])
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!((super::alert_text_height(&a4e) - 11.0 * 16.0).abs() < 1.0e-9);
     }
 
     /// The Mac alert wraps its own text, so the parent does not break the
@@ -2819,18 +2830,20 @@ fn review_title(count: VoucherCount) -> String {
 // The macOS alert as row 1964-M Part A measured it (`lab/1964-mac-alert-caps-answers`,
 // macOS 26.6.2, one display, one run of each cell, so every figure here is
 // partial). A real approval text takes its wide layout: 13-point text in a
-// column about 406 points wide, under 150 points of title, icon and buttons. The
+// column about 402 points wide (46 capitals overflow it once in ten lines, cell
+// A4e), under 150 points of title, icon and buttons. The
 // alert opens with its top at a fixed place and is never moved up, so a tall one
 // runs off the bottom of the screen. Its top was 168 points from the top of a
 // 982-point screen whose visible frame starts 33 points down; whether that is a
 // fixed offset, an offset below the visible frame or a share of the height is
 // row 1964-C2's cell C2-2, so the alert's top is taken as the lowest of the
-// three. One line of text, 16 points, is kept for a hyphenated word or a second
-// title line.
+// three. Which screen it opens on with more than one display is not measured,
+// so it must fit on every screen. One line of text, 16 points, is kept for a
+// hyphenated word or a second title line.
 #[cfg(not(windows))]
 const ALERT_FONT_POINTS: f64 = 13.0;
 #[cfg(not(windows))]
-const ALERT_TEXT_WIDTH: f64 = 406.0;
+const ALERT_TEXT_WIDTH: f64 = 402.0;
 #[cfg(not(windows))]
 const ALERT_CHROME: f64 = 150.0;
 #[cfg(not(windows))]
@@ -2898,45 +2911,50 @@ fn alert_text_height(text: &str) -> f64 {
     rect.size.height.ceil()
 }
 
-/// The menu-bar screen, which the alert is taken to open on; `None` off the
-/// main thread or with no screen.
+/// Every screen the alert could open on, each measured down from its own top
+/// edge; `None` off the main thread or with no screen.
 #[cfg(target_os = "macos")]
-fn alert_screen() -> Option<ScreenSpan> {
+fn alert_screens() -> Option<Vec<ScreenSpan>> {
     let main_thread = objc2::MainThreadMarker::new()?;
-    let screen = objc2_app_kit::NSScreen::screens(main_thread).firstObject()?;
-    let (frame, visible) = (screen.frame(), screen.visibleFrame());
-    let top = frame.origin.y + frame.size.height;
-    Some(ScreenSpan {
-        height: frame.size.height,
-        visible_top: top - (visible.origin.y + visible.size.height),
-        visible_bottom: top - visible.origin.y,
-    })
+    let screens = objc2_app_kit::NSScreen::screens(main_thread)
+        .iter()
+        .map(|screen| {
+            let (frame, visible) = (screen.frame(), screen.visibleFrame());
+            let top = frame.origin.y + frame.size.height;
+            ScreenSpan {
+                height: frame.size.height,
+                visible_top: top - (visible.origin.y + visible.size.height),
+                visible_bottom: top - visible.origin.y,
+            }
+        })
+        .collect::<Vec<_>>();
+    (!screens.is_empty()).then_some(screens)
 }
 
-/// The alert's text height and its screen, measured in the dialog child before
-/// anything is shown.
+/// The alert's text height and every screen, measured in the dialog child
+/// before anything is shown.
 #[cfg(target_os = "macos")]
-fn measured_alert(text: &str) -> Option<(f64, ScreenSpan)> {
-    Some((alert_text_height(text), alert_screen()?))
+fn measured_alert(text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
+    Some((alert_text_height(text), alert_screens()?))
 }
 
 /// No other platform's alert has been measured.
 #[cfg(all(not(windows), not(target_os = "macos")))]
-fn measured_alert(_text: &str) -> Option<(f64, ScreenSpan)> {
+fn measured_alert(_text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
     None
 }
 
 /// Ends the dialog child before anything is shown when the Mac alert would run
-/// past the bottom of its screen (#1780), with the status the parent reads as a
-/// box that did not fit the screen, as a Windows box that does not fit ends
-/// (`box_fit`). The parent then refuses the text as too large, and a batch's
+/// past the bottom of any screen it could open on (#1780), with the status the
+/// parent reads as a box that did not fit the screen, as a Windows box that does
+/// not fit ends (`box_fit`). The parent then refuses the text as too large, and a batch's
 /// next ask shows its totals only (#1832). A text that could not be measured is
 /// not shown either: the child ends with no token, which the parent reads as
 /// unavailable.
 #[cfg(not(windows))]
 fn exit_unless_the_alert_fits(text: &str) {
     match measured_alert(text) {
-        Some((height, screen)) if alert_fits(height, screen) => {}
+        Some((height, screens)) if screens.iter().all(|screen| alert_fits(height, *screen)) => {}
         Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         None => std::process::exit(0),
     }

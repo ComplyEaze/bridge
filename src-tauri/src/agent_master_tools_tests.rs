@@ -1800,6 +1800,7 @@ fn the_verified_and_absent_texts_say_what_is_checked_and_what_is_not() {
             "no ledger of this name",
             "does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for",
             "new connections",
+            "the create, the read or both on a reused one",
         ] {
             assert!(text.contains(fragment), "{fragment}: {text}");
         }
@@ -4615,6 +4616,12 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
     let again = posting(&scripted, third.call_tool("post_ledger_creates", args)).await;
     assert_eq!(sent(silent).len(), 0);
     assert_eq!(result(&again)["state"], "confirmed_absent", "{again}");
+    // The repeat answer, from the journal, still says what the state rests on.
+    assert_eq!(
+        result(&again)["verification"]["basis"],
+        "read_after_send_order",
+        "{again}"
+    );
     assert_eq!(result(&again)["dispatch"]["resent"], false);
     assert!(scripted.masters().is_empty(), "nobody was asked again");
     assert_eq!(journal_bytes(directory.path()), before);

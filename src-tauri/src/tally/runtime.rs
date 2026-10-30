@@ -118,13 +118,54 @@ pub struct AgentRead {
 }
 
 /// What an identity bracket's company list said of the Tally that answered:
-/// its release and its licence tier (Silver or Gold, none in Education). A
-/// field is `None` when the capability answer did not give it.
+/// its product, its release and its licence tier (Silver or Gold, none in
+/// Education). A field is `None` when the capability answer did not give it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ObservedTally {
+    pub product: Option<String>,
     pub release: Option<String>,
     pub license_tier: Option<bridge_tally_core::LicenseTier>,
     pub education: bool,
+}
+
+impl ObservedTally {
+    /// What a `CompanyListV2` answer says of the Tally that answered: by the
+    /// full capability observation, and Education also by any `EDUMODE` field
+    /// saying anything but `No` when that observation does not parse.
+    pub(crate) fn of_company_list(xml: &str) -> Self {
+        let observation =
+            bridge_tally_protocol::parse_company_gateway_capability_observation(xml).ok();
+        let education = observation
+            .as_ref()
+            .is_some_and(|observation| observation.educational_mode)
+            || bridge_tally_protocol::company_list_may_be_in_educational_mode(xml);
+        observation.map_or(
+            Self {
+                education,
+                ..Self::default()
+            },
+            |observation| Self {
+                product: Some(observation.product),
+                release: observation.release,
+                license_tier: match (education, observation.silver, observation.gold) {
+                    (false, true, false) => Some(bridge_tally_core::LicenseTier::Silver),
+                    (false, false, true) => Some(bridge_tally_core::LicenseTier::Gold),
+                    _ => None,
+                },
+                education,
+            },
+        )
+    }
+
+    /// The Tally a paired read was served by: what both of its identity
+    /// brackets said, or nothing known when they differ.
+    pub(crate) fn agreed(opening: Self, closing: Self) -> Self {
+        if opening == closing {
+            opening
+        } else {
+            Self::default()
+        }
+    }
 }
 
 /// What the endpoint queue read to admit a post, before the aim: the reads of
@@ -184,11 +225,7 @@ async fn fetch_admitted_agent_read(
             encoded_bytes,
             encoded_sha256,
             boundary_profile: profile,
-            observed_tally: if opening_tally == closing_tally {
-                opening_tally
-            } else {
-                ObservedTally::default()
-            },
+            observed_tally: ObservedTally::agreed(opening_tally, closing_tally),
         },
         evidence,
     ))

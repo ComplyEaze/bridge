@@ -1685,23 +1685,8 @@ impl TallyClient {
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), &mut evidence)
             .await?;
-        let observation = parse_company_gateway_capability_observation(&xml).ok();
-        let education = observation
-            .as_ref()
-            .is_some_and(|observation| observation.educational_mode)
-            || bridge_tally_protocol::company_list_may_be_in_educational_mode(&xml);
-        let tally =
-            observation.map_or_else(super::runtime::ObservedTally::default, |observation| {
-                super::runtime::ObservedTally {
-                    release: observation.release,
-                    license_tier: match (education, observation.silver, observation.gold) {
-                        (false, true, false) => Some(LicenseTier::Silver),
-                        (false, false, true) => Some(LicenseTier::Gold),
-                        _ => None,
-                    },
-                    education,
-                }
-            });
+        let tally = super::runtime::ObservedTally::of_company_list(&xml);
+        let education = tally.education;
         let discovered = xml_parser::parse_companies_from_collection(&xml)
             .map_err(|error| with_read_evidence(error, evidence.clone()))?;
         let companies = normalize_discovered_companies(discovered).map_err(|_| {

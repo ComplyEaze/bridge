@@ -120,8 +120,10 @@ pub(super) struct ReadBack {
 /// Whether the order Tally serves requests in, which both absent states rest
 /// on, was measured on the Tally a read-back went to. It was measured only on
 /// TallyPrime 7.2 Silver, licensed (the abandoned-create rows and the order
-/// rows of #1713). Built only from what the read's identity brackets saw, so
-/// no caller can claim a measured Tally it did not read.
+/// rows of #1713): the product must be exactly `TallyPrime`, since another
+/// product of the same release and tier can open the same data folder. Built
+/// only from what the read's identity brackets saw, so no caller can claim a
+/// measured Tally it did not read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum OrderCoverage {
     Measured,
@@ -135,10 +137,14 @@ impl OrderCoverage {
         if tally.education {
             return Self::NotMeasured("absent_not_measured_in_education");
         }
-        match (tally.release.as_deref(), tally.license_tier) {
-            (Some("7.2"), Some(LicenseTier::Silver)) => Self::Measured,
-            (_, Some(LicenseTier::Gold)) => Self::NotMeasured("absent_not_measured_on_gold"),
-            (Some(_), Some(LicenseTier::Silver)) => {
+        let product = tally.product.as_deref();
+        if product.is_some_and(|product| product != "TallyPrime") {
+            return Self::NotMeasured("absent_not_measured_on_this_product");
+        }
+        match (product, tally.release.as_deref(), tally.license_tier) {
+            (Some("TallyPrime"), Some("7.2"), Some(LicenseTier::Silver)) => Self::Measured,
+            (_, _, Some(LicenseTier::Gold)) => Self::NotMeasured("absent_not_measured_on_gold"),
+            (Some(_), Some(_), Some(LicenseTier::Silver)) => {
                 Self::NotMeasured("absent_not_measured_on_this_release")
             }
             _ => Self::NotMeasured("absent_tally_release_not_known"),
@@ -702,19 +708,19 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         OrderCoverage::Measured => None,
         OrderCoverage::NotMeasured(reason) => Some(reason),
     };
-    if absent_and_unchanged && target_marks.is_some() && !target_moved {
-        if let Some(reason) = uncovered {
-            reasons.push(reason);
-        } else {
-            return Judgement {
-                state: MasterVerdictState::ConfirmedAbsent,
-                guid: None,
-                checks,
-                reasons: vec!["not_in_book"],
-                name_absent_in_read_book: name_absent,
-                sealed: (),
-            };
-        }
+    if absent_and_unchanged {
+        reasons.extend(uncovered);
+    }
+    let settles = absent_and_unchanged && uncovered.is_none();
+    if settles && target_marks.is_some() && !target_moved {
+        return Judgement {
+            state: MasterVerdictState::ConfirmedAbsent,
+            guid: None,
+            checks,
+            reasons: vec!["not_in_book"],
+            name_absent_in_read_book: name_absent,
+            sealed: (),
+        };
     }
     // The mark moved since the intent: the create may have run and its ledger
     // been deleted, or another master changed. A ledger or group the pre-image
@@ -725,23 +731,19 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     let master_new_since_intent = current
         .keys()
         .any(|guid| !facts.pre_image.contains_key(guid));
-    if absent_and_unchanged && moved_forward && !master_new_since_intent {
-        if let Some(reason) = uncovered {
-            reasons.push(reason);
-        } else {
-            return Judgement {
-                state: MasterVerdictState::ConfirmedAbsentAfterChange,
-                guid: None,
-                checks,
-                reasons: vec!["not_in_book", "mark_moved_since_intent"],
-                name_absent_in_read_book: name_absent,
-                sealed: (),
-            };
-        }
+    if settles && moved_forward && !master_new_since_intent {
+        return Judgement {
+            state: MasterVerdictState::ConfirmedAbsentAfterChange,
+            guid: None,
+            checks,
+            reasons: vec!["not_in_book", "mark_moved_since_intent"],
+            name_absent_in_read_book: name_absent,
+            sealed: (),
+        };
     }
     // An absent name that stays open says why, where the read showed the
-    // cause.
-    if absent_and_unchanged && uncovered.is_none() {
+    // cause, on any Tally.
+    if absent_and_unchanged {
         if moved_forward && master_new_since_intent {
             reasons.push("master_new_since_intent");
         } else if target_marks.is_some_and(|(before, after)| after < before) {

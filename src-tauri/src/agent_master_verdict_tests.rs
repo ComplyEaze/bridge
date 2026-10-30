@@ -1953,6 +1953,7 @@ fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
     use crate::tally::ObservedTally;
     use bridge_tally_core::LicenseTier;
     let tally = |release: Option<&str>, tier: Option<LicenseTier>, education: bool| ObservedTally {
+        product: Some("TallyPrime".to_string()),
         release: release.map(str::to_string),
         license_tier: tier,
         education,
@@ -1986,6 +1987,27 @@ fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
             ObservedTally::default(),
             OrderCoverage::NotMeasured("absent_tally_release_not_known"),
         ),
+        (
+            ObservedTally {
+                product: Some("TallyPrime Edit Log".to_string()),
+                ..tally(Some("7.2"), Some(LicenseTier::Silver), false)
+            },
+            OrderCoverage::NotMeasured("absent_not_measured_on_this_product"),
+        ),
+        (
+            ObservedTally {
+                product: Some("tallyprime".to_string()),
+                ..tally(Some("7.2"), Some(LicenseTier::Silver), false)
+            },
+            OrderCoverage::NotMeasured("absent_not_measured_on_this_product"),
+        ),
+        (
+            ObservedTally {
+                product: None,
+                ..tally(Some("7.2"), Some(LicenseTier::Silver), false)
+            },
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
     ] {
         assert_eq!(OrderCoverage::of(&seen), expected, "{seen:?}");
     }
@@ -1996,6 +2018,7 @@ fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
 #[test]
 fn neither_absent_state_is_given_on_a_tally_not_covered() {
     for reason in [
+        "absent_not_measured_on_this_product",
         "absent_not_measured_on_gold",
         "absent_not_measured_on_this_release",
         "absent_tally_release_not_known",
@@ -2014,5 +2037,107 @@ fn neither_absent_state_is_given_on_a_tally_not_covered() {
             assert!(judgement.reasons.contains(&reason), "{reason} {after}");
             assert!(!judgement.state.is_terminal());
         }
+    }
+}
+
+/// On a Tally not covered, an absent name kept open names both the Tally and
+/// what else the read showed: a master new since the send, or a mark that went
+/// back.
+#[test]
+fn an_uncovered_absent_name_names_the_tally_and_the_cause() {
+    let uncovered = "absent_not_measured_on_this_release";
+    let mut new_master = World::untouched(suspense());
+    new_master.marks()[0] = mark(TARGET, 9);
+    new_master.masters().push(master(
+        MasterKind::Ledger,
+        crate::synthetic_guid(0x5153),
+        8,
+        &["Renamed Since"],
+    ));
+    let mut went_back = World::untouched(suspense());
+    went_back.marks()[0] = mark(TARGET, 6);
+    for (mut world, cause) in [
+        (new_master, "master_new_since_intent"),
+        (went_back, "mark_went_back_since_intent"),
+    ] {
+        world.read.order_coverage = OrderCoverage::NotMeasured(uncovered);
+        let judgement = world.judge();
+        assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+        assert!(
+            judgement.reasons.contains(&uncovered),
+            "{cause}: {:?}",
+            judgement.reasons
+        );
+        assert!(
+            judgement.reasons.contains(&cause),
+            "{cause}: {:?}",
+            judgement.reasons
+        );
+    }
+}
+
+/// The captured company lists, read by the parser a shipped build uses: the
+/// TallyPrime 7.2 Silver one is measured and the 7.1 Silver one is not.
+/// Brackets that disagree, or an answer that does not parse, say nothing of
+/// the Tally, so neither is measured.
+#[test]
+fn the_captured_company_lists_give_the_coverage_through_the_real_parser() {
+    use crate::tally::ObservedTally;
+    let decoded = |bytes: &[u8]| {
+        let units: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect();
+        String::from_utf16(&units)
+            .unwrap()
+            .trim_start_matches('\u{feff}')
+            .to_string()
+    };
+    let seven_two_list = decoded(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml"
+    ));
+    let seven_two = ObservedTally::of_company_list(&seven_two_list);
+    let seven_one = ObservedTally::of_company_list(&decoded(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    )));
+    assert_eq!(seven_two.release.as_deref(), Some("7.2"));
+    assert_eq!(seven_one.release.as_deref(), Some("7.1"));
+    assert_eq!(seven_two.product.as_deref(), Some("TallyPrime"));
+    assert_eq!(OrderCoverage::of(&seven_two), OrderCoverage::Measured);
+    // NOT a capture: the 7.2 capture with one element changed, its product
+    // name, since no company list from another product is captured. Release
+    // and tier alone do not pin the product: another product of the same
+    // release and tier can open the same data folder.
+    let product = r#"<PRODUCTNAME TYPE="String">TallyPrime</PRODUCTNAME>"#;
+    assert_eq!(seven_two_list.matches(product).count(), 1);
+    let other_product = ObservedTally::of_company_list(&seven_two_list.replace(
+        product,
+        r#"<PRODUCTNAME TYPE="String">TallyPrime Edit Log</PRODUCTNAME>"#,
+    ));
+    assert_eq!(other_product.release.as_deref(), Some("7.2"));
+    assert_eq!(
+        OrderCoverage::of(&other_product),
+        OrderCoverage::NotMeasured("absent_not_measured_on_this_product")
+    );
+    assert_eq!(
+        OrderCoverage::of(&ObservedTally::agreed(seven_two.clone(), seven_two.clone())),
+        OrderCoverage::Measured
+    );
+    assert_eq!(
+        OrderCoverage::of(&seven_one),
+        OrderCoverage::NotMeasured("absent_not_measured_on_this_release")
+    );
+    for (opening, closing) in [
+        (seven_two.clone(), seven_one.clone()),
+        (seven_one, seven_two.clone()),
+        (
+            seven_two,
+            ObservedTally::of_company_list("<ENVELOPE></ENVELOPE>"),
+        ),
+    ] {
+        assert_eq!(
+            OrderCoverage::of(&ObservedTally::agreed(opening, closing)),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known")
+        );
     }
 }

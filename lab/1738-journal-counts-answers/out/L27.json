@@ -1,0 +1,15 @@
+{
+ "journal_lines": 2,
+ "lines_not_parsed": 0,
+ "skip_lines_not_parsed": 0,
+ "batches": 2,
+ "status_records": 0,
+ "batches_sent": 0,
+ "batches_found_posted": 0,
+ "contras_with_statement_facts": 0,
+ "A_equal_reference_pairs": 0,
+ "A_equal_reference_pairs_both_sent_or_found": 0,
+ "A_missing_reference_same_day_pairs": 0,
+ "B_not_created_sends": 0,
+ "C_skips_posted_by_a_found_batch_unwithdrawn": 0
+}

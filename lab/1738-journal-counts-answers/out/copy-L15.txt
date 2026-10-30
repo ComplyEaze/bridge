@@ -1,0 +1,18 @@
+label L15 
+== agent-import-ledger.jsonl source before 
+size 1432 
+SHA256 hash of C:\bridge-lab\<folder-15>\data\agent-import-ledger.jsonl:
+8ce2c901928610355087f3d2110682e4dc08eb354ddf51224f95712c4afcb05b
+CertUtil: -hashfile command completed successfully.
+        1 file(s) copied.
+== agent-import-ledger.jsonl source after 
+size 1432 
+SHA256 hash of C:\bridge-lab\<folder-15>\data\agent-import-ledger.jsonl:
+8ce2c901928610355087f3d2110682e4dc08eb354ddf51224f95712c4afcb05b
+CertUtil: -hashfile command completed successfully.
+== agent-import-ledger.jsonl copy 
+size 1432 
+SHA256 hash of C:\bridge-lab\1738c\copies\L15\agent-import-ledger.jsonl:
+8ce2c901928610355087f3d2110682e4dc08eb354ddf51224f95712c4afcb05b
+CertUtil: -hashfile command completed successfully.
+== agent-import-statement-skips.jsonl absent 

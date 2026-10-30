@@ -221,30 +221,34 @@ mod tests {
 
     #[test]
     fn the_cap_counts_the_value_itself_and_refuses_from_one_character_over() {
-        let at_cap = "word ".repeat(MOST_CHARS / 5);
-        assert_eq!(at_cap.chars().count(), MOST_CHARS);
+        // The cap is the one-voucher text's 1,600 characters, written out so
+        // that a cap moved anywhere fails here.
+        let at_cap = "word ".repeat(320);
+        assert_eq!(at_cap.chars().count(), 1_600);
         assert_eq!(split(&at_cap, 50).unwrap().concat(), at_cap);
         let over = format!("{at_cap}x");
         assert_eq!(split(&over, 50), Err(VoucherTextRefusal::DoesNotFit));
         // Under the cap as typed and over it quoted: each `"` quotes as two
-        // characters, and the value is still shown, in parts.
+        // characters, and this check splits it. (The approval refuses a
+        // one-voucher text this long by its own cap, apart from this check.)
         let quotes = "a\" ".repeat(500);
-        assert!(quotes.chars().count() < MOST_CHARS && quoted_chars(&quotes) > MOST_CHARS);
+        assert!(quotes.chars().count() < 1_600 && quoted_chars(&quotes) > 1_600);
         assert_eq!(split(&quotes, 50).unwrap().concat(), quotes);
     }
 
     #[test]
     fn a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read() {
-        let text = format!("{}----", "word ".repeat(MOST_CHARS / 5));
+        let text = format!("{}----", "word ".repeat(320));
         assert_eq!(split(&text, 50), Err(VoucherTextRefusal::DoesNotFit));
     }
 
     #[test]
     fn only_a_space_splits_a_value() {
-        // A tab would fit the first part's width; no space does.
-        let text = "ab\tcdefgh ij";
+        // A no-break space would fit the first part's width; no space does.
+        // (A tab or other control character is refused before this check.)
+        let text = "ab\u{a0}cdefgh ij";
         assert_eq!(
-            VoucherText::of(text, 0, |k| if k == 1 { 6 } else { 20 }),
+            VoucherText::of(text, 0, |k| if k == 1 { 5 } else { 20 }),
             Err(VoucherTextRefusal::DoesNotFit)
         );
     }

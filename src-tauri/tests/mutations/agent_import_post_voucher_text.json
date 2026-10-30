@@ -1,7 +1,7 @@
 {
   "file": "src-tauri/src/agent_import_post_voucher_text.rs",
   "base_commit": "026ba163dfcbf75d515a24d0dbbf14c5245534ec",
-  "about": "Every mutant was applied to the file as it is at base_commit, which this commit does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test exists: base, or this_commit for the tests this commit adds. A hand-written mutant's mutation id is the first 16 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column.",
+  "about": "Every mutant was applied to the file as it is at base_commit; the change that adds this record changes only the file's test module. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column.",
   "runs": [
     {
       "run": "tool",
@@ -242,7 +242,7 @@
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
-      "killer_at": "this_commit"
+      "killer_at": "base"
     },
     "115:54 replace == with != in has_bracketed_number": {
       "verdict": "caught",
@@ -279,7 +279,7 @@
           "to": "const MOST_CHARS: usize = 1_604;"
         }
       ],
-      "mutation": "5655e6efed232485",
+      "mutation": "5655e6efed23248500cc67a46551d8c8",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read",
@@ -293,10 +293,10 @@
           "to": "const MOST_CHARS: usize = 1_599;"
         }
       ],
-      "mutation": "fa8c09d27b282352",
+      "mutation": "fa8c09d27b282352c9e4d251baa6bcf3",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read",
+      "killer": "agent::agent_import::post::voucher_text::tests::the_cap_counts_the_value_itself_and_refuses_from_one_character_over",
       "killer_at": "this_commit"
     },
     "T03": {
@@ -307,7 +307,7 @@
           "to": "const DASH_RUN: usize = 5;"
         }
       ],
-      "mutation": "0ba2da5e1a845b0e",
+      "mutation": "0ba2da5e1a845b0e62f758d553a4e1b5",
       "verdict": "caught",
       "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
       "killer_at": "base"
@@ -320,7 +320,7 @@
           "to": "const DASH_RUN: usize = 3;"
         }
       ],
-      "mutation": "68f2e5b8aa84df53",
+      "mutation": "68f2e5b8aa84df53e35a819a5e66a1fb",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
       "killer_at": "base"
@@ -333,7 +333,7 @@
           "to": "if text.chars().count() <= one_line {"
         }
       ],
-      "mutation": "8f6288ead875e84a",
+      "mutation": "8f6288ead875e84a6a7281348e8a00f0",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::widths_are_measured_on_the_quoted_form",
       "killer_at": "base"
@@ -346,7 +346,7 @@
           "to": "if quoted_chars(text) > MOST_CHARS {"
         }
       ],
-      "mutation": "71e1645bb8dd2b48",
+      "mutation": "71e1645bb8dd2b48704eda8dd407990d",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::post::voucher_text::tests::the_cap_counts_the_value_itself_and_refuses_from_one_character_over",
@@ -360,7 +360,7 @@
           "to": "if has_bracketed_number(text) {"
         }
       ],
-      "mutation": "5aa187497fdb9c45",
+      "mutation": "5aa187497fdb9c45f11cf3828f20c0fb",
       "verdict": "caught",
       "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
       "killer_at": "base"
@@ -373,7 +373,7 @@
           "to": "if has_dash_run(text) {"
         }
       ],
-      "mutation": "65eff7f23a7affdc",
+      "mutation": "65eff7f23a7affdc6b8a392dbc0ba109",
       "verdict": "caught",
       "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
       "killer_at": "base"
@@ -386,7 +386,7 @@
           "to": "        if has_dash_run(text) || has_bracketed_number(text) {\n            return Err(VoucherTextRefusal::Layout);\n        }\n        if text.chars().count() > MOST_CHARS {\n            return Err(VoucherTextRefusal::DoesNotFit);\n        }"
         }
       ],
-      "mutation": "9501df84969a875a",
+      "mutation": "9501df84969a875a134829766eccdd7b",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read",
@@ -400,7 +400,7 @@
           "to": "        if text.chars().count() > MOST_CHARS {\n            return Err(VoucherTextRefusal::Layout);"
         }
       ],
-      "mutation": "92fa246b961070ed",
+      "mutation": "92fa246b961070ed1a52fb374370a8c6",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_dialog_cap_is_refused_before_splitting",
       "killer_at": "base"
@@ -413,7 +413,7 @@
           "to": "            return Err(VoucherTextRefusal::DoesNotFit);"
         }
       ],
-      "mutation": "5cd41b59c5d5419b",
+      "mutation": "5cd41b59c5d5419b9ba1b3498fb0228f",
       "verdict": "caught",
       "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
       "killer_at": "base"
@@ -426,7 +426,7 @@
           "to": "let width = part_width(parts.len() + 2);"
         }
       ],
-      "mutation": "c52365bd5004691c",
+      "mutation": "c52365bd5004691c1908962866869d53",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::the_width_of_each_part_is_asked_by_its_number",
       "killer_at": "base"
@@ -439,7 +439,7 @@
           "to": "                .next()\n"
         }
       ],
-      "mutation": "5b83fcf5b3742fbd",
+      "mutation": "5b83fcf5b3742fbd47e32a3f3d6aa4ec",
       "verdict": "caught",
       "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
       "killer_at": "base"
@@ -452,7 +452,7 @@
           "to": ".map(|(at, _)| at)"
         }
       ],
-      "mutation": "86478955f9eecfd1",
+      "mutation": "86478955f9eecfd17f27223d5694290a",
       "verdict": "caught",
       "killer": "agent::agent_import::post::tests::a_long_narration_is_shown_in_quoted_parts_below_the_dashes",
       "killer_at": "base"
@@ -465,7 +465,7 @@
           "to": ".filter(|(_, character)| character.is_whitespace())"
         }
       ],
-      "mutation": "4ec9f3ab270161c4",
+      "mutation": "4ec9f3ab270161c4544e11339b9483be",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::post::voucher_text::tests::only_a_space_splits_a_value",
@@ -479,7 +479,7 @@
           "to": "            if !rest.contains(' ') {\n                parts.push(rest);\n                break;\n            }"
         }
       ],
-      "mutation": "31368dd5bc421f2f",
+      "mutation": "31368dd5bc421f2ff2178fbc2dac6d7c",
       "verdict": "caught",
       "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
       "killer_at": "base"
@@ -492,7 +492,7 @@
           "to": "format!(\"\\\"{text}\\\"\")"
         }
       ],
-      "mutation": "3c8ae84754702065",
+      "mutation": "3c8ae847547020652f13d2adfd7bfb35",
       "verdict": "caught",
       "killer": "agent::agent_import::post::tests::a_narration_in_parts_holding_a_quote_and_a_backslash_reads_back_whole",
       "killer_at": "base"
@@ -505,7 +505,7 @@
           "to": "|| character == '\\u{2213}'"
         }
       ],
-      "mutation": "f342fddc6712db21",
+      "mutation": "f342fddc6712db2105146f2e035f24c1",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
       "killer_at": "base"
@@ -518,11 +518,11 @@
           "to": "('\\u{2500}'..'\\u{257F}')"
         }
       ],
-      "mutation": "1f9b3d500aa13e6d",
+      "mutation": "1f9b3d500aa13e6dcbd5307a30ffc791",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
-      "killer_at": "this_commit"
+      "killer_at": "base"
     },
     "T20": {
       "what": "has_dash_run: the first box-drawing character is not dash-like (range start moved)",
@@ -532,7 +532,7 @@
           "to": "('\\u{2501}'..='\\u{257F}')"
         }
       ],
-      "mutation": "aa2d44b6f164794d",
+      "mutation": "aa2d44b6f164794d68f8a87fdfd855bb",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
       "killer_at": "base"
@@ -545,7 +545,7 @@
           "to": "GeneralCategory::ConnectorPunctuation"
         }
       ],
-      "mutation": "93c1ccd22a808aab",
+      "mutation": "93c1ccd22a808aab0de1720d88e725c7",
       "verdict": "caught",
       "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
       "killer_at": "base"
@@ -558,7 +558,7 @@
           "to": "run = if dash_like(character) { run + 1 } else { run };"
         }
       ],
-      "mutation": "f11218e6f750a910",
+      "mutation": "f11218e6f750a910cf2b3ffe35f9295b",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
       "killer_at": "base"
@@ -571,11 +571,11 @@
           "to": "(*kind == GeneralCategory::OpenPunctuation || *kind == GeneralCategory::InitialPunctuation) &&"
         }
       ],
-      "mutation": "7c22eeb354696bc3",
+      "mutation": "7c22eeb354696bc3646eb1b296209e10",
       "verdict": "caught",
       "before_this_change": "missed",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
-      "killer_at": "this_commit"
+      "killer_at": "base"
     },
     "T24": {
       "what": "has_bracketed_number: the closing bracket is not checked (guard dropped)",
@@ -585,7 +585,7 @@
           "to": "digits > 0"
         }
       ],
-      "mutation": "0560f532e7e64a34",
+      "mutation": "0560f532e7e64a34eb12ca4211d5e6b8",
       "verdict": "caught",
       "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
       "killer_at": "base"
@@ -598,7 +598,7 @@
           "to": "**kind == GeneralCategory::OtherNumber"
         }
       ],
-      "mutation": "a5d21cf6edfdaf9e",
+      "mutation": "a5d21cf6edfdaf9e87dff1d7e48233e9",
       "verdict": "caught",
       "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
       "killer_at": "base"
@@ -615,7 +615,7 @@
           "to": "Some(&GeneralCategory::OpenPunctuation)"
         }
       ],
-      "mutation": "889b77aae1e73a92",
+      "mutation": "889b77aae1e73a920da7bc986e161e10",
       "verdict": "caught",
       "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
       "killer_at": "base"

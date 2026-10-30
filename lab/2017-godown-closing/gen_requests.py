@@ -3,7 +3,8 @@
 fixture stock_summary_report_fy_request: TYPE Data, ID Stock Summary, company BRIDGE SHAPE LAB, 20250401 to 20260331).
 Each output differs from it only in the report ID, in the value of SVTODATE, and in at most ONE added static variable:
 EXPLODEFLAG with the value Yes (the variable section 12a.13 of the protocol reference measured on the Stock Summary), or
-STOCKITEMNAME naming an item (the Stock Query shape of the committed stock-query fixtures).
+STOCKITEMNAME naming an item (the Stock Query shape this gateway answered on 28 Oct, lab/2018-stock-query-items-periods-answers
+at a5b369bf, requests/r-07).
 
   Part A, the book as it stands, in the order they are sent:
   a-00-20260331-stock-summary            the template itself (the 28 Oct sitting's stock-summary request, byte for byte)
@@ -13,7 +14,7 @@ STOCKITEMNAME naming an item (the Stock Query shape of the committed stock-query
   a-04-20260331-control-unknown          ID `Bridge Probe Unknown` (the 28 Oct sitting's control request, byte for byte)
   a-05 .. a-08-20250831-*                a-00 .. a-03 at the period end 20250831 (the baseline before Part B's transfer date)
   Part B, after the keying, in the order they are sent, b-01 .. b-06 at 20250831 and b-07 .. b-12 at 20260331:
-  stock-summary, stock-summary-explode, godown-summary, godown-summary-explode, stock-query-godown-split-item,
+  stock-summary, godown-summary, stock-summary-explode, godown-summary-explode, stock-query-godown-split-item,
   stock-query-godown-single-item
 
 The report IDs, the two variables and their values, the items and the period ends are fixed in this script; nothing from
@@ -71,6 +72,30 @@ PINNED = {
     "a-04-20260331-control-unknown": "103f686bed40b37dabfca8d87f57570fd362a3ed479e3d47f3669d4396ded89c",
 }
 
+# Every request's sha256, as reviewed on 31 Oct 2026: a change to any byte of any request fails --check.
+ALL_SHA256 = {
+    "a-00-20260331-stock-summary": "17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8",
+    "a-01-20260331-godown-summary": "27ccda23a554946b16097fe004c58161d0d718ddb03d4aebf2008d38cd3a5e46",
+    "a-02-20260331-stock-summary-explode": "6566c8f06a11ff70ed96e75b0e807403ea5b87dafdfd91e87b6413d80fcfe52f",
+    "a-03-20260331-godown-summary-explode": "1d2e2204628c33f8e226777e6bd3740e68cd2849b5db28c6163a837039914c9f",
+    "a-04-20260331-control-unknown": "103f686bed40b37dabfca8d87f57570fd362a3ed479e3d47f3669d4396ded89c",
+    "a-05-20250831-stock-summary": "902491688bb5c2178fc9c50e5fd202d6f6736a46de3c79d304af1a47bf839677",
+    "a-06-20250831-godown-summary": "13ee81795756aca579dc4cecb8c2da87259f10eb21ecd26ff9be591219217233",
+    "a-07-20250831-stock-summary-explode": "62c6cf033bc4a664e83f7c55a70daa049fe089fa1dee776e26d879bee85d1a54",
+    "a-08-20250831-godown-summary-explode": "5756cbc7cf527f1aebd036d5c6f6e8159295dd6f548d6c3c622dc338d99bc592",
+    "b-01-20250831-stock-summary": "902491688bb5c2178fc9c50e5fd202d6f6736a46de3c79d304af1a47bf839677",
+    "b-02-20250831-godown-summary": "13ee81795756aca579dc4cecb8c2da87259f10eb21ecd26ff9be591219217233",
+    "b-03-20250831-stock-summary-explode": "62c6cf033bc4a664e83f7c55a70daa049fe089fa1dee776e26d879bee85d1a54",
+    "b-04-20250831-godown-summary-explode": "5756cbc7cf527f1aebd036d5c6f6e8159295dd6f548d6c3c622dc338d99bc592",
+    "b-05-20250831-stock-query-godown-split-item": "5d0096e520ad8ed62ec8f19b5b13ff983500f746c8202223de0f930c20ade2a1",
+    "b-06-20250831-stock-query-godown-single-item": "947a8668f36a8f8d19efdc362d6aca684b4f767021d5994d7c977e01c0634918",
+    "b-07-20260331-stock-summary": "17c4ff82b6ae49e6543f7be3745fbe023879ed0d2f47cc8c3bc3686e713afac8",
+    "b-08-20260331-godown-summary": "27ccda23a554946b16097fe004c58161d0d718ddb03d4aebf2008d38cd3a5e46",
+    "b-09-20260331-stock-summary-explode": "6566c8f06a11ff70ed96e75b0e807403ea5b87dafdfd91e87b6413d80fcfe52f",
+    "b-10-20260331-godown-summary-explode": "1d2e2204628c33f8e226777e6bd3740e68cd2849b5db28c6163a837039914c9f",
+    "b-11-20260331-stock-query-godown-split-item": "ec5800b73343cdbf18b2d706bd5129bc7ea7334dcec6cbd748937f8ead285aa3",
+    "b-12-20260331-stock-query-godown-single-item": "f58ac2df5c5a101dfafebe09b4b9b9bd22be9ace9d7edf2a28f1778ce0cc2975",
+}
 
 def build(report_id, variable, to_date):
     if len(report_id) > 60 or not PLAIN.fullmatch(report_id) or report_id not in IDS:
@@ -111,6 +136,17 @@ def decoded(data):
     return root.findtext("HEADER/ID"), variables.findtext("SVFROMDATE"), variables.findtext("SVTODATE"), added
 
 
+def from_name(name):
+    """The ID and variable a file's name says, read from its text alone (not from KINDS)."""
+    kind = NAME.fullmatch(name).group(4)
+    if kind.startswith("stock-query-"):
+        item = {"stock-query-godown-split-item": SPLIT, "stock-query-godown-single-item": SINGLE}[kind]
+        return "Stock Query", ("STOCKITEMNAME", item)
+    report = {"stock-summary": "Stock Summary", "godown-summary": "Godown Summary",
+              "control-unknown": "Bridge Probe Unknown"}[kind[:-len("-explode")] if kind.endswith("-explode") else kind]
+    return report, (EXPLODE if kind.endswith("-explode") else None)
+
+
 def check():
     tpl = open(TEMPLATE, "rb").read()
     assert hashlib.sha256(tpl).hexdigest() == TEMPLATE_SHA256, "the template is not the fixture stock_summary_report_fy_request"
@@ -118,7 +154,10 @@ def check():
     base = tpl[2:].decode("utf-16-le")
     assert len(JOBS) == 21 and len({name for name, *_ in JOBS}) == 21
     for name, report_id, variable, to_date in JOBS:
-        assert decoded(build(report_id, variable, to_date)) == (report_id, T_FROM, to_date, (variable,) if variable else ()), "contents differ from the name: " + name
+        said = from_name(name)
+        assert (report_id, variable) == said, "KINDS differs from the name: " + name
+        assert decoded(build(report_id, variable, to_date)) == (said[0], T_FROM, NAME.fullmatch(name).group(3), (said[1],) if said[1] else ()), "contents differ from the name: " + name
+        assert hashlib.sha256(build(report_id, variable, to_date)).hexdigest() == ALL_SHA256[name], "not the reviewed bytes: " + name
     for name, digest in PINNED.items():
         job = next(j for j in JOBS if j[0] == name)
         assert hashlib.sha256(build(*job[1:])).hexdigest() == digest, "not the 28 Oct request: " + name

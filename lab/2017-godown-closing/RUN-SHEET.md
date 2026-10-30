@@ -41,7 +41,7 @@ Differences from LAB-COMMON (the stricter rule holds everywhere else):
    - Each raw request differs from the template only in the report ID, the period end and at most one added variable:
      - `EXPLODEFLAG` `Yes` on a Stock Summary or Godown Summary;
      - `STOCKITEMNAME` on a Stock Query, naming one of the two items Part B creates.
-   - A file's name says its ID, period end and variable, and `--check` proves each file holds what its name says, refuses anything outside that set, and pins the template and three requests by sha256.
+   - A file's name says its ID, period end and variable. `--check` reads each of those from the name's text alone and from the file by parsing it, requires them to agree, refuses requests outside the set, and pins the template and all 21 requests by sha256.
    - `a-00`, `a-01` and `a-04` are byte-equal to the 28 Oct sitting's `reqs/stock-summary.xml`, `reqs/godown-1.xml` and `reqs/control.xml` (`5b793065`).
    - The two Stock Query requests have the shape this gateway answered on 28 Oct (`a5b369bf`, `requests/r-07`), with only the item and the period end changed.
 2. **No ID or variable is guessed.**
@@ -61,7 +61,8 @@ Differences from LAB-COMMON (the stricter rule holds everywhere else):
      - Enter on a godown, group or item line (never on a voucher line);
      - F2 to set the period;
      - the report's own configuration (F12, or Alt+F5 for Detailed) only where a step names it, setting each changed option back and taking a screenshot of the reset before leaving;
-     - on an item's monthly summary, the side bar's `Change View` button, then `Stock Query` from its list (the path the 28 Oct sitting used; the H key alone did nothing there).
+     - on an item's monthly summary, the side bar's `Change View` button, then `Stock Query` from its list (the path the 28 Oct sitting used; the H key alone did nothing there);
+     - at the Gateway, only the keys a step names (Alt+F2 and F2 in steps 7.4 and 7.6).
    - At the Godown Summary's `Select Godown` prompt, the first Escape clears the field and the second leaves it.
    - Leave a report with one Escape per level, with a screenshot after each. **Never press Ctrl+Q or Escape at the Gateway of Tally.**
 7. **Keys on the master and voucher screens of step 7:** C7 holds. Never press Escape.
@@ -70,7 +71,7 @@ Differences from LAB-COMMON (the stricter rule holds everywhere else):
    - A field that does not appear as step 7 expects (for example, no godown column in the opening allocation): no key, screenshot, STOP. Nothing is improvised on a master or voucher screen.
    - **The order after each Accept:** Tally opens a new blank creation (or voucher) screen. Take a screenshot showing its title, press ONE Ctrl+Q to leave it, take a screenshot of the screen it returns to, and only then read the marks.
    - On a blank voucher screen, Ctrl+Q left with no prompt in the 27 Oct sitting on this book (`lab/2015-goods-lines-notes-answers`). A `Quit ?` prompt anywhere: no key, screenshot, STOP.
-8. **Size bound** 2,000,000 bytes per answer. The 28 Oct godown answers were under 2 KB, and the largest Stock Query answer seen is about 27 KB.
+8. **Size bound** 2,000,000 bytes per answer. The 28 Oct godown answers were under 2 KB, the largest Stock Query answer seen is 3,152 B, and the stock-items collection with seven added items was 27,118 B.
 9. **The scripts run with `python -I` only**, never `-O`, which strips their checks.
 
 Licensed mode only; Education mode = STOP.
@@ -120,7 +121,7 @@ Licensed mode only; Education mode = STOP.
    Then read the marks (EXPECT M0, V0).
 
    The screens are read after the raw reads (step 4), so no screen format set on a report can be in force when these answers are taken.
-4. **Tally's screens, view only**, period 1-4-2025 to 31-3-2026 set with F2, then again with 1-4-2025 to 31-8-2025. Record the period shown on leaving each report and again at the Gateway.
+4. **Tally's screens, view only**, period 1-4-2025 to 31-3-2026 set with F2, then again with 1-4-2025 to 31-8-2025. Record the period shown on leaving each report and again at the Gateway (EXPECT the Gateway still at 1-Apr-26 to 31-Mar-27: a report's F2 does not carry to it).
    - **Godown Summary** (Display More Reports > Inventory Books > Godowns > Select Godown > `Primary`, the 28 Oct path). Record:
      - every line as shown;
      - then, with Detailed (Alt+F5) and, where F12 offers it, every level expanded, every line again: each godown, the group or item under it, quantity, rate and value.
@@ -141,7 +142,7 @@ Licensed mode only; Education mode = STOP.
 
 ### Part B: keyed, then restored
 6. **Backup** (C5) to `C:\bridge-lab\2017\bk1`, THE COMPANY only. Record the file's name, bytes and sha256, and the time. Read the marks (EXPECT M0, V0).
-7. **Key, one object at a time.** After each Accept, follow rule 7's order, then read the marks. Exactly one mark rises, by exactly one, as each sub-step says; any other change = STOP.
+7. **Key, one object at a time.** After each Accept, follow rule 7's order, then read the marks. At each Accept exactly one mark rises, by exactly one, as the sub-step says; a period or date change moves no mark; any other change = STOP.
 
    C8's statement of what the book holds after each sub-step: 7.1 the godown; 7.2 and the split item; 7.3 and the single item; 7.4 the current period and date changed, with nothing else; 7.5 and the Stock Journal; 7.6 the period and date set back. Step 12's restore removes all of it.
    1. **Godown** (Gateway > Create > Godown): Name `Godown Lab C`; Under `Main Location` (from the list Tally offers). Accept. EXPECT M 293, V 112.
@@ -153,7 +154,7 @@ Licensed mode only; Education mode = STOP.
       - Accept. EXPECT M 294, V 112.
    3. **Stock item:** Name `Godown Single Item`; Under `Primary`; Units `Nos`; Maintain in batches `No` if asked. Opening quantity `15`, allocated as one row: `Factory Floor` `15` at `10`. Accept. EXPECT M 295, V 112.
    4. **The current period and date**, as the 27 Oct sitting on this book did before keying a voucher dated in 2025: Tally refuses a date below the current period ("Date cannot be below the current period").
-      - At the Gateway, Alt+F2 Change Period: From `1-4-2025`, To kept at `31-3-2027`. Screenshot. Read the marks (EXPECT unchanged: 295, 112).
+      - At the Gateway, Alt+F2 Change Period: From `1-4-2025`, To `31-3-2027` (typed, whatever is shown). Screenshot. Read the marks (EXPECT unchanged: 295, 112).
       - F2 Change Current Date: `15-9-2025`. Screenshot. Read the marks (EXPECT unchanged).
    5. **Stock Journal** (Gateway > Vouchers > F10 Other Vouchers > `Stock Journal`). Its title must read Stock Journal, and its date 15-Sep-2025, before anything is typed.
       - Source (Consumption): `Godown Split Item`, godown `Main Location`, `8` Nos. Record the rate Tally offers, then type `11`.
@@ -169,7 +170,7 @@ Licensed mode only; Education mode = STOP.
    - the Godown Summary and the Stock Summary, each plain and then Detailed with every level expanded, every line recorded as in step 4, each format set back with a screenshot of the reset;
    - in the Godown Summary, Enter on `Main Location`: record whether `Godown Lab C` appears under it, and the lines of each;
    - at Select Godown, record whether `Godown Lab C` is offered, and the Godown Summary for it;
-   - Tally's Stock Query screen for `Godown Split Item` (Stock Summary > `Godown Split Item` > Change View > Stock Query, rule 6) and its Godown/Batch Details lines.
+   - Tally's Stock Query screen for `Godown Split Item` (Stock Summary > `Godown Split Item` > Change View > Stock Query, rule 6), with F2 on that screen to each of the two periods (it opens on the current period), and its Godown/Batch Details lines.
 
    EXPECT **on the Stock Query screen** (Godown/Batch Details):
    - `Godown Split Item`: at 31-8-2025, Main Location 30 and Godown Lab C 20; at 31-3-2026, Main Location 22, Godown Lab C 20 and Factory Floor 8.
@@ -180,7 +181,7 @@ Licensed mode only; Education mode = STOP.
     - each root item's lines per godown in the exploded answers, with any value beside them, and its value per godown against the two readings of step 7.2: the godown's own cost (Main Location 22 at 10.00 = 220.00 at 31-3-2026), or the item's average (22 × 11.00 = 242.00);
     - whether the Stock Query lines (b-05, b-06, b-11, b-12) equal the Stock Query screen of step 9;
     - whether the top-level godown amounts sum to the same period's Stock Summary total (b-01 and b-07);
-    - whether `Godown Lab C` is its own line, or folded into `Main Location`, in the plain report and in the exploded report. The arithmetic that tells these apart: each godown's amount in Part B minus its amount in Part A at the same date (a-06 against b-02 at 31-8-2025, a-01 against b-08 at 31-3-2026) is the new items' value in that godown, with the wire sign (held stock negative). Main Location's difference includes Godown Lab C's value only if the parent folds in the child;
+    - whether `Godown Lab C` is its own line, or folded into `Main Location`, in the plain report and in the exploded report. The arithmetic that tells these apart: each godown's amount in Part B minus its amount in Part A at the same date (a-06 against b-02 at 31-8-2025, a-01 against b-08 at 31-3-2026) is the new items' value in that godown, with the wire sign (held stock negative). Main Location's difference includes Godown Lab C's value only if the parent folds in the child. At 31-8-2025 a folded Main Location differs by 550.00 under both valuation readings (300 + 250, or 330 + 220), so that date tells folding apart but not the reading; 31-3-2026, a Godown Lab C line of its own and the exploded item lines tell the reading. Under the godown's own cost the godown values at 31-3-2026 total 558.00, not the item's 550.00, so a tie that fails there is a result, not a fault;
     - how the transfer shows: the split item's lines at 31-8-2025 (before it) and 31-3-2026 (after it).
 11. **Tool reads after the keying.**
     - `stock_summary` with `as_of` 20250831 and then 20260331: record each whole, with `tie_out` and `item_count_cross_check`.

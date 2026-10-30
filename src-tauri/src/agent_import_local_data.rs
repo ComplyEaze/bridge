@@ -11,6 +11,8 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use crate::local_files::visible_path::{user_visible_path, VisiblePath};
+
 /// Files and bytes of one class.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Class {
@@ -538,14 +540,21 @@ pub(super) fn to_json(
         "app_files_outside_this_folder_covered": false,
     });
     if let Some((folder, locks)) = paths {
-        value["folder_path"] = json!(folder.display().to_string());
+        // Each path as a person finds it: where Windows reports the folder, not
+        // the AppData path ComplyEaze Bridge built, which on a Microsoft Store
+        // install of Claude Desktop does not exist outside the package (#1459).
+        // Its `_state` says how it was obtained.
+        user_visible_path(folder).put_into(&mut value, "folder_path");
         // the first, as before; every one, in the order the locks are taken
         if let Some(first) = locks.first() {
-            value["lock_folder_path"] = json!(first.display().to_string());
-            value["lock_folder_paths"] = json!(locks
+            user_visible_path(first).put_into(&mut value, "lock_folder_path");
+            let shown: Vec<_> = locks.iter().map(|locks| user_visible_path(locks)).collect();
+            value["lock_folder_paths"] = json!(shown
                 .iter()
-                .map(|locks| locks.display().to_string())
+                .map(VisiblePath::display_string)
                 .collect::<Vec<_>>());
+            value["lock_folder_paths_state"] =
+                json!(shown.iter().map(VisiblePath::state).collect::<Vec<_>>());
         }
     }
     value

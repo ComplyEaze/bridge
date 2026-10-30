@@ -372,15 +372,29 @@ fn no_path_is_in_the_json_unless_asked() {
     // The value, not the serialized text: on Windows the text doubles every
     // backslash of the path, so a substring check on it proves nothing.
     let shown = to_json(&report, SystemTime::now(), Some((root, &[root])));
-    let path = root.display().to_string();
+    // Each path is shown where the operating system reports it (#1459), with its
+    // state beside it: a folder that exists resolves (Windows) or is shown as it
+    // is (elsewhere); one that does not is shown as built and marked unresolved.
+    let visible = user_visible_path(root);
+    let path = visible.display_string();
+    let state = visible.state();
+    assert_ne!(state, "unresolved", "{shown}");
     assert_eq!(shown["folder_path"], path, "{shown}");
+    assert_eq!(shown["folder_path_state"], state, "{shown}");
     assert_eq!(shown["lock_folder_path"], path, "{shown}");
+    assert_eq!(shown["lock_folder_path_state"], state, "{shown}");
     assert_eq!(
         shown["lock_folder_paths"],
         serde_json::json!([path]),
         "{shown}"
     );
-    // two lock folders: the first is still lock_folder_path, both are listed in order
+    assert_eq!(
+        shown["lock_folder_paths_state"],
+        serde_json::json!([state]),
+        "{shown}"
+    );
+    // two lock folders: the first is still lock_folder_path, both are listed in
+    // order; one not created yet is shown as built and says so
     let second = root.join("profile");
     let two = to_json(
         &report,
@@ -393,7 +407,15 @@ fn no_path_is_in_the_json_unless_asked() {
         serde_json::json!([path, second.display().to_string()]),
         "{two}"
     );
-    assert!(names_the_path(&shown.to_string(), root), "{shown}");
+    assert_eq!(
+        two["lock_folder_paths_state"],
+        serde_json::json!([state, "unresolved"]),
+        "{two}"
+    );
+    assert!(
+        names_the_path(&shown.to_string(), Path::new(&path)),
+        "{shown}"
+    );
 }
 
 fn server_over(directory: &Path) -> crate::agent::Server {

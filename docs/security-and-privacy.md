@@ -385,8 +385,11 @@ and a given file can be in either place (seen on one computer, #1459;
 that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
 Windows reports for that file, with a `path_state` beside it that says whether
 Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
-still prints the folder as built (the Windows location in the table above,
-unless you set another data folder), whichever place the files are in. On that
+prints each folder at the location Windows reports for it, with a `_state`
+beside each path (`folder_path_state`, `lock_folder_path_state` and
+`lock_folder_paths_state`); a folder that does not exist yet is printed as
+built (the Windows location in the table above, unless you set another data
+folder) and marked `unresolved`. On that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).

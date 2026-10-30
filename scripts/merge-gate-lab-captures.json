@@ -2390,6 +2390,116 @@
       "seed_basis": "synthetic lab book; see stock-lab-day/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "369aa6bbf9c87bcb2a37961fc48f8047374d7e7a0df081e08d26790385660db9",
       "size": 5416
+    },
+    {
+      "blob": "7b12233f89eee400f00be771fcbba49e1b0e588a",
+      "capture_id": "answers/A/company-list.answer.xml",
+      "company": "BRIDGE AMEND LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e, its COMPANYNUMBER text, redacted there, restored; the sha256 equals the lab's record of the answer as received",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-extent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see AMEND_NOW_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ff15e557b351ab4c98055e55f749f28cd12d489115583e7af6e4f22cb4178759",
+      "size": 4000
+    },
+    {
+      "blob": "d4a8fca8feeef11b4d1fcb663381bc9ece27c2a4",
+      "capture_id": "answers/A/a-marks.answer.xml",
+      "company": "BRIDGE AMEND LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-high-water.utf16le.xml",
+      "seed_basis": "synthetic lab book; see AMEND_NOW_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "874781bbf43b02712aa0821045eeae6ffe6f72c5edd353d12db2cd6cb82812fc",
+      "size": 3398
+    },
+    {
+      "blob": "dfb83fec3e87b2cf9de15260ebb096139ec4cf5b",
+      "capture_id": "answers/A/a-0401_census_spanned_0_1829.answer.xml",
+      "company": "BRIDGE AMEND LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-voucher-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see AMEND_NOW_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "313bbf812abd699ed62d28e1f671c842018696e0dd3f96b87557083642c3cf2b",
+      "size": 121964
+    },
+    {
+      "blob": "147c5c5f75dfff72d5c3f55ec985cabf0a7ca975",
+      "capture_id": "answers/A/a-0401_verification.answer.xml",
+      "company": "BRIDGE AMEND LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml",
+      "seed_basis": "synthetic lab book; see AMEND_NOW_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "de4050ebba90c01ffb33db521fd1cd31daf417b6a09782fe4282f5e78b3e9d79",
+      "size": 246956
+    },
+    {
+      "blob": "4f80cffe934b490e5204689c23ea225e10c935f1",
+      "capture_id": "answers/A/a-0403_census_spanned_0_1829.answer.xml",
+      "company": "BRIDGE AMEND LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-voucher-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see AMEND_NOW_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2909e9c14ef570c952df2efcfc05b6969eb77cc502970e1f4c3194d726207edf",
+      "size": 12730
+    },
+    {
+      "blob": "8302cbe9e061315ed33e3542bb3e0d2238c26785",
+      "capture_id": "answers/A/a-0403_verification.answer.xml",
+      "company": "BRIDGE AMEND LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml",
+      "seed_basis": "synthetic lab book; see AMEND_NOW_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "e896a14607cfa36214248728b1753e4a106514cae862dada191a5522509974f4",
+      "size": 23508
+    },
+    {
+      "blob": "1aa3bdd418fd56bd3471a799a1ab90549673a614",
+      "capture_id": "answers/P/company-list.answer.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e, its COMPANYNUMBER text, redacted there, restored; the sha256 equals the lab's record of the answer as received",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8d7b9498f929840ed160c9ed8b32576683d4861d2d6e05e682f4486cc21373ae",
+      "size": 4000
+    },
+    {
+      "blob": "ff3d2c5b30959afc6937e596a86595d919f8e79c",
+      "capture_id": "answers/P/p-book-extent.answer.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e, its COMPANYNUMBER text, redacted there, restored; the sha256 equals the lab's record of the answer as received",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "9c63967ad722ea001a36048a17cf10d21868c19ccd02d41c6e5012ed073874e4",
+      "size": 3836
+    },
+    {
+      "blob": "95802f108baa74c163f13fe40512037818254056",
+      "capture_id": "answers/P/p-ledgers-paired.answer.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-ledgers-paired.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "63b3a2573a91ff131c00f8e296a0aae6d6e3a02a4b150b404364d267ac0897fa",
+      "size": 25518
+    },
+    {
+      "blob": "b8e5dec2cc46e6aa9eab1c775f2af14779b53148",
+      "capture_id": "answers/P/p-0804-0805_census_spanned_0_68.answer.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "414ebb181112b299259446ff5a60832c197011127c452d331dbcfb4856c9a60f",
+      "size": 10276
+    },
+    {
+      "blob": "32397a46a713ee178faebc18b6a44101caa0411b",
+      "capture_id": "answers/P/p-0804-0805_window.answer.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2145-spanned-replay-recapture-answers at d3d4c19e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-window.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "17379f502cad7e46fd19f4f7cfdf63da0cea0e9450e3462120703220bccda00f",
+      "size": 226584
     }
   ]
 }

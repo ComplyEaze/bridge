@@ -2757,6 +2757,9 @@ const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slic
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
+const INVENTORY_FETCH_NO_PARSER: &str = "a voucher collection export whose FETCH asks for \
+     ALLINVENTORYENTRIES.* in place of ALLLEDGERENTRIES.*: no parser reads this shape yet (#2016); \
+     STOCK_MOVEMENT_CAPTURE_PROVENANCE.md says what it holds";
 const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
@@ -3577,6 +3580,38 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
         APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_credit_note_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_delivery_note_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_receipt_note_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
+    ),
+    (
+        "tests/fixtures/stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
+    ),
+    (
+        "tests/fixtures/stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
+    ),
+    (
+        "tests/fixtures/stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
     ),
     (
         "tests/fixtures/vouchers_agst_ref_reopen_live.utf16le.xml",

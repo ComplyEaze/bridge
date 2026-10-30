@@ -2380,6 +2380,26 @@
       "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
       "sha256": "de8ad96bc29a90ca10dc82f206e5988c74ebd5e3a82ca86ab8c8d34dfbbeccfc",
       "size": 54280
+    },
+    {
+      "blob": "31ba7e2790d76304e581407b6059f854d2f18207",
+      "capture_id": "native/ledger_snapshot_forex_decimal_rate.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/2071-forex-reads-answers at ea28bde038b3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/ledger_snapshot_forex_decimal_rate.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4c3796dff24e940f7b30348f6250fc1a440fa591317a7fb51fcdef71634efb87",
+      "size": 13354
+    },
+    {
+      "blob": "084bee8d377925eebca98c51fa304c3872d4f0c5",
+      "capture_id": "native/trial_balance_forex_decimal_rate.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/2071-forex-reads-answers at ea28bde038b3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_forex_decimal_rate.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1c4638e8df640575eff3e4955bed2d9783026fe7817ad73e63e05f19277fb7b7",
+      "size": 14140
     }
   ]
 }

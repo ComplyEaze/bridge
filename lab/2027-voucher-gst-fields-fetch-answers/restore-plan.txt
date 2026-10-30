@@ -1,0 +1,5 @@
+2027 step 2 restore plan (C6), written 2026-10-30T10:20Z before the first write.
+Backup: <LAB_DIR>\backups\bk1\TDBK1800_<redacted: company number>.001, 38,476 B, sha256 b9f239b31fb2d27bfe8f6ffbae7ab2681f43d7f7fb461d19a8feea846ca6b446 (the folder's only file). THE COMPANY: BRIDGE NOTES LAB, company number <redacted: company number>.
+Restore Data Path: Tally's company data folder (the Data Path the Select Company list shows). Source: Specify Path <LAB_DIR>\backups\bk1; select BRIDGE NOTES LAB (<redacted: company number>) only; End of List.
+Prompts expected: "Accept ?" Yes; "Company data folder (<redacted: company number>) already exists ... Skip ... Replace": Replace. Any other prompt: stop (C7).
+After: load THE COMPANY alone; ledger_masters first: EXPECT M 215, V 4 (M0', V0'), no BRIDGE IGST; list_companies; Day Book 3-6-2025 to 7-6-2025 empty.

@@ -1,0 +1,759 @@
+{
+ "20250603": {
+  "voucher": "SV2",
+  "six": {
+   "PLACEOFSUPPLY": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "STATENAME": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTREGISTRATIONTYPE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Regular"
+    ],
+    "trimmed": [
+     "Regular"
+    ],
+    "typed": "Regular",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTNATUREOFRETURN": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNNUMBER": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNDATE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "Date"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   }
+  },
+  "layers": {
+   "chars_cut": 395,
+   "size": {
+    "control_bytes": 65162,
+    "other_bytes": 65952,
+    "expected_other_bytes": 65952,
+    "equal": true
+   },
+   "a_bytes": "equal",
+   "b_bytes_cmpinfo_cut": "equal",
+   "c_structure": "equal"
+  }
+ },
+ "20250604": {
+  "voucher": "CN2",
+  "six": {
+   "PLACEOFSUPPLY": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "STATENAME": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTREGISTRATIONTYPE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Regular"
+    ],
+    "trimmed": [
+     "Regular"
+    ],
+    "typed": "Regular",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTNATUREOFRETURN": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "01-Sales Return"
+    ],
+    "trimmed": [
+     "01-Sales Return"
+    ],
+    "typed": "01-Sales Return",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNNUMBER": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "SYN-NOTE-1"
+    ],
+    "trimmed": [
+     "SYN-NOTE-1"
+    ],
+    "typed": "SYN-NOTE-1",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNDATE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "Date"
+     }
+    ],
+    "raw": [
+     "20250513"
+    ],
+    "trimmed": [
+     "20250513"
+    ],
+    "typed": "20250513",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   }
+  },
+  "layers": {
+   "chars_cut": 428,
+   "size": {
+    "control_bytes": 65228,
+    "other_bytes": 66084,
+    "expected_other_bytes": 66084,
+    "equal": true
+   },
+   "a_bytes": "equal",
+   "b_bytes_cmpinfo_cut": "equal",
+   "c_structure": "equal"
+  }
+ },
+ "20250605": {
+  "voucher": "DN2",
+  "six": {
+   "PLACEOFSUPPLY": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "STATENAME": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTREGISTRATIONTYPE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Regular"
+    ],
+    "trimmed": [
+     "Regular"
+    ],
+    "typed": "Regular",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTNATUREOFRETURN": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "04-Correction in Invoice"
+    ],
+    "trimmed": [
+     "04-Correction in Invoice"
+    ],
+    "typed": "04-Correction in Invoice",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNNUMBER": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "SYN-NOTE-2"
+    ],
+    "trimmed": [
+     "SYN-NOTE-2"
+    ],
+    "typed": "SYN-NOTE-2",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNDATE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "Date"
+     }
+    ],
+    "raw": [
+     "20250515"
+    ],
+    "trimmed": [
+     "20250515"
+    ],
+    "typed": "20250515",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   }
+  },
+  "layers": {
+   "chars_cut": 437,
+   "size": {
+    "control_bytes": 65306,
+    "other_bytes": 66180,
+    "expected_other_bytes": 66180,
+    "equal": true
+   },
+   "a_bytes": "equal",
+   "b_bytes_cmpinfo_cut": "equal",
+   "c_structure": "equal"
+  }
+ },
+ "20250606": {
+  "voucher": "PV2",
+  "six": {
+   "PLACEOFSUPPLY": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "STATENAME": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "Maharashtra",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTREGISTRATIONTYPE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Regular"
+    ],
+    "trimmed": [
+     "Regular"
+    ],
+    "typed": "Regular",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTNATUREOFRETURN": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNNUMBER": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNDATE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "Date"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   }
+  },
+  "layers": {
+   "chars_cut": 395,
+   "size": {
+    "control_bytes": 65318,
+    "other_bytes": 66108,
+    "expected_other_bytes": 66108,
+    "equal": true
+   },
+   "a_bytes": "equal",
+   "b_bytes_cmpinfo_cut": "equal",
+   "c_structure": "equal"
+  }
+ },
+ "20250607": {
+  "voucher": "SV3",
+  "six": {
+   "PLACEOFSUPPLY": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Karnataka"
+    ],
+    "trimmed": [
+     "Karnataka"
+    ],
+    "typed": "Karnataka",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "STATENAME": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Maharashtra"
+    ],
+    "trimmed": [
+     "Maharashtra"
+    ],
+    "typed": "the party's state (Maharashtra)",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTREGISTRATIONTYPE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "with text"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     "Regular"
+    ],
+    "trimmed": [
+     "Regular"
+    ],
+    "typed": "Regular",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "GSTNATUREOFRETURN": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNNUMBER": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "String"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   },
+   "VATPARTYTRANSRETURNDATE": {
+    "count": 1,
+    "regex_count": 1,
+    "forms": [
+     "empty (open and close)"
+    ],
+    "attrs": [
+     {
+      "TYPE": "Date"
+     }
+    ],
+    "raw": [
+     null
+    ],
+    "trimmed": [
+     ""
+    ],
+    "typed": "empty or absent",
+    "matches_typed": true,
+    "leading_or_trailing_space": false,
+    "in_control_as_child": 0
+   }
+  },
+  "layers": {
+   "chars_cut": 393,
+   "size": {
+    "control_bytes": 51152,
+    "other_bytes": 51938,
+    "expected_other_bytes": 51938,
+    "equal": true
+   },
+   "a_bytes": "equal",
+   "b_bytes_cmpinfo_cut": "equal",
+   "c_structure": "equal"
+  }
+ },
+ "repeat-20250604": {
+  "chars_cut": 0,
+  "size": {
+   "control_bytes": 65228,
+   "other_bytes": 65228,
+   "expected_other_bytes": 65228,
+   "equal": true
+  },
+  "a_bytes": "equal",
+  "b_bytes_cmpinfo_cut": "equal",
+  "c_structure": "equal"
+ }
+}

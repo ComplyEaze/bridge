@@ -1,0 +1,79 @@
+2027 step 2, step 8: reading the answers by structure (analyse.py).
+format control 20250603: 65162 B; BOM False; line ends CRLF 911 of 911; indent of VOUCHER 4 spaces, of its children 5: True
+format control 20250604: 65228 B; BOM False; line ends CRLF 911 of 911; indent of VOUCHER 4 spaces, of its children 5: True
+format control 20250605: 65306 B; BOM False; line ends CRLF 911 of 911; indent of VOUCHER 4 spaces, of its children 5: True
+format control 20250606: 65318 B; BOM False; line ends CRLF 911 of 911; indent of VOUCHER 4 spaces, of its children 5: True
+format control 20250607: 51152 B; BOM False; line ends CRLF 711 of 711; indent of VOUCHER 4 spaces, of its children 5: True
+format candidate 20250603: 65952 B; BOM False; line ends CRLF 917 of 917; indent of VOUCHER 4 spaces, of its children 5: True
+format candidate 20250604: 66084 B; BOM False; line ends CRLF 917 of 917; indent of VOUCHER 4 spaces, of its children 5: True
+format candidate 20250605: 66180 B; BOM False; line ends CRLF 917 of 917; indent of VOUCHER 4 spaces, of its children 5: True
+format candidate 20250606: 66108 B; BOM False; line ends CRLF 917 of 917; indent of VOUCHER 4 spaces, of its children 5: True
+format candidate 20250607: 51938 B; BOM False; line ends CRLF 717 of 717; indent of VOUCHER 4 spaces, of its children 5: True
+
+== 20250603 SV2 ==
+candidate VOUCHER rows 1; control VOUCHER rows 1
+  PLACEOFSUPPLY: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  STATENAME: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTREGISTRATIONTYPE: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Regular']; trimmed ['Regular']; typed/expected 'Regular': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTNATUREOFRETURN: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'String'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNNUMBER: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'String'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNDATE: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'Date'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  cut: 395 characters; size check control 65162 + 2 x 395 = 65952 vs candidate 65952: equal
+  (a) bytes: equal
+  (b) bytes, CMPINFO cut: equal
+  (c) structure ignoring the six: equal
+
+== 20250604 CN2 ==
+candidate VOUCHER rows 1; control VOUCHER rows 1
+  PLACEOFSUPPLY: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  STATENAME: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTREGISTRATIONTYPE: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Regular']; trimmed ['Regular']; typed/expected 'Regular': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTNATUREOFRETURN: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['01-Sales Return']; trimmed ['01-Sales Return']; typed/expected '01-Sales Return': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNNUMBER: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['SYN-NOTE-1']; trimmed ['SYN-NOTE-1']; typed/expected 'SYN-NOTE-1': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNDATE: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'Date'}]; raw ['20250513']; trimmed ['20250513']; typed/expected '20250513': MATCH; space at an end: False; in the control as a voucher child: 0
+  cut: 428 characters; size check control 65228 + 2 x 428 = 66084 vs candidate 66084: equal
+  (a) bytes: equal
+  (b) bytes, CMPINFO cut: equal
+  (c) structure ignoring the six: equal
+
+== 20250605 DN2 ==
+candidate VOUCHER rows 1; control VOUCHER rows 1
+  PLACEOFSUPPLY: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  STATENAME: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTREGISTRATIONTYPE: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Regular']; trimmed ['Regular']; typed/expected 'Regular': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTNATUREOFRETURN: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['04-Correction in Invoice']; trimmed ['04-Correction in Invoice']; typed/expected '04-Correction in Invoice': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNNUMBER: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['SYN-NOTE-2']; trimmed ['SYN-NOTE-2']; typed/expected 'SYN-NOTE-2': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNDATE: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'Date'}]; raw ['20250515']; trimmed ['20250515']; typed/expected '20250515': MATCH; space at an end: False; in the control as a voucher child: 0
+  cut: 437 characters; size check control 65306 + 2 x 437 = 66180 vs candidate 66180: equal
+  (a) bytes: equal
+  (b) bytes, CMPINFO cut: equal
+  (c) structure ignoring the six: equal
+
+== 20250606 PV2 ==
+candidate VOUCHER rows 1; control VOUCHER rows 1
+  PLACEOFSUPPLY: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  STATENAME: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected 'Maharashtra': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTREGISTRATIONTYPE: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Regular']; trimmed ['Regular']; typed/expected 'Regular': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTNATUREOFRETURN: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'String'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNNUMBER: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'String'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNDATE: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'Date'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  cut: 395 characters; size check control 65318 + 2 x 395 = 66108 vs candidate 66108: equal
+  (a) bytes: equal
+  (b) bytes, CMPINFO cut: equal
+  (c) structure ignoring the six: equal
+
+== 20250607 SV3 ==
+candidate VOUCHER rows 1; control VOUCHER rows 1
+  PLACEOFSUPPLY: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Karnataka']; trimmed ['Karnataka']; typed/expected 'Karnataka': MATCH; space at an end: False; in the control as a voucher child: 0
+  STATENAME: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Maharashtra']; trimmed ['Maharashtra']; typed/expected "the party's state (Maharashtra)": MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTREGISTRATIONTYPE: count 1 (text scan 1); form ['with text']; attrs [{'TYPE': 'String'}]; raw ['Regular']; trimmed ['Regular']; typed/expected 'Regular': MATCH; space at an end: False; in the control as a voucher child: 0
+  GSTNATUREOFRETURN: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'String'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNNUMBER: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'String'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  VATPARTYTRANSRETURNDATE: count 1 (text scan 1); form ['empty (open and close)']; attrs [{'TYPE': 'Date'}]; raw [None]; trimmed ['']; typed/expected 'empty or absent': MATCH; space at an end: False; in the control as a voucher child: 0
+  cut: 393 characters; size check control 51152 + 2 x 393 = 51938 vs candidate 51938: equal
+  (a) bytes: equal
+  (b) bytes, CMPINFO cut: equal
+  (c) structure ignoring the six: equal
+
+== the two 4 June controls ==
+  sha256 equal: True; (a) bytes: equal; (b) CMPINFO cut: equal; (c) structure: equal

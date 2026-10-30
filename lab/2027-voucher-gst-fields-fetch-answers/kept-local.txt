@@ -1,0 +1,7 @@
+Files kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+evidence/s1-tally-folder-<company number>-before.txt 1504 B 27580f6288b3616881cac396d5d7591c7de092ab8bb8cd83bc57e3fd6780563b
+evidence/s11-tally-folder-<company number>-after-restore.txt 1504 B 5e76caf5105bc20dc3fce335101298760792ee7f3fc33fb149053a6fc2e32744
+evidence/s11-tally-folder-<company number>-before-restore.txt 1562 B 57c4a3998bba1e8675be46853311dfba688c9b1c7056cdcaf261516ec4b2c76e
+backups/bk1/TDBK1800_<company number>.001 38476 B b9f239b31fb2d27bfe8f6ffbae7ab2681f43d7f7fb461d19a8feea846ca6b446
+data/agent-egress.jsonl 44950 B 4181ad058a200b9db5b5e9df9481398817bf5d70b6c91e37ee67830f7a95efd0
+data/terms-acceptance.jsonl 90 B 3ecaaa927d393eb974cb3f768fe943d7ec1b73d55a46aa00f21f7de9823cbc2e

@@ -72,6 +72,8 @@ use ledger_candidates::{
 mod ledgers;
 #[path = "agent_masters.rs"]
 mod masters;
+#[path = "agent_stock_by_batch.rs"]
+mod stock_by_batch;
 #[path = "agent_stock_summary.rs"]
 mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
@@ -1683,6 +1685,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         | "currency_to_master_extent_changed"
         | "masters_extent_changed"
         | "month_register_extent_changed"
+        | "stock_by_batch_extent_changed"
         | "stock_by_godown_extent_changed"
         | "stock_summary_extent_changed" => Some(
             "The company's books changed in Tally while this call was being read, so the call \
@@ -3311,6 +3314,7 @@ impl Server {
                 in_own_frame(|| self.register(register::RegisterKind::Sales, args)).await
             }
             "statement_tie_out" => in_own_frame(|| self.statement_tie_out(args)).await,
+            "stock_by_batch" => in_own_frame(|| self.stock_by_batch(args)).await,
             "stock_by_godown" => in_own_frame(|| self.stock_by_godown(args)).await,
             "stock_summary" => in_own_frame(|| self.stock_summary(args)).await,
             "tally_status" => {

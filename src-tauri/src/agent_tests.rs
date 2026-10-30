@@ -873,6 +873,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             ),
         ),
         (
+            "stock_by_batch",
+            json!({"result":{"items":[{"guid":"g-1","name":party_name("Customer One"),"state":"tied","lines":[{"godown":party_name("Supplier Two"),"batch":{"kind":"named","name":party_name("Customer One")},"quantity":{"amount":"5","unit":"Nos"}}],"godowns":[{"lines":[0],"quantity":{"amount":"5","unit":"Nos"},"source":"stock_query_lines_added"}]}]}}),
+        ),
+        (
             "stock_by_godown",
             json!({"result":{"godowns":[{"godown":party_name("Customer One"),"value":"5.00"}],"root_items":[{"item":party_name("Supplier Two"),"state":"tied","godowns":[{"godown":party_name("Customer One"),"value":"5.00"}]}]}}),
         ),

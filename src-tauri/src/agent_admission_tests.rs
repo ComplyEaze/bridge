@@ -109,6 +109,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "read_evidence",
         "sales_register",
         "statement_tie_out",
+        "stock_by_batch",
         "stock_by_godown",
         "stock_summary",
         "tally_status",

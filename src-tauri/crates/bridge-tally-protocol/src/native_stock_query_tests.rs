@@ -349,6 +349,7 @@ fn every_refusal_has_its_own_code() {
         StockQueryError::PartialLine,
         StockQueryError::NameInvalid,
         StockQueryError::QuantityUnparseable,
+        StockQueryError::LineRepeated,
     ]
     .map(StockQueryError::code);
     let distinct: std::collections::HashSet<_> = codes.iter().collect();
@@ -423,4 +424,185 @@ fn other_shapes_outside_the_capture_refuse_and_an_entity_is_read() {
         Ok(StockQueryAnswer::Lines(lines)) => assert_eq!(lines[1].godown, "Floor & Bay"),
         other => panic!("{other:?}"),
     }
+}
+
+/// Shapes no capture holds, refused under their codes: the sanitiser's marker in a name or a unit
+/// (Tally's `&#4;`), a name or quantity padded at either end, a godown and batch read twice, a kind of group
+/// coming back after the other, an element in another case or with an attribute, a comment and a
+/// declaration. Tally's failure element is its failure in any case and with an attribute. Either
+/// kind of group may come first, and an empty element with no attribute
+/// reads as one with no text.
+#[test]
+fn unmeasured_shapes_refuse_and_either_group_order_reads() {
+    let kit = answer("r-03-stock-query-cleaning-kit-a");
+    let soda = answer("r-09-stock-query-soda-ash-light");
+    let sale = "<STQSALESDATE>23-Apr-25</STQSALESDATE>\r\n <STQSALESVCHNO>Shape Buyer 1</STQSALESVCHNO>\r\n <STQSALESVCHQTY>13 Nos</STQSALESVCHQTY>\r\n <STQSALESVCHRATE>750.00</STQSALESVCHRATE>\r\n <STQSALESVCHDISC></STQSALESVCHDISC>\r\n <STQSALESVCHAMOUNT>10000.00</STQSALESVCHAMOUNT>\r\n";
+    let batch = "<STQBATCHNAME>K-2504-A</STQBATCHNAME>";
+    let cases = [
+        (
+            damaged(&kit, batch, "<STQBATCHNAME>&#4; Primary Batch</STQBATCHNAME>", 1),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &soda,
+                "<STQGODOWNNAME>Factory Floor</STQGODOWNNAME>",
+                "<STQGODOWNNAME>&#4; Factory Floor</STQGODOWNNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &kit,
+                "<STQGODOWNQTY>-13 Nos</STQGODOWNQTY>",
+                "<STQGODOWNQTY>-13 &#4;Nos</STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+        (
+            damaged(&kit, batch, "<STQBATCHNAME> K-2504-A</STQBATCHNAME>", 1),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &kit,
+                "<STQBATCHNAME>Primary Batch</STQBATCHNAME>",
+                "<STQBATCHNAME>Primary Batch </STQBATCHNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(&soda, "Factory Floor</STQGODOWNNAME>", "Factory Floor </STQGODOWNNAME>", 1),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &soda,
+                "</ENVELOPE>",
+                " <STQGODOWNNAME>Main Location</STQGODOWNNAME>\r\n <STQBATCHNAME>Primary Batch</STQBATCHNAME>\r\n <STQGODOWNQTY>1.000 Kgs</STQGODOWNQTY>\r\n</ENVELOPE>",
+                1,
+            ),
+            StockQueryError::LineRepeated,
+        ),
+        (
+            damaged(
+                &soda,
+                "<STQPURCDATE>14-Apr-25</STQPURCDATE>",
+                &format!("{sale} <STQPURCDATE>14-Apr-25</STQPURCDATE>"),
+                1,
+            ),
+            StockQueryError::PartialGroup,
+        ),
+        (
+            damaged(&kit, batch, "<stqbatchname>K-2504-A</stqbatchname>", 1),
+            StockQueryError::UnknownElement,
+        ),
+        (
+            damaged(&kit, "ENVELOPE>", "envelope>", 2),
+            StockQueryError::Malformed,
+        ),
+        (
+            damaged(&kit, batch, "<STQBATCHNAME TYPE=\"String\">K-2504-A</STQBATCHNAME>", 1),
+            StockQueryError::Malformed,
+        ),
+        (
+            damaged(&kit, "<ENVELOPE>", "<ENVELOPE A=\"1\">", 1),
+            StockQueryError::Malformed,
+        ),
+        (
+            damaged(
+                &kit,
+                "<STQSALESVCHDISC></STQSALESVCHDISC>",
+                "<STQSALESVCHDISC TYPE=\"Number\"/>",
+                1,
+            ),
+            StockQueryError::Malformed,
+        ),
+        (
+            damaged(&kit, "</ENVELOPE>", "<!-- c -->\r\n</ENVELOPE>", 1),
+            StockQueryError::Malformed,
+        ),
+        (
+            format!("<?xml version=\"1.0\"?>\r\n{kit}"),
+            StockQueryError::Malformed,
+        ),
+        (
+            damaged(&kit, "</ENVELOPE>", "<error>x</error>\r\n</ENVELOPE>", 1),
+            StockQueryError::TallyReportedFailure,
+        ),
+        (
+            damaged(&kit, "</ENVELOPE>", "<LINEERROR X=\"1\">x</LINEERROR>\r\n</ENVELOPE>", 1),
+            StockQueryError::TallyReportedFailure,
+        ),
+        (
+            damaged(&kit, "</ENVELOPE>", "<LINEERROR X=\"1\"/>\r\n</ENVELOPE>", 1),
+            StockQueryError::TallyReportedFailure,
+        ),
+        (
+            damaged(
+                &soda,
+                "<STQGODOWNNAME>Factory Floor</STQGODOWNNAME>",
+                "<STQGODOWNNAME> Factory Floor</STQGODOWNNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &kit,
+                "<STQGODOWNQTY>-13 Nos</STQGODOWNQTY>",
+                "<STQGODOWNQTY> -13 Nos</STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+        (
+            damaged(
+                &kit,
+                "<STQGODOWNQTY>-13 Nos</STQGODOWNQTY>",
+                "<STQGODOWNQTY>-13 Nos </STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+    ];
+    for (text, expected) in cases {
+        assert_eq!(
+            parse_stock_query(&text),
+            Err(expected),
+            "{}",
+            expected.code()
+        );
+    }
+    for read in [
+        damaged(
+            &soda,
+            "<STQPURCDATE>15-Apr-25</STQPURCDATE>",
+            &format!("{sale} <STQPURCDATE>15-Apr-25</STQPURCDATE>"),
+            1,
+        ),
+        damaged(
+            &soda,
+            "<STQGODOWNNAME>Main Location</STQGODOWNNAME>",
+            &format!("{sale} <STQGODOWNNAME>Main Location</STQGODOWNNAME>"),
+            1,
+        ),
+    ] {
+        assert_eq!(parse_stock_query(&read), parse_stock_query(&soda));
+    }
+    assert_eq!(
+        parse_stock_query(&damaged(
+            &kit,
+            "<STQSALESVCHDISC></STQSALESVCHDISC>",
+            "<STQSALESVCHDISC/>",
+            1
+        )),
+        parse_stock_query(&kit)
+    );
+    assert!(
+        matches!(parse_stock_query(&soda), Ok(StockQueryAnswer::Lines(lines)) if lines.len() == 2)
+    );
 }

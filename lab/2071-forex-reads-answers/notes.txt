@@ -1,0 +1,17 @@
+2071 forex reads, notes. UTC. Sheet lab/2071-forex-reads: v1 ea7ef798 (steps 0 to 3), then v3 65ec0a23 (README 6f904cff...), which keeps the v1 Round A files and adds a-group-snapshot.
+Step lines (detail, as written during the sitting: evidence/step0.txt, step0-v3.txt, log.txt (raw reads), tools-log.txt and tools-summary*.txt (tool calls), keying-notes.txt, parsed-*.txt, backups.txt):
+- 19:04Z v1 step 0: SHA256.txt 7 of 7 equal; census ok 4, skipped 2, FAIL 0.
+- 19:05Z the previous company (a new synthetic spare, not used here) shut; BRIDGE FOREXGROUP LAB loaded alone; Gateway last entry 1-Apr-25.
+- 19:06Z client started (0.7.0); list_companies: the one company, GUID 1bb48be5-...; tally_status 7.2 silver, education_mode false. m0 211/4.
+- 19:07-19:08Z company shut; BK2 to backups\bk2 (Backup Data Path, Specify Path, the company from the data-folder list, End of List, Accept y); reloaded, last entry 1-Apr-25.
+- 19:09-19:10Z Round A tools (a-tb, a-out, a-lm); Round A raw reads (tb-currency, bills-receivable, bills-payable, ledger-snapshot, ledger-snapshot-compliance).
+- 19:11Z HOLD from the run lead (v2 pending). The Create > List of Masters picker had been opened; closed by Escape before a ledger screen opened. hold-check = m0 byte for byte. MCP session closed. The company was shut for another item.
+- 19:44Z v3 step 0: SHA256.txt 8 of 8 equal; census ok 5, skipped 2, FAIL 0.
+- 19:45Z FOREXGROUP loaded alone, last entry 1-Apr-25; resume-check = m0 byte for byte; a-group-snapshot.
+- 19:46-19:52Z stage 1 keying: L3, K10 (Sales 3), K11 (Receipt 2). m1 212/6.
+- 19:53-19:55Z shut; BK3; reloaded. Round B1: client restarted (same data folder), b1 tools, b1 raw reads.
+- 19:56-20:09Z stage 2 keying: L1, L2, K5 (Purchase 1), K6 (Purchase 2), K7 (Payment 1), K8 (Payment 2), K9 (Receipt 3). m2 214/11.
+- 20:10-20:12Z shut; BK4; reloaded. Round B2 tools and raw reads.
+- 20:12Z step 10 parse (parsed-a/b1/b2.txt).
+- 20:13-20:16Z step 11: tally_status; ledger displays (USD Supplier, USD Customer, INR Customer, 1 to 30 April 2025); Bills Receivable and Bills Payable for 1 to 30 April 2025; m3 = m2 in both marks (bytes differ inside CMPINFO only). MCP session closed (exit 0).
+- 20:16Z Company > Shut (Alt+K, Shut, Enter on BRIDGE FOREXGROUP LAB). Select Company, no company loaded. About screen read (Release 7.2 Latest, Silver Rental, licensed). The company is left in the BK4 state.

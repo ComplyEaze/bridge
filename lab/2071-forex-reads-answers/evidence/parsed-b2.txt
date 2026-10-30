@@ -1,0 +1,68 @@
+Round b2: raw answers parsed with an XML parser.
+bills-receivable: 3 bill row(s)
+  row 1: BILLFIXED{BILLDATE '1-Apr-25', BILLREF 'R1', BILLPARTY 'BRIDGE INR Customer'}; BILLCL '-3000.00'; BILLDUE '1-Apr-25'; BILLOVERDUE '29'
+  row 2: BILLFIXED{BILLDATE '1-Apr-25', BILLREF '1', BILLPARTY 'BRIDGE USD Customer'}; BILLCL '-87912000.00'; BILLDUE '1-Apr-25'; BILLOVERDUE '29'
+  row 3: BILLFIXED{BILLDATE '1-Apr-25', BILLREF 'P1', BILLPARTY 'BRIDGE USD Supplier'}; BILLCL (empty); BILLDUE '1-Apr-25'; BILLOVERDUE '29'
+bills-payable: 1 bill row(s)
+  row 1: BILLFIXED{BILLDATE '1-Apr-25', BILLREF '2', BILLPARTY 'BRIDGE USD Customer'}; BILLCL (empty); BILLDUE '1-Apr-25'; BILLOVERDUE '29'
+bill 1: bills-receivable row 2
+bill 2: bills-payable row 1
+bill R1: bills-receivable row 1
+bill P1: bills-receivable row 3
+bill P2: in neither report
+tb-currency: per row (as sent)
+  NAME 'BRIDGE Export Sales'; PARENT 'Sales Accounts'; TBALOPENING '0.00'; DEBITTOTALS (empty); CREDITTOTALS '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'; TBALCLOSING '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'; CURRENCYNAME '₹'
+  NAME 'BRIDGE Import Purchases'; PARENT 'Purchase Accounts'; TBALOPENING '0.00'; DEBITTOTALS '-$200.00 @ ₹ 86/$ = -₹ 17400.00'; CREDITTOTALS (empty); TBALCLOSING '-$200.00 @ ₹ 86/$ = -₹ 17400.00'; CURRENCYNAME '₹'
+  NAME 'BRIDGE INR Customer'; PARENT 'Sundry Debtors'; TBALOPENING '0.00'; DEBITTOTALS '-5000.00'; CREDITTOTALS '2000.00'; TBALCLOSING '-3000.00'; CURRENCYNAME '₹'
+  NAME 'BRIDGE Lab Bank'; PARENT 'Bank Accounts'; TBALOPENING '0.00'; DEBITTOTALS '-$1100.00 @ ₹ 87/$ = -₹ 96700.00'; CREDITTOTALS '$200.00 @ ₹ 87/$ = ₹ 17500.00'; TBALCLOSING '-$900.00 @ ₹ 88/$ = -₹ 79200.00'; CURRENCYNAME '₹'
+  NAME 'BRIDGE USD Customer'; PARENT 'Sundry Debtors'; TBALOPENING '0.00'; DEBITTOTALS '-$1000100.00 @ ₹ 87.9999/$ = -₹ 88008700.00'; CREDITTOTALS '$1100.00 @ ₹ 87/$ = ₹ 96700.00'; TBALCLOSING '-$999000.00 @ ₹ 88/$ = -₹ 87912000.00'; CURRENCYNAME '₹'
+  NAME 'BRIDGE USD Supplier'; PARENT 'Sundry Creditors'; TBALOPENING '0.00'; DEBITTOTALS '-$200.00 @ ₹ 87/$ = -₹ 17500.00'; CREDITTOTALS '$200.00 @ ₹ 87.50/$ = ₹ 17500.00'; TBALCLOSING '$0.00 @ ₹ /$ = ₹ 0.00'; CURRENCYNAME '₹'
+  NAME 'Cash'; PARENT 'Cash-in-Hand'; TBALOPENING '0.00'; DEBITTOTALS '-3000.00'; CREDITTOTALS (empty); TBALCLOSING '-3000.00'; CURRENCYNAME '₹'
+  NAME 'Profit & Loss A/c'; PARENT 'Primary'; TBALOPENING '0.00'; DEBITTOTALS (empty); CREDITTOTALS (empty); TBALCLOSING '$0.00 @ ₹ /$ = ₹ 0.00'; CURRENCYNAME '₹'
+ledger-snapshot: per ledger (as sent)
+  NAME 'BRIDGE Export Sales'; PARENT 'Sales Accounts'; CLOSINGBALANCE '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'BRIDGE Import Purchases'; PARENT 'Purchase Accounts'; CLOSINGBALANCE '-$200.00 @ ₹ 86/$ = -₹ 17400.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'BRIDGE INR Customer'; PARENT 'Sundry Debtors'; CLOSINGBALANCE '-3000.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'Yes'; CURRENCYNAME '₹'
+  NAME 'BRIDGE Lab Bank'; PARENT 'Bank Accounts'; CLOSINGBALANCE '-$900.00 @ ₹ 88/$ = -₹ 79200.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'BRIDGE USD Customer'; PARENT 'Sundry Debtors'; CLOSINGBALANCE '-$999000.00 @ ₹ 88/$ = -₹ 87912000.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'Yes'; CURRENCYNAME '₹'
+  NAME 'BRIDGE USD Supplier'; PARENT 'Sundry Creditors'; CLOSINGBALANCE '$0.00 @ ₹ /$ = ₹ 0.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'Yes'; CURRENCYNAME '₹'
+  NAME 'Cash'; PARENT 'Cash-in-Hand'; CLOSINGBALANCE '-3000.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'Profit & Loss A/c'; PARENT 'Primary'; CLOSINGBALANCE '$999900.00 @ ₹ 86.0058/$ = ₹ 85997241.25'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+ledger-snapshot-compliance: per ledger (as sent)
+  NAME 'BRIDGE Export Sales'; PARENT 'Sales Accounts'; CLOSINGBALANCE '$1000100.00 @ ₹ 86/$ = ₹ 86014641.25'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'BRIDGE Import Purchases'; PARENT 'Purchase Accounts'; CLOSINGBALANCE '-$200.00 @ ₹ 86/$ = -₹ 17400.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'BRIDGE INR Customer'; PARENT 'Sundry Debtors'; CLOSINGBALANCE '-3000.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'Yes'; CURRENCYNAME '₹'
+  NAME 'BRIDGE Lab Bank'; PARENT 'Bank Accounts'; CLOSINGBALANCE '-$900.00 @ ₹ 88/$ = -₹ 79200.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'BRIDGE USD Customer'; PARENT 'Sundry Debtors'; CLOSINGBALANCE '-$999000.00 @ ₹ 88/$ = -₹ 87912000.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'Yes'; CURRENCYNAME '₹'
+  NAME 'BRIDGE USD Supplier'; PARENT 'Sundry Creditors'; CLOSINGBALANCE '$0.00 @ ₹ /$ = ₹ 0.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'Yes'; CURRENCYNAME '₹'
+  NAME 'Cash'; PARENT 'Cash-in-Hand'; CLOSINGBALANCE '-3000.00'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+  NAME 'Profit & Loss A/c'; PARENT 'Primary'; CLOSINGBALANCE '$999900.00 @ ₹ 86.0058/$ = ₹ 85997241.25'; OPENINGBALANCE '0.00'; ISBILLWISEON 'No'; CURRENCYNAME '₹'
+group-snapshot: 28 group row(s)
+  NAME 'Bank Accounts'; PARENT 'Current Assets'; RESERVEDNAME 'Bank Accounts'
+  NAME 'Bank OD A/c'; PARENT 'Loans (Liability)'; RESERVEDNAME 'Bank OD A/c'
+  NAME 'Branch / Divisions'; PARENT ' Primary'; RESERVEDNAME 'Branch / Divisions'
+  NAME 'Capital Account'; PARENT ' Primary'; RESERVEDNAME 'Capital Account'
+  NAME 'Cash-in-Hand'; PARENT 'Current Assets'; RESERVEDNAME 'Cash-in-Hand'
+  NAME 'Current Assets'; PARENT ' Primary'; RESERVEDNAME 'Current Assets'
+  NAME 'Current Liabilities'; PARENT ' Primary'; RESERVEDNAME 'Current Liabilities'
+  NAME 'Deposits (Asset)'; PARENT 'Current Assets'; RESERVEDNAME 'Deposits (Asset)'
+  NAME 'Direct Expenses'; PARENT ' Primary'; RESERVEDNAME 'Direct Expenses'
+  NAME 'Direct Incomes'; PARENT ' Primary'; RESERVEDNAME 'Direct Incomes'
+  NAME 'Duties & Taxes'; PARENT 'Current Liabilities'; RESERVEDNAME 'Duties & Taxes'
+  NAME 'Fixed Assets'; PARENT ' Primary'; RESERVEDNAME 'Fixed Assets'
+  NAME 'Indirect Expenses'; PARENT ' Primary'; RESERVEDNAME 'Indirect Expenses'
+  NAME 'Indirect Incomes'; PARENT ' Primary'; RESERVEDNAME 'Indirect Incomes'
+  NAME 'Investments'; PARENT ' Primary'; RESERVEDNAME 'Investments'
+  NAME 'Loans & Advances (Asset)'; PARENT 'Current Assets'; RESERVEDNAME 'Loans & Advances (Asset)'
+  NAME 'Loans (Liability)'; PARENT ' Primary'; RESERVEDNAME 'Loans (Liability)'
+  NAME 'Misc. Expenses (ASSET)'; PARENT ' Primary'; RESERVEDNAME 'Misc. Expenses (ASSET)'
+  NAME 'Provisions'; PARENT 'Current Liabilities'; RESERVEDNAME 'Provisions'
+  NAME 'Purchase Accounts'; PARENT ' Primary'; RESERVEDNAME 'Purchase Accounts'
+  NAME 'Reserves & Surplus'; PARENT 'Capital Account'; RESERVEDNAME 'Reserves & Surplus'
+  NAME 'Sales Accounts'; PARENT ' Primary'; RESERVEDNAME 'Sales Accounts'
+  NAME 'Secured Loans'; PARENT 'Loans (Liability)'; RESERVEDNAME 'Secured Loans'
+  NAME 'Stock-in-Hand'; PARENT 'Current Assets'; RESERVEDNAME 'Stock-in-Hand'
+  NAME 'Sundry Creditors'; PARENT 'Current Liabilities'; RESERVEDNAME 'Sundry Creditors'
+  NAME 'Sundry Debtors'; PARENT 'Current Assets'; RESERVEDNAME 'Sundry Debtors'
+  NAME 'Suspense A/c'; PARENT ' Primary'; RESERVEDNAME 'Suspense A/c'
+  NAME 'Unsecured Loans'; PARENT 'Loans (Liability)'; RESERVEDNAME 'Unsecured Loans'

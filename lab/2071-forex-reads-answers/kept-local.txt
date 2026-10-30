@@ -1,0 +1,6 @@
+Files kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+backups/bk2/TDBK1800_<company number>.001 31038 B d23221e41e8f8a50313044fb6218cb07caa78b8e82f86fcc977b757be9b097f9
+backups/bk3/TDBK1800_<company number>.001 32692 B cdcb1a5a527ad7bbf399bbf59c34e6acd23f07902f389b9784e9f4768cec19d6
+backups/bk4/TDBK1800_<company number>.001 37618 B 3edd94a4fd477098edb377cfb114b2927c437e4c0eccf95f874a504893a221fd
+2071-forex-reads-evidence.zip (the staged evidence, zipped before kept-local.txt, substitutions.txt, SCREENSHOTS.txt and SHA256.txt were written) 124012 B e67c9b49efbeca91b503424932f29d48da94bf0326c91842d541ad17717f37f5
+prev/: copies of the earlier sitting's raw answers from lab/2071-forex-rerun-answers, used for the Round A comparison (on that branch).

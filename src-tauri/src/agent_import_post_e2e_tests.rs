@@ -6803,12 +6803,13 @@ macro_rules! pilot_queue_block {
 // (fixtures/agent/pilot-lab/PROVENANCE.md), except that the two voucher-numbering
 // answers (X and Y) were read on 16 Oct 2026, after the book had moved on, and
 // are served DERIVED: their rows above the master mark 223 removed
-// (`pilot_types_as_of_the_round`). Two more are from 21 Oct 2026, after the book
-// gained ledgers: the ledger catalogue `k` and the rates read `Q`, which is the
-// read restricted to the parents of the invoice's ledgers (#1331) with the
-// HSN/SAC fields (#691). They are one coherent pair read in the same minute (the
-// scoped answer holds exactly the catalogue's ledgers under those parents),
-// paired here with the earlier answers of the same book (the 9 Oct listings,
+// (`pilot_types_as_of_the_round`). Two more come from 21 Oct 2026, after the
+// book gained ledgers: the ledger catalogue `k`, Tally's own bytes, and the
+// rates read `Q`, which is DERIVED: the lab's answer of that minute to the read
+// restricted to the parents of the invoice's ledgers (with the HSN/SAC fields,
+// #691) cut to the invoice's six ledgers (`lab_invoice_rates_hsn`), because the
+// code now names those ledgers by GUID (#1331) and that six-GUID request was
+// never sent to the lab. They are paired here with the earlier answers of the same book (the 9 Oct listings,
 // groups and tax units; the 12 Oct company object `O` and groups with HSN `G`;
 // the 16 Oct numbering answers `X` and `Y`, DERIVED above); the pairing was not
 // observed at one time. The order below is the order the
@@ -6816,8 +6817,8 @@ macro_rules! pilot_queue_block {
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
 // L compliance listing, Q the same listing with each ledger's GST rate and
-// rounding, restricted to the parents of the invoice's ledgers and with the
-// HSN/SAC rows (21 Oct 2026), P paired listing, g groups, T
+// rounding and the HSN/SAC rows, restricted to the invoice's ledgers by GUID
+// (DERIVED, above), P paired listing, g groups, T
 // voucher types, N number read, k ledger catalogue, w/W the 1-Aug window
 // before/after, C tax units, O the company object (W16, read after the
 // classification admits), X the voucher types bounded by the master mark and Y
@@ -6848,7 +6849,9 @@ const PILOT_REQUEST_SHA256: &str =
 /// `pilot-lab-invoice-post-request`): the answer at a position is Tally's
 /// answer to that request and no other. X and Y are the requests the code
 /// renders, sent to the lab in the 16 Oct 2026 sitting (their answers are the
-/// numbering fixtures, served derived).
+/// numbering fixtures, served derived). Q is the exception to "Tally's answer
+/// to that request": it is the code's request, never sent with these GUIDs, and
+/// its answer is DERIVED from the answer to the four-parent request.
 fn pilot_request_sha256(letter: char) -> &'static str {
     match letter {
         'e' => "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8", // r01-company-extent.xml
@@ -6858,8 +6861,10 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
         'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
         // The rates read restricted to the invoice's ledgers by GUID (#1331):
-        // the request the lab answered on 31 Oct 2026 with the six ledgers'
-        // GUIDs (`LAB_INVOICE_GUID_RATES_SHA256`).
+        // the code's request, never sent to the lab with these six GUIDs; the
+        // lab answered the same request naming five other ledgers on 31 Oct
+        // 2026, and a test derives this pin from that request
+        // (`LAB_INVOICE_GUID_RATES_SHA256`).
         'Q' => super::super::tests::LAB_INVOICE_GUID_RATES_SHA256,
         'O' => "72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648", // w14-company-object.xml
         'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml

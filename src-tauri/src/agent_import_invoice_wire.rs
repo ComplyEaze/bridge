@@ -1097,8 +1097,8 @@ pub(super) fn parse_ledger_rates(
 
 /// One row of a rate listing as the scope's proof reads it: the
 /// row's `NAME` attribute, its GUID and its immediate `PARENT`, the last two
-/// as the answer wrote them (no cleaning, so the reserved root compares as the
-/// catalogue carries it).
+/// as the answer wrote them (no cleaning: the parent is compared exactly with
+/// the catalogue's).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ListedLedger {
     pub(super) name: String,

@@ -7,8 +7,10 @@
 //!
 //! A GUID goes inside a TDL string literal, `$GUID = "…"`. Its alphabet is
 //! closed (ASCII hexadecimal digits and the hyphen), so no GUID can end the
-//! literal or add a term to the formula (AGENTS.md P7), and the comparison is
-//! exact: unlike `$Name` and `$Parent`, no case or spelling question arises.
+//! literal or add a term to the formula (AGENTS.md P7). Whether Tally compares
+//! `$GUID` with regard to letter case is not measured (the lab found `$Name`
+//! and `$Parent` fold it); the caller sends the GUID the catalogue gave and
+//! proves each row of the answer by GUID, name and parent.
 //! A request builder takes this type, never a string (P2, P3).
 //!
 //! What Tally answers to this filter on a ledger collection, and how a GUID the
@@ -28,7 +30,8 @@ pub const LEDGER_GUID_MAX_CHARS: usize = 64;
 /// The most GUIDs one part may name: the most terms an OR filter formula has
 /// been sent with, on parent filters of the ledger catalogue (protocol
 /// reference section 11e). A `$GUID` filter has been sent with five terms only
-/// (#1331); an invoice names a few ledgers, far under this bound.
+/// (#1331). The invoice, the only caller, names at most six ledgers, so six is
+/// the bound reached in practice.
 pub const LEDGER_GUID_PART_MAX_GUIDS: usize = 200;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

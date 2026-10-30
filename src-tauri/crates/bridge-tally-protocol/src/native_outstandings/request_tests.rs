@@ -381,7 +381,8 @@ fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
 
 /// bridge#1331: a ledger part adds one `$GUID` formula and its filter
 /// reference to the otherwise unchanged master and balance requests, in the
-/// place a parent part's go: the lab sheet's `g4` and `g5` requests.
+/// place a parent part's go: the shape of the lab sheet's `g4` and `g5`
+/// requests (three GUIDs here, five there).
 #[test]
 fn ledger_part_requests_differ_from_the_whole_read_only_by_the_guid_filter() {
     use crate::ledger_guid_part::{LedgerGuid, LedgerGuidPart};

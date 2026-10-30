@@ -1,3 +1,4 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md
 docs/tally/TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md
 src-tauri/crates/bridge-tally-protocol/src/lib.rs
 src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs

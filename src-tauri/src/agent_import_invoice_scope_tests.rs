@@ -239,9 +239,53 @@ fn one_row_of_the_real_answer_changed_is_refused() {
     doubled[1] = doubled[0].clone();
     assert_eq!(scope.prove(&doubled), differs("ledger_scope_row_repeated"));
 
+    let walk_in = rows
+        .iter()
+        .position(|row| row.name == "BRIDGE Walk-in")
+        .unwrap();
+    let mut recased = rows.clone();
+    recased[walk_in].name = recased[walk_in].name.to_uppercase();
+    assert_ne!(recased[walk_in].name, rows[walk_in].name);
+    assert_eq!(
+        scope.prove(&recased),
+        differs("ledger_scope_row_differs_from_catalogue")
+    );
+
+    let mut parent_recased = rows.clone();
+    parent_recased[0].parent = parent_recased[0]
+        .parent
+        .as_ref()
+        .map(|parent| parent.to_uppercase());
+    assert_ne!(parent_recased[0].parent, rows[0].parent);
+    assert_eq!(
+        scope.prove(&parent_recased),
+        differs("ledger_scope_row_differs_from_catalogue")
+    );
+
+    // A GUID is compared in lower case on both sides: the same GUID in capitals
+    // is the same ledger.
+    let mut guid_recased = rows.clone();
+    guid_recased[0].guid = guid_recased[0]
+        .guid
+        .as_ref()
+        .map(|guid| guid.to_uppercase());
+    assert_eq!(scope.prove(&guid_recased), Ok(()));
+
     let mut unnamed = rows;
     unnamed[0].guid = None;
     assert_eq!(scope.prove(&unnamed), differs("row_without_guid"));
+}
+
+/// An invoice that names no ledger plans no read.
+#[test]
+fn a_scope_of_no_ledger_is_unplannable() {
+    assert_eq!(
+        scope_of(&book(), &[]).err(),
+        Some(refuse_value(
+            "invoice_ledger_scope_unplannable",
+            "ledger_guid_part_empty"
+        ))
+    );
 }
 
 // ---- The rules, on small synthetic catalogues ----

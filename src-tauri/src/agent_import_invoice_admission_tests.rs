@@ -16,12 +16,14 @@
 //!   whose request is the same bytes. The company object the HSN/SAC check
 //!   reads is the 12 Oct answer (`O`).
 //! - The rate listing: the compliance listing with each ledger's GST rate and
-//!   rounding, restricted to the parents of the invoice's ledgers, as the lab
-//!   answered it on 21 Oct 2026 (`Q`, with the ledger catalogue read in the same
-//!   minute, which the party's bill-wise flag and the scope come from).
-//!   The derived answers of these tests are built by counted edits: the same
-//!   listing with its ledger rows removed, and with the Sundry Debtors row
-//!   removed (a party under Sales Accounts leaves that parent out of the scope).
+//!   rounding, restricted to the invoice's ledgers by GUID (#1331) (`Q`).
+//!   DERIVED: the code's request for these six ledgers was never sent to the
+//!   lab; the answer served is the lab's 21 Oct 2026 answer to the request
+//!   restricted to their parents, cut to the six (`rates_cut_to`, held equal to
+//!   the lab's GUID answers of 31 Oct 2026 for five other ledgers). The ledger
+//!   catalogue read in the same minute gives the party's bill-wise flag and the
+//!   GUIDs. Other derived answers here are counted edits of the same answer: its
+//!   ledger rows removed, or cut to another invoice's ledgers.
 //! - The read-back: the invoice round's marks after the post (17 and 223) and
 //!   its read-back of the posted invoice, before and after the post.
 use super::*;
@@ -127,7 +129,7 @@ const PILOT: &str = "BRIDGE PILOT LAB";
 /// What one admission sends, in order: e company list, s status probe, m
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
 /// listing, g groups, Q the listing with each ledger's GST rate and rounding,
-/// restricted to the parents of the ledgers the invoice names (#1331),
+/// restricted to the ledgers the invoice names, by GUID (#1331; DERIVED),
 /// T voucher types, N the number read, C the company's tax units, O the company
 /// object (the HSN/SAC check, once the classification admits);
 /// U is the number read for a number the book uses.
@@ -155,8 +157,9 @@ const LAB_R09_SHA256: &str = "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc
 const LAB_R10_SHA256: &str = "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6";
 const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
 /// The rates read restricted to the lab invoice's ledgers by GUID (#1331): the
-/// request the code renders, which is the one the lab answered on 31 Oct 2026
-/// with these ledgers' GUIDs (`LAB_INVOICE_GUID_RATES_SHA256`).
+/// request the code renders, never sent to the lab with these six GUIDs. The
+/// lab answered the same request naming five other ledgers on 31 Oct 2026, and
+/// a test derives this pin from it (`LAB_INVOICE_GUID_RATES_SHA256`).
 const LAB_Q1_SHA256: &str = super::LAB_INVOICE_GUID_RATES_SHA256;
 
 /// The sha256 of each request sent where `order` has `letter`.
@@ -203,9 +206,9 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
 }
 
 /// The ledger catalogue the build reads, as the pilot lab answered it on
-/// 10 Oct 2026 (the set the scoped rates answer belongs to): the party's
-/// bill-wise flag and the parents the rates read is restricted to come from
-/// here.
+/// 21 Oct 2026 (the file is the W18 book's, byte-equal to that answer and to
+/// the one of 31 Oct 2026): the party's bill-wise flag and the GUIDs the rates
+/// read names come from here.
 fn pilot_catalogue() -> bridge_tally_protocol::StandardLedgerCatalogV2 {
     pilot_catalogue_of(&pilot_catalogue_text())
 }

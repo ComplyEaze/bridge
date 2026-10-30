@@ -1,0 +1,19 @@
+# fixture: tests/fixtures/agent/pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml
+# parser: parse_company_book_extent_v2(PILOT LAB)
+# source: captured
+Ok(CompanyBookExtentFields {
+    company_name: "BRIDGE PILOT LAB",
+    company_guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85",
+    books_from: TallyDate(
+        "20260401",
+    ),
+    last_voucher_date: TallyDate(
+        "20260915",
+    ),
+    voucher_alter_id_high_water: Some(
+        68,
+    ),
+    master_alter_id_high_water: Some(
+        245,
+    ),
+})

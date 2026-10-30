@@ -50,3 +50,31 @@ these vouchers exercise, not any claim about other books.
 | `s6-16nov-w-1.utf16le.xml` | 65,552 | `f196f25421ea9ab593a58ad4d78050c5380d7ece3a207b7113344f115646b272` | the class-shaped voucher window for 16 Nov 2025 (V14, a Credit Note with output tax); recording row 1277; byte-exact |
 | `s6-17nov-n-1.utf16le.xml` | 5,444 | `599435920156c7bba90ef2c4fe075932c597278188b1811e8d1340bcddbcf074` | the voucher census for 17 Nov 2025 (V3, an item invoice with freight); recording row 1373; byte-exact |
 | `s6-17nov-w-1.utf16le.xml` | 94,594 | `2e72097ac027adfac2dd804f270542085f547af082a8cf2af3c844c9b6cc3a97` | the class-shaped voucher window for 17 Nov 2025 (V3, an item invoice with freight); recording row 1379; byte-exact |
+
+## The census spanned to the mark (#2145)
+
+Since #2145 each call sends its census spanned to the voucher mark it read, `(0, 64]`. The replay pins those requests:
+each day's recorded census request with ` AND $AlterID &gt; 0 AND $AlterID &lt;= 64` added to its census formula and nothing
+else changed, which the code renders byte for byte (`requests/g-DDnov_c2_spanned_0_64.request.utf16le.xml` on the run sheet
+`lab/2145-spanned-census-captures` at `6a968f01`). The lab sent each day's recorded request and its spanned one to the same
+book on 30 Oct 2026 (`lab/2145-spanned-census-captures-answers` at `993d96bc`). The comparison removes the
+answers' one `CMPINFO` element (the session's object counts); with it removed, both answers equal the recorded census answer
+of that day, so the replay keeps the recorded answer as the answer to the spanned request. Confidence: PARTIAL, these 14
+days at the mark 64, one sitting.
+
+| Day | Spanned request (sha256, pinned) | Spanned answer (sha256) |
+| --- | --- | --- |
+| 2025-11-03 | `7bc489839fbf652322e85e4202ecfafb791106d40e650d5d1113a39a8e31cf03` | `29ec24f48bba2de7cbe1ac27a1f14cfb65b40175f1ccd4e812edb84c932dd8a1` |
+| 2025-11-04 | `e2e992df45dd2f162a260a072d70040f6604fd754b5502bcda03c84d2d5fc2cd` | `3e099a0a87bf2ae5c7dcd0ee7fe04f4d49860d52896510ac1ceb14ab41f8e8f5` |
+| 2025-11-05 | `45edf463087e037063e0dc0a6889d683a8c3d20d9dba6b8831c3c696e927ca10` | `13262ceed37314a18165eb17e524964885cef7f5ccc8be8d48d88643656b521a` |
+| 2025-11-06 | `a4b070197b4d1914ddf75665ac3af332510684a97d7dec7fb15169f6953c3714` | `8a1a3c34a08669c42c8fbbf8e7ef86ffb20597e6430cd0eae072fb0a3670307a` |
+| 2025-11-07 | `e42684ba34516fc9c72808973ac3a35a2bc77ae07f9191fee692cda2ab369fd2` | `ccb35449de63d592025022748a4b1574d86b30db9b1a8c129264d8861e9f557e` |
+| 2025-11-08 | `8a8d29571f09bf75ad788fad9ff84d7c4b5f068591f4b46709648068960bb099` | `39253dce9f705dbe7f8092329017cd7579d9ed81bd615e7315f50e85b460a750` |
+| 2025-11-10 | `f411cf5dd1c5f39cfe5b6354405190745170b99f5e2eb48e67ceafaf42c05bc4` | `ff63c8c46c8a820aa7a6958b39d7d80180d57cb3222f9fa1023952b6fa480186` |
+| 2025-11-11 | `7eed0576ff4a9fb8ce2db9451915c627e5b93d90cfa2475b0577f74c118f42e1` | `f2c907950db7d4636a0871f9812102ad4d1126580f123f3b08db8bd9d125fd70` |
+| 2025-11-12 | `310a0b6378da3a909da18d404f776fb16cdfef787df5c006859c979d1000d5ad` | `2f9708d251d305d46a4144074e39612453be22b47c7daf203be1889aaec24102` |
+| 2025-11-13 | `2f5176e406b6ad0d226e8e4ad7629e497c21b0890c1ab4f70bc4fdc043e41218` | `3d27f06f6cf4620a44edca9c4a9eb3e5b10a3ded1b699ebc8be3ca1feb4ea34c` |
+| 2025-11-14 | `c6d5a5e68a792b799db65e4ce3dcd81f549952b14e6b343f80e733a7e5e5e5b6` | `72ab4be79713cbf00aa9acdca585a4de756cd87eae6451748b21425b6d8d49fe` |
+| 2025-11-15 | `0071e6a2e7fa25369bd8c06238a6e04e8b41b98c53544dc1112a9400fd0c798b` | `34868121421178ca2c3509dd953438ffa8de42fa369f8debdc2abdfce0c448e6` |
+| 2025-11-16 | `ba02b3c9ae17f9aa5fc010a3afe3ae8b7d96fdc89782a26fd672ca78b6f5bd4f` | `3df8927e9ca74d05eea7251a14e467301fdf77189afc174f9d0dda3ed86ec816` |
+| 2025-11-17 | `78e29ff774397bd4de0bc08072078db92d6512d851c13ee81697b37061a85233` | `d300197d42690382da3b7fbd19698cd23deb8c7a7a26b01e621411ee6e45f1ed` |

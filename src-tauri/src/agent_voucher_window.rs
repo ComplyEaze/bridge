@@ -268,8 +268,9 @@ impl PlanRefusal {
 /// the unbounded request this module exists to stop.
 pub(super) const VOLUME_UNESTIMATED: &str = "voucher_window_volume_unestimated";
 
-/// The voucher high-water mark moved while a divided window was being read, so
-/// its parts may not describe one state of the book. See `read_voucher_window`.
+/// The voucher high-water mark moved while a divided window was being read, or
+/// while a window was being counted, so its parts or its count may not describe
+/// one state of the book. See `read_voucher_window` and [`count_window_only`].
 pub(super) const WINDOW_CHANGED_DURING_READ: &str = "voucher_window_changed_during_read";
 
 /// A part returned vouchers that are not the ones its plan counted for it: a row
@@ -1329,12 +1330,16 @@ enum Preflight {
         census: Option<WindowCensus>,
         /// The marks the census was bounded by, when they were read.
         marks: Option<CompanyMarks>,
+        /// The census requests this read sent ([`CensusPlan::requests`]); 0 when none was.
+        census_requests: u64,
     },
     /// Counted per day; plan it.
     Counted {
         census: WindowCensus,
         /// The marks the census was bounded by, when they were read.
         marks: Option<CompanyMarks>,
+        /// The census requests this read sent ([`CensusPlan::requests`]); 0 when none was.
+        census_requests: u64,
     },
 }
 
@@ -1887,7 +1892,7 @@ where
                     if !counted.within(first, last) {
                         return Err("window_not_honoured".to_string().into());
                     }
-                    whole_or_counted(counted, None, limits)
+                    whole_or_counted(counted, None, 0, limits)
                 }
                 WindowPlanSource::Estimate { known_marks } => estimate_window_volume(
                     reader,
@@ -1910,6 +1915,7 @@ where
                 Preflight::Whole {
                     census: counted,
                     marks,
+                    ..
                 } => {
                     if let Some(counted) = &counted {
                         ceiling = marks
@@ -1926,6 +1932,7 @@ where
                 Preflight::Counted {
                     census: counted,
                     marks,
+                    ..
                 } => {
                     ceiling = marks
                         .map_or(0, |marks| marks.vouchers())
@@ -2197,22 +2204,29 @@ pub(super) enum WindowCount {
         marks: Option<CompanyMarks>,
         evidence: Option<Evidence>,
     },
-    /// Every voucher the window holds, counted per day, bracketed by the company
-    /// marks read before and after. No data part was sent.
+    /// Every voucher the window holds, counted per day, bracketed by the voucher
+    /// mark read before and after. No data part was sent. `voucher_mark` is the
+    /// one read after, when it was read. A book is counted only when its mark is
+    /// above 0, so this mark never makes an empty window `company_has_no_vouchers`:
+    /// only [`Self::NotCounted`] can.
     Counted {
         census: WindowCensus,
         evidence: Evidence,
+        voucher_mark: Option<u64>,
     },
 }
 
 /// Count `window` with a census of its own and send no data part (#1240). A
 /// caller that needs only to know whether, and on which days, the window holds
 /// vouchers has what it needs from the census: its rows carry each voucher's
-/// day. Nothing is admitted against the count. A count taken in one request is
-/// one observation, as a window read whole is; a count divided into several
-/// spans is bracketed as a divided window read is: both company marks are read
-/// again after the last census request, and marks that moved refuse it
-/// ([`WINDOW_CHANGED_DURING_READ`]).
+/// day. Nothing is admitted against the count. Every count is bracketed: the
+/// company marks are read again after the last census request, and a voucher
+/// mark that moved refuses it ([`WINDOW_CHANGED_DURING_READ`]). A count taken in
+/// one request is bracketed too: its census is spanned to the mark read before
+/// it (#2145), so a voucher saved after that read lies outside the span, and
+/// only the mark read again can show it. The master mark is not compared: a
+/// census counts vouchers, so a master saved during the count does not change
+/// it.
 pub(super) async fn count_window_only<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
@@ -2248,7 +2262,7 @@ pub(super) async fn count_window_only<R: WindowReader>(
     )
     .await
     .map_err(|failure| with_prior(failure, &preflight, &None))?;
-    let census = match estimate {
+    let (census, census_requests) = match estimate {
         Preflight::Whole { census: None, .. } => {
             return Ok(WindowCount::NotCounted {
                 marks: opening,
@@ -2257,19 +2271,25 @@ pub(super) async fn count_window_only<R: WindowReader>(
         }
         Preflight::Whole {
             census: Some(census),
+            census_requests,
             ..
         }
-        | Preflight::Counted { census, .. } => census,
+        | Preflight::Counted {
+            census,
+            census_requests,
+            ..
+        } => (census, census_requests),
     };
     let mut closing = None;
+    let mut closing_marks = None;
     if let Some(opened) = opening {
-        let spans = census_spans(opened.vouchers(), limits.census_capacity())
-            .map_or(usize::MAX, Iterator::count);
-        if spans > 1 {
+        // The count of the census that was sent, not one derived again from the marks.
+        if census_requests >= 1 {
             let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
                 .await
                 .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
-            if closed != opened {
+            closing_marks = Some(closed);
+            if closed.vouchers() != opened.vouchers() {
                 return Err(with_prior_closed(
                     WINDOW_CHANGED_DURING_READ.to_string().into(),
                     &preflight,
@@ -2279,9 +2299,14 @@ pub(super) async fn count_window_only<R: WindowReader>(
             }
         }
     }
+    let voucher_mark = closing_marks.map(CompanyMarks::vouchers);
     let evidence = chronological(&preflight, &None, &closing)
         .unwrap_or_else(|| super::agent_import::local_evidence("voucher_window_count_empty"));
-    Ok(WindowCount::Counted { census, evidence })
+    Ok(WindowCount::Counted {
+        census,
+        evidence,
+        voucher_mark,
+    })
 }
 
 impl Server {
@@ -2360,9 +2385,10 @@ async fn estimate_window_volume<R: WindowReader>(
         return Ok(Preflight::Whole {
             census: None,
             marks: None,
+            census_requests: 0,
         });
     }
-    let rows = census_window(
+    let (rows, census_requests) = census_window(
         reader, identity, scope, company, window, days, high_water, limits, preflight, boundary,
     )
     .await?;
@@ -2374,9 +2400,15 @@ async fn estimate_window_volume<R: WindowReader>(
         return Ok(Preflight::Counted {
             census,
             marks: Some(marks),
+            census_requests,
         });
     }
-    Ok(whole_or_counted(census, Some(marks), limits))
+    Ok(whole_or_counted(
+        census,
+        Some(marks),
+        census_requests,
+        limits,
+    ))
 }
 
 /// Whether a window read of a book whose voucher mark is `high_water` sends no
@@ -2400,11 +2432,12 @@ pub(super) fn census_read_count(
     if skips_census(high_water, limits) {
         return Ok(0);
     }
-    census_spans(high_water, limits.census_capacity()).map(|spans| spans.count() as u64)
+    CensusPlan::new(high_water, limits).map(|plan| plan.requests())
 }
 
 /// Count the window's vouchers per day, every census request bounded
-/// before it is sent. See [`census_spans`].
+/// before it is sent ([`CensusPlan`]). Returns the rows and the number of
+/// census requests sent, which is the plan's.
 #[allow(clippy::too_many_arguments)]
 async fn census_window<R: WindowReader>(
     reader: &R,
@@ -2417,33 +2450,22 @@ async fn census_window<R: WindowReader>(
     limits: WindowReadLimits,
     preflight: &mut Option<Evidence>,
     boundary: &mut Option<DateBoundaryProfile>,
-) -> Result<Vec<CensusRow>, ToolFailure> {
+) -> Result<(Vec<CensusRow>, u64), ToolFailure> {
     let unestimated = || ToolFailure::from(VOLUME_UNESTIMATED.to_string());
-    let spans = census_spans(high_water, limits.census_capacity())
-        .map_err(|code| ToolFailure::from(code.to_string()))?;
+    let plan =
+        CensusPlan::new(high_water, limits).map_err(|code| ToolFailure::from(code.to_string()))?;
     // The first plan reads at most this many vouchers a request (the default
     // figure, which every plan starts from) and may send at most `max_reads`
     // requests, so a census that has already counted more than both allow is
     // a certain refusal: it is refused there, before the census spans left.
     let per_read = vouchers_per_read(limits.budget_bytes, limits.default_bytes_per_voucher);
     let plannable = per_read.saturating_mul(limits.max_reads as u64);
-    let mut spans = spans.peekable();
+    let mut spans = plan.spans().peekable();
     let mut rows = Vec::new();
     while let Some(span) = spans.next() {
-        // A ledger census is always spanned, the one form observed: a book that fits
-        // one census request is asked over (0, high_water], the same rows.
-        let span = match scope {
-            WindowScope::Book => span,
-            WindowScope::Ledger(_) => Some(span.unwrap_or(AlterIdSpan {
-                after: 0,
-                through: high_water,
-            })),
-        };
-        let request = match (scope, span) {
-            (WindowScope::Ledger(ledger), Some(span)) => {
-                ledger_census_read(company, ledger, from, to, span)?
-            }
-            _ => voucher_census_read(company, from, to, span)?,
+        let request = match scope {
+            WindowScope::Ledger(ledger) => ledger_census_read(company, ledger, from, to, span)?,
+            WindowScope::Book => voucher_census_read(company, from, to, span)?,
         };
         let (xml, evidence) = match reader.read(identity, request, WindowReadKind::Census).await {
             Ok((xml, evidence, observed)) => {
@@ -2463,11 +2485,13 @@ async fn census_window<R: WindowReader>(
             Err(failure) => return Err(failure),
         };
         fold_evidence(preflight, evidence);
-        rows.extend(parse_voucher_census(&xml, days, span).map_err(|code| {
-            let mut refused = unestimated();
-            refused.cause = census_refusal_cause(&code);
-            refused
-        })?);
+        rows.extend(
+            parse_voucher_census(&xml, days, Some(span)).map_err(|code| {
+                let mut refused = unestimated();
+                refused.cause = census_refusal_cause(&code);
+                refused
+            })?,
+        );
         let counted = rows.len() as u64;
         if per_read > 0 && counted > plannable && spans.peek().is_some() {
             // The caller adds the census's evidence, as for any refusal here.
@@ -2478,7 +2502,7 @@ async fn census_window<R: WindowReader>(
             .into_failure());
         }
     }
-    Ok(rows)
+    Ok((rows, plan.requests()))
 }
 
 /// Why a census refused its window as unestimated, as a data-free cause beside
@@ -2536,12 +2560,18 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// a cardinality bound fixed before it is sent (§11c.3).
 ///
 /// A date census alone is bounded only by the whole book: a date range can
-/// hold every voucher the book has. So a book whose mark fits one census is
-/// counted in one date census of the window, bounded by the mark itself; any
-/// larger book is counted in AlterID spans of `capacity` across `(0, mark]`,
-/// each also narrowed to the window's dates, and each bounded by construction
-/// because AlterIDs are distinct. The spans are produced one at a time, and a
-/// mark needing more of them than [`MAX_CENSUS_READS`] is refused before any is.
+/// hold every voucher the book has. So every census is an AlterID span across
+/// `(0, mark]`, narrowed to the window's dates and bounded by construction
+/// because AlterIDs are distinct: one span `(0, mark]` for a book whose mark
+/// fits one census, spans of `capacity` for a larger one, and none for a book
+/// that has never held a voucher. A single census is spanned too, so a voucher
+/// saved after the mark was read cannot raise its count past the mark (#2145;
+/// byte-equal to the unspanned census in every window live whose unspanned
+/// census held no row above the mark). A voucher saved between the marks read
+/// and a whole read's census therefore lies outside the span: a part that
+/// returns it is refused as [`PART_CENSUS_MISMATCH`], as on a divided read, and
+/// the read fails safe. The spans are produced one at a time, and a mark
+/// needing more of them than [`MAX_CENSUS_READS`] is refused before any is.
 ///
 /// The cost is a census count proportional to the book, not the window: a
 /// mark of 250,000 is 31 census requests however short the window. That is a
@@ -2551,22 +2581,54 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// but no such shape is qualified live.
 pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans, &'static str> {
     let capacity = capacity.max(1);
-    let requests = high_water.div_ceil(capacity).max(1);
+    let requests = high_water.div_ceil(capacity);
     if requests > MAX_CENSUS_READS as u64 {
         return Err(BOOK_TOO_LARGE);
     }
     Ok(CensusSpans {
-        whole: high_water <= capacity,
         after: 0,
         high_water,
         capacity,
-        done: false,
+        // A book that has never held a voucher has nothing to count.
+        done: high_water == 0,
     })
 }
 
+/// The census requests of one window read, fixed before the first is sent: the
+/// spans of [`census_spans`]. [`Self::requests`] is the one count of them: what
+/// the read states beforehand ([`census_read_count`]) and what decides
+/// afterwards whether the marks are read again ([`count_window_only`]).
+#[derive(Clone, Debug)]
+pub(super) struct CensusPlan {
+    spans: CensusSpans,
+    requests: u64,
+}
+
+impl CensusPlan {
+    /// The plan for a book whose voucher mark is `high_water`, or
+    /// [`BOOK_TOO_LARGE`] before any request.
+    pub(super) fn new(high_water: u64, limits: WindowReadLimits) -> Result<Self, &'static str> {
+        let spans = census_spans(high_water, limits.census_capacity())?;
+        Ok(Self {
+            requests: spans.clone().count() as u64,
+            spans,
+        })
+    }
+
+    /// The number of census requests the plan sends.
+    pub(super) fn requests(&self) -> u64 {
+        self.requests
+    }
+
+    /// The span of each request, in order.
+    pub(super) fn spans(&self) -> impl Iterator<Item = AlterIdSpan> {
+        self.spans.clone()
+    }
+}
+
 /// See [`census_spans`].
+#[derive(Clone, Debug)]
 pub(super) struct CensusSpans {
-    whole: bool,
     after: u64,
     high_water: u64,
     capacity: u64,
@@ -2574,15 +2636,11 @@ pub(super) struct CensusSpans {
 }
 
 impl Iterator for CensusSpans {
-    type Item = Option<AlterIdSpan>;
+    type Item = AlterIdSpan;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
             return None;
-        }
-        if self.whole {
-            self.done = true;
-            return Some(None);
         }
         let through = self
             .after
@@ -2594,7 +2652,7 @@ impl Iterator for CensusSpans {
         };
         self.after = through;
         self.done = through >= self.high_water;
-        Some(Some(span))
+        Some(span)
     }
 }
 
@@ -2685,6 +2743,7 @@ fn admit_union<T: WindowRow>(rows: &[T]) -> Result<(), String> {
 fn whole_or_counted(
     census: WindowCensus,
     marks: Option<CompanyMarks>,
+    census_requests: u64,
     limits: WindowReadLimits,
 ) -> Preflight {
     if census
@@ -2695,9 +2754,14 @@ fn whole_or_counted(
         Preflight::Whole {
             census: Some(census),
             marks,
+            census_requests,
         }
     } else {
-        Preflight::Counted { census, marks }
+        Preflight::Counted {
+            census,
+            marks,
+            census_requests,
+        }
     }
 }
 

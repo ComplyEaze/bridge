@@ -1,10 +1,12 @@
-//! `Server::purchase_register` against a scripted transport replaying the bytes of one live run.
+//! The registers against a scripted transport replaying the bytes of live runs.
 //!
-//! The responses are Tally's own bytes from one read of the disposable GST lab book (2025-09-03,
-//! one Purchase voucher); the three company-listing responses are trimmed to the target book's
-//! row (see the PROVENANCE table beside the fixtures). The scripted order and the request
-//! fingerprints are the ones recorded on the wire, so a change to the order or shape of Bridge's
-//! reads fails here.
+//! The register call's own tests replay one call on BRIDGE PILOT LAB for 4 to 5 August 2026,
+//! recorded with its census spanned (#2145, `pilot-lab-register/PROVENANCE.md`). The scripted order
+//! and every request's fingerprint are the recorded ones, so a change to the order or shape of
+//! Bridge's reads fails here. The empty-window tests serve the masters answers of an earlier
+//! record of the same call (`register-e2e/PROVENANCE.md`), with its census and window answers
+//! replaced by Tally's own empty collection. The STOCK LAB, sales and note days replay their own
+//! calls, each beside its provenance.
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };
@@ -50,20 +52,52 @@ impl Kind {
 /// g groups, n voucher census, w voucher window, m company marks.
 const RECORDED_ORDER: &str = "esesebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseensnseewswseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese";
 
-fn recorded_request_sha256(kind: Kind) -> &'static str {
+/// The fingerprint of the window request this call recorded, which the STOCK LAB day's window
+/// request is checked against with only the company and the day changed.
+const RECORDED_WINDOW_SHA256: &str =
+    "34847acdf64088170371e86f5aff33e991753778290dfe47122ff0498a64b90c";
+
+/// The fingerprint of an empty request body: the status probe's.
+const STATUS_SHA256: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+
+/// The synthetic company the register call was recorded on again with its census spanned
+/// (#2145): `pilot-lab-register/PROVENANCE.md`.
+const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+
+/// The fingerprint of each request kind that call sent, in the same order as [`RECORDED_ORDER`].
+/// Each is the request Bridge renders now, REFERENCEDATE and the census span included.
+fn pilot_request_sha256(kind: Kind) -> &'static str {
     match kind {
+        Kind::Status => STATUS_SHA256,
         Kind::Extent => "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
-        Kind::Status => "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        Kind::BookExtent => "2a51f6b170aa9f6ce75be17f747b339c02c6eff0c021ba1f3494b160d7ecd8ad",
-        Kind::Currencies => "e35383713c7c8309288b8372cf05f9b91634053e70aa43f282cbdd07e6d61c5e",
+        Kind::BookExtent => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49",
+        Kind::Currencies => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661",
         Kind::LedgersCompliance => {
-            "9de7fdf791c57b6aa1c8f41aa0da3d0333224860d8b130291002067ca2c52830"
+            "b0c02fc724502e10dc23a9d6b430c9cbb20c191df948082f06fab9d7e4c8f9bc"
         }
-        Kind::LedgersPaired => "36393cad9e54cca34a235ad210d75f5d0522da3010d6623a75f161ef7bf25fc8",
-        Kind::Groups => "935cc2ca841b01c4d34af9015cb6d93051bdf282e86ff92fd633b6c51a994716",
-        Kind::Census => "4ece541a6950491ea5417e56dbba6c63e9d5fbef413dd3b4f07f53dfc7cf6e54",
-        Kind::Window => "34847acdf64088170371e86f5aff33e991753778290dfe47122ff0498a64b90c",
-        Kind::Marks => "162901e7f767920bdfabf1a5cfe5e8045deeeb276011245186cdc00492414c5a",
+        Kind::LedgersPaired => "41b2de3ed4488e5943d25fe36b2c2727f397ca01bae4082d7af36f787bb4b4b5",
+        Kind::Groups => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f",
+        Kind::Census => "93de22bb34b918c04683ea085947c5474317c2c0d7e53d8e2a308b15aad9a4c0",
+        Kind::Window => "d093bfc36aa7ea10b07dd050ce6e33226d8b597baeb0986d4851a9c752c344a1",
+        Kind::Marks => "81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c",
+    }
+}
+
+/// Tally's answer to each request kind of that call. The currencies, groups, compliance ledger
+/// listing and marks answers were byte-identical to answers already kept from the same book, so
+/// those are read from where they are kept.
+fn pilot_body_of(kind: Kind) -> String {
+    match kind {
+        Kind::Extent => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml")),
+        Kind::Status => body_of(kind),
+        Kind::BookExtent => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml")),
+        Kind::Currencies => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml")),
+        Kind::LedgersCompliance => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml")),
+        Kind::LedgersPaired => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-ledgers-paired.utf16le.xml")),
+        Kind::Groups => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-groups.utf16le.xml")),
+        Kind::Census => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml")),
+        Kind::Window => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-window.utf16le.xml")),
+        Kind::Marks => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-uncertain-august-marks.utf16le.xml")),
     }
 }
 
@@ -101,16 +135,6 @@ fn plan(kind: Kind, body: String) -> ScenarioPlan {
         .with_framing(ResponseFraming::ContentLength)
 }
 
-fn recorded_plans() -> Vec<ScenarioPlan> {
-    RECORDED_ORDER
-        .chars()
-        .map(|letter| {
-            let kind = Kind::of(letter);
-            plan(kind, body_of(kind))
-        })
-        .collect()
-}
-
 fn server_for(
     simulator: &SequenceSimulator,
     directory: &std::path::Path,
@@ -139,7 +163,7 @@ async fn run(plans: Vec<ScenarioPlan>, from_to: (&str, &str)) -> (Value, usize) 
     let response = server
         .call_tool(
             "purchase_register",
-            json!({"company_guid": COMPANY_GUID, "from": from_to.0, "to": from_to.1}),
+            json!({"company_guid": PILOT_GUID, "from": from_to.0, "to": from_to.1}),
         )
         .await;
     // Not every scripted answer is used when a read refuses early, so the count is what the
@@ -151,11 +175,11 @@ async fn run(plans: Vec<ScenarioPlan>, from_to: (&str, &str)) -> (Value, usize) 
 
 #[tokio::test]
 async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_masters_again() {
-    let (response, requests) = run(recorded_plans(), ("20250903", "20250903")).await;
+    let (response, requests) = run(pilot_plans(), ("20260804", "20260805")).await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
-    // The recorded read sent a voucher census (the `n` requests) and the window's one voucher
-    // was admitted against it, so the window is `complete` by the rule `vouchers` uses (#1031).
+    // The recorded read sent a voucher census (the `n` requests) and the window's vouchers were
+    // admitted against it, so the window is `complete` by the rule `vouchers` uses (#1031).
     assert_eq!(result["state"], "complete");
     assert!(result["reason"].is_null(), "{result}");
     assert_eq!(
@@ -166,12 +190,15 @@ async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_mast
         response["structuredContent"]["evidence"]["reason_code"].is_null(),
         "{response}"
     );
-    assert_eq!(result["total"], 1);
-    assert_eq!(result["vouchers_observed"], 1);
-    assert_eq!(result["items"][0]["status"], "complete");
-    assert_eq!(result["items"][0]["party_group"], "Sundry Creditors");
-    assert_eq!(result["items"][0]["tax_in_books"][0]["head"], "cgst");
-    assert_eq!(result["ledger_masters_observed"], 43);
+    // The two Purchases are listed; the sale is not a purchase register's row.
+    assert_eq!(result["total"], 2, "{result}");
+    assert_eq!(result["vouchers_observed"], 3, "{result}");
+    for item in result["items"].as_array().unwrap() {
+        assert_eq!(item["status"], "complete", "{item}");
+        assert_eq!(item["party_group"], "Sundry Creditors", "{item}");
+        assert_eq!(item["tax_in_books"][0]["head"], "cgst", "{item}");
+    }
+    assert_eq!(result["ledger_masters_observed"], 18, "{result}");
     assert_eq!(
         requests,
         RECORDED_ORDER.len(),
@@ -179,74 +206,79 @@ async fn the_register_reads_masters_then_the_window_then_the_marks_then_the_mast
     );
 }
 
+fn pilot_plans() -> Vec<ScenarioPlan> {
+    RECORDED_ORDER
+        .chars()
+        .map(|letter| {
+            let kind = Kind::of(letter);
+            plan(kind, pilot_body_of(kind))
+        })
+        .collect()
+}
+
+/// Every request a register sent is the one the PILOT LAB call sent, in order.
+fn assert_pilot_requests(observed: &[tally_protocol_simulator::ObservedRequest]) {
+    assert_eq!(observed.len(), RECORDED_ORDER.len());
+    for (position, (request, letter)) in observed.iter().zip(RECORDED_ORDER.chars()).enumerate() {
+        assert_eq!(
+            request.request_body_sha256,
+            pilot_request_sha256(Kind::of(letter)),
+            "request {position} ({letter}) is not the recorded one"
+        );
+    }
+}
+
 #[tokio::test]
-async fn the_sales_register_sends_the_same_requests_and_lists_the_purchase_apart() {
-    // The sales register reads exactly as the purchase register does, so the recorded
-    // answers of the purchase register's read serve it: the one voucher of that day is a
-    // Purchase, which the sales register does not list as a row but names.
-    let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+async fn the_sales_register_sends_the_same_requests_and_lists_the_purchases_apart() {
+    // The sales register reads exactly as the purchase register does, so one record of the call
+    // serves both: of the window's three vouchers it lists the sale as a row and names the two
+    // Purchases apart.
+    let simulator = SequenceSimulator::spawn(pilot_plans()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_for(&simulator, directory.path(), Redaction::None);
     let response = server
         .call_tool(
             "sales_register",
-            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+            json!({"company_guid": PILOT_GUID, "from": "20260804", "to": "20260805"}),
         )
         .await;
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["profile"], "agent_sales_register_v1");
-    assert_eq!(result["state"], "complete");
-    assert_eq!(result["total"], 0);
-    assert_eq!(result["vouchers_observed"], 1);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 1, "{result}");
+    assert_eq!(result["vouchers_observed"], 3, "{result}");
     let other = &result["other_voucher_types_touching_duties_taxes"];
-    assert_eq!(other["total"], 1);
-    assert_eq!(other["listed"][0]["voucher_class"], "Purchase");
-    let observed = simulator.finish().unwrap();
-    assert_eq!(observed.len(), RECORDED_ORDER.len());
-    for (position, (request, letter)) in observed.iter().zip(RECORDED_ORDER.chars()).enumerate() {
-        // Recorded before the voucher read named REFERENCEDATE: the request sent is the recorded one
-        // once that one word is removed (the request with the word is captured in
-        // `vouchers-reference-date.PROVENANCE.md`).
-        assert_eq!(
-            request.request_body_sha256_without_reference_date,
-            recorded_request_sha256(Kind::of(letter)),
-            "request {position} ({letter}) is not the recorded one"
-        );
-    }
+    assert_eq!(other["total"], 2, "{result}");
+    assert_eq!(other["listed"][0]["voucher_class"], "Purchase", "{result}");
+    assert_eq!(other["listed"][1]["voucher_class"], "Purchase", "{result}");
+    assert_pilot_requests(&simulator.finish().unwrap());
 }
 
 #[tokio::test]
 async fn the_requests_sent_are_the_recorded_ones_in_the_recorded_order() {
     // The scripted transport answers by position, so this is what pins the order and shape of
     // Bridge's reads: each request body's fingerprint must be the recorded one.
-    let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+    let simulator = SequenceSimulator::spawn(pilot_plans()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_for(&simulator, directory.path(), Redaction::None);
     let response = server
         .call_tool(
             "purchase_register",
-            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+            json!({"company_guid": PILOT_GUID, "from": "20260804", "to": "20260805"}),
         )
         .await;
     assert_eq!(response["isError"], false, "{response}");
-    let observed = simulator.finish().unwrap();
-    assert_eq!(observed.len(), RECORDED_ORDER.len());
-    for (position, (request, letter)) in observed.iter().zip(RECORDED_ORDER.chars()).enumerate() {
-        // Recorded before the voucher read named REFERENCEDATE: the request sent is the recorded one
-        // once that one word is removed (the request with the word is captured in
-        // `vouchers-reference-date.PROVENANCE.md`).
-        assert_eq!(
-            request.request_body_sha256_without_reference_date,
-            recorded_request_sha256(Kind::of(letter)),
-            "request {position} ({letter}) is not the recorded one"
-        );
-    }
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["total"], 2, "{result}");
+    assert_eq!(result["vouchers_observed"], 3, "{result}");
+    assert_pilot_requests(&simulator.finish().unwrap());
 }
 
 /// Every occurrence of the company-marks response, with the voucher mark moved by one.
 fn marks_with_moved_voucher_mark() -> String {
-    let body = body_of(Kind::Marks);
+    let body = pilot_body_of(Kind::Marks);
     let start = body.find("<ALTVCHID").unwrap();
     let open_end = start + body[start..].find('>').unwrap() + 1;
     let close = open_end + body[open_end..].find('<').unwrap();
@@ -256,14 +288,14 @@ fn marks_with_moved_voucher_mark() -> String {
 
 #[tokio::test]
 async fn a_voucher_mark_that_moved_while_the_window_was_read_refuses_and_releases_no_rows() {
-    let mut plans = recorded_plans();
+    let mut plans = pilot_plans();
     let moved = marks_with_moved_voucher_mark();
     for (position, letter) in RECORDED_ORDER.chars().enumerate() {
         if letter == 'm' {
             plans[position] = plan(Kind::Marks, moved.clone());
         }
     }
-    let (response, requests) = run(plans, ("20250903", "20250903")).await;
+    let (response, requests) = run(plans, ("20260804", "20260805")).await;
     assert_eq!(response["isError"], true, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(
@@ -289,17 +321,20 @@ async fn a_duty_head_changed_between_the_two_masters_reads_refuses_and_releases_
     // The marks cannot be trusted alone (whether a head change moves them is unmeasured), so
     // the masters are read again: the second listing names another head for the first ledger
     // that carries one, under the same marks.
-    let mut plans = recorded_plans();
+    let mut plans = pilot_plans();
     let first_marks = RECORDED_ORDER.find('m').unwrap();
-    let altered =
-        body_of(Kind::LedgersCompliance).replacen(">CGST</GSTDUTYHEAD>", ">IGST</GSTDUTYHEAD>", 1);
-    assert_ne!(altered, body_of(Kind::LedgersCompliance));
+    let altered = pilot_body_of(Kind::LedgersCompliance).replacen(
+        ">CGST</GSTDUTYHEAD>",
+        ">IGST</GSTDUTYHEAD>",
+        1,
+    );
+    assert_ne!(altered, pilot_body_of(Kind::LedgersCompliance));
     for (position, letter) in RECORDED_ORDER.chars().enumerate() {
         if letter == 'L' && position > first_marks {
             plans[position] = plan(Kind::LedgersCompliance, altered.clone());
         }
     }
-    let (response, requests) = run(plans, ("20250903", "20250903")).await;
+    let (response, requests) = run(plans, ("20260804", "20260805")).await;
     assert_eq!(response["isError"], true, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(
@@ -315,9 +350,9 @@ async fn a_duty_head_changed_between_the_two_masters_reads_refuses_and_releases_
 
 #[tokio::test]
 async fn a_window_whose_dates_the_caller_did_not_ask_for_is_refused() {
-    // The recorded answer is for 2025-09-03; asking for another day makes Tally's answer a
-    // window it did not honour (and changes the request, so the order is not asserted).
-    let (response, _) = run(recorded_plans(), ("20250910", "20250910")).await;
+    // The recorded answer is for 4 to 5 August 2026; asking for another day makes Tally's
+    // answer a window it did not honour (and changes the request, so the order is not asserted).
+    let (response, _) = run(pilot_plans(), ("20260810", "20260810")).await;
     assert_eq!(response["isError"], true, "{response}");
     assert!(
         response["structuredContent"]["result"]
@@ -329,22 +364,22 @@ async fn a_window_whose_dates_the_caller_did_not_ask_for_is_refused() {
 
 #[tokio::test]
 async fn the_servers_redaction_setting_masks_the_party_and_every_ledger_of_a_real_response() {
-    let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+    let simulator = SequenceSimulator::spawn(pilot_plans()).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_for(&simulator, directory.path(), Redaction::MaskParties);
     let response = server
         .call_tool(
             "purchase_register",
-            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+            json!({"company_guid": PILOT_GUID, "from": "20260804", "to": "20260805"}),
         )
         .await;
     assert_eq!(response["isError"], false, "{response}");
     let text = response["structuredContent"]["result"].to_string();
     for name in [
-        "SYN Supplier Intra (M2)",
-        "Input CGST",
-        "Input SGST",
-        "Purchase - Goods",
+        "BRIDGE Supplier RJ",
+        "BRIDGE CGST 2.5%",
+        "BRIDGE SGST 2.5%",
+        "BRIDGE Purchase Svc 5%",
     ] {
         assert!(!text.contains(name), "{name} survived masking: {text}");
     }
@@ -353,21 +388,21 @@ async fn the_servers_redaction_setting_masks_the_party_and_every_ledger_of_a_rea
 
 #[tokio::test]
 async fn the_servers_redaction_setting_masks_what_the_sales_register_lists() {
-    // Read as a sales register, the recorded day's Purchase is listed apart with the ledger names
-    // it touches; with parties masked none of them may survive, and unmasked they are there.
+    // Read as a sales register, the window's two Purchases are listed apart with the ledger
+    // names they touch; with parties masked none of them may survive, and unmasked they are there.
     for (redaction, expect_names) in [(Redaction::None, true), (Redaction::MaskParties, false)] {
-        let simulator = SequenceSimulator::spawn(recorded_plans()).unwrap();
+        let simulator = SequenceSimulator::spawn(pilot_plans()).unwrap();
         let directory = tempfile::tempdir().unwrap();
         let server = server_for(&simulator, directory.path(), redaction);
         let response = server
             .call_tool(
                 "sales_register",
-                json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+                json!({"company_guid": PILOT_GUID, "from": "20260804", "to": "20260805"}),
             )
             .await;
         assert_eq!(response["isError"], false, "{response}");
         let text = response["structuredContent"]["result"].to_string();
-        for name in ["Input CGST", "Input SGST"] {
+        for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
             assert_eq!(text.contains(name), expect_names, "{name}: {text}");
         }
         let _ = simulator.finish();
@@ -409,7 +444,7 @@ fn the_captured_sales_day_requests_are_the_window_request_the_code_sends() {
                 .iter()
                 .map(|byte| format!("{byte:02x}"))
                 .collect::<String>(),
-            recorded_request_sha256(Kind::Window),
+            RECORDED_WINDOW_SHA256,
             "the {day} request is not the window request the code sends"
         );
     }
@@ -444,13 +479,16 @@ async fn replay_note_day(prefix: &str) -> (Value, Value, Vec<String>) {
 
 /// A call recorded before a register counted a small book (#1029) sent no voucher census. The
 /// register now sends one, so the record is given the six legs of that read (company, census,
-/// status, census, status, company) just before the window's own. The census answer is the
-/// window's own recorded response, so the count is derived from the rows the call returned, not
-/// written by hand, and its request is the one the code renders for the call's company and
-/// dates. A record that already holds a census is returned unchanged. A test built on it checks
-/// the register's wiring for a small book, not that Tally's count agrees with its rows: the
-/// census is the call's own data, so only a live small-book run (#1029) can show that.
-fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Value) -> Vec<Value> {
+/// status, census, status, company) just before the window's own. Its request is the one the
+/// code renders for the call's company and dates, and its answer is
+/// `{prefix}_voucher_census_response.utf16le.xml`: the lab sent that request, spanned to the
+/// mark the record read, to the same book on 30 Oct 2026 (#2145; the directory's PROVENANCE.md).
+/// A record that already holds a census is returned unchanged.
+fn with_census_a_small_book_now_sends(
+    mut requests: Vec<Value>,
+    prefix: &str,
+    arguments: &Value,
+) -> Vec<Value> {
     const STOCK_LAB_COMPANY: &str = "BRIDGE STOCK LAB";
     let census_id = "Bridge Agent Voucher Census";
     if requests
@@ -467,11 +505,16 @@ fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Valu
         STOCK_LAB_COMPANY,
         &tally_date(arguments["from"].as_str().unwrap()),
         &tally_date(arguments["to"].as_str().unwrap()),
-        None,
+        // The census the code sends now: spanned to the mark the record read (3).
+        AlterIdSpan {
+            after: 0,
+            through: 3,
+        },
     )
     .unwrap();
     let mut census = requests[window].clone();
     census["request_id"] = json!(census_id);
+    census["fixture"] = json!(format!("{prefix}_voucher_census_response.utf16le.xml"));
     census["request_sha256"] = json!(sha256_hex(
         &bridge_tally_protocol::encode_tally_xml_request_utf16le(&census_request)
     ));
@@ -495,6 +538,28 @@ fn with_census_a_small_book_now_sends(mut requests: Vec<Value>, arguments: &Valu
 /// Replays one recorded call (the files `<prefix>_sequence.json` and the responses it names, in
 /// `directory`) and returns the tool's response, the record and the requests that were not the
 /// recorded ones. `expected_requests` is what the call is known to have sent.
+/// `requests` with each census leg asking for the census the code sends now, spanned to the mark
+/// (#2145): where `{prefix}_voucher_census_spanned_request.utf16le.xml` is kept, each census leg's
+/// fingerprint becomes that file's. The file is the request the lab sent spanned and found answered
+/// byte for byte as recorded (see the directory's PROVENANCE.md), so the recorded answer stays; the
+/// replay checks the code renders exactly those bytes.
+fn with_the_spanned_census(directory: &str, prefix: &str, mut requests: Vec<Value>) -> Vec<Value> {
+    let name = format!("{prefix}_voucher_census_spanned_request.utf16le.xml");
+    if !std::path::Path::new(directory).join(&name).exists() {
+        return requests;
+    }
+    let spanned = sha256_hex(&recorded_file(directory, &name));
+    let mut legs = 0;
+    for request in &mut requests {
+        if request["request_id"] == "Bridge Agent Voucher Census" {
+            request["request_sha256"] = json!(spanned);
+            legs += 1;
+        }
+    }
+    assert_eq!(legs, 2, "{prefix}: the census is one paired read");
+    requests
+}
+
 async fn replay_recorded(
     directory: &str,
     prefix: &str,
@@ -508,7 +573,11 @@ async fn replay_recorded(
         "the record lists every request of the call"
     );
     assert_eq!(sequence["requests_sent"], expected_requests);
-    let requests = with_census_a_small_book_now_sends(recorded.clone(), &sequence["arguments"]);
+    let requests = with_the_spanned_census(
+        directory,
+        prefix,
+        with_census_a_small_book_now_sends(recorded.clone(), prefix, &sequence["arguments"]),
+    );
     let plans = requests
         .iter()
         .map(|request| {
@@ -537,9 +606,7 @@ async fn replay_recorded(
     );
     let mut wrong = Vec::new();
     for (position, (sent, recorded)) in observed.iter().zip(&requests).enumerate() {
-        let want = recorded["request_sha256"]
-            .as_str()
-            .unwrap_or_else(|| recorded_request_sha256(Kind::Status));
+        let want = recorded["request_sha256"].as_str().unwrap_or(STATUS_SHA256);
         if sent.request_body_sha256_without_reference_date != want {
             wrong.push(format!("request {position} is not the recorded one"));
         }
@@ -645,8 +712,9 @@ async fn a_debit_note_day_replays_through_the_purchase_register_with_the_signs_t
     assert_eq!(row, &answer["result"]["items"][0]);
 }
 
-/// Every request file of `note-days/` is a request one of the three calls sent, and every request
-/// a call sent has its file: the record's fingerprints and the files' own bytes agree.
+/// Every request file of `note-days/` is a request one of the three calls sent, or the census the
+/// code sends for that call now (spanned, #2145), and every such request has its file: the record's
+/// fingerprints and the files' own bytes agree.
 #[test]
 fn the_note_day_request_files_are_exactly_the_requests_the_three_calls_sent() {
     request_files_are_exactly_the_requests_sent(
@@ -698,6 +766,11 @@ fn request_files_are_exactly_the_requests_sent(directory: &str, prefixes: &[&str
                 .iter()
                 .filter_map(|request| request["request_sha256"].as_str().map(str::to_string)),
         );
+        // The census the code sends for this call now, where one was captured (#2145).
+        let spanned = format!("{prefix}_voucher_census_spanned_request.utf16le.xml");
+        if std::path::Path::new(directory).join(&spanned).exists() {
+            sent.insert(hex(&recorded_file(directory, &spanned)));
+        }
     }
     assert_eq!(on_disk, sent);
 }
@@ -820,20 +893,19 @@ fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
 /// The recorded purchase read with the window's census and window answers spliced out for
 /// Tally's own empty collection (a committed capture of an empty collection, not a capture of an
 /// empty-window call), followed by the empty-window corroboration the register then makes: a
-/// census of the wider window (paired; no window read, #1240) and the company's voucher mark.
+/// census of the wider window (paired; no window read, #1240), then the company marks read again
+/// after it (#2145), whose voucher mark is also the one the corroboration decides by.
 const EMPTY_WINDOW_TAIL: &str = "ensnseemsmse";
 
-/// The company-marks response with the voucher mark set to zero: a book with no vouchers.
-fn marks_with_voucher_mark_zero() -> String {
+/// The company-marks response with the voucher mark one above the recorded one: a voucher saved.
+fn marks_with_a_voucher_saved() -> String {
     let body = body_of(Kind::Marks);
-    let start = body.find("<ALTVCHID").unwrap();
-    let open_end = start + body[start..].find('>').unwrap() + 1;
-    let close = open_end + body[open_end..].find('<').unwrap();
-    format!("{}0{}", &body[..open_end], &body[close..])
+    let recorded = voucher_mark_of(&body);
+    with_voucher_mark(&body, recorded + 1)
 }
 
-/// `corroborating_marks` answers the voucher-mark read of the corroboration (the tail's `m`s);
-/// the recorded marks when `None`.
+/// `corroborating_marks` answers the marks read again after the corroboration's census (the
+/// tail's `m`s); the recorded marks when `None`, so the book did not move during the read.
 async fn empty_window_register(corroborating_marks: Option<String>) -> Value {
     let empty = ScenarioPlan::new(Fixture::SyntheticXml(utf16(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
@@ -898,16 +970,71 @@ async fn an_empty_window_its_wider_read_cannot_corroborate_is_partial_in_a_regis
     );
 }
 
+/// Where the text of `body`'s voucher mark (`ALTVCHID`) starts and ends.
+fn voucher_mark_text(body: &str) -> (usize, usize) {
+    let start = body.find("<ALTVCHID").unwrap();
+    let open_end = start + body[start..].find('>').unwrap() + 1;
+    (open_end, open_end + body[open_end..].find('<').unwrap())
+}
+
+/// `body`'s voucher mark (`ALTVCHID`).
+fn voucher_mark_of(body: &str) -> u64 {
+    let (start, end) = voucher_mark_text(body);
+    body[start..end].trim().parse().unwrap()
+}
+
+/// `body` with its voucher mark (`ALTVCHID`) set to `mark`.
+fn with_voucher_mark(body: &str, mark: u64) -> String {
+    let (start, end) = voucher_mark_text(body);
+    format!("{}{mark}{}", &body[..start], &body[end..])
+}
+
 #[tokio::test]
 async fn an_empty_window_on_a_book_with_no_vouchers_is_complete_in_a_register_with_no_reason() {
-    // The corroboration finds the company's voucher mark at zero: nothing could be missing, so
-    // the empty window is `complete`. `vouchers` returns the reason `company_has_no_vouchers`
-    // beside it; a register returns none, in `result` and in the evidence. The mark is the
-    // recorded one rewritten to zero, in the corroboration's read only.
-    let response = empty_window_register(Some(marks_with_voucher_mark_zero())).await;
+    // A book that has never held a voucher, end to end: every marks answer, the book extent's
+    // included, carries a voucher mark of zero. So the register sends no census, reads its window
+    // whole and finds it empty, and the corroboration sends no census either: it reads the
+    // widened window whole, finds it empty too, and the company's voucher mark, read at zero,
+    // says nothing could be missing. The window is `complete`. `vouchers` returns the reason
+    // `company_has_no_vouchers` beside it; a register returns none, in `result` and in the
+    // evidence.
+    const CENSUS: &str = "ensnse";
+    assert_eq!(RECORDED_ORDER.matches(CENSUS).count(), 1);
+    // The recorded read without its census, then the corroboration: the widened window whole
+    // (paired) and the company's voucher mark (paired).
+    let order = format!("{}ewswseemsmse", RECORDED_ORDER.replacen(CENSUS, "", 1));
+    let empty = ScenarioPlan::new(Fixture::SyntheticXml(utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
+    ))))
+    .with_encoding(WireEncoding::Utf16Le)
+    .with_framing(ResponseFraming::ContentLength);
+    let plans = order
+        .chars()
+        .map(|letter| match Kind::of(letter) {
+            Kind::Window => empty.clone(),
+            kind @ (Kind::Marks | Kind::BookExtent) => {
+                plan(kind, with_voucher_mark(&body_of(kind), 0))
+            }
+            kind => plan(kind, body_of(kind)),
+        })
+        .collect::<Vec<_>>();
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            "purchase_register",
+            json!({"company_guid": COMPANY_GUID, "from": "20250903", "to": "20250903"}),
+        )
+        .await;
+    // Every scripted answer was asked for, in this order: no census was sent, and the
+    // corroboration really ran.
+    let observed = simulator.finish().unwrap();
+    assert_eq!(observed.len(), order.len(), "{response}");
     assert_eq!(response["isError"], false, "{response}");
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["total"], 0, "{result}");
+    assert_eq!(result["vouchers_observed"], 0, "{result}");
     assert_eq!(result["state"], "complete", "{result}");
     assert!(result["reason"].is_null(), "{result}");
     assert_eq!(
@@ -916,6 +1043,22 @@ async fn an_empty_window_on_a_book_with_no_vouchers_is_complete_in_a_register_wi
     );
     assert!(
         response["structuredContent"]["evidence"]["reason_code"].is_null(),
+        "{response}"
+    );
+}
+
+#[tokio::test]
+async fn an_empty_window_whose_voucher_mark_moved_during_the_corroboration_is_refused_in_a_register(
+) {
+    // The marks read again after the corroboration's census answer a voucher mark one above the
+    // recorded one the register's own read took: a voucher was saved during the read, outside
+    // the census's span, so the register refuses rather than calling the window empty (#2145).
+    // A book with no vouchers at all is the test above.
+    let response = empty_window_register(Some(marks_with_a_voucher_saved())).await;
+    assert_eq!(response["isError"], true, "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        "voucher_window_changed_during_read",
         "{response}"
     );
 }

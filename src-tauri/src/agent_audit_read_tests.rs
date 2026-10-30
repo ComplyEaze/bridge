@@ -795,8 +795,15 @@ mod live_pilot_lab {
         for (index, name) in PARTS.iter().enumerate() {
             let Some(name) = name else { continue };
             let sent = &observed[index * 3 + 1].request_body;
+            // The census is sent spanned to the mark since #2145: its live request is the
+            // one the lab sent for that change, not the one the capture recorded.
+            let request = if *name == "census" {
+                "census-spanned"
+            } else {
+                name
+            };
             let live = bytes(&format!(
-                "audit-read-pilot-lab/pilot-lab-audit-{name}.request.utf16le.xml"
+                "audit-read-pilot-lab/pilot-lab-audit-{request}.request.utf16le.xml"
             ));
             assert!(
                 *sent == live,

@@ -2468,15 +2468,7 @@ impl Server {
             }
             // Each voucher's own line no longer asks for a settlement it has
             // (#1709). Set after the finalisers above, which write the lines.
-            if payload["result"]["person_settlement"].is_object() {
-                if let Some(rows) = payload["result"]["vouchers"].as_array_mut() {
-                    for row in rows {
-                        if settle::asks_for_settlement(row["next_step"].as_str()) {
-                            row["next_step"] = json!(settle::NEXT_STEP);
-                        }
-                    }
-                }
-            }
+            settle::settle_voucher_next_steps(&mut payload["result"]);
             let status = final_verification_status(
                 dispatched.then(|| &payload["result"]["dispatch"]),
                 &result,

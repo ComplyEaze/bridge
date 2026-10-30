@@ -2851,12 +2851,105 @@ fn only_the_approvals_holder_makes_the_totals_form() {
     }
 }
 
+/// `source` with each comment, string literal and character literal replaced
+/// by one space, so that a word or a parenthesis inside one is not read as
+/// code. Raw and byte strings are literals too; a lifetime such as `'a` is code.
+fn code_only(source: &str) -> String {
+    let chars: Vec<char> = source.chars().collect();
+    let identifier = |at: usize| chars[at].is_alphanumeric() || chars[at] == '_';
+    let mut out = String::with_capacity(source.len());
+    let mut at = 0;
+    while at < chars.len() {
+        let character = chars[at];
+        let next = chars.get(at + 1).copied();
+        if character == '/' && next == Some('/') {
+            while at < chars.len() && chars[at] != '\n' {
+                at += 1;
+            }
+            out.push(' ');
+            continue;
+        }
+        if character == '/' && next == Some('*') {
+            let mut depth = 0_usize;
+            while at < chars.len() {
+                if chars[at] == '/' && chars.get(at + 1) == Some(&'*') {
+                    depth += 1;
+                    at += 2;
+                } else if chars[at] == '*' && chars.get(at + 1) == Some(&'/') {
+                    depth -= 1;
+                    at += 2;
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    at += 1;
+                }
+            }
+            out.push(' ');
+            continue;
+        }
+        let raw_prefix = character == 'r'
+            && (at == 0
+                || !identifier(at - 1)
+                || (chars[at - 1] == 'b' && (at == 1 || !identifier(at - 2))));
+        if raw_prefix {
+            let mut quote = at + 1;
+            while chars.get(quote) == Some(&'#') {
+                quote += 1;
+            }
+            if chars.get(quote) == Some(&'"') {
+                let hashes = quote - at - 1;
+                let mut end = quote + 1;
+                while end < chars.len()
+                    && !(chars[end] == '"'
+                        && (1..=hashes).all(|offset| chars.get(end + offset) == Some(&'#')))
+                {
+                    end += 1;
+                }
+                at = end + 1 + hashes;
+                out.push(' ');
+                continue;
+            }
+        }
+        if character == '"' {
+            at += 1;
+            while at < chars.len() && chars[at] != '"' {
+                at += if chars[at] == '\\' { 2 } else { 1 };
+            }
+            at += 1;
+            out.push(' ');
+            continue;
+        }
+        if character == '\'' {
+            if next == Some('\\') {
+                let mut end = at + 3;
+                while end < chars.len() && chars[end] != '\'' {
+                    end += 1;
+                }
+                at = end + 1;
+                out.push(' ');
+                continue;
+            }
+            if chars.get(at + 2) == Some(&'\'') {
+                at += 3;
+                out.push(' ');
+                continue;
+            }
+        }
+        out.push(character);
+        at += 1;
+    }
+    out
+}
+
 /// Whether each `MessageBoxW` call in `source` names `MB_SYSTEMMODAL` among its
-/// arguments, in source order (#1780): the text from the opening parenthesis
-/// to the one that closes it.
+/// arguments, in source order (#1780): the code from the opening parenthesis
+/// to the one that closes it. Comments and literals are not code, so a flag
+/// named only in a comment does not count.
 fn message_box_calls_are_system_modal(source: &str) -> Vec<bool> {
+    let code = code_only(source);
     let mut calls = Vec::new();
-    let mut rest = source;
+    let mut rest = code.as_str();
     while let Some(at) = rest.find("MessageBoxW(") {
         let after = &rest[at + "MessageBoxW(".len()..];
         let mut depth = 1_usize;
@@ -2909,5 +3002,31 @@ fn every_windows_message_box_is_system_modal() {
             "MessageBoxW(null, text, title, MB_YESNOCANCEL | MB_SYSTEMMODAL) MessageBoxW(a, (b), c)"
         ),
         [true, false]
+    );
+    // A flag named only in a comment or a literal is not the flag: each of
+    // the five boxes names it in a comment as well.
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(\n    null,\n    text,\n    // MB_SYSTEMMODAL keeps it above Tally\n    MB_YESNOCANCEL | MB_TOPMOST,\n)"
+        ),
+        [false]
+    );
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "MessageBoxW(null, \"MB_SYSTEMMODAL\", r#\"MB_SYSTEMMODAL\"#, /* MB_SYSTEMMODAL */ MB_TOPMOST)"
+        ),
+        [false]
+    );
+    // A parenthesis inside a literal does not end the call, and a call named
+    // only in a comment is not a call.
+    assert_eq!(
+        message_box_calls_are_system_modal("MessageBoxW(null, \")\", ')', MB_SYSTEMMODAL)"),
+        [true]
+    );
+    assert_eq!(
+        message_box_calls_are_system_modal(
+            "// MessageBoxW(null, t, c, MB_TOPMOST)\nlet a: &'a str = x;"
+        ),
+        Vec::<bool>::new()
     );
 }

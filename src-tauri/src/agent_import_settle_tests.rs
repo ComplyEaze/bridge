@@ -206,6 +206,57 @@ async fn a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held
     );
 }
 
+/// The settled summary is built where `verify_import` reports it, and keeps
+/// what follows the binding's first line (#1709, #1050). Here a second post of
+/// the company, sent after this one, proved a mark the book no longer reaches:
+/// the verification records that restore, and the settled line is followed by
+/// the sentence that names the post to verify again.
+#[tokio::test]
+async fn a_settled_batch_s_verification_keeps_the_restore_line_after_its_own() {
+    let Posted {
+        directory,
+        server,
+        simulator: _simulator,
+        line,
+    } = posted_then_later(rejected_one_silver(), false, 10, 10, 2).await;
+    let response = settle(&server, settle_args(&line), ScriptedApproval::approving()).await;
+    assert_eq!(
+        result(&response)["state"],
+        "settled_by_person",
+        "{response}"
+    );
+    let later = crate::agent::agent_import::tests::sentinel_batch_id(0x1709);
+    let journal = directory.path().join("agent-import-ledger.jsonl");
+    let text = fs::read_to_string(&journal).unwrap();
+    fs::write(&journal, append_later_post(text, &later)).unwrap();
+    let verified = server
+        .call_tool(
+            "verify_import",
+            json!({"company_guid":GUID,"batch_id":line.batch_id}),
+        )
+        .await;
+    let verified = result(&verified);
+    let binding = &verified["post_span_binding"];
+    assert_eq!(
+        verified["person_settlement"]["state"], "settled",
+        "{verified}"
+    );
+    assert_eq!(binding["rollback_recorded"], true, "{verified}");
+    assert_eq!(
+        binding["other_batches_covered"],
+        json!({"count": 1, "first": [later]}),
+        "{verified}"
+    );
+    assert_eq!(
+        binding["summary"],
+        format!(
+            "{} This check also found the company's books restored from a backup after other posts of it, and recorded that: verify the other post named in other_batches_covered again, and check their vouchers in Tally.",
+            super::super::super::settle::SUMMARY
+        ),
+        "{verified}"
+    );
+}
+
 /// A batch Tally rejected whole is settled when the post recorded its voucher
 /// mark moving by what Tally reported creating; when the mark moved, or the
 /// record of that step is gone, it is refused before any read or dialog.
@@ -689,4 +740,30 @@ fn only_the_next_steps_that_ask_for_the_settlement_are_replaced() {
     assert!(!asks_for_settlement(plain_next_step("sent_not_attributed")));
     assert!(!asks_for_settlement(Some(NEXT_STEP)));
     assert!(!asks_for_settlement(None));
+
+    // In a settled batch's result only those lines change; with no
+    // settlement nothing does.
+    use super::super::super::settle::settle_voucher_next_steps;
+    let asking = plain_next_step("tally_reported_not_created").unwrap();
+    let other = plain_next_step("sent_not_attributed").unwrap();
+    let rows = json!([
+        {"next_step": asking},
+        {"next_step": other},
+        {"next_step": null},
+        {},
+    ]);
+    let mut settled = json!({"person_settlement": {"state": "settled"}, "vouchers": rows});
+    settle_voucher_next_steps(&mut settled);
+    assert_eq!(
+        settled["vouchers"],
+        json!([
+            {"next_step": NEXT_STEP},
+            {"next_step": other},
+            {"next_step": null},
+            {},
+        ])
+    );
+    let mut open = json!({"vouchers": rows});
+    settle_voucher_next_steps(&mut open);
+    assert_eq!(open["vouchers"], rows);
 }

@@ -124,7 +124,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
-not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` is in the source after release 0.6.1 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -2874,8 +2874,7 @@ releases the stop a sent Sales invoice that is not verified posted puts on its
 company (`invoice_company_stopped`), after the person has checked Tally, in the
 same dialog the model cannot answer.
 
-`prepare_ledger_creates` and `post_ledger_creates` are in the source and are not in
-a published build yet. The create path and the rule that refuses a near name were
+`prepare_ledger_creates` and `post_ledger_creates` were added in release 0.7.0. The create path and the rule that refuses a near name were
 measured on TallyPrime 7.1 Silver, on one synthetic book; other releases and
 editions are not measured.
 
@@ -4322,8 +4321,15 @@ cap as the response is really encoded, sets `truncated`, and counts the receipts
 size in `result.omitted_for_size`. This tool has no offset, so the receipts cut for size
 cannot be reached by it; a single receipt that is alone over the cap is refused
 (`agent_response_too_large`). Receipts left out by the bounded tail scan are not counted in
-`omitted_for_size`. Missing terminal newlines, invalid
-UTF-8, or invalid JSON in retained complete rows return `egress_log_incomplete`.
+`omitted_for_size`. A receipt a stopped process left cut short (a torn tail) is never read as a
+receipt (#2172). Until the next receipt is written it is reported only by its size, in
+`result.unrepaired_tail_bytes`. Writing the next receipt repairs it, by appending, never by
+removing bytes: a `#` line, then a `torn_record` marker giving the torn bytes' offset, length and
+sha256. `result.torn_records` lists the markers among the receipts read. A line that is neither a
+whole receipt nor exactly vouched for by the marker after it, or invalid UTF-8 or JSON in a
+receipt, returns `egress_log_incomplete`. The marker is a repair note, not proof against
+tampering. The same repair keeps the Terms of Use record (`terms-acceptance.jsonl`) usable: a torn
+last line there is never an acceptance, and accepting again repairs it.
 
 Verification captures the batch journal generation before readback and checks it
 under the exclusive publication lock. If another process published the same batch

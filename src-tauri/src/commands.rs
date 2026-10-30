@@ -31,7 +31,9 @@ use crate::sync::snapshot::{
     capability_profile_sha256, AdaptiveWindowPolicy, PlannedWindow, SnapshotPlan,
     SqliteSnapshotStateStore,
 };
-use crate::tally::connection::{PairedReadValidationError, PartyLedgerMasterSourceValidationError};
+use crate::tally::connection::{
+    MailingDetailsReadFailed, PairedReadValidationError, PartyLedgerMasterSourceValidationError,
+};
 use crate::tally::runtime::{with_operation_wire_budget, TallyRuntimeControlError};
 use crate::tally::validators::{
     normalize_company_guid, validate_company_name, validate_date_range,
@@ -413,13 +415,35 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
             )
         };
     }
+    let mailing_read_failed = error
+        .chain()
+        .any(|cause| cause.downcast_ref::<MailingDetailsReadFailed>().is_some());
     let mut mapped = tally_runtime_command_error(error);
     mapped.message = format!(
         "ComplyEaze Bridge withheld the party/ledger master: {}",
         mapped.message
     );
+    // A read that timed out or came back too large or unreadable, which asked
+    // for each party's mailing details too, is named as that larger read: the
+    // export decides to ask for them from estimates (bridge#2074).
+    if mailing_read_failed
+        && matches!(
+            mapped.code,
+            "tally_request_deadline_exceeded" | "response_validation_failed"
+        )
+    {
+        mapped
+            .message
+            .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
+        mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+    }
     mapped
 }
+
+/// What a CA is told when a party/ledger master read that asked for the mailing
+/// details failed (bridge#2074).
+const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them. ComplyEaze Bridge asks for them only where it estimates the answer fits, and for this company the estimate may have been too low.";
+const MAILING_DETAILS_READ_FAILED_REMEDIATION: &str = "Retry once while nobody is editing this company in Tally. If it fails the same way again, the export will keep failing for this company: ComplyEaze Bridge cannot yet export it without the mailing addresses, so report it to ComplyEaze Bridge.";
 
 fn party_ledger_master_currency_admission_error(reason: &'static str) -> TallyCommandError {
     // Several Currency-master rows do not identify which row is the company's base

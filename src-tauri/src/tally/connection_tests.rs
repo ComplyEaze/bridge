@@ -1887,11 +1887,13 @@ fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
 }
 
 /// Once a book's ledgers were counted to size a whole read, the export decides by the count
-/// and the alterations beyond it: the counted ledgers at the mailing estimate, and one further
-/// mailing entry for every alteration past them, must fit the budget. A book of few ledgers
-/// and many alterations is then sent the mailing request; one whose alterations could hold more
-/// entries than the budget, or with more ledgers than the bound, keeps the standard request.
-/// Such a read is still admitted whole. No other kind of read is changed (bridge#2074).
+/// and the alterations beyond it: the counted ledgers at the mailing estimate, each with the
+/// further entries one save can add unseen by the mark (2074-L A4b), and one further mailing
+/// entry for every alteration past them, must fit the budget. A book of few ledgers and many
+/// alterations is then sent the mailing request; one whose alterations could hold more entries
+/// than the budget, or with more ledgers than the allowance admits, keeps the standard
+/// request. Such a read is still admitted whole. No other kind of read is changed
+/// (bridge#2074).
 #[test]
 fn the_export_takes_the_mailing_details_where_the_counted_ledgers_fit_their_bound() {
     use super::ComplianceRead::{
@@ -1900,15 +1902,28 @@ fn the_export_takes_the_mailing_details_where_the_counted_ledgers_fit_their_boun
     let budget = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED;
     let per_ledger = super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED;
     let per_entry = super::MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED;
+    let unseen = super::MAILING_DETAILS_UNSEEN_ENTRIES_PER_LEDGER_UNVERIFIED;
+    let per_counted = per_ledger + unseen * per_entry;
+    assert_eq!(per_counted, 9_800);
     let bound = super::compliance_master_ledgers_per_read(WithMailingDetails);
     assert_eq!(bound, 3_200);
-    // With no alteration past the ledgers, the count's bound is the mark's.
-    assert_eq!(Ask.resolved_for_count(bound, bound), WithMailingDetails);
-    assert_eq!(Ask.resolved_for_count(bound + 1, bound + 1), Standard);
+    // With no alteration past the ledgers, a counted ledger also carries the entries the mark
+    // may not show, so the count admits fewer ledgers than the mark's bound.
+    let counted_bound = budget / per_counted;
+    assert_eq!(counted_bound, 1_632);
+    assert_eq!(
+        Ask.resolved_for_count(counted_bound, counted_bound),
+        WithMailingDetails
+    );
+    assert_eq!(
+        Ask.resolved_for_count(counted_bound + 1, counted_bound + 1),
+        Standard
+    );
+    assert_eq!(Ask.resolved_for_count(bound, bound), Standard);
     // The issue's book: about 300 ledgers at a mark near 8,000.
     assert_eq!(Ask.resolved_for_count(300, 8_000), WithMailingDetails);
     // The largest mark nine ledgers are given the details for, exactly.
-    let nine = 9 + (budget - 9 * per_ledger) / per_entry;
+    let nine = 9 + (budget - 9 * per_counted) / per_entry;
     assert_eq!(Ask.resolved_for_count(9, nine), WithMailingDetails);
     assert_eq!(Ask.resolved_for_count(9, nine + 1), Standard);
     // 3,000 ledgers in a book near the catalogue's limit could hold more entries than fit.

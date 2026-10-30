@@ -1199,3 +1199,67 @@ fn desktop_messages_name_the_product_in_full() {
         }
     }
 }
+
+/// A party/ledger master read that asked for the mailing details and timed out, or came
+/// back too large, names that larger read and says what to do; the same failure of a read
+/// without them, and a failed connection, are told as before (bridge#2074).
+#[test]
+fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
+    use crate::tally::connection::mailing_details_read_error as marked;
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    use bridge_tally_transport::TallyTransportError;
+    let failures = || {
+        [
+            (
+                anyhow::Error::new(TallyTransportError::RequestTimedOut),
+                "tally_request_deadline_exceeded",
+            ),
+            (
+                anyhow::Error::new(TallyTransportError::ResponseTooLarge {
+                    limit: bridge_tally_transport::XML_RESPONSE_MAX_BYTES,
+                    declared_by_peer: false,
+                }),
+                "response_validation_failed",
+            ),
+        ]
+    };
+    for (error, code) in failures() {
+        let plain = party_ledger_master_runtime_command_error(with_read_evidence(
+            error,
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(plain.code, code);
+        assert!(!plain.message.contains("mailing"), "{}", plain.message);
+        assert_ne!(
+            plain.remediation,
+            super::MAILING_DETAILS_READ_FAILED_REMEDIATION
+        );
+    }
+    for (error, code) in failures() {
+        let named = party_ledger_master_runtime_command_error(with_read_evidence(
+            marked(error),
+            RuntimeReadEvidence::empty(),
+        ));
+        // The marker keeps the failure's own code and message, and adds the sentence.
+        assert_eq!(named.code, code);
+        assert!(named
+            .message
+            .starts_with("ComplyEaze Bridge withheld the party/ledger master: "));
+        assert!(
+            named
+                .message
+                .ends_with(super::MAILING_DETAILS_READ_FAILED_SENTENCE),
+            "{}",
+            named.message
+        );
+        assert_eq!(
+            named.remediation,
+            super::MAILING_DETAILS_READ_FAILED_REMEDIATION
+        );
+    }
+    // A failed connection is told as one, whichever read it was.
+    let refused = party_ledger_master_runtime_command_error(marked(anyhow::Error::new(
+        TallyTransportError::ConnectionFailed,
+    )));
+    assert!(!refused.message.contains("mailing"), "{}", refused.message);
+}

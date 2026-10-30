@@ -105,6 +105,30 @@ fn party_ledger_master_openings_agree(
     Ok(master_opening.numeric_eq(balance_opening))
 }
 
+/// A failed read that asked Tally for each ledger's dated mailing details
+/// (bridge#2074), so the export can say that the larger request is what failed.
+/// Its text is the failure's own, so every reading of the error's message is as
+/// it was; only its type marks the read.
+#[derive(Debug, thiserror::Error)]
+#[error("{source}")]
+pub(crate) struct MailingDetailsReadFailed {
+    source: anyhow::Error,
+}
+
+/// Marks a failed read that asked for the mailing details, keeping the read
+/// evidence a failed pair carries at the chain's root, as
+/// [`parent_part_response_error`] does.
+pub(crate) fn mailing_details_read_error(error: anyhow::Error) -> anyhow::Error {
+    let completed = error
+        .downcast_ref::<super::runtime::RuntimeReadFailure>()
+        .map(|failure| failure.evidence.clone());
+    let named = anyhow::Error::new(MailingDetailsReadFailed { source: error });
+    match completed {
+        Some(evidence) => with_read_evidence(named, evidence),
+        None => named,
+    }
+}
+
 /// The paired sources answered successfully but cannot be reconciled into one
 /// safe workbook source. This is distinct from endpoint or XML failure.
 #[derive(Debug, thiserror::Error)]
@@ -374,12 +398,16 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// before the second entry was measured.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 5_000;
 
-/// Bytes one dated mailing entry beyond a ledger's first is estimated to add to
-/// a mailing read's response (bridge#2074). UNVERIFIED: one second entry on one
-/// party grew its row by 944 bytes (TallyPrime 7.2, 2026-10-29, the figure above);
-/// 950 is that one measurement rounded up, not a bound. A longer address costs
-/// more.
-const MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED: u64 = 950;
+// A further dated mailing entry's cost, and how many entries a counted ledger
+// is allowed that the master mark does not show (bridge#2074). Each is an
+// allowance from one observation (lab row 2074-L, TallyPrime 7.2, 2026-10-30;
+// partial), not a bound. A4: nine further entries on one party cost 923.6 bytes
+// each, short two-line addresses, and 1,200 leaves about 30 percent over that.
+// A4b: one save of five dated entries moved the mark by one, so the mark missed
+// four of them; a party given its history in one save can hold more than four,
+// and a longer address costs more, so a book can still be admitted and overrun.
+const MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED: u64 = 1_200;
+const MAILING_DETAILS_UNSEEN_ENTRIES_PER_LEDGER_UNVERIFIED: u64 = 4;
 
 /// Bytes one ledger is estimated to add to the compliance master response when
 /// the request also names each ledger's `GSTDETAILS.LIST`
@@ -444,18 +472,20 @@ impl ComplianceRead {
 
     /// The kind of read a book is sent once its ledgers were counted to size a
     /// whole read (bridge#2074): the workbook's mailing details where the counted
-    /// ledgers, each at the mailing estimate, and one further dated mailing entry
-    /// for every master alteration beyond them fit the budget; the standard
-    /// request otherwise. The count bounds the ledgers but not their entries: each
-    /// entry beyond a ledger's first came from an alteration, which the mark
-    /// counts, so the mark still bounds them. UNVERIFIED, as both figures are. A
-    /// count that fits is inside the standard bound too, so the read stays whole.
-    /// Any other kind is unchanged.
+    /// ledgers, each at the mailing estimate with the further entries the mark
+    /// may not show, and one further dated mailing entry for every master
+    /// alteration beyond them fit the budget; the standard request otherwise. The
+    /// count bounds the ledgers but not their entries: one save can add several
+    /// entries and move the mark by one, so this is an allowance, not a bound.
+    /// UNVERIFIED, as every figure in it is. A count that fits is inside the
+    /// standard bound too, so the read stays whole. Any other kind is unchanged.
     pub(crate) fn resolved_for_count(self, counted: u64, master_mark: u64) -> Self {
         match self {
             Self::WithMailingDetailsWhereWholeReadFits => {
                 let ledgers = counted.saturating_mul(
-                    COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED,
+                    COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED
+                        + MAILING_DETAILS_UNSEEN_ENTRIES_PER_LEDGER_UNVERIFIED
+                            * MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED,
                 );
                 let entries = master_mark
                     .saturating_sub(counted)
@@ -2044,7 +2074,14 @@ impl TallyClient {
                         ledger_currency_base.as_ref(),
                         &mut evidence,
                     )
-                    .await?,
+                    .await
+                    .map_err(|error| match read {
+                        ComplianceRead::WithMailingDetails
+                        | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
+                            mailing_details_read_error(error)
+                        }
+                        ComplianceRead::Standard | ComplianceRead::WithGstDetails => error,
+                    })?,
                 );
             }
             let group_pair = self

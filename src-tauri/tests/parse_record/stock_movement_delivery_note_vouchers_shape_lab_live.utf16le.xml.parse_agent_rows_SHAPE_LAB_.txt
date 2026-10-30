@@ -1,0 +1,86 @@
+# fixture: stock_movement_delivery_note_vouchers_shape_lab_live.utf16le.xml
+# parser: parse_agent_rows(SHAPE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(113),
+        "amounts": Array [
+            Object {
+                "amount": String("-30.00"),
+                "bill_allocations": Array [
+                    Object {
+                        "amount": String("-30.00"),
+                        "bill_type": String("On Account"),
+                        "reference": Object {
+                            "kind": String("on_account"),
+                        },
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("Outstation Buyer 1"),
+            },
+            Object {
+                "amount": String("30.00"),
+                "bill_allocations": Array [],
+                "goods_lines": Array [
+                    Object {
+                        "actual_quantity": Object {
+                            "state": String("value"),
+                            "value": String("1.000 Kgs"),
+                        },
+                        "amount": Object {
+                            "state": String("value"),
+                            "value": String("30.00"),
+                        },
+                        "batches": Array [
+                            Object {
+                                "actual_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("1.000 Kgs"),
+                                },
+                                "amount": Object {
+                                    "state": String("value"),
+                                    "value": String("30.00"),
+                                },
+                                "batch": Object {
+                                    "state": String("value"),
+                                    "value": String("H-2504-A"),
+                                },
+                                "billed_quantity": Object {
+                                    "state": String("value"),
+                                    "value": String("1.000 Kgs"),
+                                },
+                                "godown": Object {
+                                    "state": String("value"),
+                                    "value": String("Main Location"),
+                                },
+                            },
+                        ],
+                        "billed_quantity": Object {
+                            "state": String("value"),
+                            "value": String("1.000 Kgs"),
+                        },
+                        "rate": Object {
+                            "state": String("value"),
+                            "value": String("30.00/Kgs"),
+                        },
+                        "stock_item": String("Hydrochloric Acid 33pc"),
+                    },
+                ],
+                "is_deemed_positive": String("No"),
+                "ledger": String("Sales - Exempt"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20260512"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000056"),
+        "is_invoice": Bool(false),
+        "master_id": String("86"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String("Outstation Buyer 1"),
+        "post_dated": Bool(false),
+        "voucher_number": String("1"),
+        "voucher_type": String("Delivery Note"),
+    },
+])

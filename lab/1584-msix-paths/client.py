@@ -3,7 +3,8 @@
 # hold exactly the extension's own settings for a default data folder (no BRIDGE_AGENT_DATA_DIR), and only the tools
 # named in ALLOWED are sent. Watches <row>\inbox\ for <seq>-<name>.json = {"tool": ..., "arguments": {...}}, sends one
 # at a time in name order, waits for each answer (no timeout, never resent), saves <row>\answers\<seq>-<name>.json
-# whole. Log: <row>\client-log.txt (UTC). Usage: python client.py <row folder> <in|out>
+# whole (written to a .tmp file, then renamed). Log: <row>\client-log.txt (UTC).
+# Usage: python client.py <row folder> <in|out> [9001|9011]  (the port the launch configuration must name; default 9001)
 # It logs the package family (or none) of itself and of the server it starts: which side of the package boundary
 # each process is on is read from the process, not assumed from how it was started.
 # Request files are read as UTF-8 with or without a BOM; any failure is logged with its traceback before exit.
@@ -17,13 +18,13 @@ import traceback
 import ctypes
 from ctypes import wintypes
 
-ROOT, SIDE = sys.argv[1], sys.argv[2]
+ROOT = sys.argv[1]
+ARGS = sys.argv[2:]
 EXE = r'C:\bridge-lab\1584\bin\bridge_mcp.exe'
 EXE_SHA = '48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d'
 LAUNCH = os.path.join(ROOT, 'launch-env.json')
 INBOX, ANSWERS = os.path.join(ROOT, 'inbox'), os.path.join(ROOT, 'answers')
-REQUIRED = {'BRIDGE_TERMS_ACCEPTED': 'true', 'BRIDGE_TALLY_HOST': '127.0.0.1', 'BRIDGE_TALLY_PORT': '9001',
-            'BRIDGE_AGENT_ENABLE_IMPORT': 'true'}
+PORTS = ('9001', '9011')
 ALLOWED = ('list', 'tally_status', 'list_companies', 'ledger_masters', 'build_import_xml', 'local_data_report')
 
 
@@ -67,17 +68,21 @@ def package_family(pid=None):
 
 
 def main():
-    global p, server_info
-    if SIDE not in ('in', 'out'):
-        log(f'stop: side {SIDE!r} is not in or out; not started')
+    global p, server_info, SIDE
+    if not 1 <= len(ARGS) <= 2 or ARGS[0] not in ('in', 'out') or (len(ARGS) == 2 and ARGS[1] not in PORTS):
+        log(f'stop: arguments {ARGS!r} are not <in|out> [9001|9011]; not started')
         sys.exit(2)
+    SIDE = ARGS[0]
+    port = ARGS[1] if len(ARGS) == 2 else '9001'
+    required = {'BRIDGE_TERMS_ACCEPTED': 'true', 'BRIDGE_TALLY_HOST': '127.0.0.1', 'BRIDGE_TALLY_PORT': port,
+                'BRIDGE_AGENT_ENABLE_IMPORT': 'true'}
     exe_sha = sha_of(EXE)
     if exe_sha != EXE_SHA:
         log(f'stop: exe sha256 {exe_sha} differs; not started')
         sys.exit(2)
     with open(LAUNCH, encoding='utf-8-sig') as f:
         launch = json.load(f)
-    if launch != REQUIRED:
+    if launch != required:
         log(f'stop: launch configuration is not exactly the required one (keys {sorted(launch)}); not started')
         sys.exit(2)
     env = {k: v for k, v in os.environ.items() if not k.startswith('BRIDGE_')}
@@ -140,8 +145,9 @@ def main():
         body = {'side': SIDE, 'server_info': server_info, 'server_pid': p.pid, 'tool': req['tool'],
                 'arguments': req.get('arguments', {}), 'call_sent_utc': t0w, 'round_trip_seconds': round(secs, 3),
                 'response': res}
-        with open(out, 'w', encoding='utf-8', newline='\n') as f:
+        with open(out + '.tmp', 'w', encoding='utf-8', newline='\n') as f:
             json.dump(body, f, ensure_ascii=False)
+        os.replace(out + '.tmp', out)
         r = res.get('result') or {}
         log(f'{fn} tool={req["tool"]} secs={secs:.3f} isError={r.get("isError")} error={res.get("error")} saved_sha256={sha_of(out)}')
     p.stdin.close()

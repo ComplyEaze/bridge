@@ -13,6 +13,8 @@ param(
     [Parameter(Mandatory = $true)][ValidatePattern('^[A-Za-z0-9._-]+$')][string]$Family,
     [ValidatePattern('^([0-9a-f]{8})?$')][string]$WriteNonce = '',
     [string]$ExtraFile = '',
+    # The port's lock key: the hex sha256 of native-dispatch-port:<port> (default: port 9001).
+    [ValidatePattern('^[0-9a-f]{64}$')][string]$Key = 'a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01',
     [string]$Root = 'C:\bridge-lab\1584'
 )
 $ErrorActionPreference = 'Stop'
@@ -132,6 +134,7 @@ foreach ($folder in $folders.Keys) {
 
 $record = [ordered]@{
     step = $Step
+    lock_key = $Key
     side = $Side
     utc = [DateTime]::UtcNow.ToString('o')
     pid = $PID
@@ -164,7 +167,6 @@ if ($WriteNonce -ne '') {
     }
 }
 
-$key = 'a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01'
 $named = [ordered]@{
     R = Join-Path $la 'Bridge\agent'
     Q = Join-Path $packageLocal 'Bridge\agent'
@@ -178,7 +180,7 @@ foreach ($name in @('R', 'Q', 'P')) {
     $named["$name-leases"] = Join-Path $named[$name] 'native-dispatch-leases'
     $named["$name-journal"] = Join-Path $named[$name] 'agent-import-ledger.jsonl'
     foreach ($suffix in @('lock', 'snapshot.lock', 'wire.lock')) {
-        $named["$name-K.$suffix"] = Join-Path $named["$name-leases"] ('{0}.{1}' -f $key, $suffix)
+        $named["$name-K.$suffix"] = Join-Path $named["$name-leases"] ('{0}.{1}' -f $Key, $suffix)
     }
 }
 foreach ($name in $named.Keys) {

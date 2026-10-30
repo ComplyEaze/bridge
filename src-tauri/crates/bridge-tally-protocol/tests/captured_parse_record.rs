@@ -1247,6 +1247,33 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#2071): the dollar party's Bills Payable report (its
+    // row a sales bill settled in dollars at another rate, sent with an empty `BILLCL`, which the
+    // strict parse refuses), and the rupee-control sitting's ledger and group snapshots.
+    Row {
+        fixture: "tests/fixtures/native/bills_payable_forex_settled_empty_closing.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_bill_rows(20250401..20250430)",
+        parse: |_, text| bills(text, "20250401", "20250430"),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_rupee_control.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_classified_for_company(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_ledger_snapshot_classified_for_company(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/group_snapshot_forexgroup_lab.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(FOREXGROUP)",
+        parse: |_, text| groups(text, FOREXGROUP_GUID),
+    },
     // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683, #2071): composites written with the foreign
     // symbol against its digits. The base is identified from the lab's own currency reads.
     Row {
@@ -2769,6 +2796,11 @@ const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDG
      agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
+const FOREX_OPEN_BILL: &str = "a Bills Receivable answer of BRIDGE FOREXGROUP LAB (30 Oct 2026, \
+     #2071), with no row here: its rendering would hold the dollar customer's rupee amount, which \
+     the merge gate's privacy scan reads as an identifier shape; the tests in \
+     src/native_outstandings/wire_settled_bill_tests.rs parse it and pin each row's party, \
+     reference and kind";
 const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRANSFER LAB and \
      BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
      yet, and the pull request that renders the census as a span replays it and changes this \
@@ -2777,6 +2809,14 @@ const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRA
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    (
+        "tests/fixtures/native/bills_receivable_forex_rupee_control.utf16le.xml",
+        FOREX_OPEN_BILL,
+    ),
+    (
+        "tests/fixtures/native/bills_receivable_forex_settled_supplier.utf16le.xml",
+        FOREX_OPEN_BILL,
+    ),
     // The audit read's live answers on the pilot lab (the company object has a row).
     (
         "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-census.utf16le.xml",

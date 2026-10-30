@@ -166,6 +166,73 @@ pub struct NativeBillRow {
     pub tally_overdue_days: Option<i64>,
 }
 
+/// A Bills report row's `BILLCL` as Tally sent it. An empty element is not a
+/// zero: Tally sends one for a bill settled in full in a foreign currency at
+/// another rate, in the other side's report (TALLY_PROTOCOL_REFERENCE §8.2d).
+/// What one would mean for a party that is not set aside is not measured.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BillClosing {
+    Amount(ExactDecimal),
+    Empty,
+}
+
+/// A Bills report row whose closing amount is not yet admitted, with its
+/// 1-based place in Tally's answer. Every other field has been read as for
+/// [`NativeBillRow`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnadmittedBillRow {
+    pub(super) row: usize,
+    pub(super) party: String,
+    pub(super) reference: String,
+    pub(super) bill_date: TallyDate,
+    pub(super) due_date: TallyDate,
+    pub(super) closing: BillClosing,
+    pub(super) tally_overdue_days: Option<i64>,
+}
+
+impl UnadmittedBillRow {
+    fn admit(self) -> Result<NativeBillRow, NativeOutstandingsError> {
+        let BillClosing::Amount(closing_balance) = self.closing else {
+            return Err(NativeOutstandingsError::InvalidAmount.in_row(self.row));
+        };
+        Ok(NativeBillRow {
+            party: self.party,
+            reference: self.reference,
+            bill_date: self.bill_date,
+            due_date: self.due_date,
+            closing_balance,
+            tally_overdue_days: self.tally_overdue_days,
+        })
+    }
+}
+
+/// One Bills report's rows, read but not yet admitted (bridge#2071). The only
+/// way to a [`NativeBillRow`] is through an admission, which refuses an
+/// `Empty` closing amount naming its row, as the parse did before.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnadmittedBillRows(pub(super) Vec<UnadmittedBillRow>);
+
+impl UnadmittedBillRows {
+    /// Admits every row.
+    pub fn admit_all(self) -> Result<Vec<NativeBillRow>, NativeOutstandingsError> {
+        self.admit_except(|_| false)
+    }
+
+    /// Drops the rows of every party `set_aside` names, whatever their
+    /// closing amount, then admits the rest. A set-aside party's bills leave
+    /// every figure (bridge#551, bridge#642), so their amounts are never read.
+    pub fn admit_except(
+        self,
+        set_aside: impl Fn(&str) -> bool,
+    ) -> Result<Vec<NativeBillRow>, NativeOutstandingsError> {
+        self.0
+            .into_iter()
+            .filter(|row| !set_aside(&row.party))
+            .map(UnadmittedBillRow::admit)
+            .collect()
+    }
+}
+
 /// One ledger master row from the `List of Ledgers` collection snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LedgerSnapshotEntry {

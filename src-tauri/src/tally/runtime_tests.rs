@@ -9,7 +9,7 @@ use crate::tally::ConnectionStatus;
 use anyhow::Context;
 use bridge_tally_core::CapabilityProfile;
 use bridge_tally_protocol::native_outstandings::{
-    compute_native_outstandings, parse_native_ledger_snapshot,
+    compute_native_outstandings, parse_native_bill_rows, parse_native_ledger_snapshot,
     parse_native_ledger_snapshot_for_company,
 };
 use std::collections::BTreeMap;

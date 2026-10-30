@@ -1,0 +1,8 @@
+Restore plan (#1331 B6, LAB-COMMON C6), written before the restore:
+- Source folder: <BK0 folder> (holds one file only).
+- File: TDBK1800_<company number>.001, 90,051 B, sha256 4a47fe92b61740bde00b017de01c0fb68568c3721c6524fea58b16a2f2648d86, taken 31 Oct 2026 00:50 local (30 Oct 19:20Z) at B0.
+- THE COMPANY: BRIDGE PILOT LAB, number <company number>, GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85.
+- Restore Data Path: Tally's data folder (<Tally data folder>).
+- Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Skip ... Replace ..." = Replace.
+- Before: shut THE COMPANY; listing of its data folder kept (before and after).
+- After: load THE COMPANY alone; screenshot; m-marks (R-m) = A-m1 (245/68), k-catalogue-v2 (R-k) byte-identical to A2, g1 (R-g1) byte-identical to A5; a difference inside CMPINFO only is recorded, not a failure.

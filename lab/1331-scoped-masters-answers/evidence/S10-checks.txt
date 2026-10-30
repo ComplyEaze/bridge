@@ -1,0 +1,13 @@
+S10-g1 against A5-g1: byte-identical False; equal outside CMPINFO True; sizes 19738 / 19730
+S10-g1-again against A5-g1: byte-identical False; equal outside CMPINFO True; sizes 19738 / 19730
+S10-n1 against A9-n1: byte-identical False; equal outside CMPINFO True; sizes 19738 / 19730
+S10-g3 against A7-g3: byte-identical False; equal outside CMPINFO True; sizes 3002 / 2994
+S10-g4 against A8-g4: byte-identical False; equal outside CMPINFO True; sizes 12994 / 12986
+S10-g5 against A8b-g5: byte-identical False; equal outside CMPINFO True; sizes 9212 / 9204
+S10-p2 against A12-p2: byte-identical False; equal outside CMPINFO True; sizes 60310 / 60302
+S10-groups against A3-groups: byte-identical False; equal outside CMPINFO True; sizes 55962 / 55954
+NUMLEDGERS 10018 (expected 10018): equal
+catalogue rows {"LEDGER": 10018}
+the 18 Part A catalogue rows are all in this catalogue unchanged (name, GUID, parent, bill-wise): True
+bytes and seconds: {"m0": [3406, 0.004064], "extent": [4908, 0.003812], "catalogue": [12365018, 1.212659], "groups": [55962, 0.016764], "g1": [19738, 0.10854], "g1-again": [19738, 0.122642], "n1": [19738, 0.0494], "g3": [3002, 0.041885], "g4": [12994, 0.115133], "g5": [9212, 0.132791], "p2": [60310, 0.056049], "m1": [3406, 0.004278]}
+gate (catalogue > 15,000,000 B or > 30 s, or a read > 120 s): passed

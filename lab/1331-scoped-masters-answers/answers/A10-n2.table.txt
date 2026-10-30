@@ -1,0 +1,3 @@
+2026-10-30T19:18:38.181Z A10-n2: requests/n2-rates-name-case-changed.xml (2222 B, sha256 9957b041ad5eba448beb8459c122c5873d9e50d3d516005652d3cd59d63cab8c); curl exit 0; printed "200 5712 0.027855"; CONTENT-LENGTH 5712; bytes 5712; sha256 2c02324cb659a8b02ad83e64eb440a6bb6e13d4495a2e94dbea44bb54d189ee5; seconds 0.027855; bound 200000
+LEDGER NAME='BRIDGE Walk-in' (len 14) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0 PARENT 'Sundry Debtors' ISBILLWISEON absent
+rows per tag {"LEDGER": 1}; LINEERROR []

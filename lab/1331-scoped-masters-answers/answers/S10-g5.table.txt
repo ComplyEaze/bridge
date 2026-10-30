@@ -1,0 +1,7 @@
+2026-10-30T19:28:13.853Z S10-g5: requests/g5-balance-guid-five.xml (2066 B, sha256 e0be8f7e8775dd8dd7e960fdf96ac923f05c508c46041a2cc51a46ee8d5684d8); curl exit 0; printed "200 9212 0.132791"; CONTENT-LENGTH 9212; bytes 9212; sha256 043db9dc22f53af36bb3f20e9d288697438a63abc127decea92a6c27809ca70b; seconds 0.132791; bound 200000
+LEDGER NAME='BRIDGE CGST 9%' (len 14) GUID absent PARENT 'Duties & Taxes' ISBILLWISEON No
+LEDGER NAME='BRIDGE Goods 18%' (len 16) GUID absent PARENT 'Sales Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Round Off' (len 16) GUID absent PARENT 'Indirect Expenses' ISBILLWISEON No
+LEDGER NAME='BRIDGE SGST 9%' (len 14) GUID absent PARENT 'Duties & Taxes' ISBILLWISEON No
+LEDGER NAME='BRIDGE Walk-in' (len 14) GUID absent PARENT 'Sundry Debtors' ISBILLWISEON No
+rows per tag {"LEDGER": 5}; LINEERROR []

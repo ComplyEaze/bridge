@@ -1,0 +1,43 @@
+A5-g1 against A4-p1 by GUID: 5 row(s): ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0']
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3: equal (91 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8: equal (38 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0: equal (42 paths)
+A6-g2 against A4-p1 by GUID: 4 row(s): ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0']
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3: equal (91 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0: equal (42 paths)
+A9-n1 against A4-p1 by GUID: 5 row(s): ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0']
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3: equal (91 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8: equal (38 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0: equal (42 paths)
+A10-n2 against A4-p1 by GUID: 1 row(s): ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0']
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0: equal (42 paths)
+A5-g1: GUID set equal to the expected 5
+A6-g2: GUID set equal to the expected 4
+A9-n1: GUID set equal to the expected 5
+A9-n1 against A5-g1 by GUID: 5 row(s): ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0']
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3: equal (91 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8: equal (38 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7: equal (40 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0: equal (42 paths)
+A8-g4 against A4-c-master-whole by GUID: 5 row(s): ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0']
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d5: equal (32 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d3: equal (30 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d8: equal (30 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d7: equal (32 paths)
+  6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000d0: equal (36 paths)
+A8-g4: GUID set equal to the five
+A8b-g5 against A4-c-balance-whole by NAME: 5 row(s): ['BRIDGE CGST 9%', 'BRIDGE Goods 18%', 'BRIDGE Round Off', 'BRIDGE SGST 9%', 'BRIDGE Walk-in']
+  BRIDGE CGST 9%: equal (20 paths)
+  BRIDGE Goods 18%: equal (20 paths)
+  BRIDGE Round Off: equal (20 paths)
+  BRIDGE SGST 9%: equal (20 paths)
+  BRIDGE Walk-in: equal (20 paths)
+A4-p1: 13 rows; the catalogue holds 13 ledgers under ['Sundry Debtors', 'Sales Accounts', 'Duties & Taxes', 'Indirect Expenses']: the same GUIDs
+A12-p2: 12 rows; the catalogue holds 12 ledgers under ['Sales Accounts', 'Duties & Taxes', 'Indirect Expenses']: the same GUIDs

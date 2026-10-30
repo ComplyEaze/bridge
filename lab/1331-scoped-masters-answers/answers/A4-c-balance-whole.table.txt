@@ -1,0 +1,20 @@
+2026-10-30T19:18:00.301Z A4-c-balance-whole: requests/c-balance-whole.xml (1284 B, sha256 71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f); curl exit 0; printed "200 25480 0.050685"; CONTENT-LENGTH 25480; bytes 25480; sha256 ffe23742ab0793221f0136c5e119bde7d2e8fd2181f01e0f31520f61608eab69; seconds 0.050685; bound 2000000
+LEDGER NAME='BRIDGE CGST 2.5%' (len 16) GUID absent PARENT 'Duties & Taxes' ISBILLWISEON No
+LEDGER NAME='BRIDGE CGST 9%' (len 14) GUID absent PARENT 'Duties & Taxes' ISBILLWISEON No
+LEDGER NAME='BRIDGE Goods 18%' (len 16) GUID absent PARENT 'Sales Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Output CGST XML' (len 22) GUID absent PARENT 'Duties & Taxes' ISBILLWISEON No
+LEDGER NAME='BRIDGE Purchase Svc 5%' (len 22) GUID absent PARENT 'Purchase Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Round Off' (len 16) GUID absent PARENT 'Indirect Expenses' ISBILLWISEON No
+LEDGER NAME='BRIDGE SGST 2.5%' (len 16) GUID absent PARENT 'Duties & Taxes' ISBILLWISEON No
+LEDGER NAME='BRIDGE SGST 9%' (len 14) GUID absent PARENT 'Duties & Taxes' ISBILLWISEON No
+LEDGER NAME='BRIDGE Supplier RJ' (len 18) GUID absent PARENT 'Sundry Creditors' ISBILLWISEON Yes
+LEDGER NAME='BRIDGE Svc 4D 5%' (len 16) GUID absent PARENT 'Sales Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Svc 998313 5%' (len 20) GUID absent PARENT 'Sales Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Svc 998314 5%' (len 20) GUID absent PARENT 'Sales Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Svc 998315 5%' (len 20) GUID absent PARENT 'Sales Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Svc INH2 5%' (len 18) GUID absent PARENT 'BRIDGE Sales Sub' ISBILLWISEON No
+LEDGER NAME='BRIDGE Svc INH 5%' (len 17) GUID absent PARENT 'Sales Accounts' ISBILLWISEON No
+LEDGER NAME='BRIDGE Walk-in' (len 14) GUID absent PARENT 'Sundry Debtors' ISBILLWISEON No
+LEDGER NAME='Cash' (len 4) GUID absent PARENT 'Cash-in-Hand' ISBILLWISEON No
+LEDGER NAME='Profit & Loss A/c' (len 17) GUID absent PARENT ' Primary' ISBILLWISEON No
+rows per tag {"LEDGER": 18}; LINEERROR []

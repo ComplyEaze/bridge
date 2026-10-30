@@ -1,0 +1,2 @@
+2026-10-30T19:28:10.671Z S10-g3: requests/g3-rates-guid-absent-only.xml (2284 B, sha256 46b20305ca7633e0f7a84f2abc169c259ebdb2efd90dfce35467346c0dfd9d9a); curl exit 0; printed "200 3002 0.041885"; CONTENT-LENGTH 3002; bytes 3002; sha256 065d82b7ed08205861efce1b14bab7ba2bce32c321528d367cb937869dd5e020; seconds 0.041885; bound 200000
+rows per tag {}; LINEERROR []

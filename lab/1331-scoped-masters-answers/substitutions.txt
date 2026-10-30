@@ -1,0 +1,20 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+answers/A1-extent.table.txt: original 705 B sha256 825c830c0a01edd96bb35a84f0799482aa9331f97861edc3688540a3fa6b3c85 (kept on the lab PC); the company number replaced in 1 place(s)
+answers/A1-extent.xml: original 4890 B sha256 128ce46b35b4c883ce7785536a5133f791b0b34739824425e66a14dc8f44992f (kept on the lab PC); COMPANYNUMBER text redacted in 1 place(s)
+evidence/B0-listing-before.txt: original 96 B sha256 66480185b936a0b639ba38a000d4e33820a84b4488728affde7f24e44658f12b (kept on the lab PC); 1 x -> <BK\1 folder>
+evidence/B5-listing-before.txt: original 96 B sha256 eb0db17bac62ad28da718d78c5d26f722d598d797038f20ec13597ec8ca1c89f (kept on the lab PC); 1 x -> <BK\1 folder>
+answers/S10-extent.table.txt: original 711 B sha256 7e39f4e0239496b7a047caa6e087daaf6480665f3dd10af7cf00b1f72a18e05f (kept on the lab PC); the company number replaced in 1 place(s)
+answers/S10-extent.xml: original 4908 B sha256 6a89c711993ed66e3a11c9bf4cddb19675e01ecbc93ac4246d213e217b18432f (kept on the lab PC); COMPANYNUMBER text redacted in 1 place(s)
+answers/S20-extent.table.txt: original 711 B sha256 c58f3bff3a03d2eb08fe793decc27f0e327754a87e93a99cc3a46d06f91bae43 (kept on the lab PC); the company number replaced in 1 place(s)
+answers/S20-extent.xml: original 4908 B sha256 ea353db26d63ac5850b539e9ff9c1f523fb543125dc00487b1ca457507dafc82 (kept on the lab PC); COMPANYNUMBER text redacted in 1 place(s)
+evidence/a0-c2-netstat.txt: original 10887 B sha256 6993913eab0eaa318780373cc6c4779dd02414320cc37b83cbe5cbedd9d002be (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/b7-c2-netstat.txt: original 12236 B sha256 1145dc61c21bdbe83afef7844e7abc48d0a3e0634a0d60ae5ab69ed016d7d011 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/pre-a0-c2-netstat.txt: original 10510 B sha256 5d866e4ea622d8fad5ed81921cbc20d8df1673941af667b916da18b7c9526992 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/restore-plan.txt: original 936 B sha256 376cf0e3276db6da7cb7f926495401e36b72bb62bde1884469ac3f69ee04ace0 (kept on the lab PC); 1 x -> <BK\1 folder>; 1 x -> <Tally data folder>
+notes.txt: original 6207 B sha256 3e9b2ff27fd3a5a7c8f00dba671b8fdf9733a403c3393bb4599b1c9e3a5e2c1d (kept on the lab PC); 3 x -> <BK\1 folder>
+scripts/send.py: original 6687 B sha256 9e1a2d324c9a1637e414bd35478ac44ead3d238652cd94cba33a14a0644528f4 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+scripts/compare.py: original 4249 B sha256 2fb781ecf97e447572979b4137f20dd1d43540b5023b9090db3e191d7781b049 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/imports.py: original 1843 B sha256 16c7eda8441233287409a41f3da13cdef5ba94c7066618aa48d9d7cae2401260 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/reads.py: original 3198 B sha256 89d7c58fe69afe766c64e8da6dc56686ad7da5e0f0e0bc3d0f84ae52106fccb5 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/cap.py: original 744 B sha256 fd4a70b7451870e8c467336a67046844d1304b3cc6743b608995d8f42c08030b (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab tools>
+scripts/c2.py: original 1224 B sha256 f76938cda0b9cb36d2c9504a9174f208b27b2e5bc661bd5b3e778fcb13d3a5fe (kept on the lab PC); 1 x -> <LAB_DIR>

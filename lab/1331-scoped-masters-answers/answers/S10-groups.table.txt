@@ -1,0 +1,31 @@
+2026-10-30T19:28:04.222Z S10-groups: requests/g-groups.xml (1066 B, sha256 20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f); curl exit 0; printed "200 55962 0.016764"; CONTENT-LENGTH 55962; bytes 55962; sha256 ea7a772c649f5338c3dfb022a3a7d80833bd5de7f1267a3278d201ff5424dff7; seconds 0.016764; bound 2000000
+GROUP NAME='Bank Accounts' (len 13) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000016 PARENT 'Current Assets' ISBILLWISEON absent
+GROUP NAME='Bank OD A/c' (len 11) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b PARENT 'Loans (Liability)' ISBILLWISEON absent
+GROUP NAME='Branch / Divisions' (len 18) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000007 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='BRIDGE Sales Sub' (len 16) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000e2 PARENT 'Sales Accounts' ISBILLWISEON absent
+GROUP NAME='Capital Account' (len 15) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000001 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Cash-in-Hand' (len 12) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000015 PARENT 'Current Assets' ISBILLWISEON absent
+GROUP NAME='Current Assets' (len 14) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000006 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Current Liabilities' (len 19) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000003 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Deposits (Asset)' (len 16) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000012 PARENT 'Current Assets' ISBILLWISEON absent
+GROUP NAME='Direct Expenses' (len 15) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001a PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Direct Incomes' (len 14) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000019 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Duties & Taxes' (len 14) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000e PARENT 'Current Liabilities' ISBILLWISEON absent
+GROUP NAME='Fixed Assets' (len 12) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000004 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Indirect Expenses' (len 17) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001c PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Indirect Incomes' (len 16) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001b PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Investments' (len 11) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000005 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Loans & Advances (Asset)' (len 24) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000013 PARENT 'Current Assets' ISBILLWISEON absent
+GROUP NAME='Loans (Liability)' (len 17) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000002 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Misc. Expenses (ASSET)' (len 22) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000008 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Provisions' (len 10) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000f PARENT 'Current Liabilities' ISBILLWISEON absent
+GROUP NAME='Purchase Accounts' (len 17) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000018 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Reserves & Surplus' (len 18) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000a PARENT 'Capital Account' ISBILLWISEON absent
+GROUP NAME='Sales Accounts' (len 14) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000017 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Secured Loans' (len 13) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000c PARENT 'Loans (Liability)' ISBILLWISEON absent
+GROUP NAME='Stock-in-Hand' (len 13) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000011 PARENT 'Current Assets' ISBILLWISEON absent
+GROUP NAME='Sundry Creditors' (len 16) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000010 PARENT 'Current Liabilities' ISBILLWISEON absent
+GROUP NAME='Sundry Debtors' (len 14) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000014 PARENT 'Current Assets' ISBILLWISEON absent
+GROUP NAME='Suspense A/c' (len 12) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000009 PARENT ' Primary' ISBILLWISEON absent
+GROUP NAME='Unsecured Loans' (len 15) GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000d PARENT 'Loans (Liability)' ISBILLWISEON absent
+rows per tag {"GROUP": 29}; LINEERROR []

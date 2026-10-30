@@ -1,0 +1,3 @@
+R-m against A13-A-m1: byte-identical True; sizes 3394 / 3394; first differing offset None; equal outside CMPINFO True
+R-k against A2-catalogue: byte-identical True; sizes 25010 / 25010; first differing offset None; equal outside CMPINFO True
+R-g1 against A5-g1: byte-identical True; sizes 19730 / 19730; first differing offset None; equal outside CMPINFO True

@@ -1,0 +1,2 @@
+census: ok 16, skipped 40, FAIL 0
+exit 0

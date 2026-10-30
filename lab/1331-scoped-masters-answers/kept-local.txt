@@ -1,0 +1,8 @@
+Files kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+evidence/S10-catalogue.table.txt 1382761 B cd320dc643562cfc0a89373d049b0ddc096892dfc0d96630e774cb38371a1ea4
+evidence/S10-catalogue.xml 12365018 B 9db247bb5a2cdaa5f42579cbf3f348625fd8b18b5581d73af6573fd8f44a6092
+evidence/S20-catalogue.table.txt 2762761 B da6dece78ba282a11fe523203f22a24bcdd0a5a4aa088ce140fee2cfcbe78281
+evidence/S20-catalogue.xml 24705018 B 99a67d9d6835554f34f408bff4707a3cedbd1230533f4eb50d10b9ad8e742406
+1331-bk0/TDBK1800_<company number>.001 90051 B 4a47fe92b61740bde00b017de01c0fb68568c3721c6524fea58b16a2f2648d86
+1331-bk1/TDBK1800_<company number>.001 946410 B 862404d698790fa57834449db5762fe8589a0f6ff5e4083bcce7441922755b0f
+evidence/notes.txt (the sitting's working note, folded into notes.txt) 250 B 0c3aeeace3fe19e7920b7e2517fd4c6b17d9c9be95374fc4e2eb663990488f0a

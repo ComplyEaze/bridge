@@ -1,0 +1,14 @@
+S20-g1 against A5-g1: byte-identical False; equal outside CMPINFO True; sizes 19738 / 19730
+S20-g1-again against A5-g1: byte-identical False; equal outside CMPINFO True; sizes 19738 / 19730
+S20-n1 against A9-n1: byte-identical False; equal outside CMPINFO True; sizes 19738 / 19730
+S20-g3 against A7-g3: byte-identical False; equal outside CMPINFO True; sizes 3002 / 2994
+S20-g4 against A8-g4: byte-identical False; equal outside CMPINFO True; sizes 12994 / 12986
+S20-g5 against A8b-g5: byte-identical False; equal outside CMPINFO True; sizes 9212 / 9204
+S20-p2 against A12-p2: byte-identical False; equal outside CMPINFO True; sizes 60310 / 60302
+S20-groups against A3-groups: byte-identical False; equal outside CMPINFO True; sizes 55962 / 55954
+NUMLEDGERS 20018 (expected 20018): equal
+catalogue rows {"LEDGER": 20018}
+the 18 Part A catalogue rows are all in this catalogue unchanged (name, GUID, parent, bill-wise): True
+bytes and seconds: {"m0": [3406, 0.005296], "extent": [4908, 0.004217], "catalogue": [24705018, 2.017133], "groups": [55962, 0.008408], "g1": [19738, 0.305605], "g1-again": [19738, 0.25936], "n1": [19738, 0.116551], "g3": [3002, 0.072288], "g4": [12994, 0.242512], "g5": [9212, 0.319133], "p2": [60310, 0.082108], "m1": [3406, 0.003373]}
+gate (catalogue > 15,000,000 B or > 30 s, or a read > 120 s): HELD
+S20 gate line: the sheet applies its gate at B2 only; at B4 it is not a rule. Recorded for information.

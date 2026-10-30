@@ -1,0 +1,2 @@
+<LAB_DIR>\answers\P\p-book-extent.answer.xml: 3836 bytes, sha256 9c63967ad722ea001a36048a17cf10d21868c19ccd02d41c6e5012ed073874e4, BODY digest 8be56fbdc1eff7d9100e49b9d1255425608b43f8c362eb21d71baddf1c09d833, 1 rows
+  ('COMPANY', 'BRIDGE PILOT LAB', '6b43e498-430c-4d5c-bfef-d32e2ab93c85', '68', '245', '20260915', '20260401')

@@ -1,0 +1,37 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+answers/A/a-0401_census_spanned_0_1829.summary.txt: original 5699 B sha256 ca4215cbb1684820e067ab1cb5391ebecb0552fa4dfb79d316244dc9a73ecfe7 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/A/a-0401_verification.summary.txt: original 5671 B sha256 bed6b2dc069bf6e8d426b9743ccf0f780b62330905130e543ad8eb7defbe8cb6 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/A/a-0403_census_spanned_0_1829.summary.txt: original 711 B sha256 8a49489e97a11985b5a90992eb8d6ea9f5b58a5eced1adbce119a5421e74b131 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/A/a-0403_verification.summary.txt: original 683 B sha256 636ff95bf25d36e1e15c4a39c56156ffd07cb3814abb638b0dd9f11857a17bff (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/A/a-marks.summary.txt: original 326 B sha256 e85940ae9406dec3c28ef21a89e04427482d8607cc9a11fbd3d1e4339338b16d (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/A/company-list.answer.xml: original 4000 B sha256 ff15e557b351ab4c98055e55f749f28cd12d489115583e7af6e4f22cb4178759 (kept on the lab PC); UTF-16LE kept; COMPANYNUMBER text redacted in 1 place(s), the number in 0
+answers/A/end/a-marks.summary.txt: original 330 B sha256 bee8c543beb4869997dd7be8ed33abfca03d883897e8a1991e02693318842b0a (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/B1/a-marks.summary.txt: original 327 B sha256 e29ddf98b1ea38faff3f6638eb127218da7bd9b42c17a233127dc1b40faeb619 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/B1/live-after/a-marks.summary.txt: original 338 B sha256 97a51b2c76f44cdc1f4183dc99d0eee011be07ec124ec081d9f8a940f9111ec8 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/company-list.answer.xml: original 4000 B sha256 8d7b9498f929840ed160c9ed8b32576683d4861d2d6e05e682f4486cc21373ae (kept on the lab PC); UTF-16LE kept; COMPANYNUMBER text redacted in 1 place(s), the number in 0
+answers/P/p-0804-0805_census_spanned_0_68.summary.txt: original 610 B sha256 d88e1ab6a43440203698d1eb05245300d60ae14f49d8dfd977cc0859c2a4745f (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/p-0804-0805_window.summary.txt: original 580 B sha256 010e351c3f29b3a118bda0048ea5323d9adc92b4ed0cfc4f6cbd9c937e41201d (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/p-book-extent.answer.xml: original 3836 B sha256 9c63967ad722ea001a36048a17cf10d21868c19ccd02d41c6e5012ed073874e4 (kept on the lab PC); UTF-16LE kept; COMPANYNUMBER text redacted in 1 place(s), the number in 0
+answers/P/p-book-extent.summary.txt: original 342 B sha256 60bb4ce43753f013708c1d1ef7c150c7eea252c81608d5d2d45d4573e29f67ef (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/p-currencies.summary.txt: original 252 B sha256 6018954c2c122e191590afa16deff40c0cbb21fe0b746821fccb91c37354ad1a (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/p-groups.summary.txt: original 1158 B sha256 d84096ab71ff260861310959c2103fb563e5267e5ef8abb940bd2667a989671f (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/p-ledgers-compliance.summary.txt: original 863 B sha256 54e63e2b63aa70be36be6aaf5360a2f1b66ab6c230d139774b4d0750100fa605 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/p-ledgers-paired.summary.txt: original 859 B sha256 660b95aa55454d2d4c06c30d18bb79153b58cd1552da27b5856cf9a56e9868d0 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/p-marks.summary.txt: original 324 B sha256 468d8f591397fb1eb7c8fc6a3db39d88e8f5083ed74ee0476c26d940ccbc5e18 (kept on the lab PC); 1 x -> <LAB_DIR>
+answers/P/end/p-marks.summary.txt: original 328 B sha256 a76d0dea1b70bce78e093f27a6ff7cca7009ddcf85a2d2898dc23f23ec8396b0 (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/a-c10-bridge-processes.txt: original 796 B sha256 d6ce62a138469cd2bf84b680d1b0b230e143bf3d6be56de74662524f2257df3d (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/a-c10-netstat.txt: original 10983 B sha256 6bec4f92ae21c3665f49aa7bd4caafad4a040c23c5754ef8c97e4d5fe9d275bb (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/a0-bridge-processes.txt: original 796 B sha256 4316b1254b4d150a26d09600aec2d3a7bb8a4d3892044f2a980c520f1aa3a5d5 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/a0-netstat.txt: original 10910 B sha256 af0690d86f79e06d8affbf7e507ece4c820d6ae993424ef577828767d690b8bd (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/b1-0-bridge-processes.txt: original 796 B sha256 b678694261ca06da551c00902b54fd53ae9278267de3b149938742efdd9c0957 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/b1-0-netstat.txt: original 10099 B sha256 9939b765b5b91776b07c48262372fef73e563aaa89a45ecb9ec86ad43aec11b5 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/close-c10-bridge-processes.txt: original 796 B sha256 6b33681760f5b3e8ffffe37f51b7ab43b8f8679cde5f9909d4ac59d5ac249d7b (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/close-c10-netstat.txt: original 10246 B sha256 8513e960b048b55d3fcb04d34749b40947f4bab463fd7a4cae0eb74a6c400f1c (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/p-c10-bridge-processes.txt: original 796 B sha256 6af8f55fffba50ef2f07cc71a57cec566c2d48ef2ee5468289aa04964f3d6cd9 (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/p-c10-netstat.txt: original 11656 B sha256 a8fa9fab738b808bd0677847fed99e71c2aab8929e7fa7777f15a73311aa105e (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/p0-bridge-processes.txt: original 796 B sha256 f35b7e91fb136b15e7f1dc55be9befce8585ddef19d379ff613311beab46087a (kept on the lab PC); process paths replaced by what they are; 4 x -> <desktop client>
+evidence/p0-netstat.txt: original 10389 B sha256 70e1f84cb9cf712a151baa8c8db4e34b550149fc0beaa370f539d890e6109131 (kept on the lab PC); only the port-9001 LISTENING lines kept
+notes.txt: original 8216 B sha256 50cf16eaa225b76d1203d425b1c90f1901f0d873b6ea30b098db618e8904f4ee (kept on the lab PC); 5 x -> <LAB_DIR>; 1 x -> <lab folder>; 2 x -> <Tally data folder>; 5 x -> run lead; 2 x -> stop
+RESULTS.md: original 2582 B sha256 19cb4c69e112dae5895a3c01a140a5099b2f150d65110ed47e8bd8ad79f1626d (kept on the lab PC); 1 x -> <Tally data folder>
+restore-plan-B1.txt: original 1169 B sha256 4857cd8f7c15841d0d918f9b2956a674133694d7a37d2e4c64f7f97459275916 (kept on the lab PC); 3 x -> <LAB_DIR>; 2 x -> run lead; 2 x -> stop
+scripts/send.py: original 3235 B sha256 ec21a986ee3439145bb1c00d0fabb03c3786b5c117c23bc62dbea5a3f708546d (kept on the lab PC); 1 x -> <LAB_DIR>; 4 x -> stop

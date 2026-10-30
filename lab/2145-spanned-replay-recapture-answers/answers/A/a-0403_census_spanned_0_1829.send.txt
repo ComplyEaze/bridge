@@ -1,0 +1,5 @@
+request requests/a-0403_census_spanned_0_1829.request.utf16le.xml 1524 B sha256 25bc466bb18f857973c144c8e8c93ba88c435a79ee17db6a5839a5c54159e5dc; SHA256.txt ('25bc466bb18f857973c144c8e8c93ba88c435a79ee17db6a5839a5c54159e5dc', 1524)
+sent 2026-10-30T07:14:40.897Z answered 2026-10-30T07:14:41.077Z; curl exit 0; printed "200 12730"; stderr ""
+CONTENT-LENGTH 12730; answer 12730 B sha256 2909e9c14ef570c952df2efcfc05b6969eb77cc502970e1f4c3194d726207edf; READ BOUND 1000000
+GET /status sent 2026-10-30T07:14:41.083Z answered 2026-10-30T07:14:41.162Z; exit 0; printed "200 51"
+C3 ok

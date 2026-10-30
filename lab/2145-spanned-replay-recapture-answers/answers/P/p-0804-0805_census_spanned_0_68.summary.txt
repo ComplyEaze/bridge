@@ -1,0 +1,5 @@
+<LAB_DIR>\answers\P\p-0804-0805_census_spanned_0_68.answer.xml: 10276 bytes, sha256 414ebb181112b299259446ff5a60832c197011127c452d331dbcfb4856c9a60f, BODY digest 900487f980df6d624a81e7a91ccd57a6016e7bec5a3befd53db00dec0b3dbbe0, 3 rows
+  ('VOUCHER', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000017', 31, '20260804', 'Purchase', '1', None, None)
+  ('VOUCHER', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000018', 32, '20260804', 'Purchase', '2', None, None)
+  ('VOUCHER', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001a', 35, '20260805', 'BRIDGE Sales', 'BP/26-27/0021', None, None)
+rows above 68: 0

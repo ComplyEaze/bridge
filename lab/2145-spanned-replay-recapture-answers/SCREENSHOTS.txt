@@ -1,0 +1,17 @@
+Captures of this item, by name, size and sha256. They stay on the lab PC.
+shots/a-c10-tally.png 72697 B 65888420aee4c9c395596abeffe8a3ca7eab61962b58e788c7fcb3b3935fc518
+shots/a0-tally.png 46798 B 75d0b4366feb68c07ddbde0ed2e6eda3f2a5e607d0bec8396ce5441cac8a960c
+shots/a1-select-company.png 72697 B 65888420aee4c9c395596abeffe8a3ca7eab61962b58e788c7fcb3b3935fc518
+shots/a4-tally.png 46798 B 75d0b4366feb68c07ddbde0ed2e6eda3f2a5e607d0bec8396ce5441cac8a960c
+shots/b1-0-tally.png 46798 B 75d0b4366feb68c07ddbde0ed2e6eda3f2a5e607d0bec8396ce5441cac8a960c
+shots/b1-backup-now-screen.png 42498 B a52a6377197260fdaf8ef47ac71398d59312105467adde63c5a6efa9813ec653
+shots/b1-data-path.png 26880 B cf6063f096b78fa55435c6cefe19188ed22f5770c2b73008923e81ee4e27718e
+shots/b1-gateway.png 46798 B 75d0b4366feb68c07ddbde0ed2e6eda3f2a5e607d0bec8396ce5441cac8a960c
+shots/b1-live-amend-gateway.png 46798 B 75d0b4366feb68c07ddbde0ed2e6eda3f2a5e607d0bec8396ce5441cac8a960c
+shots/b1-path-back.png 72697 B 65888420aee4c9c395596abeffe8a3ca7eab61962b58e788c7fcb3b3935fc518
+shots/b1-restore-screen.png 39853 B f1c939e364bf2e6e47d0771da636915090648f1284eaf06fe67f2dd92c26aed6
+shots/close-c10-tally.png 72697 B 65888420aee4c9c395596abeffe8a3ca7eab61962b58e788c7fcb3b3935fc518
+shots/p-c10-tally.png 72708 B 130723ffe6ee170e95e66df835c45dfd816624bd39b60221a989bd83d16feef5
+shots/p0-tally.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/p3-after-window-2.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/p3-after-window.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a

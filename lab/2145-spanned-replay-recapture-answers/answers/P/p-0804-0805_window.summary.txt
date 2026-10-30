@@ -1,0 +1,4 @@
+<LAB_DIR>\answers\P\p-0804-0805_window.answer.xml: 226584 bytes, sha256 17379f502cad7e46fd19f4f7cfdf63da0cea0e9450e3462120703220bccda00f, BODY digest 7915011b3c8e10aeccecf489b681f24829c99304c7ff211e70d3309dcbfcd9ab, 3 rows
+  ('VOUCHER', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000017', 31, '20260804', 'Purchase', '1', 'No', 'No')
+  ('VOUCHER', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000018', 32, '20260804', 'Purchase', '2', 'No', 'No')
+  ('VOUCHER', '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001a', 35, '20260805', 'BRIDGE Sales', 'BP/26-27/0021', 'No', 'No')

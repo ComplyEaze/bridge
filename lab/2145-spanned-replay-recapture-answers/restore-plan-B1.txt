@@ -1,0 +1,7 @@
+2145-R Part B1 restore plan (C6 with the sheet's stricter changes), written before the restore, on the run lead's word naming the backup.
+Source folder: <LAB_DIR>\source-B1 (holds one file only: a copy of the named backup)
+File: TDBK1800_<company number>.001, 616,136 B, sha256 f8ad5a71071ac106a0bb2dd2e50396e8157cac9b5f4296fed5846938766aa9f1 (equal to Part 0's record of the original in the folder stray-backup-all-companies-2026-10-12; the original was not moved or changed).
+Company: BRIDGE AMEND LAB, GUID 17a10910-773c-42c6-bd66-7bba9a392536
+Restore Data Path: <LAB_DIR>\restored-B1 (NEW, listed empty before), never Tally's data folder.
+The only prompt expected: "Accept ?" = Yes. "Company data folder ... already exists", or an offer to upgrade, migrate, repair or rewrite = no key, screenshot, stop.
+After: Select Company's data path changed to <LAB_DIR>\restored-B1; load BRIDGE AMEND LAB alone; screenshots; C2 step 0; a-marks: the GUID check, then the pair (ALTVCHID, ALTMSTID) must be exactly (1469, 222), (1676, 229) or (1685, 232), else stop (the run lead's word: record it, unload, leave the restored folder).

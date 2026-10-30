@@ -1,0 +1,5 @@
+request requests/p-currencies.request.utf16le.xml 966 B sha256 56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661; SHA256.txt ('56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661', 966)
+sent 2026-10-30T07:17:07.935Z answered 2026-10-30T07:17:08.278Z; curl exit 0; printed "200 3400"; stderr ""
+CONTENT-LENGTH 3400; answer 3400 B sha256 fe2dee55160e8af6d3a61264cb0c4daff70dbfa680212f4a90b39909b921bb96; READ BOUND 16384
+GET /status sent 2026-10-30T07:17:08.287Z answered 2026-10-30T07:17:08.480Z; exit 0; printed "200 51"
+C3 ok

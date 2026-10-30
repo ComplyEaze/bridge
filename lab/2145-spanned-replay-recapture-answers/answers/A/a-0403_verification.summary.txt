@@ -1,0 +1,5 @@
+<LAB_DIR>\answers\A\a-0403_verification.answer.xml: 23508 bytes, sha256 e896a14607cfa36214248728b1753e4a106514cae862dada191a5522509974f4, BODY digest bdd5093f14b2d4a0e8a911ea0ac2b2af2d90a47761cfac721bfe71c4a55deb88, 4 rows
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-0000064f', 1679, '20260403', 'Journal', '251', 'No', 'No')
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-0000064e', 1681, '20260403', 'Payment', '16', 'No', 'Yes')
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-00000651', 1684, '20260403', 'Payment', '2', 'No', 'No')
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-00000652', 1686, '20260403', 'Journal', '252', 'No', 'No')

@@ -1,0 +1,5 @@
+request requests/p-book-extent.request.utf16le.xml 1094 B sha256 eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49; SHA256.txt ('eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49', 1094)
+sent 2026-10-30T07:16:52.504Z answered 2026-10-30T07:16:52.592Z; curl exit 0; printed "200 3836"; stderr ""
+CONTENT-LENGTH 3836; answer 3836 B sha256 9c63967ad722ea001a36048a17cf10d21868c19ccd02d41c6e5012ed073874e4; READ BOUND 16384
+GET /status sent 2026-10-30T07:16:52.597Z answered 2026-10-30T07:16:52.652Z; exit 0; printed "200 51"
+C3 ok

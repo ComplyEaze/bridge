@@ -1,0 +1,6 @@
+Files kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+answers/part0-backups.txt 30064 B 1d11b3340eb07c93b502a727f4158e5b9fadd4bfef598f2b543b25cffbe1ed33
+restored-B1-listing-after.txt 646 B 2dc5f842ed0df87b854091b5a41028bb10e001b3e6f51d39f13642a60440b20b
+backup-amend-now/TDBK1800_<company number>.001 616136 B 05053933dcae6747e88a45515378e01bccb4b5fef24c33e225f97406b1a87b92
+source-B1/TDBK1800_<company number>.001 616136 B f8ad5a71071ac106a0bb2dd2e50396e8157cac9b5f4296fed5846938766aa9f1
+restored-B1/: the restored copy (17 files under its company-number folder), kept in place.

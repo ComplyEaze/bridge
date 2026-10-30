@@ -1,0 +1,2 @@
+<LAB_DIR>\answers\A\end\a-marks.answer.xml: 3398 bytes, sha256 874781bbf43b02712aa0821045eeae6ffe6f72c5edd353d12db2cd6cb82812fc, BODY digest 1bc1da7ce0bee77bb5cc96fbeb65fc016f177e5b5478f6df395eac94af3cf4fd, 1 rows
+  ('COMPANY', 'BRIDGE AMEND LAB', '17a10910-773c-42c6-bd66-7bba9a392536', '1829', '245', None, None)

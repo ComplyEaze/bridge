@@ -1,0 +1,2 @@
+<LAB_DIR>\answers\P\p-currencies.answer.xml: 3400 bytes, sha256 fe2dee55160e8af6d3a61264cb0c4daff70dbfa680212f4a90b39909b921bb96, BODY digest 7e56218f1efa086238bcdd5fc73a7718e90cbcdcd0d9155744cb44e4b3437729, 1 rows
+  ('CURRENCY', '₹')

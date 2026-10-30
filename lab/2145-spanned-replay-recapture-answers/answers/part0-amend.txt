@@ -1,0 +1,5 @@
+Part 0 (pushed form): the command, run from PowerShell: Get-ChildItem -Path <lab folder> -Recurse -File -Filter 'TDBK*' -ErrorAction Stop | Select-Object FullName,Length,LastWriteTime | Format-List; $? True; 220 files.
+The whole output stays on the lab PC: answers/part0-backups.txt, 30064 B, sha256 1d11b3340eb07c93b502a727f4158e5b9fadd4bfef598f2b543b25cffbe1ed33 (it names every company's backup).
+The one file that carries BRIDGE AMEND LAB's number:
+FullName      : <lab folder>\stray-backup-all-companies-2026-10-12\TDBK1800_<company number>.001
+Length 616136; sha256 f8ad5a71071ac106a0bb2dd2e50396e8157cac9b5f4296fed5846938766aa9f1; LastWriteTime 2026-10-12 08:00:01 (local); its folder holds 50 backup files.

@@ -1,0 +1,4 @@
+command: python -I check_requests.py requests (in the sheet folder)
+exit: 0
+files: ok 22, FAIL 0
+requests: ok 17, FAIL 0

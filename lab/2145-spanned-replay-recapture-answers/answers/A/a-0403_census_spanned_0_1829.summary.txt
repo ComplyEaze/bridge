@@ -1,0 +1,6 @@
+<LAB_DIR>\answers\A\a-0403_census_spanned_0_1829.answer.xml: 12730 bytes, sha256 2909e9c14ef570c952df2efcfc05b6969eb77cc502970e1f4c3194d726207edf, BODY digest ee381b99270576d658297f756dba70bc84a21ea60084f7f382a4064d3e3e885d, 4 rows
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-0000064f', 1679, '20260403', 'Journal', '251', None, None)
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-0000064e', 1681, '20260403', 'Payment', '16', None, None)
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-00000651', 1684, '20260403', 'Payment', '2', None, None)
+  ('VOUCHER', '17a10910-773c-42c6-bd66-7bba9a392536-00000652', 1686, '20260403', 'Journal', '252', None, None)
+rows above 1829: 0

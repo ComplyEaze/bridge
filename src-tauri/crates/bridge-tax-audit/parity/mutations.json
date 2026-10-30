@@ -14278,5 +14278,37 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "L1875-1",
+  "by": "author",
+  "what": "loans_interest: charge_shaped reads the ledgers on nil lines again (#1875 item 1)",
+  "file": "src/loans_interest.rs",
+  "from": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)",
+  "to": "            let counter: Vec<&str> = others_than(v, loan_ledger)"
+ },
+ {
+  "id": "L1875-2",
+  "by": "author",
+  "what": "loans_interest: interest_tds_ledgers lists a TDS ledger only on a nil line again (#1875 item 2)",
+  "file": "src/loans_interest.rs",
+  "from": "            .filter(|l| tds_here.contains(&l.ledger) && l.amount_paise != 0)",
+  "to": "            .filter(|l| tds_here.contains(&l.ledger))"
+ },
+ {
+  "id": "L1875-3",
+  "by": "author",
+  "what": "loans_interest: the misposted finding's tags name a foreign interest ledger only on a nil line again (#1875 item 2)",
+  "file": "src/loans_interest.rs",
+  "from": "                    .filter(|l| foreign_interest.contains(&l.ledger) && l.amount_paise != 0)",
+  "to": "                    .filter(|l| foreign_interest.contains(&l.ledger))"
+ },
+ {
+  "id": "L1875-4",
+  "by": "author",
+  "what": "loans_interest: a nil line on a paired loan takes a voucher out of LOAN-3's undeclared-shared check again (#1875 item 5)",
+  "file": "src/loans_interest.rs",
+  "from": "                    .any(|l| paired.contains(l.ledger.as_str()) && l.amount_paise != 0)",
+  "to": "                    .any(|l| paired.contains(l.ledger.as_str()))"
  }
 ]

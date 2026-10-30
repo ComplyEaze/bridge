@@ -1,0 +1,95 @@
+Pushed copies that differ from the files kept on the lab PC, with the original's bytes and sha256 and what changed:
+runs/K0a/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0a/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K0a/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0a/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K0a/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0a/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K0a/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0a/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K0b/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0b/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K0b/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0b/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K0b/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0b/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K0b/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K0b/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1a/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1a/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1a/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1a/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1a/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1a/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1a/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1a/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1b/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1b/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1b/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1b/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1b/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1b/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K1b/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K1b/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2a/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2a/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2a/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2a/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2a/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2a/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2a/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2a/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2b/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2b/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2b/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2b/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2b/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2b/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K2b/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K2b/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3a/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3a/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3a/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3a/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3a/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3a/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3a/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3a/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3b/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3b/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3b/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3b/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3b/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3b/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/K3b/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/K3b/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/L1B-repeat/obs1-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/L1B-repeat/obs1-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/L1B-repeat/obs15-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/L1B-repeat/obs15-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/L1B-repeat/obs30-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/L1B-repeat/obs30-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+runs/L1B-repeat/obs5-ledgers-1.plan.json: original 390 B sha256 019fefc6524cb3f8c8c66d54ddef92a86f8c57a8447ef2bcf03691405653c535; 1 x -> <lab folder>
+runs/L1B-repeat/obs5-marks-1.plan.json: original 386 B sha256 5d6b05df1340fb0d1c3d4626f3838e2f9f20e7443e7a6a6c41e2182e56d8a5ee; 1 x -> <lab folder>
+evidence/c10-netstat.txt: original 9718 B sha256 d438d4ff112196a6a5270b788f61ed27dec3c7e679f1cf07b1aea306853b5d04; only the port-9001 LISTENING lines kept
+evidence/c10b-netstat.txt: original 9644 B sha256 94db20478fe924d4e71bccc8248992c750a2b51dc43c8254bd7c4920d17d6364; only the port-9001 LISTENING lines kept
+evidence/rows-log.txt: original 61981 B sha256 7f110cd9243a77bf6c24523a76ed33340e0fa3c79bda6bb406b94f0cfa0ac791; "bytes" removed from A's end event in 9 line(s); 9 x -> <lab folder>
+evidence/s0-netstat.txt: original 9619 B sha256 7bda7bd706803e2bf3438479ba113234389b40aab5a8548c9c91d1c5d43447c3; only the port-9001 LISTENING lines kept
+evidence/s0-none-netstat.txt: original 9914 B sha256 89e9e1812ac208ea954df0be8600beb332baa57d11034cf84ef51b8a1c2ce00f; only the port-9001 LISTENING lines kept
+plans/K0a.json: original 965 B sha256 4f8d52452dab33f4b2ce818b6dced017efb9483074852f0e8d6a3e6defa46141; 3 x -> <lab folder>
+plans/K0b.json: original 965 B sha256 e386d5f5b61798cc3b7af4d5c6aabfcf9bfda6528e9e7f2e09fd1de7ba6e8506; 3 x -> <lab folder>
+plans/K1a.json: original 1164 B sha256 13dfd905cfbc6153a06f133658ac9de58adb792594465176c5cd444cd76fd44e; 4 x -> <lab folder>
+plans/K1b.json: original 1164 B sha256 b9ed5d4292f6428a85718092322c1bdd9a48fbbb41f58545cfbd5e5bfeb1c82b; 4 x -> <lab folder>
+plans/K2a.json: original 1164 B sha256 9aea5d370290d12f9e6c5695c3a57e3187074e6584b322d17dbcdfa3e41d77b6; 4 x -> <lab folder>
+plans/K2b.json: original 1164 B sha256 e4617fad9d0c5829f8281784474f5e207c35c44834ddefec2901aa41b7a60a9f; 4 x -> <lab folder>
+plans/K3a.json: original 1361 B sha256 d9906883c32332ac7ab49c5270aa63bce86b8a8809c7f8fd2cefecd96ccb7282; 5 x -> <lab folder>
+plans/K3b.json: original 1361 B sha256 c10265b92d8e7e967b3a0860d5facb40a0ec2f6ff96d696d89f1420f22ad5b2c; 5 x -> <lab folder>
+plans/L1B-repeat.json: original 974 B sha256 a56abaecc1c38b4a40e0b570510c9108bb33aa744effa486fc2d48a00ed22128; 3 x -> <lab folder>
+plans/d0.json: original 388 B sha256 4d9bebc596cf89845b357f9f61adb4f2b9dcdaa7f6768a49e37bc35caec8fab5; 1 x -> <lab folder>
+RESULTS.md: original 7378 B sha256 797c2b08f2a3353ccf677dd517ff35294649e62b514ff4da852cf04febd44e47; 1 x -> stop
+scripts/rows.py: original 10611 B sha256 bc22ef0a8d8697a6810845bb9d8b86092eac39f10b3dd2c00304d6620bbbdf98; 1 x -> <lab folder>; 17 x -> stop
+scripts/watch.ps1: original 3340 B sha256 54272c13d69dd0ebfccb3a2757c6d9dd821ba50c6bedd85e663591afe6c93d7b; 1 x -> <lab folder>; 3 x -> stop
+scripts/c3.py: original 2578 B sha256 b4c07fab5a736180f90d02af600ecb8fcf6ce87de1d487c1ebf19923b2e73e42; 1 x -> <lab folder>; 3 x -> stop
+scripts/orderread.py: original 1306 B sha256 cecb537f3374f7347fb6adc25def21eeee5545cb4c5ae389c4fa70d7a55e8c5b; 1 x -> <lab folder>
+scripts/recompute.py: original 4005 B sha256 d7fbb620298354bb5ab7db752d7f687cb85f59315b4b019e8c6409bef97b57d5; 1 x -> <lab folder>; 2 x -> stop
+scripts/step0.ps1: original 2397 B sha256 2b0c803047d2806e9996bda9cac720df476bd89cd1717e91b76dcb4f0fcefe8c; 2 x -> <lab folder>

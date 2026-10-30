@@ -1,0 +1,37 @@
+{
+ "host": "127.0.0.1",
+ "port": 9001,
+ "conns": {},
+ "steps": [
+  {
+   "name": "A",
+   "at": 1.0,
+   "conn": "new",
+   "file": "<lab folder>/earlier/lab/1713-abandoned-ledger-create/requests/busy-year.xml",
+   "sha256": "ad2d4aa96d98041cd69cc52b4d2d280feeaab561a9558f4190e8b64db30ee749",
+   "limit": null,
+   "write": false,
+   "max_bytes": 400000000
+  },
+  {
+   "name": "B",
+   "at": 5.0,
+   "conn": "new",
+   "file": "<lab folder>/plans/K0b-create.xml",
+   "sha256": "934f5e5708e6e55486f5d14791cfb410bb3fecf8bc83361ae83bd2b5ccb3627b",
+   "limit": 20,
+   "write": true,
+   "max_bytes": 2000000
+  },
+  {
+   "name": "C",
+   "at": 26.0,
+   "conn": "new",
+   "file": "<lab folder>/earlier/lab/1713-abandoned-ledger-create/requests/ledgers.xml",
+   "sha256": "3eb31c35d3b911421742005af98e5e87453fbfc7dbc0d812ac1856761a3f280b",
+   "limit": null,
+   "write": false,
+   "max_bytes": 2000000
+  }
+ ]
+}

@@ -1,0 +1,9 @@
+K0a: D 173.719 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 217, after ['218', '218', '218', '218']; NOTE
+K1a: D 173.531 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 218, after ['219', '219', '219', '219']; NOTE
+K2a: D 169.094 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 219, after ['220', '220', '220', '220']; NOTE
+K3a: D 63.562 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 220, after ['221', '221', '221', '221']; NOTE
+K0b: D 64.046 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 221, after ['222', '222', '222', '222']; NOTE
+K1b: D 66.078 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 222, after ['223', '223', '223', '223']; NOTE
+K2b: D 62.735 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 223, after ['224', '224', '224', '224']; NOTE
+K3b: D 60.672 s; B abandoned; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 224, after ['225', '225', '225', '225']; NOTE
+L1B-repeat: D 61.234 s; B answered; C absent; observations ['absent', 'absent', 'absent', 'absent']; marks before B 225, after ['226', '226', '226', '226']; NOTE

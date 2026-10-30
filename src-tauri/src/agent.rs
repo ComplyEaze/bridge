@@ -1798,7 +1798,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // A cause, reached through `voucher_window_part_not_admitted`. Since
         // #985 a window read whole is admitted against the census that sized
         // it, so this is reachable on an ordinary day's read, not only on a
-        // divided one.
+        // divided one. Since #2145 that census is spanned to the marks read
+        // before it, so a voucher saved between those marks and the census
+        // also reaches it.
         "part_census_mismatch" => Some(
             "ComplyEaze Bridge counted this window's vouchers before reading them, and the read returned \
              different vouchers from the ones it counted (`counts` gives returned against \

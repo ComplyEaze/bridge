@@ -1103,7 +1103,11 @@ impl Server {
             )
             .await?
         {
-            WindowCount::Counted { census, evidence } => {
+            WindowCount::Counted {
+                census,
+                evidence,
+                voucher_mark,
+            } => {
                 let found = census
                     .holds_a_voucher_between(from, to)
                     .map(|in_window| (in_window, !census.is_empty()))
@@ -1114,8 +1118,8 @@ impl Server {
                         identity,
                         company,
                         evidence,
-                        any_in_window,
-                        any_in_widened,
+                        (any_in_window, any_in_widened),
+                        voucher_mark,
                     )
                     .await;
             }
@@ -1159,24 +1163,34 @@ impl Server {
         })
         .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()));
         let (any_in_window, any_in_widened) = found?;
-        self.corroborate_empty_by_days(identity, company, evidence, any_in_window, any_in_widened)
-            .await
+        self.corroborate_empty_by_days(
+            identity,
+            company,
+            evidence,
+            (any_in_window, any_in_widened),
+            None,
+        )
+        .await
     }
 
     /// The corroboration's verdict from what the widened read found; when it
     /// found nothing at all, the company's voucher high-water mark decides
     /// between a book with no vouchers and an uncorroborated empty window.
+    /// `voucher_mark` is that mark when the count has just read it (the mark it
+    /// read after its census); otherwise it is read here.
     async fn corroborate_empty_by_days(
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
         mut evidence: Evidence,
-        any_in_window: bool,
-        any_in_widened: bool,
+        (any_in_window, any_in_widened): (bool, bool),
+        voucher_mark: Option<u64>,
     ) -> Result<(Evidence, bool, Option<&'static str>), ToolFailure> {
         let outcome = async {
             let high_water = if any_in_window || any_in_widened {
                 None
+            } else if let Some(mark) = voucher_mark {
+                Some(mark)
             } else {
                 let (high_water_xml, high_water_evidence) = self
                     .post_read(identity, company_high_water_read(company))

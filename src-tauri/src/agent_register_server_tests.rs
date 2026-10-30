@@ -50,6 +50,11 @@ impl Kind {
 /// g groups, n voucher census, w voucher window, m company marks.
 const RECORDED_ORDER: &str = "esesebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseensnseewswseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese";
 
+/// The fingerprint of each request kind the call recorded. The census is the recorded
+/// unspanned request: the call now sends it spanned to its mark (#2145), no answer to that
+/// request was captured from this book, and an answer captured for the unspanned census may not
+/// stand in for it (#899). The two tests that check every request against these fingerprints
+/// therefore fail until the call is recorded again with the spanned request, in 2145-R.
 fn recorded_request_sha256(kind: Kind) -> &'static str {
     match kind {
         Kind::Extent => "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
@@ -860,14 +865,11 @@ fn the_stock_lab_day_request_files_are_exactly_the_requests_the_call_sent() {
 /// The recorded purchase read with the window's census and window answers spliced out for
 /// Tally's own empty collection (a committed capture of an empty collection, not a capture of an
 /// empty-window call), followed by the empty-window corroboration the register then makes: a
-/// census of the wider window (paired; no window read, #1240), the company marks read again
-/// after it (#2145), and the company's voucher mark.
-const EMPTY_WINDOW_TAIL: &str = "ensnseemsmseemsmse";
+/// census of the wider window (paired; no window read, #1240), then the company marks read again
+/// after it (#2145), whose voucher mark is also the one the corroboration decides by.
+const EMPTY_WINDOW_TAIL: &str = "ensnseemsmse";
 
-/// The tail's legs before the company's voucher-mark read: the census and the marks read again.
-const EMPTY_WINDOW_TAIL_BEFORE_THE_MARK: usize = 12;
-
-/// The company-marks response with the voucher mark set to zero: a book with no vouchers.
+/// The company-marks response with the voucher mark set to zero.
 fn marks_with_voucher_mark_zero() -> String {
     let body = body_of(Kind::Marks);
     let start = body.find("<ALTVCHID").unwrap();
@@ -876,9 +878,8 @@ fn marks_with_voucher_mark_zero() -> String {
     format!("{}0{}", &body[..open_end], &body[close..])
 }
 
-/// `corroborating_marks` answers the voucher-mark read of the corroboration (the tail's last
-/// `m`s); the recorded marks when `None`. The marks read again after the census are the
-/// recorded ones, so the book did not move during the read.
+/// `corroborating_marks` answers the marks read again after the corroboration's census (the
+/// tail's `m`s); the recorded marks when `None`, so the book did not move during the read.
 async fn empty_window_register(corroborating_marks: Option<String>) -> Value {
     let empty = ScenarioPlan::new(Fixture::SyntheticXml(utf16(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/native-empty-collection.utf16le.xml"
@@ -894,10 +895,7 @@ async fn empty_window_register(corroborating_marks: Option<String>) -> Value {
             let kind = Kind::of(letter);
             if matches!(kind, Kind::Census | Kind::Window) {
                 empty.clone()
-            } else if kind == Kind::Marks
-                && position >= recorded + EMPTY_WINDOW_TAIL_BEFORE_THE_MARK
-                && corroborating_marks.is_some()
-            {
+            } else if kind == Kind::Marks && position >= recorded && corroborating_marks.is_some() {
                 plan(kind, corroborating_marks.clone().unwrap())
             } else {
                 plan(kind, body_of(kind))
@@ -947,23 +945,19 @@ async fn an_empty_window_its_wider_read_cannot_corroborate_is_partial_in_a_regis
 }
 
 #[tokio::test]
-async fn an_empty_window_on_a_book_with_no_vouchers_is_complete_in_a_register_with_no_reason() {
-    // The corroboration finds the company's voucher mark at zero: nothing could be missing, so
-    // the empty window is `complete`. `vouchers` returns the reason `company_has_no_vouchers`
-    // beside it; a register returns none, in `result` and in the evidence. The mark is the
-    // recorded one rewritten to zero, in the corroboration's read only.
+async fn an_empty_window_whose_voucher_mark_moved_during_the_corroboration_is_refused_in_a_register(
+) {
+    // The marks read again after the corroboration's census answer a voucher mark of zero, where
+    // the register's own read took the recorded one: the book moved during the read, so the
+    // register refuses rather than calling the window empty (#2145). Before, this tail's last
+    // read was a separate voucher-mark read, and a zero there made the window `complete`; that
+    // state needs a book whose mark was zero from the start, which sends no census, and the
+    // register's label for it is pinned in `agent_register_tests.rs`.
     let response = empty_window_register(Some(marks_with_voucher_mark_zero())).await;
-    assert_eq!(response["isError"], false, "{response}");
-    let result = &response["structuredContent"]["result"];
-    assert_eq!(result["total"], 0, "{result}");
-    assert_eq!(result["state"], "complete", "{result}");
-    assert!(result["reason"].is_null(), "{result}");
+    assert_eq!(response["isError"], true, "{response}");
     assert_eq!(
-        response["structuredContent"]["evidence"]["state"], "complete",
-        "{response}"
-    );
-    assert!(
-        response["structuredContent"]["evidence"]["reason_code"].is_null(),
+        response["structuredContent"]["result"]["error"]["code"],
+        "voucher_window_changed_during_read",
         "{response}"
     );
 }

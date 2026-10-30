@@ -201,7 +201,7 @@ request is predicted over a budget well below the cap.
      voucher saved between the marks read and the census is outside the span, so it is caught
      elsewhere: a part of a whole read that returns it is refused as a census mismatch, and a
      count-only read reads the marks again after its census, one request or several, and refuses
-     marks that moved. The spans are produced one at a time, and a mark needing more than 256 of
+     a voucher mark that moved. The spans are produced one at a time, and a mark needing more than 256 of
      them is refused before any census is sent.
    - **A census is sized against the whole transport cap,** not the half-budget: 8,192 rows at the
      planning figure of 4 KiB a row. The half-budget exists to absorb the error in an *estimated*
@@ -347,27 +347,31 @@ request is predicted over a budget well below the cap.
 - **The empty-window corroboration reuses the first read's marks.** Its widened read (±1 day) opens
   on the marks the window's own read observed. On a book large enough to be counted it is a census of
   its own and no read of the widened window's vouchers (#1240): the census carries each voucher's day,
-  which is all the control needs. A census sent in several requests is bracketed, and then a change
-  anywhere in the company since the marks the first read opened on refuses it; one sent in a single
-  request is not. Before #1240 a widened read that the book needed in several data parts was bracketed
-  too, so a book counted in one census with a busy neighbouring day was refused on moved marks and now
-  answers from the one observation; and a widened window whose data plan exceeded the read allowance was
+  which is all the control needs. The census is bracketed whether it is sent in one request or several
+  (#2145): the company marks are read again after it, and a voucher mark that moved since the marks the
+  first read opened on refuses it. A master saved in that time does not, since a census counts vouchers.
+  A single census is spanned to the opening voucher mark, so a voucher saved after it is outside the
+  span, and only the voucher mark read again shows it. Before #1240 a widened read that the book needed
+  in several data parts was bracketed by both marks; and a widened window whose data plan exceeded the read allowance was
   refused at planning, which no longer applies because no data part is sent (a census of several spans can
   still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
-  window refuses the read as `window_contradicted` (a census of several requests whose marks moved refuses as
+  window refuses the read as `window_contradicted` (a voucher mark that moved refuses it as
   `voucher_window_changed_during_read` first), and otherwise the empty result is corroborated or
   reported partial by the existing empty-window control. **Confidence: PARTIAL**: one live run (26 Oct 2026,
   TallyPrime 7.2 Silver, two synthetic books; `RESULTS.md` on the branch `lab/1240-empty-window-live-answers` at
-  `ce849cc6`) gave the same state, reason and items as the previous build on all five windows read. On the book
+  `ce849cc6`) gave the same state, reason and items as the previous build on all five windows read. Those counts
+  are of the build before #2145, which did not bracket a census of one request. On the book
   counted in one request it sent 28 and 34 requests where the previous build sent 34 and 40, as the doubles predict.
   On the book counted in four requests it sent 76 against 76 where the widened window was empty, and 70 against 88
   (475 KB of answers against 6.08 MB) where a neighbouring day held vouchers, where the doubles predicted equal
   counts; which of the previous build's requests are saved there is not established, since the trail keeps only the
-  last 32 sends. The counts that follow are from scripted doubles through the tool call: for a neighbour-empty widened window
-  a census of one request replaces one paired window read and so saves six requests (a census of
-  several requests adds a closing marks read, so a small widened window saves none), and with vouchers on the
-  neighbouring days it saves every part those days would have taken. The saving is counted in requests;
-  the bytes of a census and of the parts it replaces were not compared.
+  last 32 sends. The counts that follow are from scripted doubles through the tool call, since #2145. Every
+  census adds a closing marks read of six requests. For a neighbour-empty widened window the census replaces
+  one paired window read, and the voucher mark read after it is also the company's mark the control decides
+  by, so the six requests of a separate marks read are not sent: the corroboration is 12 requests, the census
+  and the marks read again. With vouchers on the neighbouring days it saves every part those days would have
+  taken, less the six of the closing marks read. The saving is counted in requests; the bytes of a census and
+  of the parts it replaces were not compared.
 - **AlterID 0.** Every span starts above an exclusive lower bound of 0, so a voucher with AlterID 0
   could not be read by a divided day. None has been observed; a census row carrying AlterID 0 is
   refused rather than planned around.

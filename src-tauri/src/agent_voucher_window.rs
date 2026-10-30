@@ -268,8 +268,9 @@ impl PlanRefusal {
 /// the unbounded request this module exists to stop.
 pub(super) const VOLUME_UNESTIMATED: &str = "voucher_window_volume_unestimated";
 
-/// The voucher high-water mark moved while a divided window was being read, so
-/// its parts may not describe one state of the book. See `read_voucher_window`.
+/// The voucher high-water mark moved while a divided window was being read, or
+/// while a window was being counted, so its parts or its count may not describe
+/// one state of the book. See `read_voucher_window` and [`count_window_only`].
 pub(super) const WINDOW_CHANGED_DURING_READ: &str = "voucher_window_changed_during_read";
 
 /// A part returned vouchers that are not the ones its plan counted for it: a row
@@ -2203,24 +2204,27 @@ pub(super) enum WindowCount {
         marks: Option<CompanyMarks>,
         evidence: Option<Evidence>,
     },
-    /// Every voucher the window holds, counted per day, bracketed by the company
-    /// marks read before and after. No data part was sent.
+    /// Every voucher the window holds, counted per day, bracketed by the voucher
+    /// mark read before and after. No data part was sent. `voucher_mark` is the
+    /// one read after, when it was read.
     Counted {
         census: WindowCensus,
         evidence: Evidence,
+        voucher_mark: Option<u64>,
     },
 }
 
 /// Count `window` with a census of its own and send no data part (#1240). A
 /// caller that needs only to know whether, and on which days, the window holds
 /// vouchers has what it needs from the census: its rows carry each voucher's
-/// day. Nothing is admitted against the count. Every count is bracketed as a
-/// divided window read is: both company marks are read again after the last
-/// census request, and marks that moved refuse it
-/// ([`WINDOW_CHANGED_DURING_READ`]). A count taken in one request is bracketed
-/// too: its census is spanned to the mark read before it (#2145), so a voucher
-/// saved after that read lies outside the span, and only the marks read again
-/// can show it.
+/// day. Nothing is admitted against the count. Every count is bracketed: the
+/// company marks are read again after the last census request, and a voucher
+/// mark that moved refuses it ([`WINDOW_CHANGED_DURING_READ`]). A count taken in
+/// one request is bracketed too: its census is spanned to the mark read before
+/// it (#2145), so a voucher saved after that read lies outside the span, and
+/// only the mark read again can show it. The master mark is not compared: a
+/// census counts vouchers, so a master saved during the count does not change
+/// it.
 pub(super) async fn count_window_only<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
@@ -2275,13 +2279,15 @@ pub(super) async fn count_window_only<R: WindowReader>(
         } => (census, census_requests),
     };
     let mut closing = None;
+    let mut closing_marks = None;
     if let Some(opened) = opening {
         // The count of the census that was sent, not one derived again from the marks.
         if census_requests >= 1 {
             let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
                 .await
                 .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
-            if closed != opened {
+            closing_marks = Some(closed);
+            if closed.vouchers() != opened.vouchers() {
                 return Err(with_prior_closed(
                     WINDOW_CHANGED_DURING_READ.to_string().into(),
                     &preflight,
@@ -2291,9 +2297,14 @@ pub(super) async fn count_window_only<R: WindowReader>(
             }
         }
     }
+    let voucher_mark = closing_marks.map(CompanyMarks::vouchers);
     let evidence = chronological(&preflight, &None, &closing)
         .unwrap_or_else(|| super::agent_import::local_evidence("voucher_window_count_empty"));
-    Ok(WindowCount::Counted { census, evidence })
+    Ok(WindowCount::Counted {
+        census,
+        evidence,
+        voucher_mark,
+    })
 }
 
 impl Server {
@@ -2568,7 +2579,7 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// but no such shape is qualified live.
 pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans, &'static str> {
     let capacity = capacity.max(1);
-    let requests = high_water.div_ceil(capacity).max(1);
+    let requests = high_water.div_ceil(capacity);
     if requests > MAX_CENSUS_READS as u64 {
         return Err(BOOK_TOO_LARGE);
     }

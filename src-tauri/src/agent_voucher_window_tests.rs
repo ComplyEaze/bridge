@@ -3990,12 +3990,13 @@ fn steady_mark() -> u64 {
 
 /// The `vouchers` tool over a counted book whose window is empty, then the
 /// empty-window corroboration (#1240): its own census of the window widened by
-/// a day each side, whose answer is `corroboration_census`, the marks read again
-/// after it, which read `closing_mark`, and, when the census holds no voucher,
-/// the company's mark. Returns the response and the requests Bridge sent.
+/// a day each side, whose answer is `corroboration_census`, and the marks read
+/// again after it, answered by `closing_marks`. When the census holds no voucher,
+/// the voucher mark of that read decides; it is not read again. Returns the
+/// response and the requests Bridge sent.
 async fn empty_window_over_a_counted_book(
     corroboration_census: String,
-    closing_mark: u64,
+    closing_marks: ScenarioPlan,
 ) -> (Value, Vec<tally_protocol_simulator::ObservedRequest>) {
     let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
     let mut plans = vec![company_plan(), status_plan(), company_plan(), status_plan()];
@@ -4003,14 +4004,10 @@ async fn empty_window_over_a_counted_book(
     // the window's census and its read: both empty
     plans.extend(paired(&xml_plan(empty_collection())));
     plans.extend(paired(&xml_plan(empty_collection())));
-    // the corroboration's census of the widened window, the marks read again after it
-    // (#2145), then the mark when it holds nothing
-    let holds_nothing = corroboration_census == empty_collection();
+    // the corroboration's census of the widened window, then the marks read again after it
+    // (#2145), whose voucher mark also decides when the census holds nothing
     plans.extend(paired(&xml_plan(corroboration_census)));
-    plans.extend(paired(&mark(closing_mark)));
-    if holds_nothing {
-        plans.extend(paired(&mark(limits.census_capacity())));
-    }
+    plans.extend(paired(&closing_marks));
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let response = server_at(simulator.address(), directory.path())
@@ -4066,7 +4063,7 @@ fn widened_census_reads(sent: &[tally_protocol_simulator::ObservedRequest]) -> u
 async fn an_empty_window_beside_a_voucher_is_corroborated_by_a_census_alone() {
     let (response, sent) = empty_window_over_a_counted_book(
         relabelled(&vouchers_kept(1), &[(1, "20260731")]),
-        steady_mark(),
+        mark(steady_mark()),
     )
     .await;
     let result = &response["structuredContent"]["result"];
@@ -4093,7 +4090,7 @@ async fn an_empty_window_beside_a_voucher_is_corroborated_by_a_census_alone() {
 async fn the_corroborations_census_is_its_own_read() {
     let (response, sent) = empty_window_over_a_counted_book(
         relabelled(&vouchers_kept(1), &[(1, "20260815")]),
-        steady_mark(),
+        mark(steady_mark()),
     )
     .await;
     assert_eq!(
@@ -4219,18 +4216,41 @@ async fn a_small_books_corroboration_reports_the_marks_it_had_to_take() {
 }
 
 /// #1240: nothing in the widened window leaves it `empty_uncorroborated`
-/// after the census, the marks read again after it and the company's mark;
-/// before, the same book also paid for a read of the widened window's vouchers.
+/// after the census and the marks read again after it, whose voucher mark is the
+/// company's; before, the same book also paid for a read of the widened window's
+/// vouchers.
 #[tokio::test]
 async fn an_empty_widened_window_costs_a_census_and_the_mark() {
     let (response, sent) =
-        empty_window_over_a_counted_book(empty_collection(), steady_mark()).await;
+        empty_window_over_a_counted_book(empty_collection(), mark(steady_mark())).await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["state"], "partial", "{response}");
     assert_eq!(result["reason"], "empty_uncorroborated", "{response}");
     assert_eq!(widened_census_reads(&sent), 2);
     assert_eq!(widened_window_reads(&sent), 0);
-    assert_eq!(sent.len(), 4 + 6 * 6);
+    // 4 prelude legs, the marks, the window's census, the window, the corroboration's
+    // census and the marks read again, each a pair of 6: the mark is not read a third time.
+    assert_eq!(sent.len(), 4 + 5 * 6);
+}
+
+/// #2145: the count's bracket compares the voucher mark alone. A master saved during
+/// the count (only the master mark moved) leaves the empty window `empty_uncorroborated`,
+/// in the same requests; a voucher mark that moved refuses it.
+#[tokio::test]
+async fn a_counts_bracket_admits_a_master_change_and_refuses_a_voucher_change() {
+    let (response, sent) =
+        empty_window_over_a_counted_book(empty_collection(), marks_plan(steady_mark(), 8)).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "partial", "{response}");
+    assert_eq!(result["reason"], "empty_uncorroborated", "{response}");
+    assert_eq!(sent.len(), 4 + 5 * 6);
+    let (response, _) =
+        empty_window_over_a_counted_book(empty_collection(), marks_plan(steady_mark() + 1, 7))
+            .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
+        "{response}"
+    );
 }
 
 /// #2145: a voucher saved inside the window after the first read took the company's
@@ -4240,7 +4260,7 @@ async fn an_empty_widened_window_costs_a_census_and_the_mark() {
 #[tokio::test]
 async fn a_voucher_saved_after_the_marks_were_read_refuses_a_single_census_corroboration() {
     let (response, sent) =
-        empty_window_over_a_counted_book(empty_collection(), steady_mark() + 1).await;
+        empty_window_over_a_counted_book(empty_collection(), mark(steady_mark() + 1)).await;
     assert_eq!(
         response["structuredContent"]["result"]["error"]["code"], WINDOW_CHANGED_DURING_READ,
         "{response}"

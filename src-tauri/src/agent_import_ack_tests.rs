@@ -1518,8 +1518,10 @@ fn l1_server(simulator: &SequenceSimulator, directory: &std::path::Path) -> Serv
     server
 }
 
-/// The sha256 of each request the L1 capture carried, in order; its extent
-/// and high-water requests are D3's, its census and verification reads its own.
+/// The sha256 of each request the L1 call sends, in order; its extent and
+/// high-water requests are D3's and its verification read its own. Its census is
+/// the spanned request the lab sent for #2145, whose answer was the captured one
+/// (`L1_REENTRY_CAPTURE_PROVENANCE.md`), not the unspanned one the capture carried.
 fn l1_requests() -> Vec<Option<&'static str>> {
     "SEESESEHSHSEECSCSEEVSVSEEVSVSE"
         .chars()

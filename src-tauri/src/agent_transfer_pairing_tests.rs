@@ -2036,8 +2036,9 @@ fn a_read_of_tally_does_not_change_a_row_with_a_candidate() {
 /// every answer is what Tally returned to it; no answer here is written by
 /// hand. The lab read the marks once before the days and once after, and the two
 /// answers are byte-equal, so the first is served as each day's opening marks
-/// read; the spanned census is not sent by the code, and only its answer is
-/// compared with the unspanned one.
+/// read. The code sends the spanned census (`dNN-c2`, since #2145); the lab's
+/// unspanned census (`dNN-c1`) is not sent, and only its answer is compared with
+/// the spanned one.
 mod whole_day {
     use super::*;
     use crate::agent::read_profiles::ReadRequest;

@@ -3,9 +3,10 @@
 //! The responses are Tally's own bytes from the 14 one-day calls of a lab sitting on a synthetic
 //! book whose vouchers were typed on TallyPrime 7.2's screen (see the PROVENANCE table beside the
 //! fixtures). Every answer but the census and the window was byte-equal across the 14 calls, so it
-//! is kept once. The order and the request fingerprints are the ones recorded on the wire, so a
-//! change to the order or shape of the reads fails here, and each day's answer is the one the lab
-//! item expected of that voucher.
+//! is kept once. The order and the request fingerprints are the ones recorded on the wire, except
+//! each census's: that is the spanned request the lab sent for #2145 and found answered as recorded
+//! (the PROVENANCE beside the fixtures). So a change to the order or shape of the reads fails here,
+//! and each day's answer is the one the lab item expected of that voucher.
 use tally_protocol_simulator::{
     Fixture, ProductStatus, ResponseFraming, ScenarioPlan, SequenceSimulator, WireEncoding,
 };

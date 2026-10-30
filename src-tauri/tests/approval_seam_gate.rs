@@ -1445,10 +1445,18 @@ fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
 const MAC_ALERT_EXIT: &str = r#"#[cfg(not(windows))]
 fn exit_unless_the_alert_fits(text: &str) {
     match measured_alert(text) {
-        Some((height, screens)) if screens.iter().all(|screen| alert_fits(height, *screen)) => {}
+        Some((height, screens)) if alert_fits_every_screen(height, &screens) => {}
         Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         None => std::process::exit(0),
     }
+}"#;
+
+const MAC_ALERT_EVERY_SCREEN: &str = r#"#[cfg(not(windows))]
+fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
+    !screens.is_empty()
+        && screens
+            .iter()
+            .all(|screen| alert_fits(text_height, *screen))
 }"#;
 
 const MAC_ALERT_TEXT_HEIGHT: &str = r#"#[cfg(target_os = "macos")]
@@ -2049,7 +2057,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 50] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 51] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2072,6 +2080,7 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 50] = [
     (MAC_ALERT_CHECK, 1),
     (MAC_ALERT_FITS, 1),
     (MAC_ALERT_EXIT, 1),
+    (MAC_ALERT_EVERY_SCREEN, 1),
     (MAC_ALERT_TEXT_HEIGHT, 1),
     (MAC_ALERT_SCREENS, 1),
     (
@@ -2195,11 +2204,12 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // window.
     ("#[cfg(windows)]", 12),
     // #1780's Mac check (c2): the seven measured figures, the screen span,
-    // where the top sits, the comparison, the child's exit and their two tests;
+    // where the top sits, the comparison, the fit on every screen, the child's
+    // exit and their two tests;
     // and four `cfg(target_os = "macos")` items (the text's height, the screens,
     // the two together, and the height's test) with one other-platform arm.
-    ("#[cfg(not(windows))]", 30),
-    ("cfg", 61),
+    ("#[cfg(not(windows))]", 31),
+    ("cfg", 62),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2302,7 +2312,8 @@ fn each_dialog_answers_only_on_its_positive_button() {
         source.replacen("        None => std::process::exit(0),", "        None => {}", 1),
         // The check passes on any one screen, reads only the first, takes the
         // column as wide as Part A's A4e disproved, or measures no text.
-        source.replacen(".all(|screen| alert_fits(height, *screen))", ".any(|screen| alert_fits(height, *screen))", 1),
+        source.replacen(".all(|screen| alert_fits(text_height, *screen))", ".any(|screen| alert_fits(text_height, *screen))", 1),
+        source.replacen("    !screens.is_empty()\n        && screens", "    screens", 1),
         source.replacen("(!screens.is_empty()).then_some(screens)", "Some(screens.into_iter().take(1).collect())", 1),
         source.replacen("const ALERT_TEXT_WIDTH: f64 = 402.0;", "const ALERT_TEXT_WIDTH: f64 = 406.0;", 1),
         source.replacen("    rect.size.height.ceil()\n}", "    rect.size.height.ceil() * 0.0\n}", 1),

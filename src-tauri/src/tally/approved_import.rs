@@ -2156,6 +2156,16 @@ pub(crate) mod test_seam {
         for height in [f64::NAN, f64::INFINITY, -1.0] {
             assert!(!super::alert_fits(height, measured), "{height}");
         }
+        // Every screen must hold it, the smallest room deciding; no screen holds nothing.
+        let small = super::ScreenSpan {
+            height: 800.0,
+            visible_top: 24.0,
+            visible_bottom: 716.0,
+        };
+        assert!(super::alert_fits_every_screen(448.0, &[measured]));
+        assert!(!super::alert_fits_every_screen(448.0, &[measured, small]));
+        assert!(super::alert_fits_every_screen(382.0, &[measured, small]));
+        assert!(!super::alert_fits_every_screen(16.0, &[]));
     }
 
     /// AppKit lays the alert's text out as Part A saw the panel do: 16 points a
@@ -2195,11 +2205,13 @@ pub(crate) mod test_seam {
         ]
         .join("\n");
         // 28 lines, as the panel showed it; macOS's own fonts decide the last
-        // line, so one line either way is allowed.
+        // line, so one line either way is allowed. The panel drew 600 points
+        // where 448 + 150 is 598; the slack absorbs the 2.
         let height = super::alert_text_height(&voucher);
         assert!((27.0 * 16.0..=29.0 * 16.0).contains(&height), "{height}");
         // Ten lines of 46 capitals: the panel broke one of them (cell A4e), so the
-        // column is narrower than all ten.
+        // column is narrower than all ten; the widest of them clears 402 by only
+        // about 0.3 points, which the one line of slack absorbs.
         let capitals = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(4);
         let a4e = (0..10)
             .map(|start| &capitals[start..start + 46])
@@ -2884,6 +2896,16 @@ fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
         && alert_top(screen) + ALERT_CHROME + text_height + ALERT_SLACK <= screen.visible_bottom
 }
 
+/// Whether an alert whose text is `text_height` points tall fits on every one
+/// of `screens` (#1780). No screen fits nothing, so an empty list is refused.
+#[cfg(not(windows))]
+fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
+    !screens.is_empty()
+        && screens
+            .iter()
+            .all(|screen| alert_fits(text_height, *screen))
+}
+
 /// The height AppKit lays `text` out at in the alert's column (#1780), measured
 /// without a window.
 #[cfg(target_os = "macos")]
@@ -2954,7 +2976,7 @@ fn measured_alert(_text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
 #[cfg(not(windows))]
 fn exit_unless_the_alert_fits(text: &str) {
     match measured_alert(text) {
-        Some((height, screens)) if screens.iter().all(|screen| alert_fits(height, *screen)) => {}
+        Some((height, screens)) if alert_fits_every_screen(height, &screens) => {}
         Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
         None => std::process::exit(0),
     }

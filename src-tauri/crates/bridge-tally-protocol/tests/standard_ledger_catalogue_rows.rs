@@ -5,9 +5,9 @@
 //! company bootstrap.
 
 use bridge_tally_protocol::{
-    decode_tally_xml_response_bytes_limited, parse_standard_ledger_catalog_with_identities,
-    parse_standard_ledger_identity_observation, ExpectedTallyTextEncoding,
-    StandardLedgerCatalogError,
+    decode_tally_xml_response_bytes_limited, parse_ledger_name_index,
+    parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
+    ExpectedTallyTextEncoding, StandardLedgerCatalogError,
 };
 
 const COMPANY_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
@@ -562,4 +562,116 @@ fn ledger_names_ending_in_crlf_carry_a_flag_in_the_v2_catalogue() {
             ("CRLF Supplier\r\n".to_string(), BillWiseFlag::On),
         ]
     );
+}
+
+// ---- Aliases as Tally returned them (#1688) ----------------------------------------------------------
+//
+// Tally's own answers to the three ledger-list requests on a book whose ledgers were given aliases on
+// Tally's screen and by import (`fixtures/agent/alias-lab-1688/PROVENANCE.md`).
+
+const ALIAS_LAB_COMPANY_NAME: &str = "BRIDGE ALIAS LAB";
+const ALIAS_LAB_COMPANY_GUID: &str = "021bda0c-b1b1-44c8-8279-5212ce87c9c7";
+const ALIAS_LAB_SCREEN_V2: &[u8] =
+    include_bytes!("fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml");
+const ALIAS_LAB_V1: &[u8] = include_bytes!("fixtures/agent/alias-lab-1688/i1-cat.utf16le.xml");
+const ALIAS_LAB_V2: &[u8] = include_bytes!("fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml");
+const ALIAS_LAB_V3: &[u8] = include_bytes!("fixtures/agent/alias-lab-1688/i1-idx.utf16le.xml");
+
+/// `é` is one code point, U+00E9, as Tally returned it.
+const CAFE_ALIAS: &str = "Lab Caf\u{e9} Sales";
+/// The Devanagari alias, by its code points as the import sent them.
+const SCRIPT_ALIAS: &str = "\u{932}\u{948}\u{92c} \u{916}\u{93e}\u{924}\u{93e}";
+
+/// The aliases keyed on Tally's screen, each beside the ledger that carries it, in keyed order.
+const SCREEN_ALIASES: [(&str, &str); 4] = [
+    ("Lab Other Ledger", "Lab Other First"),
+    ("Lab Other Ledger", "Lab Other Second"),
+    ("Lab Plain Ledger", "Lab Plain Alias"),
+    ("Lab Sales", CAFE_ALIAS),
+];
+
+fn alias_lab(bytes: &[u8]) -> String {
+    decode_tally_xml_response_bytes_limited(
+        bytes,
+        "text/xml; charset=utf-16",
+        ExpectedTallyTextEncoding::Utf16Le,
+        bytes.len(),
+    )
+    .expect("captured BOM-less UTF-16LE response decodes")
+    .text
+}
+
+/// `(carrying ledger, alias)` pairs, grouped by ledger and kept in Tally's order within each.
+fn by_ledger<'a>(pairs: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<(String, String)> {
+    let mut pairs: Vec<(String, String)> = pairs
+        .map(|(owner, alias)| (owner.to_string(), alias.to_string()))
+        .collect();
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+    pairs
+}
+
+fn expected(extra: &[(&str, &str)]) -> Vec<(String, String)> {
+    by_ledger(SCREEN_ALIASES.iter().chain(extra).copied())
+}
+
+/// The screen's aliases, read by the import catalogue (V2), each after its ledger's own name, in
+/// keyed order, byte for byte.
+#[test]
+fn aliases_keyed_on_tallys_screen_are_read_as_tally_listed_them() {
+    let v2 = parse_standard_ledger_catalog_v2_with_identities(
+        &alias_lab(ALIAS_LAB_SCREEN_V2),
+        ALIAS_LAB_COMPANY_NAME,
+        ALIAS_LAB_COMPANY_GUID,
+    )
+    .expect("the captured import catalogue parses");
+    assert_eq!(by_ledger(v2.catalog().aliases()), expected(&[]));
+}
+
+/// After two ledgers were created by import with an alias each, V1 and V2 read all six, the
+/// Devanagari one by its exact code points.
+#[test]
+fn imported_aliases_are_read_by_both_catalogues_with_their_code_points() {
+    let six = expected(&[
+        ("Lab Alias Script", SCRIPT_ALIAS),
+        ("Lab Alias Shape", "Lab Shape Alias"),
+    ]);
+    let v1 = parse_standard_ledger_catalog_with_identities(
+        &alias_lab(ALIAS_LAB_V1),
+        ALIAS_LAB_COMPANY_NAME,
+        ALIAS_LAB_COMPANY_GUID,
+    )
+    .expect("the captured standard catalogue parses");
+    assert_eq!(by_ledger(v1.aliases()), six);
+    let v2 = parse_standard_ledger_catalog_v2_with_identities(
+        &alias_lab(ALIAS_LAB_V2),
+        ALIAS_LAB_COMPANY_NAME,
+        ALIAS_LAB_COMPANY_GUID,
+    )
+    .expect("the captured import catalogue parses");
+    assert_eq!(by_ledger(v2.catalog().aliases()), six);
+    assert_eq!(CAFE_ALIAS.chars().filter(|c| *c == '\u{e9}').count(), 1);
+}
+
+/// The name index (V3) holds every alias among its ledger's names, after the own name.
+#[test]
+fn the_name_index_holds_each_alias_after_its_ledgers_own_name() {
+    let rows = parse_ledger_name_index(&alias_lab(ALIAS_LAB_V3), ALIAS_LAB_COMPANY_GUID)
+        .expect("the captured name index parses");
+    assert_eq!(rows.len(), 7);
+    for (owner, aliases) in [
+        (
+            "Lab Other Ledger",
+            &["Lab Other First", "Lab Other Second"][..],
+        ),
+        ("Lab Plain Ledger", &["Lab Plain Alias"][..]),
+        ("Lab Sales", &[CAFE_ALIAS][..]),
+        ("Lab Alias Shape", &["Lab Shape Alias"][..]),
+        ("Lab Alias Script", &[SCRIPT_ALIAS][..]),
+    ] {
+        let row = rows
+            .iter()
+            .find(|row| row.names.first().map(String::as_str) == Some(owner))
+            .unwrap_or_else(|| panic!("no row named {owner}"));
+        assert_eq!(&row.names[1..], aliases, "{owner}");
+    }
 }

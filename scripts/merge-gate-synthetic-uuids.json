@@ -220,6 +220,230 @@
     {
       "uuid": "5193df0a-eeb7-49fb-88f9-03aae16e2eeb",
       "note": "bank-allocation identifier Tally gave the bank entry of the Journal of 16 May 2025 in the synthetic lab company BRIDGE COST KEY LAB, as it returned it in the read-only voucher capture of 27 October 2026 (lab branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536); it is the NAME of that entry's BANKALLOCATIONS.LIST"
+    },
+    {
+      "uuid": "021bda0c-b1b1-44c8-8279-5212ce87c9c7",
+      "note": "company identifier of the synthetic lab company BRIDGE ALIAS LAB, keyed on Tally's screen for a lab item on 21 Oct 2026 and used again for the ledger aliases row of 30 Oct 2026: the LEDGER rows of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/*.utf16le.xml carry it as their company identifier and as the prefix of every ledger identifier; those answers are on lab branch lab/1688-ledger-aliases-answers at aa49368177ec"
+    },
+    {
+      "uuid": "17a10910-773c-42c6-bd66-7bba9a392536",
+      "note": "company identifier of the synthetic lab company BRIDGE AMEND LAB: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-extent.utf16le.xml names the company beside this GUID (AMEND_NOW_CAPTURE_PROVENANCE.md), as the d3-* and wa1-* extents on master do"
+    },
+    {
+      "uuid": "bdd61666-ccbb-8ca8-bf60-14f696193240",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 1 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "06ded916-7ee5-872d-9e75-e17555346b1d",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 2 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "bc2db87f-33eb-8a8a-a6f5-7aa14fdf8e5c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 3 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "598bdf86-fb3a-86cb-aa0b-2ab8004fe6b3",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 4 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "8a21728c-8ec4-88ed-b7a1-2eb6cec66616",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 6 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "3c41041d-684d-809b-af7f-fdfebf8b0482",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 7 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d4cd9639-ab94-8c0b-acbe-eb1bf32f3d54",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 8 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "bde57d54-4252-8540-bb2c-36007305eab6",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 9 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "c342cf4c-819f-8937-8680-0478212eca16",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 10 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "f3520fc9-0fca-87b5-a990-db4f8edc3fd1",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 11 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d82ffbaa-c2fd-8d8d-abdb-67992415e78b",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 12 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "e9fa667f-a4e5-8df5-8ea7-828eb0c138bf",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 13 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "f112136d-fd32-86aa-9da6-25ea97a05bbf",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 14 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "9fc6f7f3-a5cd-83b9-9727-7a585b36d107",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 15 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "e59d0f3c-bd03-8ba0-b9fc-1b40d82c5035",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 16 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d276ff7d-fb6e-8c70-b334-81f0be7108cb",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 17 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "a384addf-741e-83a3-a497-cd2c5d275d42",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 18 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "f987a90b-700c-82e2-a793-228a94a0b9d3",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 19 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "64d6df97-1bdf-8d5d-952c-d77b3fdcbadb",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 20 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "2bbddff1-3d48-8640-b840-5820611a43ad",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 21 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "64ac6e43-9635-8604-9f2e-8bc8dc075035",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 22 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "5ceb23d1-c91e-89ef-960c-2c49022bd4b0",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 23 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "4720e61b-8056-8b41-83e1-4bab78a81b03",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 24 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "db0e8ad0-7b7d-8fcf-b75a-a63e8e884fc9",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 25 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "505060c8-f170-8e8c-949b-f595a4376386",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 26 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "a594ee2e-a50e-8eb1-bc2c-3f003793bc0d",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 27 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "4cef4019-fea4-83ed-a775-3c5a9dc7d17a",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 28 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "2dd0f40e-c51c-8600-b82c-d2b2f9886c0a",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 29 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "01bd181f-f759-8607-86f3-e3ccee787eff",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 30 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "2b81ca91-18ee-891a-aaf6-c826b5720d56",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 31 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "159f8037-5b6d-8205-87b9-2c4d43b3d7b8",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 32 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "7dbafe34-fe56-89eb-ac00-046f37fda376",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 33 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "19824f0a-8487-85e8-aefa-cd16d3046e66",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 34 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "cb2c7bb0-7c30-81e6-a7f8-b95cb486d377",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 35 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "ad2f194d-821b-8a1b-a8f7-aa67feccec9f",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 36 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d246efb0-087c-8ef3-9586-a8c9160de238",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 37 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "8670f9ba-b945-89cd-baed-f000d9979f45",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 38 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "03c45c93-4061-8ac2-ae6a-96f02aa1cf1f",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 39 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "5f31d4a7-9897-843c-a783-7f26677d7155",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 40 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "577635d0-eb68-8513-b41c-e300e2234197",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 41 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "7b593ff0-40dc-8567-9b41-cd9b7477a439",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 42 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "bc39ddfd-b1eb-821b-a4b8-637da783d488",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 43 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "212d3cc4-0a9a-8ae0-9c9f-ade5a0dc3811",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 44 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "394e6f6a-d48e-8ec4-818c-5d454badcc8c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 45 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "6897f8ab-e108-86de-802a-9e95a9b86e6f",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 46 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "392abbff-8a33-88e4-a4e2-98bcdef1ceef",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 47 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "dc93e8cf-1bc0-80e0-842d-e0bc31d4a4ea",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 48 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "ab096c2b-18d1-83a0-83ee-76a3f3ac747c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 49 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "05f2080d-a329-8826-8ecc-b9c014d1da57",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 50 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "fb9eac30-a125-8dcc-b70d-027a147ce3d1",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Payment voucher number 16 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "01d76bfc-809d-8e4c-904b-aac461d0aa18",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 251 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "0fc0dde9-2be3-84f2-8f9c-8a739d68f730",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Payment voucher number 2 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "af6cf668-b7b6-8632-b248-e87f69beee1c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 252 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "5848d0ca-ed85-4c97-ab20-e045893a9803",
+      "note": "company identifier of the synthetic lab company BRIDGE LEDGERBOX CI LAB, as TallyPrime 7.2 returned it in the read-only marks and ledger reads of the two batch ledger-create rows of 29 October 2026 (lab branches lab/690-batch-ledger-create-l0-answers at 078db03e1f8b and lab/690-batch-ledger-create-l0b-answers at 5efb36d410f5); the ledger identifiers in those answers carry this value as their prefix, and pull request 2181's tests read it as L0_COMPANY"
     }
   ]
 }

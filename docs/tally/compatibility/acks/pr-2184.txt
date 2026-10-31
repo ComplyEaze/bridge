@@ -1,0 +1,7 @@
+scripts/ledger-entries-ui.test.mjs
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_register.rs
+src-tauri/src/agent_voucher_parse.rs
+src-tauri/src/agent_vouchers.rs
+reviewer: lamemustafa

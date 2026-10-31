@@ -47,6 +47,7 @@ use super::post::{refusal_cause, refusal_code, ApprovalTarget, Entry, Pass, Step
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::agent::read_profiles::{ledger_name_index_read, native_group_snapshot_read};
+use crate::agent::shown_cause;
 use crate::tally::approved_import::{
     ApprovedImportAdmissionError, BeforeDispatchError, PendingPostApproval, PostKind,
     UnderLockRefusal,
@@ -341,6 +342,7 @@ fn verdict_state_code(state: super::master_ledger::MasterVerdictState) -> &'stat
         MasterVerdictState::MasterWriteLocatedElsewhere => "master_write_located_elsewhere",
         MasterVerdictState::ConfirmedAbsent => "confirmed_absent",
         MasterVerdictState::PostedUnattributed => "posted_unattributed",
+        MasterVerdictState::ConfirmedAbsentAfterChange => "confirmed_absent_after_change",
     }
 }
 
@@ -1181,6 +1183,11 @@ impl Server {
             }
             (None, None) => {}
         }
+        // A settled absent state says what it rests on here too, as the call
+        // that judged it did.
+        if verdict.is_some_and(|verdict| verdict.state().is_absent()) {
+            result["verification"]["basis"] = json!("read_after_send_order");
+        }
         ToolOutcome {
             payload: json!({ "result": result }),
             evidence,
@@ -1462,9 +1469,30 @@ fn master_next_step(code: &str) -> Option<&'static str> {
         "master_approval_declined" => Some(
             "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         ),
+        // #2142: the lock was refused before anything was recorded or sent.
+        "tally_endpoint_draining" => Some(
+            "Nothing was sent: Tally was still busy with an earlier request that was stopped for time. Call post_ledger_creates with this batch_id again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. That call opens a new approval box.",
+        ),
         "master_pre_image_remove_failed" => Some(
             "Nothing was sent. A working file of ComplyEaze Bridge for this batch could not be removed from its local folder; do not retry this batch. Call prepare_ledger_creates for a new batch.",
         ),
+        _ => None,
+    }
+}
+
+/// The step when nothing was sent because a read before the create was cut at the request limit
+/// (#2123): what a busy gateway gives, observed while another call's long read held Tally for the
+/// whole limit. The approval this call was to use is withdrawn with the refusal, so the next call
+/// asks again.
+const NEXT_TALLY_BUSY: &str = "Nothing was sent: Tally did not answer a read made before the create within the time ComplyEaze Bridge waits for one, which is what happens while Tally is busy with another long request. Once Tally is idle and answering, call post_ledger_creates with this batch_id again; that call opens a new approval box. Do not repeat the call in a loop while Tally is busy.";
+
+/// The next step for a refusal with nothing sent whose code has none of its own, by why its
+/// request was not answered: only a read cut at the limit has one here. The steps the other tools
+/// give for an unanswered request name the endpoint in the refusal, which these refusals do not
+/// carry, so they are not borrowed.
+fn master_unanswered_next_step(reason: &str) -> Option<&'static str> {
+    match reason {
+        "request_deadline_exceeded" => Some(NEXT_TALLY_BUSY),
         _ => None,
     }
 }
@@ -1519,15 +1547,19 @@ fn master_failure_outcome(
         Some(true) => "The create may have been sent to Tally. Do not send this batch again: check the company's ledgers in Tally.",
         None => "Whether the create was sent to Tally is not known: the journal could not be read just now. Check the company's ledgers in Tally.",
     }});
-    if let Some(cause) = failure.cause {
+    if let Some(cause) = shown_cause(&failure.code, failure.cause, failure.unanswered) {
         error["cause"] = json!(cause);
     }
-    if failure.code == "tally_endpoint_busy" {
-        error["retry_after_s"] = json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+    if let Some(after) = crate::endpoint_wire::wire_retry_after_s(&failure.code) {
+        error["retry_after_s"] = json!(after);
     }
     match attempted {
         Some(false) => {
-            if let Some(next_step) = master_next_step(&failure.code) {
+            if let Some(next_step) = master_next_step(&failure.code).or_else(|| {
+                failure
+                    .unanswered
+                    .and_then(|unanswered| master_unanswered_next_step(unanswered.0))
+            }) {
                 error["next_step"] = json!(next_step);
             }
         }

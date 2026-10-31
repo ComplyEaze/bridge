@@ -133,6 +133,10 @@ pub(super) fn call_budget(call_started: std::time::Instant) -> std::time::Durati
 /// Only lock waits are bounded: the retry's own send, and the wire waits of the
 /// checks after it (each at most the policy total), are not counted, so the
 /// call can pass its ceiling by about that much and stay under the host limit.
+/// Nor is a drain met by the post's admission reads after a cut request
+/// (#2142): at most `DrainPolicy::worst_per_call`, which a test holds under the
+/// host limit with the ceiling. The marks readback's retry keeps a drain's
+/// worst case back from the ceiling as well.
 const AFTER_READ_REST_OF_POST: std::time::Duration = std::time::Duration::from_secs(13);
 /// A retry with less to wait than this is not worth its send.
 const AFTER_READ_MIN_RETRY_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
@@ -285,7 +289,10 @@ impl Server {
     /// refused as busy after a sent post would record a lasting doubt on a
     /// clean batch (#697). A busy refusal has waited that whole budget, so it
     /// is tried once more with a second, cut to what the call has left of its
-    /// ceiling (#884); a refusal that survives is returned as it is.
+    /// ceiling (#884); a refusal that survives is returned as it is. A read
+    /// refused because Tally is still finishing a request cut for time (#2142)
+    /// is tried once more after the refusal's own wait, when the call's
+    /// ceiling has room for both.
     pub(super) async fn read_marks_after_post(
         &self,
         request: crate::tally::agent_read_request::AgentReadRequest,
@@ -300,17 +307,32 @@ impl Server {
                 .read_company_marks_once(self.tally_config(), request.clone()),
         )
         .await;
-        let busy = first.as_ref().err().is_some_and(|error| {
-            crate::endpoint_wire::wire_refusal(error)
-                == Some(bridge_tally_transport::WireRefusal::Busy)
-        });
+        let pause = match first
+            .as_ref()
+            .err()
+            .and_then(crate::endpoint_wire::wire_refusal)
+        {
+            Some(bridge_tally_transport::WireRefusal::Busy) => Some(std::time::Duration::ZERO),
+            Some(bridge_tally_transport::WireRefusal::Draining { retry_after_ms }) => {
+                Some(std::time::Duration::from_millis(retry_after_ms))
+            }
+            _ => None,
+        };
         let policy_total = self.runtime.wire_gate_config().retry().total();
-        let Some(budget) = busy
-            .then(|| after_read_retry_budget(call_started.elapsed(), policy_total))
-            .flatten()
-        else {
+        // The retried read may meet a drain of its own, so its worst case is
+        // kept back from the ceiling too.
+        let drain = self
+            .runtime
+            .wire_gate_config()
+            .drain()
+            .map_or(std::time::Duration::ZERO, |policy| policy.worst_per_call());
+        let Some((pause, budget)) = pause.and_then(|pause| {
+            after_read_retry_budget(call_started.elapsed() + pause + drain, policy_total)
+                .map(|budget| (pause, budget))
+        }) else {
             return first;
         };
+        tokio::time::sleep(pause).await;
         #[cfg(test)]
         let _ = MARKS_READS.try_with(|reads| reads.lock().unwrap().push(Some(budget)));
         crate::tally::runtime::with_operation_wire_budget_of(
@@ -2024,7 +2046,12 @@ const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its 
 /// the next call asks the person again.
 const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
-/// The same, when whether the post was sent could not be observed.
+/// The same, when Tally was still busy with an earlier request cut for time
+/// (#2142): nothing was posted, and the approval has lapsed.
+const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+
+/// What a caller does when the port was busy and whether the post was sent
+/// could not be observed.
 const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
 
 /// What a caller does when an earlier invoice of the company stops this one
@@ -2101,16 +2128,20 @@ fn reconciliation_failure_payload(
     if code == DESKTOP_LEDGER_LINE_BREAK {
         payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
     }
-    if code == "tally_endpoint_busy" {
-        payload["result"]["error"]["retry_after_s"] =
-            json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+    // A draining endpoint (#2142) is held back like a busy one: nothing was
+    // sent by the refused send, and the same next steps hold.
+    if let Some(after) = crate::endpoint_wire::wire_retry_after_s(code) {
+        payload["result"]["error"]["retry_after_s"] = json!(after);
         match attempted {
             Some(true) => {
                 payload["result"]["error"]["next_step"] = json!(BUSY_AFTER_POST_NEXT_STEP)
             }
             None => payload["result"]["error"]["next_step"] = json!(BUSY_UNKNOWN_ATTEMPT_NEXT_STEP),
             Some(false) => {
-                payload["result"]["error"]["next_step"] = json!(BUSY_BEFORE_ATTEMPT_NEXT_STEP)
+                payload["result"]["error"]["next_step"] = json!(match code {
+                    "tally_endpoint_draining" => DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+                    _ => BUSY_BEFORE_ATTEMPT_NEXT_STEP,
+                })
             }
         }
     }

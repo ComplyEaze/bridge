@@ -1908,6 +1908,20 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              bounded wait, so nothing was sent. Call again after retry_after_s seconds; the \
              same request is safe to repeat.",
         ),
+        // #2142: a post cut for time can leave Tally working on it.
+        "tally_endpoint_lock_unavailable" => Some(
+            "ComplyEaze Bridge could not open, read or write its local coordination files for \
+             this Tally port, so nothing was sent. Ask the person to check that ComplyEaze \
+             Bridge's folders are available and writable. If the one that cannot be read is the \
+             file ending in .wire.debt in its coordination folder, deleting that file clears \
+             it; then call again.",
+        ),
+        "tally_endpoint_draining" => Some(
+            "Tally was still busy with an earlier request that was stopped for time, so this \
+             request was not sent. Call again after retry_after_s seconds; the same request is \
+             safe to repeat, and a different read would only wait behind the same work. It \
+             clears by itself within 10 minutes of the earlier request.",
+        ),
         "import_post_window_not_bounded" => Some(
             "Before posting, ComplyEaze Bridge checks the batch's whole date range in one request, and \
              this range holds too many vouchers for one request to stay within its bound. \
@@ -2238,6 +2252,22 @@ fn unanswered_remediation(reason: &str) -> Option<&'static str> {
     }
 }
 
+/// The cause a refusal shows: its typed cause, else why no response answered its request, unless
+/// the code already says it. One rule for every renderer of a refusal, the master tools' as well
+/// (#2123), so a request cut at the limit on a busy gateway is named, not left behind the code of
+/// the operation it was part of.
+fn shown_cause(
+    code: &str,
+    cause: Option<&'static str>,
+    unanswered: Option<Unanswered>,
+) -> Option<&'static str> {
+    cause.or_else(|| {
+        unanswered
+            .map(|unanswered| unanswered.0)
+            .filter(|unanswered| *unanswered != code)
+    })
+}
+
 /// The next step for a refusal: its own code's, else its cause's, and the outstandings
 /// causes' only under the outstandings code.
 fn remediation_for(code: &str, cause: Option<&str>) -> Option<&'static str> {
@@ -2544,6 +2574,21 @@ impl ToolFailure {
     }
 }
 
+/// Makes a tool's future in a frame of its own and boxes it. An unoptimised
+/// build gives each arm of `tool_payload`'s match a stack slot of its own for
+/// the future it awaits, so that one frame held every tool's future at once:
+/// several hundred kilobytes, under every post's deeper frames, which ran a
+/// post past a test thread's stack (#2142). A box built in the arm itself
+/// keeps the slot; one built here does not.
+fn in_own_frame<'a, F>(
+    make: impl FnOnce() -> F,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = F::Output> + Send + 'a>>
+where
+    F: std::future::Future + Send + 'a,
+{
+    Box::pin(make())
+}
+
 impl Server {
     fn new(settings: Settings) -> Self {
         let post_approvals = Arc::new(agent_import::PostApprovals::new(&settings.data_dir));
@@ -2607,6 +2652,46 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
         admitted: crate::tally::agent_read_request::AgentReadRequest,
     ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
+        self.post_admitted_read_observing_tally(identity, admitted)
+            .await
+            .map(|(body, evidence, boundary, _)| (body, evidence, boundary))
+    }
+
+    /// As [`Self::post_read_observing_boundary`], also returning the Tally the
+    /// read's identity brackets saw (its release and licence tier).
+    async fn post_read_observing_tally(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        request: ReadRequest,
+    ) -> Result<
+        (
+            String,
+            Evidence,
+            DateBoundaryProfile,
+            crate::tally::ObservedTally,
+        ),
+        ToolFailure,
+    > {
+        let admitted =
+            crate::tally::agent_read_request::AgentReadRequest::parse(request.into_xml())
+                .map_err(|error| error.to_string())?;
+        self.post_admitted_read_observing_tally(identity, admitted)
+            .await
+    }
+
+    async fn post_admitted_read_observing_tally(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        admitted: crate::tally::agent_read_request::AgentReadRequest,
+    ) -> Result<
+        (
+            String,
+            Evidence,
+            DateBoundaryProfile,
+            crate::tally::ObservedTally,
+        ),
+        ToolFailure,
+    > {
         let request_sha256 = sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
             &admitted.clone().into_xml(),
         ));
@@ -2626,7 +2711,12 @@ impl Server {
             duration_ms: None,
             reason_code: None,
         };
-        Ok((response.body, evidence, response.boundary_profile))
+        Ok((
+            response.body,
+            evidence,
+            response.boundary_profile,
+            response.observed_tally,
+        ))
     }
 
     #[cfg(test)]
@@ -2698,9 +2788,8 @@ impl Server {
                 // Retryable as it stands (#697): another Bridge window or AI
                 // client held the Tally endpoint for the whole bounded wait.
                 // A few bytes, so it is kept under any response budget.
-                if code == "tally_endpoint_busy" {
-                    error["retry_after_s"] =
-                        json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+                if let Some(after) = crate::endpoint_wire::wire_retry_after_s(&code) {
+                    error["retry_after_s"] = json!(after);
                 }
                 // Additive: `code` and `message` keep their existing shape for
                 // every refusal, and `remediation` appears only for the codes
@@ -2737,11 +2826,7 @@ impl Server {
                 }
                 // A typed validation cause wins; otherwise a request that no
                 // response answered names why, unless the code already says it.
-                let cause = cause.or_else(|| {
-                    unanswered
-                        .map(|unanswered| unanswered.0)
-                        .filter(|unanswered| *unanswered != code)
-                });
+                let cause = shown_cause(&code, cause, unanswered);
                 // Same budget rule as `remediation`: at a deliberately small cap
                 // the refusal code must survive, so the cause is only added
                 // where there is room for it.
@@ -3083,23 +3168,23 @@ impl Server {
         }
         validate_tool_arguments(name, args)?;
         match name {
-            "acknowledge_post_review" => self.acknowledge_post_review(args).await,
-            "audit_test_run" => self.audit_test_run(args).await,
-            "balance_sheet" => self.balance_sheet(args).await,
+            "acknowledge_post_review" => in_own_frame(|| self.acknowledge_post_review(args)).await,
+            "audit_test_run" => in_own_frame(|| self.audit_test_run(args)).await,
+            "balance_sheet" => in_own_frame(|| self.balance_sheet(args)).await,
             "build_import_xml" => {
                 self.import_enabled()?;
-                self.build_import_xml(args).await
+                in_own_frame(|| self.build_import_xml(args)).await
             }
-            "cash_flow" => self.cash_flow(args).await,
-            "company_features" => self.company_features(args).await,
+            "cash_flow" => in_own_frame(|| self.cash_flow(args)).await,
+            "company_features" => in_own_frame(|| self.company_features(args)).await,
             "egress_log" => self.egress_log(args).map_err(Into::into),
-            "gst_by_counter_ledger" => self.gst_by_counter_ledger(args).await,
-            "gst_status" => self.gst_status(args).await,
-            "gst_uncertain_vouchers" => self.gst_uncertain_vouchers(args).await,
-            "ledger_masters" => self.ledger_masters(args).await,
-            "ledger_movement" => self.ledger_movement(args).await,
+            "gst_by_counter_ledger" => in_own_frame(|| self.gst_by_counter_ledger(args)).await,
+            "gst_status" => in_own_frame(|| self.gst_status(args)).await,
+            "gst_uncertain_vouchers" => in_own_frame(|| self.gst_uncertain_vouchers(args)).await,
+            "ledger_masters" => in_own_frame(|| self.ledger_masters(args)).await,
+            "ledger_movement" => in_own_frame(|| self.ledger_movement(args)).await,
             "list_companies" => {
-                let (companies, evidence) = self.companies().await?;
+                let (companies, evidence) = in_own_frame(|| self.companies()).await?;
                 let flagged = companies
                     .iter()
                     .map(|company| company_json(company, &companies))
@@ -3112,27 +3197,33 @@ impl Server {
                 })
             }
             "local_data_report" => self.local_data_report().map_err(Into::into),
-            "masters" => self.masters(args).await,
-            "month_register" => self.month_register(args).await,
-            "negative_ledgers" => self.negative_ledgers(args).await,
-            "negative_stock" => self.negative_stock(args).await,
-            "outstandings" => self.outstandings(args).await,
+            "masters" => in_own_frame(|| self.masters(args)).await,
+            "month_register" => in_own_frame(|| self.month_register(args)).await,
+            "negative_ledgers" => in_own_frame(|| self.negative_ledgers(args)).await,
+            "negative_stock" => in_own_frame(|| self.negative_stock(args)).await,
+            "outstandings" => in_own_frame(|| self.outstandings(args)).await,
             "parse_bank_statement" => {
                 self.import_enabled()?;
-                self.parse_bank_statement(args).await
+                in_own_frame(|| self.parse_bank_statement(args)).await
             }
-            "parse_bank_statement_csv" => self.parse_bank_statement_csv(args).await,
-            "post_import" => self.post_import(args).await,
-            "post_ledger_creates" => self.post_ledger_creates(args).await,
-            "prepare_ledger_creates" => self.prepare_ledger_creates(args).await,
-            "profit_and_loss" => self.profit_and_loss(args).await,
-            "purchase_register" => self.register(register::RegisterKind::Purchase, args).await,
+            "parse_bank_statement_csv" => {
+                in_own_frame(|| self.parse_bank_statement_csv(args)).await
+            }
+            "post_import" => in_own_frame(|| self.post_import(args)).await,
+            "post_ledger_creates" => in_own_frame(|| self.post_ledger_creates(args)).await,
+            "prepare_ledger_creates" => in_own_frame(|| self.prepare_ledger_creates(args)).await,
+            "profit_and_loss" => in_own_frame(|| self.profit_and_loss(args)).await,
+            "purchase_register" => {
+                in_own_frame(|| self.register(register::RegisterKind::Purchase, args)).await
+            }
             "read_evidence" => self.read_evidence(args).map_err(Into::into),
-            "sales_register" => self.register(register::RegisterKind::Sales, args).await,
-            "statement_tie_out" => self.statement_tie_out(args).await,
-            "stock_summary" => self.stock_summary(args).await,
+            "sales_register" => {
+                in_own_frame(|| self.register(register::RegisterKind::Sales, args)).await
+            }
+            "statement_tie_out" => in_own_frame(|| self.statement_tie_out(args)).await,
+            "stock_summary" => in_own_frame(|| self.stock_summary(args)).await,
             "tally_status" => {
-                let (result, evidence) = self.status().await?;
+                let (result, evidence) = in_own_frame(|| self.status()).await?;
                 Ok(ToolOutcome {
                     payload: json!({"result": result}),
                     evidence,
@@ -3140,23 +3231,27 @@ impl Server {
                     truncated: false,
                 })
             }
-            "trial_balance" => self.trial_balance(args).await,
-            "validate_masters" => self.validate_masters(args).await,
-            "verify_import" => self.verify_import(args).await,
-            "voucher_presence" => self.voucher_presence(args).await,
-            "voucher_read_cost" => self.voucher_read_cost(args).await,
+            "trial_balance" => in_own_frame(|| self.trial_balance(args)).await,
+            "validate_masters" => in_own_frame(|| self.validate_masters(args)).await,
+            "verify_import" => in_own_frame(|| self.verify_import(args)).await,
+            "voucher_presence" => in_own_frame(|| self.voucher_presence(args)).await,
+            "voucher_read_cost" => in_own_frame(|| self.voucher_read_cost(args)).await,
             "voucher_schema" => self.voucher_schema().map_err(Into::into),
-            "vouchers" => self.vouchers(args).await,
+            "vouchers" => in_own_frame(|| self.vouchers(args)).await,
             #[cfg(feature = "lab-writes")]
-            "lab_read_inventory" => lab::lab_read_inventory(self, args).await,
+            "lab_read_inventory" => in_own_frame(|| lab::lab_read_inventory(self, args)).await,
             #[cfg(feature = "lab-writes")]
-            "lab_read_purchase_identity" => lab::lab_read_purchase_identity(self, args).await,
+            "lab_read_purchase_identity" => {
+                in_own_frame(|| lab::lab_read_purchase_identity(self, args)).await
+            }
             #[cfg(feature = "lab-writes")]
-            "lab_voucher_key_probe" => lab::lab_voucher_key_probe(self, args).await,
+            "lab_voucher_key_probe" => {
+                in_own_frame(|| lab::lab_voucher_key_probe(self, args)).await
+            }
             #[cfg(feature = "lab-writes")]
-            "lab_import_masters" => lab::lab_import_masters(self, args).await,
+            "lab_import_masters" => in_own_frame(|| lab::lab_import_masters(self, args)).await,
             #[cfg(feature = "lab-writes")]
-            "lab_import_vouchers" => lab::lab_import_vouchers(self, args).await,
+            "lab_import_vouchers" => in_own_frame(|| lab::lab_import_vouchers(self, args)).await,
             _ => Err("tool_not_found".to_string().into()),
         }
     }
@@ -3238,7 +3333,16 @@ impl Server {
         let tail = read_egress_tail(&path, take)?;
         let evidence = Evidence {
             request_sha256: sha256_hex(b"egress_log"),
-            response_sha256: sha256_json(&tail.records),
+            // The records, and any torn records and unrepaired tail returned beside them.
+            response_sha256: if tail.torn.is_empty() && tail.unrepaired_tail_bytes.is_none() {
+                sha256_json(&tail.records)
+            } else {
+                sha256_json(&json!({
+                    "records": tail.records,
+                    "torn_records": tail.torn.iter().map(|torn| (torn.offset, torn.bytes, &torn.sha256)).collect::<Vec<_>>(),
+                    "unrepaired_tail_bytes": tail.unrepaired_tail_bytes,
+                }))
+            },
             bytes: 0,
             state: "complete",
             read_at: None,
@@ -3246,7 +3350,24 @@ impl Server {
             reason_code: None,
         };
         Ok(ToolOutcome {
-            payload: json!({"result": {"records": tail.records, "order": "newest_first"}}),
+            payload: {
+                let mut result = json!({"records": tail.records, "order": "newest_first"});
+                if !tail.torn.is_empty() {
+                    result["torn_records"] = json!(tail
+                        .torn
+                        .iter()
+                        .map(|torn| json!({
+                            "offset": torn.offset,
+                            "bytes": torn.bytes,
+                            "sha256": torn.sha256,
+                        }))
+                        .collect::<Vec<_>>());
+                }
+                if let Some(bytes) = tail.unrepaired_tail_bytes {
+                    result["unrepaired_tail_bytes"] = json!(bytes);
+                }
+                json!({ "result": result })
+            },
             evidence,
             company_guid: None,
             truncated: tail.truncated,

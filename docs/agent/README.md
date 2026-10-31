@@ -2829,18 +2829,47 @@ deadlocks.
 - **No cause is given.** Uncleared cheques, deposits in transit, a missing entry,
   a repeated entry and the wrong bank ledger look alike; the reading says so,
   prescribes no remedy and checks the bank ledger only.
-- **Not yet proved against a live book.** The tool-level tests replay captured
-  responses with one value changed in memory, and the dated ledger read the tool
-  relies on is the one described in protocol reference section 5.5. Their
-  proposals files are written by hand, except in the round-trip test, whose file
-  is written by the code the parse uses. One run by an outside contributor on two
-  synthetic companies (TallyPrime 7.1 Silver, 10 October 2026) is only partly
-  recorded, in the pull request: the import summary was not captured and no raw
-  answers are kept. A statement whose last day is the end of a financial year is
-  still to be run, and so is a window of whole calendar months: the book's
-  position read at a month's first day and the day after its last has been
-  measured on some ledgers and dates (protocol reference section 5.5), not on a
-  bank ledger in the middle of its year or after its last voucher.
+- **Run against a live book.** Every checked row of one run passed on 30 October
+  2026 (UTC; 31 October on the lab computer), and one row was recorded as a note
+  (licensed TallyPrime 7.2 Silver, one synthetic company, the published 0.7.0
+  Windows package):
+  - A window ending in the middle of a month answered `not_established`
+    (`window_not_whole_calendar_months`) with no amount, after the company check
+    alone: four requests and no ledger read.
+  - Two windows of one whole calendar month each, on a bank ledger in the middle
+    of its year, tied while the book also held a second bank ledger.
+    `trial_balance` at each month end, and Tally's own Ledger display over the
+    two months, agreed with the statement. An entry keyed by hand that is not on
+    the statement showed as a closing gap and a change of its own amount, with
+    the opening still tied.
+  - A statement whose first and last rows fall in the middle of a month was read
+    at its first row's date and the day after its last: a voucher dated the day
+    before the first row counted in the opening, and one dated the day after the
+    last row stayed out of the closing.
+  - ComplyEaze Bridge's own post of that statement's vouchers (`post_import`,
+    `posted_verified`) then tied at `after_post`, and `before_build` run again
+    answered `file_already_partly_posted` for the closing and the change rather
+    than counting the batch twice. A twin of one row keyed after the post showed
+    at `after_post` as a closing gap and a change of its amount.
+
+  Two earlier runs were on TallyPrime 7.1 Silver: one by an outside contributor
+  on two synthetic companies (10 October 2026), only partly recorded in the pull
+  request, and one on 14 October 2026 on the same synthetic company. That run had
+  already measured whole-month windows on the bank ledger in the middle of its
+  year before and after a hand import, reads after the ledger's last voucher, a
+  window refused as `window_not_whole_calendar_months` with no ledger read, and
+  `file_already_partly_posted`. New in this run are the second bank ledger,
+  Tally's Ledger display as the reference, the statement edges in the middle of a
+  month, ComplyEaze Bridge's own post, and TallyPrime 7.2. The tool-level tests
+  replay captured responses with one value changed in memory, and the dated
+  ledger read the tool relies on is the one described in protocol reference
+  section 5.5. Their proposals files are written by hand, except in the
+  round-trip test, whose file is written by the code the parse uses. Not
+  measured: a statement whose last day is the end of a financial year, a book of
+  1,000 or more vouchers, Education mode, a voucher posted inside the window
+  during the reads, another bank's statement layout, and Gold. Evidence:
+  `RESULTS.md` on the lab branch `lab/1211-tie-out-evidence-answers` at
+  `7760d367`.
 
 ## Approved voucher posting
 

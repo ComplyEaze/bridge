@@ -1516,6 +1516,31 @@ classified as TDS payable, counted before that TDS."
             })
             .filter(|&(_, x)| x != 0)
             .collect();
+        // Rule 3's vouchers on this loan, by sign: a share split across loans is the loan's own
+        // line, which says nothing of how the deduction divides between the loans' interest, so a
+        // deduction among them is never read as covering it (coverage "not checked").
+        let split_at = |positive: bool| -> BTreeSet<usize> {
+            tds_by_voucher
+                .iter()
+                .filter(|&&(at, x)| {
+                    (x > 0) == positive
+                        && pop[at]
+                            .lines
+                            .iter()
+                            .any(|l| l.amount_paise != 0 && other_loans.contains(l.ledger.as_str()))
+                })
+                .map(|&(at, _)| at)
+                .collect()
+        };
+        let (split_deducted, split_debited) = (split_at(true), split_at(false));
+        let split_labels = |ats: &BTreeSet<usize>| {
+            ats.iter()
+                .map(|&at| voucher_label(pop[at]))
+                .collect::<BTreeSet<_>>()
+                .into_iter()
+                .collect::<Vec<_>>()
+                .join("; ")
+        };
         // A voucher whose TDS nets to a debit stays out of the TDS deducted, named in its text,
         // because a TDS debit can reverse an earlier deduction (#1875 rule 4, a declared
         // difference from the reference, which nets it in). LOAN-1 adds it back to its tie.
@@ -1536,13 +1561,25 @@ earlier deduction (tds_debited_on_loan_{h}).",
                 named.into_iter().collect::<Vec<_>>().join("; ")
             )
         };
+        // Rule 3: where a split voucher is counted, the text says what it gives (Twin A: its line
+        // on the loan of 10,000 against a TDS line of 20,000); elsewhere it is the reference's.
+        let split_part = if split_deducted.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " On {}, whose only other lines are loans on the same side and TDS lines netting to \
+their sum, the loan's own line is counted, not the voucher's TDS lines.",
+                split_labels(&split_deducted)
+            )
+        };
         let f_tds = r.fig(
             &format!("tds_on_loan_{h}"),
             paise(tds_on_loan)?,
             Unit::Paise,
             &format!(
                 "TDS deducted on loan ledger (tag {h}): the lines on ledgers in the client's \
-statutory dues classified as TDS payable, on every voucher that posts to the loan.{left_out}"
+statutory dues classified as TDS payable, on every voucher that posts to the loan.{split_part}\
+{left_out}"
             ),
             voucher_refs(deducted.iter().map(|&(at, _)| pop[at])),
         )?;
@@ -1554,9 +1591,11 @@ statutory dues classified as TDS payable, on every voucher that posts to the loa
                 &format!(
                     "TDS debited on loan ledger (tag {h}): on each voucher that posts to the loan \
 and whose lines on ledgers in the client's statutory dues classified as TDS payable net to a debit, \
-that debit, summed. It is not in the TDS deducted beside it, since a debit can reverse an earlier \
-deduction; it is shown so the loan's movement can be checked against the Trial Balance. Where such \
-a voucher is counted in the taken or repaid totals, its debit is inside tds_in_principal_{h} too."
+the debit counted on the loan, summed. That is the net of those lines, except on a voucher whose only \
+other lines are loans on the same side and TDS lines netting to their sum, where it is the loan's \
+own line. It is not in the TDS deducted beside it, since a debit can reverse an earlier deduction; \
+it is shown so the loan's movement can be checked against the Trial Balance. Where such a voucher \
+is counted in the taken or repaid totals, its debit is inside tds_in_principal_{h} too."
                 ),
                 voucher_refs(debited.iter().map(|&(at, _)| pop[at])),
             )?;
@@ -1580,24 +1619,27 @@ a voucher is counted in the taken or repaid totals, its debit is inside tds_in_p
             .filter(|(at, _)| in_principal.contains(at))
             .collect();
         if !principal_tds.is_empty() {
-            // A debit among them is in tds_debited_on_loan, not the TDS deducted (#1875 rule 4).
-            let inside = if principal_tds.iter().any(|&(_, x)| x < 0) {
+            // A debit among them is in tds_debited_on_loan, not the TDS deducted (#1875 rule 4), so
+            // the reference's text, which reads it all as deducted, is kept only where none is.
+            let definition = if principal_tds.iter().any(|&(_, x)| x < 0) {
                 format!(
-                    "Its deductions are inside the TDS deducted beside it and its debits inside \
-tds_debited_on_loan_{h},"
+                    "The TDS counted on loan ledger (tag {h}) on the vouchers counted in its taken \
+or repaid totals (a repayment booked net of TDS, say), summed, deductions positive and debits \
+negative. Its deductions are inside the TDS deducted beside it and its debits inside \
+tds_debited_on_loan_{h}. It is shown so the loan's movement can be checked against the Trial Balance."
                 )
             } else {
-                "It is inside the TDS figure beside it,".to_string()
+                format!(
+                    "Of the TDS deducted on loan ledger (tag {h}), the part on the vouchers counted \
+in its taken or repaid totals (a repayment booked net of TDS, say), summed. It is inside the TDS \
+figure beside it, and is shown so the loan's movement can be checked against the Trial Balance."
+                )
             };
             r.fig(
                 &format!("tds_in_principal_{h}"),
                 paise(principal_tds.iter().map(|&(_, x)| x).sum())?,
                 Unit::Paise,
-                &format!(
-                    "Of the TDS deducted on loan ledger (tag {h}), the part on the vouchers counted \
-in its taken or repaid totals (a repayment booked net of TDS, say), summed. {inside} and is shown so \
-the loan's movement can be checked against the Trial Balance."
-                ),
+                &definition,
                 voucher_refs(principal_tds.iter().map(|&(at, _)| pop[at])),
             )?;
         }
@@ -1732,8 +1774,11 @@ interest."
                 // The TDS seen can reach the rate by amount and not by date: a deduction at payment
                 // before a later credit of the interest, or one for an earlier year's interest; the
                 // books do not say which. Named as such, and still listed; "partly covered" is kept
-                // for a shortfall in amount.
-                if tds_on_loan > 0 && covering >= expected - tolerance {
+                // for a shortfall in amount. A deduction split across loans (#1875 rule 3) is the
+                // loan's own line, not a reading of what it covers: never a pass.
+                if !split_deducted.is_empty() {
+                    "not checked"
+                } else if tds_on_loan > 0 && covering >= expected - tolerance {
                     "covered"
                 } else if tds_on_loan >= expected - tolerance && expected - tolerance > 0 {
                     "covered by amount, not by date"
@@ -1744,6 +1789,22 @@ interest."
                 }
             }
         };
+        // The reference's text, except where this loan has a TDS debit (the TDS seen is then
+        // deductions only, #1875 rule 4) or a split deduction (the reading it gives, rule 3).
+        let (seen, unchecked) = (
+            if debited.is_empty() {
+                "TDS is seen on the loan"
+            } else {
+                "TDS deducted is seen on the loan (a TDS debit alone is not)"
+            },
+            if split_deducted.is_empty() {
+                ""
+            } else {
+                ", not checked where TDS deducted on the loan is its line on a voucher whose only \
+other lines are loans on the same side and TDS lines netting to their sum (the books do not say how \
+that TDS divides between the loans' interest)"
+            },
+        );
         r.fig(
             &format!("s194a_tds_coverage_{h}"),
             text(coverage),
@@ -1752,8 +1813,8 @@ interest."
                 "Whether the TDS on loan ledger (tag {h}) covers the s.194A rate on its interest: \
 covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the \
 date-aware count, reversals included, credits less), none, not judged where the rules carry no \
-s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries \
-interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's \
+s.194A rate{unchecked}, or not computed where a voucher listed as both crediting and debiting the \
+loan carries interest or TDS and {seen}. The rate assumes the lender furnished a PAN: s.206AA's \
 higher rate is not applied, and the books do not show a PAN."
             ),
             Vec::new(),
@@ -2186,6 +2247,16 @@ and debiting it (#779)."
                 .iter()
                 .flat_map(|v| v.lines.iter())
                 .any(|l| tds_here.contains(&l.ledger) && l.amount_paise != 0);
+            // The TDS seen is deductions only (#1875 rule 4): where a listed voucher's TDS nets to
+            // a debit, the text says where that debit is; elsewhere it is the reference's.
+            let listed_tds = if debited.iter().any(|&(at, _)| rows.listed.contains(&at)) {
+                format!(
+                    "any TDS deducted on them is in the TDS seen on the loan and any TDS debit in \
+tds_debited_on_loan_{h}"
+                )
+            } else {
+                "any TDS on them is in the TDS seen on the loan".to_string()
+            };
             let mut evidence = ev_listed_194a.clone();
             evidence.push(EvidenceRef::new("ledger", loan_ledger));
             r.findings.push(Finding {
@@ -2218,9 +2289,9 @@ that both credits and debits the loan carries interest or TDS"
                     format!(
                         "{} voucher(s) both credit and debit this loan and carry its interest \
 ledger or a TDS ledger; this test lists each as the books hold it and does not divide it into \
-entries. Their interest ({}) is shown beside the interest total, not in it; any TDS on them is in \
-the TDS seen on the loan, unless the voucher also posts to another configured loan. {} This loan is \
-in no clause 21(b) item from this test.",
+entries. Their interest ({}) is shown beside the interest total, not in it; {listed_tds}, unless \
+the voucher also posts to another configured loan. {} This loan is in no clause 21(b) item from this \
+test.",
                         listed_194a.len(),
                         rupees(interest_listed),
                         if threshold_open {
@@ -2299,7 +2370,15 @@ s.201(1A) interest still runs either way."
                     .to_string(),
             );
             let by_date = coverage == "covered by amount, not by date";
-            if by_date {
+            let unchecked = coverage == "not checked";
+            if unchecked {
+                facts.push(("tds_on_loan".to_string(), f_tds.clone()));
+                limits.push(format!(
+                    "Not checked: whether the TDS on {}, split across loans on one side, covers \
+this interest.",
+                    split_labels(&split_deducted)
+                ));
+            } else if by_date {
                 facts.push(("tds_on_loan".to_string(), f_tds.clone()));
                 limits.push(format!(
                     "TDS of {} is seen on this loan, at the s.194A rate on its interest by amount, \
@@ -2357,7 +2436,10 @@ balance, or its own amount, make it reportable, or as not computed where that is
                 clauses: ["s.194A", "3CD-21(b)", "3CD-34(a)", "3CD-34(c)"]
                     .map(str::to_string)
                     .to_vec(),
-                title: if by_date {
+                title: if unchecked {
+                    "Interest to a non-exempt lender over the s.194A threshold, TDS on the loan \
+split with another loan, not checked against the s.194A rate"
+                } else if by_date {
                     "Interest to a non-exempt lender over the s.194A threshold, TDS on the loan \
 at the s.194A rate by amount, short of it by the date-aware count"
                 } else if partly {
@@ -2389,7 +2471,21 @@ interest it covers."
             });
         }
         if over_194a && coverage == "covered" {
-            // Covered is never silent: the CA sees what was read as covering the interest.
+            // Covered is never silent: the CA sees what was read as covering the interest. A split
+            // deduction never reads covered (rule 3); a split debit is counted as a reversal.
+            let not_counted = if split_debited.is_empty() {
+                "Not counted: a deduction, or its reversal, on a voucher that also posts to another \
+loan (the books do not split it between them)."
+                    .to_string()
+            } else {
+                format!(
+                    "Not counted: a deduction on a voucher that also posts to another loan (the \
+books do not split it between them). A reversal on one is not counted either, except on {}, whose \
+only other lines are loans on the same side and TDS lines netting to their sum: its line on this \
+loan is counted as a reversal.",
+                    split_labels(&split_debited)
+                )
+            };
             let mut evidence = ev_tds.clone();
             evidence.push(EvidenceRef::new("ledger", loan_ledger));
             r.findings.push(Finding {
@@ -2413,9 +2509,7 @@ covers tax deducted but not paid by the s.139(1) due date).",
 deduction counts only against interest credited on or before it).",
                     "Not checked: the lender's PAN. The s.194A(1) rate is used; s.206AA's higher \
 rate is not applied.",
-                    "Not counted: a deduction, or its reversal, on a voucher that also posts to \
-another loan (the books do not split it between them), unless its only other lines are loans on the \
-same side and TDS netting to their sum: there each loan's own line is its TDS.",
+                    not_counted.as_str(),
                     "Not checked: that each deduction is s.194A TDS on this interest; TDS-payable \
 lines on any voucher posting to this ledger count, including TDS under another section on another \
 credit to it (rent, commission).",
@@ -4930,6 +5024,76 @@ mod tests {
             Some(30_000)
         );
         assert_eq!(loan1, Vec::<String>::new());
+    }
+
+    /// Rule 3 never makes a pass: a person lender's interest of 85,020 (Interest A Dr / Loan A
+    /// Cr), then Loan A Dr 8,502 / Loan B Dr 164.25 / TDS Payable Cr 8,666.25. Loan A's own line
+    /// is the s.194A rate on its interest, but how that TDS divides between the loans is not in
+    /// the books: coverage is "not checked", the loan is listed with that limit, and no TDS-seen
+    /// finding fires. The control, the same deduction on Loan A alone, still reads "covered".
+    #[test]
+    fn tds_split_across_loans_is_never_read_as_covering_the_interest() {
+        let interest = journal("i1", &[("Interest A", 8_502_000), ("Loan A", -8_502_000)]);
+        let split = journal(
+            "t1",
+            &[
+                ("Loan A", 850_200),
+                ("Loan B", 16_425),
+                ("TDS Payable", -866_625),
+            ],
+        );
+        let alone = journal("t1", &[("Loan A", 850_200), ("TDS Payable", -850_200)]);
+        let coverage = |b: &Book, r: &TestResult| {
+            loan_figure(b, r, "s194a_tds_coverage", "Loan A").map(|f| f.value.clone())
+        };
+        let lenders = |r: &TestResult| {
+            r.figures
+                .iter()
+                .find(|f| f.id == format!("{TEST_ID}.s194a_tds_over_threshold_lender_count"))
+                .map(int_of)
+        };
+        let (b, r, _) = two_loans_run(vec![interest.clone(), split]);
+        let h = stable_ledger_tag(&b, "Loan A").unwrap();
+        assert_eq!(paise_of(&b, &r, "tds_on_loan", "Loan A"), Some(850_200));
+        assert_eq!(
+            coverage(&b, &r),
+            Some(Value::Text("not checked".to_string()))
+        );
+        let seen = format!("{TEST_ID}/s194a_tds_seen/");
+        assert!(!r.findings.iter().any(|f| f.id.starts_with(&seen)));
+        let listed = r
+            .findings
+            .iter()
+            .find(|f| f.id == format!("{TEST_ID}/s194a/{h}"))
+            .unwrap();
+        assert!(
+            !listed.title.contains("short of") && !listed.title.contains("no TDS"),
+            "{}",
+            listed.title
+        );
+        assert!(
+            listed.limits.contains(
+                &"Not checked: whether the TDS on Journal t1 on 2025-06-01, split across loans \
+on one side, covers this interest."
+                    .to_string()
+            ),
+            "{:?}",
+            listed.limits
+        );
+        assert_eq!(lenders(&r), Some(1));
+        // The control.
+        let (b, r, _) = two_loans_run(vec![interest, alone]);
+        let h = stable_ledger_tag(&b, "Loan A").unwrap();
+        assert_eq!(coverage(&b, &r), Some(Value::Text("covered".to_string())));
+        assert!(r
+            .findings
+            .iter()
+            .any(|f| f.id == format!("{TEST_ID}/s194a_tds_seen/{h}")));
+        assert!(!r
+            .findings
+            .iter()
+            .any(|f| f.id == format!("{TEST_ID}/s194a/{h}")));
+        assert_eq!(lenders(&r), Some(0));
     }
 
     /// A Journal on 2025-06-01 with no number, so its label is "Journal <guid> on 2025-06-01".

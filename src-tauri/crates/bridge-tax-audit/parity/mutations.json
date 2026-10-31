@@ -3380,8 +3380,8 @@
   "by": "author (Lane E2)",
   "what": "coverage allows no rupee of rounding per deduction",
   "file": "src/loans_interest.rs",
-  "from": "                if tds_on_loan > 0 && covering >= expected - tolerance {",
-  "to": "                if tds_on_loan > 0 && covering >= expected {"
+  "from": "                } else if tds_on_loan > 0 && covering >= expected - tolerance {",
+  "to": "                } else if tds_on_loan > 0 && covering >= expected {"
  },
  {
   "id": "LR-38",
@@ -11716,8 +11716,8 @@
   "by": "author",
   "what": "loans_interest: the TDS in principal says it is inside the TDS deducted where a debit among it is not",
   "file": "src/loans_interest.rs",
-  "from": "            let inside = if principal_tds.iter().any(|&(_, x)| x < 0) {",
-  "to": "            let inside = if false {"
+  "from": "            let definition = if principal_tds.iter().any(|&(_, x)| x < 0) {",
+  "to": "            let definition = if false {"
  },
  {
   "id": "P1243-DEP-01",

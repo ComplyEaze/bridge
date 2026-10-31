@@ -76,8 +76,9 @@
 //! The read is `read_days`, which reads at most four of the skips' days (newest
 //! first, within 31 days of the newest) and yields a `WholeDay` only from a
 //! day whose census counted it, with none withheld, none outside the day and
-//! at least one voucher. No caller passes its days to the view yet, so every
-//! row that was `NotFound` is `TallyUnchecked` until one does (#1392).
+//! at least one voucher. `with_days_read` joins the two for a call: it plans
+//! the days of the view's `TallyUnchecked` rows, reads them, and computes the
+//! view again with the days read whole (#1392).
 //!
 //! Two skips with one `SkipKey`, or two Contras with one `ContraKey`, are refused
 //! with a typed error naming the smallest such key, whatever the input order.
@@ -87,7 +88,7 @@ use super::voucher_window::{
     AgentReader, VoucherReadShape, WindowPart, WindowReadOutcome, WindowReader,
 };
 use super::vouchers::{read_entry_window_rows_with, VoucherComposites};
-use super::VerifiedCompanyIdentity;
+use super::{combine_evidence, Evidence, VerifiedCompanyIdentity};
 use bridge_bank_statement::bank::BankReference;
 use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
 use serde_json::Value;
@@ -271,8 +272,8 @@ impl Coverage {
 /// any Contra between a skip's two ledgers, plain two-entry or not. Only such a
 /// day lets a skip with no candidate be `NotFound`. Outside tests the only
 /// constructor is [`TallyDays::from_whole_days`], which takes [`WholeDay`]s, so
-/// a day that was not read whole cannot be in it. No caller reads days yet
-/// (#1392), so [`TallyDays::none`] is what every caller passes.
+/// a day that was not read whole cannot be in it. A view computed without
+/// reading any day passes [`TallyDays::none`].
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TallyDays(
     BTreeSet<(
@@ -624,6 +625,9 @@ pub(crate) const DAY_PLAN_FOR_ANOTHER_READ: &str = "day_plan_for_another_company
 pub(crate) struct DayReads {
     pub(crate) whole: Vec<WholeDay>,
     pub(crate) kept: Vec<(TallyDate, DayKept)>,
+    /// Every read that came back, whole or not, folded in the order sent;
+    /// `None` when none did.
+    pub(crate) evidence: Option<Evidence>,
 }
 
 /// Read the planned days, newest first, one window of exactly one day each:
@@ -665,7 +669,34 @@ pub(crate) async fn read_days<R: DayReader>(
             reads.kept.push((date.clone(), DayKept::NotAttempted));
             continue;
         }
-        match read_day(reader, identity, company, &plan.endpoint_origin, date).await {
+        let read = read_entry_window_rows_with(
+            reader,
+            identity,
+            company,
+            date,
+            date,
+            VoucherReadShape::EntryWildcard,
+            VoucherComposites::Withhold,
+        )
+        .await;
+        let day = match read {
+            Err(failure) => Err(DayKept::ReadFailed(failure.code)),
+            Ok(read) => {
+                let evidence = read.all_evidence();
+                reads.evidence = Some(match reads.evidence.take() {
+                    Some(before) => combine_evidence(before, evidence),
+                    None => evidence,
+                });
+                WholeDay::from_read(
+                    CompanyGuid::new(identity.company_guid()),
+                    plan.endpoint_origin.clone(),
+                    date,
+                    &read,
+                )
+                .map_err(DayKept::NotWhole)
+            }
+        };
+        match day {
             Ok(day) => reads.whole.push(day),
             Err(kept) => {
                 failed = matches!(kept, DayKept::ReadFailed(_));
@@ -676,31 +707,37 @@ pub(crate) async fn read_days<R: DayReader>(
     reads
 }
 
-async fn read_day<R: WindowReader>(
+/// The view of a call's facts, with the days of its open skipped rows read
+/// (#1392): the view, a [`DayPlan`] of its `TallyUnchecked` rows' days read by
+/// [`read_days`] through `reader`, and the view computed again from the same
+/// facts with [`TallyDays::from_whole_days`]. `TallyDays` is consulted only
+/// for a row with no candidate whose date the statements cover, so the second
+/// view differs from the first only in rows `TallyUnchecked` there and
+/// `NotFound` here. It reads each skip's own day only, so the view is computed
+/// with `k_days` of 0 and is that view only for a caller whose k is 0. A plan
+/// that cannot be made (the reader cannot name its Tally) reads nothing. `Err`
+/// is the facts refused before any read.
+pub(crate) async fn with_days_read<R: DayReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
     company: &str,
-    endpoint_origin: &EndpointOrigin,
-    date: &TallyDate,
-) -> Result<WholeDay, DayKept> {
-    let read = read_entry_window_rows_with(
-        reader,
-        identity,
-        company,
-        date,
-        date,
-        VoucherReadShape::EntryWildcard,
-        VoucherComposites::Withhold,
-    )
-    .await
-    .map_err(|failure| DayKept::ReadFailed(failure.code))?;
-    WholeDay::from_read(
-        CompanyGuid::new(identity.company_guid()),
-        endpoint_origin.clone(),
-        date,
-        &read,
-    )
-    .map_err(DayKept::NotWhole)
+    skips: &[SkipFact],
+    contras: &[ContraFact],
+    coverage: &Coverage,
+    name_of: impl Fn(&LedgerGuid) -> Option<String>,
+) -> Result<(TransferView, DayReads), PairingInputError> {
+    let view = transfer_pairing_view(skips, contras, coverage, 0)?;
+    let Ok(plan) = DayPlan::of(skips, &view, identity, reader) else {
+        return Ok((view, DayReads::default()));
+    };
+    if plan.days().is_empty() {
+        return Ok((view, DayReads::default()));
+    }
+    let reads = read_days(reader, identity, company, &plan).await;
+    let tally = TallyDays::from_whole_days(&reads.whole, skips, name_of);
+    // the facts were admitted above, so this cannot be refused
+    let view = transfer_pairing_view_with(skips, contras, coverage, &tally, 0).unwrap_or(view);
+    Ok((view, reads))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1344,4 +1381,4 @@ fn find_double_booked(
 
 #[cfg(test)]
 #[path = "agent_transfer_pairing_tests.rs"]
-mod tests;
+pub(crate) mod tests;

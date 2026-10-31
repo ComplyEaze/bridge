@@ -113,7 +113,8 @@ fn facts_of(skips: Vec<SkipFact>, contras: Vec<ContraFact>) -> TransferFacts {
 
 fn summary_of(facts: &TransferFacts) -> TransferSummary {
     // every skip's own day counts as read whole, so that these tests keep asking
-    // what the summary does with each state; production passes no read of Tally
+    // what the summary does with each state; production reads days only for a
+    // build's tally_unchecked rows (#1392)
     let tally = TallyDays::clean_for(&facts.skips);
     let view = transfer_pairing_view_with(
         &facts.skips,
@@ -126,8 +127,9 @@ fn summary_of(facts: &TransferFacts) -> TransferSummary {
     TransferSummary::of(facts, &view)
 }
 
-/// The summary as production builds it: no day of Tally has been read, so a row
-/// no statement carries is `tally_unchecked`, never `not_found`.
+/// The summary when no day of Tally has been read (the admission view, and
+/// verify_import's section): a row no statement carries is `tally_unchecked`,
+/// never `not_found`.
 #[test]
 fn without_a_read_of_tally_a_row_no_statement_carries_is_tally_unchecked() {
     let facts = facts_of(vec![skip("st-1", "20260107", "500.00")], Vec::new());
@@ -1096,7 +1098,7 @@ fn every_sentence_that_names_tally_is_a_prohibition_a_disclosure_or_a_named_read
         "A Contra in a batch not yet verified is not in Tally until that batch is imported and verified",
         "Do not book this transfer in Tally another way, and withdraw the skip on one side only: a later post of the other statement would book it twice",
         "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, and ComplyEaze Bridge read every voucher of this date in Tally and found no Contra between the two accounts that could carry it",
-        "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date in Tally, so a Contra entered in Tally directly is not in its records",
+        "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date in Tally, or could not find one of the two ledgers in the ledger list it read, or read them all and found a voucher of this date with an entry on each of the two ledgers, which it does not compare with this row, so a Contra entered in Tally directly is not ruled out",
         "A row marked restored names a batch whose vouchers a restore that ComplyEaze Bridge recorded may have removed from Tally",
         "A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked",
         "A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet",
@@ -1464,4 +1466,94 @@ fn the_unreadable_view_refusal_at_send_has_no_build_again_ending() {
     ] {
         assert!(!step.contains(wording), "{wording}: {step}");
     }
+}
+
+/// A ledger catalogue of the lab book, as `(name, GUID)` rows under the group
+/// Bank Accounts.
+///
+/// A SYNTHETIC body (never evidence of what Tally answers): the names are the
+/// ones the captured voucher rows of 3 to 6 April 2026 spell, and the GUIDs are
+/// the ones the lab skips carry.
+fn lab_catalogue(ledgers: &[(&str, &str)]) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    use crate::agent::transfer_pairing::tests::whole_day::{LAB, LAB_GUID};
+    let rows = ledgers
+        .iter()
+        .map(|(name, guid)| {
+            format!(
+                "<LEDGER NAME=\"{name}\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{guid}</GUID>\
+                 <PARENT TYPE=\"String\">Bank Accounts</PARENT><ISBILLWISEON TYPE=\"Logical\">No</ISBILLWISEON>\
+                 <BRIDGECOMPANYGUID TYPE=\"String\">{LAB_GUID}</BRIDGECOMPANYGUID>\
+                 <BRIDGECOMPANYNAME TYPE=\"String\">{LAB}</BRIDGECOMPANYNAME></LEDGER>"
+            )
+        })
+        .collect::<String>();
+    let xml = format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO>\
+         <COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>{rows}</COLLECTION></DATA></BODY></ENVELOPE>"
+    );
+    bridge_tally_protocol::parse_standard_ledger_catalog_v2_with_identities(&xml, LAB, LAB_GUID)
+        .unwrap()
+}
+
+/// The section a build returns once its rows' days are read (#1392), with the
+/// rows' ledgers named through the catalogue the build read. The day is the
+/// lab's captured 4 April, a Contra between TLab Bank A and TLab Bank B. The
+/// row to TLab Bank C, which no voucher of the day names, is `not_found`; the
+/// row between the two banks stays `tally_unchecked`; and with TLab Bank C
+/// missing from the catalogue, both stay `tally_unchecked`.
+#[tokio::test]
+async fn a_build_names_the_rows_ledgers_from_its_catalogue_for_the_days_it_reads() {
+    use crate::agent::transfer_pairing::tests::whole_day::{
+        day_d04, identity, lab_covered, lab_skip, lab_skip_to_c, Captured, LAB,
+    };
+    let admitted = || {
+        let mut facts = facts_of(
+            vec![
+                lab_skip_to_c("st-ac", "20260404"),
+                lab_skip("st-ab", "20260404"),
+            ],
+            Vec::new(),
+        );
+        facts.coverage = lab_covered();
+        Admitted(Some(facts))
+    };
+    let row = |id: &str, state| (id.to_string(), "20260404".to_string(), state, None);
+    let bank_a = ("TLab Bank A", "tlab-a");
+    let bank_b = ("TLab Bank B", "tlab-b");
+    let bank_c = ("TLab Bank C", "tlab-c");
+
+    let reader = Captured::of(day_d04());
+    let (summary, evidence) = admitted()
+        .summary_with_days_read(
+            &reader,
+            &identity(),
+            LAB,
+            lab_catalogue(&[bank_a, bank_b, bank_c]).catalog(),
+        )
+        .await;
+    assert_eq!(reader.left(), 0, "the day was read, and nothing else");
+    assert!(evidence.is_some(), "the day read is evidenced");
+    assert_eq!(
+        rows_of(&summary),
+        vec![row("st-ab", "tally_unchecked"), row("st-ac", "not_found")]
+    );
+
+    // the day is read whole, but the row's other ledger has no name
+    let reader = Captured::of(day_d04());
+    let (summary, _) = admitted()
+        .summary_with_days_read(
+            &reader,
+            &identity(),
+            LAB,
+            lab_catalogue(&[bank_a, bank_b]).catalog(),
+        )
+        .await;
+    assert_eq!(reader.left(), 0);
+    assert_eq!(
+        rows_of(&summary),
+        vec![
+            row("st-ab", "tally_unchecked"),
+            row("st-ac", "tally_unchecked")
+        ]
+    );
 }

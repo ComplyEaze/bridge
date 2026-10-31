@@ -1755,8 +1755,25 @@ impl Server {
             // The file was stored and is read by the logical `path`. Set before the
             // essential length is measured, so the transfers section's room counts it.
             user_visible_path(&path).put_into(&mut payload["result"], "path");
-            // The summary was computed before the append, with this build in it,
-            // so nothing after the append refuses a written build. It is drawn
+            // The days of the section's tally_unchecked rows are read last, after
+            // the build is written and with the admission lock released: they
+            // change only which of those rows read not_found, which no
+            // admission reads (#1392).
+            drop(_admission_lock);
+            let (transfers, day_evidence) = transfers
+                .summary_with_days_read(
+                    &super::voucher_window::AgentReader(self),
+                    &identity,
+                    &company.name,
+                    ledger_masters.catalog(),
+                )
+                .await;
+            if let Some(day_evidence) = day_evidence {
+                accumulated = combine_evidence(accumulated.clone(), day_evidence);
+            }
+            // The summary comes from the facts admitted before the append, with
+            // this build in it, so nothing after the append refuses a written
+            // build, and a day read that fails only keeps its rows unchecked. It is drawn
             // here into the room the essential result leaves. The response
             // cap's fitter can still cut it, down to leaving it out, but only
             // for a result that fits without it (and then the answer is marked
@@ -1865,6 +1882,20 @@ impl Server {
         };
         self.append_skip_record_while_admitted(&record)
             .map_err(fail)?;
+        // As for a build: read last, with the admission lock released (#1392).
+        drop(_admission_lock);
+        let (transfers, day_evidence) = transfers
+            .summary_with_days_read(
+                &super::voucher_window::AgentReader(self),
+                &identity,
+                &company.name,
+                ledger_masters.catalog(),
+            )
+            .await;
+        let accumulated = match day_evidence {
+            Some(day_evidence) => combine_evidence(accumulated, day_evidence),
+            None => accumulated,
+        };
         let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
             "state": "skips_recorded",
             "record_id": record.record_id,

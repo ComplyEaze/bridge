@@ -281,17 +281,18 @@ the counted ledgers, each allowed four further mailing entries the mark may not 
 with one more entry allowed for each alteration beyond them (#2074). These are allowances from one lab row, not
 bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490; its header
 then says that no ledger's mailing details were observed and the status column reads not observed. A counted book that
-the standard request exported before can now be sent the larger mailing request. Where Tally declares that read's
-answer past the 32 MiB response limit, the workbook reads the book once more with the standard request, and its header
-says the larger read failed (#2214); the retry has not been run against Tally. It does the same where that answer came
-back broken, cut short or unreadable (it broke off, could not be read, did not decode or did not parse), and its header
-says so. The export fails where the larger read runs out of time, or passes the limit without Tally declaring it,
-since Tally may still be working on it; its error says the mailing addresses were part of the failed read. It also
-fails where, after an answer that broke off or could not be read, the transport refuses the standard post as draining
-because Tally has not settled within that post's own `/status` probes, and on any other refusal of the larger read's
-answer (Tally's own failure answer, a missing STATUS, an HTTP error status, the pair's two answers differing, or a row
-the grammar refuses, which markup inside a mailing field alone can cause), each told as itself. Neither cut
-of a mailing read, nor the drain after one, has been seen live. `ledger_masters` with
+the standard request exported before can now be sent the larger mailing request. The export fails where that read
+runs out of time, or passes the 32 MiB response limit without Tally declaring it, since Tally may still be working on
+it; its error says the mailing addresses were part of the failed read. After any other failure of that read, the
+workbook reads the book once more with the standard request, and its header says how the larger read failed (#2214):
+an oversize Tally declared, an answer that broke off, could not be read, did not decode or never came, an HTTP error
+status, a post that did not reach Tally, the pair's two answers differing, or any refusal of a whole answer (Tally's
+own failure answer, a missing STATUS, XML that does not parse, a row the grammar refuses, as markup inside a mailing
+field does, a wrong company, a passed bound, a repeated ledger or a ledger count that differs). After an answer that
+broke off, could not be read, did not decode or never came, Tally may still be sending it, so while the standard
+post is refused as draining before anything of it was sent, the export waits and tries again, for at most 60 s, a
+bound not measured, and fails past it. The standard read keeps every refusal it has without the mailing details.
+Only the declared oversize, and a separate read after it, have been seen live. `ledger_masters` with
 `include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default

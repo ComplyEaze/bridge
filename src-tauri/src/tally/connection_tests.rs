@@ -1854,59 +1854,84 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     );
 }
 
-/// The mailing marker carries how the read failed, decided by the master post's own transport
-/// error, and each cause has one decision for the export (bridge#2214 and the maintainers'
-/// ruling on bridge#2074): an answer that broke off, could not be read or did not decode
-/// continues without the details, an answer Tally declared past the response cap is read again
-/// without them, and a deadline or an oversize Tally did not declare refuses. A failure that is
-/// none of these, an unsupported content encoding among them, is not marked. A `/status` check of the pair that failed is not the post's failure, though it sits in
-/// the same chain.
+/// Every transport error a post of the mailing pair can end with is marked with its cause,
+/// decided by the post's own error (bridge#2214 and the maintainers' ruling on bridge#2074):
+/// a deadline and an oversize Tally did not declare refuse, a declared oversize is read again,
+/// an answer that broke off, could not be read, did not decode or never came continues once the
+/// drain clears, and every other error, an HTTP error status and a post that never reached
+/// Tally among them, continues at once. A `/status` check of the pair that failed is not the
+/// post's failure, though it sits in the same chain.
 #[test]
-fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
+fn every_failure_of_a_mailing_post_is_decided_by_its_transport_error() {
     use super::{
         mailing_details_read_error, MailingDetailsReadFailed, MailingReadDecision as D,
         MailingReadFailure as F, PairedNativeReportResponseFailure,
     };
-    use bridge_tally_transport::TallyTransportError as T;
+    use bridge_tally_transport::{TallyTransportError as T, WireRefusal};
     let limit = bridge_tally_transport::XML_RESPONSE_MAX_BYTES;
     for (error, cause, decision) in [
-        (T::RequestTimedOut, Some(F::Deadline), Some(D::Refuse)),
-        (
-            T::ResponseTooLarge {
-                limit,
-                declared_by_peer: true,
-            },
-            Some(F::ResponseTooLarge {
-                declared_by_peer: true,
-            }),
-            Some(D::Retry),
-        ),
+        (T::RequestTimedOut, F::Deadline, D::Refuse),
         (
             T::ResponseTooLarge {
                 limit,
                 declared_by_peer: false,
             },
-            Some(F::ResponseTooLarge {
+            F::ResponseTooLarge {
                 declared_by_peer: false,
-            }),
-            Some(D::Refuse),
+            },
+            D::Refuse,
         ),
-        (T::ResponseTruncated, Some(F::Truncated), Some(D::Continue)),
         (
-            T::ResponseReadFailed,
-            Some(F::ReadFailed),
-            Some(D::Continue),
+            T::ResponseTooLarge {
+                limit,
+                declared_by_peer: true,
+            },
+            F::ResponseTooLarge {
+                declared_by_peer: true,
+            },
+            D::Retry,
         ),
+        (T::ResponseTruncated, F::Truncated, D::ContinueOnceDrained),
+        (T::ResponseReadFailed, F::ReadFailed, D::ContinueOnceDrained),
+        (T::RequestFailed, F::NoAnswer, D::ContinueOnceDrained),
         (
             T::InvalidEncoding {
                 code: "invalid_utf16le",
             },
-            Some(F::Undecodable),
-            Some(D::Continue),
+            F::Undecodable,
+            D::ContinueOnceDrained,
         ),
-        (T::ConnectionFailed, None, None),
-        (T::HttpStatus { status: 503 }, None, None),
-        (T::UnsupportedContentEncoding, None, None),
+        (
+            T::UnsupportedContentEncoding,
+            F::Undecodable,
+            D::ContinueOnceDrained,
+        ),
+        (T::HttpStatus { status: 503 }, F::HttpStatus, D::Continue),
+        (
+            T::EndpointInvalid {
+                code: "endpoint_host_not_loopback",
+            },
+            F::NotSent,
+            D::Continue,
+        ),
+        (
+            T::PolicyInvalid {
+                code: "request_timeout_zero",
+            },
+            F::NotSent,
+            D::Continue,
+        ),
+        (T::ClientInitializationFailed, F::NotSent, D::Continue),
+        (T::RequestTooLarge { limit }, F::NotSent, D::Continue),
+        (T::ConnectionFailed, F::NotSent, D::Continue),
+        (
+            T::WireRefused {
+                refusal: WireRefusal::Draining { retry_after_ms: 1 },
+            },
+            F::NotSent,
+            D::Continue,
+        ),
+        (T::SendWithdrawn, F::NotSent, D::Continue),
     ] {
         let found = |error: anyhow::Error| {
             mailing_details_read_error(error)
@@ -1917,8 +1942,8 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
         let posted = found(anyhow::Error::new(PairedNativeReportResponseFailure::new(
             anyhow::Error::new(error.clone()),
         )));
-        assert_eq!(posted, cause, "{error:?}");
-        assert_eq!(posted.map(F::decision), decision, "{error:?}");
+        assert_eq!(posted, Some(cause), "{error:?}");
+        assert_eq!(cause.decision(), decision, "{error:?}");
         // The same transport error from the pair's health check, not from its post.
         let checked = anyhow::Error::new(error.clone())
             .context("Tally health check between paired native report reads failed");
@@ -1926,25 +1951,25 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
     }
 }
 
-/// The maintainers' ruling on bridge#2074: a mailing master answer that came back whole and
-/// decoded but whose XML did not parse is marked, and its decision is to continue without the
-/// details. Every other refusal of that answer is not marked, so it fails as on master: a wrong
-/// company, Tally's own failure answer, a missing STATUS, a row the grammar refuses and a passed
-/// bound.
+/// The maintainers' ruling on bridge#2074: every refusal of a whole mailing master answer that
+/// the collection parser types is marked with its cause, and each continues without the
+/// details: a wrong company, Tally's own failure answer, a missing STATUS, XML that does not
+/// parse, a row the grammar refuses and a passed bound. The refusal is still the master
+/// answer's, whatever the mark.
 #[test]
-fn a_mailing_answer_whose_xml_does_not_parse_is_marked_to_continue() {
+fn every_refusal_of_a_mailing_answer_is_marked_to_continue() {
     use super::{
         mailing_details_answer_error, party_ledger_master_master_snapshot_error,
         MailingDetailsReadFailed, MailingReadDecision as D, MailingReadFailure as F,
     };
     use bridge_tally_protocol::NativeCollectionError as N;
     for (error, cause) in [
-        (N::MalformedResponse, Some(F::Malformed)),
-        (N::NotSuccess, None),
-        (N::StatusAbsent, None),
-        (N::RowUnusable, None),
-        (N::CompanyIdentityMismatch, None),
-        (N::BoundsViolation, None),
+        (N::MalformedResponse, F::Malformed),
+        (N::NotSuccess, F::TallyFailed),
+        (N::StatusAbsent, F::StatusAbsent),
+        (N::RowUnusable, F::RowRefused),
+        (N::CompanyIdentityMismatch, F::OtherCompany),
+        (N::BoundsViolation, F::BoundPassed),
     ] {
         let marked = mailing_details_answer_error(party_ledger_master_master_snapshot_error(
             anyhow::Error::new(error),
@@ -1953,18 +1978,102 @@ fn a_mailing_answer_whose_xml_does_not_parse_is_marked_to_continue() {
             .chain()
             .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
             .map(MailingDetailsReadFailed::cause);
-        assert_eq!(found, cause, "{error:?}");
-        assert_eq!(
-            found.map(F::decision),
-            cause.map(|_| D::Continue),
-            "{error:?}"
-        );
-        // The refusal is still the master answer's, whatever the mark.
+        assert_eq!(found, Some(cause), "{error:?}");
+        assert_eq!(cause.decision(), D::Continue, "{error:?}");
         assert!(marked.chain().any(|cause| matches!(
             cause.downcast_ref::<super::PartyLedgerMasterSourceValidationError>(),
             Some(super::PartyLedgerMasterSourceValidationError::MasterResponseInvalid { .. })
         )));
     }
+}
+
+/// The export's decision for every way its mailing read can fail (bridge#2214, and the
+/// maintainers' ruling on bridge#2074): it refuses only where Tally may still be working on the
+/// read, a deadline or an oversize Tally did not declare; it reads again at once after an
+/// oversize Tally declared; it waits for the drain after an answer that broke off, could not be
+/// read, did not decode or never came; and it continues at once after every other failure.
+#[test]
+fn the_export_refuses_only_where_tally_may_still_be_working_on_its_mailing_read() {
+    use super::{MailingReadDecision as D, MailingReadFailure as F};
+    for (cause, decision) in [
+        (F::Deadline, D::Refuse),
+        (
+            F::ResponseTooLarge {
+                declared_by_peer: false,
+            },
+            D::Refuse,
+        ),
+        (
+            F::ResponseTooLarge {
+                declared_by_peer: true,
+            },
+            D::Retry,
+        ),
+        (F::Truncated, D::ContinueOnceDrained),
+        (F::ReadFailed, D::ContinueOnceDrained),
+        (F::NoAnswer, D::ContinueOnceDrained),
+        (F::Undecodable, D::ContinueOnceDrained),
+        (F::HttpStatus, D::Continue),
+        (F::NotSent, D::Continue),
+        (F::AnswersDiffered, D::Continue),
+        (F::TallyFailed, D::Continue),
+        (F::StatusAbsent, D::Continue),
+        (F::Malformed, D::Continue),
+        (F::RowRefused, D::Continue),
+        (F::OtherCompany, D::Continue),
+        (F::BoundPassed, D::Continue),
+        (F::IdentityRepeated, D::Continue),
+        (F::CountDiffers, D::Continue),
+    ] {
+        assert_eq!(cause.decision(), decision, "{cause:?}");
+    }
+}
+
+/// Markup inside a mailing field fails the whole master answer as a row the grammar refuses
+/// (the captured mailing answer, one PIN code given a child element), and that refusal of the
+/// export's mailing read continues without the details. The unchanged capture parses.
+#[test]
+fn markup_inside_a_mailing_field_is_a_refused_row_that_continues() {
+    use super::{
+        mailing_details_answer_error, party_ledger_master_master_snapshot_error,
+        MailingDetailsReadFailed, MailingReadDecision as D, MailingReadFailure as F,
+    };
+    let bytes: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml"
+    );
+    let units = bytes.strip_prefix(&[0xff, 0xfe]).unwrap_or(bytes);
+    let captured = String::from_utf16(
+        &units
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    // The company the capture's rows are bound to, read from the capture itself.
+    let bound = "<BRIDGECOMPANYGUID TYPE=\"String\">";
+    let start = captured.find(bound).expect("a bound company") + bound.len();
+    let guid = captured[start..start + captured[start..].find('<').unwrap()].trim();
+    bridge_tally_protocol::parse_native_party_ledger_master_structure(&captured, guid)
+        .expect("the unchanged capture parses");
+    let field = "<PINCODE TYPE=\"String\">";
+    assert!(captured.contains(field));
+    let with_markup = captured.replacen(field, &format!("{field}<B>0</B>"), 1);
+    let refused =
+        bridge_tally_protocol::parse_native_party_ledger_master_structure(&with_markup, guid)
+            .expect_err("markup inside a mailing field is refused");
+    assert_eq!(
+        refused
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()),
+        Some(&bridge_tally_protocol::NativeCollectionError::RowUnusable),
+        "{refused:#}"
+    );
+    let cause = mailing_details_answer_error(party_ledger_master_master_snapshot_error(refused))
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+        .map(MailingDetailsReadFailed::cause);
+    assert_eq!(cause, Some(F::RowRefused));
+    assert_eq!(F::RowRefused.decision(), D::Continue);
 }
 
 /// By the mark alone, the party/ledger master export asks for the mailing details only where

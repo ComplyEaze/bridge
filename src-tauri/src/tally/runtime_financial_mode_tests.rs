@@ -938,7 +938,7 @@ async fn an_export_whose_mailing_answer_broke_off_continues_without_the_details(
     .await;
     let standard = standard.unwrap();
     let cause = MailingReadFailure::Truncated;
-    assert_eq!(cause.decision(), MailingReadDecision::Continue);
+    assert_eq!(cause.decision(), MailingReadDecision::ContinueOnceDrained);
     for (wire, probes) in [
         (WireGateConfig::default(), 0),
         (
@@ -997,20 +997,31 @@ async fn an_export_whose_mailing_answer_broke_off_continues_without_the_details(
     }
 }
 
-/// The maintainers' ruling on bridge#2074: the export's mailing pair whose answers came back
-/// whole and decoded, but whose XML does not parse (here, the captured answer with its envelope
-/// left open), does not fail the export. The book is read once more with the standard request,
-/// the source is that read's, and the workbook is produced, its note saying the mailing answer
-/// could not be read. A whole answer owes no drain, so the standard master follows at once.
-#[tokio::test]
-async fn an_export_whose_mailing_answer_does_not_parse_still_yields_a_workbook() {
+/// The captured book's master answer, decoded, for a mailing answer made from it.
+fn captured_master() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters.utf16le.xml"
+    ))
+}
+
+/// The maintainers' ruling on bridge#2074: the export's mailing pair answered whole with
+/// `first` then `second`, and refused for `cause`, does not fail the export. The book is read
+/// once more with the standard request, at once (a whole answer owes no drain), the source is
+/// that read's (every row, no ledger's mailing details, the standard requests' commitment), the
+/// workbook is produced, and its note says `said`.
+async fn assert_a_refused_mailing_pair_still_yields_a_workbook(
+    first: String,
+    second: String,
+    cause: crate::tally::connection::MailingReadFailure,
+    said: &str,
+) {
     use crate::endpoint_wire::WireGateConfig;
     use crate::reports::party_ledger_master::build_party_ledger_master_workbook;
     use crate::reports::party_ledger_master_xlsx::render_party_ledger_master_xlsx;
     use crate::reports::schedule_iii::{DecisionInput, DecisionsUnavailable};
     use crate::tally::connection::{
         ComplianceRead::{Standard, WithMailingDetailsWhereWholeReadFits as Export},
-        MailingReadDecision, MailingReadFailure,
+        MailingReadDecision,
     };
     let (standard, standard_seen) = export_read(
         Standard,
@@ -1019,21 +1030,15 @@ async fn an_export_whose_mailing_answer_does_not_parse_still_yields_a_workbook()
     )
     .await;
     let standard = standard.unwrap();
-    let cause = MailingReadFailure::Malformed;
-    assert_eq!(cause.decision(), MailingReadDecision::Continue);
-    let captured = decode(include_bytes!(
-        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters.utf16le.xml"
-    ));
-    assert_eq!(captured.matches("</ENVELOPE>").count(), 1);
-    let unparsable = xml(captured.replace("</ENVELOPE>", ""));
+    assert_eq!(cause.decision(), MailingReadDecision::Continue, "{cause:?}");
     let mut plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
     let rest = plans.split_off(MASTER);
-    pair(&mut plans, unparsable);
+    plans.extend([xml(first), status(), xml(second), status()]);
     plans.extend(rest);
     let wire = WireGateConfig::default().with_drain(bridge_tally_transport::DrainPolicy::MEASURED);
     let (source, seen) = export_read(Export, plans, wire).await;
-    let source = source.unwrap_or_else(|error| panic!("{error:#}"));
-    assert_eq!(seen.len(), standard_seen.len() + 4);
+    let source = source.unwrap_or_else(|error| panic!("{cause:?}: {error:#}"));
+    assert_eq!(seen.len(), standard_seen.len() + 4, "{cause:?}");
     let mailing = &seen[MASTER].request_body_sha256;
     assert_ne!(mailing, &standard_seen[MASTER].request_body_sha256);
     assert_eq!(
@@ -1041,12 +1046,12 @@ async fn an_export_whose_mailing_answer_does_not_parse_still_yields_a_workbook()
             .filter(|request| &request.request_body_sha256 == mailing)
             .count(),
         2,
-        "the mailing pair's two posts, and no more"
+        "{cause:?}: the mailing pair's two posts, and no more"
     );
     assert_eq!(
         seen[MASTER + 4].request_body_sha256,
         standard_seen[MASTER].request_body_sha256,
-        "the standard master follows at once"
+        "{cause:?}: the standard master follows at once"
     );
     assert_eq!(source.rows.len(), standard.rows.len());
     assert!(source.rows.iter().all(|row| matches!(
@@ -1060,14 +1065,262 @@ async fn an_export_whose_mailing_answer_does_not_parse_still_yields_a_workbook()
         .into_iter()
         .find(|note| note.kind == SourceNoteKind::MailingDetailsReadFailed)
         .expect("the failed mailing read's note");
-    assert!(note.text.contains("could not be read"), "{}", note.text);
+    assert!(note.text.contains(said), "{cause:?}: {}", note.text);
     let workbook = build_party_ledger_master_workbook(source).unwrap();
     let bytes = render_party_ledger_master_xlsx(
         &workbook,
         DecisionInput::Unavailable(DecisionsUnavailable::StoreUnavailable),
     )
     .unwrap();
-    assert!(bytes.starts_with(b"PK"), "an xlsx archive");
+    assert!(bytes.starts_with(b"PK"), "{cause:?}: an xlsx archive");
+}
+
+/// Tally's own failure answer to the export's mailing read (the captured answer, its STATUS
+/// made 0) still yields a workbook, read without the mailing details.
+#[tokio::test]
+async fn an_export_whose_mailing_read_tally_answers_with_a_failure_still_yields_a_workbook() {
+    let captured = captured_master();
+    assert_eq!(captured.matches("<STATUS>1</STATUS>").count(), 1);
+    let failed = captured.replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+    assert_a_refused_mailing_pair_still_yields_a_workbook(
+        failed.clone(),
+        failed,
+        crate::tally::connection::MailingReadFailure::TallyFailed,
+        "Tally answered that read with a failure",
+    )
+    .await;
+}
+
+/// The export's mailing answer with no STATUS (the captured answer, its STATUS removed) still
+/// yields a workbook.
+#[tokio::test]
+async fn an_export_whose_mailing_answer_carries_no_status_still_yields_a_workbook() {
+    let captured = captured_master();
+    assert_eq!(captured.matches("<STATUS>1</STATUS>").count(), 1);
+    let absent = captured.replace("<STATUS>1</STATUS>", "");
+    assert_a_refused_mailing_pair_still_yields_a_workbook(
+        absent.clone(),
+        absent,
+        crate::tally::connection::MailingReadFailure::StatusAbsent,
+        "Tally's answer to that read carried no status",
+    )
+    .await;
+}
+
+/// The export's mailing answer whose XML does not parse (the captured answer, its envelope left
+/// open) still yields a workbook.
+#[tokio::test]
+async fn an_export_whose_mailing_answer_does_not_parse_still_yields_a_workbook() {
+    let captured = captured_master();
+    assert_eq!(captured.matches("</ENVELOPE>").count(), 1);
+    let unparsable = captured.replace("</ENVELOPE>", "");
+    assert_a_refused_mailing_pair_still_yields_a_workbook(
+        unparsable.clone(),
+        unparsable,
+        crate::tally::connection::MailingReadFailure::Malformed,
+        "Tally's answer to that read was not well-formed XML",
+    )
+    .await;
+}
+
+/// The export's mailing answer holding markup inside a mailing field (the captured answer, its
+/// first ledger given a dated mailing entry whose PIN code holds a child element) still yields a
+/// workbook: the grammar refuses the row.
+#[tokio::test]
+async fn an_export_whose_mailing_answer_holds_markup_in_a_mailing_field_still_yields_a_workbook() {
+    let captured = captured_master();
+    let entry = "<LEDMAILINGDETAILS.LIST><APPLICABLEFROM TYPE=\"Date\">20260401</APPLICABLEFROM><PINCODE TYPE=\"String\">5<B>0</B>1</PINCODE></LEDMAILINGDETAILS.LIST>";
+    // Inside the first ledger row: the header holds a `LEDGER` element of its own.
+    let start = captured.find("<LEDGER NAME=").expect("a ledger");
+    let close = start + captured[start..].find("</LEDGER>").unwrap();
+    let with_markup = format!("{}{entry}{}", &captured[..close], &captured[close..]);
+    assert_a_refused_mailing_pair_still_yields_a_workbook(
+        with_markup.clone(),
+        with_markup,
+        crate::tally::connection::MailingReadFailure::RowRefused,
+        "Tally's answer to that read held a ledger entry ComplyEaze Bridge could not read",
+    )
+    .await;
+}
+
+/// The export's mailing answer that repeats a ledger (the captured answer, its first ledger sent
+/// twice) still yields a workbook.
+#[tokio::test]
+async fn an_export_whose_mailing_answer_repeats_a_ledger_still_yields_a_workbook() {
+    let captured = captured_master();
+    let start = captured.find("<LEDGER NAME=").expect("a ledger");
+    let end = start + captured[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+    let repeated = format!(
+        "{}{}{}",
+        &captured[..end],
+        &captured[start..end],
+        &captured[end..]
+    );
+    assert_a_refused_mailing_pair_still_yields_a_workbook(
+        repeated.clone(),
+        repeated,
+        crate::tally::connection::MailingReadFailure::IdentityRepeated,
+        "Tally's answer to that read repeated a ledger",
+    )
+    .await;
+}
+
+/// The export's mailing pair whose two answers differ (the second the captured answer with one
+/// more blank line) still yields a workbook.
+#[tokio::test]
+async fn an_export_whose_mailing_answers_differ_still_yields_a_workbook() {
+    let captured = captured_master();
+    assert_eq!(captured.matches("</ENVELOPE>").count(), 1);
+    let differing = captured.replace("</ENVELOPE>", "\n</ENVELOPE>");
+    assert_a_refused_mailing_pair_still_yields_a_workbook(
+        captured,
+        differing,
+        crate::tally::connection::MailingReadFailure::AnswersDiffered,
+        "Tally's two answers to that read differed",
+    )
+    .await;
+}
+
+/// bridge#2214: after a mailing read refused for a reason that owes no drain (here Tally's own
+/// failure answer), the standard read keeps the refusal it has on master: refused as draining at
+/// its first post, it fails as itself, unmarked, and is not tried again.
+#[tokio::test]
+async fn a_standard_read_refused_as_draining_after_a_whole_mailing_answer_is_not_waited_out() {
+    use crate::tally::connection::{
+        ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export, MailingRetryHeldByDrain,
+    };
+    let failed = captured_master().replace("<STATUS>1</STATUS>", "<STATUS>0</STATUS>");
+    let mut plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
+    plans.truncate(MASTER);
+    plans.extend([xml(failed.clone()), status(), xml(failed), status()]);
+    // The mailing pair is sends 7 to 10; the standard master post, send 11, finds a drain owed.
+    let wire = crate::endpoint_wire::WireGateConfig::default().owe_at_sends(vec![MASTER + 4]);
+    let (result, seen) = export_read(Export, plans, wire).await;
+    let error = result.unwrap_err();
+    assert!(
+        matches!(
+            crate::endpoint_wire::wire_refusal(&error),
+            Some(bridge_tally_transport::WireRefusal::Draining { .. })
+        ),
+        "{error:#}"
+    );
+    assert_eq!(mailing_cause(&error), None, "{error:#}");
+    assert!(!error
+        .chain()
+        .any(|cause| cause.downcast_ref::<MailingRetryHeldByDrain>().is_some()));
+    assert_eq!(
+        seen.len(),
+        MASTER + 4,
+        "nothing sent after the mailing pair"
+    );
+}
+
+/// bridge#2214: after a mailing answer that broke off, the standard read's send is refused as
+/// draining before anything is sent while Tally may still be sending; the export waits the
+/// refusal out and sends it once `/status` has answered three times in a row (the measured
+/// drain policy).
+#[tokio::test]
+async fn an_export_waits_out_the_drain_of_its_broken_off_mailing_read_before_reading_again() {
+    use crate::tally::connection::{
+        ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export, MailingReadFailure,
+    };
+    // The broken-off mailing request is send 7; the standard read's first try, send 8, finds the
+    // drain owed with a probe sent just now.
+    let wire = crate::endpoint_wire::WireGateConfig::default().owe_at_sends(vec![MASTER + 1]);
+    let mut plans = plans_after_a_failed_master(broken_off_master());
+    for _ in 0..3 {
+        plans.insert(MASTER + 1, status());
+    }
+    let (source, seen) = export_read(Export, plans, wire).await;
+    let source = source.unwrap_or_else(|error| panic!("{error:#}"));
+    assert_eq!(
+        source.mailing_details_read_failed,
+        Some(MailingReadFailure::Truncated)
+    );
+    assert!(seen[MASTER + 1..MASTER + 4]
+        .iter()
+        .all(|request| request.method == "GET" && request.path == "/status"));
+    assert_eq!(seen[MASTER + 4].method, "POST");
+}
+
+/// bridge#2214: a drain still owed at the end of the export's wait (3 s in a unit test) after a
+/// mailing answer that broke off leaves the book unread: the export fails with the mailing
+/// read's own failure, marked as held, and sends nothing after the cut, not even a probe.
+#[tokio::test]
+async fn a_drain_past_the_export_wait_fails_it_with_the_mailing_failure() {
+    use crate::tally::connection::{
+        ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export, MailingReadFailure,
+        MailingRetryHeldByDrain,
+    };
+    let wire =
+        crate::endpoint_wire::WireGateConfig::default().owe_at_sends(vec![MASTER + 1, MASTER + 2]);
+    let (result, seen) = export_read(
+        Export,
+        plans_ending_with_a_failed_master(broken_off_master()),
+        wire,
+    )
+    .await;
+    let error = result.unwrap_err();
+    assert!(
+        error
+            .chain()
+            .any(|cause| cause.downcast_ref::<MailingRetryHeldByDrain>().is_some()),
+        "{error:#}"
+    );
+    assert_eq!(mailing_cause(&error), Some(MailingReadFailure::Truncated));
+    assert_eq!(seen.len(), MASTER + 1);
+}
+
+/// bridge#2214: a draining refusal is waited out only where nothing of the standard read was
+/// sent. After a mailing answer that broke off (whose drain the transport clears with three
+/// probes before the standard master post) or one Tally declared past the cap (which owes no
+/// drain), a refusal at the standard master pair's second post, or at the balance pair after
+/// the master pair answered, fails the standard read as itself, and nothing is sent again.
+#[tokio::test]
+async fn a_draining_refusal_after_part_of_the_standard_read_was_sent_is_not_waited_out() {
+    use crate::tally::connection::{
+        ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export, MailingRetryHeldByDrain,
+    };
+    // The failing mailing answer, the probes before the standard master post, and the lock
+    // grants they add: between three quick probes the lock is released and taken twice more.
+    for (failing, probes, regranted) in [
+        (broken_off_master(), 3, 2),
+        (declared_too_large_master(), 0, 0),
+    ] {
+        // The standard read's requests answered before the refused send: its master post and
+        // check, then its second post and check.
+        for served in [2, 4] {
+            let refused = MASTER + 1 + regranted + served;
+            let mut plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
+            let standard = plans.split_off(MASTER);
+            plans.push(failing.clone());
+            plans.extend(std::iter::repeat_with(status).take(probes));
+            plans.extend(standard.into_iter().take(served));
+            let (result, seen) = export_read(
+                Export,
+                plans,
+                crate::endpoint_wire::WireGateConfig::default().owe_at_sends(vec![refused]),
+            )
+            .await;
+            let error = result.unwrap_err();
+            assert!(
+                matches!(
+                    crate::endpoint_wire::wire_refusal(&error),
+                    Some(bridge_tally_transport::WireRefusal::Draining { .. })
+                ),
+                "{probes} probes, send {refused}: {error:#}"
+            );
+            assert_eq!(mailing_cause(&error), None, "send {refused}: {error:#}");
+            assert!(!error
+                .chain()
+                .any(|cause| cause.downcast_ref::<MailingRetryHeldByDrain>().is_some()));
+            assert_eq!(
+                seen.len(),
+                MASTER + 1 + probes + served,
+                "{probes} probes, send {refused}: nothing sent again"
+            );
+        }
+    }
 }
 
 /// bridge#2214: the mailing pair's first post answers and its second is declared past the

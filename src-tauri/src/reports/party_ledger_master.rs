@@ -141,17 +141,41 @@ impl PartyLedgerMasterSource {
     pub(crate) fn mailing_details_read_failed_note(&self) -> Option<String> {
         use crate::tally::connection::MailingReadFailure;
         let why = match self.mailing_details_read_failed? {
-            MailingReadFailure::ResponseTooLarge { .. } => {
-                "Tally's answer to that read passed the 32 MiB limit"
-            }
+            MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: true,
+            } => "Tally's answer to that read passed the 32 MiB limit",
             MailingReadFailure::Truncated => {
                 "Tally's answer to that read broke off before it ended"
             }
-            MailingReadFailure::ReadFailed
-            | MailingReadFailure::Undecodable
-            | MailingReadFailure::Malformed => "Tally's answer to that read could not be read",
+            MailingReadFailure::ReadFailed => "Tally's answer to that read could not be read",
+            MailingReadFailure::NoAnswer => "that read failed before Tally answered it",
+            MailingReadFailure::Undecodable => {
+                "Tally's answer to that read could not be decoded as text"
+            }
+            MailingReadFailure::HttpStatus => "Tally answered that read with an HTTP error",
+            MailingReadFailure::NotSent => "that read did not reach Tally",
+            MailingReadFailure::AnswersDiffered => "Tally's two answers to that read differed",
+            MailingReadFailure::TallyFailed => "Tally answered that read with a failure",
+            MailingReadFailure::StatusAbsent => "Tally's answer to that read carried no status",
+            MailingReadFailure::Malformed => "Tally's answer to that read was not well-formed XML",
+            MailingReadFailure::RowRefused => {
+                "Tally's answer to that read held a ledger entry ComplyEaze Bridge could not read"
+            }
+            MailingReadFailure::OtherCompany => {
+                "Tally's answer to that read was not for this company"
+            }
+            MailingReadFailure::BoundPassed => {
+                "Tally's answer to that read passed one of ComplyEaze Bridge's count limits"
+            }
+            MailingReadFailure::IdentityRepeated => "Tally's answer to that read repeated a ledger",
+            MailingReadFailure::CountDiffers => {
+                "Tally's answer to that read held another number of ledgers than were counted"
+            }
             // Never read again: such a read fails the export instead.
-            MailingReadFailure::Deadline => return None,
+            MailingReadFailure::Deadline
+            | MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: false,
+            } => return None,
         };
         Some(format!("The mailing details were asked for, and {why}, so this workbook was read again without them. The Mailing columns are empty and their status says not observed: that is not the same as a party having no mailing address. Read the address in Tally."))
     }

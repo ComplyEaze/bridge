@@ -1202,10 +1202,11 @@ fn desktop_messages_name_the_product_in_full() {
 
 /// A party/ledger master read that asked for the mailing details and timed out, or came
 /// back too large, names that larger read and says what to do; only the size limit says the
-/// estimate may have been too low. One whose answer broke off, could not be read, did not
-/// decode or did not parse is told exactly as a read without them, and the same failure of a
-/// read without them is told as before (bridge#2074). Which failures are marked is decided where the read is sent, and
-/// tested there; this matches on the marked cause, not on text.
+/// estimate may have been too low. Every other marked failure is told exactly as a read without
+/// them, and the same failure of a read without them is told as before (bridge#2074). An export
+/// whose wait for the drain of such a failure ended says Tally was still busy with that read
+/// (bridge#2214). Which failures are marked is decided where the read is sent, and tested
+/// there; this matches on the marked cause, not on text.
 #[test]
 fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
     use crate::tally::connection::{
@@ -1243,6 +1244,21 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
             ),
             (
                 TallyTransportError::ResponseReadFailed,
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::RequestFailed,
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::HttpStatus { status: 503 },
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::ConnectionFailed,
                 "endpoint_unreachable",
                 String::new(),
             ),
@@ -1287,6 +1303,7 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
         code: "response_encoding_invalid",
     };
     let malformed = || bridge_tally_protocol::NativeCollectionError::MalformedResponse;
+    let not_success = || bridge_tally_protocol::NativeCollectionError::NotSuccess;
     for (plain, named) in [
         (
             anyhow::Error::new(undecodable()),
@@ -1295,6 +1312,10 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
         (
             anyhow::Error::new(malformed()),
             mailing_details_answer_error(anyhow::Error::new(malformed())),
+        ),
+        (
+            anyhow::Error::new(not_success()),
+            mailing_details_answer_error(anyhow::Error::new(not_success())),
         ),
     ] {
         assert!(
@@ -1316,5 +1337,36 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
         assert_eq!(named.remediation, plain.remediation);
         assert!(!named.message.contains(SENTENCE), "{}", named.message);
         assert_ne!(named.remediation, REMEDIATION);
+    }
+    // Tally still busy with a mailing read whose answer broke off, could not be read, did not
+    // decode or never came, past the export's wait (bridge#2214): the failure's own code and
+    // message, then the wait's sentence and remediation.
+    use super::{
+        MAILING_RETRY_HELD_BY_DRAIN_REMEDIATION as HELD_REMEDIATION,
+        MAILING_RETRY_HELD_BY_DRAIN_SENTENCE as HELD,
+    };
+    for error in [
+        TallyTransportError::ResponseTruncated,
+        TallyTransportError::ResponseReadFailed,
+        TallyTransportError::RequestFailed,
+        undecodable(),
+    ] {
+        let plain = party_ledger_master_runtime_command_error(with_read_evidence(
+            anyhow::Error::new(error.clone()),
+            RuntimeReadEvidence::empty(),
+        ));
+        let held = party_ledger_master_runtime_command_error(with_read_evidence(
+            crate::tally::connection::mailing_retry_held_by_drain(marked(posted(
+                anyhow::Error::new(error.clone()),
+            ))),
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(held.code, plain.code, "{error:?}");
+        assert_eq!(
+            held.message,
+            format!("{}{HELD}", plain.message),
+            "{error:?}"
+        );
+        assert_eq!(held.remediation, HELD_REMEDIATION, "{error:?}");
     }
 }

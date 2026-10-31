@@ -902,15 +902,19 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   standard `ledger_masters` call sent about half a second later answered whole, every row equal to the standard read
   at the same state and the marks unchanged, in three of three tries. A mailing read cut at the 20 s limit, and the
   drain after one, were not reached on this book. After an oversize Tally declares, the party/ledger master export
-  reads the book once more with the standard request inside the same operation (#2214); that retry itself has not been
-  run against Tally. It does the same after any answer that came back broken, cut short or unreadable (it broke off,
-  could not be read, did not decode or did not parse; the maintainers' ruling on #2074; not reached on this book). An
-  answer that broke off or could not be read owes a drain: the transport clears it with the standard post's own
-  `/status` probes, with no wait beyond them, or refuses that post as draining, and the export fails. The export
-  refuses after a deadline or an oversize Tally did not declare, since Tally may still be working on that read, until
-  such a cut mailing read is seen live. Any other refusal of that read's answer (Tally's own failure answer, a missing
-  STATUS, an HTTP error status, the pair's two answers differing, or a row the grammar refuses, which markup inside a
-  mailing field alone can cause) fails the export as itself.
+  reads the book once more with the standard request inside the same operation (#2214); that read again has not been
+  run against Tally. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
+  still be working on that read; such a cut mailing read has not been seen live. After any other failure of that read
+  it reads the book once more without the details, and the workbook names the failure (the maintainers' ruling on
+  #2074; none reached on this book): an answer that broke off, could not be read, did not decode or never came, an
+  HTTP error status, a post that did not reach Tally, the pair's two answers differing, or any refusal of a whole
+  answer, such as Tally's own failure answer, a missing STATUS, XML that does not parse, or a row the grammar refuses,
+  which markup inside a mailing field alone can cause. An answer that broke off, could not be read, did not decode or
+  never came may leave Tally still sending it. The transport owes a drain after each of these but the decode failure
+  (#2142), though a decode failure partway through a body sent without a declared length may still leave Tally
+  sending. So after any of the four, while the standard post is refused as draining before anything of it was sent,
+  the export waits and tries again, for at most 60 s, a bound not measured on this read, and fails past it. The
+  standard read keeps every refusal it has without the mailing details.
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
   `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one

@@ -194,11 +194,11 @@ fn captured(name: &[u8]) -> bool {
 /// set, in another case or with an attribute; a comment or declaration; a group or triple cut
 /// short; a group after a line; a quantity that is empty, padded, marked by the sanitiser or
 /// unreadable; a name that is empty, padded, marked by the sanitiser or over-long; and a godown and
-/// batch read twice. Three more refuse under their own codes:
+/// batch read twice. Three more refusals, by code:
 ///
 /// - `stock_query_name_invalid` and `stock_query_quantity_unparseable` also cover a name or
-///   quantity holding a control character or one that hides or reorders the text around it, raw
-///   or as a legal reference (the crate's `unsafe_display_character`);
+///   quantity holding a character `unsafe_display_character` refuses (every control character and
+///   a closed set of characters that hide or reorder text), raw or as a legal reference;
 /// - `stock_query_groups_without_lines` is a last-purchase or last-sale group with no line after
 ///   it;
 /// - `stock_query_units_differ` is lines in more than one unit.

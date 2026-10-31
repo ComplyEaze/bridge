@@ -394,9 +394,14 @@ Desktop opened the file there with the same sha256. The command-line report
 Windows location in the table above, unless you set another data folder); beside
 it, where the files directly in that folder are as Windows reports each file
 (`folder_file_locations` and `lock_folder_file_locations`, read from the first
-64 files by name, with how many were read of how many); the import journal's own
-location (`journal_path`); and, on Windows, each copy of the data folder inside
-a Store app's package that exists (`package_copies`). It does not print a folder
+64 files by name, with how many were read of how many; not the files in its
+subfolders, such as `imports`; the listing stops at 100,000 entries, and
+`listing_capped` says so; a lock folder's `native-dispatch-leases` that is
+itself a link is not entered and reads `link_not_followed`); the import
+journal's own location (`journal_path`; a journal file that is itself a link is
+shown as built, its target not followed, with `journal_path_state`
+`link_not_followed`); and, on Windows, each copy of the data folder inside a
+Store app's package that exists (`package_copies`). It does not print a folder
 where Windows reports the folder itself to be: once both folders existed,
 Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed the
 second folder's files. Seen from inside Claude Desktop, a file both copies held

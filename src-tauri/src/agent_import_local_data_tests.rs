@@ -369,7 +369,9 @@ fn no_path_is_in_the_json_unless_asked() {
     let root = directory.path();
     write(&root.join("imports/b.xml"), b"<x/>");
     let report = build(root, &[]);
-    let plain = to_json(&report, SystemTime::now(), None).to_string();
+    let plain_value = to_json(&report, SystemTime::now(), None);
+    assert!(plain_value.get("package_copies").is_none(), "{plain_value}");
+    let plain = plain_value.to_string();
     assert!(!names_the_path(&plain, root), "{plain}");
     assert!(!plain.contains("path"), "{plain}");
     // The value, not the serialized text: on Windows the text doubles every
@@ -387,14 +389,24 @@ fn no_path_is_in_the_json_unless_asked() {
     // no file directly in the folder (imports is a folder); no lease folder
     assert_eq!(
         shown["folder_file_locations"],
-        serde_json::json!({"folders": [], "files_read": 0, "files": 0}),
+        serde_json::json!({"folders": [], "files_read": 0, "files": 0, "listing_capped": false}),
         "{shown}"
     );
     // package copies are looked for only on Windows, under %LOCALAPPDATA%
     #[cfg(not(windows))]
     assert!(shown.get("package_copies").is_none(), "{shown}");
     #[cfg(windows)]
-    assert!(shown.get("package_copies").is_some(), "{shown}");
+    {
+        let copies = &shown["package_copies"];
+        assert!(
+            copies
+                .as_array()
+                .is_some_and(|all| all.iter().all(serde_json::Value::is_string))
+                || copies == "not_listed"
+                || copies == "not_under_local_app_data",
+            "{shown}"
+        );
+    }
     assert_eq!(
         shown["lock_folder_file_locations"],
         serde_json::json!(["not_listed"]),
@@ -485,6 +497,7 @@ fn a_folder_is_shown_by_where_its_files_are_not_where_it_resolves() {
             "folders": [{"path": package.display().to_string(), "state": "resolved"}],
             "files_read": 2,
             "files": 2,
+            "listing_capped": false,
         }),
         "{shown}"
     );
@@ -494,6 +507,7 @@ fn a_folder_is_shown_by_where_its_files_are_not_where_it_resolves() {
             "folders": [{"path": leases.display().to_string(), "state": "resolved"}],
             "files_read": 1,
             "files": 1,
+            "listing_capped": false,
         }]),
         "{shown}"
     );
@@ -559,7 +573,130 @@ fn files_in_two_folders_list_both_once() {
             ],
             "files_read": 3,
             "files": 3,
+            "listing_capped": false,
         })
+    );
+}
+
+/// The listing stops at its cap and says so; the files past it are not counted.
+#[test]
+fn a_listing_past_its_cap_says_so() {
+    let directory = tempfile::tempdir().unwrap();
+    for n in 0..5 {
+        write(&directory.path().join(format!("f{n}")), b"");
+    }
+    let resolve = |path: &Path| VisiblePath::Resolved(path.to_path_buf());
+    let capped = file_locations_capped(directory.path(), &resolve, 3);
+    assert_eq!(capped["files"], 3, "{capped}");
+    assert_eq!(capped["listing_capped"], true, "{capped}");
+    let whole = file_locations_capped(directory.path(), &resolve, 5);
+    assert_eq!(whole["files"], 5, "{whole}");
+    assert_eq!(whole["listing_capped"], false, "{whole}");
+}
+
+/// A data folder under `%LOCALAPPDATA%` is matched as Windows matches a path:
+/// without regard to letter case; another folder is not.
+#[test]
+fn a_folder_is_matched_under_local_app_data_without_regard_to_case() {
+    let base = Path::new("/srv/Profile/AppData/Local");
+    assert_eq!(
+        relative_to(base, Path::new("/srv/profile/appdata/local/Bridge/agent")),
+        Some(PathBuf::from("Bridge").join("agent"))
+    );
+    assert_eq!(
+        relative_to(base, Path::new("/srv/Profile/AppData/LocalLow/Bridge")),
+        None
+    );
+    assert_eq!(relative_to(base, Path::new("/srv/Profile")), None);
+    assert_eq!(relative_to(base, base), Some(PathBuf::new()));
+}
+
+/// `package_copies` finds a copy of a data folder whose `%LOCALAPPDATA%` part
+/// differs only in letter case, and none for `%LOCALAPPDATA%` itself.
+#[test]
+fn package_copies_match_without_regard_to_case() {
+    let directory = tempfile::tempdir().unwrap();
+    let base = directory.path().join("Local");
+    let copy = base
+        .join("Packages")
+        .join("Store.App_1")
+        .join("LocalCache")
+        .join("Local")
+        .join("Bridge")
+        .join("agent");
+    fs::create_dir_all(&copy).unwrap();
+    let shouted = PathBuf::from(base.display().to_string().to_uppercase())
+        .join("Bridge")
+        .join("agent");
+    assert_eq!(
+        package_copies(&base, &shouted),
+        serde_json::json!([copy.display().to_string()])
+    );
+    assert_eq!(package_copies(&base, &base), "not_under_local_app_data");
+}
+
+/// A data folder that is a link (a folder moved to another disk) is followed,
+/// as the report counts it, so where its files are is still shown.
+#[cfg(unix)]
+#[test]
+fn a_data_folder_that_is_a_link_is_still_located() {
+    let directory = tempfile::tempdir().unwrap();
+    let moved = directory.path().join("moved");
+    write(&moved.join("terms-acceptance.jsonl"), b"{}\n");
+    let root = directory.path().join("agent");
+    std::os::unix::fs::symlink(&moved, &root).unwrap();
+    let resolve = |path: &Path| VisiblePath::Resolved(path.to_path_buf());
+    let shown = to_json_resolving(
+        &build(&root, &[]),
+        SystemTime::now(),
+        Some((&root, &[])),
+        &resolve,
+        None,
+    );
+    assert_eq!(shown["folder_file_locations"]["files"], 1, "{shown}");
+}
+
+/// The report follows no link: a linked lease folder is not entered, and a
+/// linked journal's target is not resolved.
+#[cfg(unix)]
+#[test]
+fn a_link_is_not_followed_for_a_path_shown() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().join("agent");
+    let elsewhere = directory.path().join("elsewhere");
+    write(&elsewhere.join("agent-import-ledger.jsonl"), &journal(true));
+    write(&elsewhere.join("a.lock"), b"");
+    fs::create_dir_all(&root).unwrap();
+    std::os::unix::fs::symlink(
+        elsewhere.join("agent-import-ledger.jsonl"),
+        root.join("agent-import-ledger.jsonl"),
+    )
+    .unwrap();
+    let locks = directory.path().join("locks");
+    fs::create_dir_all(&locks).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, locks.join("native-dispatch-leases")).unwrap();
+    let resolve = |path: &Path| {
+        VisiblePath::Resolved(PathBuf::from("/followed").join(path.file_name().unwrap()))
+    };
+    let report = build(&root, &[]);
+    assert!(matches!(report.root, Root::Present));
+    let shown = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&root, &[locks.as_path()])),
+        &resolve,
+        None,
+    );
+    assert_eq!(shown["journal_path_state"], "link_not_followed", "{shown}");
+    assert_eq!(
+        shown["journal_path"],
+        root.join("agent-import-ledger.jsonl").display().to_string(),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!(["link_not_followed"]),
+        "{shown}"
     );
 }
 
@@ -595,6 +732,7 @@ fn the_sample_is_the_first_files_by_name() {
             "folders": [{"path": PathBuf::from("/early").display().to_string(), "state": "resolved"}],
             "files_read": FILE_LOCATION_SAMPLE,
             "files": FILE_LOCATION_SAMPLE + 1,
+            "listing_capped": false,
         })
     );
 }

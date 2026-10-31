@@ -435,8 +435,8 @@ jobs:
       - run: node --test scripts/fetch-pdfium.test.mjs
       - run: node --test scripts/check-ai-attribution.test.mjs
       # merge-gate.test.py takes about 6.5 of this job's 7.5 minutes and tests the merge gate and what it reads. A
-      # pull request that changes nothing under scripts/, .github/ or docs/tally/compatibility/ (or the files that
-      # pin the toolchain and attributes) skips it; the merge queue, a push to master, the nightly run and a manual
+      # pull request that changes nothing under scripts/, .github/ or docs/tally/compatibility/ (or the Node version
+      # and attributes files) skips it; the merge queue, a push to master, the nightly run and a manual
       # run always run it, so a break the filter missed is caught before it lands. A diff that cannot be read fails
       # the step rather than skipping the test.
       - id: merge-gate-scope

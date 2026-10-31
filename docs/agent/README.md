@@ -3318,7 +3318,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
    **No**, and its window also takes the keyboard (Windows 10, a full-screen Tally,
-   one screen, each tried once, #1780: on the 0.6.0 release candidate a Down arrow
+   one screen, each tried once, [#1780](https://github.com/ComplyEaze/bridge/issues/1780): on the 0.6.0 release candidate a Down arrow
    moved its buttons; on the published 0.6.0 a typed **n** declined it and a typed
    **y** approved it; macOS not measured). When you ask for a post, stop typing in Tally until you have
    answered the window with the mouse. Long or directionally ambiguous previews are refused; use the

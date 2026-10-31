@@ -497,7 +497,7 @@ fn the_shapes_admitted_without_a_capture_are_pinned() {
         panic!("a valued composite");
     };
     assert_eq!(valued.foreign_symbol(), "US$");
-    // a rate with one to three decimals (the captured ones have none or four)
+    // a rate with one to three decimals (the captured 7.1 ones have none or four)
     for rate in ["86.5", "86.50", "86.500"] {
         let text = format!("$ 100.00 @ I\u{20b9} {rate}/$  = I\u{20b9} 8650.00");
         let CurrencyComposite::Valued(valued) = parse(&text).unwrap() else {

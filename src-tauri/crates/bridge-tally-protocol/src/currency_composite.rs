@@ -25,7 +25,7 @@
 //! capture shows. Among the shapes admitted without a capture are these six,
 //! and the tests pin each so a change is seen: a foreign symbol other than `$`
 //! (the symbol is not checked against a list), a rate with one to three
-//! decimals (every captured rate has none or four), a rate below one (every
+//! decimals (every captured 7.1 rate has none or four), a rate below one (every
 //! captured rate is 84 or more), a foreign amount below one other than zero
 //! (the smallest captured is 40.00), a base symbol other than the rupee symbol
 //! (the book's own base is accepted whatever it is), and a zero composite that

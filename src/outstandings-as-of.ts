@@ -130,7 +130,7 @@ export function allCompaniesOutstandingsInvokeArgument(
 /** What the ledger-master workbook says about its date, by kind, so the app
  * never reads the words of a note (bridge#903). */
 export type PartyLedgerMasterNote = {
-  kind: "later_dated_voucher" | "date_moved";
+  kind: "later_dated_voucher" | "date_moved" | "mailing_details_read_failed";
   text: string;
 };
 

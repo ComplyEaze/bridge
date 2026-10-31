@@ -1272,7 +1272,7 @@ A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before an
 item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
 `limit` and `snapshot_id` behave as in `masters`, and the result reports `snapshot`.
 
-Small books only. The items are read whole only when the master-alteration mark
+At most 874 stock items. The items are read whole only when the master-alteration mark
 (`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
 a mark of at most 874. Past that mark the stock items and the stock groups are first
 counted by AlterID span, in slices of 4,000 AlterIDs (a mark of at most 400,000), and

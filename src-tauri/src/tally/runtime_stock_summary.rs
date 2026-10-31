@@ -5,7 +5,9 @@
 //! for each) and in what sits between the extents, and a generic wrapper over
 //! an async body is more than this read needs.
 use super::*;
-use crate::tally::connection::compliance_estimate;
+use crate::tally::connection::{
+    compliance_estimate, LEDGER_CENSUS_MAX_SLICES_UNVERIFIED, LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED,
+};
 use bridge_tally_protocol::ledger_census::{
     render_stock_group_census_slice_request, render_stock_item_census_slice_request, Census,
     CensusCollection, CensusLimits, CensusPlan, CensusSlice,
@@ -193,16 +195,16 @@ pub(crate) fn check_stock_premise(
     Ok(())
 }
 
-/// The stock censuses' limits (#1233): the ledger census's slice width and slice count, so they
-/// cover a mark of 400,000. A slice holds at most its width in rows. A captured stock-item census
+/// The stock censuses' limits (#1233): the ledger census's own slice width and slice count, both
+/// UNVERIFIED as that census's are, so they cover a mark of 400,000. A slice holds at most its width in rows. A captured stock-item census
 /// row (BRIDGE STOCK LAB, `STOCK_CAPTURE_PROVENANCE.md`) is about 496 bytes as received: 228
 /// characters besides its name, which it carries once, with no language list. With a name of 128
 /// characters, each escaped to six, a row is at most 2 x (228 + 6 x 128) = 1,992 bytes, so a full
 /// slice of 4,000 is about 8 MB, half the masters budget. PARTIAL: one book, short names, no
 /// aliases; a stock-group row was the same shape.
 const STOCK_CENSUS_LIMITS: CensusLimits = CensusLimits {
-    slice_width: 4_000,
-    max_slices: 100,
+    slice_width: LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED,
+    max_slices: LEDGER_CENSUS_MAX_SLICES_UNVERIFIED,
 };
 
 /// Characters of one top-level line of Tally's Stock Summary report (a `DSPACCNAME` and its

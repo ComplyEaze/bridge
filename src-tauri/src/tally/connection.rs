@@ -484,13 +484,13 @@ const LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED: u64 = 32_000_000;
 /// the longest name Bridge assumes fits [`COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED`]
 /// (asserted by a test), which is about half the transport's cap. Measured at
 /// 800, 1,000, 4,000 and 8,000 wide, on three books (section 11e, PARTIAL).
-const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
+pub(crate) const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
 
 /// Most slices one census makes (#679): Bridge's own bound on the serial
 /// requests a census may spend, not a measured limit. With the slice width it
 /// admits a master mark of 400,000, so a book whose mark is above that is
 /// refused before anything is sent after the extent.
-const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
+pub(crate) const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
 
 /// Characters of a GUID-only census row that do not depend on the ledger's
 /// name, counting the row's separators: 391 in the committed eight-row capture

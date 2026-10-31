@@ -1580,14 +1580,23 @@ a voucher is counted in the taken or repaid totals, its debit is inside tds_in_p
             .filter(|(at, _)| in_principal.contains(at))
             .collect();
         if !principal_tds.is_empty() {
+            // A debit among them is in tds_debited_on_loan, not the TDS deducted (#1875 rule 4).
+            let inside = if principal_tds.iter().any(|&(_, x)| x < 0) {
+                format!(
+                    "Its deductions are inside the TDS deducted beside it and its debits inside \
+tds_debited_on_loan_{h},"
+                )
+            } else {
+                "It is inside the TDS figure beside it,".to_string()
+            };
             r.fig(
                 &format!("tds_in_principal_{h}"),
                 paise(principal_tds.iter().map(|&(_, x)| x).sum())?,
                 Unit::Paise,
                 &format!(
                     "Of the TDS deducted on loan ledger (tag {h}), the part on the vouchers counted \
-in its taken or repaid totals (a repayment booked net of TDS, say), summed. It is inside the TDS \
-figure beside it, and is shown so the loan's movement can be checked against the Trial Balance."
+in its taken or repaid totals (a repayment booked net of TDS, say), summed. {inside} and is shown so \
+the loan's movement can be checked against the Trial Balance."
                 ),
                 voucher_refs(principal_tds.iter().map(|&(at, _)| pop[at])),
             )?;
@@ -2405,7 +2414,8 @@ deduction counts only against interest credited on or before it).",
                     "Not checked: the lender's PAN. The s.194A(1) rate is used; s.206AA's higher \
 rate is not applied.",
                     "Not counted: a deduction, or its reversal, on a voucher that also posts to \
-another loan (the books do not split it between them).",
+another loan (the books do not split it between them), unless its only other lines are loans on the \
+same side and TDS netting to their sum: there each loan's own line is its TDS.",
                     "Not checked: that each deduction is s.194A TDS on this interest; TDS-payable \
 lines on any voucher posting to this ledger count, including TDS under another section on another \
 credit to it (rent, commission).",
@@ -4876,9 +4886,14 @@ mod tests {
         assert_eq!(int_of(debited), 130_000);
         let cited: Vec<&str> = debited.evidence.iter().map(|e| e.id.as_str()).collect();
         assert_eq!(cited, ["d1", "d2"]);
-        assert_eq!(
-            paise_of(&b, &r, "tds_in_principal", "Loan A"),
-            Some(-100_000)
+        let principal = loan_figure(&b, &r, "tds_in_principal", "Loan A").unwrap();
+        assert_eq!(int_of(principal), -100_000);
+        assert!(
+            principal
+                .definition
+                .contains("its debits inside tds_debited_on_loan_"),
+            "{}",
+            principal.definition
         );
         assert_eq!(loan1, Vec::<String>::new());
         // The control: with no debit, neither the figure nor the sentence is there.

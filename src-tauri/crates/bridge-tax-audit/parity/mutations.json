@@ -11712,6 +11712,14 @@
   "to": "            ev_tds.clone(),"
  },
  {
+  "id": "L1875-TDS-13",
+  "by": "author",
+  "what": "loans_interest: the TDS in principal says it is inside the TDS deducted where a debit among it is not",
+  "file": "src/loans_interest.rs",
+  "from": "            let inside = if principal_tds.iter().any(|&(_, x)| x < 0) {",
+  "to": "            let inside = if false {"
+ },
+ {
   "id": "P1243-DEP-01",
   "by": "author",
   "what": "depreciation: a voucher is a depreciation journal when any voucher holding its GUID carries a depreciation-expense line (by GUID again), so a sale sharing the journal's GUID is book depreciation",

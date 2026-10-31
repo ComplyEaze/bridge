@@ -247,8 +247,8 @@
       "id": "loans_interest.tds_in_principal_35dc58d9",
       "value": 0,
       "unit": "paise",
-      "definition_sha256_16": "c89767388cc6aeea",
-      "definition_text": "Of the TDS deducted on loan ledger (tag 35dc58d9), the part on the vouchers counted in its taken or repaid totals (a repayment booked net of TDS, say), summed. It is inside the TDS figure beside it, and is shown so the loan's movement can be checked against the Trial Balance.",
+      "definition_sha256_16": "778bc2617bbe9796",
+      "definition_text": "Of the TDS deducted on loan ledger (tag 35dc58d9), the part on the vouchers counted in its taken or repaid totals (a repayment booked net of TDS, say), summed. Its deductions are inside the TDS deducted beside it and its debits inside tds_debited_on_loan_35dc58d9, and is shown so the loan's movement can be checked against the Trial Balance.",
       "evidence": [
         {
           "kind": "voucher",

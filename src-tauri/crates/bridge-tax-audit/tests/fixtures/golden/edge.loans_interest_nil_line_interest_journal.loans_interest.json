@@ -406,12 +406,12 @@
       ],
       "title_sha256_16": "1ab998e85e7b33d0",
       "title_text": "TDS seen on the loan covers the s.194A rate on its interest; not listed in clause 21(b)",
-      "limits_sha256_16": "62114d78d98a8482",
+      "limits_sha256_16": "cf87a3e5e609fbe0",
       "limits_text": [
         "Not checked: that the TDS was deposited by the due date (clause 21(b) also covers tax deducted but not paid by the s.139(1) due date).",
         "Not checked: the period each deduction relates to, beyond its date (a deduction counts only against interest credited on or before it).",
         "Not checked: the lender's PAN. The s.194A(1) rate is used; s.206AA's higher rate is not applied.",
-        "Not counted: a deduction, or its reversal, on a voucher that also posts to another loan (the books do not split it between them).",
+        "Not counted: a deduction, or its reversal, on a voucher that also posts to another loan (the books do not split it between them), unless its only other lines are loans on the same side and TDS netting to their sum: there each loan's own line is its TDS.",
         "Not checked: that each deduction is s.194A TDS on this interest; TDS-payable lines on any voucher posting to this ledger count, including TDS under another section on another credit to it (rent, commission)."
       ],
       "ask_client_sha256_16": "260225180d5b0109",

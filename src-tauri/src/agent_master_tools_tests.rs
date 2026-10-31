@@ -952,7 +952,20 @@ async fn prepare_saves_a_batch_of_ledgers_in_order_under_one_preview() {
 #[tokio::test]
 async fn prepare_refuses_a_batch_it_cannot_admit_and_saves_nothing() {
     let suspense = json!({"name": LEDGER, "kind": "suspense"});
+    let eleven = (0..11)
+        .map(|index| json!({"name": format!("Batch Ledger {index:02}"), "kind": "suspense"}))
+        .collect::<Vec<_>>();
     let cases = [
+        (
+            "eleven ledgers, one more than a request may carry",
+            json!({"company_guid": GUID, "ledgers": eleven}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "a list of one, under the published minimum of two",
+            json!({"company_guid": GUID, "ledgers": [suspense]}),
+            "argument_invalid:ledgers",
+        ),
         (
             "ledger and ledgers",
             json!({"company_guid": GUID, "ledger": suspense, "ledgers": [suspense, {"name": "Other Ledger", "kind": "suspense"}]}),

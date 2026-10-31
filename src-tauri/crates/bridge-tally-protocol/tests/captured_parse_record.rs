@@ -2255,6 +2255,12 @@ const ROWS: &[Row] = &[
         parse: |_, text| party_masters(text, GST_LEDGER_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l3/dec-L-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(GST LEDGER LAB)",
+        parse: |_, text| party_masters(text, GST_LEDGER_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/note-days/shape_lab_ledgers_1_response.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(SHAPE LAB)",
@@ -2391,6 +2397,12 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-g-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(GST LEDGER LAB)",
+        parse: |_, text| groups(text, GST_LEDGER_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l3/dec-g-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_group_snapshot(GST LEDGER LAB)",
         parse: |_, text| groups(text, GST_LEDGER_LAB_GUID),
@@ -3519,6 +3531,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l3/dec-w-1.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

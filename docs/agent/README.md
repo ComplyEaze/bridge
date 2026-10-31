@@ -1024,7 +1024,15 @@ entry on a ledger under Duties & Taxes whose master carries a recognised GST dut
   not look, such as an item invoice of a shape not measured whose purchase ledger is in an inventory allocation), `sales_ledger_present`,
   `gst_on_both_sides` (reverse-charge and set-off journals), `other_ledgers_present` (any other group, such as Current
   Assets or Stock-in-Hand), `no_creditor_party` (such as a GST challan payment),
-  `no_counter_ledger` or `several_counter_ledgers`.
+  `no_counter_ledger`, `several_counter_ledgers`, or `repeats_a_purchase_bill`: a Purchase that would be attributed,
+  has no bill of its own (New Ref), is entered against the supplier bill another attributed Purchase in the books of the
+  window opened for the same supplier ledger, and carries the same tax per head as that one. That is how one supplier
+  invoice keyed twice read on the lab book (TallyPrime 7.2 Silver, once: Tally warned that the reference had been used
+  earlier and saved the copy against the first one's bill), but the rule compares only those fields: a revised invoice
+  of equal tax keyed against the original bill would read the same, and that shape is not measured. Each listed voucher
+  names the first one in `repeats`, which stays attributed. Not seen: a first copy outside the window or not
+  attributed, a copy with a bill of its own or none, a copy keyed as a Journal or Debit Note, and a copy whose tax
+  differs.
 
 `counter_ledgers` gives, per ledger, its `ledger_guid` (Tally's GUID of the ledger), its predefined `group`, its `parent` (masked like a ledger name when it is a group
 the book named), `vouchers`, `debit_side_tax` (negative, as
@@ -1057,7 +1065,8 @@ supplier, a debit note, two tax payments (one also paying interest) and a credit
 A registered book was read once, by an earlier build that did not yet admit Direct Expenses or Fixed Assets ledgers or name the ledger GUID
 (the same synthetic book after its company and one supplier were registered and December's vouchers keyed, TallyPrime 7.2 Silver): none of
 December's six vouchers was set aside, and a supplier invoice entered twice (the same reference, date and bill) was totalled twice with nothing
-flagged, so the tool does not detect a duplicate invoice. A year of 70 vouchers was read whole in the same run.
+flagged. Replayed on the current build, that December sets the second copy aside as `repeats_a_purchase_bill`. A year of 70 vouchers was read
+whole in the same run.
 Not measured: vouchers created by import, Gold and other releases, a registered book on this build, other item-invoice shapes, more than 64 vouchers
 in a window.
 

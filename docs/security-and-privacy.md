@@ -237,7 +237,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     - The GST-by-ledger read (`gst_by_counter_ledger`) sends the company, the
       dates, each counter ledger's name, Tally GUID, group and parent with its
       voucher count and its GST totals per head, and for each set-aside reason its totals and
-      up to 100 vouchers by number, date, type, class and Tally's identifier.
+      up to 100 vouchers by number, date, type, class and Tally's identifier; a voucher set
+      aside as `repeats_a_purchase_bill` also names, under `repeats`, the date, number and
+      identifier of the attributed voucher whose bill it is entered against.
       It sends no party names and no narrations; `mask_parties` shortens the
       ledger names and does not mask the GUID, which names no party.
     - The negative ledgers read (`negative_ledgers`) sends the company name and

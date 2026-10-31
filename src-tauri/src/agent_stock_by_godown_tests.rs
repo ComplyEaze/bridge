@@ -14,6 +14,9 @@ use tally_protocol_simulator::{
 };
 
 /// Inside the harness book, which begins on 1 April 2026, and a month's last day.
+/// The replayed answers belong to another request: they were captured for 1 April
+/// 2025 to 31 March 2026, a period this harness book does not admit, as it ends
+/// before the book's start.
 const AS_OF: &str = "2026-04-30";
 
 fn decode(bytes: &[u8]) -> String {
@@ -366,4 +369,69 @@ async fn an_exploded_answer_that_is_the_plain_report_says_the_flag_was_not_obser
         result["root_items_reason"],
         "explode_flag_not_observed_is_not_a_finding"
     );
+}
+
+/// A Godown Summary whose first amount is not a number, which the parser refuses.
+fn unreadable_godowns() -> String {
+    let unreadable = godowns().replacen("13530.01", "13530.0x", 1);
+    assert_ne!(unreadable, godowns(), "the target was not found");
+    unreadable
+}
+
+#[tokio::test]
+async fn an_answer_the_parser_refuses_surfaces_its_code_as_the_cause() {
+    let mut plans = plans(unreadable_godowns(), stock(), exploded());
+    // Refused after the closing extent pair, before the closing identity bracket.
+    plans.truncate(plans.len() - 3);
+    let (response, _) = call(plans, AS_OF, Redaction::None).await;
+    let error = error(&response);
+    assert_eq!(error["code"], "stock_by_godown_read_failed", "{response}");
+    assert_eq!(error["cause"], "stock_report_amount_invalid");
+}
+
+#[tokio::test]
+async fn a_parser_refusal_is_held_until_the_closing_extent_shows_the_book_moved() {
+    let mut plans = plans(unreadable_godowns(), stock(), exploded());
+    plans.truncate(plans.len() - 3);
+    let closing_first = plans.len() - 4;
+    let moved = extents().replace(
+        "<ALTVCHID TYPE=\"Number\"> ",
+        "<ALTVCHID TYPE=\"Number\"> 9",
+    );
+    assert_ne!(moved, extents(), "the extent was not changed");
+    plans[closing_first] = xml(moved.clone());
+    plans[closing_first + 2] = xml(moved);
+    let (response, _) = call(plans, AS_OF, Redaction::None).await;
+    assert_eq!(error(&response)["cause"], "stock_by_godown_extent_changed");
+}
+
+#[tokio::test]
+async fn an_empty_stock_summary_amount_is_counted_in_the_tie_out_and_nothing_ties() {
+    // The godowns move by the emptied 150.00, so the amounts present agree.
+    let godowns = godowns().replacen(
+        "<DSPCLAMTA>-11238.00</DSPCLAMTA>",
+        "<DSPCLAMTA>-11088.00</DSPCLAMTA>",
+        1,
+    );
+    let stock = stock().replacen(
+        "<DSPCLAMTA>-150.00</DSPCLAMTA>",
+        "<DSPCLAMTA></DSPCLAMTA>",
+        1,
+    );
+    assert_ne!(godowns, self::godowns(), "the godown target was not found");
+    assert_ne!(stock, self::stock(), "the stock target was not found");
+    let (response, _) = call(plans(godowns, stock, exploded()), AS_OF, Redaction::None).await;
+    let result = result(&response);
+    assert_eq!(result["state"], "not_established", "{result}");
+    assert_eq!(result["reason"], "godown_totals_not_comparable");
+    assert_eq!(
+        result["tie_out"],
+        json!({
+            "godown_total": "2442.01",
+            "stock_summary_total": "2442.01",
+            "godown_empty_amounts": 0,
+            "stock_summary_empty_amounts": 1,
+        })
+    );
+    assert_eq!(result["godowns"], Value::Null);
 }

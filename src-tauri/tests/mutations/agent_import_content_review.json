@@ -679,7 +679,7 @@
     },
     "H32": {
       "mutation": "216fd29921e7066a7622f5434841bd1c",
-      "reason": "the shared and exclusive locks differ only when another writer races the record; every sequential test passes either way, and no deterministic test reaches the race"
+      "reason": "every test passes with either lock, since none holds the admission lock while the record is written; not tried: a test that holds a shared lock on the admission lock file from the dialog's approval until after the record could tell them apart, since the exclusive lock is taken without waiting"
     }
   }
 }

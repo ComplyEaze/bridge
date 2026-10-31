@@ -146,7 +146,9 @@ pub(super) fn not_read_back_next_step(code: &str) -> &'static str {
         | "company_identity_incomplete"
         | "company_identity_mismatch"
         | "company_number_invalid" => NEXT_LOAD_SAME_COMPANIES,
-        "master_batch_invalid" | "master_intent_missing" => NEXT_RECORD_NOT_READABLE,
+        "master_batch_invalid" | "master_batch_too_large" | "master_intent_missing" => {
+            NEXT_RECORD_NOT_READABLE
+        }
         _ => NEXT_UNCONFIRMED,
     }
 }

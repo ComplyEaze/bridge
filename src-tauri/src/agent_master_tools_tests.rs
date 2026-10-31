@@ -800,6 +800,14 @@ fn a_stored_batch_that_is_not_one_admitted_ledger_is_refused() {
         creates_from_batch(&base(vec![good.clone(), good.clone()])),
         Err("master_batch_invalid".to_string())
     );
+    // More ledgers than a request may carry answer their own code.
+    let eleven = (0..11)
+        .map(|index| stored_from_item(&item(&format!("Stored Suspense {index:02}"))))
+        .collect();
+    assert_eq!(
+        creates_from_batch(&base(eleven)),
+        Err("master_batch_too_large".to_string())
+    );
     // Two ledgers Tally would keep apart are one admitted batch.
     let second = stored_from_item(&item("Second Suspense Ledger"));
     assert_eq!(
@@ -1982,7 +1990,11 @@ fn a_book_that_was_not_read_back_is_told_what_to_do_by_what_stopped_it() {
             "{code}"
         );
     }
-    for code in ["master_batch_invalid", "master_intent_missing"] {
+    for code in [
+        "master_batch_invalid",
+        "master_batch_too_large",
+        "master_intent_missing",
+    ] {
         assert_eq!(
             not_read_back_next_step(code),
             verify::NEXT_RECORD_NOT_READABLE,

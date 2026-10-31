@@ -196,8 +196,9 @@ fn parse_ledger_item(ledger: &Value) -> Result<LedgerCreateItem, String> {
 }
 
 /// The code a refused batch answers with. `TooMany` cannot come from the tool,
-/// whose published schema caps `ledgers` at the same limit; it stays for every
-/// other way a batch is built, a stored one re-read included.
+/// whose published schema caps `ledgers` at the same limit; it is the code of a
+/// stored batch re-read with more ledgers than a request may carry
+/// ([`creates_from_batch`]).
 fn batch_code(error: LedgerCreateBatchError) -> &'static str {
     match error {
         LedgerCreateBatchError::Empty => "argument_invalid:ledgers",
@@ -264,7 +265,13 @@ fn creates_from_batch(batch: &MasterBatch) -> Result<LedgerCreateBatch, String> 
         .iter()
         .map(item_from_stored)
         .collect::<Result<Vec<_>, _>>()?;
-    LedgerCreateBatch::new(items).map_err(|_| "master_batch_invalid".to_string())
+    LedgerCreateBatch::new(items).map_err(|error| {
+        match error {
+            LedgerCreateBatchError::TooMany => batch_code(error),
+            _ => "master_batch_invalid",
+        }
+        .to_string()
+    })
 }
 
 /// One stored item, parsed as a caller's input is.

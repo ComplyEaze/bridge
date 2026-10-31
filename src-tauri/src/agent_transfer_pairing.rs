@@ -301,6 +301,8 @@ impl TallyDays {
     /// the skip's own day is looked at, so it is for a view with `k_days` of 0,
     /// as production passes; with more, a Contra keyed on a neighbouring day,
     /// which was not read, would not be found.
+    // Nothing calls the whole-day read until the skipped-row check is wired to it (#1392).
+    #[allow(dead_code)]
     pub(crate) fn from_whole_days(
         days: &[WholeDay],
         skips: &[SkipFact],
@@ -480,11 +482,15 @@ impl WholeDay {
         })
     }
 
+    // Nothing calls the whole-day read until the skipped-row check is wired to it (#1392).
+    #[allow(dead_code)]
     pub(crate) fn date(&self) -> &TallyDate {
         &self.date
     }
 
     /// The GUIDs of the day's vouchers.
+    // Nothing calls the whole-day read until the skipped-row check is wired to it (#1392).
+    #[allow(dead_code)]
     pub(crate) fn guids(&self) -> BTreeSet<&str> {
         self.vouchers
             .iter()
@@ -557,6 +563,8 @@ pub(crate) struct DayPlan {
     days: Vec<TallyDate>,
 }
 
+// Nothing calls the whole-day read until the skipped-row check is wired to it (#1392).
+#[allow(dead_code)]
 impl DayPlan {
     pub(crate) fn of<R: DayReader>(
         skips: &[SkipFact],
@@ -624,6 +632,8 @@ pub(crate) struct DayReads {
 /// composite withheld, not refused, so the day is kept with its cause. A plan
 /// made for another company or another Tally than `identity` and `reader` reads
 /// nothing.
+// Nothing calls the whole-day read until the skipped-row check is wired to it (#1392).
+#[allow(dead_code)]
 pub(crate) async fn read_days<R: DayReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,

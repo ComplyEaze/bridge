@@ -2131,6 +2131,11 @@ fn reconciliation_failure_payload(
     if code == DESKTOP_LEDGER_LINE_BREAK {
         payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
     }
+    // A second journal (#2233) refuses every post from this copy, so the
+    // message says where to post from rather than to review the error.
+    if code == super::split_journal::IMPORT_JOURNAL_SPLIT && attempted == Some(false) {
+        payload["result"]["error"]["message"] = json!(super::split_journal::REFUSED_MESSAGE);
+    }
     // A draining endpoint (#2142) is held back like a busy one: nothing was
     // sent by the refused send, and the same next steps hold.
     if let Some(after) = crate::endpoint_wire::wire_retry_after_s(code) {

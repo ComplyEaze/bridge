@@ -376,6 +376,53 @@ async fn a_saved_journal_refused_for_its_text_says_to_build_it_again() {
     );
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, the desktop's post is refused before approval with a message of its
+/// own: what was found, where to post from, and to move or delete neither folder.
+#[tokio::test]
+async fn a_journal_beside_a_second_journal_says_where_to_post_from() {
+    use super::split_journal::{
+        tests::layout, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA, REFUSED_MESSAGE,
+    };
+    let at = layout();
+    // Made again, private, by the service.
+    std::fs::remove_dir(&at.data).unwrap();
+    let (service, mut line) = service(at.data.clone());
+    line.batch_id = "bridge-00000000-0000-4000-8000-000000000004".into();
+    line.ledger_identities = Some(Vec::new());
+    line.cash_in_hand_ledgers = Some(Vec::new());
+    let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
+    line.sha256 = sha256_hex(xml.as_bytes());
+    service
+        .server
+        .append_import_ledger_while_admitted(&line)
+        .unwrap();
+    std::fs::write(
+        service
+            .server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{}.xml", line.batch_id)),
+        &xml,
+    )
+    .unwrap();
+    std::fs::write(
+        at.copy.join(super::local_data::JOURNAL_FILE),
+        super::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let operation = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            service.post(&line.batch_id, &line.sha256, &line.company_guid),
+        )
+        .await;
+    let result = &operation.result["result"];
+    assert_eq!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{result}");
+    assert_eq!(result["attempt_recorded"], false, "{result}");
+    assert_eq!(result["error"]["message"], REFUSED_MESSAGE, "{result}");
+}
+
 /// A Journal whose approval window is too large to show whole is refused with a
 /// message that says what that means and what to do, not that no attempt was
 /// recorded and to review the error (#1780).

@@ -52,6 +52,18 @@ pub(super) enum SplitJournal {
 /// The refusal code of every [`SplitJournal`]; the cause says which.
 pub(super) const IMPORT_JOURNAL_SPLIT: &str = "import_journal_split";
 
+/// The message of a post refused for a second journal, which the desktop's
+/// Journal screen shows alone: what was found, where to post from instead, and
+/// that neither folder is to be moved or deleted.
+pub(super) const REFUSED_MESSAGE: &str = "Nothing was posted. On this computer a Microsoft \
+    Store app's package, such as Claude Desktop installed from the Microsoft Store, keeps a \
+    second copy of ComplyEaze Bridge's data folder, and that copy holds, or may hold, an import \
+    journal of its own. Neither copy's checks see the other's batches, so a row posted from here \
+    could be posted again from there. Post from the Store app's copy instead (the assistant \
+    inside Claude Desktop, when the package is Claude Desktop's). That copy does not see this \
+    saved Journal or anything posted from here, so check its rows in Tally before posting them \
+    there. Do not move or delete either folder.";
+
 impl SplitJournal {
     pub(super) fn cause(self) -> &'static str {
         match self {

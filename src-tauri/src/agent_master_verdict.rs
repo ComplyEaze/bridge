@@ -1,13 +1,14 @@
-//! The verdict on one master write, decided over what was read back after the
-//! POST. Pure: it reads nothing and sends nothing, so every state and every
-//! failing check is tested on constructed inputs.
+//! The verdict on one master write (one request of ledger creates, judged as
+//! one), decided over what was read back after the POST. Pure: it reads
+//! nothing and sends nothing, so every state and every failing check is tested
+//! on constructed inputs.
 //!
 //! The inputs are parsed values, never text: the company marks, the paired
 //! ledger and group index as one list of masters, the party-ledger master rows
-//! of the item's parent, the pre-image the intent named, the marks the intent
+//! of the batch's one parent, the pre-image the intent named, the marks the intent
 //! recorded, and Tally's counters when it reported them.
 //!
-//! **No client value reaches the verdict except the item the person
+//! **No client value reaches the verdict except the batch the person
 //! approved.** [`PartyView`] has no field for a PAN, a bank detail, an e-mail
 //! address, a phone number or an address, so the parser's richer row is
 //! projected onto it at the boundary ([`PartyView::project`]) and nothing else
@@ -19,7 +20,9 @@
 //! 2. a pre-image master's `ALTERID` changed, `ALTERED` above zero, or the name
 //!    resolves to a pre-image master: `posted_into_existing_master`;
 //! 3. another loaded company's `ALTMSTID` moved:
-//!    `master_write_located_elsewhere`;
+//!    `master_write_located_elsewhere`; for steps 2 and 3, a batch of more than
+//!    one ledger with no counters on file and any name absent stays
+//!    `reconciliation_required` instead ([`WriteLocated`]);
 //! 4. on a reconcile only, the name absent under every key of the index, no pre-image
 //!    master changed or missing, no loaded company's mark moved and no counter
 //!    claiming a create: `confirmed_absent`; the same, but with the target
@@ -35,7 +38,7 @@
 use super::super::master_ledger::{
     is_canonical_guid, MasterCounters, MasterMark, MasterVerdictState,
 };
-use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, NameCollision, Via,
 };
@@ -155,7 +158,7 @@ impl OrderCoverage {
 /// What the journal and the intent already hold.
 #[derive(Clone, Debug)]
 pub(super) struct Facts<'a> {
-    pub(super) item: &'a LedgerCreateItem,
+    pub(super) batch: &'a LedgerCreateBatch,
     /// Lower-case.
     pub(super) company_guid: &'a str,
     /// Every master's lower-case GUID with its `ALTERID`, before the POST.
@@ -192,23 +195,24 @@ pub(super) struct Checks {
     pub(super) tax_fields: Check,
     pub(super) party_gstin: Check,
     pub(super) opening_balance: Check,
-    /// CREATED=1, ALTERED=0, ERRORS=0, EXCEPTIONS=0. `NotChecked` when Tally
+    /// CREATED equal to the ledgers sent, ALTERED=0, ERRORS=0, EXCEPTIONS=0
+    /// (the reason keeps its first name, `counters_not_one_created`). `NotChecked` when Tally
     /// reported no counters: that can never be `posted_verified`, because a
     /// same-name master created between the aim read and the POST would be
     /// overwritten by the Create and every other check would still pass.
     pub(super) counters: Check,
     pub(super) target_mark_moved: Check,
-    /// The target company's mark moved by this one create and by no other
-    /// master change. Straight after the POST: a step of exactly one; any
-    /// other step is a doubt for a person, never a create (ADR 0004, 10 Oct
-    /// amendment, condition 3). On a later read, which the book may have moved
-    /// past: the found ledger's `ALTERID` is the intent's mark plus one, where
-    /// each measured gateway write put the master it wrote (protocol reference
-    /// §9.4j). So a later read settles a step of two whose other change came
-    /// after the create, and keeps open, with [`FirstChangeAfterIntent`]'s
-    /// reason, a create that another change came before or a ledger changed
-    /// since its create. A request carries one ledger: a request of several
-    /// would step the mark by their count, which this check does not yet know.
+    /// The target company's mark moved by this batch's creates and by no other
+    /// master change: one step for each ledger sent. Straight after the POST:
+    /// a step of exactly the batch's size; any other step is a doubt for a
+    /// person, never a create (ADR 0004, 10 Oct amendment, condition 3). On a
+    /// later read, which the book may have moved past: the found ledgers'
+    /// `ALTERID`s are the intent's mark plus one up to plus the batch's size,
+    /// where each measured gateway write put the master it wrote (protocol
+    /// reference §9.4j). So a later read settles a larger step whose other
+    /// changes came after the creates, and keeps open, with
+    /// [`FirstChangeAfterIntent`]'s reasons, a batch that another change came
+    /// before or a ledger changed since its create.
     pub(super) target_mark_step_one: Check,
     pub(super) other_marks_unmoved: Check,
     pub(super) pre_image_unchanged: Check,
@@ -303,8 +307,11 @@ impl FirstChangeAfterIntent {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(in crate::agent::agent_import) struct Judgement {
     state: MasterVerdictState,
-    /// The ledger's GUID, when the verdict names one.
+    /// The ledger's GUID, when the verdict names one: a batch of one ledger.
     guid: Option<String>,
+    /// Each item's GUID, in batch order, when the verdict names one; empty
+    /// when it names none.
+    guids: Vec<Option<String>>,
     checks: Checks,
     /// Static reasons, carrying no book data, for any verdict other than `posted_verified`.
     reasons: Vec<&'static str>,
@@ -332,6 +339,39 @@ impl Judgement {
         self.guid.as_deref()
     }
 
+    /// The GUID of the item at `index` in batch order, when the verdict names
+    /// one.
+    pub(in crate::agent::agent_import) fn guid_of(&self, index: usize) -> Option<&str> {
+        self.guids.get(index).and_then(Option::as_deref)
+    }
+
+    /// Each item's GUID in batch order; empty when the verdict names none.
+    pub(super) fn guids(&self) -> &[Option<String>] {
+        &self.guids
+    }
+
+    /// A judgement over a read-back, naming `guids` in batch order.
+    fn read(
+        state: MasterVerdictState,
+        guids: Vec<Option<String>>,
+        checks: Checks,
+        reasons: Vec<&'static str>,
+        name_absent_in_read_book: bool,
+    ) -> Self {
+        Self {
+            state,
+            guid: match guids.as_slice() {
+                [only] => only.clone(),
+                _ => None,
+            },
+            guids,
+            checks,
+            reasons,
+            name_absent_in_read_book,
+            sealed: (),
+        }
+    }
+
     pub(super) fn checks(&self) -> &Checks {
         &self.checks
     }
@@ -354,6 +394,7 @@ impl Judgement {
                 }
             },
             guid: None,
+            guids: Vec::new(),
             checks: Checks::none(),
             reasons: vec![reason],
             name_absent_in_read_book: false,
@@ -365,19 +406,18 @@ impl Judgement {
     /// first master change after the intent. Its reason says why it is not
     /// `posted_verified`.
     fn unattributed(
-        guid: Option<String>,
+        guids: Vec<Option<String>>,
         checks: Checks,
         name_absent_in_read_book: bool,
         _first_change: FirstChangeAfterIntent,
     ) -> Self {
-        Self {
-            state: MasterVerdictState::PostedUnattributed,
-            guid,
+        Self::read(
+            MasterVerdictState::PostedUnattributed,
+            guids,
             checks,
-            reasons: vec!["counters_unavailable"],
+            vec!["counters_unavailable"],
             name_absent_in_read_book,
-            sealed: (),
-        }
+        )
     }
 
     /// Any judgement, for a test that needs one [`judge`] would not give.
@@ -389,14 +429,19 @@ impl Judgement {
         reasons: Vec<&'static str>,
         name_absent_in_read_book: bool,
     ) -> Self {
-        Self {
-            state,
-            guid,
-            checks,
-            reasons,
-            name_absent_in_read_book,
-            sealed: (),
-        }
+        Self::read(state, vec![guid], checks, reasons, name_absent_in_read_book)
+    }
+
+    /// The same for a batch, naming `guids` in batch order.
+    #[cfg(test)]
+    pub(super) fn for_test_batch(
+        state: MasterVerdictState,
+        guids: Vec<Option<String>>,
+        checks: Checks,
+        reasons: Vec<&'static str>,
+        name_absent_in_read_book: bool,
+    ) -> Self {
+        Self::read(state, guids, checks, reasons, name_absent_in_read_book)
     }
 }
 
@@ -441,17 +486,19 @@ fn locate(item: &LedgerCreateItem, masters: &[IndexedMaster]) -> Option<Located>
 }
 
 /// Whether the party-ledger master read has anything to describe: the paired
-/// index shows one ledger holding the item name that the pre-image did not.
-/// The reader asks this before it makes the read, so a read that no verdict
-/// would use is not made.
+/// index shows, for some item, one ledger holding its name that the pre-image
+/// did not. The reader asks this before it makes the read, so a read that no
+/// verdict would use is not made.
 pub(super) fn party_read_needed(
-    item: &LedgerCreateItem,
+    batch: &LedgerCreateBatch,
     pre_image: &BTreeMap<String, u64>,
     masters: &[IndexedMaster],
 ) -> bool {
-    locate(item, masters)
-        .and_then(|located| located.sole_exact_ledger)
-        .is_some_and(|guid| !pre_image.contains_key(&guid))
+    batch.items().iter().any(|item| {
+        locate(item, masters)
+            .and_then(|located| located.sole_exact_ledger)
+            .is_some_and(|guid| !pre_image.contains_key(&guid))
+    })
 }
 
 /// Whether `text` is no amount or an amount of zero: every digit zero.
@@ -466,11 +513,12 @@ pub(super) fn is_zero_amount(text: &str) -> bool {
         && amount.chars().all(|c| c == '0' || c == '.')
 }
 
-fn counters_check(counters: Option<MasterCounters>) -> Check {
+/// Tally counted one create for each ledger sent and nothing else.
+fn counters_check(counters: Option<MasterCounters>, count: u64) -> Check {
     match counters {
         None => Check::NotChecked,
         Some(counters) => passed(
-            counters.created == 1
+            counters.created == count
                 && counters.altered == 0
                 && counters.errors == 0
                 && counters.exceptions == 0,
@@ -543,10 +591,115 @@ fn reasons_of(checks: &Checks, step_reason: &'static str) -> Vec<&'static str> {
     .collect()
 }
 
-/// Decides the verdict. See the module documentation for the order.
+/// Where one item stands after the POST: its place in the index and the
+/// field checks of the ledger found for it.
+struct ItemRead {
+    located: Located,
+    /// The item's name collides with no master under any key.
+    absent: bool,
+    /// The lower-case GUID of the one ledger holding the item's name.
+    found: Option<String>,
+    /// A pre-image master the item's name resolves to.
+    into_pre_image: Option<String>,
+    checks: Checks,
+}
+
+/// Whether a write that steps 2 and 3 located settles the whole batch. Both
+/// states are terminal, so either releases every name the batch holds.
+///
+/// With Tally's counters on file, the request is known to have run, and an
+/// item that reads absent was not written. Without them (the answer was lost,
+/// or came without counters), the evidence is one master or one company's
+/// mark: it places no item that reads absent, and that item's create may
+/// still be waiting in Tally. For a batch of more than one ledger with any
+/// item absent, the write therefore settles nothing, and the batch stays
+/// `reconciliation_required` before step 4's coverage gate is reached. A
+/// batch of one is judged as before: its one item is the write located, or
+/// it reads absent and the write is elsewhere, as for a single create.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WriteLocated {
+    ForTheBatch,
+    NotForAbsentItems,
+}
+
+impl WriteLocated {
+    fn over(facts: &Facts<'_>, item_reads: &[ItemRead]) -> Self {
+        if item_reads.len() > 1
+            && facts.counters.is_none()
+            && item_reads.iter().any(|item| item.absent)
+        {
+            Self::NotForAbsentItems
+        } else {
+            Self::ForTheBatch
+        }
+    }
+}
+
+/// Every check of `checks`: failed when any failed, passed when all passed,
+/// otherwise not checked. An empty list is not checked.
+fn all_of(checks: impl IntoIterator<Item = Check>) -> Check {
+    let mut seen = false;
+    let mut all_passed = true;
+    for check in checks {
+        seen = true;
+        match check {
+            Check::Failed => return Check::Failed,
+            Check::NotChecked => all_passed = false,
+            Check::Passed => {}
+        }
+    }
+    if seen && all_passed {
+        Check::Passed
+    } else {
+        Check::NotChecked
+    }
+}
+
+/// The ledgers found for a batch hold exactly the `ALTERID`s that follow
+/// `intent_mark`, one each: `M+1` to `M+N`, the place each measured gateway
+/// write put the master it wrote (protocol reference §9.4j). Batches of three
+/// and of ten in one request took `M+1` to `M+N` in request order on
+/// TallyPrime 7.2 (lab captures L0 and L0b, once each); a taken name among
+/// them was altered and took its own value in that order. The set is required
+/// here, not the order: the order adds no ledger that the set would miss, and
+/// is measured on one book and one release. For one ledger it
+/// is [`FirstChangeAfterIntent`]'s test, and a failure gives its reasons: an
+/// `ALTERID` past `M+N` is a ledger changed since its create (or a create that
+/// another change came before); otherwise one is not after the intent. `None`
+/// while any ledger is not found.
+fn span_after_intent(
+    intent_mark: u64,
+    alter_ids: &[Option<u64>],
+) -> Option<Result<(), &'static str>> {
+    let mut found = alter_ids.iter().copied().collect::<Option<Vec<u64>>>()?;
+    found.sort_unstable();
+    let count = found.len() as u64;
+    let expected = (1..=count)
+        .map(|offset| intent_mark.checked_add(offset))
+        .collect::<Option<Vec<u64>>>();
+    if expected.as_deref() == Some(found.as_slice()) {
+        return Some(Ok(()));
+    }
+    let last = intent_mark.checked_add(count);
+    Some(Err(
+        if found
+            .iter()
+            .any(|alter_id| last.is_some_and(|last| *alter_id > last))
+        {
+            "ledger_altered_since_create"
+        } else {
+            "ledger_alter_id_not_after_intent"
+        },
+    ))
+}
+
+/// Decides the verdict. See the module documentation for the order. A batch
+/// is judged as one: a check passes only when it passes for every ledger.
 pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
+    let items = facts.batch.items();
+    let count = items.len() as u64;
     let mut checks = Checks::none();
-    checks.counters = counters_check(facts.counters);
+    checks.counters = counters_check(facts.counters, count);
     let mut reasons = Vec::<&'static str>::new();
 
     // 1. A read-back that could not be made leaves the outcome open.
@@ -564,14 +717,13 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         &read.masters,
         read.party == PartyRead::Unavailable,
     ) else {
-        return Judgement {
-            state: MasterVerdictState::MastersAfterPostUnconfirmed,
-            guid: None,
+        return Judgement::read(
+            MasterVerdictState::MastersAfterPostUnconfirmed,
+            Vec::new(),
             checks,
             reasons,
-            name_absent_in_read_book: false,
-            sealed: (),
-        };
+            false,
+        );
     };
 
     // The marks: who moved, and whether the set of companies is the same.
@@ -597,11 +749,11 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     let target_marks = pre.get(facts.company_guid).zip(now.get(facts.company_guid));
     if let Some((before, after)) = target_marks {
         checks.target_mark_moved = passed(after > before);
-        // Straight after the POST, the one create is the only change the
-        // step may hold. A later read is decided by the ledger's `ALTERID`,
-        // below, once the ledger is found.
+        // Straight after the POST, the batch's creates are the only changes
+        // the step may hold: one for each ledger sent. A later read is decided
+        // by the ledgers' `ALTERID`s, below, once they are found.
         if facts.moment == Moment::JustPosted {
-            checks.target_mark_step_one = passed(before.checked_add(1) == Some(*after));
+            checks.target_mark_step_one = passed(before.checked_add(count) == Some(*after));
         }
     }
     if others_moved {
@@ -611,20 +763,46 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     }
     let target_moved = target_marks.is_some_and(|(before, after)| before != after);
 
-    // The index: the pre-image across the POST, and where the name stands.
-    let Some(located) = locate(facts.item, masters) else {
+    // The index: where each name stands.
+    let Some(item_reads) = items
+        .iter()
+        .map(|item| {
+            let located = locate(item, masters)?;
+            let absent = located.collisions.is_empty();
+            let found = located.sole_exact_ledger.clone();
+            let into_pre_image = located
+                .collisions
+                .iter()
+                .map(|hit| hit.guid.to_ascii_lowercase())
+                .find(|guid| facts.pre_image.contains_key(guid));
+            let mut item_checks = Checks::none();
+            item_checks.name = passed(found.is_some());
+            item_checks.guid_new = found.as_ref().map_or(Check::NotChecked, |guid| {
+                passed(!facts.pre_image.contains_key(guid))
+            });
+            Some(ItemRead {
+                located,
+                absent,
+                found,
+                into_pre_image,
+                checks: item_checks,
+            })
+        })
+        .collect::<Option<Vec<ItemRead>>>()
+    else {
         reasons.push("master_index_not_usable");
-        return Judgement {
-            state: MasterVerdictState::ReconciliationRequired,
-            guid: None,
+        return Judgement::read(
+            MasterVerdictState::ReconciliationRequired,
+            Vec::new(),
             checks,
             reasons,
-            name_absent_in_read_book: false,
-            sealed: (),
-        };
+            false,
+        );
     };
-    let name_absent = located.collisions.is_empty();
-    let current = located.index.pre_image();
+    let name_absent = item_reads.iter().all(|item| item.absent);
+    // Every item's index is built from the same masters: the first one's
+    // pre-image is the book's.
+    let current = item_reads[0].located.index.pre_image();
     let mut changed = false;
     let mut missing = false;
     for (guid, before) in facts.pre_image {
@@ -641,54 +819,55 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     if missing {
         reasons.push("pre_image_master_missing");
     }
-    checks.name = passed(located.sole_exact_ledger.is_some());
-    checks.guid_new = located
-        .sole_exact_ledger
-        .as_ref()
-        .map_or(Check::NotChecked, |guid| {
-            passed(!facts.pre_image.contains_key(guid))
-        });
-    let into_pre_image = located
-        .collisions
-        .iter()
-        .find(|hit| facts.pre_image.contains_key(&hit.guid.to_ascii_lowercase()));
+    checks.name = all_of(item_reads.iter().map(|item| item.checks.name));
+    checks.guid_new = all_of(item_reads.iter().map(|item| item.checks.guid_new));
     let altered = facts.counters.is_some_and(|counters| counters.altered > 0);
+    let any_into_pre_image = item_reads.iter().any(|item| item.into_pre_image.is_some());
 
     // 2. Something that existed before was written to, by this create: Tally
-    // counted an alteration, or the name resolves to a master that existed
+    // counted an alteration, or a name resolves to a master that existed
     // before. A pre-image master that changed while nothing ties the change
     // to this create (another person's edit during the window) is not called
     // a write into it: it fails the pre-image check and is left to a person
-    // below, holding the name, and it never reads absent (step 4).
-    if altered || into_pre_image.is_some() {
+    // below, holding the names, and it never reads absent (step 4).
+    // 3. Another loaded company's master mark moved.
+    let located = if altered || any_into_pre_image {
         if altered {
             reasons.push("tally_reported_altered");
         }
-        if into_pre_image.is_some() {
+        if any_into_pre_image {
             reasons.push("name_resolves_to_existing_master");
         }
-        return Judgement {
-            state: MasterVerdictState::PostedIntoExistingMaster,
-            guid: into_pre_image
-                .map(|hit| hit.guid.to_ascii_lowercase())
-                .filter(|guid| is_canonical_guid(guid)),
-            checks,
-            reasons,
-            name_absent_in_read_book: name_absent,
-            sealed: (),
-        };
-    }
-
-    // 3. Another loaded company's master mark moved.
-    if others_moved {
+        let guids = item_reads
+            .iter()
+            .map(|item| {
+                item.into_pre_image
+                    .clone()
+                    .filter(|guid| is_canonical_guid(guid))
+            })
+            .collect();
+        Some((MasterVerdictState::PostedIntoExistingMaster, guids))
+    } else if others_moved {
         reasons.push("other_company_mark_moved");
-        return Judgement {
-            state: MasterVerdictState::MasterWriteLocatedElsewhere,
-            guid: None,
-            checks,
-            reasons,
-            name_absent_in_read_book: name_absent,
-            sealed: (),
+        Some((MasterVerdictState::MasterWriteLocatedElsewhere, Vec::new()))
+    } else {
+        None
+    };
+    if let Some((state, guids)) = located {
+        return match WriteLocated::over(facts, &item_reads) {
+            WriteLocated::ForTheBatch => {
+                Judgement::read(state, guids, checks, reasons, name_absent)
+            }
+            WriteLocated::NotForAbsentItems => {
+                reasons.push("batch_ledger_absent_without_counters");
+                Judgement::read(
+                    MasterVerdictState::ReconciliationRequired,
+                    Vec::new(),
+                    checks,
+                    reasons,
+                    name_absent,
+                )
+            }
         };
     }
 
@@ -713,14 +892,13 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     }
     let settles = absent_and_unchanged && uncovered.is_none();
     if settles && target_marks.is_some() && !target_moved {
-        return Judgement {
-            state: MasterVerdictState::ConfirmedAbsent,
-            guid: None,
+        return Judgement::read(
+            MasterVerdictState::ConfirmedAbsent,
+            Vec::new(),
             checks,
-            reasons: vec!["not_in_book"],
-            name_absent_in_read_book: name_absent,
-            sealed: (),
-        };
+            vec!["not_in_book"],
+            name_absent,
+        );
     }
     // The mark moved since the intent: the create may have run and its ledger
     // been deleted, or another master changed. A ledger or group the pre-image
@@ -732,14 +910,13 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         .keys()
         .any(|guid| !facts.pre_image.contains_key(guid));
     if settles && moved_forward && !master_new_since_intent {
-        return Judgement {
-            state: MasterVerdictState::ConfirmedAbsentAfterChange,
-            guid: None,
+        return Judgement::read(
+            MasterVerdictState::ConfirmedAbsentAfterChange,
+            Vec::new(),
             checks,
-            reasons: vec!["not_in_book", "mark_moved_since_intent"],
-            name_absent_in_read_book: name_absent,
-            sealed: (),
-        };
+            vec!["not_in_book", "mark_moved_since_intent"],
+            name_absent,
+        );
     }
     // An absent name that stays open says why, where the read showed the
     // cause, on any Tally.
@@ -751,37 +928,23 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         }
     }
 
-    // 5. The ledger the write should have made, described field by field.
-    let found = located.sole_exact_ledger.clone();
-    // On a later read the step is the ledger's own `ALTERID`, and a failure
-    // names what that shows: a ledger changed since its create (by the person,
-    // or after another change that came first), or one not after the intent.
-    let mut step_reason = "target_mark_step_not_one";
-    if facts.moment == Moment::Reconcile {
-        if let (Some(guid), Some(intent_mark)) = (&found, pre.get(facts.company_guid)) {
-            if let Some(alter_id) = current.get(guid) {
-                checks.target_mark_step_one =
-                    match FirstChangeAfterIntent::of(*intent_mark, *alter_id) {
-                        Ok(_) => Check::Passed,
-                        Err(reason) => {
-                            step_reason = reason;
-                            Check::Failed
-                        }
-                    };
-            }
-        }
-    }
-    if let Some(guid) = &found {
+    // 5. The ledgers the write should have made, each described field by
+    // field from the one parent's rows.
+    let mut item_reads = item_reads;
+    for (item, read_item) in items.iter().zip(item_reads.iter_mut()) {
+        let Some(guid) = &read_item.found else {
+            continue;
+        };
         match &read.party {
             PartyRead::Rows(rows) => {
                 let mut matching = rows.iter().filter(|row| &row.guid == guid);
                 match (matching.next(), matching.next()) {
                     (Some(row), None) => {
                         // The row's own name must be the one the index stored.
-                        if row.name != facts.item.name().as_str() {
-                            checks.name = Check::Failed;
+                        if row.name != item.name().as_str() {
+                            read_item.checks.name = Check::Failed;
                         }
-                        party_checks(facts.item, row, &mut checks);
+                        party_checks(item, row, &mut read_item.checks);
                     }
                     (None, _) => reasons.push("ledger_missing_from_parent_read"),
                     (Some(_), Some(_)) => reasons.push("ledger_repeated_in_parent_read"),
@@ -791,30 +954,67 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
             PartyRead::Unavailable => {}
         }
     }
-    let recordable = found.as_deref().is_some_and(is_canonical_guid);
-    if found.is_some() && !recordable {
+    reasons.dedup();
+    checks.name = all_of(item_reads.iter().map(|item| item.checks.name));
+    checks.parent = all_of(item_reads.iter().map(|item| item.checks.parent));
+    checks.tax_fields = all_of(item_reads.iter().map(|item| item.checks.tax_fields));
+    checks.party_gstin = all_of(item_reads.iter().map(|item| item.checks.party_gstin));
+    checks.opening_balance = all_of(item_reads.iter().map(|item| item.checks.opening_balance));
+    // On a later read the step is the ledgers' own `ALTERID`s, and a failure
+    // names what they show: a ledger changed since its create (by the person,
+    // or after another change that came first), or one not after the intent.
+    let mut step_reason = "target_mark_step_not_one";
+    if facts.moment == Moment::Reconcile {
+        if let Some(intent_mark) = pre.get(facts.company_guid) {
+            let alter_ids = item_reads
+                .iter()
+                .map(|item| {
+                    item.found
+                        .as_ref()
+                        .and_then(|guid| current.get(guid).copied())
+                })
+                .collect::<Vec<_>>();
+            if let Some(span) = span_after_intent(*intent_mark, &alter_ids) {
+                checks.target_mark_step_one = match span {
+                    Ok(()) => Check::Passed,
+                    Err(reason) => {
+                        step_reason = reason;
+                        Check::Failed
+                    }
+                };
+            }
+        }
+    }
+    let found = item_reads
+        .iter()
+        .map(|item| item.found.clone())
+        .collect::<Vec<_>>();
+    let recordable = found
+        .iter()
+        .all(|guid| guid.as_deref().is_some_and(is_canonical_guid));
+    if found.iter().any(Option::is_some) && !recordable {
         reasons.push("ledger_guid_not_recordable");
     }
     if checks.all_passed() && recordable {
-        return Judgement {
-            state: MasterVerdictState::PostedVerified,
-            guid: found,
+        return Judgement::read(
+            MasterVerdictState::PostedVerified,
+            found,
             checks,
-            reasons: Vec::new(),
-            name_absent_in_read_book: name_absent,
-            sealed: (),
-        };
+            Vec::new(),
+            name_absent,
+        );
     }
 
-    // 6. Tally's answer was lost: the ledger is as sent, and it was written by
-    // the first master change after the intent.
+    // 6. Tally's answer was lost: the one ledger is as sent, and it was
+    // written by the first master change after the intent. A batch of more
+    // than one is never settled this way.
     let first_change = match (
-        &found,
+        found.as_slice(),
         pre.get(facts.company_guid),
         facts.counters,
         facts.answer_held,
     ) {
-        (Some(guid), Some(intent_mark), None, false) => current
+        ([Some(guid)], Some(intent_mark), None, false) => current
             .get(guid)
             .map(|alter_id| FirstChangeAfterIntent::of(*intent_mark, *alter_id)),
         _ => None,
@@ -838,23 +1038,26 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     if checks.counters == Check::NotChecked {
         reasons.push("counters_unavailable");
     }
-    if facts.moment == Moment::JustPosted && name_absent {
+    if facts.moment == Moment::JustPosted && item_reads.iter().any(|item| item.absent) {
         reasons.push("ledger_absent_after_post");
     }
-    if located.masters_hit > 1 {
+    if item_reads.iter().any(|item| item.located.masters_hit > 1) {
         reasons.push("name_collides_with_more_than_one_master");
     }
     if reasons.is_empty() {
         reasons.push("unclassified");
     }
-    Judgement {
-        state: MasterVerdictState::ReconciliationRequired,
-        guid: found.filter(|guid| is_canonical_guid(guid)),
+    let guids = found
+        .into_iter()
+        .map(|guid| guid.filter(|guid| is_canonical_guid(guid)))
+        .collect();
+    Judgement::read(
+        MasterVerdictState::ReconciliationRequired,
+        guids,
         checks,
         reasons,
-        name_absent_in_read_book: name_absent,
-        sealed: (),
-    }
+        name_absent,
+    )
 }
 
 #[cfg(test)]

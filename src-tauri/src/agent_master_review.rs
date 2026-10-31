@@ -1,16 +1,16 @@
-//! The text the one-ledger dialog shows.
+//! The text the ledger dialog shows.
 //!
-//! One ledger `Create`, two lines for the master, under the pinned company the
-//! voucher preview names. It is built from the typed item and the verified
-//! company, never from caller text, and it is refused rather than cut when it
-//! does not fit: a dialog that hides part of what will be created is not a
-//! review. The limits and the unsafe-character checks are the voucher
-//! preview's own.
+//! One request of ledger `Create`s, two lines for each master in the order
+//! they are sent, under the pinned company the voucher preview names. It is
+//! built from the typed items and the verified company, never from caller
+//! text, and it is refused rather than cut when it does not fit: a dialog
+//! that hides part of what will be created is not a review. The limits and the
+//! unsafe-character checks are the voucher preview's own.
 use super::post::{
     has_unreviewable_format_character, has_unsafe_review_layout_character, BATCH_REVIEW_MAX_BYTES,
     BATCH_REVIEW_MAX_CHARS, BATCH_REVIEW_MAX_LINES, BATCH_REVIEW_MAX_LINE_CHARS,
 };
-use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateItem};
+use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, LedgerCreateItem};
 use crate::tally::VerifiedCompanyIdentity;
 
 /// The last line of the preview: what the person must not do while the post
@@ -53,16 +53,18 @@ fn fits(lines: &[String]) -> bool {
             .all(|line| line.chars().count() <= BATCH_REVIEW_MAX_LINE_CHARS)
 }
 
-/// The preview of creating `item` in `company`, reached at `origin`.
+/// The preview of creating `batch` in `company`, reached at `origin`.
 ///
 /// Refused with a typed error when any text the dialog would show holds a
 /// layout or format character, or the text does not fit; never cut.
 pub(super) fn master_review_text(
-    item: &LedgerCreateItem,
+    batch: &LedgerCreateBatch,
     company: &VerifiedCompanyIdentity,
     origin: &str,
 ) -> Result<String, MasterReviewError> {
-    let lines = review_lines(item, company, origin, item.name().as_str())?;
+    let lines = review_lines(batch, company, origin, |item| {
+        item.name().as_str().to_string()
+    })?;
     if fits(&lines) {
         Ok(lines.join("\n"))
     } else {
@@ -70,29 +72,33 @@ pub(super) fn master_review_text(
     }
 }
 
-/// The same preview with the ledger's name masked, for a tool result under
-/// `mask_parties`: the dialog shows the name whole, a result never does.
+/// The same preview with each ledger's name masked, for a tool result under
+/// `mask_parties`: the dialog shows the names whole, a result never does.
 ///
 /// Refused exactly when the dialog's own text is: the fit is judged on the
-/// text with the whole name, never on the masked text, so a batch is never
+/// text with the whole names, never on the masked text, so a batch is never
 /// prepared under masking that the dialog could not then show.
 pub(super) fn masked_review_text(
-    item: &LedgerCreateItem,
+    batch: &LedgerCreateBatch,
     company: &VerifiedCompanyIdentity,
     origin: &str,
 ) -> Result<String, MasterReviewError> {
-    master_review_text(item, company, origin)?;
-    let masked = super::super::mask(item.name().as_str());
-    Ok(review_lines(item, company, origin, &masked)?.join("\n"))
+    master_review_text(batch, company, origin)?;
+    Ok(review_lines(batch, company, origin, |item| {
+        super::super::mask(item.name().as_str())
+    })?
+    .join("\n"))
 }
 
-/// The preview's lines with the ledger shown as `name`; the layout and format
-/// checks read the ledger's real name whatever is shown.
+/// The preview's lines with each ledger shown as `name` gives it; the layout
+/// and format checks read every ledger's real name whatever is shown. One
+/// ledger keeps the words its box was measured with; a batch names its count
+/// and lists each ledger in the order it is sent.
 fn review_lines(
-    item: &LedgerCreateItem,
+    batch: &LedgerCreateBatch,
     company: &VerifiedCompanyIdentity,
     origin: &str,
-    name: &str,
+    name: impl Fn(&LedgerCreateItem) -> String,
 ) -> Result<Vec<String>, MasterReviewError> {
     let shown = [
         company.display_name(),
@@ -100,8 +106,10 @@ fn review_lines(
         company.company_number(),
         company.books_from_yyyymmdd(),
         origin,
-        item.name().as_str(),
-    ];
+    ]
+    .into_iter()
+    .chain(batch.items().iter().map(|item| item.name().as_str()))
+    .collect::<Vec<_>>();
     if shown
         .iter()
         .copied()
@@ -113,22 +121,12 @@ fn review_lines(
         return Err(MasterReviewError::FormatText);
     }
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
-    let (gst, bill_wise) = match item.kind() {
-        AdmittedLedgerKind::Party {
-            gstin, bill_wise, ..
-        } => (
-            gstin
-                .as_ref()
-                .map_or_else(|| "no GST".to_string(), |g| format!("GSTIN {}", g.as_str())),
-            *bill_wise,
-        ),
-        AdmittedLedgerKind::Suspense => ("no GST".to_string(), false),
-        AdmittedLedgerKind::GstDuty { head } => {
-            (format!("duty head {}", head.head().tally_spelling()), false)
-        }
+    let count = match batch.len() {
+        1 => "ONE ledger".to_string(),
+        count => format!("{count} ledgers"),
     };
-    Ok(vec![
-        format!("Create ONE ledger in {}", quoted(company.display_name())),
+    let mut lines = vec![
+        format!("Create {count} in {}", quoted(company.display_name())),
         format!("Company GUID: {}", company.company_guid()),
         format!(
             "Company number: {}  Books from: {}",
@@ -142,14 +140,35 @@ fn review_lines(
         ),
         format!("Tally: {origin}"),
         String::new(),
-        format!("Create ledger {} under {}", quoted(name), item.parent()),
-        format!(
+    ];
+    for item in batch.items() {
+        let (gst, bill_wise) = match item.kind() {
+            AdmittedLedgerKind::Party {
+                gstin, bill_wise, ..
+            } => (
+                gstin
+                    .as_ref()
+                    .map_or_else(|| "no GST".to_string(), |g| format!("GSTIN {}", g.as_str())),
+                *bill_wise,
+            ),
+            AdmittedLedgerKind::Suspense => ("no GST".to_string(), false),
+            AdmittedLedgerKind::GstDuty { head } => {
+                (format!("duty head {}", head.head().tally_spelling()), false)
+            }
+        };
+        lines.push(format!(
+            "Create ledger {} under {}",
+            quoted(&name(item)),
+            item.parent()
+        ));
+        lines.push(format!(
             "{gst}, bill-by-bill {}",
             if bill_wise { "Yes" } else { "No" }
-        ),
-        String::new(),
-        MASTER_REVIEW_WARNING.to_string(),
-    ])
+        ));
+    }
+    lines.push(String::new());
+    lines.push(MASTER_REVIEW_WARNING.to_string());
+    Ok(lines)
 }
 
 #[cfg(test)]

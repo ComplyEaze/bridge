@@ -1053,26 +1053,26 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }"#;
 
-/// The one-ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
-/// item only, with its own title, its own positive button, and the same
+/// The ledger dialog (the masters twin of [`POST_DIALOG`]): shown for one
+/// ledger or a batch, with its own title, its own positive button, and the same
 /// Escape/default-No behaviour.
 const MASTERS_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
-    if count != ONE_ITEM {
+    let Some((title, button)) = masters_words(count) else {
         return false;
-    }
+    };
     rfd::MessageDialog::new()
-        .set_title(MASTERS_TITLE)
+        .set_title(title)
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         // The Cancel label supplies the native Escape action. Creating
         // requires the explicitly matched positive button.
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
             "Cancel".into(),
-            MASTERS_BUTTON.into(),
+            button.clone(),
         ))
         .show()
-        == rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())
+        == rfd::MessageDialogResult::Custom(button)
 }"#;
 
 const MASTERS_DIALOG_WINDOWS: &str = r#"#[cfg(windows)]
@@ -1082,11 +1082,11 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
         MB_TOPMOST, MB_YESNOCANCEL,
     };
     // As for the post dialog: No is the default, Escape and close are Cancel.
-    if count != ONE_ITEM {
+    let Some((title, _)) = masters_words(count) else {
         return false;
-    }
+    };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
-    let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832). Through `guarded` it is also
     // brought to the front once it appears, as the post's box is: its first
@@ -1389,7 +1389,10 @@ const ANSWER_EFFECT: &str = r#"fn answer_effect(shown: Shown, count: VoucherCoun
             "Nothing is closed until you answer.",
         ),
         Shown::Masters => (
-            "create this ledger in Tally".into(),
+            match count.batch() {
+                None => "create this ledger in Tally".into(),
+                Some(count) => format!("create these {count} ledgers in Tally"),
+            },
             "Nothing is created until you answer.",
         ),
     }
@@ -1403,7 +1406,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
         Shown::Settle => SETTLE_BUTTON.to_string(),
-        Shown::Masters => MASTERS_BUTTON.to_string(),
+        Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -2042,7 +2045,11 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
     }
 }
 
-const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(
+    executable: &std::path::Path,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("master_review_too_large".into());
     }
@@ -2050,7 +2057,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
         executable,
         "--confirm-masters",
         MASTERS_TOKEN_PREFIX,
-        ONE_ITEM,
+        count,
         preview,
     )
     .await
@@ -2068,7 +2075,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 45] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2122,28 +2129,43 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
         1,
     ),
     ("pub(crate) const REVIEW_BUTTON: &str = \"Yes\";", 1),
-    // The one-ledger dialog: its words, its count, both native dialogs, and
-    // the two functions that ask it and decide from the child's answer.
+    // The ledger dialog: its words, the words by count, its one-item count,
+    // both native dialogs, and the two functions that ask it and decide from
+    // the child's answer.
     (
         "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — create one ledger?\";",
         1,
     ),
     (
-        "#[cfg(not(windows))]\nconst MASTERS_BUTTON: &str = \"Create ledger\";",
+        r#"fn masters_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((MASTERS_TITLE.into(), "Create ledger".into())),
+        Some(count) if count.get() <= MAX_LEDGERS_PER_BATCH => Some((
+            format!("ComplyEaze Bridge — create {count} ledgers?"),
+            format!("Create {count} ledgers"),
+        )),
+        Some(_) => None,
+    }
+}"#,
         1,
     ),
     (
         "const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);",
         1,
     ),
+    // The ledger dialog is asked about the batch's own count (#690).
+    (
+        "let count = VoucherCount::new(batch.len()).ok_or(\"master_request_invalid\")?;",
+        1,
+    ),
     (MASTERS_DIALOG, 1),
     (MASTERS_DIALOG_WINDOWS, 1),
     (
-        "async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
-    let executable = std::env::current_exe().map_err(|_| \"master_approval_unavailable\")?;
-    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
-    confirm_masters_with(&executable, &shown).await
-}",
+        r#"async fn confirm_masters_dialog(preview: MastersPrompt<'_>) -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
+    let shown = displayed_text(Shown::Masters, preview.count, preview.text);
+    confirm_masters_with(&executable, preview.count, &shown).await
+}"#,
         1,
     ),
     (CONFIRM_MASTERS_WITH, 1),
@@ -2189,7 +2211,8 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // non-test arm's identity function. The one-ledger dialog added one of
     // each arm of its own.
     // #1780 added one more, the test-only accessor for what a review shows.
-    ("#[cfg(test)]", 8),
+    // The ledger batch made the one-item count test-only (#690).
+    ("#[cfg(test)]", 9),
     ("#[cfg(not(test))]", 5),
     // #702 ran the parent's seven unix-only test items on every platform.
     ("#[cfg(unix)]", 0),
@@ -2197,9 +2220,10 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // and the non-Windows button; #1780's follow-up, the Mac one-line answer
     // text test. #1828: the release window's question and box on Windows, and
     // its title, dialog and button on a Mac. #1709: the same for the settle
-    // window.
+    // window. The ledger batch moved the Mac ledger button into the count's
+    // words, used on both systems (#690).
     ("#[cfg(windows)]", 12),
-    ("#[cfg(not(windows))]", 17),
+    ("#[cfg(not(windows))]", 16),
     ("cfg", 43),
 ];
 
@@ -2369,14 +2393,26 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("\"Yes\";", "\"No\";", 1),
-        // The one-ledger dialog approves on anything but its own button,
+        // The ledger dialog approves on anything but its own button,
         // reads as the decline, or defaults to Yes (Windows MB_DEFBUTTON1).
+        // Inside the ledger dialog itself: the review's dialog compares its
+        // own `button` the same way and comes first in the file.
         source.replacen(
-            "== rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())",
-            "!= rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())",
+            MASTERS_DIALOG,
+            &MASTERS_DIALOG.replacen(
+                "== rfd::MessageDialogResult::Custom(button)",
+                "!= rfd::MessageDialogResult::Custom(button)",
+                1,
+            ),
             1,
         ),
         source.replacen("\"Create ledger\"", "\"Cancel\"", 1),
+        // A batch's box is asked about one ledger whatever the batch holds.
+        source.replacen(
+            "VoucherCount::new(batch.len())",
+            "VoucherCount::new(1)",
+            1,
+        ),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
             &MASTERS_DIALOG_WINDOWS.replace("MB_DEFBUTTON2", "MB_DEFBUTTON1"),
@@ -2387,8 +2423,8 @@ fn each_dialog_answers_only_on_its_positive_button() {
             &MASTERS_DIALOG_WINDOWS.replacen("answer == IDYES", "answer != IDNO", 1),
             1,
         ),
-        // The one-ledger dialog's title reads as the post's, or its count
-        // guard is gone, so a batch's count would show it.
+        // The ledger dialog's title reads as the post's, or its count guard
+        // is gone, so a count over the batch limit would show it.
         source.replacen(
             "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — create one ledger?\";",
             "const MASTERS_TITLE: &str = \"ComplyEaze Bridge — approve one voucher\";",
@@ -2396,16 +2432,16 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen(
             MASTERS_DIALOG,
-            &MASTERS_DIALOG.replacen("count != ONE_ITEM", "false", 1),
+            &MASTERS_DIALOG.replacen("masters_words(count)", "masters_words(ONE_ITEM)", 1),
             1,
         ),
         source.replacen(
             MASTERS_DIALOG_WINDOWS,
-            &MASTERS_DIALOG_WINDOWS.replacen("count != ONE_ITEM", "false", 1),
+            &MASTERS_DIALOG_WINDOWS.replacen("masters_words(count)", "masters_words(ONE_ITEM)", 1),
             1,
         ),
         source.replacen(
-            "confirm_masters_with(&executable, &shown).await\n}",
+            "confirm_masters_with(&executable, preview.count, &shown).await\n}",
             "let _ = (executable, shown);\n    Ok(())\n}",
             1,
         ),
@@ -2442,7 +2478,7 @@ fn each_dialog_answers_only_on_its_positive_button() {
         ),
         source.replacen(
             CONFIRM_MASTERS_WITH,
-            &CONFIRM_MASTERS_WITH.replacen("ONE_ITEM", "VoucherCount(NonZeroUsize::MAX)", 1),
+            &CONFIRM_MASTERS_WITH.replacen("        count,\n", "        VoucherCount(NonZeroUsize::MAX),\n", 1),
             1,
         ),
         source.replacen(

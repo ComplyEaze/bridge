@@ -5669,10 +5669,11 @@ fn the_voucher_recheck_given_a_masters_admission_refuses_and_aims_nothing() {
     let aimed = std::sync::Mutex::new(None::<u64>);
     let error = recheck_voucher_queue(
         QueuedAdmission::Masters {
-            item: &crate::tally::ledger_create_item::LedgerCreateItem::new(
+            batch: &crate::tally::ledger_create_item::LedgerCreateItem::new(
                 crate::tally::ledger_create_item::MasterName::new("Some Party").unwrap(),
                 crate::tally::ledger_create_item::AdmittedLedgerKind::Suspense,
-            ),
+            )
+            .into(),
             company: &crate::tally::VerifiedCompanyIdentity::test_fixture(
                 "Synthetic Accounts",
                 "00000000-0000-4000-8000-000000000002",

@@ -176,9 +176,10 @@ impl World {
     }
 
     fn judge(&self) -> Judgement {
+        let batch = LedgerCreateBatch::one(self.item.clone());
         judge(
             &Facts {
-                item: &self.item,
+                batch: &batch,
                 company_guid: TARGET,
                 pre_image: &self.pre_image,
                 pre_marks: &self.pre_marks,
@@ -1768,13 +1769,13 @@ fn the_party_read_is_needed_only_for_one_new_ledger_of_the_item_name() {
     let item = suspense();
     let clean = World::clean(item.clone());
     assert!(party_read_needed(
-        &item,
+        &LedgerCreateBatch::one(item.clone()),
         &clean.pre_image,
         clean.read.masters.as_ref().unwrap()
     ));
     let untouched = World::untouched(item.clone());
     assert!(!party_read_needed(
-        &item,
+        &LedgerCreateBatch::one(item.clone()),
         &untouched.pre_image,
         untouched.read.masters.as_ref().unwrap()
     ));
@@ -1782,7 +1783,7 @@ fn the_party_read_is_needed_only_for_one_new_ledger_of_the_item_name() {
     let mut existing = World::clean(item.clone());
     *existing.masters() = vec![master(MasterKind::Ledger, cash(), 9, &[NAME])];
     assert!(!party_read_needed(
-        &item,
+        &LedgerCreateBatch::one(item.clone()),
         &existing.pre_image,
         existing.read.masters.as_ref().unwrap()
     ));
@@ -1795,7 +1796,7 @@ fn the_party_read_is_needed_only_for_one_new_ledger_of_the_item_name() {
         &[NAME],
     ));
     assert!(!party_read_needed(
-        &item,
+        &LedgerCreateBatch::one(item.clone()),
         &two.pre_image,
         two.read.masters.as_ref().unwrap()
     ));
@@ -1943,6 +1944,544 @@ fn an_open_judgement_is_never_terminal() {
         assert!(!judgement.state.is_terminal(), "{verdict:?}");
         assert_eq!(judgement.guid, None);
         assert_eq!(judgement.reasons, vec!["a_reason"]);
+    }
+}
+
+// --- a batch of several ledgers ----------------------------------------------
+
+const BATCH_NAMES: [&str; 3] = ["Batch Alpha", "Batch Bravo", "Batch Charlie"];
+
+fn batch_guid(index: usize) -> &'static str {
+    crate::synthetic_guid(0xb000 + u16::try_from(index).unwrap())
+}
+
+/// Three Suspense ledgers created together, every part open to change: the
+/// mark steps from 7 to 10, and the ledgers take ALTERIDs 8, 9 and 10.
+struct BatchWorld {
+    batch: LedgerCreateBatch,
+    counters: Option<MasterCounters>,
+    answer_held: bool,
+    moment: Moment,
+    read: ReadBack,
+}
+
+impl BatchWorld {
+    fn clean() -> Self {
+        let batch = LedgerCreateBatch::new(
+            BATCH_NAMES
+                .iter()
+                .map(|name| {
+                    LedgerCreateItem::new(
+                        MasterName::new(name).unwrap(),
+                        AdmittedLedgerKind::Suspense,
+                    )
+                })
+                .collect(),
+        )
+        .unwrap();
+        let mut masters = vec![
+            master(MasterKind::Ledger, cash(), 9, &["Cash"]),
+            master(MasterKind::Group, debtors_group(), 4, &["Sundry Debtors"]),
+        ];
+        let mut rows = Vec::new();
+        for (index, name) in BATCH_NAMES.iter().enumerate() {
+            masters.push(master(
+                MasterKind::Ledger,
+                batch_guid(index),
+                8 + index as u64,
+                &[name],
+            ));
+            rows.push(PartyView {
+                name: (*name).into(),
+                guid: batch_guid(index).into(),
+                parent: Some("Suspense A/c".into()),
+                tax_type: None,
+                duty_head: None,
+                party_gstin: None,
+                opening_balance: Some("0.00".into()),
+            });
+        }
+        Self {
+            batch,
+            counters: Some(counters(3, 0, 0, 0)),
+            answer_held: true,
+            moment: Moment::JustPosted,
+            read: ReadBack {
+                marks: Some(vec![mark(TARGET, 10), mark(other(), 3)]),
+                masters: Some(masters),
+                party: PartyRead::Rows(rows),
+                order_coverage: OrderCoverage::Measured,
+            },
+        }
+    }
+
+    fn judge(&self) -> Judgement {
+        let pre_image = pre_image();
+        let pre_marks = [mark(TARGET, 7), mark(other(), 3)];
+        judge(
+            &Facts {
+                batch: &self.batch,
+                company_guid: TARGET,
+                pre_image: &pre_image,
+                pre_marks: &pre_marks,
+                counters: self.counters,
+                answer_held: self.answer_held,
+                moment: self.moment,
+            },
+            &self.read,
+        )
+    }
+
+    fn masters(&mut self) -> &mut Vec<IndexedMaster> {
+        self.read.masters.as_mut().unwrap()
+    }
+
+    fn target_mark(&mut self, altmstid: u64) {
+        self.read.marks.as_mut().unwrap()[0] = mark(TARGET, altmstid);
+    }
+}
+
+#[test]
+fn a_clean_batch_is_posted_verified_with_each_ledgers_guid_in_order() {
+    for moment in [Moment::JustPosted, Moment::Reconcile] {
+        let mut world = BatchWorld::clean();
+        world.moment = moment;
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::PostedVerified,
+            "{moment:?}: {judgement:?}"
+        );
+        assert!(judgement.checks.all_passed());
+        assert!(judgement.reasons.is_empty());
+        let expected = (0..3)
+            .map(|index| Some(batch_guid(index).to_string()))
+            .collect::<Vec<_>>();
+        assert_eq!(judgement.guids, expected);
+        // A batch names no single ledger.
+        assert!(judgement.guid.is_none());
+        assert_eq!(judgement.guid_of(2), Some(batch_guid(2)));
+    }
+}
+
+#[test]
+fn straight_after_the_post_a_batchs_mark_must_step_by_its_size() {
+    for after in [9, 11] {
+        let mut world = BatchWorld::clean();
+        world.target_mark(after);
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{after}"
+        );
+        assert_eq!(judgement.checks.target_mark_step_one, Check::Failed);
+        assert_eq!(
+            judgement.reasons,
+            vec!["target_mark_step_not_one"],
+            "{after}"
+        );
+    }
+}
+
+#[test]
+fn a_later_read_needs_the_batchs_ledgers_to_hold_the_span_after_the_intent() {
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    // Changes after the batch do not stop it settling.
+    world.target_mark(40);
+    assert_eq!(world.judge().state, MasterVerdictState::PostedVerified);
+    // A ledger outside 8 to 10: another change came between the creates.
+    world.masters()[3].alter_id = 11;
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert_eq!(judgement.checks.target_mark_step_one, Check::Failed);
+}
+
+#[test]
+fn counters_must_count_one_create_for_each_ledger() {
+    let mut world = BatchWorld::clean();
+    world.counters = Some(counters(2, 0, 0, 0));
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert!(judgement.reasons.contains(&"counters_not_one_created"));
+    // An alteration among them is a write into an existing master.
+    let mut world = BatchWorld::clean();
+    world.counters = Some(counters(2, 1, 0, 0));
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+}
+
+#[test]
+fn one_name_on_an_existing_master_makes_the_batch_a_write_into_it_and_names_that_master() {
+    let mut world = BatchWorld::clean();
+    // Bravo's name now resolves to the pre-image's Cash ledger, as when it
+    // was its alias.
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(1));
+    world.masters()[0].names.push(BATCH_NAMES[1].into());
+    world.counters = Some(counters(2, 1, 0, 0));
+    let judgement = world.judge();
+    assert_eq!(
+        judgement.state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+    assert_eq!(judgement.guids, vec![None, Some(cash().to_string()), None]);
+}
+
+#[test]
+fn one_ledger_missing_after_the_post_keeps_the_batch_open() {
+    let mut world = BatchWorld::clean();
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(2));
+    world.target_mark(9);
+    world.counters = Some(counters(2, 0, 0, 0));
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert!(judgement.reasons.contains(&"ledger_absent_after_post"));
+    assert_eq!(judgement.guid_of(2), None);
+    assert_eq!(judgement.guid_of(0), Some(batch_guid(0)));
+}
+
+#[test]
+fn a_batch_with_its_answer_lost_is_never_unattributed() {
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    world.counters = None;
+    world.answer_held = false;
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert!(judgement.reasons.contains(&"counters_unavailable"));
+}
+
+#[test]
+fn a_batch_is_confirmed_absent_only_when_every_name_is() {
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    world.counters = None;
+    world.answer_held = false;
+    world.target_mark(7);
+    world.read.party = PartyRead::NotRead;
+    world.masters().truncate(2);
+    assert_eq!(world.judge().state, MasterVerdictState::ConfirmedAbsent);
+    // One of the three present: not absent.
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    world.counters = None;
+    world.answer_held = false;
+    world.target_mark(7);
+    world.masters().truncate(3);
+    assert_ne!(world.judge().state, MasterVerdictState::ConfirmedAbsent);
+}
+
+/// A batch of three whose answer was lost, Alpha read back and Bravo and
+/// Charlie absent: the later read, with no counters.
+fn lost_batch_with_two_absent() -> BatchWorld {
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    world.counters = None;
+    world.answer_held = false;
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(1) && master.guid != batch_guid(2));
+    world
+}
+
+fn assert_held_open(judgement: &Judgement, step_reason: &str) {
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    // Not terminal: the journal's `is_settled` stays false, and the batch
+    // keeps blocking every name it holds.
+    assert!(!judgement.state.is_terminal());
+    assert!(judgement.reasons.contains(&step_reason), "{judgement:?}");
+    assert!(judgement
+        .reasons
+        .contains(&"batch_ledger_absent_without_counters"));
+    assert!(judgement.guids.is_empty());
+}
+
+#[test]
+fn a_lost_answer_batch_with_absent_names_is_not_settled_by_one_name_on_an_existing_master() {
+    let mut world = lost_batch_with_two_absent();
+    // Alpha's name resolves to the pre-image's Cash ledger.
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(0));
+    world.masters()[0].names.push(BATCH_NAMES[0].into());
+    world.target_mark(7);
+    assert_held_open(&world.judge(), "name_resolves_to_existing_master");
+}
+
+#[test]
+fn a_lost_answer_batch_with_absent_names_is_not_settled_by_another_companys_mark() {
+    let mut world = lost_batch_with_two_absent();
+    world.target_mark(8);
+    world.read.marks.as_mut().unwrap()[1] = mark(other(), 4);
+    assert_held_open(&world.judge(), "other_company_mark_moved");
+    // Every name absent: still held, and the step says so.
+    world.masters().truncate(2);
+    world.target_mark(7);
+    let judgement = world.judge();
+    assert_held_open(&judgement, "other_company_mark_moved");
+    assert!(judgement.name_absent_in_read_book);
+}
+
+#[test]
+fn a_located_write_still_settles_one_ledger_or_a_batch_with_counters_or_none_absent() {
+    // One ledger, answer lost, its name on an existing master.
+    let mut world = World::untouched(suspense());
+    world.masters()[0].names.push(NAME.into());
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+    // One ledger, answer lost, absent, another company's mark moved.
+    let mut world = World::untouched(suspense());
+    world.marks()[1] = mark(other(), 4);
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::MasterWriteLocatedElsewhere
+    );
+    // A batch with counters on file: the request ran, and its absent names
+    // were not written.
+    let mut world = lost_batch_with_two_absent();
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(0));
+    world.masters()[0].names.push(BATCH_NAMES[0].into());
+    world.counters = Some(counters(0, 1, 0, 0));
+    world.answer_held = true;
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+    // A batch with its answer lost and no name absent.
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    world.counters = None;
+    world.answer_held = false;
+    world.read.marks.as_mut().unwrap()[1] = mark(other(), 4);
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::MasterWriteLocatedElsewhere
+    );
+}
+
+#[test]
+fn the_party_read_is_needed_when_any_ledger_of_the_batch_is_new() {
+    let world = BatchWorld::clean();
+    let mut masters = world.read.masters.clone().unwrap();
+    assert!(party_read_needed(&world.batch, &pre_image(), &masters));
+    masters.truncate(3);
+    assert!(party_read_needed(&world.batch, &pre_image(), &masters));
+    masters.truncate(2);
+    assert!(!party_read_needed(&world.batch, &pre_image(), &masters));
+}
+
+// --- the lab capture of several creates in one request (L0) ------------------
+//
+// The values below are read from the answers of lab sheet L0 (branch
+// `lab/690-batch-ledger-create-l0-answers` at 078db03e, TallyPrime 7.2 Silver,
+// one synthetic company, one sitting): the company GUID, each ledger's GUID and
+// `ALTERID`, the marks and Tally's counters. The party rows are not captured:
+// they are built as the request sent them.
+
+const L0_COMPANY: &str = "5848d0ca-ed85-4c97-ab20-e045893a9803";
+
+fn l0_guid(suffix: &str) -> String {
+    format!("{L0_COMPANY}-{suffix}")
+}
+
+fn l0_creditor(name: &str) -> LedgerCreateItem {
+    LedgerCreateItem::new(
+        MasterName::new(name).unwrap(),
+        AdmittedLedgerKind::Party {
+            side: PartySide::SundryCreditors,
+            gstin: None,
+            bill_wise: false,
+        },
+    )
+}
+
+/// The book's ledgers as a step of L0 read them: name, GUID suffix, ALTERID.
+fn l0_ledgers(rows: &[(&str, &str, u64)]) -> Vec<IndexedMaster> {
+    rows.iter()
+        .map(|(name, suffix, alter_id)| {
+            master(MasterKind::Ledger, &l0_guid(suffix), *alter_id, &[name])
+        })
+        .collect()
+}
+
+const L0_STEP_0: [(&str, &str, u64); 3] = [
+    ("Cash", "0000001f", 32),
+    ("LBox Suspense", "000000ce", 208),
+    ("Profit & Loss A/c", "0000001e", 31),
+];
+
+const L0_STEP_2: [(&str, &str, u64); 6] = [
+    ("Cash", "0000001f", 32),
+    ("L0 Batch Alpha", "000000cf", 209),
+    ("L0 Batch Bravo", "000000d0", 210),
+    ("L0 Batch Charlie", "000000d1", 211),
+    ("LBox Suspense", "000000ce", 208),
+    ("Profit & Loss A/c", "0000001e", 31),
+];
+
+const L0_STEP_4: [(&str, &str, u64); 8] = [
+    ("Cash", "0000001f", 32),
+    ("L0 Batch Alpha", "000000cf", 209),
+    ("L0 Batch Bravo", "000000d0", 213),
+    ("L0 Batch Charlie", "000000d1", 211),
+    ("L0 Batch Delta", "000000d2", 212),
+    ("L0 Batch Echo", "000000d3", 214),
+    ("LBox Suspense", "000000ce", 208),
+    ("Profit & Loss A/c", "0000001e", 31),
+];
+
+fn l0_pre_image(rows: &[(&str, &str, u64)]) -> BTreeMap<String, u64> {
+    rows.iter()
+        .map(|(_, suffix, alter_id)| (l0_guid(suffix), *alter_id))
+        .collect()
+}
+
+fn l0_rows(names: &[&str], step: &[(&str, &str, u64)]) -> Vec<PartyView> {
+    names
+        .iter()
+        .map(|name| {
+            let (_, suffix, _) = step.iter().find(|(row, _, _)| row == name).unwrap();
+            PartyView {
+                name: (*name).into(),
+                guid: l0_guid(suffix),
+                parent: Some("Sundry Creditors".into()),
+                tax_type: None,
+                duty_head: None,
+                party_gstin: None,
+                opening_balance: Some("0.00".into()),
+            }
+        })
+        .collect()
+}
+
+fn l0_judge(
+    names: &[&str],
+    before: (&[(&str, &str, u64)], u64),
+    after: (&[(&str, &str, u64)], u64),
+    counters: MasterCounters,
+    moment: Moment,
+) -> Judgement {
+    let batch =
+        LedgerCreateBatch::new(names.iter().map(|name| l0_creditor(name)).collect()).unwrap();
+    let pre_image = l0_pre_image(before.0);
+    let pre_marks = [mark(L0_COMPANY, before.1)];
+    judge(
+        &Facts {
+            batch: &batch,
+            company_guid: L0_COMPANY,
+            pre_image: &pre_image,
+            pre_marks: &pre_marks,
+            counters: Some(counters),
+            answer_held: true,
+            moment,
+        },
+        &ReadBack {
+            marks: Some(vec![mark(L0_COMPANY, after.1)]),
+            masters: Some(l0_ledgers(after.0)),
+            party: PartyRead::Rows(l0_rows(names, after.0)),
+            order_coverage: OrderCoverage::Measured,
+        },
+    )
+}
+
+/// L0's request A: three new ledgers in one request counted CREATED 3, the
+/// mark stepped 208 to 211, and the ledgers took 209 to 211 in request order.
+/// The batch reads `posted_verified`, straight after the send and later.
+#[test]
+fn the_captured_batch_of_three_new_ledgers_is_posted_verified() {
+    let names = ["L0 Batch Alpha", "L0 Batch Bravo", "L0 Batch Charlie"];
+    for moment in [Moment::JustPosted, Moment::Reconcile] {
+        let judgement = l0_judge(
+            &names,
+            (&L0_STEP_0, 208),
+            (&L0_STEP_2, 211),
+            counters(3, 0, 0, 0),
+            moment,
+        );
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::PostedVerified,
+            "{moment:?}: {judgement:?}"
+        );
+        assert_eq!(
+            judgement.guids,
+            ["000000cf", "000000d0", "000000d1"].map(|suffix| Some(l0_guid(suffix)))
+        );
+    }
+}
+
+/// L0's request B: Delta, Bravo (already a ledger) and Echo in one request
+/// counted CREATED 2, ALTERED 1. Bravo kept its GUID and its ALTERID went 210
+/// to 213 with no field changed; the mark stepped 211 to 214, each master
+/// taking the next value in request order. The batch is a write into an
+/// existing master, and the verdict names Bravo against its item.
+#[test]
+fn the_captured_batch_with_one_existing_name_is_a_write_into_that_ledger_naming_it() {
+    let judgement = l0_judge(
+        &["L0 Batch Delta", "L0 Batch Bravo", "L0 Batch Echo"],
+        (&L0_STEP_2, 211),
+        (&L0_STEP_4, 214),
+        counters(2, 1, 0, 0),
+        Moment::JustPosted,
+    );
+    assert_eq!(
+        judgement.state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+    assert_eq!(judgement.guids, vec![None, Some(l0_guid("000000d0")), None]);
+    assert!(judgement.reasons.contains(&"tally_reported_altered"));
+    assert!(judgement
+        .reasons
+        .contains(&"name_resolves_to_existing_master"));
+    // Bravo's alteration moved its ALTERID although no field changed.
+    assert_eq!(judgement.checks.pre_image_unchanged, Check::Failed);
+    // The step was the batch's size: the alteration took a mark value too.
+    assert_eq!(judgement.checks.target_mark_step_one, Check::Passed);
+}
+
+/// L0b: ten new ledgers in one request counted CREATED 10, the mark stepped
+/// 208 to 218, and the ledgers took 209 to 218 in request order (branch
+/// `lab/690-batch-ledger-create-l0b-answers` at 5efb36d4, the same company).
+#[test]
+fn the_captured_batch_of_ten_new_ledgers_is_posted_verified() {
+    let names: Vec<String> = (1..=10).map(|n| format!("L0b Batch {n:02}")).collect();
+    let suffixes: Vec<String> = (0xcf..=0xd8).map(|n| format!("{n:08x}")).collect();
+    let mut after: Vec<(&str, &str, u64)> = L0_STEP_0.to_vec();
+    for (index, (name, suffix)) in names.iter().zip(&suffixes).enumerate() {
+        after.push((name.as_str(), suffix.as_str(), 209 + index as u64));
+    }
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    for moment in [Moment::JustPosted, Moment::Reconcile] {
+        let judgement = l0_judge(
+            &names,
+            (&L0_STEP_0, 208),
+            (&after, 218),
+            counters(10, 0, 0, 0),
+            moment,
+        );
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::PostedVerified,
+            "{moment:?}: {judgement:?}"
+        );
+        assert_eq!(
+            judgement.guids,
+            suffixes
+                .iter()
+                .map(|suffix| Some(l0_guid(suffix)))
+                .collect::<Vec<_>>()
+        );
     }
 }
 

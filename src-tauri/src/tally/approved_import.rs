@@ -1,6 +1,6 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
-use super::ledger_create_item::{LedgerCreateItem, RenderedLedgerCreate};
+use super::ledger_create_item::{LedgerCreateBatch, RenderedLedgerCreate, MAX_LEDGERS_PER_BATCH};
 use super::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
@@ -53,10 +53,31 @@ const MASTERS_TOKEN_PREFIX: &str = "bridge-create-ledger:";
 /// The one-ledger dialog's title. The Windows box has no custom labels, so the
 /// title asks the question there as well.
 const MASTERS_TITLE: &str = "ComplyEaze Bridge — create one ledger?";
-#[cfg(not(windows))]
-const MASTERS_BUTTON: &str = "Create ledger";
-/// What a one-ledger dialog is told as its count: always one item.
+/// The count a one-ledger dialog is told (tests).
+#[cfg(test)]
 const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
+
+/// What the ledger dialog is asked with: the text the person is shown, and the
+/// count of ledgers its title, button and answer text are worded by.
+#[derive(Clone, Copy)]
+pub(super) struct MastersPrompt<'a> {
+    pub(super) text: &'a str,
+    pub(super) count: VoucherCount,
+}
+
+/// The ledger dialog's title and its Mac button for `count` ledgers. One ledger
+/// keeps the words its box was measured with; a batch is named by its count.
+/// `None` above [`MAX_LEDGERS_PER_BATCH`]: no such box is shown.
+fn masters_words(count: VoucherCount) -> Option<(String, String)> {
+    match count.batch() {
+        None => Some((MASTERS_TITLE.into(), "Create ledger".into())),
+        Some(count) if count.get() <= MAX_LEDGERS_PER_BATCH => Some((
+            format!("ComplyEaze Bridge — create {count} ledgers?"),
+            format!("Create {count} ledgers"),
+        )),
+        Some(_) => None,
+    }
+}
 /// The same for the invoice-stop release dialog, distinct from both.
 const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
 /// The same for the settle dialog (#1709), distinct from every other.
@@ -253,7 +274,7 @@ impl VoucherAdmission {
     }
 }
 
-/// A master post's admission: one ledger `Create`, rendered once.
+/// A master post's admission: one request of ledger `Create`s, rendered once.
 ///
 /// `rendered` is produced once, when the admission is built, and never again,
 /// so the bytes the POST sends are the bytes whose digest the dispatch intent
@@ -262,7 +283,7 @@ impl VoucherAdmission {
 /// so no code holds an approved masters kind without that answer (P2).
 #[derive(Clone)]
 pub(super) struct MasterAdmission {
-    item: LedgerCreateItem,
+    batch: LedgerCreateBatch,
     rendered: RenderedLedgerCreate,
     /// The ledger name index read (the V3 catalogue request).
     ledger_index_request: AgentReadRequest,
@@ -278,16 +299,16 @@ pub(super) struct MasterAdmission {
 impl MasterAdmission {
     /// Renders the request once, with the two index reads for the company.
     fn new(
-        item: LedgerCreateItem,
+        batch: LedgerCreateBatch,
         company: &VerifiedCompanyIdentity,
     ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
         use super::agent_read_request::AgentReadRequestError;
         use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
         let validated =
             ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
-        let rendered = item.render_import(company);
+        let rendered = batch.render_import(company);
         Ok(Self {
-            item,
+            batch,
             rendered,
             ledger_index_request: AgentReadRequest::parse(
                 ReadOnlyProfile::StandardLedgerCatalogV3 {
@@ -305,8 +326,8 @@ impl MasterAdmission {
         })
     }
 
-    pub(super) fn item(&self) -> &LedgerCreateItem {
-        &self.item
+    pub(super) fn batch(&self) -> &LedgerCreateBatch {
+        &self.batch
     }
 
     pub(super) fn ledger_index_request(&self) -> AgentReadRequest {
@@ -343,7 +364,7 @@ pub(crate) enum QueuedAdmission<'a> {
         /// The request being posted and the company it is for, taken from the
         /// approved request itself, so the recheck reads the name and the
         /// company from the bytes' own source and no caller supplies them.
-        item: &'a LedgerCreateItem,
+        batch: &'a LedgerCreateBatch,
         company: &'a VerifiedCompanyIdentity,
         ledgers_first: &'a str,
         ledgers_second: &'a str,
@@ -417,13 +438,19 @@ impl ApprovedImport {
     /// `company` by the caller's review builder, and bound with them in the
     /// approval binding.
     pub(crate) async fn confirm_masters(
-        item: LedgerCreateItem,
+        batch: LedgerCreateBatch,
         company: &VerifiedCompanyIdentity,
         preview: &str,
         company_marks_request: AgentReadRequest,
     ) -> Result<Self, String> {
-        let admission = MasterAdmission::new(item, company)
+        let count = VoucherCount::new(batch.len()).ok_or("master_request_invalid")?;
+        let admission = MasterAdmission::new(batch, company)
             .map_err(|_| "master_request_invalid".to_string())?;
+        // The text the person is shown and the count its box is worded by.
+        let preview = MastersPrompt {
+            text: preview,
+            count,
+        };
         approve_masters(preview).await?;
         Ok(Self {
             kind: ApprovedKind::Masters(Box::new(admission)),
@@ -623,16 +650,16 @@ impl PendingPostApproval {
     /// The same for the one-ledger dialog: [`ApprovedImport::confirm_masters`]
     /// with exactly these arguments, on its own task. Its box is measured as
     /// the post's is, but a box that does not fit is refused with nothing to
-    /// note: the one-ledger text has no shorter form.
+    /// note: the ledger text, one ledger or a batch, has no shorter form.
     pub(crate) fn ask_masters(
-        item: LedgerCreateItem,
+        batch: LedgerCreateBatch,
         company: VerifiedCompanyIdentity,
         preview: String,
         company_marks_request: AgentReadRequest,
     ) -> Self {
         Self::stamped(
             async move {
-                ApprovedImport::confirm_masters(item, &company, &preview, company_marks_request)
+                ApprovedImport::confirm_masters(batch, &company, &preview, company_marks_request)
                     .await
             },
             None,
@@ -1109,6 +1136,9 @@ pub(crate) mod test_seam {
         /// as `previews` and `reviews` (#746).
         counts: Arc<Mutex<Vec<usize>>>,
         review_counts: Arc<Mutex<Vec<usize>>>,
+        /// The ledger count each ledger dialog was asked about, in the same
+        /// order as `masters`: a box for ten ledgers must not say one.
+        master_counts: Arc<Mutex<Vec<usize>>>,
         review_kinds: Arc<Mutex<Vec<super::ReviewKind>>>,
         /// Run while the approval is pending, as something else changing the
         /// book or the journal while an operator reads the dialog would.
@@ -1210,6 +1240,7 @@ pub(crate) mod test_seam {
                 masters: Arc::default(),
                 counts: Arc::default(),
                 review_counts: Arc::default(),
+                master_counts: Arc::default(),
                 review_kinds: Arc::default(),
                 while_pending: None,
                 held: None,
@@ -1236,6 +1267,10 @@ pub(crate) mod test_seam {
 
         pub(crate) fn review_counts(&self) -> Vec<usize> {
             self.review_counts.lock().unwrap().clone()
+        }
+
+        pub(crate) fn master_counts(&self) -> Vec<usize> {
+            self.master_counts.lock().unwrap().clone()
         }
 
         /// Which use of the review dialog each review was asked for.
@@ -1317,9 +1352,12 @@ pub(crate) mod test_seam {
     /// The test-build one-ledger dialog, scripted by the same decision
     /// (including a held dialog a test answers) and declining the same way
     /// when unscoped.
-    pub(super) async fn approve_masters(preview: &str) -> Result<(), String> {
+    pub(super) async fn approve_masters(prompt: super::MastersPrompt<'_>) -> Result<(), String> {
+        let preview = prompt.text;
+        let count = prompt.count.0.get();
         let decision = scripted_decision(|scripted| {
             scripted.masters.lock().unwrap().push(preview.to_string());
+            scripted.master_counts.lock().unwrap().push(count);
         })
         .await;
         if decision {
@@ -1405,13 +1443,18 @@ pub(crate) mod test_seam {
         assert_eq!(
             super::confirm_masters_with(
                 std::path::Path::new("/nonexistent/never-started"),
+                ONE,
                 &oversized
             )
             .await,
             Err("master_review_too_large".to_string())
         );
         assert_eq!(
-            super::confirm_masters_dialog(&oversized).await,
+            super::confirm_masters_dialog(super::MastersPrompt {
+                text: &oversized,
+                count: ONE,
+            })
+            .await,
             Err("master_review_too_large".to_string())
         );
     }
@@ -1751,7 +1794,7 @@ pub(crate) mod test_seam {
             assert_ran_to_its_end(&path, "Review", name);
             let path = standin(directory.path(), status, answer);
             assert_eq!(
-                super::confirm_masters_with(&path, "Create").await,
+                super::confirm_masters_with(&path, ONE, "Create").await,
                 Err("master_review_too_large".to_string()),
                 "one ledger: {name}"
             );
@@ -1807,7 +1850,7 @@ pub(crate) mod test_seam {
         ] {
             let path = standin(directory.path(), exit_code, answer);
             assert_eq!(
-                super::confirm_masters_with(&path, "Create").await,
+                super::confirm_masters_with(&path, ONE, "Create").await,
                 Err("master_approval_declined".to_string()),
                 "{name}"
             );
@@ -1842,7 +1885,7 @@ pub(crate) mod test_seam {
         ] {
             let path = standin(directory.path(), 0, answer);
             assert_eq!(
-                super::confirm_masters_with(&path, "Create").await,
+                super::confirm_masters_with(&path, ONE, "Create").await,
                 Err("master_approval_unavailable".to_string()),
                 "{name}"
             );
@@ -1850,7 +1893,7 @@ pub(crate) mod test_seam {
         }
         let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
         assert_eq!(
-            super::confirm_masters_with(&approves, "Create").await,
+            super::confirm_masters_with(&approves, ONE, "Create").await,
             Ok(())
         );
         assert_ran_to_its_end(&approves, "Create", "the control");
@@ -1880,7 +1923,7 @@ pub(crate) mod test_seam {
             std::fs::read_to_string(beside(path, ".args")).expect("the stand-in ran")
         };
         let masters = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
-        super::confirm_masters_with(&masters, "Create")
+        super::confirm_masters_with(&masters, ONE, "Create")
             .await
             .unwrap();
         assert_eq!(sent(&masters), "--confirm-masters");
@@ -1903,7 +1946,7 @@ pub(crate) mod test_seam {
         let mut nonces = Vec::new();
         for _ in 0..2 {
             assert_eq!(
-                super::confirm_masters_with(&approves, "Create").await,
+                super::confirm_masters_with(&approves, ONE, "Create").await,
                 Ok(())
             );
             let input = standin_input(&approves).expect("the stand-in ran");
@@ -2226,7 +2269,7 @@ enum Shown {
     Review,
     StopRelease,
     Settle,
-    /// The one-ledger dialog, always about one ledger.
+    /// The ledger dialog: one ledger, or a batch by its count.
     Masters,
 }
 
@@ -2297,7 +2340,10 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
             "Nothing is closed until you answer.",
         ),
         Shown::Masters => (
-            "create this ledger in Tally".into(),
+            match count.batch() {
+                None => "create this ledger in Tally".into(),
+                Some(count) => format!("create these {count} ledgers in Tally"),
+            },
             "Nothing is created until you answer.",
         ),
     }
@@ -2322,7 +2368,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
         Shown::Settle => SETTLE_BUTTON.to_string(),
-        Shown::Masters => MASTERS_BUTTON.to_string(),
+        Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -2521,17 +2567,22 @@ async fn confirm_review_with(
     }
 }
 
-/// The one-ledger dialog: its own subprocess mode, title, button and token,
+/// The ledger dialog: its own subprocess mode, title, button and token,
 /// answered exactly as the post dialog is, by the token for this call's nonce
-/// and a clean exit together. Always asked about one item. Like the other
+/// and a clean exit together. Asked about one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`, its title and button saying how many. Like the other
 /// dialogs, its first lines say what each answer does (#1780).
-async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
+async fn confirm_masters_dialog(preview: MastersPrompt<'_>) -> Result<(), String> {
     let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
-    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
-    confirm_masters_with(&executable, &shown).await
+    let shown = displayed_text(Shown::Masters, preview.count, preview.text);
+    confirm_masters_with(&executable, preview.count, &shown).await
 }
 
-async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+async fn confirm_masters_with(
+    executable: &std::path::Path,
+    count: VoucherCount,
+    preview: &str,
+) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("master_review_too_large".into());
     }
@@ -2539,7 +2590,7 @@ async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Re
         executable,
         "--confirm-masters",
         MASTERS_TOKEN_PREFIX,
-        ONE_ITEM,
+        count,
         preview,
     )
     .await
@@ -3033,25 +3084,26 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     answer == IDYES
 }
 
-/// The one-ledger dialog. It is shown for one item only: a count other than
-/// one is not the parent's shape and shows nothing.
+/// The ledger dialog, for one ledger or a batch of up to
+/// `MAX_LEDGERS_PER_BATCH`: a larger count has no title or button and shows
+/// nothing.
 #[cfg(not(windows))]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
-    if count != ONE_ITEM {
+    let Some((title, button)) = masters_words(count) else {
         return false;
-    }
+    };
     rfd::MessageDialog::new()
-        .set_title(MASTERS_TITLE)
+        .set_title(title)
         .set_description(preview)
         .set_level(rfd::MessageLevel::Warning)
         // The Cancel label supplies the native Escape action. Creating
         // requires the explicitly matched positive button.
         .set_buttons(rfd::MessageButtons::OkCancelCustom(
             "Cancel".into(),
-            MASTERS_BUTTON.into(),
+            button.clone(),
         ))
         .show()
-        == rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())
+        == rfd::MessageDialogResult::Custom(button)
 }
 
 #[cfg(windows)]
@@ -3061,11 +3113,11 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
         MB_TOPMOST, MB_YESNOCANCEL,
     };
     // As for the post dialog: No is the default, Escape and close are Cancel.
-    if count != ONE_ITEM {
+    let Some((title, _)) = masters_words(count) else {
         return false;
-    }
+    };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
-    let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = title.encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832). Through `guarded` it is also
     // brought to the front once it appears, as the post's box is: its first

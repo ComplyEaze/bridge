@@ -15,10 +15,15 @@
 //!   reporting success (`docs/tally/TALLY_PROTOCOL_REFERENCE.md` §8.3), so an
 //!   unmeasured head is refused here rather than sent.
 //!
+//! A request carries one or more items as a [`LedgerCreateBatch`], whose
+//! constructor refuses an empty batch, one over [`MAX_LEDGERS_PER_BATCH`],
+//! items of different parents, and two names Tally might take for one master.
+//! The batch is the only renderer: no code sends an item on its own.
+//!
 //! The master tools build it (`agent_master_tools.rs`); nothing else does.
 
 use super::VerifiedCompanyIdentity;
-use bridge_tally_core::master_binding::MAX_NAME_CHARS;
+use bridge_tally_core::master_binding::{MasterNameKeys, MAX_NAME_CHARS};
 use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::ledger_create::LedgerCreate;
 use bridge_tally_protocol::{sha256_hex, GstDutyHead};
@@ -218,8 +223,9 @@ impl LedgerCreateItem {
         self.kind.parent()
     }
 
-    /// The masters import request for the verified `company`, with its digest.
-    pub(crate) fn render_import(&self, company: &VerifiedCompanyIdentity) -> RenderedLedgerCreate {
+    /// This item's `TALLYMESSAGE`. Only [`LedgerCreateBatch::render_import`]
+    /// puts it in a request.
+    fn render_message(&self) -> String {
         let (is_billwise_on, party_gstin, tax_type, gst_duty_head) = match &self.kind {
             AdmittedLedgerKind::Party {
                 gstin, bill_wise, ..
@@ -234,7 +240,7 @@ impl LedgerCreateItem {
                 (false, None, Some("GST"), Some(head.head().tally_spelling()))
             }
         };
-        let message = LedgerCreate {
+        LedgerCreate {
             name: self.name.as_str(),
             parent: self.parent(),
             is_billwise_on,
@@ -243,11 +249,108 @@ impl LedgerCreateItem {
             tax_type,
             gst_duty_head,
         }
-        .render_message();
+        .render_message()
+    }
+}
+
+/// The most ledgers one request may create: the largest batch measured live,
+/// which is the owner's ceiling (29 Oct 2026). Lab captures on TallyPrime 7.2
+/// (L0 and L0b, part of #690) sent three and then ten creates in one request
+/// and each read back one create counted per ledger, a mark step of the
+/// batch's size and the `ALTERID`s right after the mark, in request order.
+/// The approval box lists two lines a ledger (27 lines for ten). On Windows
+/// it is measured against the screen when it opens and refused, nothing
+/// approved, when it is not wholly on it; a box of ten has not yet been shown
+/// on the lab's screen.
+pub(crate) const MAX_LEDGERS_PER_BATCH: usize = 10;
+
+/// One request's ledgers, in the order they are sent and shown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct LedgerCreateBatch {
+    items: Vec<LedgerCreateItem>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LedgerCreateBatchError {
+    Empty,
+    TooMany,
+    /// Items under different parent groups: the read-back reads one parent's
+    /// ledgers, so a batch has one.
+    MixedParents,
+    /// Two names Tally might take for one master (`MasterNameKeys`): in one
+    /// request the second would alter the first.
+    NamesMayBeOneMaster,
+}
+
+impl LedgerCreateBatch {
+    pub(crate) fn new(items: Vec<LedgerCreateItem>) -> Result<Self, LedgerCreateBatchError> {
+        let Some(first) = items.first() else {
+            return Err(LedgerCreateBatchError::Empty);
+        };
+        if items.len() > MAX_LEDGERS_PER_BATCH {
+            return Err(LedgerCreateBatchError::TooMany);
+        }
+        if items.iter().any(|item| item.parent() != first.parent()) {
+            return Err(LedgerCreateBatchError::MixedParents);
+        }
+        let mut seen: Vec<MasterNameKeys> = Vec::with_capacity(items.len());
+        for item in &items {
+            let keys = MasterNameKeys::of(item.name().as_str());
+            if seen.iter().any(|earlier| earlier.may_be_one_master(&keys)) {
+                return Err(LedgerCreateBatchError::NamesMayBeOneMaster);
+            }
+            seen.push(keys);
+        }
+        Ok(Self { items })
+    }
+
+    /// A batch of one item, which every rule admits.
+    pub(crate) fn one(item: LedgerCreateItem) -> Self {
+        Self { items: vec![item] }
+    }
+
+    /// Never empty.
+    pub(crate) fn items(&self) -> &[LedgerCreateItem] {
+        &self.items
+    }
+
+    /// At least one.
+    pub(crate) fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// The parent every item shares.
+    pub(crate) fn parent(&self) -> &'static str {
+        self.items[0].parent()
+    }
+
+    /// The masters import request for the verified `company`, with its digest:
+    /// one envelope holding each item's message in order.
+    pub(crate) fn render_import(&self, company: &VerifiedCompanyIdentity) -> RenderedLedgerCreate {
+        let messages: String = self
+            .items
+            .iter()
+            .map(LedgerCreateItem::render_message)
+            .collect();
         let xml =
-            render_import_envelope(company.display_name(), ImportReport::AllMasters, &message);
+            render_import_envelope(company.display_name(), ImportReport::AllMasters, &messages);
         let sha256 = sha256_hex(xml.as_bytes());
         RenderedLedgerCreate { xml, sha256 }
+    }
+}
+
+impl From<LedgerCreateItem> for LedgerCreateBatch {
+    fn from(item: LedgerCreateItem) -> Self {
+        Self::one(item)
+    }
+}
+
+#[cfg(test)]
+impl LedgerCreateItem {
+    /// The request a batch of this one item renders: the tests of one item go
+    /// through the batch renderer, the only one there is.
+    pub(crate) fn render_import(&self, company: &VerifiedCompanyIdentity) -> RenderedLedgerCreate {
+        LedgerCreateBatch::one(self.clone()).render_import(company)
     }
 }
 

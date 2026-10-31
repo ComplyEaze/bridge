@@ -9,14 +9,18 @@ use bridge_tally_core::master_name_index::Via;
 const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const NAME: &str = "Synthetic Masters Lab";
 
-use crate::tally::ledger_create_item::{AdmittedLedgerKind, MasterName};
+use crate::tally::ledger_create_item::{AdmittedLedgerKind, LedgerCreateBatch, MasterName};
 use std::sync::LazyLock;
 
-fn item(name: &str) -> LedgerCreateItem {
-    LedgerCreateItem::new(MasterName::new(name).unwrap(), AdmittedLedgerKind::Suspense)
+/// A batch of one Suspense ledger named `name`.
+fn item(name: &str) -> LedgerCreateBatch {
+    LedgerCreateBatch::one(LedgerCreateItem::new(
+        MasterName::new(name).unwrap(),
+        AdmittedLedgerKind::Suspense,
+    ))
 }
 
-static ITEM: LazyLock<LedgerCreateItem> = LazyLock::new(|| item("Brand New Party"));
+static ITEM: LazyLock<LedgerCreateBatch> = LazyLock::new(|| item("Brand New Party"));
 static COMPANY: LazyLock<VerifiedCompanyIdentity> =
     LazyLock::new(|| VerifiedCompanyIdentity::test_fixture(NAME, GUID));
 static OTHER_COMPANY: LazyLock<VerifiedCompanyIdentity> = LazyLock::new(|| {
@@ -235,7 +239,7 @@ fn masters_queued_for<'a>(
     at_aim: &'a str,
 ) -> QueuedAdmission<'a> {
     QueuedAdmission::Masters {
-        item: &ITEM,
+        batch: &ITEM,
         company,
         ledgers_first: ledgers.0,
         ledgers_second: ledgers.1,

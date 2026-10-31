@@ -772,7 +772,7 @@ fn the_admitted_inputs_parse_to_exactly_their_typed_items() {
             },
             items: vec![stored],
         };
-        assert_eq!(item_from_batch(&batch).unwrap(), original);
+        assert_eq!(creates_from_batch(&batch).unwrap(), original.into());
     }
 }
 
@@ -791,27 +791,41 @@ fn a_stored_batch_that_is_not_one_admitted_ledger_is_refused() {
         items,
     };
     let good = stored_from_item(&item(LEDGER));
-    assert!(item_from_batch(&base(vec![good.clone()])).is_ok());
+    assert!(creates_from_batch(&base(vec![good.clone()])).is_ok());
     assert_eq!(
-        item_from_batch(&base(vec![])),
+        creates_from_batch(&base(vec![])),
         Err("master_batch_invalid".to_string())
     );
     assert_eq!(
-        item_from_batch(&base(vec![good.clone(), good.clone()])),
+        creates_from_batch(&base(vec![good.clone(), good.clone()])),
         Err("master_batch_invalid".to_string())
+    );
+    // More ledgers than a request may carry answer their own code.
+    let eleven = (0..11)
+        .map(|index| stored_from_item(&item(&format!("Stored Suspense {index:02}"))))
+        .collect();
+    assert_eq!(
+        creates_from_batch(&base(eleven)),
+        Err("master_batch_too_large".to_string())
+    );
+    // Two ledgers Tally would keep apart are one admitted batch.
+    let second = stored_from_item(&item("Second Suspense Ledger"));
+    assert_eq!(
+        creates_from_batch(&base(vec![good.clone(), second])).map(|batch| batch.len()),
+        Ok(2)
     );
     let mut bad = good.clone();
     bad.name = "Caf\u{e9}".into();
-    assert!(item_from_batch(&base(vec![bad])).is_err());
+    assert!(creates_from_batch(&base(vec![bad])).is_err());
     // A duty head the build does not admit.
     let mut duty = good.clone();
     duty.kind = StoredLedgerKind::GstDuty;
     duty.gst_duty_head = Some("CGST".into());
-    assert!(item_from_batch(&base(vec![duty])).is_err());
+    assert!(creates_from_batch(&base(vec![duty])).is_err());
     // A suspense ledger that carries a GSTIN is not what the item stores back.
     let mut stray = good;
     stray.party_gstin = Some(LAB_GSTIN.into());
-    assert!(item_from_batch(&base(vec![stray])).is_err());
+    assert!(creates_from_batch(&base(vec![stray])).is_err());
 }
 
 // --- prepare ---------------------------------------------------------------
@@ -854,7 +868,7 @@ async fn under_mask_parties_the_preview_a_prepare_returns_names_the_ledger_maske
     let preview = result(&response)["preview"].as_str().unwrap();
     assert_eq!(
         preview,
-        super::super::master_review::masked_review_text(&item(LEDGER), &identity(), &origin)
+        super::super::master_review::masked_review_text(&item(LEDGER).into(), &identity(), &origin)
             .unwrap()
     );
     assert!(!response.to_string().contains(LEDGER), "{response}");
@@ -877,7 +891,7 @@ async fn prepare_saves_the_batch_and_returns_the_preview_the_person_will_be_show
     let batch_id = result(&response)["batch_id"].as_str().unwrap().to_string();
     assert!(valid_batch_id(&batch_id));
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
-    let expected = master_review_text(&item(LEDGER), &identity(), &origin).unwrap();
+    let expected = master_review_text(&item(LEDGER).into(), &identity(), &origin).unwrap();
     assert_eq!(result(&response)["preview"], expected.as_str());
     assert_eq!(result(&response)["parent"], "Suspense A/c");
     assert!(result(&response)["next_step"]
@@ -892,6 +906,96 @@ async fn prepare_saves_the_batch_and_returns_the_preview_the_person_will_be_show
         state.batch.batch_sha256,
         MasterPostRequest::render(item(LEDGER), &identity()).sha256()
     );
+}
+
+#[tokio::test]
+async fn prepare_saves_a_batch_of_ledgers_in_order_under_one_preview() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let names = [LEDGER, "Second Suspense Ledger", "Third Suspense Ledger"];
+    let args = json!({
+        "company_guid": GUID,
+        "ledgers": names.map(|name| json!({"name": name, "kind": "suspense"})),
+    });
+    let response = TEST_LEDGER_INDEX
+        .scope(book(), server.call_tool("prepare_ledger_creates", args))
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), before_approval().len(), "{response}");
+    let batch_id = result(&response)["batch_id"].as_str().unwrap().to_string();
+    assert_eq!(result(&response)["ledger_count"], 3);
+    assert_eq!(result(&response)["parent"], "Suspense A/c");
+    let creates = LedgerCreateBatch::new(names.map(item).to_vec()).unwrap();
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    assert_eq!(
+        result(&response)["preview"],
+        master_review_text(&creates, &identity(), &origin)
+            .unwrap()
+            .as_str()
+    );
+    let state = state_of(directory.path(), &batch_id);
+    assert_eq!(
+        state.batch.items,
+        creates
+            .items()
+            .iter()
+            .map(stored_from_item)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        state.batch.batch_sha256,
+        MasterPostRequest::render(creates, &identity()).sha256()
+    );
+}
+
+#[tokio::test]
+async fn prepare_refuses_a_batch_it_cannot_admit_and_saves_nothing() {
+    let suspense = json!({"name": LEDGER, "kind": "suspense"});
+    let eleven = (0..11)
+        .map(|index| json!({"name": format!("Batch Ledger {index:02}"), "kind": "suspense"}))
+        .collect::<Vec<_>>();
+    let cases = [
+        (
+            "eleven ledgers, one more than a request may carry",
+            json!({"company_guid": GUID, "ledgers": eleven}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "a list of one, under the published minimum of two",
+            json!({"company_guid": GUID, "ledgers": [suspense]}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "ledger and ledgers",
+            json!({"company_guid": GUID, "ledger": suspense, "ledgers": [suspense, {"name": "Other Ledger", "kind": "suspense"}]}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "two parents",
+            json!({"company_guid": GUID, "ledgers": [suspense, {"name": "Other Creditor", "kind": "party", "side": "sundry_creditors"}]}),
+            "master_batch_mixed_parents",
+        ),
+        (
+            "an item with a field the ledger object does not publish",
+            json!({"company_guid": GUID, "ledgers": [suspense, {"name": "Other Ledger", "kind": "suspense", "opening_balance": "1.00"}]}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "one name twice, differing in case",
+            json!({"company_guid": GUID, "ledgers": [suspense, {"name": LEDGER.to_uppercase(), "kind": "suspense"}]}),
+            "master_batch_names_may_be_one_master",
+        ),
+    ];
+    for (case, args, code) in cases {
+        let directory = tempfile::tempdir().unwrap();
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let response = server.call_tool("prepare_ledger_creates", args).await;
+        sent(simulator);
+        assert_eq!(error_code(&response), code, "{case}: {response}");
+        assert!(!journal_path(directory.path()).exists(), "{case}");
+    }
 }
 
 #[tokio::test]
@@ -1029,7 +1133,7 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     assert_eq!(
         scripted.masters(),
-        [master_review_text(&item(LEDGER), &identity(), &origin).unwrap()]
+        [master_review_text(&item(LEDGER).into(), &identity(), &origin).unwrap()]
     );
     assert!(
         scripted.previews().is_empty(),
@@ -1290,6 +1394,54 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         verify::NEXT_PRESENT_NOT_VERIFIED,
         false,
         false,
+    );
+    row(
+        "reconcile, batch partly present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![Some(NEW_GUID.to_string()), None],
+                Checks::none(),
+                vec!["counters_unavailable"],
+                false,
+            ),
+            r,
+        ),
+        verify::NEXT_PARTLY_PRESENT,
+        false,
+        true,
+    );
+    row(
+        "reconcile, batch all present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![Some(NEW_GUID.to_string()), Some(NEW_GUID.to_string())],
+                Checks::none(),
+                vec!["counters_unavailable"],
+                false,
+            ),
+            r,
+        ),
+        verify::NEXT_ALL_PRESENT_NOT_VERIFIED,
+        false,
+        false,
+    );
+    row(
+        "just posted, batch partly present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![None, Some(NEW_GUID.to_string())],
+                Checks::none(),
+                vec!["ledger_absent_after_post"],
+                false,
+            ),
+            p,
+        ),
+        verify::NEXT_PARTLY_PRESENT,
+        false,
+        true,
     );
     row(
         "just posted, present",
@@ -1851,7 +2003,11 @@ fn a_book_that_was_not_read_back_is_told_what_to_do_by_what_stopped_it() {
             "{code}"
         );
     }
-    for code in ["master_batch_invalid", "master_intent_missing"] {
+    for code in [
+        "master_batch_invalid",
+        "master_batch_too_large",
+        "master_intent_missing",
+    ] {
         assert_eq!(
             not_read_back_next_step(code),
             verify::NEXT_RECORD_NOT_READABLE,
@@ -2077,11 +2233,56 @@ async fn a_declined_approval_records_nothing_and_sends_nothing() {
         "the reads before the dialog, no POST"
     );
     assert_eq!(scripted.masters().len(), 1);
+    assert_eq!(scripted.master_counts(), vec![1]);
     assert_eq!(journal_bytes(directory.path()), before);
     assert!(!directory
         .path()
         .join(format!("master-pre-image-{}.json", batch.batch_id))
         .exists());
+}
+
+/// The dialog for a batch is asked about the batch's own count, so a box for
+/// three ledgers says three, and its preview lists all three.
+#[tokio::test]
+async fn the_dialog_for_a_batch_is_asked_about_its_count() {
+    let directory = tempfile::tempdir().unwrap();
+    let names = [LEDGER, "Second Suspense Ledger", "Third Suspense Ledger"];
+    let prepare = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let server = server_at(prepare.address(), directory.path());
+    let prepared = TEST_LEDGER_INDEX
+        .scope(
+            book(),
+            server.call_tool(
+                "prepare_ledger_creates",
+                json!({
+                    "company_guid": GUID,
+                    "ledgers": names.map(|name| json!({"name": name, "kind": "suspense"})),
+                }),
+            ),
+        )
+        .await;
+    sent(prepare);
+    let batch_id = result(&prepared)["batch_id"].as_str().unwrap().to_string();
+    let post = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let server = server_at(post.address(), directory.path());
+    let scripted = ScriptedApproval::declining();
+    let response = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", json!({"batch_id": batch_id})),
+    )
+    .await;
+    sent(post);
+    assert_eq!(
+        error_code(&response),
+        "master_approval_declined",
+        "{response}"
+    );
+    assert_eq!(scripted.master_counts(), vec![3]);
+    let shown = scripted.masters();
+    assert!(shown[0].starts_with("Create 3 ledgers in"), "{}", shown[0]);
+    for name in names {
+        assert!(shown[0].contains(name), "{name}");
+    }
 }
 
 #[tokio::test]
@@ -4453,7 +4654,7 @@ async fn a_call_for_a_batch_the_masters_journal_lacks_leaves_the_approval_slot_a
                 "a".repeat(64).as_str(),
                 "http://127.0.0.1:9",
                 &identity,
-                &item,
+                &item.clone().into(),
                 "p",
             ),
             ApprovedImport::approved_masters_for_test(item.clone(), &identity, marks),

@@ -1820,9 +1820,14 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// change adds 78 bytes to each list (205,255, 231,071, 233,569 and 238,542). Only the
 /// second budget went up, by 1,000 bytes, as the other three keep margins of 431 or
 /// more.
+/// On 31 Oct 2026 the ledger batch (#2181) added its texts and the `ledgers`
+/// argument to the two ledger tools, which only the master-writes list carries.
+/// Merged with master, the lists measure 205,358, 231,174, 233,672 and 239,047
+/// bytes: the master-writes list is 47 over its budget. Only that budget went up,
+/// by 1,000 bytes; the other three keep margins of 328 or more.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [206_000, 232_000, 234_000, 239_000];
+const TOOL_LIST_BUDGETS: [usize; 4] = [206_000, 232_000, 234_000, 240_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

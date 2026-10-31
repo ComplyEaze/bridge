@@ -1613,6 +1613,22 @@ pub enum OutstandingsLoadResult {
         synced_at_unix_ms: i64,
         base_currency_ledgers: Box<BaseCurrencyLedgersOutstandings>,
     },
+    /// Ledgers were set aside as for [`Self::BaseCurrencyLedgersOnly`], and
+    /// the read then withheld every figure for `reason`: on a book whose bills
+    /// all belong to set-aside ledgers, no row is left to confirm the as-of
+    /// date by (bridge#2071). It names the set-aside ledgers beside its
+    /// reason, so neither hides the other. Only a read under a classified
+    /// witness can build it.
+    #[serde(rename = "partial")]
+    WithheldWithLedgersSetAside {
+        #[serde(skip)]
+        classified: ClassifiedBase,
+        #[serde(flatten)]
+        reason: OutstandingsPartialReason,
+        #[serde(flatten, serialize_with = "CurrencyExclusions::serialize_ledgers")]
+        exclusions: CurrencyExclusions,
+        synced_at_unix_ms: i64,
+    },
 }
 
 /// The ledgers an outstandings read set aside by currency, never both empty:
@@ -1655,6 +1671,16 @@ impl CurrencyExclusions {
 
     pub fn into_parts(self) -> (Vec<ForeignCurrencyLedger>, Vec<String>) {
         (self.foreign, self.mixed)
+    }
+
+    /// The two lists without this type's own reason, for a result whose
+    /// reason is another's.
+    fn serialize_ledgers<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("CurrencyExclusions", 2)?;
+        state.serialize_field("foreign_currency_ledgers_excluded", &self.foreign)?;
+        state.serialize_field("base_currency_ledgers_mixed_excluded", &self.mixed)?;
+        state.end()
     }
 }
 
@@ -4654,28 +4680,46 @@ impl TallyRuntime {
                         total_bytes,
                     )?;
 
-                    if let Some(reason) = native_crosscheck_partial_reason(&result, &as_of) {
-                        return Ok((partial_result(reason), read_evidence.clone()));
+                    let crosscheck = native_crosscheck_partial_reason(&result, &as_of);
+                    let set_aside = match CurrencyExclusions::new(
+                        result.foreign_currency_ledgers_excluded,
+                        result.mixed_currency_ledgers_excluded,
+                    ) {
+                        None => None,
+                        // A single-master base refuses a ledger in another
+                        // currency before this point (classify_ledger_currencies),
+                        // and a composite value above; without a classified
+                        // witness no result that sets a ledger aside can be
+                        // built, so it refuses here too.
+                        Some(exclusions) => match currency_witness.classified_base() {
+                            Some(classified) => Some((classified, exclusions)),
+                            None => {
+                                return Ok((
+                                    partial_result("ledger_currency_base_unmatched"),
+                                    read_evidence.clone(),
+                                ));
+                            }
+                        },
+                    };
+                    if let Some(reason) = crosscheck {
+                        let withheld = match set_aside {
+                            Some((classified, exclusions)) => {
+                                OutstandingsLoadResult::WithheldWithLedgersSetAside {
+                                    classified,
+                                    reason,
+                                    exclusions,
+                                    synced_at_unix_ms: chrono::Utc::now().timestamp_millis(),
+                                }
+                            }
+                            None => partial_result(reason),
+                        };
+                        return Ok((withheld, read_evidence.clone()));
                     }
 
                     let statement_open_bills =
                         all_open_bill_rows(&receivable_rows, &payable_rows, ageing_anchor, &as_of);
                     let statement_unallocated_by_party = all_unallocated_parties(&result.residuals);
-                    if let Some(exclusions) = CurrencyExclusions::new(
-                        result.foreign_currency_ledgers_excluded,
-                        result.mixed_currency_ledgers_excluded,
-                    ) {
-                        // A single-master base refuses a ledger in another
-                        // currency before this point (classify_ledger_currencies),
-                        // and a composite value above; without a classified
-                        // witness this result cannot be built, so it refuses
-                        // here too.
-                        let Some(classified) = currency_witness.classified_base() else {
-                            return Ok((
-                                partial_result("ledger_currency_base_unmatched"),
-                                read_evidence.clone(),
-                            ));
-                        };
+                    if let Some((classified, exclusions)) = set_aside {
                         return Ok((
                             OutstandingsLoadResult::BaseCurrencyLedgersOnly {
                                 classified,

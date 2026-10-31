@@ -137,6 +137,26 @@ test("an empty bill report with ledger money names the unconfirmed as-of boundar
   assert.equal(state.tallyReadAttempted, true);
 });
 
+// bridge#2071: when every bill belongs to a set-aside ledger, the totals are
+// withheld for the unconfirmed date, and the set-aside ledgers are still named.
+test("a withheld result names the ledgers it also set aside", () => {
+  const state = outstandingsPartialState(
+    "native_outstandings_as_of_unconfirmed_without_bill_references",
+    undefined,
+    undefined,
+    undefined,
+    [{ ledger: "Synthetic FX Debtor A", currency: "$" }],
+    ["Synthetic Rupee Party"],
+  );
+  assert.equal(state.title, "Tally did not confirm this as-of date");
+  assert.match(state.message, /^Tally returned no bill references .* withheld the totals\. /);
+  assert.match(state.message, /1 ledger in a currency other than this company's base currency: Synthetic FX Debtor A \(\$\)\. /);
+  assert.match(state.message, /on 1 base-currency ledger: Synthetic Rupee Party\. ComplyEaze Bridge left those ledgers out, with their bills\.$/);
+  assert.equal(state.retryable, true);
+  const unnamed = outstandingsPartialState("native_outstandings_as_of_unconfirmed_without_bill_references", undefined, undefined, undefined, [], []);
+  assert.doesNotMatch(unnamed.message, /left those ledgers out/);
+});
+
 test("a refused period is distinct from a row-level disagreement", () => {
   const refused = outstandingsPartialState(
     "native_outstandings_as_of_refused",

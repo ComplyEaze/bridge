@@ -285,6 +285,7 @@ const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 /// The parity lab book's company GUID, as scrubbed in its captures (`native_masters_tests.rs`).
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
+const ALIAS_LAB_GUID: &str = "021bda0c-b1b1-44c8-8279-5212ce87c9c7";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
@@ -1081,6 +1082,30 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_standard_ledger_catalog_with_identities(OUTSTANDINGS LAB)",
         parse: |_, text| catalogue(text, "BRIDGE OUTSTANDINGS LAB", OUTSTANDINGS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_standard_ledger_catalog_v2_with_identities(ALIAS LAB)",
+        parse: |_, text| catalogue_v2(text, "BRIDGE ALIAS LAB", ALIAS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/i1-cat.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_standard_ledger_catalog_with_identities(ALIAS LAB)",
+        parse: |_, text| catalogue(text, "BRIDGE ALIAS LAB", ALIAS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_standard_ledger_catalog_v2_with_identities(ALIAS LAB)",
+        parse: |_, text| catalogue_v2(text, "BRIDGE ALIAS LAB", ALIAS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/i1-idx.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(ALIAS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, ALIAS_LAB_GUID)),
     },
     Row {
         fixture: "tests/fixtures/agent/d3-amend-lab-ledger-catalogue-v2.utf16le.xml",

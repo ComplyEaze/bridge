@@ -6422,3 +6422,61 @@ fn a_folded_twin_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
     assert_eq!(shown[1]["parent"], "Primary");
     assert_eq!(shown[2]["parent"], Value::Null);
 }
+
+/// Tally's own import catalogue of a book whose ledgers carry aliases, after the aliases keyed on
+/// its screen and after two ledgers were created with one each by import (`alias-lab-1688`).
+fn alias_lab_catalogue(bytes: &[u8]) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .expect("UTF-16LE");
+    crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+        &xml,
+        "BRIDGE ALIAS LAB",
+        "021bda0c-b1b1-44c8-8279-5212ce87c9c7",
+    )
+    .expect("the captured import catalogue parses")
+}
+
+/// On the captured catalogues, each alias names its ledger in `alias_of` as Tally lists it, at both
+/// points the lab read; the screen's alias typed in capitals names none.
+#[test]
+fn each_captured_alias_names_its_ledger_and_a_case_variant_names_none() {
+    let screen = alias_lab_catalogue(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml"
+    ));
+    let imported = alias_lab_catalogue(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml"
+    ));
+    let screen_rows = [
+        ("Lab Plain Alias", Some("Lab Plain Ledger"), "near_miss"),
+        ("Lab Other First", Some("Lab Other Ledger"), "near_miss"),
+        ("Lab Other Second", Some("Lab Other Ledger"), "near_miss"),
+        ("Lab Caf\u{e9} Sales", Some("Lab Sales"), "near_miss"),
+        ("LAB PLAIN ALIAS", None, "near_miss"),
+    ];
+    let imported_rows = [
+        ("Lab Shape Alias", Some("Lab Alias Shape"), "near_miss"),
+        (
+            "\u{932}\u{948}\u{92c} \u{916}\u{93e}\u{924}\u{93e}",
+            Some("Lab Alias Script"),
+            "missing",
+        ),
+    ];
+    for (catalogue, rows) in [
+        (&screen, &screen_rows[..]),
+        (&imported, &screen_rows[..]),
+        (&imported, &imported_rows[..]),
+    ] {
+        let names = rows.iter().map(|(name, _, _)| *name).collect::<Vec<_>>();
+        let report = alias_report(&names, catalogue.catalog());
+        assert_eq!(report.len(), rows.len());
+        for ((name, owner, state), entry) in rows.iter().zip(&report) {
+            assert_eq!(alias_of(entry), *owner, "{name}: {entry}");
+            assert_eq!(entry["match_state"], *state, "{name}: {entry}");
+        }
+    }
+}

@@ -111,3 +111,19 @@ Live captures of Tally's own Cash Flow, Funds Flow, Sales Register, Ratio Analys
 | `builtin_negative_stock_negstock_lab_2_to_20250531_live.utf16le.xml` | 490 | `720cd2f5ecb09138b675d399df3dcca90fafb416a0709738d391ad44161a65c2` | Negative Stock to 31 May, one item at `-5 Nos`, rate and amount empty |
 | `builtin_negative_stock_tieout_c_fy_request.utf16le.xml` | 758 | `6f9ed321654680017caaf3f49fbaa88f3491f9d283ba768579474c95d7017495` | request, Negative Stock, 2025-04-01 to 2026-03-31, on a book with no short item |
 | `builtin_negative_stock_tieout_c_fy_empty_live.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | Negative Stock, an empty envelope |
+
+## Added 2026-10-28: the Godown Summary of BRIDGE SHAPE LAB (#2017)
+
+- **Date and instance:** 2026-10-28, TallyPrime 7.2 Silver, licensed, on Windows, attended, one request at a time, HTTP 200. The marks were 292 and 112 before and after the reads. The answer is BOM-less UTF-16LE exactly as received; the request is UTF-16LE with a BOM.
+- **Sender:** a lab script (not `bridge_mcp`) sending the committed Stock Summary request (`stock_summary_report_fy_request`) with only the report ID changed to `Godown Summary`, the title Tally's own screen shows for its godown-wise report. A test asserts equality with `render_native_godown_summary_request`. Evidence: `lab/2017-2018-stock-by-godown-batch-answers` at `5b79306504fb`.
+- **Book:** `BRIDGE SHAPE LAB` (synthetic; the same company as the stock fixtures), with two godowns directly under the root, `Main Location` and `Factory Floor`, and eleven stock items in three stock groups.
+- **What the capture shows:**
+  - The Stock Summary's grammar: top-level `DSPACCNAME` (one `DSPDISPNAME`) and `DSPSTKINFO` (one `DSPSTKCL` holding `DSPCLQTY`, `DSPCLRATE` and `DSPCLAMTA`), one pair per godown, and no line for a stock group or an item.
+  - `Factory Floor`: `316.667 Kgs`, `34.74`, `-11000.00`. `Main Location`: quantity and rate present and empty (its items are in several units), `14000.01`.
+  - The two amounts sum to `3000.01`, the total of the Stock Summary read in the same sitting, whose answer is byte-equal to `stock_summary_report_shape_lab_fy_live` (STOCK_CAPTURE_PROVENANCE.md). Tally's Godown Summary screen showed the same lines with the signs reversed, as the Stock Summary's screen does.
+- **Not established:** a godown under another godown, a period end other than the year end, the report with the explode flag, any value per item per godown, a book that is not batch-wise, and any other release.
+
+| file | bytes | sha256 | content |
+| --- | ---: | --- | --- |
+| `builtin_godown_summary_shape_lab_fy_request.utf16le.xml` | 760 | `27ccda23a554946b16097fe004c58161d0d718ddb03d4aebf2008d38cd3a5e46` | request, Godown Summary, 2025-04-01 to 2026-03-31, on the shape lab |
+| `builtin_godown_summary_shape_lab_fy_live.utf16le.xml` | 968 | `92c3908ffe3916e5a7f9a86e7a4f84c912a77c926e3a1e4ab2f76f808ca67e01` | Godown Summary, two godown lines (read by `parse_native_stock_summary_report`) |

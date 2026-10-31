@@ -1,0 +1,39 @@
+# fixture: tests/fixtures/builtin_godown_summary_shape_lab_fy_live.utf16le.xml
+# parser: parse_native_stock_summary_report
+# source: captured
+Ok(Lines {
+    total: Some(
+        ExactDecimal(
+            "3000.01",
+        ),
+    ),
+    present: 2,
+    empty: 0,
+    lines: [
+        NativeReportLine {
+            name: "Factory Floor",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "316.667",
+                    ),
+                    unit: "Kgs",
+                },
+            ),
+            amount: Some(
+                ExactDecimal(
+                    "-11000.00",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Main Location",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "14000.01",
+                ),
+            ),
+        },
+    ],
+})

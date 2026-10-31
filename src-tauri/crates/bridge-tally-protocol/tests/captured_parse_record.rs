@@ -1396,6 +1396,13 @@ const ROWS: &[Row] = &[
         parser: "parse_native_negative_ledgers",
         parse: |_, text| typed(parse_native_negative_ledgers(text)),
     },
+    // Built-in Godown Summary report, read with the Stock Summary's grammar: src/native_godown_summary_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_godown_summary_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {
         fixture: "tests/fixtures/builtin_negative_stock_shape_lab_fy_live.utf16le.xml",

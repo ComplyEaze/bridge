@@ -2652,6 +2652,46 @@ impl Server {
         identity: &VerifiedCompanyIdentity,
         admitted: crate::tally::agent_read_request::AgentReadRequest,
     ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
+        self.post_admitted_read_observing_tally(identity, admitted)
+            .await
+            .map(|(body, evidence, boundary, _)| (body, evidence, boundary))
+    }
+
+    /// As [`Self::post_read_observing_boundary`], also returning the Tally the
+    /// read's identity brackets saw (its release and licence tier).
+    async fn post_read_observing_tally(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        request: ReadRequest,
+    ) -> Result<
+        (
+            String,
+            Evidence,
+            DateBoundaryProfile,
+            crate::tally::ObservedTally,
+        ),
+        ToolFailure,
+    > {
+        let admitted =
+            crate::tally::agent_read_request::AgentReadRequest::parse(request.into_xml())
+                .map_err(|error| error.to_string())?;
+        self.post_admitted_read_observing_tally(identity, admitted)
+            .await
+    }
+
+    async fn post_admitted_read_observing_tally(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        admitted: crate::tally::agent_read_request::AgentReadRequest,
+    ) -> Result<
+        (
+            String,
+            Evidence,
+            DateBoundaryProfile,
+            crate::tally::ObservedTally,
+        ),
+        ToolFailure,
+    > {
         let request_sha256 = sha256_hex(&bridge_tally_protocol::encode_tally_xml_request_utf16le(
             &admitted.clone().into_xml(),
         ));
@@ -2671,7 +2711,12 @@ impl Server {
             duration_ms: None,
             reason_code: None,
         };
-        Ok((response.body, evidence, response.boundary_profile))
+        Ok((
+            response.body,
+            evidence,
+            response.boundary_profile,
+            response.observed_tally,
+        ))
     }
 
     #[cfg(test)]

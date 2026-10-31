@@ -342,6 +342,7 @@ fn verdict_state_code(state: super::master_ledger::MasterVerdictState) -> &'stat
         MasterVerdictState::MasterWriteLocatedElsewhere => "master_write_located_elsewhere",
         MasterVerdictState::ConfirmedAbsent => "confirmed_absent",
         MasterVerdictState::PostedUnattributed => "posted_unattributed",
+        MasterVerdictState::ConfirmedAbsentAfterChange => "confirmed_absent_after_change",
     }
 }
 
@@ -1181,6 +1182,11 @@ impl Server {
                 result["next_step"] = json!(settled_next_step(verdict.state()))
             }
             (None, None) => {}
+        }
+        // A settled absent state says what it rests on here too, as the call
+        // that judged it did.
+        if verdict.is_some_and(|verdict| verdict.state().is_absent()) {
+            result["verification"]["basis"] = json!("read_after_send_order");
         }
         ToolOutcome {
             payload: json!({ "result": result }),

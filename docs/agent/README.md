@@ -314,7 +314,9 @@ When Bridge got no response it could read, the `cause` names why and the error a
   before any body was read.
 - An `endpoint_…` runtime code: Bridge held the request back and sent nothing. So do
   `tally_endpoint_busy` (with `retry_after_s`) and `tally_endpoint_lock_unavailable`, which
-  come back as the `code` itself.
+  come back as the `code` itself, and `tally_endpoint_draining` (with `retry_after_s`), when an
+  earlier post was cut for time and Tally has not yet answered `/status` three times in a row
+  since (#2142); a draining refusal may have sent `/status` checks, but not the request.
 
 A wrong or reset port therefore reads as an endpoint problem, not as a Tally data problem. A
 failed read without `endpoint` either received a response whose body then failed to read, decode,

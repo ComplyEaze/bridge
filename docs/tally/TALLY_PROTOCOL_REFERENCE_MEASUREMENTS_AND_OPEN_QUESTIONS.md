@@ -94,6 +94,30 @@ client had disconnected.
 Throughout that window every other request failed — including `/status`. Because the gateway
 serialises (§1), one abandoned expensive read blocks the entire instance.
 
+**Measured since, for a shorter cut** (30 Oct 2026, `lab/2142-status-while-busy-answers` and
+`lab/2142-drain-repeat-answers`: one synthetic book, one long report read cut by the client at
+20 s, five times over two sittings; **partial**):
+- `GET /status` sent while Tally builds a long read waits until the read ends (twice).
+- After the cut, Tally's work ran on 8.9 s to 25.4 s. A `/status` sent about 1 s after the cut
+  waited 9.3 s and 10.8 s.
+- Once `/status` had answered quickly three times in a row, 2 s apart, a data read answered at
+  its at-rest speed (four times).
+
+Bridge's drain after a cut post rests on these readings (`DrainPolicy::MEASURED` in the
+transport crate).
+
+**Measured through Bridge's own transport** (30 Oct 2026, `lab/2142-drain-live-answers` at
+35d4f151: one synthetic book, one sitting, two runs that agree; **partial**):
+- A report read cut at the 20 s limit was refused in about 21.5 s, and the drain was then owed.
+- A ledger read sent at once was refused as `tally_endpoint_draining`, `retry_after_s` 10: its
+  one `/status` probe was cut at 5 s and its post was not sent.
+- The next call, 10 s and 15 s later, went ahead on its first try after three answered probes
+  and answered whole, and the drain cleared. The probes' two 2 s pauses made that call about
+  4 s longer than at rest (5.3 s and 5.5 s, against 1.0 s to 1.8 s); its read did not wait.
+
+Not measured: a dropped connection, a size limit or an abandoned send in place of the cut; a
+second process sending meanwhile; other reads, books and editions.
+
 **Consequences:**
 
 1. **Abandoning a request frees your socket, not Tally.** There is no observed way to cancel

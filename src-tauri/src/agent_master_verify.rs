@@ -207,11 +207,12 @@ struct Recording {
 }
 
 fn marks_failure(error: &anyhow::Error) -> String {
-    if crate::endpoint_wire::wire_refusal(error) == Some(bridge_tally_transport::WireRefusal::Busy)
-    {
-        "tally_endpoint_busy".to_string()
-    } else {
-        "read_failed".to_string()
+    use bridge_tally_transport::WireRefusal;
+    match crate::endpoint_wire::wire_refusal(error) {
+        Some(refusal @ (WireRefusal::Busy | WireRefusal::Draining { .. })) => {
+            refusal.safe_code().to_string()
+        }
+        Some(WireRefusal::Unavailable) | None => "read_failed".to_string(),
     }
 }
 

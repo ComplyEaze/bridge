@@ -1,0 +1,13 @@
+20260804 Delivery Note 2 ALTERID 128 optional No cancelled No postdated No reserved 'Delivery Note' Yes: none
+    Movement Lab Item P: out 1.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260805 Receipt Note 1 ALTERID 129 optional No cancelled No postdated No reserved 'Receipt Note' Yes: none
+    Movement Lab Item P: in  1.000 Kgs godown 'Factory Floor' batch 'MV-P-1'
+20260806 Physical Stock 1 ALTERID 130 optional No cancelled No postdated No reserved 'Physical Stock' Yes: none
+    Movement Lab Item P: in  54.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260807 Lab Manufacturing Journal 1 ALTERID 131 optional No cancelled No postdated No reserved '' Yes: none
+    Movement Lab Item P: in  1.000 Kgs godown 'Factory Floor' batch 'MV-P-1'
+20260804: in 0 out 1
+20260805: in 1 out 0
+20260806: in 54 out 0
+20260807: in 1 out 0
+total in 56 out 1; net 55

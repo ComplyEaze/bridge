@@ -1,0 +1,17 @@
+Restore plan for #2016 step 15 (LAB-COMMON C6), on the run lead's recorded RESTORE (pre-approved for when 13.3 and 13.4 match; they did).
+
+Source, identified by all of:
+- folder: <LAB_DIR>\backups\bk1 (holds this one file only; checked before the restore)
+- file: TDBK1800_<company number>.001
+- bytes: 102,253
+- sha256: 978116b034ab1172b183ecba98234d6de3c3a937a223c08d50feed1f1d5f3e40 (checked before the restore)
+- the date and time the Restore list shows for it: 31-Oct-2026, 06:21 local (BK1's, step 2)
+Company: BRIDGE SHAPE LAB, GUID 3a6bd6e1-b835-4bff-89dd-8a6af138c346, number <company number>.
+Restore Data Path: Tally's data folder, <Tally data folder> (THE COMPANY's own folder is the one named by its number there).
+Order: Company > Shut (THE COMPANY alone loaded); Data > Backup & Restore > Restore; Restore Data Path = the data folder above; source = Specify Path, the bk1 folder; select THE COMPANY only (its number, BK1's date and time); screenshot; accept.
+The two prompts expected, and the only ones answered:
+1. "Accept ?" = Yes
+2. "Company data folder (<company number>) already exists ... Selecting Skip will cancel the Restore process for this company. Selecting Replace will overwrite the existing folder." = Replace
+Any other prompt, an offer to repair, rewrite or migrate, or a list that differs from this plan: no key, screenshot, stop.
+After: THE COMPANY loaded alone; a whole-window screenshot and one of the Gateway (period and current date equal step 0's); then list_companies, marks (EXPECT 292/112), masters voucher_types (rows equal step 1's; the single #2160 repeat allowed, two calls in one launch), stock_summary as_of 20260630 (no row named Movement Lab Item P or Movement Lab Item Q).
+Listings of THE COMPANY's data folder (names, sizes, times) are kept before and after the restore, on the lab PC.

@@ -1,0 +1,1 @@
+48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d *<lab folder>/rc070-post-x/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe

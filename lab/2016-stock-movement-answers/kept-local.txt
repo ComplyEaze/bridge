@@ -1,0 +1,6 @@
+Kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+backups/bk1/TDBK1800_<company number>.001 (BK1) 102253 B 978116b034ab1172b183ecba98234d6de3c3a937a223c08d50feed1f1d5f3e40
+listing-company-before-restore.txt (C6: the company data folder, names, sizes and times) 1285 B cea55c05a7a5c0fbb02d9ba560a5dc907d7d10772bbf67a12f77d2b290a25069
+listing-company-after-restore.txt (C6: the company data folder, names, sizes and times) 942 B 34f1f621583262ee95bfe500765272a284d594f83f912ed0b8a4982cbb138dc0
+evidence/bk1-listing-before.txt (the backup folder before step 2: 0 items) 49 B 758fc0ef641a37306f4e8f69d7d14120161537f2d6b5f89c0b9c1ea02aeed62b
+stage2016.py (this stage script: its patterns name the lab paths) 9610 B ad7c20e6c1d839db32bf525539593850c4aae30e328224543caa4de2f111b5f0

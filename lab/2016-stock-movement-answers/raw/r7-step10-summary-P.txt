@@ -1,0 +1,27 @@
+20260603 Stock Journal 1 ALTERID 113 optional No cancelled No postdated No reserved 'Stock Journal' Yes: none
+    Movement Lab Item P: in  10.000 Kgs godown 'Factory Floor' batch 'MV-P-1'
+    Movement Lab Item P: out 10.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260603 Stock Journal 2 ALTERID 114 optional No cancelled No postdated No reserved 'Stock Journal' Yes: none
+    Movement Lab Item P: in  5.000 Kgs godown 'Factory Floor' batch 'MV-P-1'
+    Movement Lab Item P: out 5.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260603 Stock Journal 3 ALTERID 115 optional No cancelled No postdated No reserved 'Stock Journal' Yes: none
+    Movement Lab Item P: out 4.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260608 Sales 1 ALTERID 116 optional No cancelled No postdated No reserved 'Sales' Yes: ['BRIDGEVCHISSALES']
+    Movement Lab Item P: out 6.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260608 Purchase 2 ALTERID 117 optional No cancelled No postdated No reserved 'Purchase' Yes: ['BRIDGEVCHISPURCHASE']
+    Movement Lab Item P: in  20.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260612 Credit Note 1 ALTERID 118 optional No cancelled No postdated No reserved 'Credit Note' Yes: ['BRIDGEVCHISCREDITNOTE']
+    Movement Lab Item P: in  2.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260612 Debit Note 1 ALTERID 119 optional No cancelled No postdated No reserved 'Debit Note' Yes: ['BRIDGEVCHISDEBITNOTE']
+    Movement Lab Item P: out 3.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260616 Sales 3 ALTERID 120 optional Yes cancelled No postdated No reserved 'Sales' Yes: ['BRIDGEVCHISSALES']
+    Movement Lab Item P: out 7.000 Kgs godown 'Main Location' batch 'MV-P-1'  (not counted: optional or cancelled)
+20260619 Purchase 3 ALTERID 122 optional No cancelled Yes postdated No reserved 'Purchase' Yes: ['BRIDGEVCHISPURCHASE']
+20260623 Sales 2 ALTERID 123 optional No cancelled No postdated Yes reserved 'Sales' Yes: ['BRIDGEVCHISSALES']
+    Movement Lab Item P: out 1.000 Kgs godown 'Main Location' batch 'MV-P-1'
+20260626 Delivery Note 1 ALTERID 124 optional No cancelled No postdated No reserved 'Delivery Note' Yes: none
+20260603: in 15 out 19
+20260608: in 20 out 6
+20260612: in 2 out 3
+20260623: in 0 out 1
+total in 37 out 29; net 8

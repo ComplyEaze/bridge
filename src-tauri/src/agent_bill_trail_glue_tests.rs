@@ -8,7 +8,10 @@
 //! party's ledger (`Café Naïve Traders` holds -102.02); none names a bill.
 use super::*;
 use crate::agent::bill_trail::{DetailKind, DetailLimits};
-use crate::agent::voucher_window::{CompanyMarks, SmallBooks, VoucherReadShape, WindowReadLimits};
+use crate::agent::voucher_window::{
+    CompanyMarks, ReadCountRefusal, SmallBooks, VoucherReadShape, WindowReadLimits,
+    MAX_PLANNED_READS,
+};
 use crate::tally::{ExposureDirection, OpenBillRow, UnallocatedComposition, UnallocatedParty};
 
 /// The outstandings' as-of date, as the bill trail is handed it.
@@ -399,6 +402,7 @@ async fn a_window_needing_more_requests_than_allowed_is_the_details_own_refusal(
         default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
         max_reads: 2,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     // (kind, named reference, code, requests the plan needs): a named bill's
     // window starts at its date, so the empty day before it is not read.
@@ -488,6 +492,7 @@ async fn a_party_whose_window_is_refused_is_read_by_its_ledger_and_its_refusal_s
         default_bytes_per_voucher: crate::agent::WINDOW_READ_BUDGET_BYTES,
         max_reads: 2,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let cycle = import_cycle_plans();
     let census = || {
@@ -830,4 +835,21 @@ async fn a_refusal_after_the_ledger_read_says_it_came_after_that_read() {
         let expected = by_ledger.then_some(LEDGER_SCOPED_LATER_REFUSAL);
         assert_eq!(failure.window_scope(), expected, "{by_ledger}");
     }
+}
+
+/// A party detail refuses its read count at the default figure, so a window
+/// too large for that is read by the party's ledger instead (#2173): only the
+/// tax audit's read refuses at the floor.
+#[test]
+fn a_party_detail_refuses_its_read_count_at_the_default() {
+    let limits = DetailLimits::PRODUCTION;
+    assert_eq!(
+        limits.window.read_count_refusal,
+        ReadCountRefusal::AtTheDefault
+    );
+    assert_eq!(limits.window.max_reads, MAX_PLANNED_READS);
+    assert_eq!(
+        limits.window.default_bytes_per_voucher,
+        VoucherReadShape::EntryWildcard.default_wire_bytes_per_voucher()
+    );
 }

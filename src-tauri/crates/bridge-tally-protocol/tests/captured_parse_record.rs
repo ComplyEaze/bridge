@@ -468,6 +468,67 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // src/native_stock_query_tests.rs: Tally's Stock Query for one item (#2018)
+    Row {
+        fixture: "tests/fixtures/stock-query/r-3-stock-query.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-4-stock-query-stockitemname.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-01-stock-query-carton-box-small.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-02-stock-query-caustic-soda-flakes.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-03-stock-query-cleaning-kit-a.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-09-stock-query-soda-ash-light.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-11-stock-query-zero-stock-item.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-12-stock-query-hcl-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-14-stock-query-cleaning-kit-a-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-15-stock-query-unknown-item.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
     // tests/simulator_corpus.rs, src/agent_tests.rs (an empty collection's export status)
     Row {
         fixture: "tests/fixtures/agent/native-bank-allocation-status.utf16le.xml",

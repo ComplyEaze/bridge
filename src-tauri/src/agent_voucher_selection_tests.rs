@@ -1286,3 +1286,50 @@ async fn an_amount_search_over_a_window_with_a_withheld_voucher_stays_partial() 
         .unwrap()
         .contains("an amount search keeps every withheld voucher"));
 }
+
+// -- #2027: an entry's GST details, read and shown only when `vouchers` asks --
+
+/// The captured three-voucher window with a taxability and one rate row added to its first entry.
+fn window_with_entry_gst_details() -> String {
+    let window = window_with_composite_vouchers(0);
+    let entry = "<ALLLEDGERENTRIES.LIST>";
+    let at = window.find(entry).expect("the window has a ledger entry") + entry.len();
+    format!(
+        "{}<GSTOVRDNTAXABILITY>Taxable</GSTOVRDNTAXABILITY><RATEDETAILS.LIST><GSTRATEDUTYHEAD>IGST</GSTRATEDUTYHEAD><GSTRATE> 5</GSTRATE></RATEDETAILS.LIST>{}",
+        &window[..at],
+        &window[at..]
+    )
+}
+
+/// Through the whole tool: with `include_gst_details` the entry carries its details as sent;
+/// without it no entry carries the key.
+#[tokio::test]
+async fn vouchers_returns_entry_gst_details_only_when_asked() {
+    let asked = call_vouchers_with(
+        vouchers_plans(window_with_entry_gst_details()),
+        json!({"include_gst_details": true}),
+    )
+    .await;
+    let text = asked.to_string();
+    assert!(text.contains("\"gst_details\""), "{asked}");
+    let details = asked["structuredContent"]["result"]["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|item| item["amounts"].as_array().into_iter().flatten())
+        .find_map(|entry| entry.get("gst_details"))
+        .cloned()
+        .expect("an entry with details");
+    assert_eq!(
+        details["taxability"],
+        json!({"state": "value", "value": "Taxable"})
+    );
+    assert_eq!(
+        details["rates"][0]["rate"],
+        json!({"kind": "value", "raw": " 5", "decimal": "5"})
+    );
+    let plain =
+        call_vouchers_with(vouchers_plans(window_with_entry_gst_details()), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    assert!(!plain.to_string().contains("gst_details"), "{plain}");
+}

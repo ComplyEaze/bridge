@@ -4,9 +4,10 @@
 // on the real tree a scanner that stopped matching would still pass; these
 // synthetic --root trees are its positive control.
 //
-// A fixture tree holds none of the pinned violations, so every run here fails
-// with them listed as `missing:`. That line proves the scan completed; the
-// assertions are about what is, or is not, listed as `unexpected:`.
+// The pinned set is empty (#1872), so a fixture tree with no hazard passes and
+// one with a hazard fails listing it as `unexpected:`. Either way the gate's
+// own pass or fail line proves the scan completed; the assertions are about
+// what is, or is not, listed as `unexpected:`.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -26,21 +27,30 @@ function builders(fields) {
     .join("\n");
 }
 
+// Runs the gate on `root` and returns its `unexpected:` lines, sorted: none
+// when it passes, which its summary line must then say.
+function gate(root) {
+  let output;
+  try {
+    output = execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" });
+  } catch (error) {
+    // The gate fails by an uncaught throw; on Windows Node prints that with CRLF line ends (#1471).
+    output = `${error.stdout ?? ""}${error.stderr ?? ""}`.replaceAll("\r\n", "\n");
+    assert.match(output, /allowlist changed:\nunexpected:\n/, "a failing scan must list what it found");
+    assert.doesNotMatch(output, /\nmissing:\n/, "the pinned set is empty, so nothing can be missing");
+    const unexpected = /\nunexpected:\n([\s\S]*?)$/.exec(output)?.[1] ?? "";
+    return [...new Set(unexpected.split("\n").filter((line) => line.startsWith("- ")).map((line) => line.slice(2)))].sort();
+  }
+  assert.match(output, /match the pinned set \(0 violations; [1-9][0-9]* file\(s\) found,/, "a passing scan must say it completed");
+  return [];
+}
+
 async function scan(fields) {
   const root = await mkdtemp(join(tmpdir(), ".request-builder-hazards-"));
   try {
     await mkdir(join(root, "src-tauri/src"), { recursive: true });
     await writeFile(join(root, FILE), builders(fields));
-    try {
-      execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" });
-    } catch (error) {
-      // The gate fails by an uncaught throw; on Windows Node prints that with CRLF line ends (#1471).
-      const output = `${error.stdout ?? ""}${error.stderr ?? ""}`.replaceAll("\r\n", "\n");
-      assert.match(output, /\nmissing:\n/, "the scan must complete and report the pinned set missing");
-      const unexpected = /\nunexpected:\n([\s\S]*?)(?:\nmissing:|$)/.exec(output)?.[1] ?? "";
-      return new Set(unexpected.split("\n").filter(Boolean).map((line) => line.replace(/^- /, "")));
-    }
-    throw new Error("a fixture tree lacks the pinned set, so the gate must fail");
+    return new Set(gate(root));
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -105,19 +115,45 @@ async function scanTree(files) {
       await mkdir(join(root, path.split("/").slice(0, -1).join("/")), { recursive: true });
       await writeFile(join(root, path), text);
     }
-    try {
-      execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" });
-    } catch (error) {
-      const output = `${error.stdout ?? ""}${error.stderr ?? ""}`.replaceAll("\r\n", "\n");
-      assert.match(output, /\nmissing:\n/, "the scan must complete and report the pinned set missing");
-      const unexpected = /\nunexpected:\n([\s\S]*?)(?:\nmissing:|$)/.exec(output)?.[1] ?? "";
-      return [...new Set(unexpected.split("\n").filter(Boolean).map((line) => line.replace(/^- /, "")))].sort();
-    }
-    throw new Error("a fixture tree lacks the pinned set, so the gate must fail");
+    return gate(root);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
 }
+
+// With nothing pinned, a scan that found no files would otherwise pass (P5).
+test("a tree with no Rust files is refused, not passed", async () => {
+  const root = await mkdtemp(join(tmpdir(), ".request-builder-hazards-"));
+  try {
+    await mkdir(join(root, "src-tauri/src"), { recursive: true });
+    assert.throws(
+      () => execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" }),
+      (error) => /found no Rust files under src-tauri/.test(`${error.stdout ?? ""}${error.stderr ?? ""}`),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+// #1872 deleted the two pinned custom company reports, so the real tree no
+// longer exercises this kind; this tree is its positive control. A bare
+// #[cfg(test)] fn is still scanned, as the deleted test-only twin was.
+test("a fixed custom report is reported by its name, in a bare test-only fn too", async () => {
+  const actual = await scanTree({
+    "src-tauri/src/lib.rs": `pub fn report() -> &'static str {
+    r#"<REPORT NAME="Planted Report"><FORMS>Planted Form</FORMS></REPORT>"#
+}
+#[cfg(test)]
+fn test_only_report() -> &'static str {
+    r#"<REPORT  NAME="Planted Twin">"#
+}
+`,
+  });
+  assert.deepEqual(actual, [
+    "custom-report|src-tauri/src/lib.rs::report|Planted Report",
+    "custom-report|src-tauri/src/lib.rs::test_only_report|Planted Twin",
+  ]);
+});
 
 const HAZARD = `pub fn planted() -> &'static str {\n    r#"<SET>$$NumItems:BRIDGE Planted Collection</SET>"#\n}\n`;
 const planted = (file) => `function-argument-with-space|${file}::planted|$$NumItems:BRIDGE Planted Collection`;

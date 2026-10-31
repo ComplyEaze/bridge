@@ -1,0 +1,2 @@
+src-tauri/crates/bridge-bank-statement/src/pdf.rs
+reviewer: lamemustafa

@@ -1268,6 +1268,17 @@ fn the_markdown_proof_follows_the_verification_status() {
     );
     assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
     assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
+    // #2152: the saved proof's note that no dispatch is on record is shown, and
+    // it is a line, not a banner.
+    assert!(!clean.contains("Dispatch record"), "{clean}");
+    let mut unsent = proof(Some("posted_verified"), json!([]));
+    verification::mark_found_not_sent(&mut unsent);
+    let unsent = render_proof_markdown(&unsent);
+    assert!(
+        unsent.contains("- Dispatch record: none on this computer — found in the book, not sent by ComplyEaze Bridge\n"),
+        "{unsent}"
+    );
+    assert!(!unsent.contains(banner), "{unsent}");
     // Not verified with no duplicates, or no status at all, is not clean either:
     // the banner follows the status, not the duplicate list. With no dispatch
     // record Bridge did not send the batch, so the banner forbids no resend.
@@ -6361,11 +6372,11 @@ async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
             assert!(next_step.starts_with("Tell the user that this connection cannot post."));
             for text in [first, next_step] {
                 assert!(
-                    text.contains("once this batch is posted, do not import this file"),
+                    text.contains("Once this batch is posted, do not import this file"),
                     "{text}"
                 );
                 assert!(
-                    text.contains("once this file is imported, do not post this batch"),
+                    text.contains("If this file is imported first, post_import"),
                     "{text}"
                 );
             }

@@ -6446,6 +6446,7 @@ async fn a_clean_batch_of_five_says_all_five_are_confirmed() {
     assert_eq!(posted["isError"], json!(false), "{posted}");
     assert_eq!(result["dispatch"]["state"], "posted_verified", "{posted}");
     assert_eq!(result["counts"]["posted_verified"], 5, "{posted}");
+    assert!(result.get("dispatch_record").is_none(), "{posted}");
     assert_batch_counts(&posted, 5, 5, &[]);
     assert_eq!(
         batch_headline(&posted)["batch"]["verdict"],
@@ -6486,6 +6487,8 @@ async fn a_built_batch_never_posted_carries_no_headline() {
     let result = &verified["structuredContent"]["result"];
     assert_eq!(result["counts"]["not_found"], 1, "{verified}");
     assert!(result.get("dispatch").is_none(), "{verified}");
+    // Nothing was found, so nothing is said of who sent it.
+    assert!(result.get("dispatch_record").is_none(), "{verified}");
     assert_no_batch_headline(&verified);
 }
 
@@ -6498,6 +6501,59 @@ async fn a_batch_verified_after_a_hand_import_carries_no_headline() {
     assert_eq!(result["counts"]["posted_verified"], 1, "{verified}");
     assert!(result.get("dispatch").is_none(), "{verified}");
     assert_no_batch_headline(&verified);
+}
+
+/// #2152: a batch that verifies while the journal holds no dispatch for it says
+/// so, on the first page and on a later page served from the saved proof. The
+/// verdict is the one it had without the note.
+#[tokio::test]
+async fn a_verified_batch_with_no_dispatch_on_record_says_it_was_not_sent_by_bridge() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(reconcile_readback())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let verified = server.call_tool("verify_import", args.clone()).await;
+    let _ = sent(simulator);
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(
+        result["verification_status"], "posted_verified",
+        "{verified}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 1, "{verified}");
+    assert!(result.get("dispatch").is_none(), "{verified}");
+    assert_eq!(
+        result["dispatch_record"],
+        json!({
+            "state": "none_on_record",
+            "summary": "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status."
+        }),
+        "{verified}"
+    );
+    // A later page comes from the saved proof alone and says the same.
+    let mut next = args;
+    next["proof_sha256"] = result["proof"]["sha256"].clone();
+    let later = server.call_tool("verify_import", next).await;
+    assert_eq!(
+        later["structuredContent"]["result"]["dispatch_record"], result["dispatch_record"],
+        "{later}"
+    );
+}
+
+/// The same batch, read back after the journal recorded its dispatch, carries
+/// no such note: Bridge sent it.
+#[tokio::test]
+async fn a_verified_batch_with_a_dispatch_on_record_carries_no_not_sent_note() {
+    let (response, ..) = reconcile_with_masters_check(None, Vec::new()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["dispatch"]["state"], "previous_attempt_reconciled",
+        "{response}"
+    );
+    assert_eq!(
+        result["verification_status"], "posted_verified",
+        "{response}"
+    );
+    assert!(result.get("dispatch_record").is_none(), "{response}");
 }
 
 // bridge#724: a voucher goes without a number, so its voucher type must read

@@ -377,7 +377,7 @@ fn present_voucher_goods_lines(mut voucher: Value, shown: GoodsLinesShown) -> Va
 
 /// Whether an answer that returns a voucher's entries shows their GST details (#2027): each
 /// entry's rates per duty head, taxability and type of supply. Only `vouchers` called with
-/// `include_gst_details: true` shows them; the parse always reads them.
+/// `include_gst_details: true` shows them, and only that call's parse reads them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum GstDetailsShown {
     Withheld,

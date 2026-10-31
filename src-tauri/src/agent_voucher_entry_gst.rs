@@ -10,12 +10,12 @@
 //! tax entries carry an empty rate list. Taxability and type of supply are each absent, empty or a
 //! value (trimmed); a duty head and its valuation type likewise; a rate and a per-unit rate are
 //! each absent, empty, zero or a value with its text as sent ([`GstRate`], the same reading as a
-//! ledger's own rates), and those are never merged. A zero is what Tally sent: on an entry whose
-//! ledger sets no rate Tally sends `0` too (a captured Purchase with tax charged carries five), so a
-//! zero is not a zero-rated supply, and a valuation type of `Not Applicable` says the head does
-//! not apply. On an item invoice the rates sit with the goods line, not on the entry. A
-//! rate list with no children is not listed. A rate list nested deeper than the entry (inside a
-//! goods line, say) belongs to that line and is not read here.
+//! ledger's own rates), and those are never merged. A zero is what Tally sent (a captured Purchase
+//! with tax charged carries five zero rates), so a zero is not a zero-rated supply, and a
+//! valuation type of `Not Applicable` says the head does not apply. On an item invoice the rates
+//! sit with the goods line, not on the entry. A rate list with no children is not listed. A rate
+//! list nested deeper than the entry (inside a goods line, say) belongs to that line and is not
+//! read here.
 //!
 //! These are the details Tally sent on the entry, not the tax charged: the tax entries' own
 //! amounts are that. Like the bank-allocation collector, this never refuses the read: an entry

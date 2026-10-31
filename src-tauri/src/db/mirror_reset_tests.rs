@@ -12,6 +12,8 @@ use zeroize::Zeroizing;
 
 const GOOD_KEY: [u8; MIRROR_KEY_BYTES] = [7; MIRROR_KEY_BYTES];
 const OTHER_KEY: [u8; MIRROR_KEY_BYTES] = [9; MIRROR_KEY_BYTES];
+/// A stored entry that is not a key of the length the mirror uses: it cannot be any mirror's key.
+const SHORT_KEY: [u8; 5] = [9; 5];
 
 /// One credential-store entry: the account name and the key under it.
 type StoredAccount = (String, Vec<u8>);
@@ -153,7 +155,7 @@ async fn a_database_no_stored_key_opens_is_reset_key_first_and_the_lock_files_st
     }
     // This database's key is absent; the only keys held are other mirrors' (so none opens it).
     let store = FakeStore::new("this-path")
-        .with("another-path", &OTHER_KEY)
+        .with("another-path", &SHORT_KEY)
         .with("a-third-path", &[1; 5]);
 
     let proof = prove(&database, &store).await.expect("a resettable mirror");
@@ -310,7 +312,7 @@ async fn an_open_mirror_refuses_a_reset_and_a_reset_refuses_an_open_at_once() {
     let directory = tempfile::tempdir().unwrap();
     let (database, ..) = paths(directory.path());
     encrypted_mirror(&database, &GOOD_KEY).await;
-    let store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
+    let store = FakeStore::new("this-path").with("another-path", &SHORT_KEY);
 
     // This process has the mirror open: the opener's locks (the shared use lock is kept) exclude
     // the reset.
@@ -352,7 +354,7 @@ async fn a_plaintext_database_is_not_reset() {
     let mut bytes = b"SQLite format 3\0".to_vec();
     bytes.extend_from_slice(&[0; 100]);
     std::fs::write(&database, bytes).unwrap();
-    let store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
+    let store = FakeStore::new("this-path").with("another-path", &SHORT_KEY);
     let refusal = prove(&database, &store).await.err().expect("a refusal");
     assert!(matches!(refusal, ResetRefusal::NotEncrypted), "{refusal:?}");
     assert!(database.exists());
@@ -407,7 +409,7 @@ async fn every_crash_point_leaves_no_readable_key_beside_the_database_and_a_reru
         for leftover in [&wal, &shm, &journal] {
             std::fs::write(leftover, b"leftover").unwrap();
         }
-        let store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
+        let store = FakeStore::new("this-path").with("another-path", &SHORT_KEY);
         // A key of the wrong length under this path's own account: the key is invalid, so the
         // reset may remove it.
         store.save(&[4; 7]).unwrap();
@@ -454,7 +456,7 @@ async fn a_key_that_cannot_be_deleted_or_is_still_readable_leaves_every_file_alo
     for (store, expect_not_deleted) in [
         (
             {
-                let mut store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
+                let mut store = FakeStore::new("this-path").with("another-path", &SHORT_KEY);
                 store.delete_fails = true;
                 store
             },
@@ -462,7 +464,7 @@ async fn a_key_that_cannot_be_deleted_or_is_still_readable_leaves_every_file_alo
         ),
         (
             {
-                let mut store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
+                let mut store = FakeStore::new("this-path").with("another-path", &SHORT_KEY);
                 store.delete_is_a_lie = true;
                 store.save(&[4; 7]).unwrap();
                 store
@@ -492,7 +494,7 @@ async fn a_file_that_cannot_be_removed_stops_the_reset_at_that_step() {
     let directory = tempfile::tempdir().unwrap();
     let (database, wal, ..) = paths(directory.path());
     encrypted_mirror(&database, &GOOD_KEY).await;
-    let store = FakeStore::new("this-path").with("another-path", &OTHER_KEY);
+    let store = FakeStore::new("this-path").with("another-path", &SHORT_KEY);
     let proof = prove(&database, &store).await.expect("a resettable mirror");
     // After the proof, a directory where the write-ahead log should be: remove_file refuses it.
     std::fs::create_dir(&wal).unwrap();
@@ -508,4 +510,81 @@ async fn a_file_that_cannot_be_removed_stops_the_reset_at_that_step() {
         "{error:?}"
     );
     assert!(database.exists());
+}
+
+#[tokio::test]
+async fn a_right_length_key_under_another_name_that_fails_to_open_it_is_never_taken_as_wrong() {
+    let directory = tempfile::tempdir().unwrap();
+    let (database, wal, shm, journal) = paths(directory.path());
+    encrypted_mirror(&database, &GOOD_KEY).await;
+    // Another mirror's key, or this mirror's own key after a profile move that SQLCipher cannot
+    // use: the answer ("not a database") is the same, so the reset is refused and nothing goes.
+    let store = FakeStore::new("this-path")
+        .with("another-path", &OTHER_KEY)
+        .with("a-short-entry", &SHORT_KEY);
+    let before = std::fs::read(&database).unwrap();
+    let refusal = prove(&database, &store).await.err().expect("a refusal");
+    assert!(
+        matches!(refusal, ResetRefusal::AnotherKeyNotProvenWrong),
+        "{refusal:?}"
+    );
+    assert_eq!(std::fs::read(&database).unwrap(), before);
+    for absent in [&wal, &shm, &journal] {
+        assert!(!absent.exists(), "{}", absent.display());
+    }
+    assert_eq!(store.accounts(), ["another-path", "a-short-entry"]);
+
+    // Take the right-length key away and the same database is resettable: only short entries
+    // are left, and none of them can be a mirror's key.
+    let only_short = FakeStore::new("this-path").with("a-short-entry", &SHORT_KEY);
+    let proof = prove(&database, &only_short)
+        .await
+        .expect("a resettable mirror");
+    assert_eq!(proof.state(), ResettableState::DatabaseNoKeyOpens);
+}
+
+#[tokio::test]
+async fn a_wrong_length_own_entry_does_not_excuse_a_right_length_key_under_another_name() {
+    let directory = tempfile::tempdir().unwrap();
+    let (database, ..) = paths(directory.path());
+    encrypted_mirror(&database, &GOOD_KEY).await;
+    // This database's own entry is not a key of the mirror's length, so the own-key refusal does not
+    // apply; the right-length key beside it still has to be proven wrong, and it cannot be.
+    let store = FakeStore::new("this-path")
+        .with("this-path", &[3; 7])
+        .with("another-path", &OTHER_KEY);
+    let refusal = prove(&database, &store).await.err().expect("a refusal");
+    assert!(
+        matches!(refusal, ResetRefusal::AnotherKeyNotProvenWrong),
+        "{refusal:?}"
+    );
+    assert!(database.exists());
+    assert_eq!(store.accounts(), ["this-path", "another-path"]);
+}
+
+#[tokio::test]
+async fn the_right_key_under_another_name_with_a_damaged_first_page_is_never_taken_as_wrong() {
+    use std::io::{Seek, SeekFrom, Write};
+    let directory = tempfile::tempdir().unwrap();
+    let (database, ..) = paths(directory.path());
+    encrypted_mirror(&database, &GOOD_KEY).await;
+    // Overwrite the encrypted bytes after the salt: SQLCipher now answers "not a database" for
+    // the key that encrypted this file, exactly as it does for a key that never did.
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(&database)
+        .unwrap();
+    file.seek(SeekFrom::Start(16)).unwrap();
+    file.write_all(&[0xA5; 512]).unwrap();
+    drop(file);
+    let damaged = std::fs::read(&database).unwrap();
+    // The key that really belongs to this file is kept under a name this path does not map to.
+    let store = FakeStore::new("new-path-spelling").with("old-path-spelling", &GOOD_KEY);
+    let refusal = prove(&database, &store).await.err().expect("a refusal");
+    assert!(
+        matches!(refusal, ResetRefusal::AnotherKeyNotProvenWrong),
+        "{refusal:?}"
+    );
+    assert_eq!(std::fs::read(&database).unwrap(), damaged);
+    assert_eq!(store.accounts(), ["old-path-spelling"]);
 }

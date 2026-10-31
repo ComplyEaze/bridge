@@ -608,11 +608,13 @@ fn to_json_resolving(
             "not_settled_no_response": settlement.unsettled_no_response,
             "not_settled_binding_refused": settlement.unsettled_binding_refused,
             "not_settled_reviewed_not_attributed": settlement.unsettled_reviewed,
+            "not_settled_restored": settlement.unsettled_restored,
             "settled_by_person": settlement.settled_by_person,
             "not_settled_not_verified": settlement.unsettled
                 - settlement.unsettled_no_response
                 - settlement.unsettled_binding_refused
-                - settlement.unsettled_reviewed,
+                - settlement.unsettled_reviewed
+                - settlement.unsettled_restored,
             "no_dispatch_never_verified": settlement.no_dispatch_never_verified,
         }),
     };

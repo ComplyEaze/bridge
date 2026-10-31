@@ -2821,17 +2821,18 @@ deadlocks.
   a repeated entry and the wrong bank ledger look alike; the reading says so,
   prescribes no remedy and checks the bank ledger only.
 - **Run against a live book.** Every checked row of one run passed on 30 October
-  2026, and one row was recorded as a note (licensed TallyPrime 7.2 Silver, one
-  synthetic company, the published 0.7.0 Windows package):
+  2026 (UTC; 31 October on the lab computer), and one row was recorded as a note
+  (licensed TallyPrime 7.2 Silver, one synthetic company, the published 0.7.0
+  Windows package):
   - A window ending in the middle of a month answered `not_established`
     (`window_not_whole_calendar_months`) with no amount, after the company check
     alone: four requests and no ledger read.
   - Two windows of one whole calendar month each, on a bank ledger in the middle
-    of its year, tied with a second bank ledger in the book. `trial_balance` at
-    each month end, and Tally's own Ledger display over the two months, agreed
-    with the statement. An entry keyed by hand that is not on the statement
-    showed as a closing gap and a change of its own amount, with the opening
-    still tied.
+    of its year, tied while the book also held a second bank ledger.
+    `trial_balance` at each month end, and Tally's own Ledger display over the
+    two months, agreed with the statement. An entry keyed by hand that is not on
+    the statement showed as a closing gap and a change of its own amount, with
+    the opening still tied.
   - A statement whose first and last rows fall in the middle of a month was read
     at its first row's date and the day after its last: a voucher dated the day
     before the first row counted in the opening, and one dated the day after the

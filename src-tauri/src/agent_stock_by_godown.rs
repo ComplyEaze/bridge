@@ -105,6 +105,7 @@ fn result_json(read: &StockByGodownRead) -> Value {
             godown_total,
             stock_summary_total,
             godown_empty_amounts,
+            stock_summary_empty_amounts,
         } => (
             "not_established",
             Some("godown_totals_not_comparable"),
@@ -112,6 +113,7 @@ fn result_json(read: &StockByGodownRead) -> Value {
                 "godown_total": godown_total,
                 "stock_summary_total": stock_summary_total,
                 "godown_empty_amounts": godown_empty_amounts,
+                "stock_summary_empty_amounts": stock_summary_empty_amounts,
             }),
         ),
     };

@@ -130,27 +130,31 @@ pub enum NativeGodownTie {
         godown_total: ExactDecimal,
         stock_summary_total: ExactDecimal,
     },
-    /// A total is missing, or a godown's amount is empty, so nothing ties.
+    /// A total is missing, or an amount on either side is empty, so nothing
+    /// ties.
     NotComparable {
         godown_total: Option<ExactDecimal>,
         stock_summary_total: Option<ExactDecimal>,
         godown_empty_amounts: usize,
+        stock_summary_empty_amounts: usize,
     },
 }
 
-/// Ties the godowns to the Stock Summary. An empty godown amount is not zero, so
-/// a summary with one never ties, whatever the sums say.
+/// Ties the godowns to the Stock Summary. An empty amount on either report is
+/// not zero, so a report with one never ties, whatever the sums say.
 pub fn tie_godowns(godowns: &NativeGodownSummary, stock: &NativeStockReport) -> NativeGodownTie {
     let (godown_total, godown_empty_amounts) = match godowns {
         NativeGodownSummary::Lines { total, empty, .. } => (total.clone(), *empty),
         NativeGodownSummary::Empty => (None, 0),
     };
-    let stock_summary_total = match stock {
-        NativeStockReport::Lines { total, .. } => total.clone(),
-        NativeStockReport::Empty => None,
+    let (stock_summary_total, stock_summary_empty_amounts) = match stock {
+        NativeStockReport::Lines { total, empty, .. } => (total.clone(), *empty),
+        NativeStockReport::Empty => (None, 0),
     };
     match (godown_total, stock_summary_total) {
-        (Some(godown_total), Some(stock_summary_total)) if godown_empty_amounts == 0 => {
+        (Some(godown_total), Some(stock_summary_total))
+            if godown_empty_amounts == 0 && stock_summary_empty_amounts == 0 =>
+        {
             if godown_total.numeric_eq(&stock_summary_total) {
                 NativeGodownTie::Tied {
                     total: stock_summary_total,
@@ -166,6 +170,7 @@ pub fn tie_godowns(godowns: &NativeGodownSummary, stock: &NativeStockReport) -> 
             godown_total,
             stock_summary_total,
             godown_empty_amounts,
+            stock_summary_empty_amounts,
         },
     }
 }

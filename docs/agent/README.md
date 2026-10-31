@@ -1120,7 +1120,8 @@ Summary's total. It then returns `godowns`: each godown directly under Tally's r
 item's closing, and is `empty` for a godown holding items in several units. A godown under another
 godown has no line of its own: its stock is in its parent's figures. Otherwise `state` is
 `not_established`, with `reason` `godown_totals_differ` or `godown_totals_not_comparable` (a total
-missing, or a godown value empty), `tie_out` holding both totals, and no godown or item.
+missing, or a value empty on either report: `tie_out` then also counts `godown_empty_amounts` and
+`stock_summary_empty_amounts`), `tie_out` holding both totals, and no godown or item.
 
 `root_items` gives, for each item directly under the root, its value and quantity in each godown, as
 Tally's exploded Stock Summary writes them: each godown at that godown's own cost, not the item's average

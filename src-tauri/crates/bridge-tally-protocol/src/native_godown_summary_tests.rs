@@ -207,6 +207,36 @@ fn an_empty_godown_amount_is_not_zero_and_does_not_tie() {
             godown_total: Some(decimal("13530.01")),
             stock_summary_total: Some(decimal("2292.01")),
             godown_empty_amounts: 1,
+            stock_summary_empty_amounts: 0,
+        }
+    );
+}
+
+#[test]
+fn an_empty_stock_summary_amount_is_not_zero_and_does_not_tie() {
+    // The godowns are moved by the emptied item's 150.00, so the amounts present on
+    // each side add up to the same 2442.01: only the empty amount keeps them apart.
+    let godowns = parse_native_godown_summary(&damaged(
+        GODOWNS_FY,
+        "<DSPCLAMTA>-11238.00</DSPCLAMTA>",
+        "<DSPCLAMTA>-11088.00</DSPCLAMTA>",
+        1,
+    ))
+    .unwrap();
+    let stock = parse_native_stock_summary_report(&damaged(
+        STOCK_FY,
+        "<DSPCLAMTA>-150.00</DSPCLAMTA>",
+        "<DSPCLAMTA></DSPCLAMTA>",
+        1,
+    ))
+    .unwrap();
+    assert_eq!(
+        tie_godowns(&godowns, &stock),
+        NativeGodownTie::NotComparable {
+            godown_total: Some(decimal("2442.01")),
+            stock_summary_total: Some(decimal("2442.01")),
+            godown_empty_amounts: 0,
+            stock_summary_empty_amounts: 1,
         }
     );
 }
@@ -222,6 +252,7 @@ fn an_empty_godown_summary_is_not_a_total_of_zero() {
             godown_total: None,
             stock_summary_total: Some(decimal("2292.01")),
             godown_empty_amounts: 0,
+            stock_summary_empty_amounts: 0,
         }
     );
 }

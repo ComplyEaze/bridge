@@ -440,6 +440,10 @@
     {
       "uuid": "af6cf668-b7b6-8632-b248-e87f69beee1c",
       "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 252 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "5848d0ca-ed85-4c97-ab20-e045893a9803",
+      "note": "company identifier of the synthetic lab company BRIDGE LEDGERBOX CI LAB, as TallyPrime 7.2 returned it in the read-only marks and ledger reads of the two batch ledger-create rows of 29 October 2026 (lab branches lab/690-batch-ledger-create-l0-answers at 078db03e1f8b and lab/690-batch-ledger-create-l0b-answers at 5efb36d410f5); the ledger identifiers in those answers carry this value as their prefix, and pull request 2181's tests read it as L0_COMPANY"
     }
   ]
 }

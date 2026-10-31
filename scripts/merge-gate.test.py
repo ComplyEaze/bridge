@@ -119,6 +119,17 @@ class MergeGateControls(unittest.TestCase):
             "exec " + shlex.quote(real_node) + ' "$@"\n'
         )
         node.chmod(node.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        # The pin-list retry waits between tries (#2179). With GATE_SLEEPS set, a wait is recorded there instead of slept.
+        real_sleep = shutil.which("sleep")
+        if not real_sleep:
+            raise RuntimeError("sleep is required for merge-gate controls")
+        sleep = cls.bin / "sleep"
+        sleep.write_text(
+            "#!/usr/bin/env bash\n"
+            'if [ -n "${GATE_SLEEPS:-}" ]; then printf \'%s\\n\' "$*" >>"$GATE_SLEEPS"; exit 0; fi\n'
+            "exec " + shlex.quote(real_sleep) + ' "$@"\n'
+        )
+        sleep.chmod(sleep.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     @classmethod
     def git_in_repo(cls, *args):
@@ -172,10 +183,11 @@ class MergeGateControls(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge"):
+    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge", env_extra=None):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
+        env.update(env_extra or {})
         return subprocess.run(
             [str(self.script), "321", "--repo", repo, *extra_args],
             cwd=str(cwd) if cwd else ROOT,
@@ -380,7 +392,64 @@ class MergeGateControls(unittest.TestCase):
         self.assert_pass("history-out-of-order-then-dropped-declared", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_an_unreadable_pin_list_in_the_branch_history_is_indeterminate(self):
-        self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        result = self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        # A failure with no HTTP status is not tried again, and the line names the commit and the error.
+        self.assertIn("(commit c1c1c1c1c1c1, after 1 try: controlled history surface read failure)", result.stdout)
+
+    # -- A pin-list read that fails and is tried again (#2179) ----------------------
+
+    def run_flaky(self, scenario):
+        """Run a flaky-read scenario; return the result, the waits the gate asked for, and the reads of the flaky commit."""
+        with tempfile.TemporaryDirectory(prefix="merge-gate-flaky-") as folder:
+            state, sleeps = Path(folder) / "calls", Path(folder) / "sleeps"
+            result = self.run_gate(scenario, env_extra={"GATE_STATE": str(state), "GATE_SLEEPS": str(sleeps)})
+            waits = sleeps.read_text().split() if sleeps.exists() else []
+            calls = int(state.read_text()) if state.exists() else 0
+        return result, waits, calls
+
+    def assert_flaky_passes(self, scenario):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("INDETERMINATE", result.stdout)
+        self.assertEqual((waits, calls), (["2"], 2), "one failed read, one wait of 2 s, then the read that answered")
+
+    def assert_flaky_not_retried(self, scenario, phrase):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn(phrase, result.stdout)
+        self.assertEqual((waits, calls), ([], 1), "a failure a second try cannot cure is not tried again")
+
+    def test_a_server_error_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-502-once")
+
+    def test_a_secondary_rate_limit_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-rate-limit-once")
+
+    def test_a_404_for_one_of_the_prs_own_commits_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-404-own-commit-once")
+
+    def test_three_failed_reads_stay_indeterminate_and_name_the_commit_and_the_status(self):
+        result, waits, calls = self.run_flaky("history-flaky-502-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("MAY MERGE", result.stdout)
+        self.assertIn("could not read and parse the pin list at every commit of the PR", result.stdout)
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
+
+    def test_a_rate_limit_that_persists_names_its_first_error_line_with_the_account_id_masked(self):
+        result, waits, calls = self.run_flaky("history-flaky-rate-limit-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        # the error's first line is blank: the next one is printed, and its long digit run is masked
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 403, after 3 tries: gh: You have exceeded a secondary rate limit for user ID <n>. (HTTP 403))", result.stdout)
+        self.assertNotIn("12345678", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3))
+
+    def test_a_403_that_is_not_a_rate_limit_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-403-not-a-rate-limit", "(commit c1c1c1c1c1c1, HTTP 403, after 1 try: ")
+
+    def test_a_404_for_a_commit_outside_the_pr_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-404-outside-the-pr", "(commit d2d2d2d2d2d2, HTTP 404, after 1 try: gh: Not Found (HTTP 404))")
 
     def test_removed_pin_line_for_a_pin_that_is_kept_blocks(self):
         self.assert_blocked("pin-removed-line-for-a-kept-pin", "has removed-pin line(s) for pin(s) the PR does not remove: src/other.rs")

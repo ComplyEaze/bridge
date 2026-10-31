@@ -512,7 +512,7 @@ pub struct LedgerNameRow {
     pub alter_id: u64,
 }
 
-/// Parses the V3 catalogue answer ([`crate::ReadOnlyProfile::StandardLedgerCatalogV3`])
+/// Parses the V3 catalogue answer ([`crate::xml_read_profiles::ReadOnlyProfile::StandardLedgerCatalogV3`])
 /// into the ledgers a new ledger's name is checked against, refusing what the
 /// V1 and V2 parsers would pass where a gap could hide a name: a row without an
 /// `ALTERID` or a `LANGUAGENAME.LIST`, an empty or unusable name or alias, and
@@ -1433,7 +1433,7 @@ fn safe_standard_ledger_parent(value: &str) -> Option<String> {
     Some(value.to_string())
 }
 
-fn unsafe_display_character(value: char) -> bool {
+pub(crate) fn unsafe_display_character(value: char) -> bool {
     value.is_control() || deceptive_display_character(value)
 }
 

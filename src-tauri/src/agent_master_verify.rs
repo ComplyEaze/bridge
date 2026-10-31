@@ -57,6 +57,9 @@ pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger 
 pub(super) const NEXT_ABSENT_UNCOVERED: &str = "The read-back found no ledger of this name, but ComplyEaze Bridge closes a batch on an absent ledger only on TallyPrime 7.2 Silver, licensed, the one Tally where the order it rests on (a read sent after the create was served after it) was measured; the reasons say how this Tally differs, and what else the read showed. The batch stays open, and ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for: a create it sent may still be waiting in Tally. Calling post_ledger_creates with this batch_id again sends nothing and reads the book back, but it can close the batch only when the company is open on TallyPrime 7.2 Silver, licensed: on this Tally, calling again will not close it. Check the company's ledgers in Tally, and do not create this ledger in Tally by hand. Never post this batch again.";
 /// A ledger of this name is in the book and the read-back could not verify it.
 pub(super) const NEXT_PRESENT_NOT_VERIFIED: &str = "A ledger of this name is in the book, but ComplyEaze Bridge could not verify that it is the one this batch sent (see the checks and reasons). There is nothing to create: compare the ledger in Tally with this batch by eye. Never post this batch again.";
+/// Every ledger of a batch of more than one is in the book and the read-back
+/// could not verify the batch: `NEXT_PRESENT_NOT_VERIFIED` for several.
+pub(super) const NEXT_ALL_PRESENT_NOT_VERIFIED: &str = "Every ledger of this batch is in the book (verification.guids gives each one's GUID, in the order sent), but ComplyEaze Bridge could not verify that they are the ones this batch sent (see the checks and reasons). There is nothing to create: compare each ledger in Tally with this batch by eye. Never post this batch again.";
 /// Some of a batch's ledgers are in the book and some are not, and the
 /// read-back could not verify the batch: there is something left to settle.
 pub(super) const NEXT_PARTLY_PRESENT: &str = "Some of this batch's ledgers are in the book and some are not (verification.guids gives a GUID for each one found, in the order sent), and ComplyEaze Bridge could not verify the batch (see the checks and reasons). Check the ledgers in Tally against the reasons given, then call post_ledger_creates with this batch_id again to read it back (it sends nothing). Do not create the ledger in Tally by hand meanwhile, for any of this batch's names. Never post this batch again.";
@@ -127,8 +130,12 @@ pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'stati
         NEXT_ABSENT_NOT_SETTLED
     } else if !judgement.guids().is_empty() && judgement.guids().iter().all(Option::is_some) {
         // Every name is in the book: one ledger's GUID, or each of a batch's
-        // (a batch names no single GUID).
-        NEXT_PRESENT_NOT_VERIFIED
+        // (a batch names no single GUID), in words chosen by the count.
+        if judgement.guids().len() > 1 {
+            NEXT_ALL_PRESENT_NOT_VERIFIED
+        } else {
+            NEXT_PRESENT_NOT_VERIFIED
+        }
     } else if judgement.guids().iter().any(Option::is_some) {
         // Only some of a batch's names are in the book.
         NEXT_PARTLY_PRESENT

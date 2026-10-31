@@ -16,7 +16,7 @@ composites carry a rate with decimals, although every rate keyed on screen was a
   - a dollar part receipt against the first sale, at a whole-number rate.
 - **Date:** 2026-10-30, 20:11:57 and 20:11:59 UTC. Each request was sent once with curl, and the answer was
   kept byte for byte. Source: `raw/b2-ledger-snapshot.response` and `raw/b2-tb-currency.response`
-  on branch `lab/2071-forex-reads-answers` at `ea28bde038b3`. Each sha256 equals the lab's own
+  on branch `lab/2071-forex-reads-answers` at `ea28bde0`. Each sha256 equals the lab's own
   `SHA256.txt` line.
 - **Requests:** the bytes Bridge's own builders emit, for 1 to 30 April 2025: the ledger snapshot
   that `outstandings` sends (`render_native_ledger_snapshot_request`), and the Trial Balance the

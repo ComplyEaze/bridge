@@ -245,6 +245,10 @@ test("the TLS, HTTP/2 and QUIC names planted below are exactly the gate's list",
   assert.deepEqual(names, TRANSPORT_STACKS);
 });
 
+test("a lock file read as nothing is refused", { skip }, () => {
+  assertRefused(sandbox({ "src-tauri/Cargo.lock": "" }).run(), "src-tauri/Cargo.lock lists no packages; it was not read");
+});
+
 test("a network-capable crate, or a TLS, HTTP/2 or QUIC crate, in the lock file is refused", { skip }, () => {
   const lock = (name) => ({ "src-tauri/Cargo.lock": `[[package]]\nname = "reqwest"\n\n[[package]]\nname = "${name}"\n` });
   assertRefused(sandbox(lock("ureq")).run(), "src-tauri/Cargo.lock contains ureq, a network-capable crate outside the pinned HTTP client");

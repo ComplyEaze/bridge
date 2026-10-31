@@ -4,7 +4,8 @@
 //! Each part is one [`fetch_audit_part`] (single, identity-bracketed, kept byte
 //! for byte), the vouchers come from the sealing window reader, and the company
 //! marks are read before the first part and again by the window after the last.
-//! Nothing is written to disk. The crate then does what it does for a directory:
+//! Nothing is written to disk (a lab build may keep an admitted read: see
+//! `lab::persist_audit_read`). The crate then does what it does for a directory:
 //! `Read::open_from` (C1-C4, every blob re-hashed), `Read::check` (pin, period,
 //! bracket, windows) and `book::load_book` (C5, C8, C9, C11). A read it refuses
 //! is refused by its rule code; no detail, which can hold a ledger name, leaves
@@ -14,6 +15,7 @@
 use super::voucher_window::{
     company_marks, AuditWindowFailure, AuditWindowReader, CompanyMarks, RetainedWindowRead,
     VoucherReadShape, WindowReadKind, WindowReadLimits, WINDOW_CHANGED_DURING_READ,
+    WINDOW_DIVIDED_BY_ALTERID,
 };
 use super::*;
 use crate::tally::agent_read_request::AgentReadRequest;
@@ -32,9 +34,6 @@ use std::io::Cursor;
 /// The assessment year the crate's rules exist for (`rules_for` refuses any other).
 const ASSESSMENT_YEAR: &str = "2026-27";
 
-/// A window plan that divides a day by AlterID span cannot become a read: the
-/// crate's windows must tile the period by date (C7).
-const WINDOW_DIVIDED_BY_ALTERID: &str = "audit_window_divided_by_alterid";
 const MARKS_MISSING: &str = "audit_window_marks_missing";
 const BOOK_UNUSABLE: &str = "audit_book_refused";
 const PART_UNPARSABLE: &str = "audit_part_unparsable";
@@ -60,6 +59,21 @@ pub(super) struct AuditBook {
     pub(super) engagement: Engagement,
     pub(super) book: Book,
     pub(super) evidence: Evidence,
+    /// The admitted read's stored bytes, kept only in a lab build, which can
+    /// write them out for a real-book parity record (`lab::persist_audit_read`).
+    #[cfg(feature = "lab-writes")]
+    pub(super) stored: StoredRead,
+}
+
+/// An admitted read as the crate opened it: its manifest, the manifest's
+/// sha256 and each part's bytes by their manifest path (`parts/<name>`).
+#[cfg(feature = "lab-writes")]
+pub(super) struct StoredRead {
+    pub(super) read_id: String,
+    pub(super) company_guid: String,
+    pub(super) manifest: Vec<u8>,
+    pub(super) manifest_sha256: String,
+    pub(super) blobs: std::collections::BTreeMap<String, Vec<u8>>,
 }
 
 /// Why the read was not made or not admitted: a code and whether the same read
@@ -301,14 +315,14 @@ fn memory_read(
         "bridge-audit-{}-{}-{}-{}",
         period.0.as_str(),
         period.1.as_str(),
-        before.vouchers,
-        before.masters
+        before.vouchers(),
+        before.masters()
     );
     let read_at = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
     let side = |marks: CompanyMarks, part: &str| {
         json!({
-            "alter_voucher_id": marks.vouchers,
-            "alter_master_id": marks.masters,
+            "alter_voucher_id": marks.reported_vouchers(),
+            "alter_master_id": marks.masters(),
             "part": part,
         })
     };
@@ -382,6 +396,14 @@ pub(super) async fn read_audit_book(
         engagement,
         book,
         evidence: evidence_of(&parts),
+        #[cfg(feature = "lab-writes")]
+        stored: StoredRead {
+            read_id,
+            company_guid: identity.company_guid().to_string(),
+            manifest: store.manifest,
+            manifest_sha256,
+            blobs: store.blobs,
+        },
     })
 }
 
@@ -400,6 +422,14 @@ fn evidence_of(parts: &[Collected]) -> Evidence {
         })
         .reduce(combine_evidence)
         .expect("a read has parts")
+}
+
+/// The limits the audit's window is read under. A book small enough for one
+/// request is counted too: the census is the only count of the window from
+/// outside its own data (ADR 0017). The period cannot be narrowed, so its read
+/// count is refused only when no measurement could fit it (#2173).
+pub(super) const fn audit_window_limits(limits: WindowReadLimits) -> WindowReadLimits {
+    limits.counting_small_books().refusing_at_the_floor()
 }
 
 /// Every part of the read, in order, and the marks it opened and closed on.
@@ -499,8 +529,6 @@ async fn collect_parts(
         voucher_types,
     ));
 
-    // A book small enough for one request is counted too: the census is the
-    // only count of the window from outside its own data (ADR 0017).
     let read = AuditWindowReader::new(runtime, config.clone())
         .read_window(
             identity,
@@ -508,7 +536,7 @@ async fn collect_parts(
             period.0,
             period.1,
             VoucherReadShape::EntryWildcard,
-            limits.counting_small_books(),
+            audit_window_limits(limits),
             |xml| parse_agent_rows(xml, guid),
         )
         .await;

@@ -1,11 +1,11 @@
 //! One user-approved voucher attempt (a Journal, Payment, Receipt or Contra);
 //! subsequent calls only reconcile its identity.
-use super::approval::{self, ApprovalBinding, Begin, Joined};
+use super::approval::{self, ApprovalBinding, Begin, HeldRequest, Joined, PreviewForm};
 use super::*;
 use crate::agent::evidence_from_runtime_read;
 use crate::tally::approved_import::{
     Answered, ApprovedImport, ApprovedImportAdmissionError, BeforeDispatchError,
-    PendingPostApproval, UnderLockRefusal,
+    PendingPostApproval, QueuedAdmission, UnderLockRefusal,
 };
 use bridge_tally_protocol::native_outstandings::{parse_company_currency, BaseCurrencyName};
 use bridge_tally_protocol::{parse_import_outcome, TallyImportApplicationStatus};
@@ -57,7 +57,7 @@ impl PostScope {
 const RECHECK_REFUSAL_BUDGET: usize = 4_096;
 
 /// Where a post stands with its person, when it returns without posting.
-enum ApprovalState {
+pub(super) enum ApprovalState {
     /// The dialog is open, with this much of its time limit left when known.
     Pending(Option<std::time::Duration>),
     Approved,
@@ -81,9 +81,19 @@ pub(in crate::agent) enum Entry {
 /// What a post's checked body came to: an answer, or an approval its Join
 /// found that the same call redeems by entering again from the top, so every
 /// check before the wait is made again after it.
-enum Step {
+pub(super) enum Step {
     Done(Box<ToolOutcome>),
     Redeem,
+}
+
+/// What an agent post's approval steps need to know about the post they serve,
+/// whichever kind it is: the tool a caller is told to call again, the batch,
+/// the company, and how many vouchers (one for a master) it would send.
+pub(super) struct ApprovalTarget<'a> {
+    pub(super) tool: &'a str,
+    pub(super) batch_id: &'a str,
+    pub(super) guid: &'a str,
+    pub(super) vouchers: usize,
 }
 
 /// What one pass of a post call came to: its answer, or a click its Join
@@ -98,7 +108,7 @@ pub(in crate::agent) enum Pass {
 }
 
 /// What waiting on a dialog came to.
-enum Waited {
+pub(super) enum Waited {
     /// Boxed: an approval carries an invoice's read plan (#1337), and the two
     /// other cases are a handle and a unit.
     Answered(Box<(Result<ApprovedImport, String>, Answered)>),
@@ -110,7 +120,7 @@ enum Waited {
 
 /// What is left of the call's budget for waiting on the person, never less
 /// than enough to have the dialog up before the call returns.
-fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
+pub(super) fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
     approval::CALL_BUDGET
         .saturating_sub(call_started.elapsed())
         .max(approval::MIN_DIALOG_WAIT)
@@ -123,6 +133,10 @@ fn call_budget(call_started: std::time::Instant) -> std::time::Duration {
 /// Only lock waits are bounded: the retry's own send, and the wire waits of the
 /// checks after it (each at most the policy total), are not counted, so the
 /// call can pass its ceiling by about that much and stay under the host limit.
+/// Nor is a drain met by the post's admission reads after a cut request
+/// (#2142): at most `DrainPolicy::worst_per_call`, which a test holds under the
+/// host limit with the ceiling. The marks readback's retry keeps a drain's
+/// worst case back from the ceiling as well.
 const AFTER_READ_REST_OF_POST: std::time::Duration = std::time::Duration::from_secs(13);
 /// A retry with less to wait than this is not worth its send.
 const AFTER_READ_MIN_RETRY_WAIT: std::time::Duration = std::time::Duration::from_secs(1);
@@ -148,7 +162,7 @@ fn after_read_retry_budget(
 /// admission read that meets a held lock is refused at once as
 /// `tally_endpoint_busy`, before the attempt is recorded and before anything is
 /// sent, rather than holding the call past its ceiling.
-fn redeem_pass_wire_budget(
+pub(super) fn redeem_pass_wire_budget(
     elapsed: std::time::Duration,
     shared_left: std::time::Duration,
 ) -> std::time::Duration {
@@ -174,7 +188,10 @@ fn after_read_cause(error: &anyhow::Error) -> &'static str {
 
 /// Wait up to `budget` for the person's answer, stopping at once if the call
 /// is withdrawn (#554): nothing is sent to Tally while waiting.
-async fn wait_for_answer(dialog: PendingPostApproval, budget: std::time::Duration) -> Waited {
+pub(super) async fn wait_for_answer(
+    dialog: PendingPostApproval,
+    budget: std::time::Duration,
+) -> Waited {
     let withdrawn = crate::tally::runtime::TOOL_CANCELLATION
         .try_with(Clone::clone)
         .ok();
@@ -272,8 +289,11 @@ impl Server {
     /// refused as busy after a sent post would record a lasting doubt on a
     /// clean batch (#697). A busy refusal has waited that whole budget, so it
     /// is tried once more with a second, cut to what the call has left of its
-    /// ceiling (#884); a refusal that survives is returned as it is.
-    async fn read_marks_after_post(
+    /// ceiling (#884); a refusal that survives is returned as it is. A read
+    /// refused because Tally is still finishing a request cut for time (#2142)
+    /// is tried once more after the refusal's own wait, when the call's
+    /// ceiling has room for both.
+    pub(super) async fn read_marks_after_post(
         &self,
         request: crate::tally::agent_read_request::AgentReadRequest,
         call_started: std::time::Instant,
@@ -287,17 +307,32 @@ impl Server {
                 .read_company_marks_once(self.tally_config(), request.clone()),
         )
         .await;
-        let busy = first.as_ref().err().is_some_and(|error| {
-            crate::endpoint_wire::wire_refusal(error)
-                == Some(bridge_tally_transport::WireRefusal::Busy)
-        });
+        let pause = match first
+            .as_ref()
+            .err()
+            .and_then(crate::endpoint_wire::wire_refusal)
+        {
+            Some(bridge_tally_transport::WireRefusal::Busy) => Some(std::time::Duration::ZERO),
+            Some(bridge_tally_transport::WireRefusal::Draining { retry_after_ms }) => {
+                Some(std::time::Duration::from_millis(retry_after_ms))
+            }
+            _ => None,
+        };
         let policy_total = self.runtime.wire_gate_config().retry().total();
-        let Some(budget) = busy
-            .then(|| after_read_retry_budget(call_started.elapsed(), policy_total))
-            .flatten()
-        else {
+        // The retried read may meet a drain of its own, so its worst case is
+        // kept back from the ceiling too.
+        let drain = self
+            .runtime
+            .wire_gate_config()
+            .drain()
+            .map_or(std::time::Duration::ZERO, |policy| policy.worst_per_call());
+        let Some((pause, budget)) = pause.and_then(|pause| {
+            after_read_retry_budget(call_started.elapsed() + pause + drain, policy_total)
+                .map(|budget| (pause, budget))
+        }) else {
             return first;
         };
+        tokio::time::sleep(pause).await;
         #[cfg(test)]
         let _ = MARKS_READS.try_with(|reads| reads.lock().unwrap().push(Some(budget)));
         crate::tally::runtime::with_operation_wire_budget_of(
@@ -415,8 +450,9 @@ impl Server {
     /// open (`pending`) or answered and not yet posted (`approved`). Nothing
     /// was sent to Tally; calling `post_import` again with the same batch
     /// waits on the dialog or posts the approved batch.
-    fn approval_outcome(
+    pub(super) fn approval_outcome(
         &self,
+        tool: &str,
         batch_id: &str,
         guid: &str,
         state: ApprovalState,
@@ -435,7 +471,7 @@ impl Server {
                     .approval_remaining(batch_id)
                     .map(|remaining| remaining.as_secs()),
                 "retry_after_s": 0,
-                "next_step": "Call post_import again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s.",
+                "next_step": format!("Call {tool} again now with the same batch: nothing is posted until you do, and the approval lapses after expires_in_s."),
             }),
         };
         ToolOutcome {
@@ -449,6 +485,150 @@ impl Server {
             evidence,
             company_guid: Some(guid.to_string()),
             truncated: false,
+        }
+    }
+
+    /// What a call finds held for its batch, before it checks anything else
+    /// (#725): the one place an agent post's Pending, Redeem and Join are
+    /// decided, shared by the voucher and the master tools so neither forks it.
+    /// `Ok(Ok((redeeming, form)))` goes on, with the form the ask shows or the
+    /// approval is bound to; `Ok(Err(step))` is the call's answer, or a click
+    /// found that a second, redeem-only pass takes.
+    pub(super) async fn begin_agent_approval(
+        &self,
+        target: &ApprovalTarget<'_>,
+        redeem_only: bool,
+        call_started: std::time::Instant,
+        accumulated: &Evidence,
+    ) -> Result<Result<(bool, PreviewForm), Step>, ToolFailure> {
+        let ApprovalTarget {
+            tool,
+            batch_id,
+            guid,
+            vouchers,
+        } = *target;
+        // Re-entered to redeem what its Join found: only that approval lets it
+        // go on, and it never asks (#725 slice 2.0).
+        if redeem_only {
+            return Ok(Ok((true, self.post_approvals.begin_redeem(batch_id)?)));
+        }
+        match self.post_approvals.begin(batch_id) {
+            Begin::Ask(form) => Ok(Ok((false, form))),
+            Begin::Redeem(form) => Ok(Ok((true, form))),
+            Begin::Busy(code) => Err(code.to_string().into()),
+            Begin::Refused(code) => Err(code.into()),
+            Begin::Waiting => Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                tool,
+                batch_id,
+                guid,
+                ApprovalState::Pending(None),
+                accumulated.clone(),
+            ))))),
+            Begin::Join(dialog) => {
+                // Only a click that landed while no call waited is posted by the
+                // call that finds it (#725 slice 2.0): posting after this call's
+                // own wait could run past the host's timeout on a large book
+                // (#852).
+                let answered_at_join = dialog.answered().is_some();
+                let waited = match wait_for_answer(dialog, call_budget(call_started)).await {
+                    Waited::Cancelled => return Err("request_cancelled".to_string().into()),
+                    Waited::Open(dialog) => Err(dialog),
+                    Waited::Answered(answer) => Ok(*answer),
+                };
+                match self.post_approvals.settle_join(batch_id, waited) {
+                    Joined::StillOpen { remaining } => {
+                        Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                            tool,
+                            batch_id,
+                            guid,
+                            ApprovalState::Pending(Some(remaining)),
+                            accumulated.clone(),
+                        )))))
+                    }
+                    // Posted by this call when it found the click already made
+                    // and the redeem fits in it, entering again from the top so
+                    // every check is made anew.
+                    Joined::Approved
+                        if answered_at_join
+                            && self
+                                .post_approvals
+                                .redeem_fits_in_call(call_started.elapsed(), vouchers) =>
+                    {
+                        Ok(Err(Step::Redeem))
+                    }
+                    Joined::Approved => Ok(Err(Step::Done(Box::new(self.approval_outcome(
+                        tool,
+                        batch_id,
+                        guid,
+                        ApprovalState::Approved,
+                        accumulated.clone(),
+                    ))))),
+                    Joined::Refused(code) => Err(code.into()),
+                }
+            }
+        }
+    }
+
+    /// Ask the person in `asked`, wait for the answer within the call's budget,
+    /// and hold what came of it for a later call: the shared tail of every
+    /// agent post's approval. `Ok(Some(step))` is the call's answer (the dialog
+    /// is still open, or was answered too late in the call for the post to
+    /// fit); `Ok(None)` is an approval held for this call to take at once.
+    pub(super) async fn ask_and_hold(
+        &self,
+        target: &ApprovalTarget<'_>,
+        asked: PendingPostApproval,
+        binding: &ApprovalBinding,
+        held: impl Into<HeldRequest>,
+        call_started: std::time::Instant,
+        accumulated: &Evidence,
+    ) -> Result<Option<Step>, ToolFailure> {
+        let ApprovalTarget {
+            tool,
+            batch_id,
+            guid,
+            vouchers,
+        } = *target;
+        match wait_for_answer(asked, call_budget(call_started)).await {
+            Waited::Cancelled => Err("request_cancelled".to_string().into()),
+            Waited::Open(dialog) => {
+                let remaining = dialog.remaining();
+                self.post_approvals
+                    .hold_pending(batch_id, binding.clone(), dialog, held)?;
+                Ok(Some(Step::Done(Box::new(self.approval_outcome(
+                    tool,
+                    batch_id,
+                    guid,
+                    ApprovalState::Pending(Some(remaining)),
+                    accumulated.clone(),
+                )))))
+            }
+            Waited::Answered(answer) => {
+                let (answer, answered) = *answer;
+                self.post_approvals.hold_approved(
+                    batch_id,
+                    binding.clone(),
+                    answer?,
+                    held,
+                    answered,
+                )?;
+                // Answered too late in the call for the post to fit: the next
+                // call redeems it, after checking the book again.
+                if self
+                    .post_approvals
+                    .fits_in_call(call_started.elapsed(), vouchers)
+                {
+                    Ok(None)
+                } else {
+                    Ok(Some(Step::Done(Box::new(self.approval_outcome(
+                        tool,
+                        batch_id,
+                        guid,
+                        ApprovalState::Approved,
+                        accumulated.clone(),
+                    )))))
+                }
+            }
         }
     }
 
@@ -665,7 +845,7 @@ impl Server {
             }
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
-            let redeeming = match scope {
+            let (redeeming, form) = match scope {
                 // Never built by the flow: only an agent's Join hands on a
                 // redeem, and a second pass keeps its scope. The types allow
                 // this pair, and the desktop's post asks through its own
@@ -674,71 +854,28 @@ impl Server {
                 PostScope::JournalOnly if redeem_only => {
                     return Err("import_approval_revoked".to_string().into())
                 }
-                PostScope::JournalOnly => false,
+                PostScope::JournalOnly => (false, PreviewForm::Listed),
                 // Re-entered to redeem what its Join found: only that
                 // approval lets it go on, and it never asks (#725 slice 2.0).
-                PostScope::Vouchers if redeem_only => {
-                    self.post_approvals.begin_redeem(batch_id)?;
-                    true
-                }
-                PostScope::Vouchers => match self.post_approvals.begin(batch_id) {
-                    Begin::Ask => false,
-                    Begin::Redeem => true,
-                    Begin::Busy(code) => return Err(code.to_string().into()),
-                    Begin::Refused(code) => return Err(code.into()),
-                    Begin::Waiting => {
-                        return Ok(Step::Done(Box::new(self.approval_outcome(
-                            batch_id,
-                            guid,
-                            ApprovalState::Pending(None),
-                            accumulated.clone(),
-                        ))))
-                    }
-                    Begin::Join(dialog) => {
-                        // Only a click that landed while no call waited is
-                        // posted by the call that finds it (#725 slice 2.0):
-                        // posting after this call's own wait could run past
-                        // the host's timeout on a large book (#852).
-                        let answered_at_join = dialog.answered().is_some();
-                        let waited = match wait_for_answer(dialog, call_budget(call_started)).await
-                        {
-                            Waited::Cancelled => {
-                                return Err("request_cancelled".to_string().into())
-                            }
-                            Waited::Open(dialog) => Err(dialog),
-                            Waited::Answered(answer) => Ok(*answer),
-                        };
-                        return match self.post_approvals.settle_join(batch_id, waited) {
-                            Joined::StillOpen { remaining } => {
-                                Ok(Step::Done(Box::new(self.approval_outcome(
-                                    batch_id,
-                                    guid,
-                                    ApprovalState::Pending(Some(remaining)),
-                                    accumulated.clone(),
-                                ))))
-                            }
-                            // Posted by this call when it found the click
-                            // already made and the redeem fits in it, entering
-                            // again from the top so every check is made anew.
-                            Joined::Approved
-                                if answered_at_join
-                                    && self.post_approvals.redeem_fits_in_call(
-                                        call_started.elapsed(),
-                                        line.vouchers.len(),
-                                    ) =>
-                            {
-                                Ok(Step::Redeem)
-                            }
-                            Joined::Approved => Ok(Step::Done(Box::new(self.approval_outcome(
+                PostScope::Vouchers => {
+                    match self
+                        .begin_agent_approval(
+                            &ApprovalTarget {
+                                tool: "post_import",
                                 batch_id,
                                 guid,
-                                ApprovalState::Approved,
-                                accumulated.clone(),
-                            )))),
-                            Joined::Refused(code) => Err(code.into()),
-                        };
+                                vouchers: line.vouchers.len(),
+                            },
+                            redeem_only,
+                            call_started,
+                            &accumulated,
+                        )
+                        .await?
+                    {
+                        Ok(asked) => asked,
+                        Err(step) => return Ok(step),
                     }
-                },
+                }
             };
             // Tally may have seen any REMOTEID the journal records, and resending
             // one can undo a person's cancel or delete (protocol reference §9.3).
@@ -774,7 +911,10 @@ impl Server {
                 send_transfer_refusal = Some((detail, step));
                 return Err(code.to_string().into());
             }
-            let preview = review_preview_for(&line, &self.settings.endpoint, scope)?;
+            let ShownPreview {
+                text: preview,
+                lists_vouchers: preview_lists_vouchers,
+            } = review_preview_for_form(&line, &self.settings.endpoint, scope, form)?;
             // Number matching precedence is not qualified for native Create.
             // Previously dispatched numbered batches remain reconcilable above.
             // Also admits, on this read's measurement, the whole-window request
@@ -979,7 +1119,7 @@ impl Server {
             let mut redemption = None;
             let (request, native) = match scope {
                 PostScope::JournalOnly => (
-                    ApprovedImport::confirm(
+                    ApprovedImport::confirm_vouchers(
                         xml,
                         &preview,
                         voucher_dates,
@@ -997,7 +1137,7 @@ impl Server {
                 PostScope::Vouchers => {
                     // What the person is shown, and what it is about: an
                     // approval is redeemed only for exactly this (#725).
-                    let binding = ApprovalBinding::new(&line, &preview, &ledger_binding);
+                    let binding = ApprovalBinding::new(&line, &preview, &ledger_binding, form);
                     if !redeeming {
                         let asked = PendingPostApproval::ask(
                             xml,
@@ -1009,46 +1149,31 @@ impl Server {
                             group_collection_request,
                             currency_request,
                             company_marks_request.clone(),
+                            // A batch's box with the voucher lines that does
+                            // not fit the screen is noted, so its next ask
+                            // shows the totals (#1832). Nothing else is: not
+                            // a totals box, nor a listed ask whose text
+                            // already stood in for the voucher lines.
+                            (form == PreviewForm::Listed && preview_lists_vouchers)
+                                .then(|| self.post_approvals.note_listed_did_not_fit(batch_id)),
                         );
-                        match wait_for_answer(asked, call_budget(call_started)).await {
-                            Waited::Cancelled => {
-                                return Err("request_cancelled".to_string().into())
-                            }
-                            Waited::Open(dialog) => {
-                                let remaining = dialog.remaining();
-                                self.post_approvals
-                                    .hold_pending(batch_id, binding, dialog, native)?;
-                                return Ok(Step::Done(Box::new(self.approval_outcome(
+                        if let Some(step) = self
+                            .ask_and_hold(
+                                &ApprovalTarget {
+                                    tool: "post_import",
                                     batch_id,
                                     guid,
-                                    ApprovalState::Pending(Some(remaining)),
-                                    accumulated.clone(),
-                                ))));
-                            }
-                            Waited::Answered(answer) => {
-                                let (answer, answered) = *answer;
-                                self.post_approvals.hold_approved(
-                                    batch_id,
-                                    binding.clone(),
-                                    answer?,
-                                    native,
-                                    answered,
-                                )?;
-                                // Answered too late in the call for the post to
-                                // fit: the next call redeems it, after checking
-                                // the book again.
-                                if !self
-                                    .post_approvals
-                                    .fits_in_call(call_started.elapsed(), line.vouchers.len())
-                                {
-                                    return Ok(Step::Done(Box::new(self.approval_outcome(
-                                        batch_id,
-                                        guid,
-                                        ApprovalState::Approved,
-                                        accumulated.clone(),
-                                    ))));
-                                }
-                            }
+                                    vouchers: line.vouchers.len(),
+                                },
+                                asked,
+                                &binding,
+                                native,
+                                call_started,
+                                &accumulated,
+                            )
+                            .await?
+                        {
+                            return Ok(step);
                         }
                     }
                     // The dialog may have stayed open: an invoice's masters are
@@ -1077,9 +1202,16 @@ impl Server {
                         accumulated = combine_evidence(accumulated.clone(), evidence);
                         invoice_plan = Some(plan);
                     }
-                    let (taken, request, native) =
+                    let (taken, request, held) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;
                     redemption = Some(taken);
+                    // The binding was a voucher binding, so only a voucher
+                    // request can come back; a master request here is a wiring
+                    // fault, refused as a changed binding with the approval
+                    // unspent (the redemption lapses as this returns).
+                    let HeldRequest::Vouchers(native) = held else {
+                        return Err("import_approval_binding_changed".to_string().into());
+                    };
                     (request.with_invoice(invoice_plan.clone()), native)
                 }
             };
@@ -1111,36 +1243,15 @@ impl Server {
                     &identity,
                     request,
                     |queued| {
-                        recheck_import_admission(
+                        recheck_voucher_queue(
+                            queued,
                             &line,
-                            identity.company_guid(),
-                            &company.name,
-                            queued.first,
-                            queued.second,
-                            queued.catalogue,
-                            queued.groups,
-                            queued.currencies,
-                            queued.ledger_binding,
+                            &identity,
+                            &aimed_mark,
                             invoice_identity,
-                            queued.invoice,
                             invoice_control.as_ref(),
-                        )?;
-                        admit_queued_aim(
-                            queued.company_marks_at_binding,
-                            queued.company_marks,
-                            identity.company_guid(),
-                            &company.name,
                             &numbering_admission,
-                        )?;
-                        let mark = location::aimed_voucher_mark(
-                            queued.company_marks,
-                            identity.company_guid(),
-                            &company.name,
-                        );
-                        if let Ok(mut aimed) = aimed_mark.lock() {
-                            *aimed = mark;
-                        }
-                        Ok(())
+                        )
                     },
                     || {
                         // The file lock covers only the admission+synced append. It is not
@@ -1282,155 +1393,7 @@ impl Server {
                         _ => None,
                     }
                 });
-                let code = if error.chain().any(|cause| {
-                    cause.is::<crate::tally::approved_import::AmbiguousImportCompany>()
-                }) {
-                    "import_company_scope_ambiguous"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
-                    )
-                }) {
-                    "education_voucher_date_unsupported"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::PreexistingIdentity)
-                    )
-                }) {
-                    "import_preexisting_identity"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::LedgerIdentityChanged)
-                    )
-                }) {
-                    "import_masters_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BankClassificationChanged)
-                    )
-                }) {
-                    "import_bank_classification_changed"
-                } else if invoice_field.is_some() {
-                    "import_invoice_masters_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
-                    )
-                }) {
-                    "cash_ledger_not_cash_in_hand"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
-                    )
-                }) {
-                    CASH_LEDGERS_NOT_RECORDED
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
-                    )
-                }) {
-                    super::bill_wise::BILL_WISE_NOT_RECORDED
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BillWiseChanged)
-                    )
-                }) {
-                    "import_bill_wise_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
-                    )
-                }) {
-                    "ledger_has_folded_twin"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::AdmissionInconsistent)
-                    )
-                }) {
-                    "import_post_admission_inconsistent"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CompanyScopeChanged)
-                    )
-                }) {
-                    "post_company_scope_changed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
-                    )
-                }) {
-                    "post_company_scope_unconfirmed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MultiCurrencyBook { .. })
-                    )
-                }) {
-                    "import_multi_currency_unsupported"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
-                    )
-                }) {
-                    "import_base_currency_undetermined"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MastersMoved)
-                    )
-                }) {
-                    "post_masters_moved"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::MastersUnconfirmed)
-                    )
-                }) {
-                    "post_masters_unconfirmed"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::CatalogueUnreadable(_))
-                    )
-                }) {
-                    "post_catalogue_unreadable"
-                } else if error.chain().any(|cause| {
-                    matches!(
-                        cause.downcast_ref::<ApprovedImportAdmissionError>(),
-                        Some(ApprovedImportAdmissionError::GroupExportInvalid { .. })
-                    )
-                }) {
-                    "group_export_invalid"
-                } else if let Some(refusal) = error
-                    .chain()
-                    .find_map(|cause| cause.downcast_ref::<UnderLockRefusal>())
-                {
-                    // Refused under the admission lock before the intent was
-                    // appended (#711): nothing was recorded or sent.
-                    refusal.code()
-                } else if error
-                    .chain()
-                    .any(|cause| cause.is::<crate::tally::approved_import::PreIntentQueueRefusal>())
-                {
-                    // Refused in the queue before the intent (#656): nothing
-                    // was sent, so the outcome is known.
-                    "post_queue_read_failed"
-                } else {
-                    "import_dispatch_outcome_unknown"
-                };
+                let code = refusal_code(&error);
                 let code = invoice_refusal.as_deref().unwrap_or(code);
                 // A queue read that failed in transport has no typed cause of
                 // its own; the transport's safe code names it.
@@ -1798,6 +1761,247 @@ impl Server {
     }
 }
 
+/// The queue's recheck of a voucher post: the batch's vouchers against the
+/// reads the queue made, then the aim, remembering the target's voucher mark
+/// from the aim snapshot for the intent. A master admission handed to it is a
+/// wiring fault, refused with a typed error and never posted.
+#[allow(clippy::too_many_arguments)]
+fn recheck_voucher_queue(
+    queued: QueuedAdmission<'_>,
+    line: &ImportLedgerLine,
+    identity: &crate::tally::VerifiedCompanyIdentity,
+    aimed_mark: &std::sync::Mutex<Option<u64>>,
+    invoice_identity: InvoiceIdentity,
+    invoice_control: Option<&ledger::NumberControl>,
+    numbering: &numbering::NumberingAdmission,
+) -> anyhow::Result<()> {
+    let QueuedAdmission::Vouchers {
+        first,
+        second,
+        catalogue,
+        groups,
+        currencies,
+        company_marks_at_binding,
+        company_marks,
+        ledger_binding,
+        invoice,
+    } = queued
+    else {
+        return Err(ApprovedImportAdmissionError::AdmissionInconsistent.into());
+    };
+    let (company_guid, company_name) = (identity.company_guid(), identity.display_name());
+    recheck_import_admission(
+        line,
+        identity,
+        first,
+        second,
+        catalogue,
+        groups,
+        currencies,
+        ledger_binding,
+        invoice_identity,
+        invoice,
+        invoice_control,
+    )?;
+    admit_queued_voucher_aim(
+        company_marks_at_binding,
+        company_marks,
+        company_guid,
+        company_name,
+        numbering,
+    )?;
+    let mark = location::aimed_voucher_mark(company_marks, company_guid, company_name);
+    if let Ok(mut aimed) = aimed_mark.lock() {
+        *aimed = mark;
+    }
+    Ok(())
+}
+
+/// The code a refused or failed approved post reports, from the typed cause
+/// in its error chain. The first cause that has a rung names it; a refusal
+/// that was made before the intent and has no rung of its own is
+/// `post_queue_read_failed`, and anything else is an unknown outcome, so a
+/// cause added without a rung here is reported as one of those two rather
+/// than as itself. Both a voucher post and a master post end here.
+pub(super) fn refusal_code(error: &anyhow::Error) -> &'static str {
+    if error
+        .chain()
+        .any(|cause| cause.is::<crate::tally::approved_import::AmbiguousImportCompany>())
+    {
+        "import_company_scope_ambiguous"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+        )
+    }) {
+        "education_voucher_date_unsupported"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::PreexistingIdentity)
+        )
+    }) {
+        "import_preexisting_identity"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::LedgerIdentityChanged)
+        )
+    }) {
+        "import_masters_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BankClassificationChanged)
+        )
+    }) {
+        "import_bank_classification_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::InvoiceMastersChanged { .. })
+        )
+    }) {
+        "import_invoice_masters_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CashLedgerNotCashInHand { .. })
+        )
+    }) {
+        "cash_ledger_not_cash_in_hand"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CashLedgersNotRecorded)
+        )
+    }) {
+        CASH_LEDGERS_NOT_RECORDED
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseNotRecorded)
+        )
+    }) {
+        super::bill_wise::BILL_WISE_NOT_RECORDED
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BillWiseChanged)
+        )
+    }) {
+        "import_bill_wise_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+        )
+    }) {
+        "ledger_has_folded_twin"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::AdmissionInconsistent)
+        )
+    }) {
+        "import_post_admission_inconsistent"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeChanged)
+        )
+    }) {
+        "post_company_scope_changed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CompanyScopeUnconfirmed)
+        )
+    }) {
+        "post_company_scope_unconfirmed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MultiCurrencyBook { .. })
+        )
+    }) {
+        "import_multi_currency_unsupported"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::BaseCurrencyUndetermined)
+        )
+    }) {
+        "import_base_currency_undetermined"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersMoved)
+        )
+    }) {
+        "post_masters_moved"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MastersUnconfirmed)
+        )
+    }) {
+        "post_masters_unconfirmed"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::CatalogueUnreadable(_))
+        )
+    }) {
+        "post_catalogue_unreadable"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::GroupExportInvalid { .. })
+        )
+    }) {
+        "group_export_invalid"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterWritesNeedLicensedMode)
+        )
+    }) {
+        "master_writes_need_licensed_mode"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterNameTaken { .. })
+        )
+    }) {
+        "master_name_taken"
+    } else if error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ApprovedImportAdmissionError>(),
+            Some(ApprovedImportAdmissionError::MasterLedgerIndexUnavailable { .. })
+        )
+    }) {
+        "master_ledger_index_unavailable"
+    } else if let Some(refusal) = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<UnderLockRefusal>())
+    {
+        // Refused under the admission lock before the intent was
+        // appended (#711): nothing was recorded or sent.
+        refusal.code()
+    } else if error
+        .chain()
+        .any(|cause| cause.is::<crate::tally::approved_import::PreIntentQueueRefusal>())
+    {
+        // Refused in the queue before the intent (#656): nothing
+        // was sent, so the outcome is known.
+        "post_queue_read_failed"
+    } else {
+        "import_dispatch_outcome_unknown"
+    }
+}
+
 fn post_failure_outcome(
     batch_id: &str,
     guid: &str,
@@ -1825,7 +2029,7 @@ fn post_failure_outcome(
 /// The cause a failure adds to its code: none when it would only repeat the
 /// code, as a wire refusal's transport code does once `from_runtime` made it the
 /// code itself (#697).
-fn refusal_cause(
+pub(super) fn refusal_cause(
     code: &str,
     group: Option<&'static str>,
     transport: Option<&'static str>,
@@ -1842,7 +2046,12 @@ const BUSY_AFTER_POST_NEXT_STEP: &str = "The post was already sent and only its 
 /// the next call asks the person again.
 const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port was busy. Call post_import with this same batch again after retry_after_s seconds, once Tally is free. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
-/// The same, when whether the post was sent could not be observed.
+/// The same, when Tally was still busy with an earlier request cut for time
+/// (#2142): nothing was posted, and the approval has lapsed.
+const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+
+/// What a caller does when the port was busy and whether the post was sent
+/// could not be observed.
 const BUSY_UNKNOWN_ATTEMPT_NEXT_STEP: &str = "Whether the post was sent could not be observed. Call verify_import with this original batch after retry_after_s seconds. Never rebuild the batch and never call post_import again before it says the batch is not in Tally.";
 
 /// What a caller does when an earlier invoice of the company stops this one
@@ -1852,11 +2061,17 @@ const STOPPED_NEXT_STEP: &str = "Nothing was sent and the approval is withdrawn.
 /// What a caller does when another batch already sent, or was found to have
 /// posted, a row of this one (#876). Tally's counters for a rejected send are
 /// not proof that the row is absent now, so Bridge never lifts the block itself.
-const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so. The same holds when verify_import reports that batch book_rolled_back: a backup was restored over the book and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it, except an invoice released as described above.";
+const TXN_ALREADY_POSTED_NEXT_STEP: &str = "Nothing was sent. Another batch of this company already went to Tally with this row, or was found posted. Call verify_import with that earlier batch (blocking_batch_id names it; when it is absent, verify the company's recent batches). If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: do not post it again, and correct the posted voucher in Tally if its ledger is wrong. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or amend a batch that was imported by hand); if it is a second real transaction that is not in the book, rebuild that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot post this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so. The same holds when verify_import reports that batch book_rolled_back: the company's voucher mark was seen below that batch's, which a book restored from a backup or replaced by another copy shows, and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too. For an overlapping statement, rebuild without the rows already posted. Never rebuild a row to retry it, except an invoice released as described above.";
 
 /// What a caller is told when `post_import` refuses a saved batch's own text
 /// before any attempt (#1055).
 const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a narration, reference or voucher number that cannot be posted, and a saved batch cannot be changed. Correct the text, build the batch again, then post the new one.";
+
+/// What a caller is told when the approval window for a saved batch was too
+/// large to show whole, by the batch's length or for the screen it would open
+/// on, before any attempt (#1780). The desktop's Journal screen shows the
+/// message alone.
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
@@ -1895,6 +2110,12 @@ fn reconciliation_failure_payload(
     if code == "voucher_text_invalid" && attempted == Some(false) {
         payload["result"]["error"]["message"] = json!(TEXT_REFUSED_MESSAGE);
     }
+    // The window for the batch was too large to show whole. Asking again soon
+    // shows a window that listed the vouchers as totals only (#1832), and does
+    // not shrink any other, so the message says what does.
+    if code == "import_review_too_large" && attempted == Some(false) {
+        payload["result"]["error"]["message"] = json!(REVIEW_TOO_LARGE_MESSAGE);
+    }
     // A transfer check refused the batch, and it refuses again on every request
     // until the batch is built again: the desktop is told so, not to review.
     if attempted == Some(false) && transfers::SEND_REFUSALS.contains(&code) {
@@ -1907,16 +2128,20 @@ fn reconciliation_failure_payload(
     if code == DESKTOP_LEDGER_LINE_BREAK {
         payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
     }
-    if code == "tally_endpoint_busy" {
-        payload["result"]["error"]["retry_after_s"] =
-            json!(bridge_tally_transport::WIRE_BUSY_RETRY_AFTER.as_secs());
+    // A draining endpoint (#2142) is held back like a busy one: nothing was
+    // sent by the refused send, and the same next steps hold.
+    if let Some(after) = crate::endpoint_wire::wire_retry_after_s(code) {
+        payload["result"]["error"]["retry_after_s"] = json!(after);
         match attempted {
             Some(true) => {
                 payload["result"]["error"]["next_step"] = json!(BUSY_AFTER_POST_NEXT_STEP)
             }
             None => payload["result"]["error"]["next_step"] = json!(BUSY_UNKNOWN_ATTEMPT_NEXT_STEP),
             Some(false) => {
-                payload["result"]["error"]["next_step"] = json!(BUSY_BEFORE_ATTEMPT_NEXT_STEP)
+                payload["result"]["error"]["next_step"] = json!(match code {
+                    "tally_endpoint_draining" => DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+                    _ => BUSY_BEFORE_ATTEMPT_NEXT_STEP,
+                })
             }
         }
     }
@@ -2223,16 +2448,16 @@ fn name_preexisting_rows(
 
 /// The aim check on the snapshot the queue read last before the POST (#574).
 /// The aim check (#574), then the master mark (#239): the target's ALTMSTID in
-/// the aim snapshot must equal the one read as the queue's binding reads began,
-/// and that one must equal the mark the voucher numbering was read under before
-/// the approval (bridge#724), so no master moved from that read to the POST.
-fn admit_queued_aim(
+/// the aim snapshot must equal the one read as the queue's binding reads began.
+/// A voucher post and a master post both make it; the binding snapshot's rows
+/// are returned for the check only a voucher post adds
+/// ([`admit_queued_voucher_aim`]).
+pub(super) fn admit_queued_aim(
     marks_at_binding: &str,
     marks: &str,
     company_guid: &str,
     company_name: &str,
-    numbering: &numbering::NumberingAdmission,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<location::LoadedCompanyMarks>> {
     let rows = location::parse_all_company_marks(marks)
         .map_err(|_| ApprovedImportAdmissionError::CompanyScopeUnconfirmed)?;
     location::admit_post_target(&rows, company_guid, company_name)
@@ -2244,6 +2469,20 @@ fn admit_queued_aim(
         Some(false) => return Err(ApprovedImportAdmissionError::MastersMoved.into()),
         None => return Err(ApprovedImportAdmissionError::MastersUnconfirmed.into()),
     }
+    Ok(at_binding)
+}
+
+/// [`admit_queued_aim`] for a voucher post, whose binding snapshot must also
+/// equal the mark the voucher numbering was read under before the approval
+/// (bridge#724), so no master moved from that read to the POST.
+fn admit_queued_voucher_aim(
+    marks_at_binding: &str,
+    marks: &str,
+    company_guid: &str,
+    company_name: &str,
+    numbering: &numbering::NumberingAdmission,
+) -> anyhow::Result<()> {
+    let at_binding = admit_queued_aim(marks_at_binding, marks, company_guid, company_name)?;
     numbering
         .admit_at_binding(&at_binding, company_guid, company_name)
         .map_err(Into::into)
@@ -2252,8 +2491,7 @@ fn admit_queued_aim(
 #[allow(clippy::too_many_arguments)]
 fn recheck_import_admission(
     line: &ImportLedgerLine,
-    company_guid: &str,
-    company_name: &str,
+    identity: &crate::tally::VerifiedCompanyIdentity,
     first: &str,
     second: &str,
     catalogue: &str,
@@ -2264,6 +2502,7 @@ fn recheck_import_admission(
     invoice: Option<crate::tally::approved_import::QueuedInvoice<'_>>,
     invoice_control: Option<&ledger::NumberControl>,
 ) -> anyhow::Result<()> {
+    let (company_guid, company_name) = (identity.company_guid(), identity.display_name());
     // The ledgers the build found under Cash-in-Hand (#815): a record without
     // them predates the field and has nothing to check again.
     let cash_in_hand = line
@@ -2354,13 +2593,7 @@ fn recheck_import_admission(
             },
         )?;
         super::invoice::admit_queued_invoice(
-            voucher,
-            company_name,
-            company_guid,
-            &catalogue,
-            control,
-            &today,
-            &queued,
+            voucher, identity, &catalogue, control, &today, &queued,
         )?;
     }
     // The binding above compares each ledger's name and GUID, not its parent,
@@ -2920,6 +3153,41 @@ pub(super) fn review_preview_for(
     }
 }
 
+/// [`review_preview_for`] in the form an ask shows (#1832). The desktop's post
+/// shows one Journal and has no other form.
+pub(super) fn review_preview_for_form(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    scope: PostScope,
+    form: PreviewForm,
+) -> Result<ShownPreview, String> {
+    match scope {
+        PostScope::JournalOnly => {
+            admit_fresh_saved_voucher(line, endpoint).map(|text| ShownPreview {
+                text,
+                lists_vouchers: false,
+            })
+        }
+        PostScope::Vouchers => {
+            review_text(line, endpoint, &agent_post_timing_lines(), form).map(|shown| {
+                let lists_vouchers = shown.lists_vouchers();
+                ShownPreview {
+                    text: shown.into_string(),
+                    lists_vouchers,
+                }
+            })
+        }
+    }
+}
+
+/// A preview and whether it lists the batch's vouchers one line each: what the
+/// box shows, so that a box that did not fit is noted only when it listed them
+/// (#1832).
+pub(super) struct ShownPreview {
+    pub(super) text: String,
+    pub(super) lists_vouchers: bool,
+}
+
 /// The preview an agent's post shows: the voucher or batch, and when it is
 /// posted, all inside the dialog's caps.
 pub(super) fn agent_review_preview(
@@ -2947,20 +3215,30 @@ fn review_preview_with(
     endpoint: &super::super::TallyEndpointConfig,
     footer: &[String],
 ) -> Result<String, String> {
-    review_text(line, endpoint, footer).map(ReviewText::into_string)
+    review_preview_with_form(line, endpoint, footer, PreviewForm::Listed)
+}
+
+fn review_preview_with_form(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    footer: &[String],
+    form: PreviewForm,
+) -> Result<String, String> {
+    review_text(line, endpoint, footer, form).map(ReviewText::into_string)
 }
 
 fn review_text(
     line: &ImportLedgerLine,
     endpoint: &super::super::TallyEndpointConfig,
     footer: &[String],
+    form: PreviewForm,
 ) -> Result<ReviewText, String> {
     let company = line.company.as_ref().ok_or("import_post_company_missing")?;
     let origin =
         super::super::canonical_loopback_origin(endpoint).map_err(|_| "host_setting_invalid")?;
     let (debit, credit) = totals(&line.vouchers)?;
     if line.vouchers.len() > 1 {
-        return batch_review_text(line, company, &origin, &debit, &credit, footer);
+        return batch_review_text(line, company, &origin, &debit, &credit, footer, form);
     }
     let voucher = &line.vouchers[0];
     if voucher.voucher_type.is_invoice() {
@@ -3025,8 +3303,8 @@ fn review_text(
     // after every line ComplyEaze Bridge writes itself, the footer included.
     // The date line says where they are.
     let preview = format!("Create ONE {} in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}\nDate: {}  Voucher number: {}  {cue}\n\n{}\n{under}\nTotal debit: {}  Total credit: {}{classification}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually.\nPause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
-        voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, company.books_from.as_str(),
-        voucher.date.as_str(), voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
+        voucher.voucher_type.as_str(), quoted(&company.name), company.guid, company.company_number, shown_date(company.books_from.as_str()),
+        shown_date(voucher.date.as_str()), voucher.voucher_number.as_deref().map(quoted).unwrap_or_else(|| "Tally assigns it".into()),
         entries, debit.as_str(), credit.as_str(), line.batch_id);
     let preview = std::iter::once(preview)
         .chain(footer.iter().cloned())
@@ -3185,8 +3463,8 @@ fn invoice_review_preview(
         invoice_checked_hsn_line(warned)
     };
     let preview = format!("Create ONE Sales invoice in {}\nCompany GUID: {}\nCompany number: {}  Books from: {}\nTally: {origin}  {VOUCHER_TEXT_CUE}\nVoucher type: {}  Date: {}  Number: {}\nCustomer: {}\n{registration}  Place of supply: {}\nBill allocation: {allocation}\n{}\n{under}Total debit: {debit}  Total credit: {credit}\n{checked}\nBatch: {}\nLedgers checked by identity against the build; narrations sent as prepared, nothing added.\nDo not post a file already imported manually. Pause other edits/imports in this company.\nAfter a timeout, reconcile this batch; do not rebuild or resend it.",
-        quoted(&company.name), company.guid, company.company_number, company.books_from.as_str(),
-        quoted(&detail.voucher_type_name), voucher.date.as_str(), quoted(number),
+        quoted(&company.name), company.guid, company.company_number, shown_date(company.books_from.as_str()),
+        quoted(&detail.voucher_type_name), shown_date(voucher.date.as_str()), quoted(number),
         quoted(party), detail.place_of_supply, entries, line.batch_id);
     // The invoice's reference is its number. It and the narration come last,
     // under their heading, after the footer, as in the other one-voucher text.
@@ -3218,6 +3496,13 @@ fn invoice_review_preview(
 /// it will be posted, or `(none)`.
 pub(super) const VOUCHER_TEXT_HEADING: &str =
     "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----";
+/// A date in an approval or review text, in Tally's day-month-year form with
+/// the year in full (`14-Sep-2026`, #2101). A value that is not a date is shown as it is.
+pub(super) fn shown_date(yyyymmdd: &str) -> String {
+    bridge_tally_core::TallyDate::parse(yyyymmdd)
+        .map_or_else(|_| yyyymmdd.to_string(), |date| date.shown())
+}
+
 /// What the date line of a one-voucher approval text says about them.
 pub(super) const VOUCHER_TEXT_CUE: &str = "(the voucher's own text: last two lines)";
 /// What it says when the narration is shown in parts (#1535): the line
@@ -3483,7 +3768,7 @@ fn voucher_review_lines(
             format!(
                 "{} {}  {}  {ledger}  {narration}",
                 voucher.voucher_type.as_str(),
-                voucher.date.as_str(),
+                shown_date(voucher.date.as_str()),
                 value.as_str(),
             )
         };
@@ -3527,6 +3812,7 @@ fn batch_review_text(
     debit: &ExactDecimal,
     credit: &ExactDecimal,
     footer: &[String],
+    form: PreviewForm,
 ) -> Result<ReviewText, String> {
     let names = admit_review_text(
         [company.name.as_str()],
@@ -3575,7 +3861,7 @@ fn batch_review_text(
     }
     let (first, last) = date_window(line.vouchers.iter().map(|voucher| &voucher.date))
         .ok_or("voucher_count_invalid")?;
-    let (first, last) = (first.as_str(), last.as_str());
+    let (first, last) = (shown_date(first.as_str()), shown_date(last.as_str()));
     let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
     let marks = OnAccountMarks::of(line);
     let mut head = vec![
@@ -3587,7 +3873,7 @@ fn batch_review_text(
         format!(
             "Company number: {}  Books from: {}",
             company.company_number,
-            company.books_from.as_str()
+            shown_date(company.books_from.as_str())
         ),
         format!(
             "Types: {}",
@@ -3665,22 +3951,28 @@ fn batch_review_text(
     let reason = if line.vouchers.len() > BATCH_REVIEW_MAX_VOUCHER_LINES {
         VOUCHER_LINES_OVER_LIMIT
     } else if let Some(vouchers) = voucher_review_lines(&line.vouchers, !legend.is_empty())? {
-        let listed = whole(
-            [
-                if legend.is_empty() {
-                    VOUCHER_LINES_HEADING
-                } else {
-                    VOUCHER_LINES_HEADING_MARKED
-                },
-                VOUCHER_LINES_NARRATION_HEADING,
-            ]
-            .map(str::to_string)
-            .into_iter()
-            .chain(vouchers)
-            .collect(),
-        );
-        if fits(&listed) {
-            return marks.seal(line, listed.join("\n"));
+        // The totals form skips the listed attempt, and keeps every refusal
+        // before it: over the voucher limit, and lines that cannot be shown.
+        if form == PreviewForm::Listed {
+            let listed = whole(
+                [
+                    if legend.is_empty() {
+                        VOUCHER_LINES_HEADING
+                    } else {
+                        VOUCHER_LINES_HEADING_MARKED
+                    },
+                    VOUCHER_LINES_NARRATION_HEADING,
+                ]
+                .map(str::to_string)
+                .into_iter()
+                .chain(vouchers)
+                .collect(),
+            );
+            if fits(&listed) {
+                return marks
+                    .seal(line, listed.join("\n"))
+                    .map(ReviewText::listing_vouchers);
+            }
         }
         VOUCHER_LINES_DO_NOT_FIT
     } else {

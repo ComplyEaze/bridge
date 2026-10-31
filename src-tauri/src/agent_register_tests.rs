@@ -497,10 +497,7 @@ fn masters_read(marks: CompanyMarks, index: MasterIndex) -> RegisterMasters {
     }
 }
 
-const PINNED: CompanyMarks = CompanyMarks {
-    vouchers: 54,
-    masters: 120,
-};
+const PINNED: CompanyMarks = CompanyMarks::new(Some(54), 120);
 
 #[test]
 fn a_window_whose_marks_are_unchanged_is_stable() {
@@ -508,15 +505,19 @@ fn a_window_whose_marks_are_unchanged_is_stable() {
 }
 
 #[test]
+fn a_voucher_mark_omitted_by_one_read_and_sent_as_zero_by_the_other_is_not_drift() {
+    // The extent listing and the high-water read are two requests; on a book that has never
+    // held a voucher they may differ on whether ALTVCHID is sent, which is not the book moving.
+    let extent = CompanyMarks::new(None, 120);
+    let high_water = CompanyMarks::new(Some(0), 120);
+    assert_eq!(window_drift(extent, high_water), None);
+    assert_eq!(window_drift(high_water, extent), None);
+}
+
+#[test]
 fn a_window_is_refused_when_either_mark_moved_after_it() {
-    let moved_voucher = CompanyMarks {
-        vouchers: 55,
-        ..PINNED
-    };
-    let moved_master = CompanyMarks {
-        masters: 121,
-        ..PINNED
-    };
+    let moved_voucher = CompanyMarks::new(Some(55), 120);
+    let moved_master = CompanyMarks::new(Some(54), 121);
     for closing in [moved_voucher, moved_master] {
         assert_eq!(
             window_drift(PINNED, closing),
@@ -538,13 +539,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks {
-                    masters: 121,
-                    ..PINNED
-                },
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(54), 121), captured_index())
         ),
         Some("ledger_snapshot_drifted")
     );
@@ -564,13 +559,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
     assert_eq!(
         masters_drifted(
             &first,
-            &masters_read(
-                CompanyMarks {
-                    vouchers: 55,
-                    ..PINNED
-                },
-                captured_index()
-            )
+            &masters_read(CompanyMarks::new(Some(55), 120), captured_index())
         ),
         Some("voucher_window_changed_during_read")
     );
@@ -1469,4 +1458,74 @@ fn the_register_labels_its_window_by_the_one_rule_vouchers_uses() {
         register_window_label(false, Some((false, Some("company_has_no_vouchers")))),
         ("complete", None)
     );
+}
+
+#[test]
+fn cost_centre_and_category_names_on_register_entries_are_masked_like_the_ledger_names() {
+    // The register copies each whole entry into its lists, so the allocation names of an
+    // entry go out with it; they are marked the way the vouchers read marks them.
+    let mut rows = captured_rows();
+    for entry in rows[0]["amounts"].as_array_mut().unwrap() {
+        entry["cost_centre_allocations"] = json!([
+            {"category": "Reg Category", "cost_centre": "Reg Centre", "amount": "-1.00"}
+        ]);
+    }
+    let plain = result_for(rows.clone(), &captured_index(), Redaction::None).unwrap();
+    let plain = plain.result.to_string();
+    assert!(
+        plain.contains("Reg Centre") && plain.contains("Reg Category"),
+        "the unmasked response carries the names, so the assertion below can fail: {plain}"
+    );
+    let masked = result_for(rows, &captured_index(), Redaction::MaskParties).unwrap();
+    let masked = masked.result.to_string();
+    assert!(!masked.contains("Reg Centre"), "{masked}");
+    assert!(!masked.contains("Reg Category"), "{masked}");
+    assert!(
+        masked.contains("-1.00"),
+        "the amount is not a name: {masked}"
+    );
+}
+
+#[test]
+fn cost_centre_names_in_the_side_list_of_unplaced_ledgers_are_masked_too() {
+    // Without Sundry Creditors in the group collection the suppliers' ledgers cannot be
+    // placed, so the voucher goes to the side list of unplaced ledgers, which copies each
+    // entry whole.
+    let xml = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-register-lab-groups.utf16le.xml"
+    ));
+    let groups: Vec<_> = parse_native_group_snapshot(&xml, COMPANY_GUID)
+        .unwrap()
+        .into_iter()
+        .filter(|group| group.name != "Sundry Creditors")
+        .collect();
+    let index = MasterIndex::build(
+        captured_masters().iter(),
+        &GroupIndex::build(groups),
+        Vec::new(),
+    )
+    .unwrap();
+    let mut rows = captured_rows();
+    // As in the test above: a voucher whose only ledgers outside Duties & Taxes are unplaced
+    // lands in the unplaced side list.
+    rows[0]["amounts"].as_array_mut().unwrap().retain(|entry| {
+        let name = entry["ledger"].as_str().unwrap();
+        name != "Input CGST" && name != "Input SGST"
+    });
+    rows[0]["voucher_class"] = json!("Sales");
+    for entry in rows[0]["amounts"].as_array_mut().unwrap() {
+        entry["cost_centre_allocations"] = json!([
+            {"category": "Side Category", "cost_centre": "Side Centre", "amount": "-1.00"}
+        ]);
+    }
+    let plain = result_for(rows.clone(), &index, Redaction::None).unwrap();
+    let side = plain.result["vouchers_with_unplaced_ledgers"].to_string();
+    assert!(
+        side.contains("Side Centre"),
+        "the side list carries the names unmasked, so the assertion below can fail: {side}"
+    );
+    let masked = result_for(rows, &index, Redaction::MaskParties).unwrap();
+    let masked = masked.result.to_string();
+    assert!(!masked.contains("Side Centre"), "{masked}");
+    assert!(!masked.contains("Side Category"), "{masked}");
 }

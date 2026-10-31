@@ -31,6 +31,7 @@ async fn persisted_build(cap: usize) -> (tempfile::TempDir, Server, ToolResponse
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let tool = server

@@ -166,8 +166,7 @@ The earlier draft's open questions now have measured answers:
   closure (18 items, 904 lines) is disjoint from the standard ledger path, apart from the base
   layers and shared output types.
 - **The ten "ledger data" functions are at least four responsibilities,** each with its own
-  closure: standard ledger source records (`parse_ledger_source_records_with_evidence` and its
-  wrappers), native ledger collection, period balance report (removed by #1643; see #1642), write read-back. The standard ledger
+  closure: standard ledger source records (removed by #2102; see #1570), native ledger collection, period balance report (removed by #1643; see #1642), write read-back. The standard ledger
   catalogue and identity (`parse_standard_ledger_catalog*`, 622 lines) is a separate family beside
   them.
 - **Text encoding is the first safe split.** It is 22 items and 586 lines, with no coupling to the

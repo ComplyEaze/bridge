@@ -1,0 +1,4 @@
+src-tauri/Cargo.lock
+src-tauri/Cargo.toml
+src-tauri/crates/bridge-tally-transport/Cargo.toml
+reviewer: lamemustafa

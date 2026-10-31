@@ -376,6 +376,10 @@
       "path": "src-tauri/src/agent_bank_statement.rs"
     },
     {
+      "path": "src-tauri/src/agent_bill_trail.rs",
+      "reason": "The outstandings party detail: decides when the census and the read by the party's own ledger are sent (only after the company window needs too many reads) and what each of their results means. A defect sends a ledger-scoped request where none was meant, or reports a refusal or a partial list as the party's whole trail."
+    },
+    {
       "path": "src-tauri/src/agent_cash_flow.rs",
       "reason": "The cash_flow tool: returns the months only when their net total tied to the trial balance's cash and bank ledgers, and withholds them otherwise. A defect shows a cash movement Tally's own ledgers contradict."
     },
@@ -400,6 +404,10 @@
     },
     {
       "path": "src-tauri/src/agent_egress.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_gst_by_ledger.rs",
+      "reason": "The gst_by_counter_ledger tool: totals the GST the books record per counter ledger and sets every other voucher aside under a named reason. A defect gives one expense or purchase ledger tax that belongs to another voucher shape (an item invoice, a two-ledger voucher, a reverse-charge journal) or counts a voucher's tax twice or not at all."
     },
     {
       "path": "src-tauri/src/agent_gst_status.rs",
@@ -527,6 +535,30 @@
     },
     {
       "path": "src-tauri/src/agent_trial_balance.rs"
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_bank_allocations.rs",
+      "reason": "Voucher bank allocations: reads each ledger entry's bank date, instrument number and date, transaction type and status from the vouchers answer; a defect hides or invents the reference a transfer is matched on, or shows an empty field as a value."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_bank_allocations_tests.rs",
+      "reason": "Tests pinning the bank-allocation reader to its captured answer, its typed reasons and its refusals on mutations of that capture."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_cost_centres.rs",
+      "reason": "Voucher cost-centre allocations: reads each ledger entry's category and centre rows from the vouchers answer; a defect hides or doubles an allocation, or reads one as none."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_cost_centres_tests.rs",
+      "reason": "Tests pinning the allocation reader to its captured answer, its typed reasons and its refusals on mutations of that capture."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_goods_lines.rs",
+      "reason": "Voucher goods lines: reads each invoice ledger entry's item, quantities, rate, amount and godown and batch rows from the vouchers answer; a defect hides, doubles or misattributes a line, or shows a split that does not add up as read."
+    },
+    {
+      "path": "src-tauri/src/agent_voucher_goods_lines_tests.rs",
+      "reason": "Tests pinning the goods-line reader to its captured answers, its typed reasons and its refusals on mutations of the capture."
     },
     {
       "path": "src-tauri/src/agent_voucher_parse.rs"

@@ -1445,6 +1445,7 @@ Ok([
             Object {
                 "amount": String("-50.00"),
                 "bill_allocations": Array [],
+                "cost_centre_allocations_unreadable": String("cost_category_present_but_empty"),
                 "is_deemed_positive": String("Yes"),
                 "ledger": String("Test Expense B"),
             },

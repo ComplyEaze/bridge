@@ -1,8 +1,21 @@
 //! Voucher parse for the local MCP adapter.
 use super::*;
 
+#[path = "agent_voucher_bank_allocations.rs"]
+mod bank_allocations;
+#[path = "agent_voucher_cost_centres.rs"]
+mod cost_centres;
+#[path = "agent_voucher_entry_gst.rs"]
+mod entry_gst;
+#[path = "agent_voucher_goods_lines.rs"]
+mod goods_lines;
 #[path = "agent_voucher_scalars.rs"]
 mod scalars;
+use bank_allocations::BankAllocationCollector;
+use cost_centres::CostCentreCollector;
+pub(super) use cost_centres::CostCentreProblem;
+use entry_gst::EntryGstCollector;
+use goods_lines::GoodsLineCollector;
 pub(super) use scalars::*;
 
 /// Shares the native collection boundary used by the protocol crate: CMPINFO
@@ -35,6 +48,33 @@ impl NativeCollectionScope {
         self.path.len() == 7
             && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
             && self.path[5] == "ALLLEDGERENTRIES.LIST"
+    }
+    /// The path below the current `ALLLEDGERENTRIES.LIST`, including the element being
+    /// read; `None` outside a ledger entry.
+    pub(super) fn entry_tail(&self) -> Option<&[String]> {
+        (self.path.len() >= 6
+            && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
+            && self.path[5] == "ALLLEDGERENTRIES.LIST")
+            .then(|| &self.path[6..])
+    }
+    /// Whether the element being read lies inside a `CATEGORYALLOCATIONS.LIST`.
+    pub(super) fn in_cost_centres(&self) -> bool {
+        self.entry_tail().is_some_and(|tail| {
+            tail.first()
+                .is_some_and(|c| c == "CATEGORYALLOCATIONS.LIST")
+        })
+    }
+    /// Whether the element being read lies inside a `BANKALLOCATIONS.LIST`.
+    pub(super) fn in_bank_allocations(&self) -> bool {
+        self.entry_tail()
+            .is_some_and(|tail| tail.first().is_some_and(|c| c == "BANKALLOCATIONS.LIST"))
+    }
+    /// Whether the element being read lies inside an `INVENTORYALLOCATIONS.LIST`.
+    pub(super) fn in_goods_lines(&self) -> bool {
+        self.entry_tail().is_some_and(|tail| {
+            tail.first()
+                .is_some_and(|c| c == "INVENTORYALLOCATIONS.LIST")
+        })
     }
     pub(super) fn bill_allocation(&self) -> bool {
         self.path.len() == 7
@@ -100,6 +140,7 @@ pub(super) fn parse_import_verification_rows(
         true,
         company_guid,
         CompositePolicy::Refuse,
+        GstDetailsShown::Withheld,
     )?)
 }
 
@@ -114,6 +155,24 @@ pub(super) fn parse_agent_rows_with_accounting_state(
         false,
         company_guid,
         CompositePolicy::Refuse,
+        GstDetailsShown::Withheld,
+    )?)
+}
+
+/// [`parse_agent_rows`], reading each entry's GST details (#2027) only when `gst` asks for them,
+/// so that every read that does not ask holds and returns exactly what it did before.
+pub(super) fn parse_agent_rows_reading_gst(
+    xml: &str,
+    company_guid: &str,
+    gst: GstDetailsShown,
+) -> Result<Vec<Value>, String> {
+    refused_composites(parse_voucher_rows(
+        xml,
+        false,
+        false,
+        company_guid,
+        CompositePolicy::Refuse,
+        gst,
     )?)
 }
 
@@ -122,22 +181,38 @@ pub(super) fn parse_agent_rows_with_accounting_state(
 /// instead of failing the window. Every other check still applies to it, and
 /// any other bad amount still fails the window. Nothing that sums, matches or
 /// verifies amounts reads through here.
+#[cfg(test)]
 pub(super) fn parse_agent_rows_withholding(
     xml: &str,
     company_guid: &str,
 ) -> Result<Vec<VoucherRow>, String> {
-    Ok(
-        parse_voucher_rows(xml, false, false, company_guid, CompositePolicy::Withhold)?
-            .into_iter()
-            .map(|(row, withheld)| {
-                if withheld {
-                    VoucherRow::Withheld(WithheldVoucher::from_parsed(row))
-                } else {
-                    VoucherRow::Read(row)
-                }
-            })
-            .collect(),
-    )
+    parse_agent_rows_withholding_reading_gst(xml, company_guid, GstDetailsShown::Withheld)
+}
+
+/// The `vouchers` rows, withheld as `parse_agent_rows_withholding` withholds them, with each
+/// entry's GST details read only when `gst` shows them (#2027).
+pub(super) fn parse_agent_rows_withholding_reading_gst(
+    xml: &str,
+    company_guid: &str,
+    gst: GstDetailsShown,
+) -> Result<Vec<VoucherRow>, String> {
+    Ok(parse_voucher_rows(
+        xml,
+        false,
+        false,
+        company_guid,
+        CompositePolicy::Withhold,
+        gst,
+    )?
+    .into_iter()
+    .map(|(row, withheld)| {
+        if withheld {
+            VoucherRow::Withheld(WithheldVoucher::from_parsed(row))
+        } else {
+            VoucherRow::Read(row)
+        }
+    })
+    .collect())
 }
 
 /// What an amount that is not a plain decimal does to its voucher.
@@ -275,7 +350,11 @@ fn parse_voucher_rows(
     include_effective_date: bool,
     company_guid: &str,
     composites: CompositePolicy,
+    gst_details: GstDetailsShown,
 ) -> Result<Vec<(Value, bool)>, String> {
+    // An entry's GST details are read only for a call that shows them (#2027): a read that does
+    // not ask holds, sizes and returns exactly the rows it did before.
+    let read_gst = gst_details == GstDetailsShown::Shown;
     // Tally's collection XML varies by release; use a deliberately conservative
     // extractor and never infer a missing field. Malformed rows fail before
     // optional selectors can hide them as an apparently complete empty result.
@@ -291,6 +370,10 @@ fn parse_voucher_rows(
     let mut allocation: Option<BTreeMap<String, String>> = None;
     let mut entries = Vec::<Value>::new();
     let mut allocations = Vec::<Value>::new();
+    let mut cost = CostCentreCollector::default();
+    let mut bank = BankAllocationCollector::default();
+    let mut goods = GoodsLineCollector::default();
+    let mut gst = EntryGstCollector::default();
     let mut current_tag = String::new();
     let mut scope = NativeCollectionScope::default();
     // Set by a composite amount under `CompositePolicy::Withhold`, per voucher.
@@ -325,6 +408,16 @@ fn parse_voucher_rows(
                 if tag == "ALLLEDGERENTRIES.LIST" && scope.row("VOUCHER") {
                     entry = Some(BTreeMap::new());
                     allocations.clear();
+                    cost.reset();
+                    bank.reset();
+                    goods.reset();
+                    gst.reset();
+                }
+                if let Some(tail) = scope.entry_tail() {
+                    cost.start(tail, &tag);
+                    bank.start(tail, &tag);
+                    goods.start(tail, &tag);
+                    gst.start(tail, &tag);
                 }
                 if tag == "BILLALLOCATIONS.LIST" && scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST")
                 {
@@ -344,6 +437,36 @@ fn parse_voucher_rows(
                 current_tag = tag;
             }
             Ok(quick_xml::events::Event::Text(text)) => {
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => gst.text(tail, &current_tag, &value),
+                        Err(_) => gst.undecodable(tail),
+                    }
+                }
+                if scope.in_cost_centres() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => {
+                            cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => cost.undecodable(),
+                    }
+                }
+                if scope.in_bank_allocations() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => {
+                            bank.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => bank.undecodable(),
+                    }
+                }
+                if scope.in_goods_lines() {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => {
+                            goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => goods.undecodable(),
+                    }
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -357,6 +480,18 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::CData(text)) => {
                 let value = text.to_string();
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
+                    gst.text(tail, &current_tag, &value);
+                }
+                if scope.in_cost_centres() {
+                    cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
+                }
+                if scope.in_bank_allocations() {
+                    bank.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
+                }
+                if scope.in_goods_lines() {
+                    goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value);
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -369,6 +504,36 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::GeneralRef(reference)) => {
+                if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => gst.text(tail, &current_tag, &value),
+                        Err(_) => gst.undecodable(tail),
+                    }
+                }
+                if scope.in_cost_centres() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => {
+                            cost.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => cost.undecodable(),
+                    }
+                }
+                if scope.in_bank_allocations() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => {
+                            bank.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => bank.undecodable(),
+                    }
+                }
+                if scope.in_goods_lines() {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => {
+                            goods.text(scope.entry_tail().unwrap_or(&[]), &current_tag, &value)
+                        }
+                        Err(_) => goods.undecodable(),
+                    }
+                }
                 if let Some(row) = allocation
                     .as_mut()
                     .filter(|_| scope.bill_allocation_field())
@@ -382,6 +547,12 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::End(event)) => {
                 let end = event.name().as_ref().to_ascii_uppercase();
+                if let Some(tail) = scope.entry_tail() {
+                    cost.end(tail);
+                    bank.end(tail);
+                    goods.end(tail);
+                    gst.end(tail);
+                }
                 if scope.bill_allocation() {
                     if let Some(allocation_row) = allocation.take().filter(|row| !row.is_empty()) {
                         // Tally emits an amount-only container for a ledger entry with no
@@ -524,6 +695,48 @@ fn parse_voucher_rows(
                             "is_deemed_positive": if is_deemed_positive { "Yes" } else { "No" },
                             "bill_allocations": std::mem::take(&mut allocations),
                         });
+                        // A cost-centre list that cannot be read whole is not shown in
+                        // part and does not refuse the read: the entry says why.
+                        match cost.finish() {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => {
+                                parsed_entry["cost_centre_allocations"] = Value::Array(rows)
+                            }
+                            Err(problem) => {
+                                parsed_entry["cost_centre_allocations_unreadable"] =
+                                    json!(problem.reason());
+                            }
+                        }
+                        // The same for bank allocations (five fields, each absent, empty or a
+                        // value); an entry with no populated allocation has no key. Every answer
+                        // removes them unless `vouchers` was asked for them (#1231).
+                        match bank.finish() {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => parsed_entry["bank_allocations"] = Value::Array(rows),
+                            Err(problem) => {
+                                parsed_entry["bank_allocations_unreadable"] =
+                                    json!(problem.reason());
+                            }
+                        }
+                        // The same for goods lines (#2015): an invoice's item lines with their
+                        // godown and batch split, withheld unless `vouchers` asks for them.
+                        match goods.finish() {
+                            Ok(rows) if rows.is_empty() => {}
+                            Ok(rows) => parsed_entry["goods_lines"] = Value::Array(rows),
+                            Err(problem) => {
+                                parsed_entry["goods_lines_unreadable"] = json!(problem.reason());
+                            }
+                        }
+                        // The same for the entry's GST details (#2027): its rates, taxability and
+                        // type of supply as Tally sent them, withheld unless `vouchers` asks.
+                        match gst.finish() {
+                            _ if !read_gst => {}
+                            Ok(None) => {}
+                            Ok(Some(details)) => parsed_entry["gst_details"] = details,
+                            Err(problem) => {
+                                parsed_entry["gst_details_unreadable"] = json!(problem.reason());
+                            }
+                        }
                         if parsed_amount.as_ref().is_some_and(|parsed| {
                             !tally_entry_polarity_agrees(parsed, is_deemed_positive)
                         }) {
@@ -700,9 +913,21 @@ fn parse_voucher_rows(
                     entry.as_mut(),
                     allocation.as_mut(),
                 )?;
+                if let Some(tail) = scope.entry_tail() {
+                    cost.start(tail, &name);
+                    bank.start(tail, &name);
+                    goods.start(tail, &name);
+                    gst.start(tail, &name);
+                }
                 scope.start(name.clone());
                 if scope.repeated_collection {
                     return Err("agent_read_protocol_invalid".into());
+                }
+                if let Some(tail) = scope.entry_tail() {
+                    cost.end(tail);
+                    bank.end(tail);
+                    goods.end(tail);
+                    gst.end(tail);
                 }
                 scope.end(&name)?;
             }
@@ -871,3 +1096,16 @@ pub(super) fn window_with_composite_vouchers(count: usize) -> String {
 #[cfg(test)]
 #[path = "agent_voucher_parse_tests.rs"]
 mod boundary_tests;
+
+#[cfg(test)]
+#[path = "agent_voucher_bank_allocations_tests.rs"]
+mod bank_allocation_tests;
+#[cfg(test)]
+#[path = "agent_voucher_cost_centres_tests.rs"]
+mod cost_centre_tests;
+#[cfg(test)]
+#[path = "agent_voucher_entry_gst_tests.rs"]
+mod entry_gst_tests;
+#[cfg(test)]
+#[path = "agent_voucher_goods_lines_tests.rs"]
+mod goods_line_tests;

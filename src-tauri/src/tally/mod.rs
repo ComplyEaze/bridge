@@ -3,6 +3,7 @@ pub(crate) mod approved_import;
 mod box_fit;
 pub mod connection;
 pub mod connector;
+pub(crate) mod ledger_create_item;
 pub mod runtime;
 pub(crate) mod standard_ledger_catalog;
 // Crate-internal only: `tally::runtime` is the sole consumer.
@@ -19,9 +20,10 @@ pub use connector::{
     company_source_identity, core_snapshot_start_authorized, source_lineage, RuntimeTallyConnector,
 };
 pub use runtime::{
-    CurrencyExclusions, EndpointKey, ExposureDirection, OpenBillRow, OutstandingsAgeingAnchor,
-    OutstandingsCurrencyAssertion, OutstandingsLoadResult, OutstandingsPartialReason, TallyRuntime,
-    TallySessionSnapshot, UnallocatedComposition, UnallocatedParty,
+    CurrencyExclusions, EndpointKey, ExposureDirection, ObservedTally, OpenBillRow,
+    OutstandingsAgeingAnchor, OutstandingsCurrencyAssertion, OutstandingsLoadResult,
+    OutstandingsPartialReason, TallyRuntime, TallySessionSnapshot, UnallocatedComposition,
+    UnallocatedParty,
 };
 pub use xml_parser::{TallyCompany, TallyLedger};
 

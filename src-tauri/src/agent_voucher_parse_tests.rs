@@ -1433,6 +1433,31 @@ fn every_amount_consuming_parse_still_refuses_the_composite_window() {
     );
 }
 
+/// The 7.2 layout of a composite (the foreign symbol against its digits) is read as a ledger's
+/// balance, not as a voucher's amount: no 7.2 voucher answer is committed, so a voucher entry that
+/// holds one is not withheld and its window refuses, as it did before that layout was known
+/// (#683, #2071). The same entry in the captured 7.1 layout is withheld.
+#[test]
+fn a_72_layout_composite_on_a_voucher_entry_still_refuses_the_window() {
+    let captured = captured_forex_composite_vouchers();
+    let composite = "-$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 8600.00";
+    let at = captured.find(composite).unwrap();
+    let unspaced = format!(
+        "{}-$100.00 @ \u{20b9} 86/$ = -\u{20b9} 8600.00{}",
+        &captured[..at],
+        &captured[at + composite.len()..]
+    );
+    assert!(
+        bridge_tally_protocol::currency_composite::is_balance_composite(
+            "-$100.00 @ \u{20b9} 86/$ = -\u{20b9} 8600.00"
+        )
+    );
+    assert_eq!(
+        parse_agent_rows_withholding(&unspaced, FOREX_COMPANY_GUID).unwrap_err(),
+        "voucher_amount_invalid"
+    );
+}
+
 #[test]
 fn only_a_whole_composite_withholds_anything_else_still_refuses() {
     let captured = captured_forex_composite_vouchers();

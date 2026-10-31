@@ -38,7 +38,9 @@ use bridge_tally_protocol::{
         render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
         render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
         render_party_ledger_master_request_for_parents_with_gst_details,
-        render_party_ledger_master_request_with_gst_details, BaseCurrencyName,
+        render_party_ledger_master_request_for_parents_with_mailing_details,
+        render_party_ledger_master_request_with_gst_details,
+        render_party_ledger_master_request_with_mailing_details, BaseCurrencyName,
         ForeignCurrencyLedger, LedgerSnapshotEntry, NativeLedgerExportPeriod,
         NativeLedgerSnapshotPeriod, NativeOutstandingsError,
     },
@@ -48,8 +50,8 @@ use bridge_tally_protocol::{
         DateBoundaryProfile, OutstandingsError,
     },
     parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
-    parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
-    parse_ledger_census_slice, parse_native_party_ledger_master_records_leaving_unparsed,
+    parse_company_gateway_capability_observation, parse_ledger_census_slice,
+    parse_native_party_ledger_master_records_leaving_unparsed,
     parse_native_party_ledger_master_structure, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
@@ -299,7 +301,8 @@ impl PartyLedgerMasterSourceValidationError {
                 | StandardLedgerCatalogError::LedgerNameUnusable
                 | StandardLedgerCatalogError::BillWiseFlagMissing
                 | StandardLedgerCatalogError::BillWiseFlagInvalid
-                | StandardLedgerCatalogError::BillWiseFlagRepeated => "ledger_span_slice_malformed",
+                | StandardLedgerCatalogError::BillWiseFlagRepeated
+                | StandardLedgerCatalogError::AlterIdInvalid => "ledger_span_slice_malformed",
             },
             Self::LedgerSpanSliceResponseTooLarge { .. } => "ledger_span_slice_response_too_large",
             Self::LedgerCountDiffers { .. } => "ledger_count_differs",
@@ -350,6 +353,28 @@ fn parent_part_response_error(part: Option<&ParentPart>, error: anyhow::Error) -
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 
 /// Bytes one ledger is estimated to add to the compliance master response when
+/// the request also names each ledger's `LEDMAILINGDETAILS.LIST`
+/// ([`ComplianceRead::WithMailingDetails`], bridge#1490). UNVERIFIED. Naming it
+/// grew the one populated party row of the captured eight-ledger book by 948
+/// bytes (3,010 to 3,958 UTF-16 bytes; one dated entry of two short address
+/// lines) and every other row by 122. A second dated entry on that party then
+/// grew its row by 944 more, to 4,902 (TallyPrime 7.2, 2026-10-29, eight
+/// ledgers; the read averaged 2,612 bytes a ledger with one entry and 2,730 with
+/// two). The figure, 5,000, is above that largest row measured, which was a sparse
+/// probe row (3,010 bytes before the list was named): 3,200 rows of 4,902 bytes,
+/// with the response's own 3,010-byte envelope and 12 bytes between rows, come to
+/// about 15.73 MB, about 272 KB under the budget. It is not a bound: at exactly 5,000
+/// a row the rows alone fill the budget and the envelope goes over it (about 41 KB
+/// at 3,200 rows). A fully populated party row of 3.3 KB (the 1,989-ledger book
+/// above) with two entries is about 5,190 bytes, over the figure; so is a party with
+/// three entries (about 950 more each, extrapolated) or with longer address lines,
+/// and a book of such parties can still be admitted and overrun. No such book has
+/// been read. The 20 s request deadline leaves no slack over the 16 MB budget, so
+/// an under-estimate can be an abandoned read, not only a refusal. It was 4,700
+/// before the second entry was measured.
+const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 5_000;
+
+/// Bytes one ledger is estimated to add to the compliance master response when
 /// the request also names each ledger's `GSTDETAILS.LIST`
 /// ([`ComplianceRead::WithGstDetails`]). UNVERIFIED. The one capture (14
 /// ledgers, a lab book) measured 2,138 to 2,704 bytes for a ledger with an
@@ -368,21 +393,53 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_000;
 
 /// What a compliance master read asks Tally for. [`Self::Standard`] is the
-/// production request, and every caller other than a `ledger_masters` call
-/// that asked for the GST details passes it. [`Self::WithGstDetails`] names
-/// each ledger's dated GST details in the request's `FETCH` and is sized by
-/// its own per-ledger estimate everywhere the standard one would be.
+/// production request, and every caller other than a `ledger_masters` call that
+/// asked for the dated mailing or GST details and the party/ledger master
+/// workbook passes it. [`Self::WithMailingDetails`] names each ledger's dated
+/// mailing details (`include_mailing_details`). [`Self::WithGstDetails`] names each ledger's dated GST
+/// details. They are not combined: the request naming both has not been captured
+/// live, so `ledger_masters` refuses the two flags together. Each is sized by its
+/// own per-ledger estimate wherever the standard one would be.
+/// [`Self::WithMailingDetailsWhereWholeReadFits`] is what the party/ledger master
+/// workbook asks for (bridge#1490): the mailing details where the book's master
+/// change mark puts the whole read inside the mailing bound, the standard request
+/// otherwise, so a book the standard request read before is never refused for the
+/// larger per-ledger estimate. [`Self::resolved_for_mark`] makes that choice before
+/// any ledger request is sent; no request is rendered for the unresolved kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
+    WithMailingDetails,
+    WithMailingDetailsWhereWholeReadFits,
     WithGstDetails,
 }
 
 impl ComplianceRead {
+    /// The kind of read a book is actually sent, and whether the mailing details
+    /// asked for were given up for it. The mark upper-bounds the ledgers (every
+    /// master raises it), so a mark inside the mailing bound is a whole read the
+    /// mailing request may carry; a larger one is read as it was before the mailing
+    /// details existed, whatever its size class then. Any other kind is unchanged.
+    pub(crate) fn resolved_for_mark(self, master_mark: u64) -> Self {
+        match self {
+            Self::WithMailingDetailsWhereWholeReadFits => {
+                if compliance_estimate_unverified(master_mark, Self::WithMailingDetails).fits {
+                    Self::WithMailingDetails
+                } else {
+                    Self::Standard
+                }
+            }
+            other => other,
+        }
+    }
+
     /// The bytes one ledger is estimated to add to this read's master response.
     const fn bytes_per_ledger(self) -> u64 {
         match self {
             Self::Standard => COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED,
+            Self::WithMailingDetails | Self::WithMailingDetailsWhereWholeReadFits => {
+                COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED
+            }
             Self::WithGstDetails => COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED,
         }
     }
@@ -492,13 +549,15 @@ const PARENT_PART_MAX_PARENTS_UNVERIFIED: usize = 200;
 /// ledgers than one part may carry is refused as `parent_over_budget`, never
 /// split, because a group cannot be read in pieces by `$Parent`. That figure is
 /// the budget over the read's per-ledger constant, not a measurement: 4,266
-/// ledgers for a [`ComplianceRead::Standard`] read and 2,000 for a
+/// ledgers for a [`ComplianceRead::Standard`] read, 3,200 for a
+/// [`ComplianceRead::WithMailingDetails`] one and 2,000 for a
 /// [`ComplianceRead::WithGstDetails`] one.
 ///
 /// Most parts one book may be read as (#679). UNVERIFIED: Bridge's own bound on
 /// the serial requests one call may spend (four per part), not a measured
-/// limit. It admits about 51,000 ledgers (about 24,000 with the GST details),
-/// far past what the mark bound admits.
+/// limit. It admits about 51,000 ledgers (about 38,400 with the mailing
+/// details, about 24,000 with the GST details), far past what the mark bound
+/// admits.
 const PARENT_PART_MAX_PARTS_UNVERIFIED: usize = 12;
 
 /// Most bytes of `NOT` formula text the complement part's request may carry
@@ -751,6 +810,8 @@ pub(crate) enum PairedReadValidationError {
     NativeStatement,
     #[error("Tally's own Cash Flow changed between paired reads")]
     NativeCashFlow,
+    #[error("Tally's own Negative Ledgers changed between paired reads")]
+    NativeNegativeLedgers,
     #[error("Tally's Company collection changed between paired reads")]
     CompanyFeatures,
     #[error("Tally company book changed during the company features read")]
@@ -803,6 +864,7 @@ impl PairedReadValidationError {
             Self::CompanyCurrencyName => "company_currency_name_changed",
             Self::NativeStatement => "native_statement_changed",
             Self::NativeCashFlow => "native_cash_flow_changed",
+            Self::NativeNegativeLedgers => "native_negative_ledgers_changed",
             Self::CompanyFeatures => "company_features_changed",
             Self::CompanyFeaturesExtent => "company_features_extent_changed",
             Self::CurrencyExtent => "currency_extent_changed",
@@ -1077,6 +1139,20 @@ const ENCODING_UTF16_LE: u8 = 3;
 const ENCODING_UTF16_LE_BOM: u8 = 4;
 const ENCODING_UTF16_BE_BOM: u8 = 5;
 
+/// `http` gated on `wire`'s lock and retry bound, and drained after a cut post
+/// when `wire` has a drain policy (#2142).
+fn gated(
+    http: TallyHttpTransport,
+    config: &TallyConfig,
+    wire: &WireGateConfig,
+) -> TallyHttpTransport {
+    let http = http.with_wire_gate(wire.gate_for(config), wire.retry());
+    match wire.drain() {
+        Some(policy) => http.with_drain(policy),
+        None => http,
+    }
+}
+
 impl TallyClient {
     /// Every send takes the endpoint's wire lock (`endpoint_wire`), at the
     /// shared per-user coordination root.
@@ -1087,8 +1163,7 @@ impl TallyClient {
 
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
-        let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry())
+        let http = gated(TallyHttpTransport::new(config.clone())?, &config, wire)
             .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
@@ -1126,13 +1201,16 @@ impl TallyClient {
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
         let wire = WireGateConfig::default();
-        let http = TallyHttpTransport::with_builder(
-            config.clone(),
-            bridge_tally_transport::TransportPolicy::default(),
-            builder,
+        let http = gated(
+            TallyHttpTransport::with_builder(
+                config.clone(),
+                bridge_tally_transport::TransportPolicy::default(),
+                builder,
+            )
+            .expect("build synthetic Tally HTTP transport"),
+            &config,
+            &wire,
         )
-        .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry())
         .with_send_observer(crate::request_trail::observer());
         Self {
             http,
@@ -1146,10 +1224,12 @@ impl TallyClient {
         policy: bridge_tally_transport::TransportPolicy,
         wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
-        let http =
-            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry())
-                .with_send_observer(crate::request_trail::observer());
+        let http = gated(
+            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?,
+            &config,
+            wire,
+        )
+        .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
@@ -1205,6 +1285,12 @@ impl TallyClient {
         // `/status` is useful local diagnostics but is not part of Tally's
         // documented third-party XML contract. Never gate the POST probe or
         // authoritative product metadata on this unauthenticated heuristic.
+        // The one exception is the drain after a cut post (#2142), which holds
+        // the next post until `/status` has answered three times in a row,
+        // whatever its answer, and at most 10 minutes: two lab rows measured
+        // that `/status` waits while Tally works on a cut read, and that a data
+        // read sent after three quick probes answered at its rest speed
+        // (`bridge_tally_transport::DrainPolicy::MEASURED`).
         let (mut connection, mut wire_evidence) =
             match self.check_connection_strict_with_wire_evidence().await {
                 Ok(observation) => observation,
@@ -1409,16 +1495,14 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`). Unlike the legacy custom TDL
-    /// report, its response is Tally's ordinary shaped `HEADER/STATUS=1`
-    /// success envelope, so a successful parse directly satisfies the export
-    /// trust check instead of requiring the narrower, explicitly-untrusted
-    /// interactive compatibility parse.
+    /// (`ReadOnlyProfile::CompanyListV2`). Its response is Tally's ordinary
+    /// shaped `HEADER/STATUS=1` success envelope, so a successful parse
+    /// directly satisfies the export trust check.
     ///
-    /// Responders that reject the collection outright — a shaped failure, an
-    /// unrecognized shape, or anything else the collection parser cannot
-    /// read — fall back to `legacy_company_discovery_evidence`, off the happy
-    /// path but otherwise unchanged.
+    /// A responder that rejects the collection is reported from that one
+    /// answer: a shaped failure by its own reason code, anything else as
+    /// `xml_export_shape_unrecognized`. No second request is sent; the legacy
+    /// custom company report it once fell back to is gone (#1872).
     async fn company_discovery_evidence(
         &self,
         connection: &mut ConnectionStatus,
@@ -1429,55 +1513,11 @@ impl TallyClient {
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), wire_evidence)
             .await?;
-        match xml_parser::parse_companies_from_collection(&xml) {
+        Ok(match xml_parser::parse_companies_from_collection(&xml) {
             Ok(discovered) => {
                 *gateway_product_mode = parse_company_gateway_capability_observation(&xml)
                     .map(GatewayProductModeEvidence::from_observation)
                     .unwrap_or_else(|_| GatewayProductModeEvidence::unavailable());
-                connection.reachable = true;
-                if connection.error.is_some() {
-                    connection.error = Some("status_heuristic_unavailable".to_string());
-                }
-                Ok(match normalize_discovered_companies(discovered) {
-                    Ok(normalized) => {
-                        *companies = normalized;
-                        CapabilityEvidence {
-                            state: CapabilityState::Supported,
-                            confidence: EvidenceConfidence::Observed,
-                            safe_reason_code: None,
-                        }
-                    }
-                    Err(()) => CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("company_identity_invalid".to_string()),
-                    },
-                })
-            }
-            Err(_) => {
-                self.legacy_company_discovery_evidence(connection, companies, wire_evidence)
-                    .await
-            }
-        }
-    }
-
-    /// The pre-`CompanyListV2` company discovery path: the custom
-    /// `CompanyListV1` TDL report, which most Tally responders answer with a
-    /// bare `<ENVELOPE><COMPANYINFO>...` document carrying no
-    /// `HEADER`/`STATUS` at all. That bare shape is accepted only through the
-    /// narrow, explicitly-untrusted interactive discovery parse; it can never
-    /// promote `CapabilityState::Supported`.
-    async fn legacy_company_discovery_evidence(
-        &self,
-        connection: &mut ConnectionStatus,
-        companies: &mut Vec<TallyCompany>,
-        wire_evidence: &mut RuntimeReadEvidence,
-    ) -> anyhow::Result<CapabilityEvidence> {
-        let xml = self
-            .post_probe_xml(tdl_engine::company_list_request(), wire_evidence)
-            .await?;
-        Ok(match xml_parser::parse_companies(&xml) {
-            Ok(discovered) => {
                 connection.reachable = true;
                 if connection.error.is_some() {
                     connection.error = Some("status_heuristic_unavailable".to_string());
@@ -1508,17 +1548,6 @@ impl TallyClient {
                         xml_parser::export_failure_reason_code(&xml).to_string(),
                     ),
                 },
-                _ if parse_companies_for_interactive_discovery(&xml).is_ok() => {
-                    connection.reachable = true;
-                    if connection.error.is_some() {
-                        connection.error = Some("status_heuristic_unavailable".to_string());
-                    }
-                    CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("direct_company_report_untrusted".to_string()),
-                    }
-                }
                 _ => CapabilityEvidence {
                     state: CapabilityState::Unknown,
                     confidence: EvidenceConfidence::Observed,
@@ -1583,12 +1612,10 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`) rather than the legacy `CompanyListV1`
-    /// custom TDL report. Unlike the legacy report -- which one Tally instance
-    /// answers with a bare, unwrapped `<COMPANYINFO>` document and another is
-    /// known to simply hang on -- the collection always answers with the
-    /// ordinary shaped `HEADER/STATUS=1` envelope, so `parse_companies_from_collection`
-    /// can require that shape outright.
+    /// (`ReadOnlyProfile::CompanyListV2`). It answers with the ordinary shaped
+    /// `HEADER/STATUS=1` envelope, so `parse_companies_from_collection` can
+    /// require that shape outright. Bridge sends no custom TDL report for this
+    /// (#1872).
     pub async fn fetch_companies(&self) -> anyhow::Result<Vec<TallyCompany>> {
         self.fetch_companies_with_wire_evidence()
             .await
@@ -1603,7 +1630,7 @@ impl TallyClient {
     ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence)> {
         self.fetch_companies_observing_education_mode()
             .await
-            .map(|(companies, evidence, _)| (companies, evidence))
+            .map(|(companies, evidence, _, _)| (companies, evidence))
     }
 
     /// As [`Self::fetch_companies_with_wire_evidence`], also returning whether
@@ -1613,15 +1640,18 @@ impl TallyClient {
     /// further request is made.
     pub(crate) async fn fetch_companies_observing_education_mode(
         &self,
-    ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence, bool)> {
+    ) -> anyhow::Result<(
+        Vec<TallyCompany>,
+        RuntimeReadEvidence,
+        bool,
+        super::runtime::ObservedTally,
+    )> {
         let mut evidence = RuntimeReadEvidence::empty();
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), &mut evidence)
             .await?;
-        let education = parse_company_gateway_capability_observation(&xml)
-            .map(|observation| observation.educational_mode)
-            .unwrap_or(false)
-            || bridge_tally_protocol::company_list_may_be_in_educational_mode(&xml);
+        let tally = super::runtime::ObservedTally::of_company_list(&xml);
+        let education = tally.education;
         let discovered = xml_parser::parse_companies_from_collection(&xml)
             .map_err(|error| with_read_evidence(error, evidence.clone()))?;
         let companies = normalize_discovered_companies(discovered).map_err(|_| {
@@ -1632,7 +1662,7 @@ impl TallyClient {
                 evidence.clone(),
             )
         })?;
-        Ok((companies, evidence, education))
+        Ok((companies, evidence, education, tally))
     }
 
     /// Re-enumerates the trusted `Company` collection, then proves one
@@ -1722,6 +1752,9 @@ impl TallyClient {
                 .master_alter_id_high_water()
                 .ok_or(OutstandingsError::MasterWitnessAbsent)?
                 .get();
+            // The workbook's mailing details are given up where the mark puts the
+            // whole read past the mailing bound, so nothing it read before is refused.
+            let read = read.resolved_for_mark(master_mark);
             // Sized before any ledger request is sent (#637): by the mark when
             // it fits, otherwise by the count of a balance-free catalogue read
             // once the local checks below have passed (#668).
@@ -1857,6 +1890,13 @@ impl TallyClient {
                             identity.display_name(),
                             &master_period,
                         ),
+                        ComplianceRead::WithMailingDetails
+                        | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
+                            render_party_ledger_master_request_with_mailing_details(
+                                identity.display_name(),
+                                &master_period,
+                            )
+                        }
                         ComplianceRead::WithGstDetails => {
                             render_party_ledger_master_request_with_gst_details(
                                 identity.display_name(),
@@ -1874,6 +1914,14 @@ impl TallyClient {
                             match read {
                                 ComplianceRead::Standard => {
                                     render_party_ledger_master_request_for_parents(
+                                        identity.display_name(),
+                                        &master_period,
+                                        part,
+                                    )
+                                }
+                                ComplianceRead::WithMailingDetails
+                                | ComplianceRead::WithMailingDetailsWhereWholeReadFits => {
+                                    render_party_ledger_master_request_for_parents_with_mailing_details(
                                         identity.display_name(),
                                         &master_period,
                                         part,

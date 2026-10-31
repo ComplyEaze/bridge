@@ -82,7 +82,7 @@ class MergeGateControls(unittest.TestCase):
         # The gate runs only from origin/master's tree: build a throwaway repository whose origin/master holds exactly these scripts.
         cls.repo = cls.bin / "gate-repo"
         (cls.repo / "scripts").mkdir(parents=True)
-        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json"):
+        for name in ("merge-gate.sh", "merge_gate_diff.py", "merge_gate_privacy.py", "merge_gate_verdict.py", "review-tier.mjs", "review-tier-paths.json", "check-ai-attribution.mjs"):
             shutil.copyfile(ROOT / "scripts" / name, cls.repo / "scripts" / name)
         os.chmod(cls.repo / "scripts" / "merge-gate.sh", 0o755)
         cls.origin = cls.bin / "origin.git"
@@ -119,6 +119,17 @@ class MergeGateControls(unittest.TestCase):
             "exec " + shlex.quote(real_node) + ' "$@"\n'
         )
         node.chmod(node.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        # The pin-list retry waits between tries (#2179). With GATE_SLEEPS set, a wait is recorded there instead of slept.
+        real_sleep = shutil.which("sleep")
+        if not real_sleep:
+            raise RuntimeError("sleep is required for merge-gate controls")
+        sleep = cls.bin / "sleep"
+        sleep.write_text(
+            "#!/usr/bin/env bash\n"
+            'if [ -n "${GATE_SLEEPS:-}" ]; then printf \'%s\\n\' "$*" >>"$GATE_SLEEPS"; exit 0; fi\n'
+            "exec " + shlex.quote(real_sleep) + ' "$@"\n'
+        )
+        sleep.chmod(sleep.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     @classmethod
     def git_in_repo(cls, *args):
@@ -172,10 +183,11 @@ class MergeGateControls(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge"):
+    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge", env_extra=None):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
+        env.update(env_extra or {})
         return subprocess.run(
             [str(self.script), "321", "--repo", repo, *extra_args],
             cwd=str(cwd) if cwd else ROOT,
@@ -380,7 +392,64 @@ class MergeGateControls(unittest.TestCase):
         self.assert_pass("history-out-of-order-then-dropped-declared", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_an_unreadable_pin_list_in_the_branch_history_is_indeterminate(self):
-        self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        result = self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        # A failure with no HTTP status is not tried again, and the line names the commit and the error.
+        self.assertIn("(commit c1c1c1c1c1c1, after 1 try: controlled history surface read failure)", result.stdout)
+
+    # -- A pin-list read that fails and is tried again (#2179) ----------------------
+
+    def run_flaky(self, scenario):
+        """Run a flaky-read scenario; return the result, the waits the gate asked for, and the reads of the flaky commit."""
+        with tempfile.TemporaryDirectory(prefix="merge-gate-flaky-") as folder:
+            state, sleeps = Path(folder) / "calls", Path(folder) / "sleeps"
+            result = self.run_gate(scenario, env_extra={"GATE_STATE": str(state), "GATE_SLEEPS": str(sleeps)})
+            waits = sleeps.read_text().split() if sleeps.exists() else []
+            calls = int(state.read_text()) if state.exists() else 0
+        return result, waits, calls
+
+    def assert_flaky_passes(self, scenario):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("INDETERMINATE", result.stdout)
+        self.assertEqual((waits, calls), (["2"], 2), "one failed read, one wait of 2 s, then the read that answered")
+
+    def assert_flaky_not_retried(self, scenario, phrase):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn(phrase, result.stdout)
+        self.assertEqual((waits, calls), ([], 1), "a failure a second try cannot cure is not tried again")
+
+    def test_a_server_error_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-502-once")
+
+    def test_a_secondary_rate_limit_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-rate-limit-once")
+
+    def test_a_404_for_one_of_the_prs_own_commits_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-404-own-commit-once")
+
+    def test_three_failed_reads_stay_indeterminate_and_name_the_commit_and_the_status(self):
+        result, waits, calls = self.run_flaky("history-flaky-502-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("MAY MERGE", result.stdout)
+        self.assertIn("could not read and parse the pin list at every commit of the PR", result.stdout)
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
+
+    def test_a_rate_limit_that_persists_names_its_first_error_line_with_the_account_id_masked(self):
+        result, waits, calls = self.run_flaky("history-flaky-rate-limit-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        # the error's first line is blank: the next one is printed, and its long digit run is masked
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 403, after 3 tries: gh: You have exceeded a secondary rate limit for user ID <n>. (HTTP 403))", result.stdout)
+        self.assertNotIn("12345678", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3))
+
+    def test_a_403_that_is_not_a_rate_limit_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-403-not-a-rate-limit", "(commit c1c1c1c1c1c1, HTTP 403, after 1 try: ")
+
+    def test_a_404_for_a_commit_outside_the_pr_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-404-outside-the-pr", "(commit d2d2d2d2d2d2, HTTP 404, after 1 try: gh: Not Found (HTTP 404))")
 
     def test_removed_pin_line_for_a_pin_that_is_kept_blocks(self):
         self.assert_blocked("pin-removed-line-for-a-kept-pin", "has removed-pin line(s) for pin(s) the PR does not remove: src/other.rs")
@@ -508,6 +577,60 @@ class MergeGateControls(unittest.TestCase):
 
     def test_known_public_agent_address_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+
+    # -- AI attribution is a note, never a block (owner practice of 25 Oct 2026) ------------
+
+    def assert_noted(self, scenario, text):
+        result = self.run_gate(scenario)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("BLOCK", result.stdout)
+        self.assertIn("AI attribution: " + text, result.stdout)
+        return result
+
+    def test_a_generated_with_line_in_the_title_or_body_is_a_note_in_each_form(self):
+        for scenario in ("attribution-body-plain", "attribution-body-link", "attribution-body-comment", "attribution-title", "attribution-body-markdown"):
+            with self.subTest(scenario=scenario):
+                self.assert_noted(scenario, "")
+
+    def test_a_coauthor_line_in_the_body_is_a_note_that_says_a_squash_copies_the_body(self):
+        self.assert_noted("attribution-body-trailer", "body: a Co-authored-by line")
+
+    def test_the_body_is_noted_even_when_the_commit_list_is_not_proven(self):
+        result = self.run_gate("attribution-body-with-unproven-commits")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("AI attribution: body: a \"Generated with\" line", result.stdout)
+        self.assertIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_a_trailer_on_a_commit_whatever_its_date_is_a_note_that_says_a_squash_can_copy_it(self):
+        for scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated"):
+            with self.subTest(scenario=scenario):
+                result = self.assert_noted(scenario, "commit ")
+                self.assertIn("a squash merge can copy it into the commit on master", result.stdout)
+
+    def test_a_committer_identity_naming_an_assistant_is_a_note(self):
+        self.assert_noted("attribution-identity", "commit ")
+
+    def test_a_check_that_crashes_is_not_a_pass(self):
+        # The helper exits 1 with nothing on stdout (a crash, an old node): no answer, so the gate must say it could not determine.
+        copy = self.private_copy("attribution-crash")
+        for source in ("process.exit(1);\n", "process.exit(0);\n", "throw new Error('boom');\n", "console.log('REFUSE x');\nconsole.log('CHECKED 1');\nprocess.exit(0);\n",
+                       "console.log('NOTE x');\nconsole.log('CHECKED 0');\nprocess.exit(1);\n", "console.log('CHECKED 9');\nprocess.exit(0);\n",
+                       "console.log('CHECKED 1');\nconsole.log('NOTE after');\nprocess.exit(0);\n"):
+            (copy / "scripts" / "check-ai-attribution.mjs").write_text(source)
+            self.git_copy(copy, "add", "-A")
+            self.git_copy(copy, "commit", "-q", "-m", "a broken helper")
+            self.git_copy(copy, "push", "-q", "origin", "master")
+            for scenario in ("attribution-trailer-after", "pass"):
+                with self.subTest(scenario=scenario, helper=source):
+                    result = self.run_copy(copy, scenario)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertNotIn("MAY MERGE", result.stdout)
+                    self.assertIn("could not run the AI attribution check", result.stdout)
+
+    def test_a_human_coauthor_after_the_rule_passes_and_a_clean_pull_request_says_so(self):
+        self.assert_pass("attribution-trailer-human-after", "no AI attribution in the title, body or commits")
+        self.assert_pass("pass", "no AI attribution in the title, body or commits")
 
     def test_arbitrary_customer_address_in_a_coauthor_trailer_still_blocks(self):
         self.assert_blocked("customer-coauthor-trailer", "customer email shape")
@@ -1247,7 +1370,7 @@ class MergeGateControls(unittest.TestCase):
 
     def test_a_pull_request_that_changes_the_gate_or_a_workflow_is_the_owners_own_act(self):
         for scenario in ("changes-the-gate", "changes-a-workflow", "renames-a-workflow-away", "renames-the-verdict-module-away",
-                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier", "changes-the-lab-manifest"):
+                         "changes-the-registry", "changes-the-registry-in-another-case", "changes-the-review-tier", "changes-the-lab-manifest", "changes-the-attribution-check"):
             with self.subTest(scenario=scenario):
                 self.assert_blocked(scenario, "the merge is the owner's own act")
 

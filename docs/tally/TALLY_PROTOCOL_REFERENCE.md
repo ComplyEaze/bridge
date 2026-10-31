@@ -153,9 +153,24 @@ base revision.
 <a id="82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book"></a>
 
 [8.2f `REFERENCEDATE` on the voucher `FETCH` — **VERIFIED 2026-10-07; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82f-referencedate-on-the-voucher-fetch--verified-2026-10-07-tallyprime-71-one-synthetic-book)
+<a id="82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book"></a>
+
+[8.2g Cost-centre allocations on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82g-cost-centre-allocations-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-one-synthetic-book)
+<a id="82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-28-tallyprime-72-two-synthetic-books"></a>
+
+[8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-28-tallyprime-72-two-synthetic-books)
+<a id="82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-12-tallyprime-71-one-synthetic-book"></a>
+
+[8.2h Bank allocations on a voucher's ledger entry — **VERIFIED 2026-10-28; TallyPrime 7.2, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82h-bank-allocations-on-a-vouchers-ledger-entry--verified-2026-10-28-tallyprime-72-two-synthetic-books)
+<a id="82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books"></a>
+
+[8.2i Goods lines on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books)
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
+<a id="84-a-partys-dated-mailing-details-are-in-ledmailingdetailslist-which-the-fetch-must-name--verified-2026-10-12-tallyprime-71-one-synthetic-book"></a>
+
+[8.4 A party's dated mailing details are in `LEDMAILINGDETAILS.LIST`, which the `FETCH` must name — **VERIFIED 2026-10-12; TallyPrime 7.1, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#84-a-partys-dated-mailing-details-are-in-ledmailingdetailslist-which-the-fetch-must-name--verified-2026-10-12-tallyprime-71-one-synthetic-book)
 <a id="9-writes-import"></a>
 
 [9. Writes (import)](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#9-writes-import)
@@ -207,6 +222,12 @@ base revision.
 <a id="94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else"></a>
 
 [9.4i A ledger `Create` on a new name moved the master mark by one and changed nothing else](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94i-a-ledger-create-on-a-new-name-moved-the-master-mark-by-one-and-changed-nothing-else)
+<a id="94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid"></a>
+
+[9.4j Each gateway master write moved the master mark by one, to the written ledger's `ALTERID`](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid)
+<a id="94k-three-ledger-creates-in-one-request-one-create-counted-for-each-the-mark-stepped-by-three-in-request-order"></a>
+
+[9.4k Three ledger `Create`s in one request: one create counted for each, the mark stepped by three, in request order](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94k-three-ledger-creates-in-one-request-one-create-counted-for-each-the-mark-stepped-by-three-in-request-order)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)
@@ -354,6 +375,9 @@ base revision.
 <a id="11c5-live-evidence-2026-09-21"></a>
 
 [11c.5 Live evidence, 2026-09-21](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c5-live-evidence-2026-09-21)
+<a id="11c6-one-ledgers-vouchers-can-be-read-alone-with-the-same-spans--verified-once-2026-10-28-tallyprime-72-silver-one-synthetic-book"></a>
+
+[11c.6 One ledger's vouchers can be read alone, with the same spans — **VERIFIED once, 2026-10-28; TallyPrime 7.2 Silver, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11c6-one-ledgers-vouchers-can-be-read-alone-with-the-same-spans--verified-once-2026-10-28-tallyprime-72-silver-one-synthetic-book)
 <a id="11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred"></a>
 
 [11d. Education refuses Bridge's report-family TDL with a blocking dialog — **VERIFIED live for `ledgers_v1`, 2026-09-22; the rest inferred**](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#11d-education-refuses-bridges-report-family-tdl-with-a-blocking-dialog--verified-live-for-ledgers_v1-2026-09-22-the-rest-inferred)
@@ -450,6 +474,9 @@ base revision.
 <a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
 
 [12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)
+<a id="12a23-stock-query-by-item-name-gives-an-items-closing-quantity-per-godown-and-batch"></a>
+
+[12a.23 Stock Query by item name gives an item's closing quantity per godown and batch](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a23-stock-query-by-item-name-gives-an-items-closing-quantity-per-godown-and-batch)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

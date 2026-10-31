@@ -369,3 +369,134 @@ fn parent_option_search_accepts_supported_display_and_control_text_but_refuses_o
         TrialBalanceCaptureParentOptionsError::SearchInvalid
     );
 }
+
+/// The two captured answers of #2068 (`native/PROVENANCE.md` in the protocol crate's
+/// fixtures), each with a Closing Stock ledger whose closing balance was keyed on Tally's screen.
+pub(crate) fn stock_ledger_captures() -> [(NativeTrialBalance, &'static str); 2] {
+    fn parse(bytes: &[u8], company: &str) -> NativeTrialBalance {
+        let units: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect();
+        parse_native_trial_balance(&String::from_utf16(&units).unwrap(), company).unwrap()
+    }
+    let nonint = "567653b1-c8be-4deb-b4fc-3ea5de801884";
+    let integrated = "3fc2a3c7-1da8-4bc4-a472-44028cdebca7";
+    [
+        (
+            parse(
+                include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml"),
+                nonint,
+            ),
+            nonint,
+        ),
+        (
+            parse(
+                include_bytes!("../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml"),
+                integrated,
+            ),
+            integrated,
+        ),
+    ]
+}
+
+fn rows_json(report: &NativeTrialBalance) -> serde_json::Value {
+    serialize_report_with_movements(report, serde_json::value::Serializer).unwrap()["rows"].clone()
+}
+
+/// On both captured books the desktop's rows carry `movements_differ_by` on the Closing Stock
+/// ledger alone, with the closing as Tally sent it; a parent query of Stock-in-Hand carries it
+/// too; and the limitation is the MCP answer's, for one ledger.
+#[test]
+fn a_keyed_closing_stock_ledger_carries_its_gap_in_every_desktop_view() {
+    for (report, company) in stock_ledger_captures() {
+        let rows = rows_json(&report);
+        let flagged: Vec<_> = rows
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|row| row.get("movements_differ_by").is_some())
+            .collect();
+        assert_eq!(flagged.len(), 1, "{company}: {rows}");
+        assert_eq!(flagged[0]["name"], "Closing Stock");
+        assert_eq!(flagged[0]["movements_differ_by"], "400.00");
+        assert_eq!(flagged[0]["closing"]["value"], "-1000.00");
+        assert_eq!(
+            movements_differ_limitation(&report.rows),
+            Some(MOVEMENTS_DIFFER_LIMITATION.replace("{count}", "1"))
+        );
+        let query = query_observed_parent(
+            &report,
+            &PartyLedgerMasterFieldObservation::Returned("Stock-in-Hand".into()),
+        )
+        .unwrap();
+        let query = serde_json::to_value(&query).unwrap();
+        assert_eq!(query["selected_rows"][0]["movements_differ_by"], "400.00");
+        let query = query_observed_parent(
+            &report,
+            &PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".into()),
+        )
+        .unwrap();
+        assert!(serde_json::to_value(&query).unwrap()["selected_rows"][0]
+            .get("movements_differ_by")
+            .is_none());
+    }
+}
+
+/// A report whose every row adds up is written byte for byte as it was before #2068, when the
+/// protocol row derived `Serialize`: that derive wrote the known-lab capture as 1,682 bytes with
+/// the SHA-256 below (recorded from the derive on this branch before it was removed). It has no
+/// limitation.
+#[test]
+fn a_report_whose_rows_add_up_is_serialized_as_before() {
+    use sha2::Digest;
+    let report = parse_native_trial_balance(
+        include_str!(
+            "../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_known_lab.xml"
+        ),
+        "eebb9a9f-1679-4468-9e8f-814c729674cb",
+    )
+    .unwrap();
+    let mut ours = Vec::new();
+    serialize_report_with_movements(&report, &mut serde_json::Serializer::new(&mut ours)).unwrap();
+    let hex: String = sha2::Sha256::digest(&ours)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        (ours.len(), hex.as_str()),
+        (
+            1_682,
+            "d9b565219240c67e6bf42e6e15064c0c764623acb8076cbcabff6ffdc5559e6d"
+        )
+    );
+    assert_eq!(movements_differ_limitation(&report.rows), None);
+}
+
+/// As above for the opening-year capture, which the removed derive wrote as 2,182 bytes with the
+/// SHA-256 below (recorded on the #2132 branch before the derive was removed). Its company GUID is
+/// read from the capture: every row's GUID starts with it.
+#[test]
+fn the_opening_year_rows_are_serialized_as_before() {
+    use sha2::Digest;
+    let xml = include_str!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_opening_year.xml"
+    );
+    let guid = r#"<GUID TYPE="String">"#;
+    let start = xml.find(guid).unwrap() + guid.len();
+    let report = parse_native_trial_balance(xml, &xml[start..start + 36]).unwrap();
+    let mut ours = Vec::new();
+    serialize_report_with_movements(&report, &mut serde_json::Serializer::new(&mut ours)).unwrap();
+    let hex: String = sha2::Sha256::digest(&ours)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        (ours.len(), hex.as_str()),
+        (
+            2_182,
+            "b0ca99eec868fc9dd6bd512ce9b2b7ed6b8f8e9bf4d255b1c9ea18b821be6889"
+        )
+    );
+    assert_eq!(movements_differ_limitation(&report.rows), None);
+}

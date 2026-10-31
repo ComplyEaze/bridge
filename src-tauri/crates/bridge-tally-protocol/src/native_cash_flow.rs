@@ -29,14 +29,11 @@ use std::fmt;
 use crate::{
     native_outstandings::NativeLedgerSnapshotPeriod,
     native_statement_reports::{
-        amount, read_text, render_built_in_report_request, NativeStatementAmount,
+        amount, read_text, render_built_in_report_request, BuiltInReport, NativeStatementAmount,
     },
     outstandings_shared::DateBoundaryProfile,
     tolerant_xml::sanitize_invalid_numeric_references,
 };
-
-/// The report name Tally's gateway accepts (live capture, 6 Oct 2026).
-const REPORT_ID: &str = "Cash Flow";
 
 /// The most months one window may hold: the label has no year, so beyond twelve
 /// two rows could carry the same name.
@@ -162,7 +159,7 @@ impl WholeMonthWindow {
 /// Renders the only supported request: Tally's own Cash Flow by name over the
 /// window, for the named company. No TDL.
 pub fn render_native_cash_flow_request(company: &str, window: &WholeMonthWindow) -> String {
-    render_built_in_report_request(REPORT_ID, company, window.period())
+    render_built_in_report_request(BuiltInReport::CashFlow, company, window.period())
 }
 
 /// One month's row, each amount exactly as Tally printed it. The closing figure

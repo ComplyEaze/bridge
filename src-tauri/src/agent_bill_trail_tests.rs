@@ -1992,6 +1992,7 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
         redaction: Redaction::None,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let refusal = || {
@@ -2021,6 +2022,29 @@ fn a_detail_window_refusal_carries_its_size_remedy_and_window_to_the_caller() {
     assert_eq!(error["cause"], "voucher_window_too_many_reads");
     assert_eq!(error["reads"], json!({"needed_at_least": 5, "allowed": 2}));
     assert_eq!(error["window"]["from"], "20260401", "{error}");
+    assert_eq!(
+        error.get("window_scope"),
+        None,
+        "only a detail that tried its ledger says so"
+    );
+    // A refusal that stands after the party's ledger could not answer says why (#1356).
+    let reason = super::bill_trail::NotByLedger::ScopedReadFoundNothing;
+    let response = server.finish_tool_response(
+        "outstandings",
+        &json!({}),
+        chrono::Utc::now(),
+        Err(refusal().with_window_scope(reason.report())),
+    );
+    let scoped = &response.value["structuredContent"]["result"]["error"];
+    assert_eq!(scoped["code"], "unadjusted_window_too_large", "{scoped}");
+    assert_eq!(scoped["window_scope"]["basis"], "whole_book");
+    assert_eq!(
+        scoped["window_scope"]["reason"],
+        "ledger_scope_empty_not_established"
+    );
+    assert!(scoped["window_scope"]["note"]
+        .as_str()
+        .is_some_and(|note| note.contains("refusal stands")));
     assert!(
         error["remediation"]
             .as_str()
@@ -2108,4 +2132,128 @@ fn naming_a_reference_can_turn_an_ambiguous_bill_into_a_tied_one() {
         .collect::<Vec<_>>();
     let named = bill_trails("P", Some("R"), &read, &natives).unwrap();
     assert_eq!(named[0].state(), "tied");
+}
+
+/// The ledger-scoped read a party detail sends on a larger book (#1356) gives the party exactly the
+/// allocations the book-wide window read gives: on BRIDGE BILLTRAIL LAB, whose party Lab Party P1
+/// holds three bank-ledger Receipts that a filter on the voucher's party ledger loses, the same
+/// lab run read the year both ways (fixtures/ledger-filtered-allocations/PROVENANCE.md).
+#[test]
+fn the_ledger_read_gives_the_party_the_allocations_the_window_read_gives() {
+    const BILLTRAIL_GUID: &str = "9ab5002c-e910-4242-83e4-a27cc490600b";
+    let rows = |bytes: &[u8]| {
+        let text = String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        parse_agent_rows(&text, BILLTRAIL_GUID).unwrap()
+    };
+    let window = rows(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml"
+    ));
+    let ledger = rows(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml"
+    ));
+    assert_eq!((window.len(), ledger.len()), (7, 7));
+    let from_window = entries_for_party(&window, "Lab Party P1").unwrap();
+    let from_ledger = entries_for_party(&ledger, "Lab Party P1").unwrap();
+    assert_eq!(from_ledger.len(), 9);
+    assert_eq!(from_ledger, from_window);
+    // Every voucher of the ledger-scoped read carries a line on the party's ledger; one that did
+    // not would not be the party's, and is refused.
+    use super::bill_trail::every_row_has_a_line_for;
+    assert!(every_row_has_a_line_for(&ledger, "Lab Party P1"));
+    let mut stray = ledger.clone();
+    stray[0]["amounts"] = json!([]);
+    assert!(!every_row_has_a_line_for(&stray, "Lab Party P1"));
+    // A cancelled or optional voucher keeps no lines, and is not held against the read.
+    stray[0]["cancelled"] = json!(true);
+    assert!(every_row_has_a_line_for(&stray, "Lab Party P1"));
+    stray[0]["cancelled"] = json!(false);
+    stray[0]["optional"] = json!(true);
+    assert!(every_row_has_a_line_for(&stray, "Lab Party P1"));
+}
+
+/// A party detail reads by its ledger only after the book's window was refused as needing more
+/// requests than one call may spend, under a name a ledger-scoped request admits, matched to one
+/// ledger alone (#1356). Every other refusal stands, and every window the book's read answers is
+/// answered by it.
+#[test]
+fn a_detail_reads_by_its_ledger_only_after_the_books_window_needed_too_many_reads() {
+    use super::bill_trail::{ledger_scope_after, NotByLedger};
+    let too_many = ToolFailure::from("voucher_window_too_many_reads".to_string());
+    let exact = |name: &str| LedgerMatch::Exact {
+        name: name.to_string(),
+        similar: Vec::new(),
+    };
+    // The reason code each case reports, or the name the ledger is read by.
+    let scope = |refusal: &ToolFailure, resolved: &LedgerMatch, party: &str| {
+        ledger_scope_after(refusal, resolved, party)
+            .map(|name| name.as_str().to_string())
+            .map_err(|reason| reason.map(NotByLedger::code))
+    };
+    assert_eq!(
+        scope(&too_many, &exact("DN Party 001"), "DN Party 001"),
+        Ok("DN Party 001".to_string())
+    );
+    // Any other refusal of the book's window stands, with no reason added.
+    for code in [
+        "voucher_window_book_too_large",
+        "voucher_window_volume_unestimated",
+        "voucher_window_changed_during_read",
+        "trail_window_too_large",
+    ] {
+        assert_eq!(
+            scope(
+                &ToolFailure::from(code.to_string()),
+                &exact("DN Party 001"),
+                "DN Party 001"
+            ),
+            Err(None)
+        );
+    }
+    let close = LedgerMatch::CaseOrSpacing {
+        name: "DN Party 001".to_string(),
+    };
+    assert_eq!(
+        scope(&too_many, &close, "DN Party 001"),
+        Ok("DN Party 001".to_string())
+    );
+    // Each case the ledger is not read in says why, with the codes the movement read uses.
+    assert_eq!(
+        scope(&too_many, &exact("M/s. Party & Co"), "M/s. Party & Co"),
+        Err(Some("ledger_name_outside_scoped_alphabet"))
+    );
+    assert_eq!(
+        scope(&too_many, &exact("Sharma and Sons"), "Sharma and Sons"),
+        Err(Some("ledger_name_holds_formula_word"))
+    );
+    assert_eq!(
+        scope(&too_many, &exact("A OR B Traders"), "A OR B Traders"),
+        Err(Some("ledger_name_holds_formula_word"))
+    );
+    let twins = LedgerMatch::Exact {
+        name: "DN Party 001".to_string(),
+        similar: vec!["DN PARTY 001".to_string()],
+    };
+    assert_eq!(
+        scope(&too_many, &twins, "DN Party 001"),
+        Err(Some("ledger_name_shared_but_for_case"))
+    );
+    assert_eq!(
+        scope(&too_many, &close, "DN PARTY 001"),
+        Err(Some("ledger_vouchers_spell_it_otherwise"))
+    );
+    assert_eq!(
+        scope(&too_many, &exact("Andheri Traders"), "Andheri Traders"),
+        Ok("Andheri Traders".to_string())
+    );
+    // A reason refuses as the company window's refusal, which stands, and says so.
+    let report = NotByLedger::ScopedReadFoundNothing.report();
+    assert_eq!(report.basis, "whole_book");
+    assert_eq!(report.reason, Some("ledger_scope_empty_not_established"));
+    assert!(report.note.contains("refusal stands"), "{}", report.note);
 }

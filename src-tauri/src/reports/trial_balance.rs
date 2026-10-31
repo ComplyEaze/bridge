@@ -1,7 +1,10 @@
 //! Exact summaries of the native amounts already captured by the runtime.
 use bridge_tally_core::ExactDecimal;
 use bridge_tally_protocol::{
-    native_trial_balance::{NativeTrialBalance, NativeTrialBalanceAmount, NativeTrialBalanceRow},
+    native_trial_balance::{
+        NativeTrialBalance, NativeTrialBalanceAmount, NativeTrialBalanceMovements,
+        NativeTrialBalanceRow,
+    },
     PartyLedgerMasterFieldObservation,
 };
 use std::borrow::Cow;
@@ -19,6 +22,79 @@ const GROUP_LABEL_PREFIX: &str = "Group: ";
 const MAX_PARENT_DISPLAY_BYTES: usize = MAX_RETAINED_PARENT_BYTES + GROUP_LABEL_PREFIX.len();
 const NOT_RETURNED_PARENT_LABEL: &str = "Missing field: Parent not returned";
 const RETURNED_EMPTY_PARENT_LABEL: &str = "Empty field: Parent returned empty";
+
+/// What a ledger whose closing is not its opening plus its debit and credit totals means
+/// (#2068), with `{count}` for the number of such ledgers. The MCP answer, the desktop screen
+/// and its workbook all say it in these words. Measured on a Closing Stock ledger with a closing
+/// balance keyed on Tally's screen, on two synthetic TallyPrime 7.2 books (one integrated with
+/// inventory, one not).
+pub(crate) const MOVEMENTS_DIFFER_LIMITATION: &str = "{count} ledger(s) carry movements_differ_by: their closing is not their opening plus their debit and credit totals, counting an empty amount as zero. Each is returned as Tally sent it and nothing is corrected. On the books measured this was a Closing Stock ledger whose closing balance was keyed on Tally's screen: Tally kept the opening as the closing and showed the change only in the debit total. The closing of such a ledger is not necessarily the figure Tally's statements use: on the book not integrated with inventory they used the keyed figure, and on the integrated one they valued the stock from the stock item. The column totals include the closing as sent.";
+
+/// The limitation for `rows`, or `None` when every row adds up.
+pub(crate) fn movements_differ_limitation<'a>(
+    rows: impl IntoIterator<Item = &'a NativeTrialBalanceRow>,
+) -> Option<String> {
+    let count = rows
+        .into_iter()
+        .filter(|row| matches!(row.movements(), NativeTrialBalanceMovements::Differ(_)))
+        .count();
+    (count > 0).then(|| MOVEMENTS_DIFFER_LIMITATION.replace("{count}", &count.to_string()))
+}
+
+/// The desktop's only way to write a Trial Balance row (the protocol row is not `Serialize`): its
+/// own fields, in the order and form they had before #2068, plus `movements_differ_by` (closing
+/// minus opening, debit and credit) on a row whose columns do not add up.
+#[derive(Serialize)]
+struct RowWithMovements<'a> {
+    name: &'a str,
+    guid: &'a str,
+    parent: &'a PartyLedgerMasterFieldObservation,
+    opening: &'a NativeTrialBalanceAmount,
+    debit: &'a NativeTrialBalanceAmount,
+    credit: &'a NativeTrialBalanceAmount,
+    closing: &'a NativeTrialBalanceAmount,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    movements_differ_by: Option<String>,
+}
+
+fn rows_with_movements<'a>(
+    rows: &'a [NativeTrialBalanceRow],
+) -> impl Iterator<Item = RowWithMovements<'a>> {
+    rows.iter().map(|row| RowWithMovements {
+        name: &row.name,
+        guid: &row.guid,
+        parent: &row.parent,
+        opening: &row.opening,
+        debit: &row.debit,
+        credit: &row.credit,
+        closing: &row.closing,
+        movements_differ_by: match row.movements() {
+            NativeTrialBalanceMovements::Tie => None,
+            NativeTrialBalanceMovements::Differ(gap) => Some(gap),
+        },
+    })
+}
+
+/// `serialize_with` for a Trial Balance's rows wherever the desktop receives them.
+pub(crate) fn serialize_rows_with_movements<S: serde::Serializer>(
+    rows: &[NativeTrialBalanceRow],
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.collect_seq(rows_with_movements(rows))
+}
+
+/// `serialize_with` for a whole report, as `{"rows": [...]}` with each row as above.
+pub(crate) fn serialize_report_with_movements<S: serde::Serializer>(
+    report: &NativeTrialBalance,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    #[derive(Serialize)]
+    struct Report<'a> {
+        #[serde(serialize_with = "serialize_rows_with_movements")]
+        rows: &'a [NativeTrialBalanceRow],
+    }
+    Report { rows: &report.rows }.serialize(serializer)
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ObservedAmountTotal {
@@ -39,6 +115,7 @@ pub struct TrialBalanceTotals {
 #[derive(Debug, Clone, Serialize)]
 pub struct TrialBalanceParentQuery {
     pub parent: PartyLedgerMasterFieldObservation,
+    #[serde(serialize_with = "serialize_rows_with_movements")]
     pub selected_rows: Vec<NativeTrialBalanceRow>,
     pub totals: TrialBalanceTotals,
     pub source_row_count: usize,
@@ -371,4 +448,4 @@ pub fn query_observed_parent(
 
 #[cfg(test)]
 #[path = "trial_balance_tests.rs"]
-mod tests;
+pub(crate) mod tests;

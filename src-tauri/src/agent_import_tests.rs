@@ -78,6 +78,7 @@ async fn batch_total_overflow_is_refused_before_dispatch_or_persistence() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut input = payload();
@@ -115,6 +116,7 @@ async fn a_narration_that_would_read_back_rewritten_is_refused_at_build() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let mut input = payload();
@@ -147,6 +149,7 @@ async fn a_batch_with_several_defects_reports_the_validation_defect_before_the_n
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let build = |input: &ImportPayload<String>| {
@@ -433,6 +436,7 @@ fn external_import_ledger_read_refuses_busy_admission_without_waiting() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     };
     let server = Server::new(settings.clone());
@@ -472,6 +476,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     };
     let server = Server::new(settings.clone());
@@ -598,6 +603,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
@@ -735,6 +741,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
@@ -1109,6 +1116,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let input = admitted_payload();
@@ -2294,6 +2302,7 @@ async fn simulator_verification_is_independent_of_the_output_row_limit() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let built = server
@@ -2967,6 +2976,7 @@ async fn import_bounds_distinct_ledger_names_before_tally_without_reducing_vouch
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let response = server
@@ -3259,6 +3269,7 @@ async fn built_batch_guidance_matches_the_saved_native_admission() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::from_enabled(writes_enabled),
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let mut input = captured_catalogue_payload();
@@ -3400,6 +3411,7 @@ async fn built_batch_warning_names_the_admission_refusal_post_import_returns() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::On,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let built = server
@@ -3759,6 +3771,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
@@ -3892,6 +3905,7 @@ fn line_error_text_does_not_count_against_a_pages_never_cut_part() {
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         })
     };
@@ -3938,6 +3952,7 @@ async fn a_hand_imported_batchs_alter_id_delta_is_measured_from_its_build_mark()
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -3982,6 +3997,7 @@ async fn a_verification_is_paged_from_its_persisted_proof_without_reading_tally_
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         })
     };
@@ -4135,6 +4151,7 @@ async fn a_later_page_of_a_dispatched_batch_states_the_headline_of_the_first() {
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -4288,6 +4305,7 @@ async fn verify_saved_batch_after_dispatch(
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -4367,6 +4385,7 @@ async fn current_dispatch_persists_its_reconciliation_verdict_before_returning_t
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -4528,6 +4547,7 @@ async fn a_split_verification_replays_with_its_witness_and_refuses_the_whole_pre
             redaction: super::super::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let built = server
@@ -4643,6 +4663,7 @@ async fn a_counted_and_bracketed_verification_is_not_replayed_and_the_proof_says
         redaction: super::super::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -5429,6 +5450,7 @@ async fn verification_pages_mask_ledger_names_under_mask_parties() {
             redaction,
             import_enabled: true,
             posting: crate::agent::Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         })
     };
@@ -5574,6 +5596,88 @@ fn a_post_summary_names_tally_s_rejection_only_when_every_voucher_was_reported_n
     assert_eq!(summary(&["sent_not_attributed"]), refused);
     assert_eq!(summary(&["posted_verified"]), refused);
     assert_eq!(summary(&[]), refused);
+}
+
+/// #1633: a refusal by the mark's step or the span's count adds, after the line
+/// that says what to check, that another change was made during the post, as
+/// an example and never as the cause; no other refusal and no binding adds it.
+#[test]
+fn a_step_or_count_refusal_names_a_concurrent_change_after_what_to_check() {
+    let line = super::span_identity::CONCURRENT_CHANGE_LINE;
+    let matched = json!([{ "status": "matching_content_observed", "accounting_effective": true }]);
+    for code in ["span_step_not_created", "span_count_mismatch"] {
+        let summary = with_post_span_summary(json!({ "state": "refused", "code": code }), &matched)
+            ["summary"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(
+            summary.starts_with("ComplyEaze Bridge could not confirm which Tally vouchers"),
+            "{code}: {summary}"
+        );
+        assert!(summary.ends_with(line), "{code}: {summary}");
+        assert!(
+            summary.contains("check each voucher in Tally before posting any of them again"),
+            "{code}"
+        );
+    }
+    // With no voucher matched by content, the line follows the plain refusal.
+    let plain = with_post_span_summary(
+        json!({ "state": "refused", "code": "span_step_not_created" }),
+        &json!([]),
+    )["summary"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        plain,
+        format!("ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open: check its vouchers in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it. {line}")
+    );
+    // A mark that moved by less than the post created refuses with the same
+    // code, so it reads the same line.
+    assert_eq!(
+        super::span_identity::concurrent_change_line_for(
+            super::span_identity::SpanRefusal::StepNotCreated {
+                step: 0,
+                created: 2
+            }
+            .code()
+        ),
+        Some(line)
+    );
+    // A restore recorded by the same check is named after the line.
+    let restored = with_post_span_summary(
+        json!({
+            "state": "refused",
+            "code": "span_count_mismatch",
+            "rollback_recorded": true,
+            "other_batches_covered": {"count": 1},
+        }),
+        &matched,
+    )["summary"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let at_line = restored.find(line).expect("the line");
+    let at_restore = restored
+        .find("This check also found the company's books restored")
+        .expect("the restore sentence");
+    assert!(at_line < at_restore, "{restored}");
+    for (state, code) in [
+        ("refused", "span_position_mismatch"),
+        ("refused", "span_content_mismatch"),
+        ("refused", "span_mark_went_back"),
+        ("bound", "span_step_not_created"),
+        ("unsettled", "span_count_mismatch"),
+    ] {
+        let summary = with_post_span_summary(json!({ "state": state, "code": code }), &matched)
+            ["summary"]
+            .clone();
+        assert!(
+            !summary.as_str().unwrap().contains(line),
+            "{state} {code}: {summary}"
+        );
+    }
 }
 
 /// A refused binding whose vouchers the book matches by content says what the
@@ -5785,6 +5889,7 @@ fn numbering_server(directory: &std::path::Path, port: u16) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -6198,6 +6303,7 @@ async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
             redaction: crate::agent::Redaction::None,
             import_enabled: true,
             posting: crate::agent::Posting::from_enabled(writes_enabled),
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let mut input = captured_catalogue_payload();
@@ -6289,4 +6395,30 @@ fn the_rebuild_route_is_offered_only_for_a_batch_over_the_limit() {
         assert_eq!(native_post_route(code, true), " Import", "{code}");
         assert_eq!(native_post_route(code, false), " Import", "{code}");
     }
+}
+
+/// A folded twin directly under Tally's root shows the root as Tally sent it, not as the
+/// decoders' working marker; a group a user named Primary and an absent parent are as read.
+#[test]
+fn a_folded_twin_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
+    let root = format!(
+        "{} Primary",
+        bridge_tally_protocol::TALLY_SANITIZED_ROOT_MARKER
+    );
+    let twins = FoldedTwins {
+        requested: "Profit & Loss A/c".to_string(),
+        live: vec![
+            ("Profit & Loss A/c".to_string(), Some(root)),
+            (
+                "Profit and Loss A/c".to_string(),
+                Some("Primary".to_string()),
+            ),
+            ("Profit &amp; Loss A/c".to_string(), None),
+        ],
+        through_alias: Default::default(),
+    };
+    let shown = folded_live_ledgers_json(&twins);
+    assert_eq!(shown[0]["parent"], "&#4; Primary");
+    assert_eq!(shown[1]["parent"], "Primary");
+    assert_eq!(shown[2]["parent"], Value::Null);
 }

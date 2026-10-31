@@ -33,7 +33,19 @@ pub(in crate::agent) fn parse_company_marks(
     expected_guid: &str,
 ) -> Result<(u64, u64), String> {
     // The voucher axis means exactly what every other read-side mark means.
-    let vouchers = company_voucher_high_water(xml, expected_guid)?;
+    parse_company_marks_as_answered(xml, expected_guid)
+        .map(|(vouchers, masters)| (vouchers.unwrap_or(0), masters))
+}
+
+/// Both change marks of one company as Tally answered them: the voucher mark is
+/// `None` when the answer omits `ALTVCHID` (a company that has never held a
+/// voucher), which is not the same answer as a mark of zero (AGENTS.md P3).
+/// Refuses exactly what [`parse_company_marks`] refuses.
+pub(in crate::agent) fn parse_company_marks_as_answered(
+    xml: &str,
+    expected_guid: &str,
+) -> Result<(Option<u64>, u64), String> {
+    let vouchers = company_voucher_mark(xml, expected_guid)?;
     let row = company_high_water_row(xml, expected_guid)?;
     let masters = observed_checkpoint(row.get("ALTMSTID"), "master")?;
     Ok((vouchers, masters))

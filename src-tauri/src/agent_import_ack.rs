@@ -13,8 +13,11 @@
 //! the verification read returns, including its REMOTEID). The fingerprint catches an edit to any of
 //! those fields whether or not it moved the ALTERID; an edit only to a field
 //! that read does not return (a reference, an allocation, GST detail, the
-//! party ledger) is caught only if it moves the ALTERID, which is not yet
-//! measured for an edit made in Tally's own screens.
+//! party ledger) is caught only if it moves the ALTERID. On Tally's own
+//! screens, saving a voucher unchanged and cancelling it moved it (VERIFIED),
+//! and so did changing a bill allocation's reference, adding a cost-centre
+//! allocation and setting a bank-reconciliation date (PARTIAL): one run each,
+//! protocol reference §11c.5.
 use super::*;
 use crate::tally::approved_import::{ReviewAcknowledged, ReviewKind, VoucherCount, REVIEW_BUTTON};
 
@@ -574,7 +577,10 @@ fn render_review_text(
             .map(quoted)
             .unwrap_or_else(|| "voucher".into()),
         quoted(company_name),
-        quoted(row.date.as_str()),
+        // A date read from Tally shows in Tally's day-month-year form (#2101); one that is
+        // not a date stays quoted, like every other value read from Tally.
+        bridge_tally_core::TallyDate::parse(row.date.as_str())
+            .map_or_else(|_| quoted(row.date.as_str()), |date| date.shown()),
         shown(&row.voucher_number),
         row.alter_id.map(|id| id.to_string()).unwrap_or_else(|| "(none)".into()),
         batch_id,
@@ -725,8 +731,13 @@ fn batch_review_preview(
     text.push("Not shown here: narrations, voucher numbers and types.".into());
     text.push(format!(
         "Dates: {} to {}  ALTERIDs: {} to {}",
-        dates.clone().min().unwrap_or("(none)"),
-        dates.max().unwrap_or("(none)"),
+        dates
+            .clone()
+            .min()
+            .map_or_else(|| "(none)".into(), post::shown_date),
+        dates
+            .max()
+            .map_or_else(|| "(none)".into(), post::shown_date),
         alter_ids
             .clone()
             .min()
@@ -1019,6 +1030,16 @@ impl Server {
         // never one of the doubts below: this review "unblocks nothing".
         if args.get("doubt").and_then(Value::as_str) == Some("invoice_stop") {
             return self.release_invoice_stop(args).await;
+        }
+        // A batch matched by content only has no doubt to review: its record
+        // is its own, and binds no voucher (#1039).
+        if args.get("doubt").and_then(Value::as_str) == Some("content_only") {
+            return self.review_content_only(args).await;
+        }
+        // A batch Tally answered as creating none of its vouchers is settled
+        // by the person, with a record of its own; nothing is sent (#1709).
+        if args.get("doubt").and_then(Value::as_str) == Some("not_created") {
+            return self.settle_not_created(args).await;
         }
         let batch_id = required_string(args, "batch_id")?;
         let imports = self.imports_dir()?;

@@ -952,6 +952,7 @@ async fn the_readback_right_after_a_post_never_computes_the_section() {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let built = server
@@ -1432,7 +1433,8 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        vec![open_row(skipped_row(), "not_found", None)],
+        // no day of Tally has been read, so the absence is not claimed
+        vec![open_row(skipped_row(), "tally_unchecked", None)],
         "{again}"
     );
     // and the paired row is not one to withdraw
@@ -1597,6 +1599,7 @@ fn server_with_cap(directory: &Path, port: u16, max_bytes: usize) -> Server {
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -2476,7 +2479,7 @@ async fn a_withdrawn_row_the_other_statement_now_carries_is_refused_when_the_bat
         "{step}"
     );
     assert!(
-        step.ends_with(" This batch cannot be sent as built: build it again."),
+        step.ends_with(" This batch cannot be sent as built: build this statement again with the rows in paired_rows still skipped, not named in withdraw_skips."),
         "{step}"
     );
     // nothing was written: no intent, no status

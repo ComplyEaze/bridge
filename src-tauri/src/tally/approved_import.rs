@@ -1,5 +1,8 @@
 //! Independent local approval. The model never supplies an approval boolean.
 use super::agent_read_request::AgentReadRequest;
+use super::ledger_create_item::{LedgerCreateItem, RenderedLedgerCreate};
+use super::VerifiedCompanyIdentity;
+use bridge_tally_core::master_name_index::{MasterKind, Via};
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::{
     outstandings_shared::DateBoundaryProfile, StandardLedgerCatalogBinding,
@@ -8,6 +11,20 @@ use std::{io::Read, num::NonZeroUsize, process::Stdio, time::Duration};
 use tokio::io::AsyncWriteExt;
 
 const MAX_PREVIEW_BYTES: usize = 8_000;
+
+tokio::task_local! {
+    /// Whether the post dialog of the task it is scoped to showed a box that did
+    /// not fit the screen (#1832): set by [`note_box_did_not_fit`] when the
+    /// dialog child exits with the status that says so, and read once by that
+    /// task when the dialog ends. Scoped only by [`PendingPostApproval::ask`];
+    /// anywhere else noting it does nothing.
+    static BOX_DID_NOT_FIT: std::cell::Cell<bool>;
+}
+
+/// Record, for the dialog task this runs in, that its box did not fit.
+fn note_box_did_not_fit() {
+    let _ = BOX_DID_NOT_FIT.try_with(|noted| noted.set(true));
+}
 #[cfg(not(windows))]
 const POST_LABEL: &str = "Post voucher";
 /// The review dialog's positive button, as the person sees it. Windows shows
@@ -16,12 +33,34 @@ const POST_LABEL: &str = "Post voucher";
 pub(crate) const REVIEW_BUTTON: &str = "I reviewed it";
 #[cfg(windows)]
 pub(crate) const REVIEW_BUTTON: &str = "Yes";
+/// The invoice-stop release dialog's positive button on a Mac. Windows shows the
+/// same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const RELEASE_BUTTON: &str = "Release the stop";
+/// The settle dialog's positive button on a Mac (#1709). Windows shows the
+/// same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const SETTLE_BUTTON: &str = "Close the batch";
 /// What the review dialog's subprocess prints, followed by the nonce it was
 /// given, when and only when the person chose the positive button.
 const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
 /// The same for the post dialog (#635). Distinct from the review's, so a
 /// subprocess in one mode can never answer the other.
 const POST_TOKEN_PREFIX: &str = "bridge-post-approved:";
+/// The same for the one-ledger dialog. Distinct from both others, so a
+/// subprocess in one mode can never answer another.
+const MASTERS_TOKEN_PREFIX: &str = "bridge-create-ledger:";
+/// The one-ledger dialog's title. The Windows box has no custom labels, so the
+/// title asks the question there as well.
+const MASTERS_TITLE: &str = "ComplyEaze Bridge — create one ledger?";
+#[cfg(not(windows))]
+const MASTERS_BUTTON: &str = "Create ledger";
+/// What a one-ledger dialog is told as its count: always one item.
+const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
+/// The same for the invoice-stop release dialog, distinct from both.
+const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
+/// The same for the settle dialog (#1709), distinct from every other.
+const SETTLE_TOKEN_PREFIX: &str = "bridge-batch-settle-acknowledged:";
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -47,8 +86,40 @@ impl VoucherCount {
     }
 }
 
+/// What the person approved, and the all-company marks request every kind of
+/// post is aimed with. The kind decides which reads the queue makes and which
+/// recheck runs; it cannot be changed after construction.
 #[derive(Clone)]
 pub(crate) struct ApprovedImport {
+    pub(super) kind: ApprovedKind,
+    /// The all-company change marks, read last before the POST to confirm the
+    /// aim and again right after it to see where the post went (#574).
+    company_marks_request: AgentReadRequest,
+}
+
+/// The two requests one dispatch can carry. A voucher post and a master post
+/// share the queue, the identity brackets, the aim and the single POST; they
+/// differ only in what is read to admit them.
+#[derive(Clone)]
+pub(super) enum ApprovedKind {
+    Vouchers(VoucherAdmission),
+    /// Boxed: a master admission carries a rendered request and two reads, and
+    /// every `ApprovedImport` moves by value through the approval path.
+    Masters(Box<MasterAdmission>),
+}
+
+/// Which request an approval, a binding or a held request is for. Compared by
+/// kind, never by a count that happens to differ between kinds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PostKind {
+    Vouchers,
+    Masters,
+}
+
+/// A voucher post's admission: every field the voucher path carried before
+/// there was a second kind, moved here unchanged.
+#[derive(Clone)]
+pub(super) struct VoucherAdmission {
     xml: String,
     /// Every voucher's date, in batch order: the queue's Education recheck
     /// covers each of them.
@@ -63,9 +134,6 @@ pub(crate) struct ApprovedImport {
     /// The company's Currency masters, re-read inside the queue: a post goes
     /// only into a book with exactly one (bridge#551).
     currency_request: AgentReadRequest,
-    /// The all-company change marks, read last before the POST to confirm the
-    /// aim and again right after it to see where the voucher went (#574).
-    company_marks_request: AgentReadRequest,
     /// The reads an invoice's admission makes, for the queue to make again
     /// under its lock (#1337). `None` for every other voucher type. Boxed so
     /// that an approval an enum carries stays the size it was.
@@ -157,73 +225,11 @@ pub(crate) struct QueuedInvoice<'a> {
     pub(crate) answers: &'a InvoiceAnswers,
 }
 
-/// What the queue read for the last admission before the POST.
-pub(crate) struct QueuedAdmission<'a> {
-    pub(crate) first: &'a str,
-    pub(crate) second: &'a str,
-    pub(crate) catalogue: &'a str,
-    pub(crate) groups: Option<&'a str>,
-    pub(crate) currencies: &'a str,
-    /// The all-company marks read as the binding reads began (#239).
-    pub(crate) company_marks_at_binding: &'a str,
-    pub(crate) company_marks: &'a str,
-    pub(crate) ledger_binding: &'a StandardLedgerCatalogBinding,
-    /// An invoice's masters, read again for the admission's judge (#1337).
-    pub(crate) invoice: Option<QueuedInvoice<'a>>,
-}
-
-/// Whether the profile accepts every voucher's date, and there is at least
-/// one: an empty list approves nothing.
-fn every_date_accepted(profile: DateBoundaryProfile, voucher_dates: &[TallyDate]) -> bool {
-    !voucher_dates.is_empty()
-        && voucher_dates
-            .iter()
-            .all(|voucher_date| profile.accepts_boundary(voucher_date))
-}
-
-impl ApprovedImport {
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) async fn confirm(
-        xml: String,
-        preview: &str,
-        voucher_dates: Vec<TallyDate>,
-        verification_request: AgentReadRequest,
-        ledger_catalogue_request: AgentReadRequest,
-        ledger_binding: StandardLedgerCatalogBinding,
-        group_collection_request: Option<AgentReadRequest>,
-        currency_request: AgentReadRequest,
-        company_marks_request: AgentReadRequest,
-    ) -> Result<Self, String> {
-        let count = VoucherCount::new(voucher_dates.len())
-            .ok_or_else(|| "voucher_date_invalid".to_string())?;
-        approve(count, preview).await?;
-        Ok(Self {
-            xml,
-            voucher_dates,
-            verification_request,
-            ledger_catalogue_request,
-            ledger_binding,
-            group_collection_request,
-            currency_request,
-            company_marks_request,
-            invoice: None,
-        })
-    }
-
-    /// The same approval, to be redeemed with an invoice's masters read again
-    /// in the queue. A plain field of the approval and no part of what the
-    /// person was shown: the queue's judge holds the plan to the invoice.
-    pub(crate) fn with_invoice(mut self, invoice: Option<InvoiceReadPlan>) -> Self {
-        self.invoice = invoice.map(Box::new);
-        self
-    }
-
+impl VoucherAdmission {
+    /// The reads an invoice's admission makes, `None` for every other
+    /// voucher type (#1337).
     pub(super) fn invoice_plan(&self) -> Option<&InvoiceReadPlan> {
         self.invoice.as_deref()
-    }
-
-    pub(super) fn xml(&self) -> &str {
-        &self.xml
     }
 
     pub(super) fn verification_request(&self) -> AgentReadRequest {
@@ -245,21 +251,262 @@ impl ApprovedImport {
     pub(super) fn currency_request(&self) -> AgentReadRequest {
         self.currency_request.clone()
     }
+}
+
+/// A master post's admission: one ledger `Create`, rendered once.
+///
+/// `rendered` is produced once, when the admission is built, and never again,
+/// so the bytes the POST sends are the bytes whose digest the dispatch intent
+/// records. The only production constructor is [`ApprovedImport::confirm_masters`],
+/// which builds it before the dialog and holds it only if the person approves,
+/// so no code holds an approved masters kind without that answer (P2).
+#[derive(Clone)]
+pub(super) struct MasterAdmission {
+    item: LedgerCreateItem,
+    rendered: RenderedLedgerCreate,
+    /// The ledger name index read (the V3 catalogue request).
+    ledger_index_request: AgentReadRequest,
+    /// The group name index read (the group snapshot request).
+    group_index_request: AgentReadRequest,
+    company: VerifiedCompanyIdentity,
+    /// The master journal batch this approval is for, once the tool binds it
+    /// ([`ApprovedImport::bound_to_batch`]). A master request not bound to a
+    /// batch is licensed by no intent.
+    batch_id: Option<String>,
+}
+
+impl MasterAdmission {
+    /// Renders the request once, with the two index reads for the company.
+    fn new(
+        item: LedgerCreateItem,
+        company: &VerifiedCompanyIdentity,
+    ) -> Result<Self, super::agent_read_request::AgentReadRequestError> {
+        use super::agent_read_request::AgentReadRequestError;
+        use bridge_tally_protocol::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
+        let validated =
+            ValidatedCompanyName::new(company.display_name()).map_err(|_| AgentReadRequestError)?;
+        let rendered = item.render_import(company);
+        Ok(Self {
+            item,
+            rendered,
+            ledger_index_request: AgentReadRequest::parse(
+                ReadOnlyProfile::StandardLedgerCatalogV3 {
+                    company: &validated,
+                }
+                .render(),
+            )?,
+            group_index_request: AgentReadRequest::parse(
+                bridge_tally_protocol::native_outstandings::render_native_group_snapshot_request(
+                    company.display_name(),
+                ),
+            )?,
+            company: company.clone(),
+            batch_id: None,
+        })
+    }
+
+    pub(super) fn item(&self) -> &LedgerCreateItem {
+        &self.item
+    }
+
+    pub(super) fn ledger_index_request(&self) -> AgentReadRequest {
+        self.ledger_index_request.clone()
+    }
+
+    pub(super) fn group_index_request(&self) -> AgentReadRequest {
+        self.group_index_request.clone()
+    }
+
+    pub(super) fn company(&self) -> &VerifiedCompanyIdentity {
+        &self.company
+    }
+}
+
+/// What the queue read for the last admission before the POST, by kind.
+pub(crate) enum QueuedAdmission<'a> {
+    Vouchers {
+        first: &'a str,
+        second: &'a str,
+        catalogue: &'a str,
+        groups: Option<&'a str>,
+        currencies: &'a str,
+        /// The all-company marks read as the binding reads began (#239).
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+        ledger_binding: &'a StandardLedgerCatalogBinding,
+        /// An invoice's masters, read again for the admission's judge (#1337).
+        invoice: Option<QueuedInvoice<'a>>,
+    },
+    /// Each index is read twice, as the voucher absence reads are: the recheck
+    /// requires the pairs byte-equal.
+    Masters {
+        /// The request being posted and the company it is for, taken from the
+        /// approved request itself, so the recheck reads the name and the
+        /// company from the bytes' own source and no caller supplies them.
+        item: &'a LedgerCreateItem,
+        company: &'a VerifiedCompanyIdentity,
+        ledgers_first: &'a str,
+        ledgers_second: &'a str,
+        groups_first: &'a str,
+        groups_second: &'a str,
+        company_marks_at_binding: &'a str,
+        company_marks: &'a str,
+    },
+}
+
+/// Whether the profile accepts every voucher's date, and there is at least
+/// one: an empty list approves nothing.
+fn every_date_accepted(profile: DateBoundaryProfile, voucher_dates: &[TallyDate]) -> bool {
+    !voucher_dates.is_empty()
+        && voucher_dates
+            .iter()
+            .all(|voucher_date| profile.accepts_boundary(voucher_date))
+}
+
+impl ApprovedImport {
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) async fn confirm_vouchers(
+        xml: String,
+        preview: &str,
+        voucher_dates: Vec<TallyDate>,
+        verification_request: AgentReadRequest,
+        ledger_catalogue_request: AgentReadRequest,
+        ledger_binding: StandardLedgerCatalogBinding,
+        group_collection_request: Option<AgentReadRequest>,
+        currency_request: AgentReadRequest,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, String> {
+        let count = VoucherCount::new(voucher_dates.len())
+            .ok_or_else(|| "voucher_date_invalid".to_string())?;
+        approve(count, preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Vouchers(VoucherAdmission {
+                xml,
+                voucher_dates,
+                verification_request,
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request,
+                currency_request,
+                invoice: None,
+            }),
+            company_marks_request,
+        })
+    }
+
+    /// The same approval, to be redeemed with an invoice's masters read again
+    /// in the queue. A plain field of the approval and no part of what the
+    /// person was shown: the queue's judge holds the plan to the invoice. Only
+    /// a voucher approval carries a plan; a master approval is returned as it
+    /// is, since the voucher post that calls this admits a voucher approval
+    /// only.
+    pub(crate) fn with_invoice(mut self, invoice: Option<InvoiceReadPlan>) -> Self {
+        if let ApprovedKind::Vouchers(vouchers) = &mut self.kind {
+            vouchers.invoice = invoice.map(Box::new);
+        }
+        self
+    }
+
+    /// The master post's approval: the one-ledger dialog, answered only by its
+    /// own token. On the person's approval this holds `item` as the masters
+    /// kind; any other answer is a typed refusal and holds nothing. The
+    /// request and the two index reads are built before the dialog, so a
+    /// fault there asks no one.
+    ///
+    /// `preview` is what the person is shown. It is built from `item` and
+    /// `company` by the caller's review builder, and bound with them in the
+    /// approval binding.
+    pub(crate) async fn confirm_masters(
+        item: LedgerCreateItem,
+        company: &VerifiedCompanyIdentity,
+        preview: &str,
+        company_marks_request: AgentReadRequest,
+    ) -> Result<Self, String> {
+        let admission = MasterAdmission::new(item, company)
+            .map_err(|_| "master_request_invalid".to_string())?;
+        approve_masters(preview).await?;
+        Ok(Self {
+            kind: ApprovedKind::Masters(Box::new(admission)),
+            company_marks_request,
+        })
+    }
+
+    /// Which request this approval is for.
+    pub(crate) fn post_kind(&self) -> PostKind {
+        match &self.kind {
+            ApprovedKind::Vouchers(_) => PostKind::Vouchers,
+            ApprovedKind::Masters(_) => PostKind::Masters,
+        }
+    }
+
+    /// The bytes the one POST sends, whatever the kind. For masters they are
+    /// the bytes rendered once in [`MasterAdmission::new`], whose digest the
+    /// dispatch intent records.
+    pub(super) fn xml(&self) -> &str {
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => &vouchers.xml,
+            ApprovedKind::Masters(masters) => masters.rendered.xml(),
+        }
+    }
+
+    /// Whether the one POST would send exactly `xml`.
+    pub(crate) fn sends_exactly(&self, xml: &str) -> bool {
+        self.xml() == xml
+    }
+
+    /// Lowercase hex digest of the bytes the one POST sends, as a master
+    /// dispatch intent records them.
+    pub(crate) fn xml_sha256(&self) -> String {
+        bridge_tally_protocol::sha256_hex(self.xml().as_bytes())
+    }
+
+    /// This approval bound to the master journal batch it was taken for, so the
+    /// intent that licenses its send must be that batch's. A voucher approval is
+    /// returned as it is.
+    #[must_use]
+    pub(crate) fn bound_to_batch(mut self, batch_id: &str) -> Self {
+        if let ApprovedKind::Masters(masters) = &mut self.kind {
+            masters.batch_id = Some(batch_id.to_string());
+        }
+        self
+    }
+
+    /// The master journal batch this approval is bound to, if it is a master
+    /// approval that was bound.
+    pub(crate) fn master_batch_id(&self) -> Option<&str> {
+        match &self.kind {
+            ApprovedKind::Masters(masters) => masters.batch_id.as_deref(),
+            ApprovedKind::Vouchers(_) => None,
+        }
+    }
 
     pub(super) fn company_marks_request(&self) -> AgentReadRequest {
         self.company_marks_request.clone()
     }
 
-    /// Recheck the operator-approved dates after the endpoint queue admits this
-    /// request. The observed product/mode can change while native approval waits.
+    /// Recheck the operator-approved request against the observed product and
+    /// mode after the endpoint queue admits it. The mode can change while
+    /// native approval waits. Vouchers: every date is one the mode accepts.
+    /// Masters: the mode is not Education, which this path has not measured a
+    /// master write in.
     pub(super) fn require_boundary_profile(
         &self,
         profile: DateBoundaryProfile,
     ) -> Result<(), ApprovedImportAdmissionError> {
-        if every_date_accepted(profile, &self.voucher_dates) {
-            Ok(())
-        } else {
-            Err(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => {
+                if every_date_accepted(profile, &vouchers.voucher_dates) {
+                    Ok(())
+                } else {
+                    Err(ApprovedImportAdmissionError::EducationVoucherDateUnsupported)
+                }
+            }
+            ApprovedKind::Masters(_) => match profile {
+                DateBoundaryProfile::ModeAgnostic => Ok(()),
+                DateBoundaryProfile::EducationRestricted => {
+                    Err(ApprovedImportAdmissionError::MasterWritesNeedLicensedMode)
+                }
+            },
         }
     }
 
@@ -276,18 +523,21 @@ impl ApprovedImport {
         // bypass (bridge#583).
         std::hint::black_box(test_seam::SEAM_MARKER);
         Self {
-            xml,
-            voucher_dates: vec![voucher_date],
-            verification_request: AgentReadRequest::parse(
-                bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2.render(),
-            )
-            .expect("static read profile is admitted"),
-            ledger_catalogue_request,
-            ledger_binding,
-            group_collection_request: None,
-            currency_request,
+            kind: ApprovedKind::Vouchers(VoucherAdmission {
+                xml,
+                voucher_dates: vec![voucher_date],
+                verification_request: AgentReadRequest::parse(
+                    bridge_tally_protocol::xml_read_profiles::ReadOnlyProfile::CompanyListV2
+                        .render(),
+                )
+                .expect("static read profile is admitted"),
+                ledger_catalogue_request,
+                ledger_binding,
+                group_collection_request: None,
+                currency_request,
+                invoice: None,
+            }),
             company_marks_request,
-            invoice: None,
         }
     }
 }
@@ -319,9 +569,10 @@ impl Answered {
 }
 
 /// A post dialog left open after the MCP call that asked it returned (#725).
-/// It is [`ApprovedImport::confirm`] itself, unchanged, run on its own task so
+/// It is [`ApprovedImport::confirm_vouchers`] itself, unchanged, run on its own task so
 /// that the dialog's time limit and its child's exit are observed while no call
-/// is waiting. Dropping this aborts that task, which drops the dialog child:
+/// is waiting. When its box did not fit the screen (#1832) the task also runs
+/// the one note the asking call gave it, before the answer is stamped. Dropping this aborts that task, which drops the dialog child:
 /// `kill_on_drop` closes the dialog, and a token it prints afterwards is never
 /// read, so a late click approves nothing.
 pub(crate) struct PendingPostApproval {
@@ -333,8 +584,10 @@ pub(crate) struct PendingPostApproval {
 
 impl PendingPostApproval {
     /// Ask the person in a dialog that may outlive the calling call:
-    /// [`ApprovedImport::confirm`] with exactly these arguments, on its own
-    /// task. Nothing else can be run there.
+    /// [`ApprovedImport::confirm_vouchers`] with exactly these arguments, on its own
+    /// task. Nothing else can be run there but the masters twin below and the one
+    /// note of a box that did not fit, which the caller gives and only the dialog
+    /// task calls.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn ask(
         xml: String,
@@ -346,22 +599,66 @@ impl PendingPostApproval {
         group_collection_request: Option<AgentReadRequest>,
         currency_request: AgentReadRequest,
         company_marks_request: AgentReadRequest,
+        on_box_did_not_fit: Option<Box<dyn FnOnce() + Send>>,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_vouchers(
+                    xml,
+                    &preview,
+                    voucher_dates,
+                    verification_request,
+                    ledger_catalogue_request,
+                    ledger_binding,
+                    group_collection_request,
+                    currency_request,
+                    company_marks_request,
+                )
+                .await
+            },
+            on_box_did_not_fit,
+        )
+    }
+
+    /// The same for the one-ledger dialog: [`ApprovedImport::confirm_masters`]
+    /// with exactly these arguments, on its own task. Its box is measured as
+    /// the post's is, but a box that does not fit is refused with nothing to
+    /// note: the one-ledger text has no shorter form.
+    pub(crate) fn ask_masters(
+        item: LedgerCreateItem,
+        company: VerifiedCompanyIdentity,
+        preview: String,
+        company_marks_request: AgentReadRequest,
+    ) -> Self {
+        Self::stamped(
+            async move {
+                ApprovedImport::confirm_masters(item, &company, &preview, company_marks_request)
+                    .await
+            },
+            None,
+        )
+    }
+
+    /// Run `confirm` on its own task, stamping its answer as it ends, and tell
+    /// `on_box_did_not_fit` first if the box it showed did not fit the screen.
+    fn stamped(
+        confirm: impl std::future::Future<Output = Result<ApprovedImport, String>> + Send + 'static,
+        on_box_did_not_fit: Option<Box<dyn FnOnce() + Send>>,
     ) -> Self {
         let answered = std::sync::Arc::new(std::sync::OnceLock::new());
         let stamp = std::sync::Arc::clone(&answered);
         let dialog = async move {
-            let answer = ApprovedImport::confirm(
-                xml,
-                &preview,
-                voucher_dates,
-                verification_request,
-                ledger_catalogue_request,
-                ledger_binding,
-                group_collection_request,
-                currency_request,
-                company_marks_request,
-            )
-            .await;
+            let (answer, too_tall) = BOX_DID_NOT_FIT
+                .scope(std::cell::Cell::new(false), async {
+                    let answer = confirm.await;
+                    (answer, BOX_DID_NOT_FIT.with(std::cell::Cell::get))
+                })
+                .await;
+            // Told before the answer is stamped, so a call that reads the
+            // refusal finds the fact already recorded.
+            if let (true, Some(note)) = (too_tall, on_box_did_not_fit) {
+                note();
+            }
             // Stamped before the task ends, never after: a task seen finished
             // with no stamp is one that ended without an answer. A refusal's
             // code is stamped with it, so it can be read without the task.
@@ -438,8 +735,14 @@ impl ApprovedImport {
     /// How many vouchers the person was asked about: the dialog's count is
     /// taken from these dates (#746), so a redeemed approval can be held to the
     /// batch it is redeemed for.
-    pub(crate) fn voucher_count(&self) -> usize {
-        self.voucher_dates.len()
+    ///
+    /// A master post has no vouchers and no count: `None`. Whether an approval
+    /// is for the right kind is decided by [`Self::post_kind`], never by this.
+    pub(crate) fn voucher_count(&self) -> Option<usize> {
+        match &self.kind {
+            ApprovedKind::Vouchers(vouchers) => Some(vouchers.voucher_dates.len()),
+            ApprovedKind::Masters(_) => None,
+        }
     }
 }
 
@@ -507,8 +810,12 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free code, as the read before approval does (bridge#717).
     #[error("group_export_invalid")]
     GroupExportInvalid { cause: Option<&'static str> },
-    /// A bank voucher reached the queue without its group read, or a Journal
-    /// with one: a wiring fault, refused before any request is sent.
+    /// What the queue reads does not fit what the batch calls for: a bank
+    /// voucher without its group read or a Journal with one, an invoice without
+    /// its reads or reads without an invoice, a plan other than the one the
+    /// build carried, or a judge or precheck that still asks for an answer once
+    /// its reads are in. A wiring fault, refused before the POST is sent; the
+    /// queue's own reads may already have been sent.
     #[error("import_post_admission_inconsistent")]
     AdmissionInconsistent,
     /// The snapshot sent last before the POST no longer shows exactly one
@@ -547,6 +854,23 @@ pub(crate) enum ApprovedImportAdmissionError {
     /// data-free cause the refusal carries.
     #[error("post_catalogue_unreadable")]
     CatalogueUnreadable(#[source] bridge_tally_protocol::StandardLedgerCatalogError),
+    /// A master post met an Education profile at the queue's opening or closing
+    /// observation. Raised before any index read is trusted and before the
+    /// intent; nothing was sent.
+    #[error("master_writes_need_licensed_mode")]
+    MasterWritesNeedLicensedMode,
+    /// The proposed ledger name could resolve to an existing master, through
+    /// its stored name or an alias. Carries only the colliding master's kind
+    /// and how its name matched, never another client's name.
+    #[error("master_name_taken")]
+    MasterNameTaken { kind: MasterKind, via: Via },
+    /// The ledger name index answer could not be read, so a master post
+    /// cannot show a ledger name absent and is refused before the intent.
+    /// `cause` is the parser's code, which carries no book data
+    /// (`StandardLedgerCatalogError::safe_code`),
+    /// so a foreign company's answer is told apart from a malformed one.
+    #[error("master_ledger_index_unavailable")]
+    MasterLedgerIndexUnavailable { cause: &'static str },
     /// What the queue read of an invoice's masters differs from what the build
     /// recorded (#1337). `field` names the first that differs.
     #[error("import_invoice_masters_changed")]
@@ -616,6 +940,33 @@ pub(crate) enum UnderLockRefusal {
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
     ApprovalRevoked,
+    /// A master post reached the lock without the pre-image its queue recheck
+    /// was to leave for the intent: no sidecar can be named, so no intent is
+    /// recorded and nothing is sent.
+    #[error("master_pre_image_unrecorded")]
+    PreImageUnrecorded,
+    /// The pre-image sidecar could not be written. Refused before the intent:
+    /// nothing was recorded in the master journal and nothing was sent.
+    #[error("master_pre_image_write_failed")]
+    PreImageWriteFailed,
+    /// The pre-image sidecar written for a dispatch the journal then refused
+    /// could not be removed again: nothing was recorded or sent, but a file for
+    /// the batch is left behind.
+    #[error("master_pre_image_remove_failed")]
+    PreImageRemoveFailed,
+    /// Another dispatched master batch, whose outcome is still open, names a
+    /// ledger this one names: a second send of it under a new batch id. Nothing
+    /// was recorded and nothing was sent.
+    #[error("master_ledger_open_dispatch_overlaps")]
+    MasterOverlapsOpenDispatch,
+    /// The master journal refused the record before writing it: nothing was
+    /// recorded and nothing was sent.
+    #[error("master_ledger_invalid")]
+    MasterJournalRefused,
+    /// The master journal could not be read under the lock, so the batch's
+    /// state could not be checked: nothing was recorded and nothing was sent.
+    #[error("master_ledger_unavailable")]
+    MasterJournalUnavailable,
     /// Another invoice of this company was sent and is not verified posted, as
     /// an approval dialog stood open (ADR 0004, slice 4): nothing was recorded
     /// or sent.
@@ -638,11 +989,23 @@ impl UnderLockRefusal {
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
+            Self::PreImageUnrecorded => "master_pre_image_unrecorded",
+            Self::PreImageWriteFailed => "master_pre_image_write_failed",
+            Self::PreImageRemoveFailed => "master_pre_image_remove_failed",
+            Self::MasterOverlapsOpenDispatch => "master_ledger_open_dispatch_overlaps",
+            Self::MasterJournalRefused => "master_ledger_invalid",
+            Self::MasterJournalUnavailable => "master_ledger_unavailable",
             Self::CompanyStopped => "invoice_company_stopped",
             Self::Transfers(reason) => reason,
         }
     }
 }
+
+// What `before_dispatch` hands the send: the licence to send this request. Sealed
+// in its own module, where the only two licences are defined.
+#[path = "dispatch_license.rs"]
+mod dispatch_license;
+pub(crate) use dispatch_license::{DispatchLicense, RecordedIntent};
 
 /// Why `before_dispatch` refused. Only a named check made before the intent
 /// append is `Refused`; the lock, the journal read and the append itself are
@@ -671,6 +1034,14 @@ use confirm_review as approve_review;
 
 #[cfg(test)]
 use test_seam::approve_review;
+
+/// The native one-ledger dialog every master approval goes through, gated
+/// exactly as [`approve`] is.
+#[cfg(not(test))]
+use confirm_masters_dialog as approve_masters;
+
+#[cfg(test)]
+use test_seam::approve_masters;
 
 /// What a post dialog's own task runs under (#725). Outside this crate's unit
 /// tests it is the dialog alone: nothing is carried into the task.
@@ -704,6 +1075,17 @@ pub(crate) mod test_seam {
         super::VoucherCount::new(count).unwrap()
     }
 
+    /// Whether the review dialog for `kind` holds `preview` within the box's
+    /// caps, as the real dialog measures it, for the caller's tests.
+    pub(crate) fn review_fits(
+        kind: super::ReviewKind,
+        count: super::VoucherCount,
+        preview: &str,
+    ) -> bool {
+        let shown = kind.shown();
+        super::fits_the_box(shown, count, &super::displayed_text(shown, count, preview))
+    }
+
     /// What a test decided, and every preview the post path asked it about.
     #[derive(Clone)]
     pub(crate) struct ScriptedApproval {
@@ -712,6 +1094,9 @@ pub(crate) mod test_seam {
         /// Every preview the review dialog was asked about, kept apart from
         /// the post dialog's so a test can tell which dialog a person saw.
         reviews: Arc<Mutex<Vec<String>>>,
+        /// Every preview the one-ledger dialog was asked about, kept apart
+        /// from the other two so a test can tell which dialog a person saw.
+        masters: Arc<Mutex<Vec<String>>>,
         /// The voucher count each dialog was asked about, in the same order
         /// as `previews` and `reviews` (#746).
         counts: Arc<Mutex<Vec<usize>>>,
@@ -727,6 +1112,10 @@ pub(crate) mod test_seam {
         /// Signalled when a held post dialog opens, so a test waits for that
         /// event rather than polling for it against a clock.
         opened: Arc<tokio::sync::Notify>,
+        /// How many of the next post dialogs show a box that does not fit the
+        /// screen, as the real dialog child would report with its exit status
+        /// (#1832): each is refused as `import_review_too_large` and noted.
+        too_tall: Arc<std::sync::atomic::AtomicUsize>,
     }
 
     impl ScriptedApproval {
@@ -746,11 +1135,30 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// Approves, except that the first `times` post dialogs show a box that
+        /// does not fit the screen.
+        pub(crate) fn too_tall_first(times: usize) -> Self {
+            let scripted = Self::new(true);
+            scripted
+                .too_tall
+                .store(times, std::sync::atomic::Ordering::SeqCst);
+            scripted
+        }
+
         /// A post dialog that stays open until [`ScriptedApproval::answer`].
         pub(crate) fn held() -> Self {
             Self {
                 held: Some(Arc::new(tokio::sync::watch::channel(None).0)),
                 ..Self::new(false)
+            }
+        }
+
+        /// A held post dialog that runs `while_pending` as it opens, on the
+        /// dialog's own task, before it waits for [`ScriptedApproval::answer`].
+        pub(crate) fn held_after(while_pending: impl Fn() + Send + Sync + 'static) -> Self {
+            Self {
+                while_pending: Some(Arc::new(while_pending)),
+                ..Self::held()
             }
         }
 
@@ -791,12 +1199,14 @@ pub(crate) mod test_seam {
                 approve,
                 previews: Arc::default(),
                 reviews: Arc::default(),
+                masters: Arc::default(),
                 counts: Arc::default(),
                 review_counts: Arc::default(),
                 review_kinds: Arc::default(),
                 while_pending: None,
                 held: None,
                 opened: Arc::default(),
+                too_tall: Arc::default(),
             }
         }
 
@@ -806,6 +1216,10 @@ pub(crate) mod test_seam {
 
         pub(crate) fn reviews(&self) -> Vec<String> {
             self.reviews.lock().unwrap().clone()
+        }
+
+        pub(crate) fn masters(&self) -> Vec<String> {
+            self.masters.lock().unwrap().clone()
         }
 
         pub(crate) fn counts(&self) -> Vec<usize> {
@@ -829,13 +1243,13 @@ pub(crate) mod test_seam {
         pub(crate) static SCRIPTED_APPROVAL: ScriptedApproval;
     }
 
-    /// The test-build approval. Unscoped, it declines at once and starts no
-    /// process, so no test can reach a real dialog or approve by default.
-    pub(super) async fn approve(count: super::VoucherCount, preview: &str) -> Result<(), String> {
+    /// What the scripted decision is for a dialog that records itself with
+    /// `record`: the decision, once a held dialog has been answered. Unscoped
+    /// it declines at once and starts no process.
+    async fn scripted_decision(record: impl FnOnce(&ScriptedApproval)) -> bool {
         let decision = SCRIPTED_APPROVAL
             .try_with(|scripted| {
-                scripted.previews.lock().unwrap().push(preview.to_string());
-                scripted.counts.lock().unwrap().push(count.0.get());
+                record(scripted);
                 if let Some(while_pending) = &scripted.while_pending {
                     while_pending();
                 }
@@ -851,20 +1265,59 @@ pub(crate) mod test_seam {
             .unwrap_or(Ok(false));
         let decision = match decision {
             Ok(decision) => decision,
-            Err(mut held) => {
-                let answered = held
-                    .wait_for(Option::is_some)
-                    .await
-                    .map(|answer| *answer == Some(true))
-                    .unwrap_or(false);
-                answered
-            }
+            Err(mut held) => held
+                .wait_for(Option::is_some)
+                .await
+                .map(|answer| *answer == Some(true))
+                .unwrap_or(false),
         };
         std::hint::black_box(SEAM_MARKER);
+        decision
+    }
+
+    /// The test-build approval. Unscoped, it declines at once and starts no
+    /// process, so no test can reach a real dialog or approve by default.
+    pub(super) async fn approve(count: super::VoucherCount, preview: &str) -> Result<(), String> {
+        let decision = scripted_decision(|scripted| {
+            scripted.previews.lock().unwrap().push(preview.to_string());
+            scripted.counts.lock().unwrap().push(count.0.get());
+        })
+        .await;
+        let too_tall = SCRIPTED_APPROVAL
+            .try_with(|scripted| {
+                scripted
+                    .too_tall
+                    .fetch_update(
+                        std::sync::atomic::Ordering::SeqCst,
+                        std::sync::atomic::Ordering::SeqCst,
+                        |left| left.checked_sub(1),
+                    )
+                    .is_ok()
+            })
+            .unwrap_or(false);
+        if too_tall {
+            super::note_box_did_not_fit();
+            return Err("import_review_too_large".into());
+        }
         if decision {
             Ok(())
         } else {
             Err("import_approval_declined".into())
+        }
+    }
+
+    /// The test-build one-ledger dialog, scripted by the same decision
+    /// (including a held dialog a test answers) and declining the same way
+    /// when unscoped.
+    pub(super) async fn approve_masters(preview: &str) -> Result<(), String> {
+        let decision = scripted_decision(|scripted| {
+            scripted.masters.lock().unwrap().push(preview.to_string());
+        })
+        .await;
+        if decision {
+            Ok(())
+        } else {
+            Err("master_approval_declined".into())
         }
     }
 
@@ -934,6 +1387,24 @@ pub(crate) mod test_seam {
         assert_eq!(
             super::confirm_review(super::ReviewKind::Review, ONE, &oversized).await,
             Err("ack_review_too_large".to_string())
+        );
+    }
+
+    /// The same for the one-ledger dialog, which has its own limit code.
+    #[tokio::test]
+    async fn the_real_masters_approval_refuses_an_oversized_preview_before_starting_a_process() {
+        let oversized = "x".repeat(super::MAX_PREVIEW_BYTES + 1);
+        assert_eq!(
+            super::confirm_masters_with(
+                std::path::Path::new("/nonexistent/never-started"),
+                &oversized
+            )
+            .await,
+            Err("master_review_too_large".to_string())
+        );
+        assert_eq!(
+            super::confirm_masters_dialog(&oversized).await,
+            Err("master_review_too_large".to_string())
         );
     }
 
@@ -1075,6 +1546,12 @@ pub(crate) mod test_seam {
                 Err("ack_review_unavailable"),
             ),
             (
+                "the one-ledger dialog's token for this nonce",
+                0,
+                "bridge-create-ledger:{NONCE}\n",
+                Err("ack_review_unavailable"),
+            ),
+            (
                 "a log line, then the token",
                 0,
                 "starting\nbridge-review-acknowledged:{NONCE}\n",
@@ -1104,17 +1581,49 @@ pub(crate) mod test_seam {
             // `ack_review_unavailable`, and would pass a row without reaching
             // the clean-exit-without-token arm it is here to pin.
             let path = standin(directory.path(), exit_code, answer);
-            let result = super::confirm_review_with(&path, ONE, "Review").await;
+            let result =
+                super::confirm_review_with(&path, super::ReviewKind::Review, ONE, "Review").await;
             assert_eq!(result, expected.map_err(str::to_string), "{name}");
             assert_ran_to_its_end(&path, "Review", name);
         }
         // The control: the token for this call's nonce is accepted.
         let echoes_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
         assert_eq!(
-            super::confirm_review_with(&echoes_token, ONE, "Review").await,
+            super::confirm_review_with(&echoes_token, super::ReviewKind::Review, ONE, "Review")
+                .await,
             Ok(())
         );
         assert_ran_to_its_end(&echoes_token, "Review", "the control");
+        // A stop release runs its own mode and answers with its own token: the
+        // review's token does not release a stop, and the release's does.
+        let review_token = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
+        assert_eq!(
+            super::confirm_review_with(
+                &review_token,
+                super::ReviewKind::StopRelease,
+                ONE,
+                "Review"
+            )
+            .await,
+            Err("ack_review_unavailable".to_string())
+        );
+        assert_ran_to_its_end(&review_token, "Review", "a review token for a release");
+        let release_token = standin(
+            directory.path(),
+            0,
+            "bridge-stop-release-acknowledged:{NONCE}\n",
+        );
+        assert_eq!(
+            super::confirm_review_with(
+                &release_token,
+                super::ReviewKind::StopRelease,
+                ONE,
+                "Review"
+            )
+            .await,
+            Ok(())
+        );
+        assert_ran_to_its_end(&release_token, "Review", "the release control");
     }
 
     /// The post dialog is answered only by the token echoing this call's
@@ -1154,6 +1663,10 @@ pub(crate) mod test_seam {
                 "the review dialog's token for this nonce",
                 "bridge-review-acknowledged:{NONCE}\n",
             ),
+            (
+                "the one-ledger dialog's token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
+            ),
             // The answer is matched byte for byte, so any stray output, such
             // as a log line, is refused. That is fail-closed on purpose: do
             // not trim or search the output to "fix" it.
@@ -1191,9 +1704,10 @@ pub(crate) mod test_seam {
 
     /// A dialog whose box did not fit the screen exits with its own status
     /// (#1832). That is a refusal that says the text is too large, for the
-    /// post and for the review, with or without a token: no answer, a
-    /// printed approval included, passes for a box the person could not see
-    /// whole. It is not a decline, not unavailable and never approved.
+    /// post, the review and the one-ledger box (#1780), with or without a
+    /// token: no answer, a printed approval included, passes for a box the
+    /// person could not see whole. It is not a decline, not unavailable and
+    /// never approved.
     #[tokio::test]
     async fn a_box_that_did_not_fit_the_screen_is_refused_whatever_it_printed() {
         let directory = standin_directory();
@@ -1208,6 +1722,10 @@ pub(crate) mod test_seam {
                 "the review token for this nonce",
                 "bridge-review-acknowledged:{NONCE}\n",
             ),
+            (
+                "the one-ledger token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
+            ),
         ] {
             let path = standin(directory.path(), status, answer);
             assert_eq!(
@@ -1218,11 +1736,18 @@ pub(crate) mod test_seam {
             assert_ran_to_its_end(&path, "Post", name);
             let path = standin(directory.path(), status, answer);
             assert_eq!(
-                super::confirm_review_with(&path, ONE, "Review").await,
+                super::confirm_review_with(&path, super::ReviewKind::Review, ONE, "Review").await,
                 Err("ack_review_too_large".to_string()),
                 "review: {name}"
             );
             assert_ran_to_its_end(&path, "Review", name);
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, "Create").await,
+                Err("master_review_too_large".to_string()),
+                "one ledger: {name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
         }
         // The statuses next to it keep their meaning: a decline is exit 1, a
         // clean exit with no token is unavailable.
@@ -1256,6 +1781,131 @@ pub(crate) mod test_seam {
         assert_ne!(nonces[0], nonces[1]);
     }
 
+    /// The one-ledger dialog is approved only by the token echoing this call's
+    /// nonce and a clean exit, as the post dialog is. Anything else is refused,
+    /// never approved: a clean exit without the token is an executable that is
+    /// not this dialog (unavailable), and the post and review dialogs' tokens
+    /// are not this one's.
+    #[tokio::test]
+    async fn a_ledger_create_is_approved_only_by_the_token_for_its_nonce() {
+        let directory = standin_directory();
+        for (name, exit_code, answer) in [
+            ("a person's decline: no token, exit 1", 1, ""),
+            (
+                "the token, but a failing exit",
+                1,
+                "bridge-create-ledger:{NONCE}\n",
+            ),
+        ] {
+            let path = standin(directory.path(), exit_code, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, "Create").await,
+                Err("master_approval_declined".to_string()),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        let another_nonce = format!("bridge-create-ledger:{}\n", crate::synthetic_guid(0));
+        for (name, answer) in [
+            ("an executable ignoring the flag exits 0", ""),
+            ("an echo of the input", "{NONCE}\n1\nCreate"),
+            ("a token for another nonce", another_nonce.as_str()),
+            (
+                "the post dialog's token for this nonce",
+                "bridge-post-approved:{NONCE}\n",
+            ),
+            (
+                "the review dialog's token for this nonce",
+                "bridge-review-acknowledged:{NONCE}\n",
+            ),
+            (
+                "a log line, then the token",
+                "starting\nbridge-create-ledger:{NONCE}\n",
+            ),
+            (
+                "the token, then more output",
+                "bridge-create-ledger:{NONCE}\nmore\n",
+            ),
+            ("the token with CRLF", "bridge-create-ledger:{NONCE}\r\n"),
+            (
+                "the token without its newline",
+                "bridge-create-ledger:{NONCE}",
+            ),
+        ] {
+            let path = standin(directory.path(), 0, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, "Create").await,
+                Err("master_approval_unavailable".to_string()),
+                "{name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
+        }
+        let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        assert_eq!(
+            super::confirm_masters_with(&approves, "Create").await,
+            Ok(())
+        );
+        assert_ran_to_its_end(&approves, "Create", "the control");
+    }
+
+    /// The one-ledger token does not approve the post or the review dialog.
+    #[tokio::test]
+    async fn the_ledger_create_token_approves_neither_the_post_nor_the_review() {
+        let directory = standin_directory();
+        let answers = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        assert_eq!(
+            super::confirm_with(&answers, ONE, "Post").await,
+            Err("import_approval_unavailable".to_string())
+        );
+        assert_eq!(
+            super::confirm_review_with(&answers, super::ReviewKind::Review, ONE, "Review").await,
+            Err("ack_review_unavailable".to_string())
+        );
+    }
+
+    /// Each dialog is started in its own mode, so the one-ledger preview is
+    /// never shown by the post dialog or the reverse.
+    #[tokio::test]
+    async fn each_dialog_is_started_in_its_own_mode() {
+        let directory = standin_directory();
+        let sent = |path: &std::path::Path| {
+            std::fs::read_to_string(beside(path, ".args")).expect("the stand-in ran")
+        };
+        let masters = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        super::confirm_masters_with(&masters, "Create")
+            .await
+            .unwrap();
+        assert_eq!(sent(&masters), "--confirm-masters");
+        let post = standin(directory.path(), 0, "bridge-post-approved:{NONCE}\n");
+        super::confirm_with(&post, ONE, "Post").await.unwrap();
+        assert_eq!(sent(&post), "--confirm-journal");
+        let review = standin(directory.path(), 0, "bridge-review-acknowledged:{NONCE}\n");
+        super::confirm_review_with(&review, super::ReviewKind::Review, ONE, "Review")
+            .await
+            .unwrap();
+        assert_eq!(sent(&review), "--confirm-review");
+    }
+
+    /// The one-ledger dialog is told it is about one item, on the count line,
+    /// and each call sends a nonce of its own.
+    #[tokio::test]
+    async fn the_ledger_create_dialog_is_told_one_item_with_a_fresh_nonce() {
+        let directory = standin_directory();
+        let approves = standin(directory.path(), 0, "bridge-create-ledger:{NONCE}\n");
+        let mut nonces = Vec::new();
+        for _ in 0..2 {
+            assert_eq!(
+                super::confirm_masters_with(&approves, "Create").await,
+                Ok(())
+            );
+            let input = standin_input(&approves).expect("the stand-in ran");
+            let (nonce, shown, text) = super::dialog_input(&input).expect("the parent's shape");
+            assert_eq!((shown, text), (ONE, "Create"));
+            nonces.push(nonce.to_string());
+        }
+        assert_ne!(nonces[0], nonces[1]);
+    }
+
     /// Each dialog child is told the voucher count its title and button
     /// name, on the line after the nonce, and then the preview (#746). The
     /// stand-in saves the bytes the parent sent, and the child's own parser
@@ -1269,7 +1919,13 @@ pub(crate) mod test_seam {
         ] {
             let answers = standin(directory.path(), 0, &format!("{prefix}{{NONCE}}\n"));
             let result = if review {
-                super::confirm_review_with(&answers, count(sent), preview).await
+                super::confirm_review_with(
+                    &answers,
+                    super::ReviewKind::Review,
+                    count(sent),
+                    preview,
+                )
+                .await
             } else {
                 super::confirm_with(&answers, count(sent), preview).await
             };
@@ -1309,6 +1965,11 @@ pub(crate) mod test_seam {
             super::review_title(count(50)),
             "ComplyEaze Bridge — record that you reviewed 50 vouchers"
         );
+        // A stop release is titled for what it does, and names no review (#1828).
+        assert_eq!(
+            super::release_title(),
+            "ComplyEaze Bridge — release the invoice stop"
+        );
         // What each window's answer text says, in its own buttons' words (#1780).
         assert_eq!(
             super::answer_text(super::Shown::Post, ONE),
@@ -1327,9 +1988,14 @@ pub(crate) mod test_seam {
         );
         assert_eq!(
             super::answer_text(super::Shown::StopRelease, ONE),
-            "Click \"I reviewed it\" to release the invoice stop for this company, so that \
+            "Click \"Release the stop\" to release the invoice stop for this company, so that \
              ComplyEaze Bridge builds and posts invoices for it again. Click Cancel to cancel. \
              Nothing is released until you answer."
+        );
+        assert_eq!(
+            super::answer_text(super::Shown::Masters, ONE),
+            "Click \"Create ledger\" to create this ledger in Tally. Click Cancel to cancel. \
+             Nothing is created until you answer."
         );
     }
 
@@ -1377,6 +2043,11 @@ pub(crate) mod test_seam {
              ComplyEaze Bridge builds and posts invoices for it again. Press N (or click No) to \
              cancel. Nothing is released until you answer."
         );
+        assert_eq!(
+            super::answer_text(super::Shown::Masters, ONE).replace('\n', " "),
+            "Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to \
+             cancel. Nothing is created until you answer."
+        );
     }
 
     /// The answer text is wrapped under the dialog's line width without losing
@@ -1391,6 +2062,7 @@ pub(crate) mod test_seam {
             super::Shown::Post,
             super::Shown::Review,
             super::Shown::StopRelease,
+            super::Shown::Masters,
         ] {
             for n in [1, 2, 9, 10, 50] {
                 let text = super::answer_text(shown, count(n));
@@ -1489,6 +2161,14 @@ pub(crate) mod test_seam {
         assert_ne!(post, review);
         assert!(!release.contains("record that you reviewed"));
         assert!(!post.contains("release the invoice stop"));
+        // The one-ledger dialog opens with its own answer text, never a
+        // voucher's.
+        let masters = super::displayed_text(super::Shown::Masters, super::ONE_ITEM, "Details");
+        assert_eq!(
+            masters,
+            format!("{}\n\nDetails", wrapped(super::Shown::Masters))
+        );
+        assert!(masters.contains("create this ledger in Tally") && !masters.contains("voucher"));
     }
 
     /// The dialog subprocesses show a dialog only for input of the shape the
@@ -1537,14 +2217,22 @@ enum Shown {
     Post,
     Review,
     StopRelease,
+    Settle,
+    /// The one-ledger dialog, always about one ledger.
+    Masters,
 }
 
-/// The two uses of the review dialog. [`ReviewAcknowledged::confirm`] takes
-/// one, so the invoice-stop release cannot be shown with the review's words.
+/// The kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
+/// and each has its own subprocess mode, so the invoice-stop release or a
+/// batch's settlement is never shown with the review's title or button
+/// (#1828, #1709).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReviewKind {
     Review,
     StopRelease,
+    /// A person's settlement of a batch Tally answered as creating none of
+    /// its vouchers (#1709).
+    Settle,
 }
 
 impl ReviewKind {
@@ -1552,6 +2240,17 @@ impl ReviewKind {
         match self {
             Self::Review => Shown::Review,
             Self::StopRelease => Shown::StopRelease,
+            Self::Settle => Shown::Settle,
+        }
+    }
+
+    /// The subprocess mode that shows this dialog, and the token prefix it answers
+    /// with: each kind its own, so its window is titled for what it does.
+    fn child(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
+            Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
+            Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
         }
     }
 }
@@ -1582,6 +2281,17 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Settle => (
+            format!(
+                "close this batch in ComplyEaze Bridge for good, so that it never sends {} again",
+                these_vouchers(count)
+            ),
+            "Nothing is closed until you answer.",
+        ),
+        Shown::Masters => (
+            "create this ledger in Tally".into(),
+            "Nothing is created until you answer.",
+        ),
     }
 }
 
@@ -1601,7 +2311,10 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
     let (yes, nothing) = answer_effect(shown, count);
     let button = match shown {
         Shown::Post => post_words(count).1,
-        Shown::Review | Shown::StopRelease => REVIEW_BUTTON.to_string(),
+        Shown::Review => REVIEW_BUTTON.to_string(),
+        Shown::StopRelease => RELEASE_BUTTON.to_string(),
+        Shown::Settle => SETTLE_BUTTON.to_string(),
+        Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     wrapped(
         &format!("Click \"{button}\" to {yes}. Click Cancel to cancel. {nothing}"),
@@ -1616,7 +2329,7 @@ const ANSWER_WIDTH: usize = 100;
 /// Windows box needs it, to keep the box's width bounded; the Mac passes no
 /// limit, because the alert wraps its own text and a break of ours would be
 /// wrapped a second time.
-fn wrapped(text: &str, limit: usize) -> String {
+pub(crate) fn wrapped(text: &str, limit: usize) -> String {
     let (mut lines, mut width) = (String::new(), 0);
     for word in text.split(' ') {
         let length = word.chars().count();
@@ -1696,8 +2409,8 @@ pub(crate) fn review_text(kind: ReviewKind, count: VoucherCount, preview: &str) 
 }
 
 /// What the dialog shows: the answer text, then the preview. A stop release
-/// keeps its own statement first, because the title of the shared review
-/// dialog names only a review, and puts the answer text under it.
+/// keeps its own statement first, so its first line says what it releases, and
+/// puts the answer text under it.
 fn displayed_text(shown: Shown, count: VoucherCount, preview: &str) -> String {
     let answer = answer_text(shown, count);
     match (shown, preview.split_once("\n\n")) {
@@ -1742,7 +2455,10 @@ async fn confirm_with(
     {
         // A box that did not fit the screen is a refusal whatever else the
         // child printed: the text is too large for this person's screen.
-        Ok(answer) if answer.box_did_not_fit => Err("import_review_too_large".into()),
+        Ok(answer) if answer.box_did_not_fit => {
+            note_box_did_not_fit();
+            Err("import_review_too_large".into())
+        }
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1: `run_confirmation`
         // returns false. A clean exit without the token is never that; it is
@@ -1755,8 +2471,9 @@ async fn confirm_with(
     }
 }
 
-/// The review dialog for a doubted post (#239): its own subprocess mode, so
-/// its title and button never read as approving a post. It is answered by
+/// The review dialog for a doubted post (#239), or the invoice-stop release
+/// dialog (#1828): each its own subprocess mode, so neither title nor button
+/// reads as approving a post, nor one as the other. It is answered by
 /// the token alone, as the post dialog is by the token and a clean exit; a
 /// clean exit without the token is unavailable, as the post dialog's is.
 async fn confirm_review(
@@ -1769,36 +2486,66 @@ async fn confirm_review(
     if !fits_the_box(kind.shown(), count, &shown) {
         return Err("ack_review_too_large".into());
     }
-    confirm_review_with(&executable, count, &shown).await
+    confirm_review_with(&executable, kind, count, &shown).await
 }
 
 async fn confirm_review_with(
     executable: &std::path::Path,
+    kind: ReviewKind,
     count: VoucherCount,
     preview: &str,
 ) -> Result<(), String> {
     if preview.len() > MAX_PREVIEW_BYTES {
         return Err("ack_review_too_large".into());
     }
-    match nonce_bound_dialog(
-        executable,
-        "--confirm-review",
-        REVIEW_TOKEN_PREFIX,
-        count,
-        preview,
-    )
-    .await
-    {
+    let (mode, prefix) = kind.child();
+    match nonce_bound_dialog(executable, mode, prefix, count, preview).await {
         Ok(answer) if answer.box_did_not_fit => Err("ack_review_too_large".into()),
         Ok(answer) if answer.token_matched => Ok(()),
         // A person's decline is no token and exit 1: `run_review_confirmation`
-        // returns false. A clean exit without the token is never that; it is
-        // an executable that is not this dialog, such as one ignoring the
-        // flag (#689).
+        // and `run_release_confirmation` return false. A clean exit without
+        // the token is never that; it is an executable that is not this
+        // dialog, such as one ignoring the flag (#689).
         Ok(answer) if answer.exited_cleanly => Err("ack_review_unavailable".into()),
         Ok(_) => Err("ack_review_declined".into()),
         Err(DialogFailure::Unavailable) => Err("ack_review_unavailable".into()),
         Err(DialogFailure::TimedOut) => Err("ack_review_timed_out".into()),
+    }
+}
+
+/// The one-ledger dialog: its own subprocess mode, title, button and token,
+/// answered exactly as the post dialog is, by the token for this call's nonce
+/// and a clean exit together. Always asked about one item. Like the other
+/// dialogs, its first lines say what each answer does (#1780).
+async fn confirm_masters_dialog(preview: &str) -> Result<(), String> {
+    let executable = std::env::current_exe().map_err(|_| "master_approval_unavailable")?;
+    let shown = displayed_text(Shown::Masters, ONE_ITEM, preview);
+    confirm_masters_with(&executable, &shown).await
+}
+
+async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Result<(), String> {
+    if preview.len() > MAX_PREVIEW_BYTES {
+        return Err("master_review_too_large".into());
+    }
+    match nonce_bound_dialog(
+        executable,
+        "--confirm-masters",
+        MASTERS_TOKEN_PREFIX,
+        ONE_ITEM,
+        preview,
+    )
+    .await
+    {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the post's box (#1832).
+        Ok(answer) if answer.box_did_not_fit => Err("master_review_too_large".into()),
+        Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
+        // A person's decline is no token and exit 1. A clean exit without the
+        // token is an executable that is not this dialog.
+        Ok(answer) if answer.exited_cleanly => Err("master_approval_unavailable".into()),
+        Ok(_) => Err("master_approval_declined".into()),
+        Err(DialogFailure::Unavailable) => Err("master_approval_unavailable".into()),
+        Err(DialogFailure::TimedOut) => Err("master_approval_timed_out".into()),
     }
 }
 
@@ -1898,6 +2645,39 @@ pub fn run_review_confirmation() -> bool {
     )
 }
 
+/// Entry point for the one-ledger dialog's subprocess, under the same rules.
+pub fn run_masters_confirmation() -> bool {
+    answer_with_token(
+        MASTERS_TOKEN_PREFIX,
+        show_create_ledger,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the invoice-stop release dialog's subprocess, under the same
+/// rules: its own window title and token, so a release is never titled a review.
+pub fn run_release_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_TOKEN_PREFIX,
+        show_release_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
+/// Entry point for the settle dialog's subprocess (#1709), under the same
+/// rules: its own window title and token, so a settlement is never titled a
+/// review.
+pub fn run_settle_confirmation() -> bool {
+    answer_with_token(
+        SETTLE_TOKEN_PREFIX,
+        show_settle_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
 /// Read the parent's nonce line, count line and preview from `input`, show
 /// `dialog` with that count and preview, and
 /// write the token for that nonce to `output` only when it returns true. The
@@ -1972,6 +2752,52 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         == rfd::MessageDialogResult::Custom(REVIEW_BUTTON.into())
 }
 
+/// The invoice-stop release window's title: it releases a stop and reviews no
+/// voucher, so it names neither a review nor a post (#1828).
+#[cfg(not(windows))]
+fn release_title() -> String {
+    "ComplyEaze Bridge — release the invoice stop".into()
+}
+
+/// The invoice-stop release dialog: the acknowledgement dialog with its own
+/// title and button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    rfd::MessageDialog::new()
+        .set_title(release_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_BUTTON.into())
+}
+
+/// The settle window's title: it closes a batch and reviews no voucher, so it
+/// names neither a review nor a post (#1709).
+#[cfg(not(windows))]
+fn settle_title() -> String {
+    "ComplyEaze Bridge — close this batch".into()
+}
+
+/// The settle dialog: the acknowledgement dialog with its own title and
+/// button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    rfd::MessageDialog::new()
+        .set_title(settle_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            SETTLE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(SETTLE_BUTTON.into())
+}
+
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
 /// custom labels, so the title asks the question, with the count for a batch
 /// (#746).
@@ -1988,8 +2814,8 @@ fn review_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
@@ -1998,22 +2824,107 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
-                // Topmost: a window the connector opens while Tally fills the
-                // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). With
-                // MB_SETFOREGROUND the box also takes the foreground, so a key
-                // typed for Tally answers it; the parent puts a first line on
-                // its text that says what Y and N do (#1780). No stays the
-                // default button.
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows invoice-stop release box's title, a question as the review's is
+/// (#1828).
+#[cfg(windows)]
+fn release_question() -> String {
+    "ComplyEaze Bridge — release the invoice stop for this company?".into()
+}
+
+/// The Windows invoice-stop release box: the review's box with its own title.
+#[cfg(windows)]
+fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows settle box's title, a question as the review's is (#1709).
+#[cfg(windows)]
+fn settle_question() -> String {
+    "ComplyEaze Bridge — close this batch for good?".into()
+}
+
+/// The Windows settle box: the review's box with its own title.
+#[cfg(windows)]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2067,8 +2978,8 @@ fn post_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
@@ -2076,23 +2987,101 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // The box cannot scroll: `guarded` measures it when it opens and, if it is
     // not wholly on the screen, never returns (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: Both buffers are NUL-terminated and live for the synchronous
-        // dialog; no parent HWND is borrowed. No application state is exposed
+        // dialog; the owner is `guarded`'s hidden window, alive until the box
+        // returns. No application state is exposed
         // to callbacks.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
                 // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). With
-                // MB_SETFOREGROUND the box also takes the foreground, so a key
-                // typed for Tally answers it; the parent puts a first line on
+                // process may not take the foreground (#1589). MB_TOPMOST alone
+                // was seen not to hold when the box opened seconds after the
+                // last input went to Tally. With MB_SYSTEMMODAL added the box
+                // held it in one lab run on Windows 10, where Tally still took a
+                // click and a key while the box was open (#1780). That run did
+                // not test what else a system-modal box changes: the taskbar
+                // showed no task buttons while it was open, cause not tested
+                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // window, the other way a stand-in box was seen to stay on top
+                // (#1780); an owned box has no taskbar button. When Windows lets it,
+                // MB_SETFOREGROUND also gives the box the foreground, so a key
+                // typed for Tally can answer it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
                 // default button.
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The one-ledger dialog. It is shown for one item only: a count other than
+/// one is not the parent's shape and shows nothing.
+#[cfg(not(windows))]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    if count != ONE_ITEM {
+        return false;
+    }
+    rfd::MessageDialog::new()
+        .set_title(MASTERS_TITLE)
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        // The Cancel label supplies the native Escape action. Creating
+        // requires the explicitly matched positive button.
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            MASTERS_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(MASTERS_BUTTON.into())
+}
+
+#[cfg(windows)]
+fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    // As for the post dialog: No is the default, Escape and close are Cancel.
+    if count != ONE_ITEM {
+        return false;
+    }
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832). Through `guarded` it is also
+    // brought to the front once it appears, as the post's box is: its first
+    // line tells the person to press Y or N, and in one lab run on Windows 10
+    // MB_SETFOREGROUND alone did not give it the keyboard when it opened
+    // seconds after the last input went to Tally (#1780).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });

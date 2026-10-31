@@ -323,6 +323,34 @@ fn a_post_span_needs_clean_counters_a_lastvchid_and_a_step_equal_to_created() {
     );
 }
 
+/// A wrapped reply that reports `STATUS=0` failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6), so no span is bound from it, with or
+/// without a mark read after the post (#2008).
+#[test]
+fn a_reply_reporting_status_zero_binds_no_span_whatever_its_counters() {
+    let before = PreMark::recorded(1795);
+    let failed = |status: &str| {
+        bridge_tally_protocol::parse_import_outcome(&format!(
+            "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1733</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>"
+        ))
+        .unwrap()
+    };
+    // The same counters under STATUS=1 make a span: only the status differs.
+    assert!(PostSpan::after_clean_post(before, 1805, &failed("1"), 10).is_ok());
+    assert!(matches!(
+        PostSpan::after_clean_post(before, 1805, &failed("0"), 10),
+        Err(BindError::Refused(SpanRefusal::StatusFailure))
+    ));
+    assert_eq!(
+        PostSpan::after_clean_response(before, &failed("0"), 10),
+        Err(SpanRefusal::StatusFailure)
+    );
+    assert_eq!(
+        SpanRefusal::StatusFailure.code(),
+        "span_response_status_failure"
+    );
+}
+
 /// Verification treats an absent `EFFECTIVEDATE` as not observed, so the
 /// binding is decided again by the next read, never refused for good. A real
 /// difference later in the span still refuses: the absence, met first, never
@@ -681,6 +709,24 @@ fn sent_journals() -> Vec<ImportVoucher> {
     ]
 }
 
+/// #2062: the cancel candidate of each captured request (Payment, Receipt and
+/// Contra; Journal) is that request with only each voucher's `ACTION` changed.
+#[test]
+fn the_cancel_candidate_of_each_captured_request_changes_only_its_actions() {
+    let journal_ids = JOURNAL_IMPORT
+        .split("REMOTEID=\"")
+        .skip(1)
+        .map(|rest| Uuid::parse_str(&rest[..36]).unwrap())
+        .collect::<Vec<_>>();
+    for (vouchers, ids) in [
+        (sent(), captured_remote_ids()),
+        (sent_journals(), journal_ids),
+    ] {
+        let pairs = vouchers.iter().zip(ids).collect::<Vec<_>>();
+        super::super::cancel::tests::assert_cancel_changes_only_the_action(COMPANY, &pairs);
+    }
+}
+
 #[test]
 fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
     let ids = JOURNAL_IMPORT
@@ -729,6 +775,14 @@ fn five_captured_journals_are_bridges_own_request_and_bind_in_request_order() {
 /// The ten captured vouchers saved as one batch on a server of its own, with
 /// the journal on disk that `decide_post_span` records its verdict in.
 fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, ImportLedgerLine) {
+    journaled_batch_answered(directory, outcome())
+}
+
+/// [`journaled_batch`], with `answer` as the post's recorded response.
+fn journaled_batch_answered(
+    directory: &std::path::Path,
+    answer: bridge_tally_protocol::TallyImportOutcome,
+) -> (crate::agent::Server, ImportLedgerLine) {
     let server = crate::agent::Server::new(crate::agent::Settings {
         endpoint: bridge_tally_transport::TallyEndpointConfig {
             host: "127.0.0.1".into(),
@@ -740,6 +794,7 @@ fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, Import
         redaction: crate::agent::Redaction::None,
         import_enabled: true,
         posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     });
     let batch_id = "bridge-00000000-0000-4000-8000-000000001055";
@@ -782,12 +837,88 @@ fn journaled_batch(directory: &std::path::Path) -> (crate::agent::Server, Import
                     request_sha256: native.request_sha256.clone(),
                     response_sha256: crate::agent::sha256_hex(RESPONSE),
                     bytes: RESPONSE.len(),
-                    outcome: Some(outcome()),
+                    outcome: Some(answer),
                 },
             ))
             .unwrap();
     }
     (server, line)
+}
+
+/// The decision on the captured post answered `STATUS=0` with `CREATED` 10, by
+/// a check that reads the company's mark where it stood before the post, with
+/// no mark read after it; `bound`, when given, stands in for the journal's
+/// verdict. Returns the decision and the pre-POST mark.
+fn status_zero_decision(
+    bound: Option<Vec<PostedVoucherIdentity>>,
+) -> (super::super::PostSpanDecision, u64) {
+    let failed = bridge_tally_protocol::parse_import_outcome(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>1805</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
+    )
+    .unwrap();
+    assert_eq!(failed.counters().created, 10);
+    assert_eq!(
+        failed.application_status(),
+        bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let (server, line) = journaled_batch_answered(directory.path(), failed);
+    let snapshot = server
+        .latest_import_snapshot(&line.batch_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.span_verdict, None);
+    let response = snapshot.response.expect("the post's recorded response");
+    let before = snapshot
+        .pre_post_voucher_mark
+        .expect("the recorded pre-POST mark");
+    let decision = server.decide_post_span(
+        &line,
+        PreMark::recorded(before),
+        bound.map(super::super::ledger::PostSpanVerdict::Bound),
+        Some(&response),
+        &span_read(),
+        None,
+        before,
+        snapshot.generation,
+    );
+    (decision, before)
+}
+
+/// A recorded answer that reported `STATUS=0` proves no voucher landed
+/// (#2035): the book is not read as rolled back, and the binding refuses the
+/// answer (#2008).
+#[test]
+fn a_status_zero_answer_does_not_read_an_unchanged_book_as_rolled_back() {
+    let (decision, _) = status_zero_decision(None);
+    assert!(!decision.rolled_back, "{}", decision.report);
+    assert_eq!(
+        decision.report,
+        json!({"state": "refused", "code": SpanRefusal::StatusFailure.code()})
+    );
+}
+
+/// The vouchers a post bound outrank its answer in the floor, as in the
+/// journal's own floor: the same mark reads as rolled back when the post is
+/// bound, whatever its answer's status (#2035). No build since #2008 binds
+/// from such an answer; the verdict stands in for one journaled earlier.
+#[test]
+fn a_bound_post_keeps_its_floor_whatever_its_answers_status() {
+    let bound = bind(
+        &span(),
+        COMPANY_GUID,
+        &sent(),
+        &span_read(),
+        &BTreeSet::new(),
+    )
+    .unwrap();
+    assert_eq!(bound.len(), 10);
+    let (decision, before) = status_zero_decision(Some(bound));
+    assert!(decision.rolled_back, "{}", decision.report);
+    assert_eq!(
+        decision.report,
+        json!({"state": "book_rolled_back", "current_mark": before, "expected_at_least": before + 10})
+    );
 }
 
 /// One verification's decision on the captured post, as `verify_import` makes
@@ -902,4 +1033,68 @@ fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
             "{spelling}"
         );
     }
+}
+
+/// #1633: only a mark that moved by more than the post created, or a span that
+/// later held another number of vouchers, says another change was made during
+/// the post. The match has no wildcard, so a new refusal must be sorted here.
+#[test]
+fn only_the_step_and_count_refusals_name_a_concurrent_change() {
+    fn names_concurrent_change(refusal: &SpanRefusal) -> bool {
+        match refusal {
+            SpanRefusal::StepNotCreated { .. } | SpanRefusal::SpanCount { .. } => true,
+            // A reply reporting `STATUS=0` says Tally failed the post: it is no
+            // evidence of another change, and the line's "Tally reported
+            // creating each voucher once" would not be true of it (#2008).
+            SpanRefusal::EmptyBatch
+            | SpanRefusal::StatusFailure
+            | SpanRefusal::CountersNotClean
+            | SpanRefusal::CreatedNotCount { .. }
+            | SpanRefusal::LastVchIdAbsent
+            | SpanRefusal::MarkWentBack
+            | SpanRefusal::Position { .. }
+            | SpanRefusal::Content { .. }
+            | SpanRefusal::NotEffective { .. }
+            | SpanRefusal::MasterIdNotInSequence { .. }
+            | SpanRefusal::GuidNotMasterId { .. }
+            | SpanRefusal::IdentityReused { .. } => false,
+        }
+    }
+    let every = [
+        SpanRefusal::EmptyBatch,
+        SpanRefusal::StatusFailure,
+        SpanRefusal::CountersNotClean,
+        SpanRefusal::CreatedNotCount {
+            created: 1,
+            count: 2,
+        },
+        SpanRefusal::LastVchIdAbsent,
+        SpanRefusal::MarkWentBack,
+        SpanRefusal::StepNotCreated {
+            step: 4,
+            created: 1,
+        },
+        SpanRefusal::SpanCount {
+            expected: 1,
+            observed: 2,
+        },
+        SpanRefusal::Position { position: 0 },
+        SpanRefusal::Content {
+            position: 0,
+            fields: vec!["date"],
+        },
+        SpanRefusal::NotEffective { position: 0 },
+        SpanRefusal::MasterIdNotInSequence { position: 0 },
+        SpanRefusal::GuidNotMasterId { position: 0 },
+        SpanRefusal::IdentityReused { position: 0 },
+    ];
+    for refusal in &every {
+        assert_eq!(
+            concurrent_change_line_for(refusal.code()),
+            names_concurrent_change(refusal).then_some(CONCURRENT_CHANGE_LINE),
+            "{}",
+            refusal.code()
+        );
+    }
+    assert_eq!(concurrent_change_line_for("span_unknown_code"), None);
 }

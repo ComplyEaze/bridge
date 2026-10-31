@@ -1,14 +1,13 @@
 use super::*;
 
-fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 7] {
+fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 6] {
     [
-        ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
         ReadOnlyProfile::CompanyBookExtentV2 { company },
         ReadOnlyProfile::StandardLedgerIdentityV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV1 { company },
         ReadOnlyProfile::StandardLedgerCatalogV2 { company },
-        ReadOnlyProfile::LedgersV1 { company },
+        ReadOnlyProfile::StandardLedgerCatalogV3 { company },
     ]
 }
 
@@ -57,14 +56,14 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
             assert!(!upper.contains(&format!("<TALLYREQUEST>{forbidden}")));
         }
     }
-    let ledger = ReadOnlyProfile::LedgersV1 { company: &company }.render();
+    let ledger = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
     assert!(ledger.contains("BRIDGE &amp; &lt;SYNTHETIC&gt; &quot;BOOK&quot;"));
     assert!(!ledger.contains("BRIDGE & <SYNTHETIC>"));
 
     let injection =
         ValidatedCompanyName::new("X</SVCURRENTCOMPANY><TALLYREQUEST>IMPORT</TALLYREQUEST>")
             .unwrap();
-    let escaped = ReadOnlyProfile::LedgersV1 {
+    let escaped = ReadOnlyProfile::StandardLedgerCatalogV2 {
         company: &injection,
     }
     .render();
@@ -89,8 +88,8 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     assert!(extent_v2_request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
 }
 
-/// `CompanyListV2` is a native Tally `Company` collection, not the
-/// embedded-TDL custom report `CompanyListV1` builds: no `REPORT`/`FORM`/
+/// `CompanyListV2` is a native Tally `Company` collection, not an
+/// embedded-TDL custom report: no `REPORT`/`FORM`/
 /// `PART`/`LINE`/`FIELD` stack and no computed TDL function call (a
 /// report stack, and no dynamic `$Field:Argument` invocation). Its three
 /// fixed `$$LicenseInfo` arguments contain no spaces. It also carries no
@@ -120,10 +119,6 @@ fn company_list_v2_is_a_native_collection_scoped_to_no_single_company() {
 fn profile_ids_and_template_hashes_are_stable() {
     let expected: Vec<(ReadOnlyProfileId, &str)> = vec![
         (
-            ReadOnlyProfileId::CompanyListV1,
-            "8905c041a75929f157be704ca9dd076a37995dc7936e0ad71c9361406a8fb694",
-        ),
-        (
             ReadOnlyProfileId::CompanyListV2,
             "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
         ),
@@ -144,8 +139,8 @@ fn profile_ids_and_template_hashes_are_stable() {
             "e93bbf843455db2a4c9f77991c52b16f10b16bbb792af5ecae4909a48216a62e",
         ),
         (
-            ReadOnlyProfileId::LedgersV1,
-            "259b8159eb7c5a503c96f2760996db992127298781d5a332699a090cea90301b",
+            ReadOnlyProfileId::StandardLedgerCatalogV3,
+            "5bdc4b7c5c1baec328934aa5f090efd72ac821956defe63a58a4cc44909d9462",
         ),
         (
             ReadOnlyProfileId::AuditCompanyObjectV1,
@@ -184,20 +179,12 @@ fn profile_ids_and_template_hashes_are_stable() {
 fn compatibility_renderers_preserve_validated_profile_bytes() {
     let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
     assert_eq!(
-        compatibility::company_list_request(),
-        ReadOnlyProfile::CompanyListV1.render()
-    );
-    assert_eq!(
         compatibility::standard_ledger_identity_request(company.as_str()),
         ReadOnlyProfile::StandardLedgerIdentityV1 { company: &company }.render()
     );
     assert_eq!(
         compatibility::standard_ledger_catalog_request(company.as_str()),
         ReadOnlyProfile::StandardLedgerCatalogV1 { company: &company }.render()
-    );
-    assert_eq!(
-        compatibility::ledgers_request(company.as_str()),
-        ReadOnlyProfile::LedgersV1 { company: &company }.render()
     );
 }
 
@@ -576,13 +563,12 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
     // The match makes a new profile fail to compile here until it is listed.
     fn listed(id: ReadOnlyProfileId) {
         match id {
-            ReadOnlyProfileId::CompanyListV1
-            | ReadOnlyProfileId::CompanyListV2
+            ReadOnlyProfileId::CompanyListV2
             | ReadOnlyProfileId::CompanyBookExtentV2
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
             | ReadOnlyProfileId::StandardLedgerCatalogV2
-            | ReadOnlyProfileId::LedgersV1
+            | ReadOnlyProfileId::StandardLedgerCatalogV3
             | ReadOnlyProfileId::AuditCompanyObjectV1
             | ReadOnlyProfileId::InvoiceCompanyHsnV1
             | ReadOnlyProfileId::AuditLedgersV1
@@ -591,13 +577,12 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         }
     }
     let ids = vec![
-        ReadOnlyProfileId::CompanyListV1,
         ReadOnlyProfileId::CompanyListV2,
         ReadOnlyProfileId::CompanyBookExtentV2,
         ReadOnlyProfileId::StandardLedgerIdentityV1,
         ReadOnlyProfileId::StandardLedgerCatalogV1,
         ReadOnlyProfileId::StandardLedgerCatalogV2,
-        ReadOnlyProfileId::LedgersV1,
+        ReadOnlyProfileId::StandardLedgerCatalogV3,
         ReadOnlyProfileId::AuditCompanyObjectV1,
         ReadOnlyProfileId::InvoiceCompanyHsnV1,
         ReadOnlyProfileId::AuditLedgersV1,
@@ -621,8 +606,19 @@ fn education_refuses_exactly_the_profiles_that_render_a_spaced_function_argument
         );
         refused.extend(hazard.map(|h| (id.as_str(), h)));
     }
-    let ledgers = spaced("NumItems", "BRIDGE Ledger Collection V1");
-    assert_eq!(refused, [("ledgers_v1", ledgers)]);
+    assert!(refused.is_empty(), "{refused:?}");
+}
+
+/// No read profile renders a custom TDL report. The hazard script reads
+/// source literals, so it cannot see a report assembled from several; this
+/// reads each profile's rendered request instead (#1872: the last such
+/// profile, the legacy company report, was deleted).
+#[test]
+fn no_read_profile_renders_a_custom_report() {
+    for id in every_profile_id() {
+        let request = id.template().to_ascii_uppercase();
+        assert!(!request.contains("<REPORT"), "{}", id.as_str());
+    }
 }
 
 /// `$$name:argument`, assembled at run time: a literal would itself be a hit
@@ -691,5 +687,79 @@ fn the_v2_catalogue_request_is_v1_plus_the_bill_wise_method() {
     assert_ne!(
         ReadOnlyProfileId::StandardLedgerCatalogV1.template_sha256(),
         ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256()
+    );
+}
+
+/// V3 is V2 and one more native method, `AlterID`, placed straight after
+/// `IsBillWiseOn` and formatted like it; V2's own bytes are not touched.
+#[test]
+fn the_v3_catalogue_request_is_v2_plus_the_alter_id_method() {
+    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
+    let v2 = ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render();
+    let v3 = ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render();
+    let method = "<NATIVEMETHOD>AlterID</NATIVEMETHOD>";
+    assert_eq!(v3.matches(method).count(), 1);
+    assert!(!v2.contains(method));
+    assert_eq!(
+        v3.lines()
+            .filter(|line| !line.contains(method))
+            .collect::<Vec<_>>(),
+        v2.lines().collect::<Vec<_>>()
+    );
+    let lines = v3.lines().collect::<Vec<_>>();
+    let bill_wise = lines
+        .iter()
+        .position(|line| line.trim() == "<NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>")
+        .unwrap();
+    assert_eq!(
+        lines[bill_wise + 1],
+        format!("                        {method}")
+    );
+    assert_eq!(
+        ReadOnlyProfileId::StandardLedgerCatalogV3.as_str(),
+        "standard_ledger_catalog_v3"
+    );
+    assert_ne!(
+        ReadOnlyProfileId::StandardLedgerCatalogV2.template_sha256(),
+        ReadOnlyProfileId::StandardLedgerCatalogV3.template_sha256()
+    );
+}
+
+/// The exact bytes V3 sends for a sample company.
+#[test]
+fn the_v3_catalogue_request_renders_these_exact_bytes() {
+    let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
+    let expected = r#"<ENVELOPE>
+    <HEADER>
+        <VERSION>1</VERSION>
+        <TALLYREQUEST>EXPORT</TALLYREQUEST>
+        <TYPE>COLLECTION</TYPE>
+        <ID>List of Ledgers</ID>
+    </HEADER>
+    <BODY>
+        <DESC>
+            <STATICVARIABLES>
+                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+                <SVCURRENTCOMPANY>BRIDGE SYNTHETIC BOOK</SVCURRENTCOMPANY>
+            </STATICVARIABLES>
+            <TDL>
+                <TDLMESSAGE>
+                    <COLLECTION NAME="List of Ledgers" ISMODIFY="Yes">
+                        <NATIVEMETHOD>Name</NATIVEMETHOD>
+                        <NATIVEMETHOD>GUID</NATIVEMETHOD>
+                        <NATIVEMETHOD>Parent</NATIVEMETHOD>
+                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>
+                        <NATIVEMETHOD>AlterID</NATIVEMETHOD>
+                        <COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>
+                        <COMPUTE>BRIDGECOMPANYNAME:##SVCurrentCompany</COMPUTE>
+                    </COLLECTION>
+                </TDLMESSAGE>
+            </TDL>
+        </DESC>
+    </BODY>
+</ENVELOPE>"#;
+    assert_eq!(
+        ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render(),
+        expected
     );
 }

@@ -34,7 +34,7 @@ pub(super) fn ledger_movement_row(
         redact_value(
             json!({
                 "ledger": party_name(name),
-                "parent": parent,
+                "parent": parent.as_deref().map(bridge_tally_protocol::tally_root_as_sent),
                 "opening": opening,
                 "debit": debit,
                 "credit": credit,

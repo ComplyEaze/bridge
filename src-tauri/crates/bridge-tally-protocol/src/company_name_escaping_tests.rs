@@ -20,7 +20,6 @@ use crate::native_stock_summary::{
 };
 use crate::native_trial_balance::render_native_trial_balance_request;
 use crate::outstandings_shared::{render_company_book_extent_v2, DateBoundaryProfile};
-use crate::xml_read_profiles::compatibility::ledgers_request;
 use crate::xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName};
 
 const NAME: &str = "BRIDGE ESCAPE & <LAB> \"Q\" 'A'";
@@ -69,8 +68,8 @@ fn company_name_round_trips_through_xml_parsing_across_renderer_families() {
             ReadOnlyProfile::StandardLedgerCatalogV2 { company: &company }.render(),
         ),
         (
-            "xml_read_profiles::compatibility::ledgers_request",
-            ledgers_request(NAME),
+            "xml_read_profiles::ReadOnlyProfile::StandardLedgerCatalogV3",
+            ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render(),
         ),
         (
             "native_masters::render_native_masters_request",

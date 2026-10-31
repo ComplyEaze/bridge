@@ -16,6 +16,7 @@ use bridge_tally_core::master_binding::{
 };
 use bridge_tally_core::text::draws_nothing;
 use bridge_tally_core::{ExactDecimal, TallyDate};
+use bridge_tally_protocol::import_envelope::{render_import_envelope, ImportReport};
 use bridge_tally_protocol::native_outstandings::parse_native_group_snapshot;
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
@@ -28,6 +29,10 @@ use std::io::{Seek, SeekFrom, Write};
 
 #[path = "agent_import_bill_wise.rs"]
 mod bill_wise;
+// Candidate requests that remove a voucher Bridge posted (#2062): nothing sends them yet.
+#[cfg_attr(not(test), allow(dead_code))]
+#[path = "agent_import_cancel.rs"]
+mod cancel;
 #[path = "agent_import_cash_bank.rs"]
 mod cash_bank;
 use cash_bank::{CashBankState, LegRequirement, ObservedMasters};
@@ -59,16 +64,30 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
-// The master write journal; a building block no caller reaches yet.
+// The master write journal. The read-back piece, which follows the tools,
+// reads the parts of it the tools do not yet (the sidecar read, the verdict).
 #[cfg_attr(not(test), allow(dead_code))]
 #[path = "agent_master_ledger.rs"]
 mod master_ledger;
+// The master post's queue recheck.
+#[path = "agent_master_post.rs"]
+mod master_post;
+// The one-ledger dialog's preview.
+#[path = "agent_master_review.rs"]
+mod master_review;
+// `prepare_ledger_creates` and `post_ledger_creates`.
+#[path = "agent_master_tools.rs"]
+mod master_tools;
 #[path = "agent_import_persistence.rs"]
 mod persistence;
 #[path = "agent_import_post.rs"]
 mod post;
 /// The post's next step for a numbering refusal, for the refusal table.
 pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
+#[path = "agent_import_content_review.rs"]
+mod content_review;
+#[path = "agent_import_settle.rs"]
+mod settle;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
@@ -607,7 +626,10 @@ fn folded_live_ledgers_json(twins: &FoldedTwins) -> Value {
         .live
         .iter()
         .map(|(name, parent)| {
-            let mut ledger = json!({"name": party_name(name.clone()), "parent": parent});
+            let mut ledger = json!({
+                "name": party_name(name.clone()),
+                "parent": parent.as_deref().map(bridge_tally_protocol::tally_root_as_sent),
+            });
             if let Some(alias) = twins.through_alias.get(name) {
                 ledger["through_alias"] = json!(party_name(alias.clone()));
             }
@@ -788,10 +810,33 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     } else {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     };
+    let mut summary = summary.to_string();
+    summary.push_str(&post_span_summary_tails(&report));
+    report["summary"] = json!(summary);
+    report
+}
+
+/// What follows the first line of a binding's summary: the examples that name
+/// what can make the check refuse (#1633), and the restore that reached other
+/// posts of the company (#1050). Each starts with a space, so a first line of
+/// any kind takes them as they are, and a settlement's line keeps them.
+fn post_span_summary_tails(report: &Value) -> String {
+    let mut summary = String::new();
+    // A refusal by the mark's step or the span's count says what was observed
+    // and what can do that, as examples, after the line that says what to
+    // check (#1633).
+    if report["state"] == "refused" {
+        if let Some(line) = report["code"]
+            .as_str()
+            .and_then(span_identity::concurrent_change_line_for)
+        {
+            summary.push(' ');
+            summary.push_str(line);
+        }
+    }
     // A check that recorded a restore while its own post reads intact names
     // it: the restore reaches other posts of the company, and the posts it
     // covers keep their status until each is verified again (#1050).
-    let mut summary = summary.to_string();
     if report["rollback_recorded"] == true && report["state"] != "book_rolled_back" {
         let count = report["other_batches_covered"]["count"]
             .as_u64()
@@ -805,8 +850,13 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
             " This check also found the company's books restored from a backup after other posts of it, and recorded that: verify {posts} again, and check their vouchers in Tally."
         ));
     }
-    report["summary"] = json!(summary);
-    report
+    summary
+}
+
+/// The summary of a binding whose batch a person settled (#1709): the settled
+/// line, then what follows any first line (see [`post_span_summary_tails`]).
+fn settled_post_span_summary(binding: &Value) -> String {
+    format!("{}{}", settle::SUMMARY, post_span_summary_tails(binding))
 }
 
 /// How one verification attributes a native post by its own span, and what it
@@ -1485,7 +1535,7 @@ impl Server {
                     (&date_from, &date_to),
                     super::WindowPlanSource::Estimate {
                         known_marks: mark.value.zip(mark.master_value).map(
-                            |(vouchers, masters)| super::CompanyMarks { vouchers, masters },
+                            |(vouchers, masters)| super::CompanyMarks::new(Some(vouchers), masters),
                         ),
                     },
                 )
@@ -2066,7 +2116,7 @@ impl Server {
             let window_voucher_mark = observed_read
                 .witness
                 .as_ref()
-                .map(|witness| witness.marks.vouchers);
+                .map(|witness| witness.marks.vouchers());
             let corroboration_proof = match super::SecondRead::of(
                 observed_read.reads,
                 observed_read.witness,
@@ -2373,6 +2423,30 @@ impl Server {
                     proof["operator_review"] = review;
                 }
             }
+            // A person's standing record that they checked this batch, matched
+            // by content only, in Tally (#1039). Beside the verdict, never
+            // instead of it. Standing is the journal's rule, as for
+            // `local_data_report`: a rollback voids it once its record is
+            // written. A journal that cannot be read reports none and fails
+            // nothing here.
+            if dispatched {
+                if let Ok(Some(reviewed)) = self.import_content_review(&line.batch_id) {
+                    proof["content_review"] = content_review::report(reviewed);
+                }
+            }
+            // A person's standing settlement of this batch after Tally answered
+            // that its post created none of its vouchers (#1709), on the same
+            // rule. It changes no verdict, only the binding's summary line.
+            if dispatched && self.import_person_settlement(&line.batch_id) == Ok(true) {
+                proof["person_settlement"] = settle::report();
+                if proof["post_span_binding"].is_object() {
+                    // The settled line replaces the first line only: what can
+                    // make the check refuse and the restore that reached other
+                    // posts of the company still follow it (#1633, #1050).
+                    proof["post_span_binding"]["summary"] =
+                        json!(settled_post_span_summary(&proof["post_span_binding"]));
+                }
+            }
             *observed_rows = Some(observed.rows.clone());
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": proof});
             if dispatched {
@@ -2392,6 +2466,9 @@ impl Server {
                     );
                 }
             }
+            // Each voucher's own line no longer asks for a settlement it has
+            // (#1709). Set after the finalisers above, which write the lines.
+            settle::settle_voucher_next_steps(&mut payload["result"]);
             let status = final_verification_status(
                 dispatched.then(|| &payload["result"]["dispatch"]),
                 &result,
@@ -2683,9 +2760,15 @@ impl Server {
         let outcome = response.and_then(|response| response.outcome.as_ref());
         // After a create of N, the mark never again reads below before + N, nor
         // below a mark read after the post, unless the book was rolled back
-        // (a backup restored, or another copy put in its place).
+        // (a backup restored, or another copy put in its place). N is what the
+        // post proved, as the journal's own floor counts it: the vouchers it
+        // bound, else those its answer proves landed.
+        let proved = match &journaled {
+            Some(ledger::PostSpanVerdict::Bound(bindings)) => bindings.len() as u64,
+            _ => outcome.map_or(0, ledger::landed_count),
+        };
         let floor = before
-            .saturating_add(outcome.map_or(0, |outcome| outcome.counters().created))
+            .saturating_add(proved)
             .max(after_post_mark.unwrap_or(0));
         if current < floor {
             return PostSpanDecision {
@@ -3392,7 +3475,7 @@ fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
-const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and ComplyEaze Bridge cannot build the rest of that day from the statement yet), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so, and never build it again under a new bridge_txn_id to retry it. The same holds when verify_import reports that batch book_rolled_back: a backup was restored over the book and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too.";
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and ComplyEaze Bridge cannot build the rest of that day from the statement yet), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so, and never build it again under a new bridge_txn_id to retry it. The same holds when verify_import reports that batch book_rolled_back: the company's voucher mark was seen below that batch's, which a book restored from a backup or replaced by another copy shows, and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too.";
 
 /// The code of the refusal that stops an invoice build while voucher posting
 /// is off (see `build_import_xml`); its text is in agent.rs.
@@ -5060,10 +5143,15 @@ fn render_import_xml(company: &str, vouchers: &[ImportVoucher], batch_id: &str) 
         .iter()
         .map(|voucher| {
             let identity = import_identity(batch_id, &voucher.bridge_txn_id);
-            render_voucher_xml(voucher, identity, NarrationAttribution::Tagged(identity))
+            render_voucher_xml(
+                voucher,
+                identity,
+                NarrationAttribution::Tagged(identity),
+                VoucherAction::Create,
+            )
         })
         .collect::<String>();
-    render_import_envelope(company, &messages)
+    render_import_envelope(company, ImportReport::Vouchers, &messages)
 }
 
 /// The native post's request: each voucher paired with its own REMOTEID. The
@@ -5080,12 +5168,38 @@ fn render_native_vouchers_xml<'a>(
     company: &str,
     vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, Uuid)>,
 ) -> String {
+    render_native_vouchers_as(VoucherAction::Create, company, vouchers_with_remote_ids)
+}
+
+/// The native request with `action` on every voucher; nothing else depends on it.
+fn render_native_vouchers_as<'a>(
+    action: VoucherAction,
+    company: &str,
+    vouchers_with_remote_ids: impl Iterator<Item = (&'a ImportVoucher, Uuid)>,
+) -> String {
     let messages: String = vouchers_with_remote_ids
         .map(|(voucher, remote_id)| {
-            render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged)
+            render_voucher_xml(voucher, remote_id, NarrationAttribution::Untagged, action)
         })
         .collect();
-    render_import_envelope(company, &messages)
+    render_import_envelope(company, ImportReport::Vouchers, &messages)
+}
+
+/// A rendered voucher's `ACTION`. Every post sends `Create`; `Cancel` is the
+/// candidate of #2062, which nothing sends yet.
+#[derive(Clone, Copy)]
+enum VoucherAction {
+    Create,
+    Cancel,
+}
+
+impl VoucherAction {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Create => "Create",
+            Self::Cancel => "Cancel",
+        }
+    }
 }
 
 /// Whether a rendered voucher's narration carries Bridge's `[BRIDGE:…]` tag.
@@ -5095,10 +5209,6 @@ fn render_native_vouchers_xml<'a>(
 enum NarrationAttribution {
     Tagged(Uuid),
     Untagged,
-}
-
-fn render_import_envelope(company: &str, messages: &str) -> String {
-    format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY></STATICVARIABLES></REQUESTDESC><REQUESTDATA>{messages}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>", xml_escape(company))
 }
 
 /// The narration a post sends for `voucher`, and the one its approval dialog
@@ -5113,6 +5223,7 @@ fn render_voucher_xml(
     voucher: &ImportVoucher,
     remote_id: Uuid,
     attribution: NarrationAttribution,
+    action: VoucherAction,
 ) -> String {
     let text = posted_narration(voucher).unwrap_or("");
     let narration = match attribution {
@@ -5138,7 +5249,7 @@ fn render_voucher_xml(
         // An invoice reaches here only after the build recorded what it
         // observed (`admit_saved_voucher_integrity` refuses one that has not).
         // An unobserved one renders as nothing rather than as a guess.
-        return invoice::render_sales_invoice_xml(voucher, remote_id, &date, &narration)
+        return invoice::render_sales_invoice_xml(voucher, remote_id, &date, &narration, action)
             .unwrap_or_default();
     }
     let shape = voucher.voucher_type.bank_shape();
@@ -5186,7 +5297,7 @@ fn render_voucher_xml(
     // The qualified human-import slice uses Create + stable client REMOTEID;
     // native posting uses a separate private REMOTEID and no supplied number.
     // See docs/tally/TALLY_PROTOCOL_REFERENCE.md §9.8 for scope and limits.
-    format!("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{}\" VCHTYPE=\"{}\" ACTION=\"Create\" OBJVIEW=\"Accounting Voucher View\"><DATE>{date}</DATE>{effective_date}<VOUCHERTYPENAME>{}</VOUCHERTYPENAME>{party}{voucher_number}{narration}{reference}{entries}</VOUCHER></TALLYMESSAGE>", remote_id, voucher.voucher_type.as_str(), voucher.voucher_type.as_str())
+    format!("<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"{}\" VCHTYPE=\"{}\" ACTION=\"{}\" OBJVIEW=\"Accounting Voucher View\"><DATE>{date}</DATE>{effective_date}<VOUCHERTYPENAME>{}</VOUCHERTYPENAME>{party}{voucher_number}{narration}{reference}{entries}</VOUCHER></TALLYMESSAGE>", remote_id, voucher.voucher_type.as_str(), action.as_str(), voucher.voucher_type.as_str())
 }
 
 /// The voucher mark to record when Tally omitted it twice in one verification. The company is read as

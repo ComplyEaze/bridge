@@ -756,18 +756,13 @@ fn an_unobservable_high_water_mark_is_not_read_as_an_empty_book() {
     let guid = "61c6de69-1748-461c-ad3f-162cb949df9f";
     assert_eq!(
         company_marks(&mark_xml(guid, "<ALTVCHID>42</ALTVCHID>"), guid),
-        Ok(CompanyMarks {
-            vouchers: 42,
-            masters: 7
-        })
+        Ok(CompanyMarks::new(Some(42), 7))
     );
-    // Tally omits ALTVCHID for a company that has never held a voucher.
+    // Tally omits ALTVCHID for a company that has never held a voucher: a mark
+    // of 0 for every comparison, recorded as not reported.
     assert_eq!(
         company_marks(&mark_xml(guid, ""), guid),
-        Ok(CompanyMarks {
-            vouchers: 0,
-            masters: 7
-        })
+        Ok(CompanyMarks::new(None, 7))
     );
     assert_eq!(
         company_marks(&mark_xml(guid, "<ALTVCHID>x</ALTVCHID>"), guid),
@@ -867,6 +862,12 @@ fn the_census_request_is_an_admitted_light_collection_export() {
 // --- Through the simulator --------------------------------------------------
 
 const GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
+/// A page that asked for neither bank allocations nor goods lines.
+const WITHHELD: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown) = (
+    BankAllocationsShown::Withheld,
+    GoodsLinesShown::Withheld,
+    GstDetailsShown::Withheld,
+);
 
 fn mark_xml(guid: &str, altvchid: &str) -> String {
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{guid}</GUID>{altvchid}<ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
@@ -874,10 +875,7 @@ fn mark_xml(guid: &str, altvchid: &str) -> String {
 
 /// The marks `mark(value)` serves: the master mark of `mark_xml` is 7.
 fn marks_of(vouchers: u64) -> CompanyMarks {
-    CompanyMarks {
-        vouchers,
-        masters: 7,
-    }
+    CompanyMarks::new(Some(vouchers), 7)
 }
 
 /// A high-water response carrying both marks.
@@ -990,6 +988,7 @@ fn server_with(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -1004,6 +1003,7 @@ fn three_a_read() -> WindowReadLimits {
         default_bytes_per_voucher: budget,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     }
 }
 
@@ -1204,6 +1204,7 @@ async fn a_single_voucher_over_budget_is_refused_before_any_read() {
                 default_bytes_per_voucher: 1001,
                 max_reads: MAX_PLANNED_READS,
                 small_books: SmallBooks::Skip,
+                read_count_refusal: ReadCountRefusal::AtTheDefault,
             },
             |xml| parse_agent_rows(xml, GUID),
         )
@@ -1683,6 +1684,7 @@ async fn a_census_the_transport_refuses_is_not_divided_but_refused() {
         default_bytes_per_voucher: one,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     assert!(limits.census_capacity() >= 4);
     let (outcome, observed) = read_window(
@@ -2063,6 +2065,7 @@ async fn a_lighter_part_never_loosens_the_plan_for_the_rest() {
         default_bytes_per_voucher: 2 * heavy_len,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let census = WindowCensus::from_rows(
         [
@@ -2167,6 +2170,7 @@ async fn a_light_first_part_does_not_widen_the_next_beyond_the_floor() {
         default_bytes_per_voucher: 4 * one,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let census = WindowCensus::from_rows([
         (day("20260801"), 1),
@@ -2383,6 +2387,7 @@ async fn a_census_that_times_out_refuses_the_window_and_sends_nothing_more() {
         default_bytes_per_voucher: 16 * 1024,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let mut plans = vec![
         company_plan(),
@@ -2481,6 +2486,7 @@ async fn a_read_divided_only_by_date_is_bracketed_too() {
         default_bytes_per_voucher: 2 * heavy_len,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     // One census: AlterIDs 2 and 3, one on each day.
     let two = vouchers_kept(2);
@@ -2721,6 +2727,7 @@ async fn a_divided_read_of_a_window_the_caller_counted_does_not_hold_the_bracket
             default_bytes_per_voucher: wire_len(&xml_plan(vouchers_kept(1))),
             max_reads: MAX_PLANNED_READS,
             small_books: SmallBooks::Skip,
+            read_count_refusal: ReadCountRefusal::AtTheDefault,
         },
     )
     .await;
@@ -2927,6 +2934,7 @@ async fn the_read_allowance_is_spent_at_dispatch_including_reactive_splits() {
         let limits = WindowReadLimits {
             max_reads: allowance,
             small_books: SmallBooks::Skip,
+            read_count_refusal: ReadCountRefusal::AtTheDefault,
             ..WindowReadLimits::for_shape(shape)
         };
         let mut plans = oversized();
@@ -4736,6 +4744,7 @@ async fn the_audit_reader_plans_later_parts_at_the_cost_the_agent_reader_measure
         default_bytes_per_voucher: per_voucher,
         max_reads: MAX_PLANNED_READS,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     let census = || {
         WindowCensus::from_rows([
@@ -5120,6 +5129,7 @@ fn one_read_of(per_read: u64) -> WindowReadLimits {
         default_bytes_per_voucher: WINDOW_READ_BUDGET_BYTES / per_read,
         max_reads: 1,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     }
 }
 
@@ -5313,6 +5323,7 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
         default_bytes_per_voucher: one / 2,
         max_reads: 2,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     };
     // Day one's voucher is its own part; day two's six are the second.
     let census = WindowCensus::from_rows([
@@ -5346,6 +5357,478 @@ async fn a_replan_refusal_counts_the_requests_already_sent() {
         observed.iter().filter(|request| !request.cancelled).count(),
         6
     );
+}
+
+// -- #2173: a window that cannot be narrowed is refused for its read count only at the floor ------
+
+/// Limits under which a voucher of `one` encoded bytes is one to a read at the
+/// default figure and two to a read at the floor, with `allowed` reads.
+fn default_one_floor_two(one: u64, allowed: usize) -> WindowReadLimits {
+    WindowReadLimits {
+        budget_bytes: 4 * one,
+        default_bytes_per_voucher: 4 * one,
+        max_reads: allowed,
+        small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
+    }
+}
+
+/// Three vouchers on 1 August, AlterIDs 1 to 3, as a counted window.
+fn three_on_one_day() -> WindowCensus {
+    WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260801"), 2),
+        (day("20260801"), 3),
+    ])
+}
+
+/// One voucher on 1 August and two on each of 2 and 3 August, AlterIDs 1 to 5:
+/// a window whose first day one read carries at the default figure and whose
+/// later days one read each carries at the floor.
+fn one_then_two_a_day() -> WindowCensus {
+    WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260802"), 2),
+        (day("20260802"), 3),
+        (day("20260803"), 4),
+        (day("20260803"), 5),
+    ])
+}
+
+/// The plan at the default figure needs five reads against three allowed (each
+/// later day divided in two), so a read refusing at the default is refused by
+/// its first plan, before any data part, as before #2173. Refusing at the
+/// floor, the same window is read in three whole days: the first at the default
+/// figure, and, measured light, each later day in one read at the floor.
+#[tokio::test]
+async fn refusing_at_the_floor_reads_a_window_the_default_plan_refuses() {
+    let one = wire_len(&xml_plan(vouchers_kept(1)));
+    let limits = default_one_floor_two(one, 3);
+    let (first, last) = (day("20260801"), day("20260803"));
+    assert_eq!(
+        first_plan(first, last, &one_then_two_a_day(), 5, limits),
+        Err(PlanRefusal::TooManyReads {
+            reads: 5,
+            allowed: 3,
+        })
+    );
+
+    let mut plans = paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")])));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(2),
+        &[(2, "20260802"), (3, "20260802")],
+    ))));
+    plans.extend(paired(&xml_plan(relabelled(
+        &vouchers_kept(2),
+        &[(4, "20260803"), (5, "20260803")],
+    ))));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260803"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Counted(one_then_two_a_day()),
+        limits.refusing_at_the_floor(),
+    )
+    .await;
+    let read = outcome.unwrap();
+    assert_eq!(read.rows.len(), 5);
+    assert_eq!(
+        read.reads
+            .iter()
+            .map(|part| (
+                part.from.as_str().to_string(),
+                part.to.as_str().to_string(),
+                part.span
+            ))
+            .collect::<Vec<_>>(),
+        [
+            ("20260801".to_string(), "20260801".to_string(), None),
+            ("20260802".to_string(), "20260802".to_string(), None),
+            ("20260803".to_string(), "20260803".to_string(), None),
+        ]
+    );
+    assert_eq!(observed.len(), 18);
+}
+
+/// Refusing at the floor, a window admitted on the floor plan whose first part
+/// measures heavier than the floor is refused on that part's re-plan, after one
+/// data part, with the read counted as a whole.
+#[tokio::test]
+async fn refusing_at_the_floor_refuses_after_a_first_part_heavier_than_the_floor() {
+    // One voucher measures `one`. A read holds one at the default figure, two at
+    // the floor (three quarters of `one`) and one at the measured figure.
+    let one = wire_len(&xml_plan(vouchers_kept(1)));
+    let budget = (3 * one / 2) & !1;
+    let limits = WindowReadLimits {
+        budget_bytes: budget,
+        default_bytes_per_voucher: budget,
+        max_reads: 2,
+        small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheFloor,
+    };
+    let census = WindowCensus::from_rows([
+        (day("20260801"), 1),
+        (day("20260802"), 2),
+        (day("20260802"), 3),
+    ]);
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(relabelled(&vouchers_kept(1), &[(1, "20260801")]))),
+        ("20260801", "20260802"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Counted(census),
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused on the re-plan");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 3,
+            allowed: 2,
+        })
+    );
+    // The first part only.
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+}
+
+/// Refusing at the floor, a day certain to be divided by AlterID span is
+/// refused by the first plan, before any data part: the first day holding
+/// vouchers, over what one read holds at the default figure (three against
+/// one), or any later day over what one holds at the floor (three against two).
+/// The tax audit's read must tile its period by whole days.
+#[test]
+fn refusing_at_the_floor_refuses_a_day_no_read_carries_whole() {
+    let one = wire_len(&xml_plan(vouchers_kept(1)));
+    let limits = default_one_floor_two(one, 128).refusing_at_the_floor();
+    assert_eq!(
+        first_plan(
+            day("20260801"),
+            day("20260801"),
+            &three_on_one_day(),
+            3,
+            limits
+        ),
+        Err(PlanRefusal::DayDividedBySpan {
+            day: day("20260801")
+        })
+    );
+    let later = WindowCensus::from_rows([
+        (day("20260731"), 9),
+        (day("20260801"), 1),
+        (day("20260801"), 2),
+        (day("20260801"), 3),
+    ]);
+    assert_eq!(
+        first_plan(day("20260731"), day("20260801"), &later, 9, limits),
+        Err(PlanRefusal::DayDividedBySpan {
+            day: day("20260801")
+        })
+    );
+    // Two on that later day, which one read at the floor holds, are admitted,
+    // and the empty day before the first voucher day joins its part.
+    let fits = WindowCensus::from_rows([
+        (day("20260731"), 9),
+        (day("20260801"), 1),
+        (day("20260801"), 2),
+    ]);
+    let (plan, unmeasured) =
+        first_plan(day("20260730"), day("20260801"), &fits, 9, limits).unwrap();
+    assert_eq!(
+        unmeasured, 1,
+        "only the first part is sent before a measurement"
+    );
+    assert_eq!(plan[0].from, day("20260730"));
+    // The same windows refusing at the default are planned as before: divided.
+    assert!(first_plan(
+        day("20260801"),
+        day("20260801"),
+        &three_on_one_day(),
+        3,
+        default_one_floor_two(one, 128)
+    )
+    .is_ok());
+}
+
+/// Refusing at the floor, the census still stops before its next span once it
+/// has counted more than the fewest reads allowed can carry at the floor: three
+/// vouchers need two reads (one at the default, two at the floor) against one.
+#[tokio::test]
+async fn a_census_past_the_floor_ceiling_stops_before_its_next_span() {
+    let limits = reads_of(1, 1).refusing_at_the_floor();
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(three_vouchers())),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(limits.census_capacity() + 1)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused");
+    assert_eq!(failure.code, "voucher_window_too_many_reads");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 2,
+            allowed: 1,
+        })
+    );
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+}
+
+/// With two reads allowed and three vouchers on one day, a read refusing at
+/// the default is stopped by its census after the first span (three reads at
+/// one a read). A read refusing at the floor finishes the census and is then
+/// refused before any data part, because that day is certain to be divided by
+/// AlterID span: every request it sent is a census request.
+#[tokio::test]
+async fn a_census_between_the_ceilings_of_a_day_no_read_carries_sends_only_the_census() {
+    let limits = reads_of(1, 2);
+    let high_water = limits.census_capacity() + 1;
+    let counted = relabelled(
+        &three_vouchers(),
+        &[(1, "20260801"), (2, "20260801"), (3, "20260801")],
+    );
+    let (outcome, observed) = read_window(
+        paired(&xml_plan(counted.clone())),
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(high_water)),
+        },
+        limits,
+    )
+    .await;
+    let failure = outcome.err().expect("refused at the default");
+    assert_eq!(
+        failure.planned_reads(),
+        Some(&crate::agent::PlannedReads {
+            needed_at_least: 3,
+            allowed: 2,
+        })
+    );
+    assert_eq!(
+        observed.iter().filter(|request| !request.cancelled).count(),
+        6
+    );
+
+    let mut plans = paired(&xml_plan(counted));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    let (outcome, observed) = read_window(
+        plans,
+        ("20260801", "20260801"),
+        VoucherReadShape::EntryWildcard,
+        WindowPlanSource::Estimate {
+            known_marks: Some(marks_of(high_water)),
+        },
+        limits.refusing_at_the_floor(),
+    )
+    .await;
+    let failure = outcome.err().expect("refused before any data part");
+    assert_eq!(failure.code, WINDOW_DIVIDED_BY_ALTERID);
+    let census = [
+        render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260801"),
+            Some(AlterIdSpan {
+                after: 0,
+                through: limits.census_capacity(),
+            }),
+        ),
+        render_agent_voucher_census(
+            &company(),
+            &tally_date("20260801"),
+            &tally_date("20260801"),
+            Some(AlterIdSpan {
+                after: limits.census_capacity(),
+                through: high_water,
+            }),
+        ),
+    ]
+    .map(|request| request_sha(&request.unwrap()));
+    // Every voucher request sent is one of the two census spans, each sent
+    // twice; the rest are the paired reads' identity brackets and status probes.
+    let vouchers = observed
+        .iter()
+        .filter(|request| {
+            captured_utf16(&request.request_body).contains("<ID>Bridge Agent Voucher")
+        })
+        .map(|request| request.request_body_sha256.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        vouchers,
+        [&census[0], &census[0], &census[1], &census[1]].map(|sha| sha.to_string())
+    );
+    assert_eq!(observed.len(), 12);
+}
+
+/// Every read but the tax audit's keeps today's refusal point: the limits each
+/// shape starts from, and those that count small books, refuse at the default.
+#[test]
+fn every_shape_refuses_at_the_default_unless_asked() {
+    for shape in [
+        VoucherReadShape::ImportVerification,
+        VoucherReadShape::Movement,
+        VoucherReadShape::EntryWildcard,
+        VoucherReadShape::ClassEntryWildcard,
+    ] {
+        let limits = WindowReadLimits::for_shape(shape);
+        assert_eq!(limits.read_count_refusal, ReadCountRefusal::AtTheDefault);
+        assert_eq!(
+            limits.counting_small_books().read_count_refusal,
+            ReadCountRefusal::AtTheDefault
+        );
+        assert_eq!(
+            limits.refusing_at_the_floor().read_count_refusal,
+            ReadCountRefusal::AtTheFloor
+        );
+    }
+}
+
+/// No read but the tax audit's asks to refuse at the floor. Across every
+/// production source of the app crate, the only call of
+/// `refusing_at_the_floor` (in any form) and of `audit_window_limits` is the
+/// audit window's, and `AtTheFloor` is named nowhere but the window module,
+/// where it is defined, so `vouchers`, the registers, `voucher_presence`,
+/// `ledger_movement`, the verification reads and `outstandings` keep the
+/// default's refusal point.
+#[test]
+fn only_the_audit_window_refuses_at_the_floor() {
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    let mut pending = vec![source.clone()];
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(&directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|extension| extension == "rs") {
+                files.push(path);
+            }
+        }
+    }
+    assert!(
+        files.len() > 100,
+        "the app crate's sources were read: {}",
+        files.len()
+    );
+    let mut calls = Vec::new();
+    let mut named = Vec::new();
+    for path in files {
+        let file_name = path.file_name().unwrap().to_string_lossy().into_owned();
+        if file_name == "tests.rs" || file_name.ends_with("_tests.rs") {
+            continue;
+        }
+        let name = path
+            .strip_prefix(&source)
+            .unwrap()
+            .to_string_lossy()
+            .into_owned();
+        let text = std::fs::read_to_string(&path).unwrap();
+        calls.extend(
+            text.matches("refusing_at_the_floor(")
+                .chain(text.matches("audit_window_limits("))
+                .map(|call| (name.clone(), call.to_string())),
+        );
+        named.extend(text.matches("AtTheFloor").map(|_| name.clone()));
+    }
+    calls.sort();
+    assert_eq!(
+        calls,
+        [
+            ("agent_audit_read.rs", "audit_window_limits("),
+            ("agent_audit_read.rs", "audit_window_limits("),
+            ("agent_audit_read.rs", "refusing_at_the_floor("),
+            ("agent_voucher_window.rs", "refusing_at_the_floor("),
+        ]
+        .map(|(file, call)| (file.to_string(), call.to_string()))
+    );
+    assert!(
+        named.iter().all(|name| name == "agent_voucher_window.rs"),
+        "{named:?}"
+    );
+}
+
+/// The floor plan at the production figures, through the planner. Refusing at
+/// the floor, a read holds 42 vouchers at the default figure and 85 at the
+/// floor. The issue's 6,000 vouchers at 25 a day are admitted. A first day of
+/// 40 and then 127 days of 85 (10,835 vouchers, 128 reads) are admitted, and
+/// 128 such days are not (129 reads). A day of 82 first, or a later day of 86,
+/// is refused before any count: the audit cannot read it whole.
+#[test]
+fn the_floor_plan_admits_whole_days_up_to_the_ceiling_and_refuses_a_divided_day() {
+    let limits =
+        WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).refusing_at_the_floor();
+    let first = day("20250401");
+    let admit = |per_day: &[u64]| {
+        let mut next = 0;
+        let census =
+            WindowCensus::from_rows(per_day.iter().enumerate().flat_map(|(offset, count)| {
+                let date = first
+                    .checked_add_days(chrono::Days::new(offset as u64))
+                    .unwrap();
+                let ids = (next + 1..=next + count)
+                    .map(move |id| (date, id))
+                    .collect::<Vec<_>>();
+                next += count;
+                ids
+            }));
+        let last = first
+            .checked_add_days(chrono::Days::new(per_day.len() as u64 - 1))
+            .unwrap();
+        let ceiling = per_day.iter().sum();
+        first_plan(first, last, &census, ceiling, limits)
+            .map(|(plan, unmeasured)| (plan.len(), unmeasured))
+    };
+    assert_eq!(admit(&[25; 240]).map(|(_, unmeasured)| unmeasured), Ok(1));
+    let mut dense = vec![40];
+    dense.extend([85; 127]);
+    assert!(admit(&dense).is_ok());
+    dense.push(85);
+    assert_eq!(
+        admit(&dense),
+        Err(PlanRefusal::TooManyReads {
+            reads: 129,
+            allowed: 128,
+        })
+    );
+    assert_eq!(
+        admit(&[82; 127]),
+        Err(PlanRefusal::DayDividedBySpan { day: first })
+    );
+    let mut later = vec![40, 85];
+    later.push(86);
+    assert_eq!(
+        admit(&later),
+        Err(PlanRefusal::DayDividedBySpan {
+            day: first.checked_add_days(chrono::Days::new(2)).unwrap()
+        })
+    );
+    // A window the first part covers whole: nothing is left to re-plan.
+    assert_eq!(admit(&[30]), Ok((1, 1)));
+}
+
+/// The ceilings at the production figures: 42 vouchers a read at the default
+/// and 85 at the floor give 5,376 at the default and 42 + 85 x 127 = 10,837 at
+/// the floor, for 128 reads.
+#[test]
+fn the_entry_wildcard_ceilings_are_5376_at_the_default_and_10837_at_the_floor() {
+    let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+    let max = limits.max_reads as u64;
+    assert_eq!(limits.reads_at_least(5_376), Some(max));
+    assert_eq!(limits.reads_at_least(5_377), Some(max + 1));
+    let floor = limits.refusing_at_the_floor();
+    assert_eq!(floor.reads_at_least(10_837), Some(max));
+    assert_eq!(floor.reads_at_least(10_838), Some(max + 1));
 }
 
 // -- #485: a later page of a complete window is served from its first page's read -----------------
@@ -5438,6 +5921,25 @@ async fn whole_counted_window() -> Vec<Value> {
     let response =
         call_vouchers_over(counted_vouchers_plans(three_vouchers(), three_vouchers())).await;
     page_items_of(&response)
+}
+
+/// #1984: the snapshot of a book whose marks answer omits `ALTVCHID` shows no voucher mark,
+/// not a 0 Tally never sent, while a mark Tally sent as 0 is shown as 0.
+#[tokio::test]
+async fn the_snapshot_shows_no_voucher_mark_only_when_tally_sent_none() {
+    for (altvchid, shown) in [("", Value::Null), ("<ALTVCHID>0</ALTVCHID>", json!(0))] {
+        let mut plans = identity_plans();
+        plans.extend(paired(&xml_plan(mark_xml(GUID, altvchid))));
+        // The window, the day-wider read that corroborates an empty window, and the closing marks.
+        plans.extend(paired(&xml_plan(empty_collection())));
+        plans.extend(paired(&xml_plan(empty_collection())));
+        plans.extend(paired(&xml_plan(mark_xml(GUID, altvchid))));
+        let response = call_vouchers_over(plans).await;
+        assert_ne!(response["isError"], true, "{response}");
+        let snapshot = page_snapshot(&response);
+        assert_eq!(snapshot["voucher_alter_id"], shown, "{snapshot}");
+        assert_eq!(snapshot["master_alter_id"], 7, "{snapshot}");
+    }
 }
 
 #[tokio::test]
@@ -6043,7 +6545,7 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
     let directory = tempfile::tempdir().unwrap();
     let address: std::net::SocketAddr = "127.0.0.1:9".parse().unwrap();
     let masked = server_with(address, directory.path(), Redaction::MaskParties);
-    let page = super::super::vouchers::page_items(&masked, &rows, 1, 1);
+    let page = super::super::vouchers::page_items(&masked, &rows, (1, 1), WITHHELD);
     assert_eq!(page.len(), 1);
     let text = serde_json::to_string(&page).unwrap();
     assert!(
@@ -6052,8 +6554,13 @@ fn page_items_masks_the_party_names_of_every_row_it_cuts() {
     );
     // The control: with nothing masked the same page carries the names as plain text.
     let plain = server_with(address, directory.path(), Redaction::None);
-    let text =
-        serde_json::to_string(&super::super::vouchers::page_items(&plain, &rows, 1, 1)).unwrap();
+    let text = serde_json::to_string(&super::super::vouchers::page_items(
+        &plain,
+        &rows,
+        (1, 1),
+        WITHHELD,
+    ))
+    .unwrap();
     assert!(
         text.contains("Lab Party 1") && text.contains("Lab Party Pvt"),
         "{text}"
@@ -6353,7 +6860,14 @@ fn the_vouchers_schema_lists_the_groupings_and_the_search_criteria() {
         }
         validate_tool_arguments("vouchers", &args)
     };
-    for grouping in ["ledger", "month", "voucher_type", "group", "primary_group"] {
+    for grouping in [
+        "ledger",
+        "month",
+        "voucher_type",
+        "group",
+        "primary_group",
+        "cost_centre",
+    ] {
         assert_eq!(call(json!({"summarise_by": grouping})), Ok(()));
     }
     assert!(call(json!({"summarise_by": "groups"})).is_err());
@@ -6382,6 +6896,103 @@ async fn a_narration_search_is_refused_where_narrations_are_withheld() {
     let response = one.call(json!({"narration_contains": "WR2-N3"})).await;
     assert_eq!(refusal_of(&response)["code"], "search_narration_redacted");
     assert_eq!(one.requests(), 4);
+}
+
+/// #1231: a cost-centre summary of a window with no allocation answers with no buckets, the
+/// categories' totals empty and every entry unallocated, and its basis says that this does not
+/// mean the Cost Centres setting is off. Only this grouping carries those two fields.
+#[tokio::test]
+async fn a_cost_centre_summary_of_a_window_with_no_allocation_says_so_in_its_fields() {
+    let one = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let response = one.call(json!({"summarise_by": "cost_centre"})).await;
+    let result = result_of(&response);
+    assert_eq!(result["state"], "complete", "{result}");
+    assert_eq!(result["summarised_by"], "cost_centre");
+    assert_eq!(result["total"], 0);
+    assert_eq!(result["buckets"], json!([]));
+    assert_eq!(result["category_totals"], json!([]));
+    assert_eq!(result["entries_unallocated"]["entries"], 6);
+    assert_eq!(result["vouchers_summarised"], 3);
+    let basis = result["basis"].as_str().unwrap();
+    assert!(basis.contains("not that the company's Cost Centres setting is off"));
+    assert!(basis.contains("memorandum"));
+    let ledger = OneServer::spawn(counted_vouchers_plans(three_vouchers(), three_vouchers()));
+    let ledger = ledger.call(json!({"summarise_by": "ledger"})).await;
+    let ledger = result_of(&ledger);
+    assert!(ledger.get("category_totals").is_none(), "{ledger}");
+    assert!(ledger.get("entries_unallocated").is_none(), "{ledger}");
+}
+
+/// The keyed Journal capture of #1231 (BRIDGE COST KEY LAB, TallyPrime 7.2): one expense entry
+/// allocated in full under two categories, and a bank entry with none. Moved onto this file's company
+/// and window by replacing its company GUID and its date, so a derived variant of a live answer.
+fn keyed_journal() -> String {
+    captured_utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml"
+    ))
+    .replace("ddf3a557-704c-4f61-ae8d-46a3380062a1", GUID)
+    .replace("20250516", "20260816")
+}
+
+/// #1231: under `mask_parties` a cost-centre summary with populated allocations names no centre, no
+/// category and no ledger anywhere in the response, `category_totals` included, while its figures and
+/// order are the same as unmasked.
+/// Mutant run and killed: a `category_totals` name built without the party-name marker. Mutant run and
+/// NOT killed (by design, the layer is redundant): removing the explicit redaction of `category_totals`
+/// in `render_page_body`, under the whole-response pass in `redact_tool_response`, as for the buckets of
+/// `a_ledger_summary_masks_every_bucket_label_under_mask_parties`.
+#[tokio::test]
+async fn a_cost_centre_summary_masks_every_centre_category_and_ledger_under_mask_parties() {
+    let plain = OneServer::spawn(counted_vouchers_plans(keyed_journal(), keyed_journal()));
+    let plain = plain.call(json!({"summarise_by": "cost_centre"})).await;
+    let masked = OneServer::spawn_with(
+        counted_vouchers_plans(keyed_journal(), keyed_journal()),
+        Redaction::MaskParties,
+    );
+    let masked = masked.call(json!({"summarise_by": "cost_centre"})).await;
+    let (shown, hidden) = (result_of(&plain), result_of(&masked));
+    assert_eq!(shown["state"], "complete", "{shown}");
+    assert_eq!(bucket_names(&plain), ["CK South", "CK Retail"]);
+    let categories = |result: &Value| {
+        result["category_totals"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["category"].clone())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        categories(shown),
+        [json!("Primary Cost Category"), json!("CK Region")]
+    );
+    let leaked = masked.to_string();
+    for real in [
+        "CK South",
+        "CK Retail",
+        "Primary Cost Category",
+        "CK Region",
+        "CK Expense",
+    ] {
+        assert!(
+            !leaked.contains(real),
+            "{real} appears in a masked response: {masked}"
+        );
+    }
+    for (real, shown) in categories(shown).iter().zip(categories(hidden)) {
+        assert_ne!(*real, shown, "a category total's name was not masked");
+    }
+    // Masking changes the names only.
+    for field in ["debit", "credit", "net", "entries"] {
+        for at in 0..2 {
+            assert_eq!(
+                hidden["category_totals"][at][field], shown["category_totals"][at][field],
+                "{field}"
+            );
+            assert_eq!(hidden["buckets"][at][field], shown["buckets"][at][field]);
+        }
+    }
+    assert_eq!(hidden["totals"], shown["totals"]);
+    assert_eq!(hidden["entries_unallocated"], shown["entries_unallocated"]);
 }
 
 #[tokio::test]
@@ -6602,15 +7213,15 @@ async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_rem
         selected_ledger: None,
         placements: None,
     };
-    let body =
-        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    let body = vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500), WITHHELD)
+        .expect("renders");
     assert_eq!(body.items.len(), 3, "{:?}", body.items);
     assert_eq!(body.total, 4);
     assert!(body.truncated);
     // Under a budget that holds everything the page is whole.
     one.server.settings.max_bytes = 200_000;
-    let whole =
-        vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500)).expect("renders");
+    let whole = vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500), WITHHELD)
+        .expect("renders");
     assert_eq!(whole.items.len(), 4);
     assert!(!whole.truncated);
 }
@@ -7517,4 +8128,767 @@ fn a_census_holds_a_voucher_between_two_days_including_both_ends() {
     assert!(census.holds_a_voucher_between(&from, &to).unwrap());
     let failure = census.holds_a_voucher_between(&to, &from).unwrap_err();
     assert_eq!(failure.code, "invalid_date_range");
+}
+
+// A ledger-scoped census and movement read (#485, candidate builders). The requests are the ones
+// the lab sent on BRIDGE CORPUS DENSE (TallyPrime 7.2 Silver, 28 Oct 2026) and the answers are
+// what Tally returned; the builders must render the requests byte for byte, and the existing
+// census parser must read the answers (fixtures/ledger-scoped-vouchers/PROVENANCE.md).
+mod ledger_scoped {
+    use super::*;
+    use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+
+    const COMPANY: &str = "BRIDGE CORPUS DENSE";
+
+    fn utf16(bytes: &[u8]) -> String {
+        assert_eq!(bytes.len() % 2, 0, "a UTF-16 capture has an even length");
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+    }
+
+    /// A request as the lab sent it: UTF-16LE with a BOM.
+    fn sent(bytes: &[u8]) -> String {
+        utf16(bytes).trim_start_matches('\u{feff}').to_string()
+    }
+
+    fn ledger(name: &str) -> LedgerScopeName {
+        LedgerScopeName::new(name).unwrap()
+    }
+
+    fn span(after: u64, through: u64) -> AlterIdSpan {
+        AlterIdSpan { after, through }
+    }
+
+    #[test]
+    fn the_census_builder_renders_the_requests_the_lab_sent_byte_for_byte() {
+        let day = tally_date("20250515");
+        let sales = ledger("DN Sales");
+        assert_eq!(
+            render_agent_ledger_census(COMPANY, &sales, &day, &day, span(0, 8192)).unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml"))
+        );
+        assert_eq!(
+            render_agent_ledger_census(COMPANY, &sales, &day, &day, span(8192, 16384)).unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml"))
+        );
+        assert_eq!(
+            render_agent_ledger_census(
+                COMPANY,
+                &ledger("DN Party 001"),
+                &tally_date("20250401"),
+                &tally_date("20260331"),
+                span(0, 8192),
+            )
+            .unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml"))
+        );
+    }
+
+    #[test]
+    fn the_movement_builder_renders_the_request_the_lab_sent_byte_for_byte() {
+        assert_eq!(
+            render_agent_ledger_vouchers(
+                COMPANY,
+                &ledger("DN Party 001"),
+                LedgerVoucherFields::Movement,
+                &tally_date("20250501"),
+                &tally_date("20250531"),
+            )
+            .unwrap(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))
+        );
+    }
+
+    /// The window field list changes the `FETCH` element and nothing else: the request is the
+    /// lab's movement request with that one element replaced.
+    #[test]
+    fn the_window_field_list_differs_from_the_movement_one_in_the_fetch_element_alone() {
+        let render = |fields| {
+            render_agent_ledger_vouchers(
+                COMPANY,
+                &ledger("DN Party 001"),
+                fields,
+                &tally_date("20250501"),
+                &tally_date("20250531"),
+            )
+            .unwrap()
+        };
+        let movement = render(LedgerVoucherFields::Movement);
+        let window = render(LedgerVoucherFields::Window);
+        let element = |request: &str| {
+            let start = request.find("<FETCH>").unwrap() + "<FETCH>".len();
+            let end = request.find("</FETCH>").unwrap();
+            (start, end)
+        };
+        let (movement_start, movement_end) = element(&movement);
+        let (window_start, window_end) = element(&window);
+        assert_eq!(movement[..movement_start], window[..window_start]);
+        assert_eq!(movement[movement_end..], window[window_end..]);
+        let fetch = &window[window_start..window_end];
+        // The list the lab sent ledger-scoped: the book-wide window read's list as it stood before
+        // `REFERENCEDATE` was added (#1363), ending `PARTYGSTIN`.
+        assert!(fetch.starts_with("DATE,VOUCHERNUMBER,"), "{fetch}");
+        assert!(fetch.contains("ALLLEDGERENTRIES.*"), "{fetch}");
+        assert!(fetch.ends_with("REFERENCE,ISINVOICE,PARTYGSTIN"), "{fetch}");
+        assert!(!fetch.contains("REFERENCEDATE"), "{fetch}");
+        // It is the book-wide window list minus that one word: a change to the book-wide list is
+        // seen here, not silently sent ledger-scoped.
+        assert_eq!(
+            Some(fetch),
+            crate::agent::read_profiles::AGENT_VOUCHER_FETCH.strip_suffix(",REFERENCEDATE")
+        );
+        assert!(!movement[movement_start..movement_end].contains("ALLLEDGERENTRIES.*"));
+    }
+
+    /// The ledger rides in one `CHILDOF` element, and the book-wide requests carry no such element
+    /// and keep their own collection names. A name is escaped as any XML text is, and the only
+    /// characters admitted are ones that escape leaves unchanged.
+    #[test]
+    fn the_ledger_sits_in_one_element_and_the_book_wide_requests_are_unchanged() {
+        let day = tally_date("20250515");
+        let census =
+            render_agent_ledger_census(COMPANY, &ledger("Sales 2025"), &day, &day, span(0, 8192))
+                .unwrap();
+        assert_eq!(census.matches("<CHILDOF>").count(), 1);
+        assert!(census.contains("<CHILDOF>Sales 2025</CHILDOF>"), "{census}");
+        assert!(census.contains("<TYPE>Vouchers : Ledger</TYPE>"));
+        let book = render_agent_voucher_census(COMPANY, &day, &day, None).unwrap();
+        assert!(
+            !book.contains("CHILDOF") && !book.contains("Ledger Census"),
+            "{book}"
+        );
+        assert!(book.contains("<TYPE>Voucher</TYPE>"));
+        let movement = render_agent_movement_vouchers(COMPANY, &day, &day).unwrap();
+        assert!(!movement.contains("CHILDOF") && !movement.contains("Ledger Vouchers"));
+    }
+
+    fn census(bytes: &[u8], window: (&str, &str), span: Option<AlterIdSpan>) -> Vec<CensusRow> {
+        let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+        parse_voucher_census(&utf16(bytes), (parse(window.0), parse(window.1)), span)
+            .expect("the captured answer parses")
+    }
+
+    #[test]
+    fn the_existing_census_parser_reads_the_captured_ledger_scoped_answers() {
+        let day = ("20250515", "20250515");
+        let rows = census(
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml"),
+            day,
+            Some(span(0, 8192)),
+        );
+        assert_eq!(rows.len(), 82);
+        let guids = rows
+            .iter()
+            .map(|row| row.guid.as_str())
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(guids.len(), 82, "82 distinct vouchers");
+        assert!(rows.iter().all(|row| row
+            .guid
+            .starts_with("d45bc1b0-e5e3-4261-b3b2-cce3915f42d3-")));
+        assert!(rows
+            .iter()
+            .all(|row| row.alter_id > 0 && row.alter_id <= 8192));
+        // The same day's next span is an empty collection, not a refusal.
+        assert!(census(
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml"),
+            day,
+            Some(span(8192, 16384))
+        )
+        .is_empty());
+        let year = census(
+            include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml"),
+            ("20250401", "20260331"),
+            Some(span(0, 8192)),
+        );
+        assert_eq!(year.len(), 67);
+    }
+
+    /// The movement answer is read by the voucher row parser the movement read already uses: 21
+    /// vouchers, each with a line on the ledger asked for.
+    #[test]
+    fn the_movement_row_parser_reads_the_captured_ledger_scoped_movement_answer() {
+        let rows = parse_agent_rows(
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml")),
+            "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+        )
+        .expect("the captured answer parses");
+        assert_eq!(rows.len(), 21);
+        assert!(rows.iter().all(|row| row["amounts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|line| line["ledger"] == "DN Party 001")));
+    }
+
+    /// The 21 vouchers' lines on the ledger add up, exactly, to the debit the committed one-month
+    /// Trial Balance gives the same ledger (the lab compared them; this pins it).
+    #[test]
+    fn the_movement_answers_lines_on_the_ledger_sum_to_the_trial_balances_debit() {
+        use bridge_tally_core::ExactDecimal;
+        use bridge_tally_protocol::native_trial_balance::{
+            parse_native_trial_balance, NativeTrialBalanceAmount,
+        };
+        let company = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
+        let rows = parse_agent_rows(&utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml")), company)
+            .expect("the captured answer parses");
+        let mut lines = ExactDecimal::zero();
+        let mut counted = 0;
+        for row in &rows {
+            for line in row["amounts"].as_array().unwrap() {
+                if line["ledger"] == "DN Party 001" {
+                    let amount =
+                        ExactDecimal::parse(line["amount"].as_str().expect("an exact amount"))
+                            .expect("an exact decimal");
+                    lines = lines.checked_add(&amount).expect("no overflow");
+                    counted += 1;
+                }
+            }
+        }
+        assert!(counted >= 21, "{counted} lines on the ledger");
+        let trial_balance = parse_native_trial_balance(
+            &utf16(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_dense_month_live.utf16le.xml"
+            )),
+            company,
+        )
+        .expect("the committed Trial Balance parses");
+        let row = trial_balance
+            .rows
+            .iter()
+            .find(|row| row.name == "DN Party 001")
+            .expect("the ledger is in the Trial Balance");
+        let NativeTrialBalanceAmount::Present(debit) = &row.debit else {
+            panic!("the ledger has a debit total");
+        };
+        assert!(
+            lines.numeric_eq(debit),
+            "{} against {}",
+            lines.as_str(),
+            debit.as_str()
+        );
+    }
+
+    /// An answer is read against the span it is read for: the first span's rows are not accepted
+    /// as the second's, so a mixed-up pair of answers is refused, not summed.
+    #[test]
+    fn an_answer_read_against_another_span_is_refused() {
+        let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+        let day = parse("20250515");
+        let refused = parse_voucher_census(
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml")),
+            (day, day),
+            Some(span(8192, 16384)),
+        );
+        assert_eq!(refused.unwrap_err(), "window_not_honoured");
+    }
+
+    const DENSE_GUID: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
+
+    /// Answers a window read from a script and keeps every request it was sent, in order. A
+    /// request past the script is a failure, so a test sees what was asked after the last answer.
+    struct Scripted {
+        answers: std::sync::Mutex<std::collections::VecDeque<String>>,
+        sent: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl Scripted {
+        fn new(answers: Vec<String>) -> Self {
+            Self {
+                answers: std::sync::Mutex::new(answers.into()),
+                sent: std::sync::Mutex::default(),
+            }
+        }
+
+        fn sent(&self) -> Vec<String> {
+            self.sent.lock().unwrap().clone()
+        }
+    }
+
+    impl WindowReader for Scripted {
+        fn evidence_copies(&self) -> u64 {
+            1
+        }
+
+        async fn read(
+            &self,
+            _identity: &VerifiedCompanyIdentity,
+            request: ReadRequest,
+            _kind: WindowReadKind,
+        ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
+            self.sent.lock().unwrap().push(request.as_str().to_string());
+            let answer = self.answers.lock().unwrap().pop_front();
+            match answer {
+                Some(xml) => Ok((
+                    xml,
+                    crate::agent::agent_import::local_evidence("scripted"),
+                    DateBoundaryProfile::ModeAgnostic,
+                )),
+                None => Err("scripted_answers_exhausted".to_string().into()),
+            }
+        }
+    }
+
+    fn dense() -> VerifiedCompanyIdentity {
+        VerifiedCompanyIdentity::test_fixture(COMPANY, DENSE_GUID)
+    }
+
+    async fn read_scoped(
+        reader: &Scripted,
+        scope: WindowScope<'_>,
+        (from, to): (&str, &str),
+        source: WindowPlanSource,
+    ) -> Result<WindowReadOutcome<serde_json::Value>, ToolFailure> {
+        read_scoped_voucher_window_with(
+            reader,
+            &dense(),
+            scope,
+            COMPANY,
+            &tally_date(from),
+            &tally_date(to),
+            VoucherReadShape::Movement,
+            source,
+            WindowReadLimits::for_shape(VoucherReadShape::Movement),
+            |xml| parse_agent_changed_rows(xml, DENSE_GUID),
+        )
+        .await
+    }
+
+    /// A book that fits one request is not counted: the window is read in the one movement request
+    /// the lab observed, and the 21 vouchers come back. Such a read is not a count of the book, so
+    /// it earns no bracketed count.
+    #[tokio::test]
+    async fn a_ledger_window_that_fits_one_request_is_sent_as_the_observed_movement_read() {
+        let party = ledger("DN Party 001");
+        let reader = Scripted::new(vec![utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml"))]);
+        let read = read_scoped(
+            &reader,
+            WindowScope::Ledger(&party),
+            ("20250501", "20250531"),
+            WindowPlanSource::Estimate {
+                known_marks: Some(CompanyMarks::new(Some(3), 7)),
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            reader.sent(),
+            vec![sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))]
+        );
+        assert_eq!(read.rows.len(), 21);
+        assert!(read.bracketed.is_none());
+    }
+
+    /// A book too large to send whole is counted first, by a census of the ledger's vouchers in the
+    /// observed spanned form, and the data part is the ledger's, never the book's.
+    #[tokio::test]
+    async fn a_large_books_ledger_window_is_counted_by_the_ledger_census_first() {
+        let party = ledger("DN Party 001");
+        let reader = Scripted::new(vec![utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml"))]);
+        let refused = read_scoped(
+            &reader,
+            WindowScope::Ledger(&party),
+            ("20250401", "20260331"),
+            WindowPlanSource::Estimate {
+                known_marks: Some(CompanyMarks::new(Some(8192), 7)),
+            },
+        )
+        .await
+        .err()
+        .expect("the read is refused");
+        // The script ends after the census: the request after it is the failure.
+        assert_eq!(refused.code, "scripted_answers_exhausted");
+        let requests = reader.sent();
+        assert_eq!(requests.len(), 2, "{requests:?}");
+        assert_eq!(
+            requests[0],
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml"))
+        );
+        assert_eq!(
+            requests[1],
+            render_agent_ledger_vouchers(
+                COMPANY,
+                &party,
+                LedgerVoucherFields::Movement,
+                &tally_date("20250401"),
+                &tally_date("20260331"),
+            )
+            .unwrap()
+        );
+    }
+
+    /// A part with an AlterID span is not a form the lab observed ledger-scoped: it is refused
+    /// before it is rendered, by the code `ledger_movement` answers with the book's window.
+    #[tokio::test]
+    async fn a_spanned_part_is_never_sent_ledger_scoped() {
+        let party = ledger("DN Party 001");
+        let reader = Scripted::new(vec![]);
+        let refused = read_scoped(
+            &reader,
+            WindowScope::Ledger(&party),
+            ("20250501", "20250501"),
+            WindowPlanSource::replay_of(
+                vec![WindowPart {
+                    from: tally_date("20250501"),
+                    to: tally_date("20250501"),
+                    span: Some(span(0, 8192)),
+                }],
+                Some(WindowWitness {
+                    marks: CompanyMarks::new(Some(8192), 7),
+                    census: None,
+                }),
+            ),
+        )
+        .await
+        .err()
+        .expect("the read is refused");
+        assert_eq!(refused.code, LEDGER_SCOPE_NEEDS_DAY_SPLIT);
+        assert!(reader.sent().is_empty());
+    }
+
+    #[test]
+    fn only_the_movement_and_window_reads_without_a_span_are_offered_ledger_scoped() {
+        let party = ledger("DN Party 001");
+        let (from, to) = (tally_date("20250501"), tally_date("20250531"));
+        for shape in [
+            VoucherReadShape::ImportVerification,
+            VoucherReadShape::ClassEntryWildcard,
+        ] {
+            assert_eq!(
+                ledger_part_read(shape, COMPANY, &party, &from, &to, None).unwrap_err(),
+                LEDGER_SCOPE_NEEDS_DAY_SPLIT
+            );
+        }
+        assert_eq!(
+            ledger_part_read(
+                VoucherReadShape::Movement,
+                COMPANY,
+                &party,
+                &from,
+                &to,
+                Some(span(0, 8192)),
+            )
+            .unwrap_err(),
+            LEDGER_SCOPE_NEEDS_DAY_SPLIT
+        );
+        assert_eq!(
+            ledger_part_read(
+                VoucherReadShape::Movement,
+                COMPANY,
+                &party,
+                &from,
+                &to,
+                None
+            )
+            .unwrap()
+            .as_str(),
+            sent(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml"))
+        );
+    }
+}
+
+// The ledger-scoped read of a party detail (#1356): a ledger census in AlterID spans, then one
+// ledger-scoped read admitted against it. Every request is checked against the one the lab sent,
+// byte for byte, and every answer is what Tally returned to it: the census answers come from the
+// #485 run on BRIDGE CORPUS DENSE and the read from the #1356 run, whose marks answers for the
+// company are byte-equal (fixtures/ledger-filtered-allocations/PROVENANCE.md).
+mod ledger_window {
+    use super::*;
+    use bridge_tally_protocol::ledger_scope::LedgerScopeName;
+    use std::sync::Mutex;
+
+    const DENSE: &str = "BRIDGE CORPUS DENSE";
+    const DENSE_GUID: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
+    /// The company's voucher mark in both runs.
+    const DENSE_MARK: u64 = 29_900;
+
+    fn utf16(bytes: &[u8]) -> String {
+        assert_eq!(bytes.len() % 2, 0, "a UTF-16 capture has an even length");
+        String::from_utf16(
+            &bytes
+                .chunks_exact(2)
+                .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap()
+        .trim_start_matches('\u{feff}')
+        .to_string()
+    }
+
+    type Exchange = (&'static [u8], &'static [u8]);
+
+    /// Serves the lab's answers in order, each only to the request the lab sent for it.
+    struct Captured(Mutex<Vec<Exchange>>);
+
+    impl WindowReader for Captured {
+        fn evidence_copies(&self) -> u64 {
+            1
+        }
+
+        async fn read(
+            &self,
+            _identity: &VerifiedCompanyIdentity,
+            request: ReadRequest,
+            _kind: WindowReadKind,
+        ) -> Result<(String, Evidence, DateBoundaryProfile), ToolFailure> {
+            let (sent, answer) = {
+                let mut exchanges = self.0.lock().unwrap();
+                assert!(
+                    !exchanges.is_empty(),
+                    "an extra request: {}",
+                    request.as_str()
+                );
+                exchanges.remove(0)
+            };
+            assert_eq!(request.as_str(), utf16(sent), "the request the lab sent");
+            Ok((
+                utf16(answer),
+                crate::agent::agent_import::local_evidence("captured"),
+                DateBoundaryProfile::ModeAgnostic,
+            ))
+        }
+    }
+
+    /// The census of `DN Sales` on 15 May 2025 in its four spans, then its ledger-scoped read.
+    fn dense_day() -> Vec<Exchange> {
+        vec![
+            (
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice(),
+            ),
+            (
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice(),
+            ),
+            (
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml").as_slice(),
+            ),
+            (
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml").as_slice(),
+            ),
+            (
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.request.utf16le.xml").as_slice(),
+                include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml").as_slice(),
+            ),
+        ]
+    }
+
+    /// The planner's limits, with a per-voucher figure under which the day's 82 vouchers fit one
+    /// read (the default fits 42). The census capacity, which comes from the budget, is unchanged.
+    fn eighty_two_a_read() -> WindowReadLimits {
+        WindowReadLimits {
+            default_bytes_per_voucher: WINDOW_READ_BUDGET_BYTES / 82,
+            ..WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard)
+        }
+    }
+
+    async fn read_day(
+        exchanges: Vec<Exchange>,
+        limits: WindowReadLimits,
+    ) -> (Result<WindowReadOutcome<Value>, ToolFailure>, usize) {
+        let reader = Captured(Mutex::new(exchanges));
+        let day = tally_date("20250515");
+        let sales = LedgerScopeName::new("DN Sales").unwrap();
+        let read = read_scoped_voucher_window_with(
+            &reader,
+            &VerifiedCompanyIdentity::test_fixture(DENSE, DENSE_GUID),
+            WindowScope::Ledger(&sales),
+            DENSE,
+            &day,
+            &day,
+            VoucherReadShape::EntryWildcard,
+            WindowPlanSource::Estimate {
+                known_marks: Some(CompanyMarks::new(Some(DENSE_MARK), 328)),
+            },
+            limits,
+            |xml| parse_agent_rows(xml, DENSE_GUID),
+        )
+        .await;
+        let left = reader.0.lock().unwrap().len();
+        (read, left)
+    }
+
+    #[tokio::test]
+    async fn the_dense_day_is_counted_in_four_spans_then_read_once_and_admitted() {
+        assert_eq!(
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard).census_capacity(),
+            8192,
+            "the spans the lab sent are the production ones"
+        );
+        let (read, left) = read_day(dense_day(), eighty_two_a_read()).await;
+        assert_eq!(left, 0, "every captured request was sent, and no other");
+        let rows = read.unwrap().rows;
+        let parse = |value: &str| NaiveDate::parse_from_str(value, "%Y%m%d").unwrap();
+        let census = parse_voucher_census(
+            &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice()),
+            (parse("20250515"), parse("20250515")),
+            Some(AlterIdSpan {
+                after: 0,
+                through: 8192,
+            }),
+        )
+        .unwrap();
+        assert_eq!(rows.len(), 82);
+        assert_eq!(
+            rows.iter()
+                .map(|row| row["guid"].as_str().unwrap())
+                .collect::<std::collections::BTreeSet<_>>(),
+            census
+                .iter()
+                .map(|row| row.guid.as_str())
+                .collect::<std::collections::BTreeSet<_>>()
+        );
+    }
+
+    /// Under the planner's own figure the day's 82 vouchers are more than one read carries (42),
+    /// and one day can be divided only by AlterID, a part never observed ledger-scoped: the plan is
+    /// refused after the census, before any data part is sent.
+    #[tokio::test]
+    async fn under_the_planners_figure_the_day_needs_a_part_never_observed_and_none_is_sent() {
+        let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+        let (read, left) = read_day(dense_day(), limits).await;
+        assert_eq!(read.err().unwrap().code, LEDGER_SCOPE_NEEDS_DAY_SPLIT);
+        assert_eq!(left, 1, "the four census spans were sent, and no read");
+    }
+
+    #[tokio::test]
+    async fn a_census_answer_outside_its_span_is_refused_before_any_read() {
+        let mut exchanges = dense_day();
+        exchanges[1].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice();
+        let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
+        let failure = read.err().unwrap();
+        assert_eq!(failure.code, VOLUME_UNESTIMATED);
+        assert_eq!(failure.cause, Some("census_window_not_honoured"));
+        assert_eq!(left, 3);
+    }
+
+    /// A read is held to its window's dates before its census: another ledger's month, from the same
+    /// book and run as the census, none of whose vouchers is on that day, is not admitted. (A read
+    /// on the right day with other vouchers meets the census comparison of `admit_part`, whose own
+    /// tests show it; no captured answer of that day other than the ledger's own exists.)
+    #[tokio::test]
+    async fn a_read_whose_vouchers_lie_outside_the_window_is_not_admitted() {
+        let mut exchanges = dense_day();
+        exchanges[4].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml").as_slice();
+        let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
+        let failure = read.err().unwrap();
+        assert_eq!(failure.code, PART_NOT_ADMITTED);
+        assert_eq!(failure.cause, Some(PART_ROW_OUTSIDE_DATES));
+        assert_eq!(left, 0);
+    }
+
+    /// A read on the census's own day that returns vouchers the census did not count is not
+    /// admitted: here every span of the day answered empty and the read returned the day's 82.
+    #[tokio::test]
+    async fn a_read_that_is_not_the_census_vouchers_is_not_admitted() {
+        let mut exchanges = dense_day();
+        exchanges[0].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
+        let (read, left) = read_day(exchanges, eighty_two_a_read()).await;
+        let failure = read.err().unwrap();
+        assert_eq!(failure.code, PART_NOT_ADMITTED);
+        assert_eq!(failure.cause, Some(PART_CENSUS_MISMATCH));
+        assert_eq!(left, 0);
+    }
+
+    /// What the party detail does with each result of the scoped read of its ledger (#1356): it
+    /// uses an admitted read of at least one voucher, each with a line on the party's ledger. A
+    /// read that found nothing, and a day needing an AlterID split, leave the company window's
+    /// refusal standing with their reason. A row with no party line, a read not admitted against
+    /// its census and every other failure are the ledger read's own refusals, code kept.
+    #[tokio::test]
+    async fn the_detail_uses_only_an_admitted_ledger_read_of_the_partys_vouchers() {
+        use crate::agent::bill_trail::{ledger_outcome, LedgerOutcome, NotByLedger};
+        let outcome = |read, party| ledger_outcome(read, party).map(|(outcome, _)| outcome);
+        let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
+        assert!(
+            matches!(outcome(read, "DN Sales"), Ok(LedgerOutcome::Use(rows)) if rows.len() == 82)
+        );
+        // The same read, taken for a party whose ledger none of its vouchers carries a line on.
+        let (read, _) = read_day(dense_day(), eighty_two_a_read()).await;
+        let refused = outcome(read, "DN Party 001").unwrap_err();
+        assert_eq!(refused.code, "party_ledger_row_without_line");
+        assert!(refused.evidence.is_some(), "the reads made are kept");
+        // An empty census: every span of the day answered empty, and the read an empty collection
+        // (the captured empty answer of the same book and run).
+        let mut empty = dense_day();
+        empty[0].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
+        empty[4].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
+        let (read, left) = read_day(empty, eighty_two_a_read()).await;
+        assert_eq!(left, 0);
+        assert!(matches!(
+            outcome(read, "DN Sales"),
+            Ok(LedgerOutcome::NotByLedger(
+                NotByLedger::ScopedReadFoundNothing
+            ))
+        ));
+        // A day that only a part never observed ledger-scoped could divide.
+        let limits = WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard);
+        let (read, _) = read_day(dense_day(), limits).await;
+        let (decided, evidence) = ledger_outcome(read, "DN Sales").unwrap();
+        assert!(matches!(
+            decided,
+            LedgerOutcome::NotByLedger(NotByLedger::PlanNeedsDaySplit)
+        ));
+        assert!(evidence.is_some(), "the census reads made are kept");
+        // A read not admitted against its census keeps its own code and cause.
+        let mut drift = dense_day();
+        drift[0].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml").as_slice();
+        let (read, _) = read_day(drift, eighty_two_a_read()).await;
+        let refused = outcome(read, "DN Sales").unwrap_err();
+        assert_eq!(refused.code, PART_NOT_ADMITTED);
+        assert_eq!(refused.cause, Some(PART_CENSUS_MISMATCH));
+        // A census Tally did not answer within its span is the ledger read's own refusal too.
+        let mut wrong = dense_day();
+        wrong[1].1 = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml").as_slice();
+        let (read, _) = read_day(wrong, eighty_two_a_read()).await;
+        assert_eq!(
+            outcome(read, "DN Sales").unwrap_err().code,
+            VOLUME_UNESTIMATED
+        );
+    }
+
+    #[test]
+    fn the_party_detail_read_is_the_request_the_lab_sent_byte_for_byte() {
+        let part = |company: &str, ledger: &str, from: &str, to: &str, span| {
+            ledger_part_read(
+                VoucherReadShape::EntryWildcard,
+                company,
+                &LedgerScopeName::new(ledger).unwrap(),
+                &tally_date(from),
+                &tally_date(to),
+                span,
+            )
+            .map(|request| request.as_str().to_string())
+        };
+        assert_eq!(
+            part(
+                "BRIDGE BILLTRAIL LAB",
+                "Lab Party P1",
+                "20250401",
+                "20260331",
+                None
+            )
+            .unwrap(),
+            utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.request.utf16le.xml").as_slice())
+        );
+        assert_eq!(
+            part(DENSE, "DN Sales", "20250515", "20250515", None).unwrap(),
+            utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.request.utf16le.xml").as_slice())
+        );
+        // Never sent with an AlterID span, which was not observed ledger-scoped.
+        let span = Some(AlterIdSpan {
+            after: 0,
+            through: 8192,
+        });
+        assert_eq!(
+            part(DENSE, "DN Sales", "20250515", "20250515", span).unwrap_err(),
+            LEDGER_SCOPE_NEEDS_DAY_SPLIT
+        );
+    }
 }

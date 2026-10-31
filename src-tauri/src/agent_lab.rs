@@ -8,8 +8,9 @@
 //! `approved_import.rs`); this module adds a parallel, narrowly-scoped
 //! surface rather than changing those. Scope for this pass (3.1/3.2): the
 //! shared lab guard machinery (a later lab writer will reuse
-//! `admit_lab_target`) and one read-only tool, `lab_read_inventory`. No write
-//! path exists anywhere in this file.
+//! `admit_lab_target`) and one read-only tool, `lab_read_inventory`. No Tally
+//! write path exists anywhere in this file; it writes only lab evidence under
+//! the data folder (each exchange, and a kept audit read).
 //!
 //! No signed compatibility evidence exists for any inventory field read here
 //! on any Tally release/mode:
@@ -251,6 +252,117 @@ fn persist_lab_exchange(
         "response_sha256": response_sha256,
     });
     append_egress_line(&dir.join("lab-manifest.jsonl"), &record.to_string())
+}
+
+/// The guards a kept audit read must pass, before the read is made: the
+/// always-on lab preconditions (lab writes on, port 9001, a well-formed target
+/// and deny list), and the company being read being the lab's target. A run
+/// keeps a book only when `BRIDGE_LAB_TARGET_GUID` names it on purpose; the
+/// deny list never holds the target (`LabGuardConfig::from_values`), so the
+/// target check also keeps out every denied company.
+pub(super) fn admit_audit_read_capture(
+    server: &Server,
+    company_guid: &str,
+) -> Result<CaptureGrant, ToolFailure> {
+    let config = require_lab_read_guards(server)?;
+    capture_target_admitted(&config, company_guid).map_err(ToolFailure::from)?;
+    Ok(CaptureGrant(()))
+}
+
+/// Proof that `admit_audit_read_capture` passed for this call:
+/// `persist_audit_read` takes one, so a read cannot be kept without the guards.
+pub(super) struct CaptureGrant(());
+
+fn capture_target_admitted(config: &LabGuardConfig, company_guid: &str) -> Result<(), String> {
+    if company_guid.eq_ignore_ascii_case(&config.target_guid) {
+        Ok(())
+    } else {
+        Err("lab_audit_read_not_target".to_string())
+    }
+}
+
+/// Writes an admitted audit read to `data_dir/lab/audit-reads/<manifest
+/// sha256>/` as the directory `Read::open` and the crate's `local_parity`
+/// read, so a real-book parity record can be made from exactly what the audit
+/// read sent and admitted. The tool's answer does not change. The folder is
+/// new for each read: one that already exists is refused, never written into.
+/// It holds a book's raw answers and stays on this computer; it is written
+/// only for the lab's target company (`admit_audit_read_capture`). Nothing
+/// deletes it: committing none of it, and deleting a client book's copy at the
+/// end of its review cycle (the manifest line names the company), are the
+/// lab's own duties, not this code's.
+pub(super) fn persist_audit_read(
+    server: &Server,
+    _grant: CaptureGrant,
+    stored: &super::audit_read::StoredRead,
+) -> Result<(), String> {
+    let reads = lab_evidence_dir(server)?.join("audit-reads");
+    private_dir(&reads)?;
+    write_audit_read(&reads, stored)?;
+    let record = json!({
+        "tool": "audit_test_run",
+        "at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+        "read_id": stored.read_id,
+        // The company, so a client book's copy can be found and deleted at
+        // the end of its review cycle.
+        "company_guid": stored.company_guid,
+        "manifest_sha256": stored.manifest_sha256,
+        "parts": stored.blobs.len(),
+    });
+    append_egress_line(
+        &lab_evidence_dir(server)?.join("lab-manifest.jsonl"),
+        &record.to_string(),
+    )
+}
+
+/// The read's own folder under `reads`, made new, then its manifest and parts.
+pub(super) fn write_audit_read(
+    reads: &std::path::Path,
+    stored: &super::audit_read::StoredRead,
+) -> Result<(), String> {
+    // A manifest path is `parts/` and one plain file name: anything else
+    // could leave the read's folder. Every name is checked before anything is
+    // written.
+    let parts = stored
+        .blobs
+        .iter()
+        .map(|(path, bytes)| {
+            path.strip_prefix("parts/")
+                .filter(|name| {
+                    !name.is_empty() && *name != ".." && *name != "." && !name.contains(['/', '\\'])
+                })
+                .map(|name| (name, bytes))
+                .ok_or_else(|| "lab_evidence_write_failed".to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let dir = reads.join(&stored.manifest_sha256);
+    // Not recursive, so a folder that already exists is refused; owner-only
+    // from creation, as `ensure_private_directory` then checks.
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(&dir).map_err(|error| match error.kind() {
+        std::io::ErrorKind::AlreadyExists => "lab_audit_read_exists".to_string(),
+        _ => "lab_evidence_write_failed".to_string(),
+    })?;
+    private_dir(&dir)?;
+    private_dir(&dir.join("parts"))?;
+    write_private_file(&dir.join("manifest.json"), &stored.manifest)?;
+    for (name, bytes) in parts {
+        write_private_file(&dir.join("parts").join(name), bytes)?;
+    }
+    Ok(())
+}
+
+fn private_dir(dir: &std::path::Path) -> Result<(), String> {
+    ensure_private_directory(dir).map_err(|error| match error {
+        DirectoryAdmissionError::Unavailable => "lab_dir_unavailable".to_string(),
+        #[cfg(unix)]
+        DirectoryAdmissionError::Permissions => "lab_dir_permissions_failed".to_string(),
+    })
 }
 
 fn write_private_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
@@ -894,6 +1006,195 @@ pub(super) async fn lab_read_inventory(
 }
 
 // ---------------------------------------------------------------------------
+// The tool: lab_read_purchase_identity (#1904)
+// ---------------------------------------------------------------------------
+
+/// Differences listed at most, so a read that differs everywhere stays a small answer.
+const MAX_IDENTITY_DIFFERENCES: usize = 100;
+
+/// The widest window this tool reads, in days: both reads go out whole, unplanned, where the
+/// production read would plan a heavy window from a census and divide it, so the tool stays on
+/// windows the production read sends whole on a lab book.
+const MAX_IDENTITY_WINDOW_DAYS: usize = 31;
+
+/// Where two parsed reads of one window differ, keyed by the voucher's GUID (the parser refuses a
+/// repeated or missing one): a GUID one read has and the other lacks, and every row field whose
+/// value differs (`amounts` holds each entry's ledger, amount and side and its bill allocations).
+/// Only the fields the parser keeps are compared. Only the field's name is listed, never its
+/// values, which can be names from the book: the values are in the exchange this tool persists on
+/// the lab machine.
+fn purchase_identity_differences(agent: &[Value], narrow: &[Value]) -> Vec<Value> {
+    // The opt-in entry details a `vouchers` call can ask for (bank allocations, goods lines, GST
+    // details) are not part of the identity compared: the narrow read never asks for them.
+    let identity_only = |row: &Value| {
+        let mut row = row.clone();
+        if let Some(entries) = row["amounts"].as_array_mut() {
+            for entry in entries.iter_mut().filter_map(Value::as_object_mut) {
+                for key in [
+                    "bank_allocations",
+                    "bank_allocations_unreadable",
+                    "goods_lines",
+                    "goods_lines_unreadable",
+                    "gst_details",
+                    "gst_details_unreadable",
+                ] {
+                    entry.remove(key);
+                }
+            }
+        }
+        row
+    };
+    let by_guid = |rows: &[Value]| {
+        rows.iter()
+            .filter_map(|row| Some((row["guid"].as_str()?.to_string(), identity_only(row))))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let (agent, narrow) = (by_guid(agent), by_guid(narrow));
+    let guids = agent
+        .keys()
+        .chain(narrow.keys())
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut out = Vec::new();
+    for guid in guids {
+        match (agent.get(guid), narrow.get(guid)) {
+            (Some(_), None) => out.push(json!({"guid": guid, "only_in": "agent"})),
+            (None, Some(_)) => out.push(json!({"guid": guid, "only_in": "narrow"})),
+            (Some(left), Some(right)) => {
+                let fields = left
+                    .as_object()
+                    .into_iter()
+                    .chain(right.as_object())
+                    .flat_map(|row| row.keys())
+                    .collect::<std::collections::BTreeSet<_>>();
+                for field in fields {
+                    if left.get(field) != right.get(field) {
+                        out.push(json!({"guid": guid, "field": field}));
+                    }
+                }
+            }
+            (None, None) => {}
+        }
+    }
+    out
+}
+
+/// One read's size: its rows and the characters of its decoded answer (the whole answer, envelope
+/// included; the wire carries it as UTF-16), per row.
+fn identity_read_size(xml: &str, rows: usize) -> Value {
+    let chars = xml.chars().count();
+    json!({
+        "rows": rows,
+        "response_chars": chars,
+        "response_chars_per_row": (rows > 0).then(|| chars / rows),
+    })
+}
+
+/// Whether `from..=to` spans at most [`MAX_IDENTITY_WINDOW_DAYS`] days.
+fn identity_window_fits(
+    from: &bridge_tally_core::TallyDate,
+    to: &bridge_tally_core::TallyDate,
+) -> bool {
+    let mut day = from.clone();
+    for _ in 1..MAX_IDENTITY_WINDOW_DAYS {
+        if &day >= to {
+            return true;
+        }
+        match day.next_day() {
+            Ok(next) => day = next,
+            Err(_) => return false,
+        }
+    }
+    &day >= to
+}
+
+/// LAB-ONLY: the candidate narrow read for a supplier invoice already in the books (#1904), sent
+/// beside the agent read it would replace, on the same window, through the same dispatch path, and
+/// compared field by field after the same parser. It writes nothing.
+pub(super) async fn lab_read_purchase_identity(
+    server: &Server,
+    args: &Value,
+) -> Result<ToolOutcome, ToolFailure> {
+    let guid = required_string(args, "company_guid")?;
+    let date = |key| -> Result<bridge_tally_core::TallyDate, ToolFailure> {
+        Ok(normalized_date(required_string(args, key)?)?)
+    };
+    let (from, to) = (date("from")?, date("to")?);
+    if from > to {
+        return Err("invalid_date_range".to_string().into());
+    }
+    if !identity_window_fits(&from, &to) {
+        return Err("lab_identity_window_too_wide".to_string().into());
+    }
+    require_lab_read_guards(server)?;
+    let (company, identity, mut evidence) = server.verified_company(guid).await?;
+    let result: Result<ToolOutcome, ToolFailure> = async {
+        let mut reads = Vec::new();
+        for (label, request) in [
+            (
+                "lab_read_purchase_identity.agent",
+                lab_agent_class_vouchers_read(identity.display_name(), &from, &to),
+            ),
+            (
+                "lab_read_purchase_identity.narrow",
+                lab_purchase_identity_vouchers_read(identity.display_name(), &from, &to),
+            ),
+        ] {
+            let request = request.map_err(ToolFailure::from)?;
+            let (xml, read_evidence) = lab_post_read(server, &identity, label, request).await?;
+            evidence = combine_evidence(evidence.clone(), read_evidence);
+            // A refusal of the narrow answer by the parser is a finding of this tool, not a
+            // failure of it: it is returned beside the agent read's size.
+            let parsed = parse_agent_rows(&xml, identity.company_guid());
+            if let Ok(rows) = &parsed {
+                if !window_honoured(rows, from.as_str(), to.as_str()) {
+                    return Err(ToolFailure::from("window_not_honoured".to_string())
+                        .with_prior_evidence(evidence.clone()));
+                }
+            }
+            reads.push((xml, parsed));
+        }
+        let (narrow_xml, narrow) = reads.pop().expect("two reads");
+        let (agent_xml, agent) = reads.pop().expect("two reads");
+        let agent =
+            agent.map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()))?;
+        // Each read's window was checked against its own rows; a refused narrow answer was not.
+        let mut agent_size = identity_read_size(&agent_xml, agent.len());
+        agent_size["window_honoured"] = json!(true);
+        let mut result = json!({
+            "profile": "lab_read_purchase_identity_v1",
+            "agent": agent_size,
+        });
+        match narrow {
+            Err(code) => {
+                result["narrow"] = json!({"refused": code});
+            }
+            Ok(narrow) => {
+                let differences = purchase_identity_differences(&agent, &narrow);
+                let mut narrow_size = identity_read_size(&narrow_xml, narrow.len());
+                narrow_size["window_honoured"] = json!(true);
+                result["narrow"] = narrow_size;
+                // Two empty answers agree vacuously: no voucher was compared.
+                result["inconclusive"] = json!(agent.is_empty() && narrow.is_empty());
+                result["differences"] = json!({
+                    "total": differences.len(),
+                    "listed": differences.iter().take(MAX_IDENTITY_DIFFERENCES).collect::<Vec<_>>(),
+                    "listed_truncated": differences.len() > MAX_IDENTITY_DIFFERENCES,
+                });
+            }
+        }
+        Ok(ToolOutcome {
+            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": result}),
+            evidence: evidence.clone(),
+            company_guid: Some(guid.to_string()),
+            truncated: false,
+        })
+    }
+    .await;
+    result.map_err(|failure| failure.with_prior_evidence(evidence))
+}
+
+// ---------------------------------------------------------------------------
+
 // The tool: lab_voucher_key_probe (#685)
 // ---------------------------------------------------------------------------
 
@@ -1100,6 +1401,26 @@ mod tests {
         ENV_MUTEX
             .lock()
             .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    /// A kept audit read is admitted only for the lab's target company, in
+    /// any case; any other company, a denied one included, is refused.
+    #[test]
+    fn only_the_lab_target_keeps_its_audit_read() {
+        let config =
+            LabGuardConfig::from_values(TARGET_GUID, &format!("{DENY_GUID_1},{DENY_GUID_2}"))
+                .unwrap();
+        assert!(capture_target_admitted(&config, &TARGET_GUID.to_uppercase()).is_ok());
+        for other in [
+            DENY_GUID_1,
+            DENY_GUID_2,
+            "00000000-0000-4000-8000-000000000002",
+        ] {
+            assert_eq!(
+                capture_target_admitted(&config, other),
+                Err("lab_audit_read_not_target".to_string())
+            );
+        }
     }
 
     fn synthetic_unit_collection() -> String {
@@ -1346,6 +1667,7 @@ mod tests {
             "lab_import_masters",
             "lab_import_vouchers",
             "lab_read_inventory",
+            "lab_read_purchase_identity",
             "lab_voucher_key_probe",
         ] {
             assert_eq!(
@@ -1869,6 +2191,7 @@ mod tests {
             redaction: Redaction::None,
             import_enabled: false,
             posting: Posting::Off,
+            master_writes_enabled: false,
             audit_enabled: false,
         });
         let expected = render_lab_master_collection(
@@ -1986,6 +2309,86 @@ mod tests {
                 kind.tally_type()
             );
         }
+    }
+
+    /// #1904: the candidate narrow read is the agent's class-resolved read with only its entry
+    /// wildcard narrowed, so a difference between the two answers is the FETCH list's alone.
+    #[test]
+    fn the_narrow_purchase_identity_read_differs_from_the_agent_read_only_in_its_entry_fields() {
+        let from = bridge_tally_core::TallyDate::parse("20251201").unwrap();
+        let to = bridge_tally_core::TallyDate::parse("20251231").unwrap();
+        let narrow =
+            render_agent_lab_purchase_identity_vouchers("BRIDGE GST LEDGER LAB", &from, &to)
+                .unwrap();
+        let agent =
+            render_agent_class_vouchers_in_span("BRIDGE GST LEDGER LAB", &from, &to, None).unwrap();
+        let entries = "ALLLEDGERENTRIES.LEDGERNAME,ALLLEDGERENTRIES.AMOUNT,\
+ALLLEDGERENTRIES.ISDEEMEDPOSITIVE,ALLLEDGERENTRIES.BILLALLOCATIONS.*,";
+        assert_eq!(narrow.matches(entries).count(), 1, "{narrow}");
+        assert_eq!(narrow.replace(entries, "ALLLEDGERENTRIES.*,"), agent);
+    }
+
+    #[test]
+    fn purchase_identity_differences_name_the_voucher_and_field_never_their_values() {
+        let row = |guid: &str, party: &str| {
+            json!({"guid": guid, "party": party, "reference": "GS1/P/0001",
+                   "amounts": [{"ledger": "Purchase - Goods", "amount": "-10000.00"}]})
+        };
+        let agent = vec![
+            row("g-1", "SYN GS1 Supplier B"),
+            row("g-2", "SYN GS1 Supplier B"),
+        ];
+        assert!(purchase_identity_differences(&agent, &agent.clone()).is_empty());
+        // A bill allocation the narrow read lost, a voucher only one read has.
+        let mut narrow = vec![agent[0].clone()];
+        narrow[0]["amounts"][0]["bill_allocations"] = json!([]);
+        let found = purchase_identity_differences(&agent, &narrow);
+        assert_eq!(
+            found,
+            vec![
+                json!({"guid": "g-1", "field": "amounts"}),
+                json!({"guid": "g-2", "only_in": "agent"}),
+            ]
+        );
+        assert!(!found
+            .iter()
+            .any(|item| item.to_string().contains("SYN GS1")));
+    }
+
+    /// An entry's opt-in details on the agent read are not a difference: the narrow read never
+    /// asks for them (#2027).
+    #[test]
+    fn purchase_identity_differences_ignore_opt_in_entry_details() {
+        let row = |guid: &str| json!({"guid": guid, "amounts": [{"ledger": "Purchase - Goods", "amount": "-10000.00"}]});
+        let narrow = vec![row("g-1")];
+        let mut agent = narrow.clone();
+        for (key, value) in [
+            ("gst_details", json!({"rates": []})),
+            (
+                "gst_details_unreadable",
+                json!("gst_details_rates_too_many"),
+            ),
+            ("bank_allocations", json!([])),
+            ("goods_lines", json!([])),
+        ] {
+            agent[0]["amounts"][0][key] = value;
+        }
+        assert!(purchase_identity_differences(&agent, &narrow).is_empty());
+        agent[0]["amounts"][0]["amount"] = json!("-9000.00");
+        assert_eq!(
+            purchase_identity_differences(&agent, &narrow),
+            vec![json!({"guid": "g-1", "field": "amounts"})]
+        );
+    }
+
+    #[test]
+    fn the_identity_read_takes_a_window_of_at_most_31_days() {
+        let date = |text: &str| bridge_tally_core::TallyDate::parse(text).unwrap();
+        assert!(identity_window_fits(&date("20251201"), &date("20251201")));
+        assert!(identity_window_fits(&date("20251201"), &date("20251231")));
+        assert!(!identity_window_fits(&date("20251201"), &date("20260101")));
+        assert!(identity_window_fits(&date("20250201"), &date("20250303")));
+        assert!(!identity_window_fits(&date("20250401"), &date("20260331")));
     }
 
     /// A native post's REMOTEID and a voucher GUID, from the merge gate's

@@ -27,6 +27,7 @@ use bridge_tally_protocol::native_company_features::{parse_company_features, Exp
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
 use bridge_tally_protocol::native_month_register::parse_native_month_register;
+use bridge_tally_protocol::native_negative_ledgers::parse_native_negative_ledgers;
 use bridge_tally_protocol::native_negative_stock::parse_native_negative_stock;
 use bridge_tally_protocol::native_outstandings::{
     parse_company_currency, parse_company_currency_name,
@@ -54,8 +55,7 @@ use bridge_tally_protocol::{
     company_list_may_be_in_educational_mode, decode_tally_xml_response_bytes_limited,
     export_status, parse_companies_from_collection, parse_company_gateway_capability_observation,
     parse_import_evidence, parse_import_outcome, parse_import_result, parse_ledger_census_slice,
-    parse_ledger_source_records_with_evidence, parse_ledgers, parse_ledgers_with_evidence,
-    parse_native_group_source_records_with_evidence,
+    parse_ledger_name_index, parse_native_group_source_records_with_evidence,
     parse_native_ledger_source_records_with_evidence,
     parse_native_party_ledger_master_records_with_evidence,
     parse_native_voucher_source_records_with_evidence,
@@ -278,18 +278,26 @@ fn company_features(text: &str, guid: &str, name: &str, number: &str) -> String 
 }
 
 const FOREX_GUID: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+const FOREXGROUP_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
 const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 /// The parity lab book's company GUID, as scrubbed in its captures (`native_masters_tests.rs`).
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
+const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const GST_LEDGER_LAB_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
+const NESTED_STOCK_GUID: &str = "4b6094e2-d6db-46b6-a4ad-90c283cd1b52";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
 const READS_LAB_GUID: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
+const MAILING_LAB_GUID: &str = "8e34483e-2bd3-472b-ae37-c4b197e8c15a";
 const TIEOUT_B_GUID: &str = "d64eda55-da7c-4106-a171-3e3cb6cdd331";
+const TIEOUT_D_GUID: &str = "6a9518b2-a88c-417c-a700-40243f9d9119";
 const STOCK_LAB_GUID: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
 const MASTER_FIELDS_LAB_GUID: &str = "56359347-3976-4d01-b44e-56fa0f6a422c";
+const NONINT_LAB_GUID: &str = "567653b1-c8be-4deb-b4fc-3ea5de801884";
+const INTEGRATED_CTRL_LAB_GUID: &str = "3fc2a3c7-1da8-4bc4-a472-44028cdebca7";
 const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.utf16le.xml";
 
 /// The base of a book with several masters, built the way
@@ -297,7 +305,17 @@ const COMPANY_CURRENCY_NAMES: &str = "tests/fixtures/company_currencyname_live.u
 /// tests' `among_several_for_tests` is not public): the currency read with `ORIGINALNAME` and the
 /// company's `CURRENCYNAME`. `expected` is the base the tests name.
 fn base_among_several(currencies: &str, guid: &str, expected: &str) -> BaseCurrencyName {
-    let company = parse_company_currency_name(&fixture_text(COMPANY_CURRENCY_NAMES), guid)
+    base_among_several_from(currencies, COMPANY_CURRENCY_NAMES, guid, expected)
+}
+
+/// [`base_among_several`] with the company read named.
+fn base_among_several_from(
+    currencies: &str,
+    company_names: &str,
+    guid: &str,
+    expected: &str,
+) -> BaseCurrencyName {
+    let company = parse_company_currency_name(&fixture_text(company_names), guid)
         .expect("the captured company currency name");
     let base = parse_currency_master_list(&fixture_text(currencies))
         .expect("the captured currency masters")
@@ -313,6 +331,17 @@ fn forex_base() -> BaseCurrencyName {
         "tests/fixtures/currency_originalname_forex_live.utf16le.xml",
         FOREX_GUID,
         "I\u{20b9}",
+    )
+}
+
+/// `₹`, BRIDGE FOREXGROUP LAB's base, identified as Bridge identifies it from the lab's own two
+/// reads on 7.2: the Currency masters with `ORIGINALNAME` and the company's `CURRENCYNAME`.
+fn forexgroup_base() -> BaseCurrencyName {
+    base_among_several_from(
+        "tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml",
+        "tests/fixtures/native/company_base_currency_forex_72.utf16le.xml",
+        FOREXGROUP_GUID,
+        "\u{20b9}",
     )
 }
 
@@ -438,6 +467,67 @@ const ROWS: &[Row] = &[
                 8,
             ))
         },
+    },
+    // src/native_stock_query_tests.rs: Tally's Stock Query for one item (#2018)
+    Row {
+        fixture: "tests/fixtures/stock-query/r-3-stock-query.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-4-stock-query-stockitemname.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-01-stock-query-carton-box-small.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-02-stock-query-caustic-soda-flakes.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-03-stock-query-cleaning-kit-a.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-09-stock-query-soda-ash-light.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-11-stock-query-zero-stock-item.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-12-stock-query-hcl-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-14-stock-query-cleaning-kit-a-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/r-15-stock-query-unknown-item.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
     },
     // tests/simulator_corpus.rs, src/agent_tests.rs (an empty collection's export status)
     Row {
@@ -589,7 +679,19 @@ const ROWS: &[Row] = &[
         parse: |_, text| companies(text),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
         fixture: "tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_company_gateway_capability_observation",
         parse: |_, text| gateway(text),
@@ -656,6 +758,18 @@ const ROWS: &[Row] = &[
                 text,
                 "tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml",
                 REGISTER_LAB_GUID,
+            )
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-b-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_book_extent_v2(GST LEDGER LAB)",
+        parse: |_, text| {
+            extent_v2(
+                text,
+                "tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml",
+                GST_LEDGER_LAB_GUID,
             )
         },
     },
@@ -942,6 +1056,43 @@ const ROWS: &[Row] = &[
         parse: |_, text| catalogue(text, "BRIDGE OUTSTANDINGS LAB", OUTSTANDINGS_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-baseline.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-after-name-cases.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-ledger-index-after-fold-cases.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-m1-marks/ledger-index-after-m1-shapes.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture:
+            "tests/fixtures/agent/masters-m1-marks/ledger-index-after-probe-create.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(MASTERS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, MASTERS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/masters-lab-groups-baseline.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(MASTERS LAB)",
+        parse: |_, text| groups(text, MASTERS_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/agent/shape-lab-standard-ledger-catalogue.utf16le.xml",
         source: Source::Captured,
         parser: "parse_standard_ledger_catalog_with_identities(SHAPE LAB)",
@@ -1055,6 +1206,35 @@ const ROWS: &[Row] = &[
         parser: "parse_native_trial_balance",
         parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_B_GUID)),
     },
+    // A book whose Balance Sheet export does not balance (BRIDGE TIEOUT D, #2063): src/reports/statements_tests.rs.
+    Row {
+        fixture: "tests/fixtures/statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(BalanceSheet)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::BalanceSheet,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_statement(ProfitAndLoss)",
+        parse: |_, text| {
+            typed(parse_native_statement(
+                NativeStatementKind::ProfitAndLoss,
+                text,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, TIEOUT_D_GUID)),
+    },
     // Native trial balances: src/native_trial_balance/tests.rs; src/reports/statements_tests.rs for
     // the statement captures; the FOREX plain request (FOREX_601D_CAPTURE_PROVENANCE.md) by the
     // FOREX company of the same unit tests.
@@ -1079,6 +1259,19 @@ const ROWS: &[Row] = &[
                 "915d42f8-42ae-4b03-8291-55f596e3a2ea",
             ))
         },
+    },
+    // A Closing Stock ledger with a keyed closing balance (#2068), one book of each kind.
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, NONINT_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, INTEGRATED_CTRL_LAB_GUID)),
     },
     Row {
         fixture: "tests/fixtures/statement_trial_balance_fy_live.utf16le.xml",
@@ -1112,6 +1305,26 @@ const ROWS: &[Row] = &[
                 text,
                 FOREX_GUID,
                 &forex_base(),
+            ))
+        },
+    },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683, #2071): composites written with the foreign
+    // symbol against its digits. The base is identified from the lab's own currency reads.
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance",
+        parse: |_, text| typed(parse_native_trial_balance(text, FOREXGROUP_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
             ))
         },
     },
@@ -1163,6 +1376,25 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_cash_flow(20250401..20260331)",
         parse: |_, text| cash_flow(text, "20250401", "20260331"),
+    },
+    // Built-in Negative Ledgers report: src/native_negative_ledgers_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_probe_b_fy_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_negative_ledgers_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_negative_ledgers",
+        parse: |_, text| typed(parse_native_negative_ledgers(text)),
     },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {
@@ -1412,6 +1644,84 @@ const ROWS: &[Row] = &[
         parser: "parse_native_stock_summary_report",
         parse: |_, text| typed(parse_native_stock_summary_report(text)),
     },
+    Row {
+        fixture: "tests/fixtures/stock_items_nested_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_nested_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_nested_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_nested_lab_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_nested_lab_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_nested_lab_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_nested_lab_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_nested_lab_as_of_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, NESTED_STOCK_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_tieout_d_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, TIEOUT_D_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_tieout_d_to_20250930_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_items_tieout_d_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, TIEOUT_D_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock_summary_report_tieout_d_to_20250531_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/company_inventory_flags_tieout_d_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_inventory_flags",
+        parse: |_, text| typed(parse_company_inventory_flags(text, TIEOUT_D_GUID)),
+    },
     // Currency reads: src/native_outstandings/wire_currency_tests.rs,
     // wire_company_currency_tests.rs; the app's replays for the rest, read as production reads a
     // currency answer (parse_company_currency and the master list).
@@ -1500,12 +1810,24 @@ const ROWS: &[Row] = &[
         parse: |_, text| currency(text),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-c-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_currency",
+        parse: |_, text| currency(text),
+    },
+    Row {
         fixture: "tests/fixtures/agent/register-e2e/native-register-e2e-currencies.utf16le.xml",
         source: Source::Captured,
         parser: "parse_currency_master_list",
         parse: |_, text| currency_masters(text),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-c-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_currency_master_list",
+        parse: |_, text| currency_masters(text),
+    },
+    Row {
         fixture: "tests/fixtures/note-days/shape_lab_currencies_1_response.utf16le.xml",
         source: Source::Captured,
         parser: "parse_company_currency",
@@ -1540,6 +1862,32 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_currency_master_list",
         parse: |_, text| currency_masters(text),
+    },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683): the book's Currency masters and the company's
+    // own currency name, which name its base.
+    Row {
+        fixture: "tests/fixtures/native/currency_masters_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_currency",
+        parse: |_, text| currency(text),
+    },
+    Row {
+        fixture: "tests/fixtures/native/currency_masters_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_currency_master_list",
+        parse: |_, text| currency_masters(text),
+    },
+    Row {
+        fixture: "tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_currency_master_list",
+        parse: |_, text| currency_masters(text),
+    },
+    Row {
+        fixture: "tests/fixtures/native/company_base_currency_forex_72.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_currency_name(FOREXGROUP)",
+        parse: |_, text| typed(parse_company_currency_name(text, FOREXGROUP_GUID)),
     },
     // The company's own currency name: src/native_outstandings/wire_company_currency_tests.rs, and
     // the note-day replay's base-currency read for SHAPE LAB.
@@ -1632,6 +1980,36 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot",
         parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_compliance_ledger_snapshot_for_company(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_compliance_ledger_snapshot_for_company(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_classified_for_company(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_ledger_snapshot_classified_for_company(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
     },
     Row {
         fixture: "tests/fixtures/balance_snapshot_forex_live.utf16le.xml",
@@ -1764,6 +2142,12 @@ const ROWS: &[Row] = &[
         parse: |_, text| ledger_snapshot_for(text, REGISTER_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-P-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_for_company(GST LEDGER LAB)",
+        parse: |_, text| ledger_snapshot_for(text, GST_LEDGER_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/note-days/shape_lab_ledgers_2_response.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot_for_company(SHAPE LAB)",
@@ -1835,6 +2219,18 @@ const ROWS: &[Row] = &[
         parse: |_, text| party_masters(text, READS_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(MAILING LAB, list not named)",
+        parse: |_, text| party_masters(text, MAILING_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/agent/native-party-masters.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(WR2)",
@@ -1851,6 +2247,12 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(REGISTER LAB)",
         parse: |_, text| party_masters(text, REGISTER_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-L-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(GST LEDGER LAB)",
+        parse: |_, text| party_masters(text, GST_LEDGER_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/note-days/shape_lab_ledgers_1_response.utf16le.xml",
@@ -1986,6 +2388,12 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_group_snapshot(REGISTER LAB)",
         parse: |_, text| groups(text, REGISTER_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-g-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(GST LEDGER LAB)",
+        parse: |_, text| groups(text, GST_LEDGER_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/agent/native-shape-lab-groups.utf16le.xml",
@@ -2273,12 +2681,6 @@ const ROWS: &[Row] = &[
         parse: |_, text| untyped(export_status(text)),
     },
     Row {
-        fixture: "../tally-protocol-simulator/fixtures/export_status_0.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
         fixture: "../tally-protocol-simulator/fixtures/export_status_missing.xml",
         source: Source::Synthetic,
         parser: "export_status",
@@ -2289,60 +2691,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "export_status",
         parse: |_, text| untyped(export_status(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/normal_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledger_source_records_with_evidence",
-        parse: |_, text| untyped(parse_ledger_source_records_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/empty_export.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/duplicate_identity.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/wrong_company.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/record_count_mismatch.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/malformed_export_metadata.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/duplicate_export_metadata.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers_with_evidence",
-        parse: |_, text| untyped(parse_ledgers_with_evidence(text)),
     },
     Row {
         fixture: "../tally-protocol-simulator/fixtures/import_counters.xml",
@@ -2361,18 +2709,6 @@ const ROWS: &[Row] = &[
         source: Source::Synthetic,
         parser: "parse_import_result",
         parse: |_, text| untyped(parse_import_result(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/malformed.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
-    },
-    Row {
-        fixture: "../tally-protocol-simulator/fixtures/truncated.xml",
-        source: Source::Synthetic,
-        parser: "parse_ledgers",
-        parse: |_, text| untyped(parse_ledgers(text)),
     },
     // src/native_masters_tests.rs: cost centres and cost categories (#1398).
     Row {
@@ -2415,6 +2751,8 @@ const APP_CENSUS: &str =
     "recorded by the app crate's record (#1198 slice 2): parse_voucher_census (a voucher census)";
 const APP_HIGH_WATER: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_company_high_water / parse_company_marks (a company ALTVCHID/ALTMSTID read)";
+const APP_ALL_MARKS: &str = "recorded by the app crate's record (#1198 slice 2): \
+     parse_all_company_marks (a company ALTMSTID read of a book that holds no voucher)";
 const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slice 2): \
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
@@ -2486,8 +2824,16 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
+const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
+     (26 Oct 2026, #1392), with no row here: no parser or test reads it yet, and the pull request \
+     that adds the day reader replays it and changes this reason; \
+     agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
+const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRANSFER LAB and \
+     BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
+     yet, and the pull request that renders the census as a span replays it and changes this \
+     reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
@@ -2804,6 +3150,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/agent/gst-ledger-l1/s6-03nov-m-1.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
         "tests/fixtures/note-days/shape_lab_company_marks_response.utf16le.xml",
         APP_HIGH_WATER,
     ),
@@ -2812,11 +3162,139 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_HIGH_WATER,
     ),
     (
+        "tests/fixtures/company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-00-baseline.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-01-n-0a.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-02-n-0b.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-03-n-a.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-04-n-b.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-05-n-c.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-06-n-d.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-07-n-f.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-08-n-e.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-09-m1-party.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-10-m1-susp.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-13-m1-duty-state.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-17-q-0.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-18-q-r.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-19-q-a.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-20-q-c0.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
+        "tests/fixtures/agent/masters-m1-marks/marks-21-q-c.utf16le.xml",
+        APP_ALL_MARKS,
+    ),
+    (
         "tests/fixtures/agent/native-company-book-extents.utf16le.xml",
         "recorded by the app crate's record (#1198 slice 2): company_high_water_rows \
          (src/agent_company_checkpoint.rs reads this extent collection for its marks)",
     ),
     // Voucher censuses.
+    (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
     (
         "tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml",
         APP_CENSUS,
@@ -2835,6 +3313,62 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/register-e2e/native-register-e2e-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-03nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-04nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-05nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-06nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-07nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-08nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-10nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-11nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-12nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-13nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-14nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-15nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-16nov-n-1.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-17nov-n-1.utf16le.xml",
         APP_CENSUS,
     ),
     (
@@ -2932,6 +3466,62 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-04nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-05nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-06nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-07nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-08nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-10nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-11nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-12nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-13nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-14nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-15nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-16nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/note-days/cancelled_purchase_day_voucher_window_response.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
@@ -2969,6 +3559,26 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/voucher_cost_centre_allocations_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/vouchers_agst_ref_reopen_live.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
@@ -2988,6 +3598,63 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/vouchers_ageing_corpus_live.utf16le.xml",
         VOUCHER_EXPORT_NO_PARSER,
     ),
+    // The whole-day read's answers on BRIDGE TRANSFER LAB (#1392).
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
+    (
+        "tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
+        WHOLE_DAY_READ,
+    ),
     // Built-in reports no parser reads.
     (
         "tests/fixtures/builtin_ratio_analysis_probe_b_fy_live.utf16le.xml",
@@ -3006,6 +3673,39 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/unit_a_invalid_char_ref_live.xml",
         "only the pre-parse sanitizer reads it (src/tolerant_xml_tests.rs): a NAME/PARENT-only \
          ledger collection with no GUID, company or balance, which no parser of this crate binds",
+    ),
+    // The span read's answers on two synthetic books (#899).
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/t-m2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-c2.utf16le.xml",
+        SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/spanned-census-two-books/o-m2.utf16le.xml",
+        SPANNED_CENSUS,
     ),
 ];
 

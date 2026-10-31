@@ -389,6 +389,11 @@ for (const [name, change] of [
     refused(withChange(".github/workflows/ci.yml", change), "the merge gate's test must run once, exactly when the merge-gate-scope step says so");
   });
 }
+test("merge gate scope: a base SHA taken from the pull request's head is refused", () => {
+  const scope = "      - id: merge-gate-scope\n        env:\n          EVENT_NAME: ${{ github.event_name }}\n          PR_BASE_SHA: ${{ github.event.pull_request.";
+  refused(withChange(".github/workflows/ci.yml", (text) => text.replace(`${scope}base.sha }}\n`, `${scope}head.sha }}\n`)),
+    "the merge-gate-scope step must read the event name and the pull request's base SHA");
+});
 
 // The nightly records run must not hold eight of the account's twenty runner slots at once.
 for (const [name, replacement] of [

@@ -102,7 +102,7 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
             .map(|(index, item)| VerdictItem {
                 name: item.name.clone(),
                 // A ledger confirmed absent has no GUID to name.
-                guid: (state != MasterVerdictState::ConfirmedAbsent)
+                guid: (!state.is_absent())
                     .then(|| format!("0000000{index}-aaaa-bbbb-cccc-dddddddddddd")),
                 reason: None,
             })
@@ -2127,4 +2127,78 @@ fn two_names_differing_only_by_spaces_or_symbols_may_be_one_master() {
     assert!(one(dotted, plain));
     assert!(one("Synthetic Fresh Party", "Synthetic FreshParty"));
     assert!(!one("Synthetic Probe Pvt Ltd", "Synthetic Probe Pvt Ltd 2"));
+}
+
+/// `confirmed_absent_after_change` is admitted as `confirmed_absent` is: a
+/// snake-case terminal verdict with no GUID, refused against counters that show
+/// a write, followed by nothing, settled in the local-data report, and no
+/// longer holding its name against a new batch.
+#[test]
+fn confirmed_absent_after_change_is_admitted_as_the_other_absent_state() {
+    let state = MasterVerdictState::ConfirmedAbsentAfterChange;
+    assert_eq!(
+        serde_json::to_string(&state).unwrap(),
+        "\"confirmed_absent_after_change\""
+    );
+    assert!(state.is_terminal() && state.is_absent());
+    let after_change = |batch: &MasterBatch| {
+        let mut verdict = verdict_for(batch, state);
+        for item in &mut verdict.items {
+            item.reason = Some("not_in_book,mark_moved_since_intent".into());
+        }
+        verdict
+    };
+    let batch = batch(&batch_id());
+    let prefix = quiet_prefix(&batch);
+    let journal = read(&format!(
+        "{prefix}{}",
+        line(&MasterRecord::Verdict(after_change(&batch)))
+    ))
+    .unwrap();
+    assert!(journal.state(&batch.batch_id).unwrap().is_settled());
+    assert_eq!(journal.summary().not_settled, 0);
+    let mut named = after_change(&batch);
+    named.items[0].guid = Some(crate::synthetic_guid(0xaabc).into());
+    assert_eq!(
+        read(&format!("{prefix}{}", line(&MasterRecord::Verdict(named)))).unwrap_err(),
+        invalid(Invalid::AbsentWithGuid)
+    );
+    let later = format!(
+        "{prefix}{}{}",
+        line(&MasterRecord::Verdict(after_change(&batch))),
+        line(&MasterRecord::Verdict(verdict_for(
+            &batch,
+            MasterVerdictState::ConfirmedAbsent
+        )))
+    );
+    assert_eq!(
+        read(&later).unwrap_err(),
+        invalid(Invalid::VerdictAfterTerminal)
+    );
+    // Against Tally's own count of a write.
+    let intent = journal_text(&full_records(&batch)[..2]);
+    let mut response = response_for(&batch);
+    response.counters = Some(MasterCounters {
+        created: 1,
+        altered: 0,
+        deleted: 0,
+        ignored: 0,
+        errors: 0,
+        cancelled: 0,
+        exceptions: 0,
+    });
+    assert_eq!(
+        read(&format!(
+            "{intent}{}{}",
+            line(&MasterRecord::DispatchResponse(response)),
+            line(&MasterRecord::Verdict(after_change(&batch)))
+        ))
+        .unwrap_err(),
+        invalid(Invalid::AbsentAgainstCounters)
+    );
+    // It releases the name, as `confirmed_absent` does.
+    let (first, mut records) = dispatched_batch("Synthetic Two");
+    let (_, again) = dispatched_batch("SYNTHETIC-TWO");
+    records.push(MasterRecord::Verdict(after_change(&first)));
+    assert!(read(&journal_text(&[records, again].concat())).is_ok());
 }

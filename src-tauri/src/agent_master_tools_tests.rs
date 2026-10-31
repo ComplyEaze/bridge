@@ -13,7 +13,8 @@ use super::super::master_ledger::{
     read_pre_image, MasterVerdict, MasterVerdictState, VerdictItem, TEST_FAULTS,
 };
 use super::super::master_post::{TEST_LEDGER_INDEX, TEST_LEDGER_INDEX_AFTER_POST};
-use super::verify::{judged_next_step, not_read_back_next_step};
+use super::verdict::OrderCoverage;
+use super::verify::{judged_next_step, not_read_back_next_step, TEST_ORDER_COVERAGE};
 use super::*;
 use crate::agent::master_writes_effective;
 use crate::agent::{Posting, Redaction, Settings};
@@ -383,7 +384,13 @@ fn saved_batch(server: &Server, name: &str) -> (MasterBatch, Value) {
 /// read-back after a POST sees the same book: the ledger is not there.
 async fn posting<F: std::future::Future>(scripted: &ScriptedApproval, call: F) -> F::Output {
     SCRIPTED_APPROVAL
-        .scope(scripted.clone(), TEST_LEDGER_INDEX.scope(book(), call))
+        .scope(
+            scripted.clone(),
+            TEST_ORDER_COVERAGE.scope(
+                OrderCoverage::Measured,
+                TEST_LEDGER_INDEX.scope(book(), call),
+            ),
+        )
         .await
 }
 
@@ -393,10 +400,17 @@ async fn posting_then<F: std::future::Future>(
     after: Vec<IndexedMaster>,
     call: F,
 ) -> F::Output {
+    // These tests judge the verdict, not the release: the captured company
+    // list is of 7.1, where an absent state is not settled, so the Tally is
+    // said to be the measured one. The gate on the release is tested below on
+    // the captured answer itself.
     SCRIPTED_APPROVAL
         .scope(
             scripted.clone(),
-            TEST_LEDGER_INDEX.scope(book(), TEST_LEDGER_INDEX_AFTER_POST.scope(after, call)),
+            TEST_ORDER_COVERAGE.scope(
+                OrderCoverage::Measured,
+                TEST_LEDGER_INDEX.scope(book(), TEST_LEDGER_INDEX_AFTER_POST.scope(after, call)),
+            ),
         )
         .await
 }
@@ -1907,6 +1921,27 @@ fn the_verified_and_absent_texts_say_what_is_checked_and_what_is_not() {
             assert!(!text.contains(replaced), "{replaced}: {text}");
         }
     }
+    // The state after a change says what the moved mark does not show, and
+    // rests on the same basis as the other absent state.
+    for text in [
+        settled_note(MasterVerdictState::ConfirmedAbsentAfterChange),
+        settled_next_step(MasterVerdictState::ConfirmedAbsentAfterChange),
+    ] {
+        for fragment in [
+            "no ledger of this name",
+            "does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for",
+            "new connections",
+            "the create, the read or both on a reused one",
+        ] {
+            assert!(text.contains(fragment), "{fragment}: {text}");
+        }
+    }
+    assert!(settled_note(MasterVerdictState::ConfirmedAbsentAfterChange)
+        .contains("not that this create ran"));
+    assert!(
+        settled_next_step(MasterVerdictState::ConfirmedAbsentAfterChange)
+            .contains("Whether the create ran")
+    );
     for text in [
         settled_note(MasterVerdictState::ConfirmedAbsent),
         settled_next_step(MasterVerdictState::ConfirmedAbsent),
@@ -4432,6 +4467,76 @@ fn a_cancelled_post_is_answered_for_nothing_sent_a_send_recorded_and_not_known()
     assert_ne!(NEXT_UNCONFIRMED, NEXT_SEND_NOT_KNOWN);
 }
 
+/// A post whose company read is cut at the request limit, as on a gateway kept busy by another
+/// call's long read (#2123), names that as its cause and says to post again once Tally is idle,
+/// through the whole tool answer: the code stays the company read's, nothing was sent and no
+/// intent was recorded.
+#[tokio::test]
+async fn a_post_whose_company_read_is_cut_at_the_limit_names_a_busy_tally() {
+    let mut plans = verified_company();
+    plans[0] = plans[0]
+        .clone()
+        .with_delivery(Delivery::SlowHeaders(Duration::from_millis(1_500)));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::runtime::TallyRuntime::with_transport_policy(
+        bridge_tally_transport::TransportPolicy {
+            request_timeout: Duration::from_millis(300),
+            ..Default::default()
+        },
+    );
+    let (batch, args) = saved_batch(&server, LEDGER);
+    let response = posting(
+        &ScriptedApproval::approving(),
+        server.call_tool("post_ledger_creates", args),
+    )
+    .await;
+    let observed = sent(simulator);
+    let error = &result(&response)["error"];
+    assert_eq!(error["code"], "company_collection_invalid", "{response}");
+    assert_eq!(error["cause"], "request_deadline_exceeded", "{response}");
+    assert_eq!(error["next_step"], NEXT_TALLY_BUSY, "{response}");
+    assert_eq!(result(&response)["attempt_recorded"], false, "{response}");
+    assert_eq!(
+        result(&response)["dispatch"]["state"],
+        "not_dispatched",
+        "{response}"
+    );
+    assert!(!create_was_sent(&observed, &expected_request()));
+    assert!(
+        !journal_text(directory.path()).contains("master_dispatch_intent"),
+        "no intent for {}",
+        batch.batch_id
+    );
+}
+
+/// A request cut at the limit is named as the cause whatever was sent, but the busy-gateway step,
+/// which says nothing was sent, is given only when the journal shows nothing sent: a cut create
+/// (a send recorded) keeps the read-back step, and a journal that could not be read keeps the
+/// step that is true either way.
+#[test]
+fn the_busy_tally_step_is_given_only_when_nothing_was_sent() {
+    let answer = |attempted: Option<bool>| {
+        let failure = ToolFailure::from_runtime(
+            "post_queue_read_failed",
+            anyhow::Error::new(bridge_tally_transport::TallyTransportError::RequestTimedOut),
+        );
+        let outcome =
+            master_failure_outcome("bridge-batch", GUID, failure, empty_evidence(), attempted);
+        outcome.payload["result"]["error"].clone()
+    };
+    let nothing_sent = answer(Some(false));
+    let send_recorded = answer(Some(true));
+    let not_known = answer(None);
+    for error in [&nothing_sent, &send_recorded, &not_known] {
+        assert_eq!(error["cause"], "request_deadline_exceeded", "{error}");
+    }
+    assert_eq!(nothing_sent["next_step"], NEXT_TALLY_BUSY);
+    assert_eq!(send_recorded["next_step"], NEXT_UNCONFIRMED);
+    assert_eq!(not_known["next_step"], NEXT_SEND_NOT_KNOWN);
+}
+
 /// `tools/call post_ledger_creates` runs the master post, not the voucher
 /// post: an unknown batch is answered by the master tool.
 #[tokio::test]
@@ -4757,18 +4862,92 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
     let again = posting(&scripted, third.call_tool("post_ledger_creates", args)).await;
     assert_eq!(sent(silent).len(), 0);
     assert_eq!(result(&again)["state"], "confirmed_absent", "{again}");
+    // The repeat answer, from the journal, still says what the state rests on.
+    assert_eq!(
+        result(&again)["verification"]["basis"],
+        "read_after_send_order",
+        "{again}"
+    );
     assert_eq!(result(&again)["dispatch"]["resent"], false);
     assert!(scripted.masters().is_empty(), "nobody was asked again");
     assert_eq!(journal_bytes(directory.path()), before);
 }
 
+/// The gate on the release, on the captured company list itself: it reports
+/// TallyPrime 7.1 Silver, where the order an absent state rests on was not
+/// measured. A reconcile that would settle as absent on 7.2 Silver stays open
+/// here, for both absent states, with the reason and a step that says so.
 #[tokio::test]
-async fn a_reconcile_does_not_confirm_absence_when_a_mark_moved_or_the_name_appeared() {
-    // The mark of the target moved since the intent: not absent, a doubt.
+async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
+    for target in [7, 8] {
+        let plans = through_post(xml(created_one()).with_delivery(
+            Delivery::ResetAfterRequestProcessed {
+                delay: Duration::from_millis(0),
+            },
+        ));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (batch, args) = saved_batch(&server, LEDGER);
+        posting(
+            &ScriptedApproval::approving(),
+            server.call_tool("post_ledger_creates", args.clone()),
+        )
+        .await;
+        sent(simulator);
+        let reads =
+            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, 3, None))).unwrap();
+        let later = server_at(reads.address(), directory.path());
+        // No coverage seam: the read-back reads the release from the answer.
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                TEST_LEDGER_INDEX.scope(
+                    book(),
+                    TEST_LEDGER_INDEX_AFTER_POST
+                        .scope(book(), later.call_tool("post_ledger_creates", args)),
+                ),
+            )
+            .await;
+        sent(reads);
+        assert_eq!(
+            result(&response)["state"],
+            "reconciliation_required",
+            "{target}: {response}"
+        );
+        assert!(
+            result(&response)["verification"]["reasons"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("absent_not_measured_on_this_release")),
+            "{target}: {response}"
+        );
+        assert_eq!(
+            result(&response)["next_step"],
+            verify::NEXT_ABSENT_UNCOVERED,
+            "{target}"
+        );
+        assert_eq!(result(&response)["verification"]["settled"], false);
+        assert!(!state_of(directory.path(), &batch.batch_id).is_settled());
+    }
+}
+
+#[tokio::test]
+async fn a_reconcile_after_a_moved_mark_or_an_appeared_name_is_judged_by_what_it_finds() {
     for (target, other, held, expect, next_step) in [
-        // Read, the name absent, and not settled: the name stays held.
+        // The target's mark moved forward, the name absent and no master new:
+        // settled as absent after a change, and the name released.
         (
             8,
+            3,
+            book(),
+            "confirmed_absent_after_change",
+            verify::NEXT_ABSENT_AFTER_CHANGE,
+        ),
+        // The mark went back: read, the name absent, and not settled; the name
+        // stays held.
+        (
+            6,
             3,
             book(),
             "reconciliation_required",
@@ -4815,7 +4994,29 @@ async fn a_reconcile_does_not_confirm_absence_when_a_mark_moved_or_the_name_appe
         assert_eq!(result(&response)["state"], expect, "{response}");
         assert_ne!(result(&response)["state"], "confirmed_absent");
         assert_eq!(result(&response)["next_step"], next_step, "{response}");
-        let _ = batch;
+        // The terminal states settle the batch; a loud one too.
+        let settled = matches!(
+            expect,
+            "confirmed_absent_after_change" | "master_write_located_elsewhere"
+        );
+        assert_eq!(
+            result(&response)["verification"]["settled"],
+            settled,
+            "{response}"
+        );
+        assert_eq!(
+            state_of(directory.path(), &batch.batch_id).is_settled(),
+            settled,
+            "{response}"
+        );
+        if expect == "confirmed_absent_after_change" {
+            assert_eq!(
+                result(&response)["verification"]["basis"],
+                "read_after_send_order",
+                "{response}"
+            );
+            assert!(result(&response).get("alert").is_none(), "{response}");
+        }
     }
 }
 
@@ -6306,4 +6507,20 @@ fn the_ledger_index_seams_are_under_bare_cfg_test() {
     for forbidden in ["cfg(any(test", "cfg(feature", "cfg(all(test"] {
         assert!(!source.contains(forbidden), "{forbidden}");
     }
+}
+
+/// #2142: a ledger create refused before anything is recorded because Tally is
+/// draining after a cut request says to call again with the same batch.
+#[test]
+fn a_draining_refusal_names_the_ledger_create_next_step() {
+    let step = master_next_step("tally_endpoint_draining").unwrap();
+    assert!(
+        step.starts_with("Nothing was sent: Tally was still busy"),
+        "{step}"
+    );
+    assert!(
+        step.contains("post_ledger_creates with this batch_id again"),
+        "{step}"
+    );
+    assert!(step.contains("retry_after_s"), "{step}");
 }

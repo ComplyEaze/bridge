@@ -1,0 +1,2 @@
+docs/adr/0004-tally-write-safety.md
+reviewer: lamemustafa

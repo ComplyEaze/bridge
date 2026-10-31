@@ -33,7 +33,7 @@ const stand = {
   silent: ["", 0],
 };
 
-function runScope(event, { script = "silent", changed = [], draft = "", env = {}, versions = null } = {}) {
+function runScope(event, { script = "silent", changed = [], draft = "", env = {}, versions = null, tools = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "scope-step-"));
   try {
     const sh = (command) => {
@@ -64,6 +64,11 @@ function runScope(event, { script = "silent", changed = [], draft = "", env = {}
     // A stand-in `gh api repos/<repo>/pulls/<n> --jq .draft`: prints the live draft state, or fails.
     writeFileSync(join(dir, "bin", "gh"), `#!/bin/bash\nprintf '%s' "$*" > "$STUB_GH_ARGS"\n[ "$STUB_GH_EXIT" = 0 ] || exit "$STUB_GH_EXIT"\nprintf '%s\\n' "$STUB_LIVE_DRAFT"\n`);
     chmodSync(join(dir, "bin", "gh"), 0o755);
+    // Further stand-ins for system tools, ahead of the real ones on PATH.
+    for (const [name, text] of Object.entries(tools)) {
+      writeFileSync(join(dir, "bin", name), text);
+      chmodSync(join(dir, "bin", name), 0o755);
+    }
     writeFileSync(join(dir, "scope.sh"), scopeScript());
     const outputFile = join(dir, "out");
     const summaryFile = join(dir, "summary");
@@ -113,6 +118,21 @@ test("a push runs everything on Windows when the script says no, says nothing, c
     assert.deepEqual(heavy(outputs), ALL, script);
     assert.deepEqual(systems(outputs), { native: BOTH, bundle: WIN }, script);
   }
+});
+
+// A `head` that writes each line as it reads it, as a pipe may deliver them, with a pause after each. A reader of its
+// output that stops at a match on the first line ends it while it writes the second, so it is killed by SIGPIPE.
+const lineByLineHead = `#!/bin/bash
+count=2
+[ "$1" = -n ] && count=$2
+while [ "$count" -gt 0 ] && IFS= read -r line; do printf '%s\\n' "$line"; sleep 0.3; count=$((count - 1)); done
+`;
+
+test("a push honours a reuse line on the first line however its lines reach the step", () => {
+  // The step once piped the decision through `head -n 2 | grep -q` under pipefail: grep stopped at a first-line
+  // match, head died writing the second line, and a reuse of the native family was read as none.
+  const { outputs } = runScope("push", { script: "both", tools: { head: lineByLineHead } });
+  assert.deepEqual(systems(outputs), { native: MAC, bundle: null });
 });
 
 test("a push runs the macOS bundle and seam jobs when it changes a packaging path, or when its before commit cannot be compared", () => {

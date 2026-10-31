@@ -1889,6 +1889,45 @@ async fn a_batch_recorded_before_its_cash_in_hand_ledgers_is_refused_before_any_
     assert!(observed.is_empty(), "{response}");
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, a post is refused before any dialog or Tally request, and nothing
+/// is recorded.
+#[tokio::test]
+async fn a_post_beside_a_second_journal_is_refused_before_any_request() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (_, args) = saved_bank_batch(&server, contra());
+    std::fs::write(
+        at.copy.join("agent-import-ledger.jsonl"),
+        crate::agent::agent_import::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let before = journal(&at.data);
+    let scripted = ScriptedApproval::approving();
+    let response = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{response}");
+    assert_eq!(
+        result["error"]["cause"],
+        SplitJournal::OtherHoldsBatches.cause(),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert!(observed.is_empty(), "{response}");
+    assert_eq!(journal(&at.data), before);
+}
+
 /// #1234: a batch saved before the build recorded its bill-wise approvals is
 /// refused before any Tally request and must be rebuilt, as above.
 #[tokio::test]

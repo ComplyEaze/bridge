@@ -424,6 +424,14 @@ probe making the same Windows call), and `package_copies`, which lists
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).
+Because each side's journal checks see only its own batches, on Windows
+`build_import_xml` and `post_import` refuse (`import_journal_split`) while a
+Store app's copy of the data folder holds an import journal, other than the one
+the running process uses, with a batch; neither journal is moved, merged or
+deleted (#2233). Seen from inside Claude Desktop, a journal in
+`%LOCALAPPDATA%\Bridge\agent` is hidden behind the package's own copy, so only
+the side outside Claude Desktop is refused by it. **Not measured:** this refusal
+on a real computer.
 Microsoft's documentation says that uninstalling or resetting a Store app
 (here Claude Desktop itself; this is not the removal of the extension that
 section 8 describes) removes that second folder and everything in it.

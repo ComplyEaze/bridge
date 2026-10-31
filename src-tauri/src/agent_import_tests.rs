@@ -6088,6 +6088,40 @@ async fn numbered_journal_built_against(plans: Vec<ScenarioPlan>) -> (Value, usi
     )
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, a build is refused under the admission lock: it writes no file and
+/// no journal record, and the copy is left as it was.
+#[tokio::test]
+async fn a_build_beside_a_second_journal_is_refused_and_writes_nothing() {
+    use super::split_journal::{tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA};
+    let at = layout();
+    let other = at.copy.join(super::local_data::JOURNAL_FILE);
+    fs::write(&other, super::local_data::tests::journal(true)).unwrap();
+    let simulator =
+        SequenceSimulator::spawn(whole_build(build_numbering_plans(&[]))).expect("build plan");
+    let server = numbering_server(&at.data, simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    input.vouchers[0].voucher_number = Some("TEST-1".into());
+    let failure = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            server.build_import_xml(&serde_json::to_value(input).unwrap()),
+        )
+        .await
+        .err()
+        .expect("refused");
+    simulator.cancel();
+    assert_eq!(failure.code, IMPORT_JOURNAL_SPLIT);
+    assert_eq!(failure.cause, Some(SplitJournal::OtherHoldsBatches.cause()));
+    assert_eq!(written_files(&at.data), 0);
+    assert!(!at.data.join(super::local_data::JOURNAL_FILE).exists());
+    assert_eq!(
+        fs::read(&other).unwrap(),
+        super::local_data::tests::journal(true)
+    );
+}
+
 /// The numbering read with the Journal type numbered Manual and its series'
 /// duplicate setting read as prevented (the capture reads it as not).
 fn manual_journal_preventing_duplicates() -> Vec<ScenarioPlan> {

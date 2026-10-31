@@ -1979,6 +1979,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              batch_id and doubt invoice_stop (available when posting is enabled): a native \
              dialog asks the user, and nothing but their answer releases the stop.",
         ),
+        "import_journal_split" => Some(
+            "Nothing was written or sent. On this computer Windows keeps a second copy of \
+             ComplyEaze Bridge's data folder inside a Microsoft Store app's package, as it does \
+             for Claude Desktop installed from the Microsoft Store, and that copy holds an \
+             import journal other than this process's. The journal checks of one copy do not \
+             see the batches of the other, so a row posted from one could be posted again \
+             from the other. The cause says what was found: other_journal_holds_batches, or \
+             other_journal_not_read, package_copies_not_listed or journal_not_located when \
+             ComplyEaze Bridge could not tell and refuses the same way. Tell the user to post \
+             from the copy that already keeps that journal (the extension inside Claude \
+             Desktop, when the package is Claude Desktop's), not from this one, and not to \
+             move, merge or delete either folder. Running bridge_mcp --local-data-report \
+             --show-paths outside Claude Desktop lists the package copies (package_copies). \
+             Do not retry here.",
+        ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \
              invoice of this company stops this one, so the build is refused. Tell the user and \

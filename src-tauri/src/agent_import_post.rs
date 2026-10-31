@@ -843,6 +843,9 @@ impl Server {
             if line.on_account_approved.is_none() {
                 return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.to_string().into());
             }
+            // Nor while a Store package's copy of the data folder keeps a
+            // second journal this one cannot see (#2233): before any dialog.
+            super::split_journal::admit(&self.settings.data_dir)?;
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
             let (redeeming, form) = match scope {

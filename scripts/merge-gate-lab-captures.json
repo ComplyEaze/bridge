@@ -3060,6 +3060,36 @@
       "seed_basis": "synthetic lab book; see agent/pilot-lab-register/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "17379f502cad7e46fd19f4f7cfdf63da0cea0e9450e3462120703220bccda00f",
       "size": 226584
+    },
+    {
+      "blob": "f51a55cd9060bee4d85caf504a48202f50ec3cb4",
+      "capture_id": "gst-ledger-l3/dec-L-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "branch lab/1867-l3-answers at 92d92d044367",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/dec-L-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l3/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ba12a07e182f3e6d33680d080a13222df77d93fc5cea8900d93ef97e38a14cae",
+      "size": 40114
+    },
+    {
+      "blob": "cda49787230539d09a9694fd73c4f81975b97000",
+      "capture_id": "gst-ledger-l3/dec-g-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "branch lab/1867-l3-answers at 92d92d044367",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/dec-g-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l3/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8d4b5b86ea290e4e0d76dcc29d9355d1ed93359b67ee0c56498ab98f76ea9c60",
+      "size": 54280
+    },
+    {
+      "blob": "6abba7f2d6ac2976a9784b0d7f1d6ddbd8172da6",
+      "capture_id": "gst-ledger-l3/dec-w-1.utf16le.xml",
+      "company": "BRIDGE GST LEDGER LAB",
+      "lab_ref": "branch lab/1867-l3-answers at 92d92d044367",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l3/dec-w-1.utf16le.xml",
+      "seed_basis": "synthetic lab book typed on screen; see agent/gst-ledger-l3/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6fb1f5d4b246a6262d9be1e201919162b5fbf7b49c13b9a5a3314ddcfc9b2143",
+      "size": 291372
     }
   ]
 }

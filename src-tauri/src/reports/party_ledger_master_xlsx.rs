@@ -87,7 +87,8 @@ pub(crate) fn render_party_ledger_master_xlsx(
     if let Some(note) = source.notes_text() {
         worksheet.write_string(2, 2, note)?;
     }
-    if no_mailing_details_were_observed(source) {
+    // A failed mailing read says so among the notes instead (bridge#2214).
+    if no_mailing_details_were_observed(source) && source.mailing_details_read_failed.is_none() {
         worksheet.write_string(3, 2, NO_MAILING_DETAILS_OBSERVED_NOTE)?;
     }
     worksheet.write_string_with_format(7, 0, "Repeated read agreement", &bold)?;

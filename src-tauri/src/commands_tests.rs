@@ -1258,4 +1258,26 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
             super::MAILING_DETAILS_READ_FAILED_REMEDIATION
         );
     }
+    // Tally still working on the read past the export's wait (bridge#2214): its own code, both
+    // sentences, and the wait's remediation.
+    for (error, code) in failures() {
+        let held = party_ledger_master_runtime_command_error(with_read_evidence(
+            crate::tally::connection::mailing_retry_held_by_drain(marked(error)),
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(held.code, code);
+        assert!(
+            held.message.ends_with(&format!(
+                "{}{}",
+                super::MAILING_DETAILS_READ_FAILED_SENTENCE,
+                super::MAILING_RETRY_HELD_BY_DRAIN_SENTENCE
+            )),
+            "{}",
+            held.message
+        );
+        assert_eq!(
+            held.remediation,
+            super::MAILING_RETRY_HELD_BY_DRAIN_REMEDIATION
+        );
+    }
 }

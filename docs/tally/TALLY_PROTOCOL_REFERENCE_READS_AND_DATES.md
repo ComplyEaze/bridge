@@ -881,6 +881,16 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   from 3,010 to 3,958 (its mailing element is 934 bytes), and each of the other seven rows by 122 (an empty element is
   108 bytes). A second entry on that party was then measured (TallyPrime 7.2, 2026-10-29, `lab/1490-mailing-captures-answers`): the answer grew from 20,896 to 21,840 bytes, so the second entry added 944 bytes and the party's row is 4,902; the eight ledgers average 2,612 bytes a ledger with one entry (20,896 / 8) and 2,730 with two (21,840 / 8). Bridge's per-ledger budget for a read that names the list is
   5,000 bytes (above that largest row; it was 4,700 before the second entry was measured) against 3,750 for one that does not (UNVERIFIED: a party with three entries, longer address lines or a book of many populated parties has not been read). `ledger_masters` sends it only when asked (`include_mailing_details`, refused with `include_gst_details` because the request naming both has not been captured).
+- **An answer past the response cap is refused at its head, owes no drain, and the standard read after it answers
+  whole. PARTIAL: TallyPrime 7.2 Silver, 2026-10-30, one synthetic book, one sitting
+  (`lab/2214-mailing-cut-drain-answers`).** Parties holding many dated mailing entries were added to the book step by
+  step. The mailing master answer grew by about 940 bytes an entry and answered whole at every step up to about 32,000
+  entries (about 30 MB), never reaching the 20 s limit. At about 40,000 entries (an answer of about 37.6 MB) Tally
+  declared the answer's length in its head, so Bridge refused it there, about 5 s into the post, as past its 32 MiB cap
+  (`ResponseTooLarge`, declared by the peer), with no drain owed. A standard read sent about half a second later
+  answered whole, every row equal to the read at rest and the marks unchanged, in three of three tries. A mailing read
+  cut at the 20 s limit, and the drain after one, were not reached on this book. After either failure the party/ledger
+  master export reads the book once more with the standard request (#2214).
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
   `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one

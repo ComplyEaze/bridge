@@ -54,6 +54,7 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     }
 }
 
@@ -124,6 +125,7 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -192,6 +194,7 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
 
@@ -258,6 +261,7 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -324,6 +328,7 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -845,6 +850,41 @@ fn a_workbook_that_observed_no_mailing_details_says_so_loudly() {
     );
     assert!(!workbook_text(source.clone()).contains(NOTE));
     assert_eq!(sheet_cell(source, "C4"), None);
+}
+
+/// A workbook read again without the mailing details after their read failed says that read
+/// failed, in place of the note that none were observed (bridge#2214).
+#[test]
+fn a_workbook_read_again_after_its_mailing_read_failed_says_that_read_failed() {
+    use crate::tally::connection::MailingReadFailure;
+    const NOT_OBSERVED: &str = "No ledger's mailing details were observed in this read";
+    let mut source = source_with_precision(2);
+    source.rows = vec![
+        mailing_row("A", "1", MailingDetailsHistory::NotObserved),
+        mailing_row("B", "2", MailingDetailsHistory::NotObserved),
+    ];
+    for (cause, said) in [
+        (
+            MailingReadFailure::Deadline,
+            "Tally did not answer that read within its 20-second limit",
+        ),
+        (
+            MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: true,
+            },
+            "Tally's answer to that read passed the 32 MiB limit",
+        ),
+    ] {
+        source.mailing_details_read_failed = Some(cause);
+        let text = workbook_text(source.clone());
+        assert!(!text.contains(NOT_OBSERVED), "{cause:?}");
+        assert_eq!(sheet_cell(source.clone(), "C4"), None, "{cause:?}");
+        let note = sheet_cell(source.clone(), "C3").expect("the notes cell");
+        assert!(
+            note.starts_with("The mailing details were asked for, and ") && note.contains(said),
+            "{note}"
+        );
+    }
 }
 
 #[test]

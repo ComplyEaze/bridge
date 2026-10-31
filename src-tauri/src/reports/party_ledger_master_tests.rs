@@ -79,6 +79,7 @@ fn source() -> PartyLedgerMasterSource {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     }
 }
 
@@ -192,6 +193,7 @@ fn captured_master_fields_lab_drives_the_party_export_and_schedule_iii_view() {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     };
     let workbook = build_party_ledger_master_workbook(source).expect("captured source admits");
     let xlsx = super::super::party_ledger_master_xlsx::render_party_ledger_master_xlsx(

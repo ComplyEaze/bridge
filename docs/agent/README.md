@@ -281,9 +281,11 @@ the counted ledgers, each allowed four further mailing entries the mark may not 
 with one more entry allowed for each alteration beyond them (#2074). These are allowances from one lab row, not
 bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490; its header
 then says that no ledger's mailing details were observed and the status column reads not observed. A counted book that
-the standard request exported before can now be sent the larger mailing request and fail by its deadline or size, with
-no fall back to the standard request until #2214; the export's error then says the mailing addresses were part of the
-failed read. Where it reads them it shows only the entry in force on its
+the standard request exported before can now be sent the larger mailing request. Where that read fails by its deadline
+or size, the workbook reads the book once more with the standard request, after waiting at most a minute for a cut read
+to drain, and its header says the larger read failed (#2214). Where its answer broke off, or Tally was still working after
+that wait, the export fails and its error says the mailing addresses were part of the failed read. `ledger_masters` with
+`include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,

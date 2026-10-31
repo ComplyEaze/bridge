@@ -1854,6 +1854,51 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     );
 }
 
+/// The mailing marker carries how the read failed, decided by the transport's own error; only
+/// a deadline or the response cap send the export's read again without the details, and a
+/// failure that is none of these is not marked (bridge#2214).
+#[test]
+fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
+    use super::{mailing_details_read_error, MailingDetailsReadFailed, MailingReadFailure as F};
+    use bridge_tally_transport::TallyTransportError as T;
+    let limit = bridge_tally_transport::XML_RESPONSE_MAX_BYTES;
+    for (error, cause, again) in [
+        (T::RequestTimedOut, Some(F::Deadline), true),
+        (
+            T::ResponseTooLarge {
+                limit,
+                declared_by_peer: true,
+            },
+            Some(F::ResponseTooLarge {
+                declared_by_peer: true,
+            }),
+            true,
+        ),
+        (
+            T::ResponseTooLarge {
+                limit,
+                declared_by_peer: false,
+            },
+            Some(F::ResponseTooLarge {
+                declared_by_peer: false,
+            }),
+            true,
+        ),
+        (T::ResponseTruncated, Some(F::Truncated), false),
+        (T::ResponseReadFailed, Some(F::ReadFailed), false),
+        (T::ConnectionFailed, None, false),
+        (T::HttpStatus { status: 503 }, None, false),
+    ] {
+        let marked = mailing_details_read_error(anyhow::Error::new(error));
+        let found = marked
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+            .map(MailingDetailsReadFailed::cause);
+        assert_eq!(found, cause, "{marked:#}");
+        assert_eq!(found.is_some_and(F::read_again_without_details), again);
+    }
+}
+
 /// By the mark alone, the party/ledger master export asks for the mailing details only where
 /// the whole read fits their bound: a mark inside 3,200 is sent the mailing request, any larger
 /// mark (a group of 3,201 to 4,266 ledgers included) the standard one, and no other kind of

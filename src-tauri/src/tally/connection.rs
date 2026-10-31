@@ -113,39 +113,122 @@ fn party_ledger_master_openings_agree(
 #[derive(Debug, thiserror::Error)]
 #[error("{source}")]
 pub(crate) struct MailingDetailsReadFailed {
+    cause: MailingReadFailure,
     source: anyhow::Error,
 }
 
-/// Whether a read failed because its answer took too long or ran too large:
-/// the deadline, the response cap, or a body that ended early or could not be
-/// read. Decided by the transport's own error, not by the message.
-fn answer_ran_too_long(error: &anyhow::Error) -> bool {
-    error.chain().any(|cause| {
-        matches!(
-            cause.downcast_ref::<TallyTransportError>(),
-            Some(
-                TallyTransportError::RequestTimedOut
-                    | TallyTransportError::ResponseTooLarge { .. }
-                    | TallyTransportError::ResponseTruncated
-                    | TallyTransportError::ResponseReadFailed
-            )
-        )
-    })
+impl MailingDetailsReadFailed {
+    pub(crate) const fn cause(&self) -> MailingReadFailure {
+        self.cause
+    }
+}
+
+/// How a read's answer took too long or ran too large, decided once, from the
+/// transport's own error where the read is sent, never from its message
+/// (bridge#2214).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MailingReadFailure {
+    /// The request's deadline.
+    Deadline,
+    /// The response cap; `declared_by_peer` when Tally's head declared the
+    /// length, so Tally had finished the work.
+    ResponseTooLarge { declared_by_peer: bool },
+    /// A body that ended before its declared length.
+    Truncated,
+    /// A body that could not be read.
+    ReadFailed,
+}
+
+impl MailingReadFailure {
+    /// Whether the party/ledger master export reads the book again without the
+    /// mailing details after this failure (bridge#2214): an answer too slow or
+    /// too large for its budget, which the standard request's smaller answer
+    /// can fit. A body that ended early or could not be read says the
+    /// connection broke, not that the answer was too big, so it is not.
+    pub(crate) const fn read_again_without_details(self) -> bool {
+        match self {
+            Self::Deadline | Self::ResponseTooLarge { .. } => true,
+            Self::Truncated | Self::ReadFailed => false,
+        }
+    }
+
+    /// Every transport error is named, so a new one is placed before it
+    /// compiles.
+    const fn of(error: &TallyTransportError) -> Option<Self> {
+        match error {
+            TallyTransportError::RequestTimedOut => Some(Self::Deadline),
+            TallyTransportError::ResponseTooLarge {
+                declared_by_peer, ..
+            } => Some(Self::ResponseTooLarge {
+                declared_by_peer: *declared_by_peer,
+            }),
+            TallyTransportError::ResponseTruncated => Some(Self::Truncated),
+            TallyTransportError::ResponseReadFailed => Some(Self::ReadFailed),
+            TallyTransportError::EndpointInvalid { .. }
+            | TallyTransportError::PolicyInvalid { .. }
+            | TallyTransportError::ClientInitializationFailed
+            | TallyTransportError::RequestTooLarge { .. }
+            | TallyTransportError::ConnectionFailed
+            | TallyTransportError::RequestFailed
+            | TallyTransportError::HttpStatus { .. }
+            | TallyTransportError::UnsupportedContentEncoding
+            | TallyTransportError::InvalidEncoding { .. }
+            | TallyTransportError::WireRefused { .. }
+            | TallyTransportError::SendWithdrawn => None,
+        }
+    }
 }
 
 /// Marks a master read that asked for the mailing details and whose answer ran
 /// too long, keeping the read evidence a failed pair carries at the chain's
-/// root, as [`parent_part_response_error`] does.
+/// root, as [`parent_part_response_error`] does. Any other failure is returned
+/// as it is.
 pub(crate) fn mailing_details_read_error(error: anyhow::Error) -> anyhow::Error {
+    let Some(cause) = error
+        .chain()
+        .find_map(|cause| MailingReadFailure::of(cause.downcast_ref::<TallyTransportError>()?))
+    else {
+        return error;
+    };
     let completed = error
         .downcast_ref::<super::runtime::RuntimeReadFailure>()
         .map(|failure| failure.evidence.clone());
-    let named = anyhow::Error::new(MailingDetailsReadFailed { source: error });
+    let named = anyhow::Error::new(MailingDetailsReadFailed {
+        cause,
+        source: error,
+    });
     match completed {
         Some(evidence) => with_read_evidence(named, evidence),
         None => named,
     }
 }
+
+/// The export's mailing read failed and the drain it left had not cleared
+/// within [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], so the book was not read
+/// again without the details (bridge#2214). It carries the mailing read's own
+/// failure, whose text it keeps.
+#[derive(Debug, thiserror::Error)]
+#[error("{source}")]
+pub(crate) struct MailingRetryHeldByDrain {
+    source: anyhow::Error,
+}
+
+/// The mailing read's own failure, `mailing`, marked as held by its drain.
+pub(crate) fn mailing_retry_held_by_drain(mailing: anyhow::Error) -> anyhow::Error {
+    anyhow::Error::new(MailingRetryHeldByDrain { source: mailing })
+}
+
+/// The longest the export waits for Tally to finish a mailing read it cut
+/// before it reads the book again without the details (bridge#2214). Each wait
+/// sends only `/status` probes. UNVERIFIED on this read: a cut mailing read was
+/// never reached in the lab (2214 lab row: Tally declared every oversize, which
+/// owes no drain). It rests on the outstandings drains, which ran 8.9 s to
+/// 25.4 s past a 20 s cut, so 60 s covers about twice the longest. A unit test
+/// reaches the bound in 3 s instead.
+#[cfg(not(test))]
+const MAILING_RETRY_DRAIN_WAIT_UNVERIFIED: std::time::Duration = std::time::Duration::from_secs(60);
+#[cfg(test)]
+const MAILING_RETRY_DRAIN_WAIT_UNVERIFIED: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// The paired sources answered successfully but cannot be reconciled into one
 /// safe workbook source. This is distinct from endpoint or XML failure.
@@ -461,8 +544,8 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_GST_DETAILS_UNVERIFIED: u64 = 8_00
 /// the ledgers were counted to size a whole read (bridge#2074); no request is
 /// rendered for the unresolved kind. The count's choice rests on an allowance,
 /// not a bound: a counted book that the standard request read before can now be
-/// sent the larger mailing request and fail, with no fall back to the standard
-/// one until bridge#2214.
+/// sent the larger mailing request, and where it runs out of time or past its
+/// size limit, the standard request is sent once instead (bridge#2214).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ComplianceRead {
     Standard,
@@ -1899,7 +1982,8 @@ impl TallyClient {
                 .get();
             // The workbook's mailing details are given up where the mark puts the
             // whole read past the mailing bound. A count taken below may resolve the
-            // kind asked for again, on an allowance that is not a bound (bridge#2214).
+            // kind asked for again, on an allowance that is not a bound, so a failed
+            // mailing read of the export is read again without them (bridge#2214).
             let asked = read;
             let read = read.resolved_for_mark(master_mark);
             // Sized before any ledger request is sent (#637): by the mark when
@@ -2037,7 +2121,7 @@ impl TallyClient {
                 None => read,
             };
             let group_request = render_native_group_snapshot_request(identity.display_name());
-            let part_requests = match &partition {
+            let part_requests = |read: ComplianceRead| match &partition {
                 None => vec![(
                     match read {
                         ComplianceRead::Standard => render_party_ledger_master_request(
@@ -2098,30 +2182,63 @@ impl TallyClient {
                     })
                     .collect(),
             };
-            let committed_requests = part_requests
+            let mut requests = part_requests(read);
+            let mut mailing_details_read_failed = None;
+            let reads = match self
+                .read_party_ledger_master_parts(
+                    identity,
+                    &requests,
+                    partition.as_ref(),
+                    expected_ledgers,
+                    ledger_currency_base.as_ref(),
+                    read == ComplianceRead::WithMailingDetails,
+                    &mut evidence,
+                )
+                .await
+            {
+                Ok(reads) => reads,
+                // The export's mailing read that ran out of time or past its size limit
+                // is sent once more as the standard request (bridge#2214). Only the
+                // export's own kind: a `ledger_masters` call that asked for the details by
+                // name keeps its failure. Nothing before the parts is sent again.
+                Err(error) => {
+                    let Some(cause) = error
+                        .chain()
+                        .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+                        .map(MailingDetailsReadFailed::cause)
+                        .filter(|cause| {
+                            asked == ComplianceRead::WithMailingDetailsWhereWholeReadFits
+                                && cause.read_again_without_details()
+                        })
+                    else {
+                        return Err(error);
+                    };
+                    if let Some(failure) =
+                        error.downcast_ref::<super::runtime::RuntimeReadFailure>()
+                    {
+                        evidence = evidence.clone().combine(failure.evidence.clone());
+                    }
+                    requests = part_requests(ComplianceRead::Standard);
+                    mailing_details_read_failed = Some(cause);
+                    self.read_party_ledger_master_parts_once_drained(
+                        identity,
+                        &requests,
+                        partition.as_ref(),
+                        expected_ledgers,
+                        ledger_currency_base.as_ref(),
+                        error,
+                        &mut evidence,
+                    )
+                    .await?
+                }
+            };
+            // The requests whose answers make the source: after a retry, the standard ones.
+            let committed_requests = requests
                 .iter()
                 .flat_map(|(master, balance)| [master.clone(), balance.clone()])
                 .chain(std::iter::once(group_request.clone()))
                 .collect::<Vec<_>>();
             let request_sha256 = party_ledger_request_commitment(&committed_requests);
-            let mut reads = Vec::with_capacity(part_requests.len());
-            for (index, (master_request, balance_request)) in part_requests.iter().enumerate() {
-                reads.push(
-                    self.read_party_ledger_master_part(
-                        identity,
-                        master_request,
-                        balance_request,
-                        match &partition {
-                            Some(partition) => PartyLedgerRead::Part(&partition.parts()[index]),
-                            None => PartyLedgerRead::Whole { expected_ledgers },
-                        },
-                        ledger_currency_base.as_ref(),
-                        read == ComplianceRead::WithMailingDetails,
-                        &mut evidence,
-                    )
-                    .await?,
-                );
-            }
             let group_pair = self
                 .fetch_native_report_paired(group_request.clone())
                 .await?;
@@ -2224,6 +2341,7 @@ impl TallyClient {
                 groups,
                 foreign_currency_ledgers_excluded,
                 mixed_currency_ledgers_excluded,
+                mailing_details_read_failed,
             };
             Ok((source, count_evidence))
         }
@@ -2348,6 +2466,97 @@ impl TallyClient {
         })
     }
 
+    /// Every part's master-and-balance pair, in order: the whole book as one
+    /// part, or its parent parts (#679).
+    #[allow(clippy::too_many_arguments)]
+    async fn read_party_ledger_master_parts(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        part_requests: &[(String, String)],
+        partition: Option<&ParentPartition>,
+        expected_ledgers: Option<u64>,
+        ledger_currency_base: Option<&BaseCurrencyName>,
+        names_mailing_details: bool,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<Vec<PartyLedgerMasterPartRead>> {
+        let mut reads = Vec::with_capacity(part_requests.len());
+        for (index, (master_request, balance_request)) in part_requests.iter().enumerate() {
+            reads.push(
+                self.read_party_ledger_master_part(
+                    identity,
+                    master_request,
+                    balance_request,
+                    match partition {
+                        Some(partition) => PartyLedgerRead::Part(&partition.parts()[index]),
+                        None => PartyLedgerRead::Whole { expected_ledgers },
+                    },
+                    ledger_currency_base,
+                    names_mailing_details,
+                    evidence,
+                )
+                .await?,
+            );
+        }
+        Ok(reads)
+    }
+
+    /// The standard read the export sends once after its mailing read failed
+    /// (bridge#2214). A cut mailing read can leave Tally working on it: the
+    /// transport then probes `/status` before the send, and refuses it as
+    /// draining while Tally does not answer them, before anything is sent. Each
+    /// such refusal is waited out and the read tried again, within
+    /// [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`] in all; past it, the export fails
+    /// with the mailing read's own failure, `mailing`. Any other failure of the
+    /// standard read is returned as itself, with no mailing marker.
+    #[allow(clippy::too_many_arguments)]
+    async fn read_party_ledger_master_parts_once_drained(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        part_requests: &[(String, String)],
+        partition: Option<&ParentPartition>,
+        expected_ledgers: Option<u64>,
+        ledger_currency_base: Option<&BaseCurrencyName>,
+        mailing: anyhow::Error,
+        evidence: &mut RuntimeReadEvidence,
+    ) -> anyhow::Result<Vec<PartyLedgerMasterPartRead>> {
+        let started = std::time::Instant::now();
+        loop {
+            let before = evidence.clone();
+            let error = match self
+                .read_party_ledger_master_parts(
+                    identity,
+                    part_requests,
+                    partition,
+                    expected_ledgers,
+                    ledger_currency_base,
+                    false,
+                    evidence,
+                )
+                .await
+            {
+                Ok(reads) => return Ok(reads),
+                Err(error) => error,
+            };
+            // Refused at the first send, with no pair completed and none begun.
+            let nothing_sent = *evidence == before
+                && error
+                    .downcast_ref::<super::runtime::RuntimeReadFailure>()
+                    .is_none();
+            let wait = match crate::endpoint_wire::wire_refusal(&error) {
+                Some(bridge_tally_transport::WireRefusal::Draining { retry_after_ms })
+                    if nothing_sent =>
+                {
+                    std::time::Duration::from_millis(retry_after_ms)
+                }
+                _ => return Err(error),
+            };
+            if started.elapsed() + wait > MAILING_RETRY_DRAIN_WAIT_UNVERIFIED {
+                return Err(mailing_retry_held_by_drain(mailing));
+            }
+            tokio::time::sleep(wait).await;
+        }
+    }
+
     /// One master-and-balance pair of a compliance ledger read: the whole book,
     /// or one parent part of it (#679). Each response is checked against the
     /// selected company and classified before any other request is sent.
@@ -2374,7 +2583,7 @@ impl TallyClient {
             .await
             .map_err(|error| parent_part_response_error(part, error))
             .map_err(|error| {
-                if names_mailing_details && answer_ran_too_long(&error) {
+                if names_mailing_details {
                     mailing_details_read_error(error)
                 } else {
                     error

@@ -1519,8 +1519,8 @@ classified as TDS payable, counted before that TDS."
         // A voucher whose TDS nets to a debit stays out of the TDS deducted, named in its text,
         // because a TDS debit can reverse an earlier deduction (#1875 rule 4, a declared
         // difference from the reference, which nets it in). LOAN-1 adds it back to its tie.
-        let (deducted, debited): (Vec<(usize, i128)>, Vec<(usize, i128)>) =
-            tds_by_voucher.iter().partition(|&&(_, x)| x > 0);
+        let (deducted, debited): (Vec<_>, Vec<_>) =
+            tds_by_voucher.iter().copied().partition(|&(_, x)| x > 0);
         let tds_on_loan: i128 = deducted.iter().map(|&(_, x)| x).sum();
         let ev_tds = voucher_refs(tds_by_voucher.iter().map(|&(at, _)| pop[at]));
         let left_out = if debited.is_empty() {

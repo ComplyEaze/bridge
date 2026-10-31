@@ -11668,8 +11668,8 @@
   "by": "author",
   "what": "loans_interest: a TDS debit is netted into the TDS deducted again (#1875 rule 4)",
   "file": "src/loans_interest.rs",
-  "from": "            tds_by_voucher.iter().partition(|&&(_, x)| x > 0);",
-  "to": "            tds_by_voucher.iter().partition(|&&(_, x)| x != 0);"
+  "from": "            tds_by_voucher.iter().copied().partition(|&(_, x)| x > 0);",
+  "to": "            tds_by_voucher.iter().copied().partition(|&(_, x)| x != 0);"
  },
  {
   "id": "L1875-TDS-08",

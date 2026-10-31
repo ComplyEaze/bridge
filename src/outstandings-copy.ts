@@ -106,18 +106,33 @@ export function outstandingsPartialState(
   excludedLedgers?: ReadonlyArray<ExcludedCurrencyLedger>,
   mixedLedgers?: ReadonlyArray<string>,
 ): OutstandingsPartialState {
-  if (reasonCode === "currency_ledgers_excluded") {
-    const named = [
-      excludedLedgers?.length ? excludedLedgersSentence(excludedLedgers) : null,
-      mixedLedgers?.length ? mixedLedgersSentence(mixedLedgers) : null,
-    ].filter((sentence): sentence is string => sentence !== null);
-    return {
-      title: "Outstandings totals withheld on the desktop",
-      message: `${named.length ? named.join(". ") : outstandingsPartialReason(reasonCode)}. ComplyEaze Bridge left those ledgers out of the figures, with their bills, and shows no totals here, because figures without them would not describe the whole book. The agent connection (MCP outstandings) reports the plain base-currency ledgers only, labelled as such.`,
-      retryable: false,
-      tallyReadAttempted: true,
-    };
+  const named = [
+    excludedLedgers?.length ? excludedLedgersSentence(excludedLedgers) : null,
+    mixedLedgers?.length ? mixedLedgersSentence(mixedLedgers) : null,
+  ].filter((sentence): sentence is string => sentence !== null);
+  if (reasonCode !== "currency_ledgers_excluded") {
+    const state = withheldState(reasonCode, requestedAsOf, tallyAsOf, foreignCurrencyLedgerName);
+    // bridge#2071: ledgers were set aside, then every figure was withheld for
+    // this other reason; both are said.
+    const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
+    return named.length
+      ? { ...state, message: `${sentence(state.message)} ${named.map(sentence).join(" ")} ComplyEaze Bridge left those ledgers out, with their bills.` }
+      : state;
   }
+  return {
+    title: "Outstandings totals withheld on the desktop",
+    message: `${named.length ? named.join(". ") : outstandingsPartialReason(reasonCode)}. ComplyEaze Bridge left those ledgers out of the figures, with their bills, and shows no totals here, because figures without them would not describe the whole book. The agent connection (MCP outstandings) reports the plain base-currency ledgers only, labelled as such.`,
+    retryable: false,
+    tallyReadAttempted: true,
+  };
+}
+
+function withheldState(
+  reasonCode: string,
+  requestedAsOf?: string,
+  tallyAsOf?: string,
+  foreignCurrencyLedgerName?: string,
+): OutstandingsPartialState {
   if (reasonCode === "native_outstandings_as_of_refused") {
     return {
       title: "Tally did not accept this as-of date",

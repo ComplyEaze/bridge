@@ -1029,6 +1029,37 @@ async fn an_empty_closing_amount_is_dropped_only_with_a_set_aside_party() {
     );
 }
 
+/// bridge#2071: a result withheld after ledgers were set aside carries its
+/// own reason for the desktop, and the set-aside ledgers in the same keys as
+/// a result with figures, so the screen can name them.
+#[test]
+fn a_withheld_result_with_ledgers_set_aside_serializes_both() {
+    let exclusions = CurrencyExclusions::new(
+        vec![ForeignCurrencyLedger {
+            ledger: "FX USD Debtor 01".to_string(),
+            currency: "$".to_string(),
+        }],
+        vec!["FX USD Debtor 02".to_string()],
+    )
+    .unwrap();
+    let result = OutstandingsLoadResult::WithheldWithLedgersSetAside {
+        classified: ClassifiedBase(()),
+        reason: OutstandingsPartialReason::code("native_overdue_crosscheck_mismatch"),
+        exclusions,
+        synced_at_unix_ms: 1,
+    };
+    assert_eq!(
+        serde_json::to_value(&result).unwrap(),
+        serde_json::json!({
+            "state": "partial",
+            "reason_code": "native_overdue_crosscheck_mismatch",
+            "foreign_currency_ledgers_excluded": [{"ledger": "FX USD Debtor 01", "currency": "$"}],
+            "base_currency_ledgers_mixed_excluded": ["FX USD Debtor 02"],
+            "synced_at_unix_ms": 1,
+        })
+    );
+}
+
 /// bridge#551: on a book with one master the classified read sends exactly
 /// the plain currency read, no `ORIGINALNAME` re-read and no Company read,
 /// and admits as `admit_inr` does: the captured `INR` master, and not the

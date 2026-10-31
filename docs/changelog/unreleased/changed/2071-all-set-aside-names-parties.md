@@ -1,0 +1,1 @@
+- When every open bill belongs to a party set aside for its currency, the partial `outstandings` answer now names those parties beside its reason, on the desktop and through the agent connection, as it does when it gives the other parties' figures (#2071).

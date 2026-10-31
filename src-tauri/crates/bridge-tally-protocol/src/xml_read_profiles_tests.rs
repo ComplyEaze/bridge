@@ -1,8 +1,7 @@
 use super::*;
 
-fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 7] {
+fn profiles(company: &ValidatedCompanyName) -> [ReadOnlyProfile<'_>; 6] {
     [
-        ReadOnlyProfile::CompanyListV1,
         ReadOnlyProfile::CompanyListV2,
         ReadOnlyProfile::CompanyBookExtentV2 { company },
         ReadOnlyProfile::StandardLedgerIdentityV1 { company },
@@ -89,8 +88,8 @@ fn closed_profiles_emit_exports_only_and_escape_dynamic_values() {
     assert!(extent_v2_request.contains("&lt;/SVCURRENTCOMPANY&gt;"));
 }
 
-/// `CompanyListV2` is a native Tally `Company` collection, not the
-/// embedded-TDL custom report `CompanyListV1` builds: no `REPORT`/`FORM`/
+/// `CompanyListV2` is a native Tally `Company` collection, not an
+/// embedded-TDL custom report: no `REPORT`/`FORM`/
 /// `PART`/`LINE`/`FIELD` stack and no computed TDL function call (a
 /// report stack, and no dynamic `$Field:Argument` invocation). Its three
 /// fixed `$$LicenseInfo` arguments contain no spaces. It also carries no
@@ -119,10 +118,6 @@ fn company_list_v2_is_a_native_collection_scoped_to_no_single_company() {
 #[test]
 fn profile_ids_and_template_hashes_are_stable() {
     let expected: Vec<(ReadOnlyProfileId, &str)> = vec![
-        (
-            ReadOnlyProfileId::CompanyListV1,
-            "8905c041a75929f157be704ca9dd076a37995dc7936e0ad71c9361406a8fb694",
-        ),
         (
             ReadOnlyProfileId::CompanyListV2,
             "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
@@ -183,10 +178,6 @@ fn profile_ids_and_template_hashes_are_stable() {
 #[test]
 fn compatibility_renderers_preserve_validated_profile_bytes() {
     let company = ValidatedCompanyName::new("BRIDGE SYNTHETIC BOOK").unwrap();
-    assert_eq!(
-        compatibility::company_list_request(),
-        ReadOnlyProfile::CompanyListV1.render()
-    );
     assert_eq!(
         compatibility::standard_ledger_identity_request(company.as_str()),
         ReadOnlyProfile::StandardLedgerIdentityV1 { company: &company }.render()
@@ -572,8 +563,7 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
     // The match makes a new profile fail to compile here until it is listed.
     fn listed(id: ReadOnlyProfileId) {
         match id {
-            ReadOnlyProfileId::CompanyListV1
-            | ReadOnlyProfileId::CompanyListV2
+            ReadOnlyProfileId::CompanyListV2
             | ReadOnlyProfileId::CompanyBookExtentV2
             | ReadOnlyProfileId::StandardLedgerIdentityV1
             | ReadOnlyProfileId::StandardLedgerCatalogV1
@@ -587,7 +577,6 @@ fn every_profile_id() -> Vec<ReadOnlyProfileId> {
         }
     }
     let ids = vec![
-        ReadOnlyProfileId::CompanyListV1,
         ReadOnlyProfileId::CompanyListV2,
         ReadOnlyProfileId::CompanyBookExtentV2,
         ReadOnlyProfileId::StandardLedgerIdentityV1,
@@ -618,6 +607,18 @@ fn education_refuses_exactly_the_profiles_that_render_a_spaced_function_argument
         refused.extend(hazard.map(|h| (id.as_str(), h)));
     }
     assert!(refused.is_empty(), "{refused:?}");
+}
+
+/// No read profile renders a custom TDL report. The hazard script reads
+/// source literals, so it cannot see a report assembled from several; this
+/// reads each profile's rendered request instead (#1872: the last such
+/// profile, the legacy company report, was deleted).
+#[test]
+fn no_read_profile_renders_a_custom_report() {
+    for id in every_profile_id() {
+        let request = id.template().to_ascii_uppercase();
+        assert!(!request.contains("<REPORT"), "{}", id.as_str());
+    }
 }
 
 /// `$$name:argument`, assembled at run time: a literal would itself be a hit

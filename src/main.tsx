@@ -1537,8 +1537,8 @@ function App() {
             /* Every company Tally reports open, GUID-verified by the probe --
                NOT only the ones already saved. Requiring a save first was
                correct while company discovery could never be trusted
-               (CompanyListV1 returned no HEADER/STATUS); with CompanyListV2
-               the probe verifies every open book on every run, and a firm
+               (the old custom company report, deleted under #1872, returned
+               no HEADER/STATUS); with CompanyListV2 the probe verifies every open book on every run, and a firm
                holding ten client books will not bless each one before a
                cross-client screen works. */
             companies={completeCurrentProbeCompanies
@@ -1752,10 +1752,11 @@ function App() {
                 )}
                 {/* Switching to another client's book must not require noticing
                     that "Check Tally again" repopulates a hidden list.
-                    Bridge's company report carries no HEADER/STATUS, so the
-                    probe can never mark it trusted; the verified picker above
-                    therefore only ever lists companies already SAVED, and
-                    every other open book was unreachable once one was saved.
+                    Bridge's old company report (deleted under #1872) carried
+                    no HEADER/STATUS, so the probe could never mark it trusted;
+                    the verified picker above then listed only companies already
+                    SAVED, and every other open book was unreachable once one
+                    was saved.
                     These stay a visually separate, clearly-unverified group --
                     choosing one runs the scoped bootstrap that verifies it. */}
                 {currentProbeCompanyList.length > 0 && otherOpenCompanies.length > 0 && (

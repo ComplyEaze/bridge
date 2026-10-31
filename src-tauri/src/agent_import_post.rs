@@ -1309,6 +1309,14 @@ impl Server {
                                 UnderLockRefusal::CompanyStopped,
                             ));
                         }
+                        // A second journal in a Store package's copy of the data
+                        // folder (#2233) may have been made while the dialog stood
+                        // open: asked again here, under the lock.
+                        super::split_journal::admit(&self.settings.data_dir).map_err(|split| {
+                            BeforeDispatchError::Refused(UnderLockRefusal::JournalSplit(
+                                split.cause(),
+                            ))
+                        })?;
                         // The transfer records again, between the check before the
                         // dialog and the intent: the approval is withdrawn and the
                         // next call gives the whole reason before asking.
@@ -1426,11 +1434,18 @@ impl Server {
                         .downcast_ref::<crate::tally::runtime::CurrencyAdmissionRefusal>()
                         .map(|refusal| refusal.0)
                 });
+                // What the split-journal check found under the lock (#2233).
+                let split_cause = error.chain().find_map(|cause| {
+                    match cause.downcast_ref::<UnderLockRefusal>() {
+                        Some(UnderLockRefusal::JournalSplit(cause)) => Some(*cause),
+                        _ => None,
+                    }
+                });
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
                     failure.cause = refusal_cause(
                         &failure.code,
-                        group.or(invoice_field).or(currency_cause),
+                        group.or(invoice_field).or(currency_cause).or(split_cause),
                         transport,
                     );
                 }

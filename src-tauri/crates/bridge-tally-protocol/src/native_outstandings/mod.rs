@@ -7,14 +7,14 @@
 //! (TALLY_PROTOCOL_REFERENCE ground truth captured 2026-08-07) and is
 //! documented at each module:
 //!
-//! - [`request`] — exact request XML for both native reports.
-//! - [`date`] — Tally's `D-MMM-YY` display dates: a bill date resolved in the
+//! - `request` — exact request XML for both native reports.
+//! - `date` — Tally's `D-MMM-YY` display dates: a bill date resolved in the
 //!   pinned company's book window, a due date against its bill date.
-//! - [`wire`] — the flat, inverted-`STATUS` Bills grammar and the
+//! - `wire` — the flat, inverted-`STATUS` Bills grammar and the
 //!   `DATA`-scoped Ledger collection grammar (`CMPINFO` counter trap).
-//! - [`model`] — row and result types; reuses `OutstandingsReport` so this
+//! - `model` — row and result types; reuses `OutstandingsReport` so this
 //!   path is a drop-in for the UI.
-//! - [`compute`] — assembles the report and the unallocated residual
+//! - `compute` — assembles the report and the unallocated residual
 //!   cross-check.
 
 mod compute;

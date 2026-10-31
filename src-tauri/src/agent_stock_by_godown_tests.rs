@@ -355,3 +355,15 @@ async fn under_mask_parties_godown_and_item_names_are_masked_and_figures_are_not
         assert!(!text.contains(name), "{name}");
     }
 }
+
+#[tokio::test]
+async fn an_exploded_answer_that_is_the_plain_report_says_the_flag_was_not_observed() {
+    let (response, _) = call(plans(godowns(), stock(), stock()), AS_OF, Redaction::None).await;
+    let result = result(&response);
+    assert_eq!(result["state"], "tied", "{result}");
+    assert_eq!(result["root_items"], Value::Null);
+    assert_eq!(
+        result["root_items_reason"],
+        "explode_flag_not_observed_is_not_a_finding"
+    );
+}

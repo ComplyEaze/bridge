@@ -4,7 +4,7 @@ use crate::tally::runtime::StockByGodownRead;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::native_godown_summary::{
     GodownNetQuantity, GodownQuantityCheck, NativeGodownSummary, NativeGodownTie,
-    NativeItemByGodown, NativeItemGodowns,
+    NativeItemByGodown, NativeItemGodowns, NativeRootItemsByGodown,
 };
 use bridge_tally_protocol::native_stock_summary::{NativeQuantityRead, StockSummaryAsOf};
 
@@ -12,11 +12,11 @@ const VERIFICATION: &str = "stable_paired_reports_with_company_mode_and_extent_g
 
 const LIMITATIONS: [&str; 7] = [
     "A godown's quantity is Tally's net of every item in that godown that shares a unit, never one item's closing: on the book measured, 316.667 Kgs was one item's 366.667 Kgs and another's -50.000 Kgs. It is empty for a godown holding items in several units, and the cause of an empty quantity is not measured",
-    "Godowns are the ones directly under Tally's root: a godown under another godown has no line of its own, and its stock is in its parent's figures",
-    "A value per item per godown is returned only for an item directly under the root, each godown at its own cost as Tally values it (not the item's average rate times the quantity), and only where the godown values and quantities add up to the item's own line. Tally gives no value per godown for an item inside a stock group, so none is returned for it",
+    "In godowns, the godowns are the ones directly under Tally's root: a godown under another godown has no line of its own there, and its stock is in its parent's figures. In an item's own godowns, such a child godown is a line of its own",
+    "A value per item per godown is returned only for an item directly under the root, each godown at its own cost as Tally values it (not the item's average rate times the quantity), and only where the godown values and quantities add up to the item's own line. root_items lists only the items Tally wrote godown lines for. Tally's export answer gives no value per godown for an item inside a stock group, so none is returned for it, although Tally's Stock Summary screen, Detailed with every level expanded, shows one",
     "Signs are kept as Tally's export carries them, as in stock_summary: a negative value is a debit, which is stock held, and Tally's screen shows it as positive",
     "An empty value or quantity is returned as empty and is not zero",
-    "Measured on one synthetic book on TallyPrime 7.2 at two month ends (protocol reference section 12a.24); a batch-wise item under the root, a godown two levels down and other releases are not measured",
+    "Measured on one synthetic book on TallyPrime 7.2 at two month ends (protocol reference section 12a.24); a batch-wise item under the root, a godown two levels down, a costing method other than the average cost the book used, a compound unit and other releases are not measured",
     "Three reports are each read twice inside one company, mode and book-extent bracket; the size is admitted on the book's master mark against a ceiling that is a stated guess. Education mode is refused. Not an atomic snapshot",
 ];
 
@@ -131,8 +131,18 @@ fn result_json(read: &StockByGodownRead) -> Value {
         ),
         _ => Value::Null,
     };
+    // Why `root_items` is null although the godowns tied: neither answer is a finding.
+    let root_items_reason = match &read.items {
+        None => Some("exploded_stock_summary_empty_is_not_a_finding"),
+        Some(NativeRootItemsByGodown::ExplodeNotObserved) => {
+            Some("explode_flag_not_observed_is_not_a_finding")
+        }
+        Some(NativeRootItemsByGodown::Lines(_)) => None,
+    };
     let root_items = match (&read.items, tied) {
-        (Some(items), true) => Value::Array(items.iter().map(item_json).collect()),
+        (Some(NativeRootItemsByGodown::Lines(items)), true) => {
+            Value::Array(items.iter().map(item_json).collect())
+        }
         _ => Value::Null,
     };
     let mut result = json!({
@@ -155,11 +165,8 @@ fn result_json(read: &StockByGodownRead) -> Value {
     if let Some(object) = result.as_object_mut() {
         if let Some(reason) = reason {
             object.insert("reason".to_string(), json!(reason));
-        } else if read.items.is_none() {
-            object.insert(
-                "root_items_reason".to_string(),
-                json!("exploded_stock_summary_empty_is_not_a_finding"),
-            );
+        } else if let Some(why) = root_items_reason {
+            object.insert("root_items_reason".to_string(), json!(why));
         }
     }
     result

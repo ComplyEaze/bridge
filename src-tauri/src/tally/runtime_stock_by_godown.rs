@@ -15,7 +15,7 @@ use super::*;
 use bridge_tally_protocol::native_godown_summary::{
     items_by_godown, parse_native_godown_summary, render_native_godown_summary_request,
     render_native_stock_summary_exploded_request, tie_godowns, NativeGodownSummary,
-    NativeGodownTie, NativeItemGodowns,
+    NativeGodownTie, NativeRootItemsByGodown,
 };
 use bridge_tally_protocol::native_stock_summary::{
     parse_native_stock_summary_exploded, parse_native_stock_summary_report,
@@ -31,7 +31,7 @@ pub(crate) struct StockByGodownRead {
     pub(crate) tie: NativeGodownTie,
     /// The root items the exploded Stock Summary gave godown lines for, or
     /// `None` when that answer was an empty envelope: not an answer of none.
-    pub(crate) items: Option<Vec<NativeItemGodowns>>,
+    pub(crate) items: Option<NativeRootItemsByGodown>,
     pub(crate) evidence: RuntimeReadEvidence,
 }
 

@@ -241,17 +241,40 @@ pub struct NativeItemGodowns {
     pub outcome: NativeItemByGodown,
 }
 
+/// What the exploded Stock Summary said about root items by godown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NativeRootItemsByGodown {
+    /// Every exploded line that carried godown lines, in document order. Only
+    /// those lines are listed: a root item Tally wrote no godown line for is not
+    /// among them.
+    Lines(Vec<NativeItemGodowns>),
+    /// The answer is the plain report's lines, line for line, with no godown
+    /// line: nothing shows the explode flag was honoured, so an empty list here
+    /// would not be a finding (on the captures the flag expanded each group into
+    /// its items).
+    ExplodeNotObserved,
+}
+
 /// The exploded lines that carry godown sub-lines, each tied to its own line and
 /// to the plain Stock Summary. A line without sub-lines (a stock group, or an
-/// item inside one) is left out: it has no value per godown.
+/// item inside one) is left out: it has no value per godown in this answer.
 pub fn items_by_godown(
     exploded: &[NativeExplodedLine],
     plain: &NativeStockReport,
-) -> Result<Vec<NativeItemGodowns>, NativeStockError> {
+) -> Result<NativeRootItemsByGodown, NativeStockError> {
     let plain_lines = match plain {
         NativeStockReport::Lines { lines, .. } => lines.as_slice(),
         NativeStockReport::Empty => &[],
     };
+    let unexpanded = exploded.len() == plain_lines.len()
+        && exploded.iter().zip(plain_lines).all(|(exploded, plain)| {
+            exploded.sub_lines.is_empty()
+                && exploded.line.name == plain.name
+                && exploded.line.amount == plain.amount
+        });
+    if unexpanded {
+        return Ok(NativeRootItemsByGodown::ExplodeNotObserved);
+    }
     exploded
         .iter()
         .filter(|exploded| !exploded.sub_lines.is_empty())
@@ -275,7 +298,8 @@ pub fn items_by_godown(
                 },
             })
         })
-        .collect()
+        .collect::<Result<_, _>>()
+        .map(NativeRootItemsByGodown::Lines)
 }
 
 fn item_outcome(exploded: &NativeExplodedLine) -> Result<NativeItemByGodown, NativeStockError> {

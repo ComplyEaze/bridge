@@ -93,7 +93,10 @@ fn items(exploded: &str, plain: &[u8]) -> Vec<NativeItemGodowns> {
         .unwrap()
         .unwrap();
     let plain = parse_native_stock_summary_report(&response(plain)).unwrap();
-    items_by_godown(&exploded, &plain).unwrap()
+    match items_by_godown(&exploded, &plain).unwrap() {
+        NativeRootItemsByGodown::Lines(items) => items,
+        NativeRootItemsByGodown::ExplodeNotObserved => panic!("the captures were exploded"),
+    }
 }
 
 fn outcome_of(exploded: &str, item: &str) -> NativeItemByGodown {
@@ -238,8 +241,9 @@ fn each_godown_is_valued_at_its_own_cost_and_the_values_add_up_to_the_item() {
             },
             NativeItemGodowns {
                 item: "Godown Split Item".to_string(),
-                // 22 Nos in Main Location is 220.00 at its own 10.00, not 242.00 at the
-                // item's 11.16; the three add up to the item's 558.00.
+                // 22 Nos in Main Location is 220.00 at its own 10.00: not 245.52 at the item's
+                // 11.16, nor 242.00 at the 11.00 it had before the transfer. The three add up to
+                // the item's 558.00.
                 outcome: NativeItemByGodown::Tied {
                     value: decimal("-558.00"),
                     quantity: GodownQuantityCheck::Added,
@@ -451,5 +455,41 @@ fn an_empty_exploded_answer_is_not_an_answer_of_no_lines() {
     assert_eq!(
         parse_native_stock_summary_exploded("<ENVELOPE></ENVELOPE>"),
         Ok(None)
+    );
+}
+
+#[test]
+fn an_answer_that_is_the_plain_report_line_for_line_shows_the_flag_was_not_observed() {
+    let plain = response(STOCK_FY);
+    let exploded = parse_native_stock_summary_exploded(&plain)
+        .unwrap()
+        .unwrap();
+    let report = parse_native_stock_summary_report(&plain).unwrap();
+    assert_eq!(
+        items_by_godown(&exploded, &report),
+        Ok(NativeRootItemsByGodown::ExplodeNotObserved)
+    );
+}
+
+#[test]
+fn an_expanded_answer_with_no_godown_line_is_an_empty_list_not_an_unobserved_flag() {
+    // Every line but the groups' and their items' taken out of the exploded capture would be
+    // the plain report again; here the two root items' godown lines alone are removed.
+    let text = response(EXPLODED_FY);
+    let mut kept = String::new();
+    let mut rest = text.as_str();
+    while let Some(start) = rest.find(" <SSBATCHNAME>") {
+        kept.push_str(&rest[..start]);
+        let after = &rest[start..];
+        let end = after.find("</DSPSTKINFO>").unwrap() + "</DSPSTKINFO>".len();
+        rest = after[end..].trim_start_matches(['\r', '\n']);
+    }
+    kept.push_str(rest);
+    let exploded = parse_native_stock_summary_exploded(&kept).unwrap().unwrap();
+    assert_eq!(exploded.len(), 13);
+    let report = parse_native_stock_summary_report(&response(STOCK_FY)).unwrap();
+    assert_eq!(
+        items_by_godown(&exploded, &report),
+        Ok(NativeRootItemsByGodown::Lines(Vec::new()))
     );
 }

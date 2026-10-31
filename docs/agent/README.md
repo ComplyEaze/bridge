@@ -1119,12 +1119,16 @@ item's own value, and the quantities too where all are in the item's unit (`quan
 `added_to_the_item_quantity`, or `not_compared`), and where the plain Stock Summary shows the item's line
 with that value. Otherwise `state` says why and no godown line is returned: `values_differ` and
 `quantities_differ` (with both sides), `value_empty`, `batch_named` (a batch line, not measured),
-`godown_repeated` and `plain_report_differs`. Tally gives no value per godown for an item inside a stock
-group, so none is returned for it (`checks.items_inside_stock_groups` is `not_available`). An empty
-exploded answer returns the godowns with `root_items` null.
+`godown_repeated` and `plain_report_differs`. `root_items` lists only the items Tally wrote godown lines
+for. Tally's export answer gives no value per godown for an item inside a stock group (its Stock Summary
+screen, Detailed with every level expanded, does show one), so none is returned for it
+(`checks.items_inside_stock_groups` is `not_available`). An empty exploded answer returns the godowns with
+`root_items` null and `root_items_reason` `exploded_stock_summary_empty_is_not_a_finding`; so does an
+answer that is the plain report line for line, which does not show the explode flag was honoured
+(`explode_flag_not_observed_is_not_a_finding`). Only average cost and simple units were measured.
 
 Refusals: `stock_by_godown_as_of_not_measured` (before any request), `stock_by_godown_as_of_before_books`,
-`stock_by_godown_as_of_in_future`, `stock_by_godown_education_unqualified`, `stock_by_godown_too_large`
+`stock_by_godown_as_of_in_future`, `stock_by_godown_period_not_honoured`, `stock_by_godown_education_unqualified`, `stock_by_godown_too_large`
 (with `size`), `stock_by_godown_bound_premise_violated` and `stock_by_godown_extent_changed`. Signs are
 kept as sent: a negative value is stock held. Godown and item names are masked under `mask_parties`.
 Measured on TallyPrime 7.2 on one synthetic book at two month ends (protocol reference §12a.24); the tool

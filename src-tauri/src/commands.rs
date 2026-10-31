@@ -32,7 +32,8 @@ use crate::sync::snapshot::{
     SqliteSnapshotStateStore,
 };
 use crate::tally::connection::{
-    MailingDetailsReadFailed, PairedReadValidationError, PartyLedgerMasterSourceValidationError,
+    MailingDetailsReadFailed, MailingReadFailure, PairedReadValidationError,
+    PartyLedgerMasterSourceValidationError,
 };
 use crate::tally::runtime::{with_operation_wire_budget, TallyRuntimeControlError};
 use crate::tally::validators::{
@@ -425,31 +426,49 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
     }
     let mailing_read_failed = error
         .chain()
-        .any(|cause| cause.downcast_ref::<MailingDetailsReadFailed>().is_some());
+        .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+        .map(MailingDetailsReadFailed::cause);
     let mut mapped = tally_runtime_command_error(error);
     mapped.message = format!(
         "ComplyEaze Bridge withheld the party/ledger master: {}",
         mapped.message
     );
-    // A master read that asked for each party's mailing details too and whose
-    // answer took too long, came back too large, broke off or could not be read
-    // is named as that larger read: the export decides to ask for them on an
-    // allowance (bridge#2074). The marker is set only for those failures, so the
-    // code does not decide it. Only an answer Tally declared past the size limit
-    // is read again without them (bridge#2214); every other such failure reaches
-    // here, told as it was before.
-    if mailing_read_failed {
-        mapped
-            .message
-            .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
-        mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+    // A master read that asked for each party's mailing details too is marked by
+    // the transport's own error where it is sent (bridge#2074). Of the marked
+    // causes, only a deadline and an answer past the size limit are named as that
+    // larger read here, with the remediation for it; only the size limit says the
+    // estimate may have been too low, since a deadline does not show the answer's
+    // size. An answer that broke off or could not be read says the connection
+    // broke, so it is told exactly as a read without the details would be. The
+    // export reads the book again without the details after a declared oversize
+    // or a broken answer (bridge#2214), so a marked failure that reaches here is
+    // a deadline or an oversize Tally did not declare.
+    match mailing_read_failed {
+        Some(MailingReadFailure::Deadline) => {
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
+            mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+        }
+        Some(MailingReadFailure::ResponseTooLarge { .. }) => {
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE);
+            mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+        }
+        Some(MailingReadFailure::Truncated | MailingReadFailure::ReadFailed) | None => {}
     }
     mapped
 }
 
 /// What a CA is told when a party/ledger master read that asked for the mailing
-/// details failed (bridge#2074).
-const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them. ComplyEaze Bridge asks for them only where it estimates the answer fits, and for this company the estimate may have been too low.";
+/// details ran out of time or past the size limit (bridge#2074).
+const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them.";
+/// Added only where the answer passed the size limit, not after a deadline.
+const MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE: &str = " ComplyEaze Bridge asks for them only where it estimates the answer fits, and for this company the estimate may have been too low.";
 const MAILING_DETAILS_READ_FAILED_REMEDIATION: &str = "Do not retry the unchanged export: it sends the same larger read. Try again only after something has changed, such as Tally being less busy or this company's books being smaller; if it keeps failing, report it to ComplyEaze Bridge, which cannot yet export this company's workbook without the mailing addresses.";
 
 fn party_ledger_master_currency_admission_error(reason: &'static str) -> TallyCommandError {
@@ -1972,9 +1991,9 @@ fn verify_observed_company_tuple_from_companies(
 /// (bridge#2074), and is the
 /// standard request otherwise (bridge#1490); the workbook says when they were not
 /// read. The count's choice is an allowance, so where Tally declares the larger read's
-/// answer past its size limit, the book is read again without them, once (bridge#2214); a
-/// larger read that runs out of time fails as before. A grouping-decision save uses none of
-/// them and sends the standard request.
+/// answer past its size limit, or that answer breaks off or cannot be read, the book is read
+/// again without them, once (bridge#2214); a larger read that runs out of time fails. A
+/// grouping-decision save uses none of them and sends the standard request.
 const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
     crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits;
 

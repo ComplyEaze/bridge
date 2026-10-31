@@ -1201,9 +1201,11 @@ fn desktop_messages_name_the_product_in_full() {
 }
 
 /// A party/ledger master read that asked for the mailing details and timed out, or came
-/// back too large, names that larger read and says what to do; the same failure of a read
-/// without them is told as before (bridge#2074). Which failures are marked is decided where
-/// the read is sent, and tested there.
+/// back too large, names that larger read and says what to do; only the size limit says the
+/// estimate may have been too low. One whose answer broke off or could not be read is told
+/// exactly as a read without them, and the same failure of a read without them is told as
+/// before (bridge#2074). Which failures are marked is decided where the read is sent, and
+/// tested there; this matches on the marked cause, not on text.
 #[test]
 fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
     use crate::tally::connection::{
@@ -1211,55 +1213,71 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
     };
     // The marker reads the master post's own failure, which the paired read wraps.
     let posted = |error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error));
+    use super::{
+        MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE as ESTIMATE,
+        MAILING_DETAILS_READ_FAILED_REMEDIATION as REMEDIATION,
+        MAILING_DETAILS_READ_FAILED_SENTENCE as SENTENCE,
+    };
     use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
     use bridge_tally_transport::TallyTransportError;
+    // Each failure, the code it keeps, and the sentences a marked one adds.
     let failures = || {
         [
             (
-                anyhow::Error::new(TallyTransportError::RequestTimedOut),
+                TallyTransportError::RequestTimedOut,
                 "tally_request_deadline_exceeded",
+                SENTENCE.to_owned(),
             ),
             (
-                anyhow::Error::new(TallyTransportError::ResponseTooLarge {
+                TallyTransportError::ResponseTooLarge {
                     limit: bridge_tally_transport::XML_RESPONSE_MAX_BYTES,
                     declared_by_peer: false,
-                }),
+                },
                 "response_validation_failed",
+                format!("{SENTENCE}{ESTIMATE}"),
+            ),
+            (
+                TallyTransportError::ResponseTruncated,
+                "endpoint_unreachable",
+                String::new(),
+            ),
+            (
+                TallyTransportError::ResponseReadFailed,
+                "endpoint_unreachable",
+                String::new(),
             ),
         ]
     };
-    for (error, code) in failures() {
+    for (error, code, added) in failures() {
         let plain = party_ledger_master_runtime_command_error(with_read_evidence(
-            error,
+            anyhow::Error::new(error.clone()),
             RuntimeReadEvidence::empty(),
         ));
-        assert_eq!(plain.code, code);
+        assert_eq!(plain.code, code, "{error:?}");
         assert!(!plain.message.contains("mailing"), "{}", plain.message);
-        assert_ne!(
-            plain.remediation,
-            super::MAILING_DETAILS_READ_FAILED_REMEDIATION
-        );
-    }
-    for (error, code) in failures() {
+        assert_ne!(plain.remediation, REMEDIATION);
         let named = party_ledger_master_runtime_command_error(with_read_evidence(
-            marked(posted(error)),
+            marked(posted(anyhow::Error::new(error.clone()))),
             RuntimeReadEvidence::empty(),
         ));
-        // The marker keeps the failure's own code and message, and adds the sentence.
-        assert_eq!(named.code, code);
+        // The marker keeps the failure's own code and message, and adds the sentences.
+        assert_eq!(named.code, code, "{error:?}");
         assert!(named
             .message
             .starts_with("ComplyEaze Bridge withheld the party/ledger master: "));
-        assert!(
-            named
-                .message
-                .ends_with(super::MAILING_DETAILS_READ_FAILED_SENTENCE),
-            "{}",
-            named.message
-        );
         assert_eq!(
-            named.remediation,
-            super::MAILING_DETAILS_READ_FAILED_REMEDIATION
+            named.message,
+            format!("{}{added}", plain.message),
+            "{error:?}"
         );
+        if added.is_empty() {
+            // Told exactly as the same failure of a read without the details.
+            assert!(!named.message.contains(SENTENCE), "{}", named.message);
+            assert!(!named.message.contains(ESTIMATE), "{}", named.message);
+            assert_eq!(named.remediation, plain.remediation, "{error:?}");
+            assert_ne!(named.remediation, REMEDIATION, "{error:?}");
+        } else {
+            assert_eq!(named.remediation, REMEDIATION, "{error:?}");
+        }
     }
 }

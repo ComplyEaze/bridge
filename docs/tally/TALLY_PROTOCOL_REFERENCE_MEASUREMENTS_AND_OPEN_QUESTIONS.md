@@ -638,7 +638,8 @@ Reading ledgers and vouchers in Education waits for the Collection-based profile
 - whether Education accepts `$$` functions whose arguments contain no space;
 - whether Education accepts a `COMPUTE` of `$GUID:Company:##SVCurrentCompany`;
 - whether Education accepts `CompanyListV1`, a custom report with no `$$` function that the
-  live-read tool sent before its removal (#1745).
+  live-read tool sent before its removal (#1745). (2026-10-31: no longer asked; Bridge builds no
+  such report since #1872.)
 
 ## 11e. Ledger master read sizes and part reads on two books — **PARTIAL**
 

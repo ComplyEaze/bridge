@@ -210,7 +210,7 @@ pub(crate) fn render_built_in_report_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
-    render_report_envelope(report, company, period, "")
+    render_report_envelope(report.id(), company, period, "")
 }
 
 /// The same envelope with Tally's explode flag after the dates, the one
@@ -221,23 +221,24 @@ pub(crate) fn render_exploded_stock_summary_request(
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
     render_report_envelope(
-        BuiltInReport::StockSummary,
+        BuiltInReport::StockSummary.id(),
         company,
         period,
         "<EXPLODEFLAG>Yes</EXPLODEFLAG>",
     )
 }
 
-/// `flag` is one of the two fixed texts above, never a run-time value.
-fn render_report_envelope(
-    report: BuiltInReport,
+/// The built-in report envelope for the report `id`, with `extra` (already-rendered static
+/// variables, or nothing) after the period's. `id` and `extra` come only from this crate's own
+/// builders, never from data; the company is escaped here, once.
+pub(crate) fn render_report_envelope(
+    id: &str,
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
-    flag: &'static str,
+    extra: &str,
 ) -> String {
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>{flag}</STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        id = report.id(),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>{extra}</STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),

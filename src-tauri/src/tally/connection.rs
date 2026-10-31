@@ -50,8 +50,8 @@ use bridge_tally_protocol::{
         DateBoundaryProfile, OutstandingsError,
     },
     parent_partition::{ParentPart, ParentPartition, ParentPartitionError, PartitionLimits},
-    parse_companies_for_interactive_discovery, parse_company_gateway_capability_observation,
-    parse_ledger_census_slice, parse_native_party_ledger_master_records_leaving_unparsed,
+    parse_company_gateway_capability_observation, parse_ledger_census_slice,
+    parse_native_party_ledger_master_records_leaving_unparsed,
     parse_native_party_ledger_master_structure, parse_standard_ledger_identity_observation,
     xml_read_profiles::{ReadOnlyProfile, ValidatedCompanyName},
     ParsedExport, ParsedSourceRecord, PartyLedgerMasterRecord, StandardLedgerCatalogError,
@@ -1148,6 +1148,20 @@ const ENCODING_UTF16_LE: u8 = 3;
 const ENCODING_UTF16_LE_BOM: u8 = 4;
 const ENCODING_UTF16_BE_BOM: u8 = 5;
 
+/// `http` gated on `wire`'s lock and retry bound, and drained after a cut post
+/// when `wire` has a drain policy (#2142).
+fn gated(
+    http: TallyHttpTransport,
+    config: &TallyConfig,
+    wire: &WireGateConfig,
+) -> TallyHttpTransport {
+    let http = http.with_wire_gate(wire.gate_for(config), wire.retry());
+    match wire.drain() {
+        Some(policy) => http.with_drain(policy),
+        None => http,
+    }
+}
+
 impl TallyClient {
     /// Every send takes the endpoint's wire lock (`endpoint_wire`), at the
     /// shared per-user coordination root.
@@ -1158,8 +1172,7 @@ impl TallyClient {
 
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
-        let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry())
+        let http = gated(TallyHttpTransport::new(config.clone())?, &config, wire)
             .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
@@ -1197,13 +1210,16 @@ impl TallyClient {
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
         let wire = WireGateConfig::default();
-        let http = TallyHttpTransport::with_builder(
-            config.clone(),
-            bridge_tally_transport::TransportPolicy::default(),
-            builder,
+        let http = gated(
+            TallyHttpTransport::with_builder(
+                config.clone(),
+                bridge_tally_transport::TransportPolicy::default(),
+                builder,
+            )
+            .expect("build synthetic Tally HTTP transport"),
+            &config,
+            &wire,
         )
-        .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry())
         .with_send_observer(crate::request_trail::observer());
         Self {
             http,
@@ -1217,10 +1233,12 @@ impl TallyClient {
         policy: bridge_tally_transport::TransportPolicy,
         wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
-        let http =
-            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry())
-                .with_send_observer(crate::request_trail::observer());
+        let http = gated(
+            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?,
+            &config,
+            wire,
+        )
+        .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
@@ -1276,6 +1294,12 @@ impl TallyClient {
         // `/status` is useful local diagnostics but is not part of Tally's
         // documented third-party XML contract. Never gate the POST probe or
         // authoritative product metadata on this unauthenticated heuristic.
+        // The one exception is the drain after a cut post (#2142), which holds
+        // the next post until `/status` has answered three times in a row,
+        // whatever its answer, and at most 10 minutes: two lab rows measured
+        // that `/status` waits while Tally works on a cut read, and that a data
+        // read sent after three quick probes answered at its rest speed
+        // (`bridge_tally_transport::DrainPolicy::MEASURED`).
         let (mut connection, mut wire_evidence) =
             match self.check_connection_strict_with_wire_evidence().await {
                 Ok(observation) => observation,
@@ -1480,16 +1504,14 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`). Unlike the legacy custom TDL
-    /// report, its response is Tally's ordinary shaped `HEADER/STATUS=1`
-    /// success envelope, so a successful parse directly satisfies the export
-    /// trust check instead of requiring the narrower, explicitly-untrusted
-    /// interactive compatibility parse.
+    /// (`ReadOnlyProfile::CompanyListV2`). Its response is Tally's ordinary
+    /// shaped `HEADER/STATUS=1` success envelope, so a successful parse
+    /// directly satisfies the export trust check.
     ///
-    /// Responders that reject the collection outright — a shaped failure, an
-    /// unrecognized shape, or anything else the collection parser cannot
-    /// read — fall back to `legacy_company_discovery_evidence`, off the happy
-    /// path but otherwise unchanged.
+    /// A responder that rejects the collection is reported from that one
+    /// answer: a shaped failure by its own reason code, anything else as
+    /// `xml_export_shape_unrecognized`. No second request is sent; the legacy
+    /// custom company report it once fell back to is gone (#1872).
     async fn company_discovery_evidence(
         &self,
         connection: &mut ConnectionStatus,
@@ -1500,55 +1522,11 @@ impl TallyClient {
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), wire_evidence)
             .await?;
-        match xml_parser::parse_companies_from_collection(&xml) {
+        Ok(match xml_parser::parse_companies_from_collection(&xml) {
             Ok(discovered) => {
                 *gateway_product_mode = parse_company_gateway_capability_observation(&xml)
                     .map(GatewayProductModeEvidence::from_observation)
                     .unwrap_or_else(|_| GatewayProductModeEvidence::unavailable());
-                connection.reachable = true;
-                if connection.error.is_some() {
-                    connection.error = Some("status_heuristic_unavailable".to_string());
-                }
-                Ok(match normalize_discovered_companies(discovered) {
-                    Ok(normalized) => {
-                        *companies = normalized;
-                        CapabilityEvidence {
-                            state: CapabilityState::Supported,
-                            confidence: EvidenceConfidence::Observed,
-                            safe_reason_code: None,
-                        }
-                    }
-                    Err(()) => CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("company_identity_invalid".to_string()),
-                    },
-                })
-            }
-            Err(_) => {
-                self.legacy_company_discovery_evidence(connection, companies, wire_evidence)
-                    .await
-            }
-        }
-    }
-
-    /// The pre-`CompanyListV2` company discovery path: the custom
-    /// `CompanyListV1` TDL report, which most Tally responders answer with a
-    /// bare `<ENVELOPE><COMPANYINFO>...` document carrying no
-    /// `HEADER`/`STATUS` at all. That bare shape is accepted only through the
-    /// narrow, explicitly-untrusted interactive discovery parse; it can never
-    /// promote `CapabilityState::Supported`.
-    async fn legacy_company_discovery_evidence(
-        &self,
-        connection: &mut ConnectionStatus,
-        companies: &mut Vec<TallyCompany>,
-        wire_evidence: &mut RuntimeReadEvidence,
-    ) -> anyhow::Result<CapabilityEvidence> {
-        let xml = self
-            .post_probe_xml(tdl_engine::company_list_request(), wire_evidence)
-            .await?;
-        Ok(match xml_parser::parse_companies(&xml) {
-            Ok(discovered) => {
                 connection.reachable = true;
                 if connection.error.is_some() {
                     connection.error = Some("status_heuristic_unavailable".to_string());
@@ -1579,17 +1557,6 @@ impl TallyClient {
                         xml_parser::export_failure_reason_code(&xml).to_string(),
                     ),
                 },
-                _ if parse_companies_for_interactive_discovery(&xml).is_ok() => {
-                    connection.reachable = true;
-                    if connection.error.is_some() {
-                        connection.error = Some("status_heuristic_unavailable".to_string());
-                    }
-                    CapabilityEvidence {
-                        state: CapabilityState::Unknown,
-                        confidence: EvidenceConfidence::Observed,
-                        safe_reason_code: Some("direct_company_report_untrusted".to_string()),
-                    }
-                }
                 _ => CapabilityEvidence {
                     state: CapabilityState::Unknown,
                     confidence: EvidenceConfidence::Observed,
@@ -1654,12 +1621,10 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`) rather than the legacy `CompanyListV1`
-    /// custom TDL report. Unlike the legacy report -- which one Tally instance
-    /// answers with a bare, unwrapped `<COMPANYINFO>` document and another is
-    /// known to simply hang on -- the collection always answers with the
-    /// ordinary shaped `HEADER/STATUS=1` envelope, so `parse_companies_from_collection`
-    /// can require that shape outright.
+    /// (`ReadOnlyProfile::CompanyListV2`). It answers with the ordinary shaped
+    /// `HEADER/STATUS=1` envelope, so `parse_companies_from_collection` can
+    /// require that shape outright. Bridge sends no custom TDL report for this
+    /// (#1872).
     pub async fn fetch_companies(&self) -> anyhow::Result<Vec<TallyCompany>> {
         self.fetch_companies_with_wire_evidence()
             .await
@@ -1674,7 +1639,7 @@ impl TallyClient {
     ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence)> {
         self.fetch_companies_observing_education_mode()
             .await
-            .map(|(companies, evidence, _)| (companies, evidence))
+            .map(|(companies, evidence, _, _)| (companies, evidence))
     }
 
     /// As [`Self::fetch_companies_with_wire_evidence`], also returning whether
@@ -1684,15 +1649,18 @@ impl TallyClient {
     /// further request is made.
     pub(crate) async fn fetch_companies_observing_education_mode(
         &self,
-    ) -> anyhow::Result<(Vec<TallyCompany>, RuntimeReadEvidence, bool)> {
+    ) -> anyhow::Result<(
+        Vec<TallyCompany>,
+        RuntimeReadEvidence,
+        bool,
+        super::runtime::ObservedTally,
+    )> {
         let mut evidence = RuntimeReadEvidence::empty();
         let xml = self
             .post_probe_xml(ReadOnlyProfile::CompanyListV2.render(), &mut evidence)
             .await?;
-        let education = parse_company_gateway_capability_observation(&xml)
-            .map(|observation| observation.educational_mode)
-            .unwrap_or(false)
-            || bridge_tally_protocol::company_list_may_be_in_educational_mode(&xml);
+        let tally = super::runtime::ObservedTally::of_company_list(&xml);
+        let education = tally.education;
         let discovered = xml_parser::parse_companies_from_collection(&xml)
             .map_err(|error| with_read_evidence(error, evidence.clone()))?;
         let companies = normalize_discovered_companies(discovered).map_err(|_| {
@@ -1703,7 +1671,7 @@ impl TallyClient {
                 evidence.clone(),
             )
         })?;
-        Ok((companies, evidence, education))
+        Ok((companies, evidence, education, tally))
     }
 
     /// Re-enumerates the trusted `Company` collection, then proves one

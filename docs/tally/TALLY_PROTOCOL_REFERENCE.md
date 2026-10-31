@@ -225,6 +225,9 @@ base revision.
 <a id="94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid"></a>
 
 [9.4j Each gateway master write moved the master mark by one, to the written ledger's `ALTERID`](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94j-each-gateway-master-write-moved-the-master-mark-by-one-to-the-written-ledgers-alterid)
+<a id="94k-three-ledger-creates-in-one-request-one-create-counted-for-each-the-mark-stepped-by-three-in-request-order"></a>
+
+[9.4k Three ledger `Create`s in one request: one create counted for each, the mark stepped by three, in request order](./TALLY_PROTOCOL_REFERENCE_WRITE_RESPONSES_AND_MASTERS.md#94k-three-ledger-creates-in-one-request-one-create-counted-for-each-the-mark-stepped-by-three-in-request-order)
 <a id="95-identity-after-write"></a>
 
 [9.5 Identity after write](./TALLY_PROTOCOL_REFERENCE_VOUCHER_WRITES.md#95-identity-after-write)
@@ -471,6 +474,9 @@ base revision.
 <a id="12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read"></a>
 
 [12a.22 Stock items carry their own dated HSN and GST lists in a masters read; whether a group's or the company's setting reaches them is not read](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a22-stock-items-carry-their-own-dated-hsn-and-gst-lists-in-a-masters-read-whether-a-groups-or-the-companys-setting-reaches-them-is-not-read)
+<a id="12a23-stock-query-by-item-name-gives-an-items-closing-quantity-per-godown-and-batch"></a>
+
+[12a.23 Stock Query by item name gives an item's closing quantity per godown and batch](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a23-stock-query-by-item-name-gives-an-items-closing-quantity-per-godown-and-batch)
 <a id="12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost"></a>
 
 [12a.24 The Godown Summary gives godown totals, and the exploded Stock Summary values a root item per godown at that godown's own cost](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost)

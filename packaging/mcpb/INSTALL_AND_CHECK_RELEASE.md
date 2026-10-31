@@ -5,5 +5,5 @@ file, check it against the `.sha256` file of the same name in the same list: on 
 `cd Downloads` and then run `certutil -hashfile "<file>" SHA256`; on a Mac, in Terminal, type `cd Downloads` and then
 run `shasum -a 256 "<file>"` (put your downloaded file's name in place of `<file>`, brackets included, and keep the quotes: a file
 downloaded twice can get a name with "(1)" in it, which needs them). The 64-character code it prints must match the code at
-the start of the `.sha256` file. ComplyEaze Bridge is not yet code-signed or notarized, so your
-computer may warn you before opening it.
+the start of the `.sha256` file; that shows the file arrived whole, not who made it. ComplyEaze Bridge is not yet
+code-signed or notarized.

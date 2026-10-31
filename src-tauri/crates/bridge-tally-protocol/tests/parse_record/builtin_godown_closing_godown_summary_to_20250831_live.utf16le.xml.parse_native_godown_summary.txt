@@ -1,0 +1,31 @@
+# fixture: tests/fixtures/builtin_godown_closing_godown_summary_to_20250831_live.utf16le.xml
+# parser: parse_native_godown_summary
+# source: captured
+Ok(Lines {
+    total: Some(
+        ExactDecimal(
+            "2300.01",
+        ),
+    ),
+    empty: 0,
+    lines: [
+        NativeGodownLine {
+            name: "Factory Floor",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "-11150.00",
+                ),
+            ),
+        },
+        NativeGodownLine {
+            name: "Main Location",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "13450.01",
+                ),
+            ),
+        },
+    ],
+})

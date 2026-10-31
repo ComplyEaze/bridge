@@ -304,3 +304,60 @@ test("pull requests supersede by branch; master pushes share one group and never
     assert.notEqual(first.group, push.group);
   }
 });
+
+// The `merge-gate-scope` step of the Workflow consistency job decides whether a pull request runs the merge gate's
+// 6.5-minute test. It runs under bash against a real two-commit repository, like the scope step above.
+function gateStep() {
+  const start = workflow.indexOf("      - id: merge-gate-scope");
+  const run = workflow.indexOf("        run: |", start);
+  const end = workflow.findIndex((line, index) => index > run && /^ {6}- /.test(line));
+  assert.ok(start !== -1 && run !== -1 && end !== -1, "the merge-gate-scope step is where this test expects it");
+  return workflow.slice(run + 1, end).map((line) => line.slice(10)).join("\n");
+}
+function runGateStep(event, changed, { base } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "gate-scope-"));
+  try {
+    const sh = (command) => {
+      const result = spawnSync("bash", ["-c", command], { cwd: dir, encoding: "utf8" });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    const commit = (message) => sh(`git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false commit -q --allow-empty -m ${message} && git rev-parse HEAD`);
+    sh("git init -q -b main");
+    const first = commit("base");
+    for (const file of changed) {
+      mkdirSync(join(dir, file, ".."), { recursive: true });
+      writeFileSync(join(dir, file), "x");
+    }
+    sh("git add -A");
+    const head = commit("change");
+    writeFileSync(join(dir, "step.sh"), gateStep());
+    const outputFile = join(dir, "out");
+    writeFileSync(outputFile, "");
+    const result = spawnSync("bash", ["step.sh"], {
+      cwd: dir, encoding: "utf8",
+      env: { PATH: process.env.PATH, HOME: dir, GITHUB_OUTPUT: outputFile, GITHUB_SHA: head, EVENT_NAME: event, PR_BASE_SHA: base ?? first },
+    });
+    return { status: result.status, output: readFileSync(outputFile, "utf8").trim() };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("a pull request runs the merge gate's test only when it changes the gate or what it reads; every other event always runs it", () => {
+  for (const changed of [["scripts/merge-gate.sh"], ["scripts/anything.mjs"], [".github/workflows/ci.yml"], ["docs/tally/compatibility/acks/pr-1.txt"], [".gitattributes"], [".node-version"], ["src-tauri/src/x.rs", "scripts/a.mjs"]]) {
+    assert.deepEqual(runGateStep("pull_request", changed), { status: 0, output: "run=true" }, changed.join());
+  }
+  for (const changed of [["src-tauri/src/x.rs"], ["src/App.tsx"], ["docs/a.md"], ["CHANGELOG.md"], ["docs/tally/TALLY_PROTOCOL_REFERENCE.md"], ["src-tauri/crates/bridge-tax-audit/parity/mutations.mjs"]]) {
+    assert.deepEqual(runGateStep("pull_request", changed), { status: 0, output: "run=false" }, changed.join());
+  }
+  for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) {
+    assert.deepEqual(runGateStep(event, ["src-tauri/src/x.rs"]), { status: 0, output: "run=true" }, event);
+  }
+});
+
+test("a pull request whose diff cannot be read fails the step instead of skipping the test", () => {
+  const result = runGateStep("pull_request", ["src-tauri/src/x.rs"], { base: "f".repeat(40) });
+  assert.notEqual(result.status, 0);
+  assert.equal(result.output, "", "no run= line is written, so the test step does not skip");
+});

@@ -788,3 +788,42 @@ fn a_reserved_ledgers_built_in_name_is_refused() {
         Some("Synthetic Reserved")
     );
 }
+
+const ALIAS_LAB_GUID: &str = "021bda0c-b1b1-44c8-8279-5212ce87c9c7";
+/// Tally's own name index of a book whose ledgers carry aliases keyed on its screen and by import
+/// (`alias-lab-1688/PROVENANCE.md` beside the fixture).
+const ALIAS_LAB_LEDGERS: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/i1-idx.utf16le.xml"
+);
+
+/// On the captured index, a new ledger named as any ledger's alias is taken via that alias, one named
+/// as a ledger's own name is taken via its name, and a new name is admitted. The non-ASCII aliases are not
+/// tried here: `MasterName` refuses a name outside its alphabet before any check.
+#[test]
+fn a_name_that_is_a_captured_alias_is_taken_via_alias() {
+    let ledgers = ledger_masters(&masters_lab(ALIAS_LAB_LEDGERS), ALIAS_LAB_GUID)
+        .expect("the captured name index parses");
+    for (candidate, via) in [
+        ("Lab Plain Alias", Some(Via::Alias)),
+        ("Lab Other Second", Some(Via::Alias)),
+        ("Lab Shape Alias", Some(Via::Alias)),
+        ("Lab Plain Ledger", Some(Via::Name)),
+        ("Lab New Party", None),
+    ] {
+        let taken = admit_free_name(ledgers.clone(), groups(), &item(candidate))
+            .err()
+            .map(|error| {
+                error
+                    .downcast::<ApprovedImportAdmissionError>()
+                    .expect("a typed admission error")
+            });
+        assert_eq!(
+            taken,
+            via.map(|via| ApprovedImportAdmissionError::MasterNameTaken {
+                kind: MasterKind::Ledger,
+                via,
+            }),
+            "{candidate}"
+        );
+    }
+}

@@ -43,6 +43,7 @@ pub mod mailing_details;
 pub mod native_cash_flow;
 pub mod native_company_features;
 pub mod native_funds_flow;
+pub mod native_godown_summary;
 mod native_ledger_collection;
 pub mod native_masters;
 pub mod native_month_register;

@@ -25,6 +25,7 @@ use bridge_tally_protocol::audit_company_part::admit_audit_company_part;
 use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonthWindow};
 use bridge_tally_protocol::native_company_features::{parse_company_features, ExpectedCompany};
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
+use bridge_tally_protocol::native_godown_summary::parse_native_godown_summary;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
 use bridge_tally_protocol::native_month_register::parse_native_month_register;
 use bridge_tally_protocol::native_negative_ledgers::parse_native_negative_ledgers;
@@ -41,7 +42,8 @@ use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, NativeStatementKind,
 };
 use bridge_tally_protocol::native_stock_summary::{
-    parse_company_inventory_flags, parse_native_stock_items, parse_native_stock_summary_report,
+    parse_company_inventory_flags, parse_native_stock_items, parse_native_stock_summary_exploded,
+    parse_native_stock_summary_report,
 };
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
@@ -283,6 +285,7 @@ const SHAPE_GUID: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 /// The parity lab book's company GUID, as scrubbed in its captures (`native_masters_tests.rs`).
 const PARITY_GUID: &str = "7c0de000-0000-4000-8000-0000000000a1";
 const WR2_GUID: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
+const ALIAS_LAB_GUID: &str = "021bda0c-b1b1-44c8-8279-5212ce87c9c7";
 const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
@@ -528,6 +531,103 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_stock_query",
         parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-02-stock-query-kit-co-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-03-stock-query-gauge-test-50l-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-04-stock-query-owner-s-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-05-stock-query-owner-s-item-f2.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-06-stock-query-quote-q-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-07-stock-query-quote-q-item-f2.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-08-stock-query-alt-unit-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-09-stock-query-mix-5-set-large-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-10-stock-query-dash-item-7-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-04-stock-query-alt-unit-probe-a.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-05-stock-query-alt-unit-probe-b.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    // The stock-item collection beside those Stock Query answers, same sittings (#2018)
+    Row {
+        fixture: "tests/fixtures/stock-query/a-01-items-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/a-02-items-to-20250501.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/a-03-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-01-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-01-items-fy-s4.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
     },
     // tests/simulator_corpus.rs, src/agent_tests.rs (an empty collection's export status)
     Row {
@@ -984,6 +1084,30 @@ const ROWS: &[Row] = &[
         parse: |_, text| catalogue(text, "BRIDGE OUTSTANDINGS LAB", OUTSTANDINGS_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_standard_ledger_catalog_v2_with_identities(ALIAS LAB)",
+        parse: |_, text| catalogue_v2(text, "BRIDGE ALIAS LAB", ALIAS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/i1-cat.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_standard_ledger_catalog_with_identities(ALIAS LAB)",
+        parse: |_, text| catalogue(text, "BRIDGE ALIAS LAB", ALIAS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_standard_ledger_catalog_v2_with_identities(ALIAS LAB)",
+        parse: |_, text| catalogue_v2(text, "BRIDGE ALIAS LAB", ALIAS_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/alias-lab-1688/i1-idx.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_name_index(ALIAS LAB)",
+        parse: |_, text| typed(parse_ledger_name_index(text, ALIAS_LAB_GUID)),
+    },
+    Row {
         fixture: "tests/fixtures/agent/d3-amend-lab-ledger-catalogue-v2.utf16le.xml",
         source: Source::Captured,
         parser: "parse_standard_ledger_catalog_v2_with_identities(AMEND LAB)",
@@ -1334,6 +1458,33 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#2071): the dollar party's Bills Payable report (its
+    // row a sales bill settled in dollars at another rate, sent with an empty `BILLCL`, which the
+    // strict parse refuses), and the rupee-control sitting's ledger and group snapshots.
+    Row {
+        fixture: "tests/fixtures/native/bills_payable_forex_settled_empty_closing.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_bill_rows(20250401..20250430)",
+        parse: |_, text| bills(text, "20250401", "20250430"),
+    },
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_rupee_control.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_classified_for_company(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_ledger_snapshot_classified_for_company(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/group_snapshot_forexgroup_lab.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(FOREXGROUP)",
+        parse: |_, text| groups(text, FOREXGROUP_GUID),
+    },
     // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#683, #2071): composites written with the foreign
     // symbol against its digits. The base is identified from the lab's own currency reads.
     Row {
@@ -1421,6 +1572,50 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_negative_ledgers",
         parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    // Built-in Godown Summary report, read with the Stock Summary's grammar: src/native_godown_summary_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_godown_summary_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    // Closing stock by godown after keying, with the exploded Stock Summary: src/native_godown_summary_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_godown_summary_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_godown_summary",
+        parse: |_, text| typed(parse_native_godown_summary(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_exploded_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_exploded",
+        parse: |_, text| typed(parse_native_stock_summary_exploded(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_godown_summary_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_godown_summary",
+        parse: |_, text| typed(parse_native_godown_summary(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_exploded_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_exploded",
+        parse: |_, text| typed(parse_native_stock_summary_exploded(text)),
     },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {
@@ -2856,6 +3051,12 @@ const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDG
      agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
+const FOREX_OPEN_BILL: &str = "a Bills Receivable answer of BRIDGE FOREXGROUP LAB (30 Oct 2026, \
+     #2071), with no row here: its rendering would hold the dollar customer's rupee amount, which \
+     the merge gate's privacy scan reads as an identifier shape; the tests in \
+     src/native_outstandings/wire_settled_bill_tests.rs parse it, pinning each row's party, \
+     reference and kind for the settled-supplier answer and, for the rupee-control answer, the \
+     party and reference of the one row admitted";
 const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRANSFER LAB and \
      BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
      yet, and the pull request that renders the census as a span replays it and changes this \
@@ -2864,6 +3065,14 @@ const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRA
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    (
+        "tests/fixtures/native/bills_receivable_forex_rupee_control.utf16le.xml",
+        FOREX_OPEN_BILL,
+    ),
+    (
+        "tests/fixtures/native/bills_receivable_forex_settled_supplier.utf16le.xml",
+        FOREX_OPEN_BILL,
+    ),
     // The audit read's live answers on the pilot lab (the company object has a row).
     (
         "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-census.utf16le.xml",

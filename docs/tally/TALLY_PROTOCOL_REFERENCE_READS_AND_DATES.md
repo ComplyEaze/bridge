@@ -623,13 +623,27 @@ Billwise, not committed.
 amounts, and a zero foreign balance closes as a plain `0.00` (`FOREX_LEDGER_CAPTURE_PROVENANCE.md`).
 Only this field tells such a ledger from a base one.
 
+**A rupee ledger holding bills entered in dollars (TallyPrime 7.2 Silver, PARTIAL: one synthetic
+book, `BRIDGE FOREXGROUP LAB`, raw answers kept in two sittings; `lab/2071-forex-rerun-answers`,
+`lab/2071-forex-reads-answers`).** Every ledger is kept in `₹`, and the parties' bills were entered in
+`$`. Each such party's closing balance is a composite, which the ledger snapshot sets aside by
+name (bridge#2141).
+- The `BILLCL` of an open bill, or of a bill settled in part at another rate, is a plain decimal
+  in rupees, in the report of its own side.
+- A bill settled in full in dollars at a rate other than its own is still sent, with `BILLCL`
+  present and **empty**, in the report of the *other* side: a customer's sales bill in Bills
+  Payable, a supplier's purchase bill in Bills Receivable. Tally's own Pending Bills screen shows
+  such a bill as a zero dollar amount with a rupee remainder.
+- A bill settled in full at its own rate is in neither report.
+- The Bills Payable answer carrying it was byte-identical in all four reads across the two
+  sittings. An empty
+  `BILLCL` is not a zero; `outstandings` drops such a row only when its party is set aside, and
+  refuses it otherwise (bridge#2071).
+
 **Not measured:**
 - whether a book with a single Currency master can hold a ledger in another currency. It is inferred
   not to, because Tally assigns a ledger its currency from the masters;
-- a base-currency ledger, on a book with several masters, holding a bill entered in another
-  currency: whether its `BILLCL` or its closing balance shows that currency. The bills on FOREX's `$`
-  ledgers are plain decimals, so the bill alone may not; a composite closing balance on a base ledger
-  is refused (bridge#551);
+- a rupee party's bill settled in another currency on 7.1, or on Gold;
 - releases before 7.1.
 
 ---

@@ -1,5 +1,5 @@
 {
- "comment": "loans_interest, bridge#1259 item 3, a firm: two sites the reference left reading a nil line's ledger. Loan K: a journal debiting an expense ledger and crediting the loan, beside a nil line on Bank A, is a loan taken (clause 31 row) that is not charge-shaped, because the counter ledgers the charge test reads include the ledger on the nil line, which is no expense ledger (no expense entry count). Loan L: a TDS journal beside a nil line on Suspense is still a TDS journal, neither taken nor repaid (repaid total 0, TDS on the loan 100000, no tds_in_principal).",
+ "comment": "loans_interest, bridge#1259 item 3, a firm: two sites the reference left reading a nil line's ledger. Loan K: a journal debiting an expense ledger and crediting the loan, beside a nil line on Bank A, is a loan taken (clause 31 row). In the reference it is not charge-shaped, because the counter ledgers the charge test reads include the ledger on the nil line; since #1875 the crate reads only the ledgers posted to, so it is charge-shaped (one expense entry), a declared behaviour difference. Loan L: a TDS journal beside a nil line on Suspense is still a TDS journal, neither taken nor repaid (repaid total 0, TDS on the loan 100000, no tds_in_principal).",
  "groups": {
   "Current Assets": null,
   "Cash-in-Hand": "Current Assets",

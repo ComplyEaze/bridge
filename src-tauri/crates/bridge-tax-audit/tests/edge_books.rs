@@ -9,7 +9,9 @@
 //! (`golden/edge.NAME.trial_balance.order.json`).
 //!
 //! These books are not Tally reads: they prove the port and the reference agree on the same book,
-//! and nothing about reading Tally.
+//! and nothing about reading Tally. Since the ruling of parity spec section 12, a golden can also
+//! carry a declared behaviour difference: the crate's own output for the parts its provenance note
+//! names, where the crate is the source of truth and the reference still differs.
 
 mod common;
 

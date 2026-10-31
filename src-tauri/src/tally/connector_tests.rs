@@ -622,8 +622,7 @@ async fn presentation_equivalent_company_snapshot_probe_stops_before_core_export
     let company_guid = "7c1d9a52-3e84-4b6f-a0d3-5f2b8e9c4a71";
     // `TallyClient::probe` requests the trusted `Company` collection
     // (`CompanyListV2`) first, so the presentation-equivalent same-GUID
-    // rows this test exercises are expressed in that shape rather than the legacy
-    // `CompanyListV1` direct report.
+    // rows this test exercises are expressed in that shape.
     let duplicate_company_xml = format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company A"><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY><COMPANY NAME=" synthetic company a "><GUID TYPE="String">{company_guid}</GUID><COMPANYNUMBER TYPE="Number">100002</COMPANYNUMBER><BOOKSFROM TYPE="Date">20270401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#
     );
@@ -1361,9 +1360,8 @@ async fn direct_company_snapshot_probe_rejects_identity_without_company_collecti
     );
     let direct = "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>direct-guid-must-not-escape</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>";
     // `fetch_companies` (called from `bootstrap_direct_company`, the second
-    // POST below) now requests the native `Company` collection
-    // (`ReadOnlyProfile::CompanyListV2`) rather than the legacy
-    // `CompanyListV1` direct report, so its response carries that shape.
+    // POST below) requests the native `Company` collection
+    // (`ReadOnlyProfile::CompanyListV2`), so its response carries that shape.
     // Its GUID must still not escape into the returned identity -- only
     // the third, scoped `standard` read may do that.
     let discovered = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">discovered-guid-must-not-escape</GUID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#;

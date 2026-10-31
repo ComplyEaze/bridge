@@ -246,8 +246,7 @@ pub enum ReadOnlyProfile<'a> {
     /// A versioned Company collection that includes the observed company
     /// number required to distinguish year-split sibling books.
     CompanyBookExtentV2 { company: &'a ValidatedCompanyName },
-    /// A narrow compatibility bootstrap for Tally responders that reject
-    /// Bridge's custom report profile but accept the documented built-in
+    /// A narrow compatibility bootstrap through the documented built-in
     /// `List of Ledgers` collection. Its output is parsed only for repeated
     /// computed company context; ledger data is discarded.
     StandardLedgerIdentityV1 { company: &'a ValidatedCompanyName },

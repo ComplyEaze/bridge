@@ -13,8 +13,8 @@ const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[r
 
 // Legacy, deliberately quarantined request profiles. The last two, the
 // custom company report and its test-only twin, were deleted under #1872, so
-// the set is empty. The match is exact: adding either hazard anywhere fails
-// this gate. A new exception requires a reviewed edit to this list and a
+// the set is empty. The match is exact: adding any hazard of any kind anywhere
+// fails this gate. A new exception requires a reviewed edit to this list and a
 // distinct request-profile decision.
 const expected = new Set([]);
 
@@ -27,6 +27,8 @@ const ATTRIBUTES = String.raw`((?:#\[[^\]]*\]\s*)*)(?:pub(?:\([^)]*\))?\s+)?mod\
 
 const actual = new Set();
 const sources = ["src-tauri"].flatMap((sourceRoot) => rustFiles(resolve(repositoryRoot, sourceRoot)));
+// With nothing pinned, a scan of no files would pass silently (AGENTS.md P5).
+if (sources.length === 0) throw new Error("Tally request-builder hazard scan found no Rust files under src-tauri");
 // A file reached only through a test-only module declaration is test code, by
 // its #[cfg(test)] attribute rather than by its name (#837).
 const quarantined = testOnlyFiles(sources);
@@ -48,7 +50,7 @@ if (unexpected.length || missing.length) {
 
 console.log(
   `Tally request-builder hazards match the pinned set (${actual.size} violations; ` +
-    `${quarantined.size} test-only file(s) skipped by their #[cfg(test)] mod declaration).`,
+    `${sources.length} file(s) found, ${quarantined.size} test-only file(s) skipped by their #[cfg(test)] mod declaration).`,
 );
 
 function rustFiles(directory) {

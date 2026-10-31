@@ -41,7 +41,7 @@ function gate(root) {
     const unexpected = /\nunexpected:\n([\s\S]*?)$/.exec(output)?.[1] ?? "";
     return [...new Set(unexpected.split("\n").filter((line) => line.startsWith("- ")).map((line) => line.slice(2)))].sort();
   }
-  assert.match(output, /match the pinned set \(0 violations;/, "a passing scan must say it completed");
+  assert.match(output, /match the pinned set \(0 violations; [1-9][0-9]* file\(s\) found,/, "a passing scan must say it completed");
   return [];
 }
 
@@ -120,6 +120,20 @@ async function scanTree(files) {
     await rm(root, { recursive: true, force: true });
   }
 }
+
+// With nothing pinned, a scan that found no files would otherwise pass (P5).
+test("a tree with no Rust files is refused, not passed", async () => {
+  const root = await mkdtemp(join(tmpdir(), ".request-builder-hazards-"));
+  try {
+    await mkdir(join(root, "src-tauri/src"), { recursive: true });
+    assert.throws(
+      () => execFileSync("node", [GATE, "--root", root], { encoding: "utf8", stdio: "pipe" }),
+      (error) => /found no Rust files under src-tauri/.test(`${error.stdout ?? ""}${error.stderr ?? ""}`),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 // #1872 deleted the two pinned custom company reports, so the real tree no
 // longer exercises this kind; this tree is its positive control. A bare

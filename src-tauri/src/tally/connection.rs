@@ -1588,12 +1588,10 @@ impl TallyClient {
     }
 
     /// Discovers companies through Tally's documented `Company` collection
-    /// (`ReadOnlyProfile::CompanyListV2`), not the custom TDL company report
-    /// Bridge once sent (deleted under #1872). Unlike that report -- which one Tally instance
-    /// answers with a bare, unwrapped `<COMPANYINFO>` document and another is
-    /// known to simply hang on -- the collection always answers with the
-    /// ordinary shaped `HEADER/STATUS=1` envelope, so `parse_companies_from_collection`
-    /// can require that shape outright.
+    /// (`ReadOnlyProfile::CompanyListV2`). It answers with the ordinary shaped
+    /// `HEADER/STATUS=1` envelope, so `parse_companies_from_collection` can
+    /// require that shape outright. Bridge sends no custom TDL report for this
+    /// (#1872).
     pub async fn fetch_companies(&self) -> anyhow::Result<Vec<TallyCompany>> {
         self.fetch_companies_with_wire_evidence()
             .await

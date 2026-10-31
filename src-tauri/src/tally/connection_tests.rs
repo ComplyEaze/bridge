@@ -957,9 +957,8 @@ async fn capability_probe_records_unavailable_product_mode_evidence_without_refu
     );
 }
 
-/// `fetch_companies` now requests the native `Company` collection
-/// (`ReadOnlyProfile::CompanyListV2`) instead of the legacy `CompanyListV1`
-/// custom TDL report. This asserts the request itself carries that shape --
+/// `fetch_companies` requests the native `Company` collection
+/// (`ReadOnlyProfile::CompanyListV2`). This asserts the request itself carries that shape --
 /// `TYPE=Collection`, no `REPORT`/`FORM`/`PART`/`LINE`/`FIELD` stack, and no
 /// `SVCURRENTCOMPANY` scoping a discovery read to one company -- and that a
 /// company row's `NAME` attribute and nested `GUID` are trimmed and returned.
@@ -1055,10 +1054,9 @@ async fn direct_company_bootstrap_uses_only_the_shaped_collection_identity() {
         .await
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
-    // `fetch_companies` (the first of the two reads below) now requests the
+    // `fetch_companies` (the first of the two reads below) requests the
     // native `Company` collection (`ReadOnlyProfile::CompanyListV2`), so its
-    // response carries that shape rather than the legacy `CompanyListV1`
-    // direct report. Its GUID must still not escape into the returned
+    // response carries that shape. Its GUID must still not escape into the returned
     // identity -- only the second, scoped `standard` read may do that.
     let discovered = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">scoped-guid</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#;
     let standard = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO /></DESC><DATA><COLLECTION MSTDEPTYPE=\"Ledger\" ISMSTDEPTYPE=\"Yes\"><SyntheticLedger NAME=\"synthetic-ledger\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">ledger-guid</GUID><PARENT TYPE=\"String\">Primary</PARENT><BRIDGECOMPANYGUID TYPE=\"String\">scoped-guid</BRIDGECOMPANYGUID><BRIDGECOMPANYNAME TYPE=\"String\">Synthetic Company</BRIDGECOMPANYNAME><LANGUAGENAME.LIST><LANGUAGEID>1033</LANGUAGEID></LANGUAGENAME.LIST></SyntheticLedger></COLLECTION></DATA></BODY></ENVELOPE>";

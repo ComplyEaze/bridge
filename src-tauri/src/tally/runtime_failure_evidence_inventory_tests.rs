@@ -53,7 +53,7 @@ fn retained(error: &anyhow::Error) -> &RuntimeReadEvidence {
 }
 
 #[tokio::test]
-async fn probe_failures_retain_completed_get_and_discovery_before_failed_attempt() {
+async fn probe_failures_retain_the_completed_get_before_the_failed_discovery_attempt() {
     // The probe sends one company request (`CompanyListV2`) and no fallback
     // after it (#1872), so the failed attempt is the second of two.
     for framing in [

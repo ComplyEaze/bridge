@@ -50,6 +50,8 @@ use company::*;
 mod cash_flow;
 #[path = "agent_company_features.rs"]
 mod company_features;
+#[path = "agent_failure_code.rs"]
+mod failure_code;
 #[path = "agent_gst_status.rs"]
 mod gst_status;
 #[path = "agent_gst_uncertain.rs"]
@@ -1131,6 +1133,12 @@ fn unanswered_cause(error: &anyhow::Error) -> Option<Unanswered> {
 struct RowCounts {
     returned: u64,
     counted: u64,
+}
+
+impl From<failure_code::FailureCode> for ToolFailure {
+    fn from(code: failure_code::FailureCode) -> Self {
+        Self::from(code.as_str().to_string())
+    }
 }
 
 impl From<String> for ToolFailure {

@@ -11,6 +11,7 @@
 //!
 //! A voucher's status is read from the second read's own flags. The count is a count, not a
 //! source: nothing is classified from it.
+use super::failure_code::GstUncertainCode;
 use super::gst_status::{
     counts_json, gst_status_item_status, status_arguments, status_counts, GstStatus, Node,
     StatusRow,
@@ -178,8 +179,8 @@ impl Server {
             .await?;
         let counted = counted.len() as u64;
         if counted > UNCERTAIN_MAX_WINDOW_VOUCHERS {
-            let mut failure = ToolFailure::from("gst_uncertain_window_too_large".to_string())
-                .with_prior_evidence(evidence);
+            let mut failure =
+                ToolFailure::from(GstUncertainCode::WindowTooLarge).with_prior_evidence(evidence);
             failure.counts = Some(Box::new(RowCounts {
                 returned: 0,
                 counted,
@@ -198,8 +199,8 @@ impl Server {
         // window (an empty one would read as "none found"). More than counted is not refused: a
         // voucher saved between the two reads is allowed for in the limitations.
         if (rows.len() as u64) < counted {
-            let mut failure = ToolFailure::from("gst_uncertain_wide_read_short".to_string())
-                .with_prior_evidence(evidence);
+            let mut failure =
+                ToolFailure::from(GstUncertainCode::WideReadShort).with_prior_evidence(evidence);
             failure.counts = Some(Box::new(RowCounts {
                 returned: rows.len() as u64,
                 counted,
@@ -231,8 +232,8 @@ impl Server {
             }
         }
         if items.len() > self.settings.max_rows {
-            let mut failure = ToolFailure::from("gst_uncertain_rows_over_limit".to_string())
-                .with_prior_evidence(evidence);
+            let mut failure =
+                ToolFailure::from(GstUncertainCode::RowsOverLimit).with_prior_evidence(evidence);
             failure.counts = Some(Box::new(RowCounts {
                 returned: 0,
                 counted: items.len() as u64,

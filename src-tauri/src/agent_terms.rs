@@ -26,7 +26,7 @@
 //! The desktop app has its own acceptance (`desktop_terms.rs`, bridge#1106): the same record file
 //! in the app's own data folder, a line with `source` `desktop_app`. A line counts only for the
 //! source that wrote it, so an acceptance made in the extension does not open the app.
-use super::egress::{append_egress_line, read_egress_tail};
+use super::egress::{append_egress_line_unless, read_egress_tail, EgressTail};
 use chrono::{SecondsFormat, Utc};
 use serde_json::{json, Value};
 use std::path::Path;
@@ -84,31 +84,42 @@ impl TermsGate {
 }
 
 /// Whether the record holds a line that accepts [`TERMS_VERSION`] from `source`. A missing file is
-/// "not accepted"; an unreadable one (or a torn last line) is an error, and the caller refuses.
+/// "not accepted". A torn last line is never an acceptance: it is left for the next acceptance to
+/// repair (#2172). An unreadable file, or a line that is neither a record nor vouched for as torn,
+/// is an error, and the caller refuses.
 pub(crate) fn acceptance_recorded(data_dir: &Path, source: &str) -> Result<bool, String> {
     let path = data_dir.join(RECORD_FILE);
     let tail = read_egress_tail(&path, RECORD_SCAN_LINES)?;
-    Ok(tail.records.iter().any(|line| {
+    Ok(accepts(&tail, source))
+}
+
+/// Whether one of `tail`'s whole records accepts [`TERMS_VERSION`] from `source`.
+fn accepts(tail: &EgressTail, source: &str) -> bool {
+    tail.records.iter().any(|line| {
         serde_json::from_str::<Value>(line)
             .ok()
             .is_some_and(|record| {
                 record["terms_version"] == TERMS_VERSION && record["source"] == source
             })
-    }))
+    })
 }
 
 /// Appends the acceptance of [`TERMS_VERSION`] from `source` once. A version already recorded for
-/// that source is not recorded again.
+/// that source is not recorded again. The repair of a torn last line, the check and the append
+/// happen under one exclusive lock, so the desktop app and the MCP server cannot both append.
 pub(crate) fn record_acceptance(data_dir: &Path, source: &str) -> Result<(), String> {
-    if acceptance_recorded(data_dir, source)? {
-        return Ok(());
-    }
     let record = json!({
         "terms_version": TERMS_VERSION,
         "accepted_at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         "source": source,
     });
-    append_egress_line(&data_dir.join(RECORD_FILE), &record.to_string())
+    append_egress_line_unless(
+        &data_dir.join(RECORD_FILE),
+        &record.to_string(),
+        RECORD_SCAN_LINES,
+        |tail| accepts(tail, source),
+    )
+    .map(|_| ())
 }
 
 #[cfg(test)]

@@ -509,6 +509,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_no_response: 2,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
             no_dispatch_never_verified: 1
         }
@@ -522,6 +523,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
             no_dispatch_never_verified: 0
         }
@@ -1559,6 +1561,89 @@ fn a_posts_reading_is_recorded_on_the_first_batch_it_covers() {
     );
 }
 
+/// #1050: in the local data report's count, a native post a recorded restore
+/// covers is not settled whatever its latest status reads, and counts in its
+/// own bucket and in no other part of `unsettled`.
+#[test]
+fn a_restored_post_is_not_settled_whatever_its_status_reads() {
+    let created = captured_outcome().counters().created;
+    assert!(created > 0);
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let verified = |line: &ImportLedgerLine| {
+        let mut read = line.clone();
+        read.status = "posted_verified".into();
+        record(&StatusRecord::from(&read))
+    };
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        verified(&p1),
+        record(&p2),
+        intent(&p2, Some(1 + created)),
+        answered(&p2),
+    ];
+    let before = settlement(Cursor::new(journal.concat())).unwrap();
+    // P1 verified and settled; P2 answered, not yet verified.
+    assert_eq!((before.unsettled, before.unsettled_restored), (1, 0));
+    let read = journal.len() as u64;
+    journal.push(seen(&p2, 1, read));
+    let after = settlement(Cursor::new(journal.concat())).unwrap();
+    assert_eq!(after.unsettled, 2, "{after:?}");
+    assert_eq!(after.unsettled_restored, 2, "{after:?}");
+    assert_eq!(
+        after.unsettled_no_response + after.unsettled_binding_refused + after.unsettled_reviewed,
+        0,
+        "{after:?}"
+    );
+    assert_eq!(after.settled_by_person, 0);
+    assert_eq!(after.sent_or_found, 2, "the rows stay held");
+}
+
+/// #1050: a cover reaches only native posts dispatched before its reading. A
+/// hand-imported batch beside it, with no dispatch intent, and a post sent
+/// after the record are counted as before, and the parts still sum to
+/// `unsettled`.
+#[test]
+fn a_restore_leaves_a_hand_import_and_a_later_post_where_they_were() {
+    let created = captured_outcome().counters().created;
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let hand = placed("hand", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let later = placed("later", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut hand_found = hand.clone();
+    hand_found.status = "posted_verified".into();
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        record(&hand_found),
+    ];
+    let read = journal.len() as u64;
+    journal.push(seen(&p1, 1, read));
+    journal.push(record(&later));
+    // Its floor is above the record's mark, so only its place after the
+    // record keeps it uncovered.
+    journal.push(intent(&later, Some(1 + created)));
+    let counted = settlement(Cursor::new(journal.concat())).unwrap();
+    assert!(created > 0);
+    // P1 restored; `later` sent after the record, no answer: no response;
+    // the hand import was never dispatched and was found posted.
+    assert_eq!(counted.unsettled_restored, 1, "{counted:?}");
+    assert_eq!(counted.unsettled_no_response, 1, "{counted:?}");
+    assert_eq!(counted.unsettled, 2, "{counted:?}");
+    assert_eq!(counted.sent_or_found, 3, "{counted:?}");
+    assert_eq!(counted.no_dispatch_never_verified, 0, "{counted:?}");
+    assert_eq!(
+        counted.unsettled,
+        counted.unsettled_no_response
+            + counted.unsettled_binding_refused
+            + counted.unsettled_reviewed
+            + counted.unsettled_restored,
+        "{counted:?}"
+    );
+}
+
 /// A record judges a batch only on what the journal held when its mark was
 /// read: a post written after that point, or answered after it, is not
 /// covered by a mark its own vouchers had not yet raised.
@@ -2032,10 +2117,17 @@ fn a_reviewed_batch_is_counted_in_its_own_bucket_until_voided() {
     assert_eq!(counts(&both), (2, 0, 1, 1));
     both.push(reviewed(&p2, ResponseNotRecorded));
     assert_eq!(counts(&both), (2, 0, 0, 2));
-    // A restore below both posts' floors voids both reviews.
+    // A restore below both posts' floors voids both reviews, and both posts
+    // then count as restored and in no other part (#1050).
     let read = both.len() as u64;
     both.push(seen(&p2, 1, read));
-    assert_eq!(counts(&both), (2, 1, 1, 0));
+    assert_eq!(counts(&both), (2, 0, 0, 0));
+    assert_eq!(
+        settlement(Cursor::new(both.concat()))
+            .unwrap()
+            .unsettled_restored,
+        2
+    );
 }
 
 /// The writer's check: the review a record would stand as if appended, or the
@@ -2298,10 +2390,17 @@ fn a_settled_batch_leaves_every_not_settled_count_until_voided() {
     assert_eq!(counts(&reviewed_too), (2, 0, 1, 1, 0, 2));
     reviewed_too.push(settled(&p1));
     assert_eq!(counts(&reviewed_too), (1, 0, 1, 0, 1, 2));
-    // A restore below the post's floor voids the settlement.
+    // A restore below the post's floor voids the settlement, and both posts
+    // then count as restored and in no other part (#1050).
     let read = settled_journal.len() as u64;
     settled_journal.push(seen(&p2, 1, read));
-    assert_eq!(counts(&settled_journal), (2, 1, 1, 0, 0, 2));
+    assert_eq!(counts(&settled_journal), (2, 0, 0, 0, 0, 2));
+    assert_eq!(
+        settlement(Cursor::new(settled_journal.concat()))
+            .unwrap()
+            .unsettled_restored,
+        2
+    );
 }
 
 /// The writer's check: whether a record would stand if appended, or the

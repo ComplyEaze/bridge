@@ -1,0 +1,625 @@
+{
+  "file": "src-tauri/src/agent_import_post_voucher_text.rs",
+  "base_commit": "026ba163dfcbf75d515a24d0dbbf14c5245534ec",
+  "about": "Every mutant was applied to the file as it is at base_commit; the change that adds this record changes only the file's test module. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 1873,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_post_voucher_text.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv/)'",
+      "time": "2026-10-29T23:04:45.599578Z"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 1873,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/import|numbering|post|approv/)'"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 1876,
+      "command": "as the hand run, for the tool's two missed mutants and the seven hand-written ones that survived"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "unviable": 1,
+      "caught": 45
+    },
+    "hand": {
+      "caught": 26
+    },
+    "survived_at_base": {
+      "tool": 2,
+      "hand": 7
+    }
+  },
+  "tool_results": {
+    "39:9 replace VoucherText<'a>::of -> Result<Self, VoucherTextRefusal> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `VoucherText<'_>: std::default::Default` is not satisfied"
+    },
+    "39:31 replace <= with > in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "42:33 replace > with == in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_dialog_cap_is_refused_before_splitting",
+      "killer_at": "base"
+    },
+    "42:33 replace > with < in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "42:33 replace > with >= in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::the_cap_counts_the_value_itself_and_refuses_from_one_character_over",
+      "killer_at": "this_commit"
+    },
+    "45:31 replace || with && in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "50:15 delete ! in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "51:48 replace + with - in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "51:48 replace + with * in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::the_width_of_each_part_is_asked_by_its_number",
+      "killer_at": "base"
+    },
+    "52:35 replace <= with > in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "58:53 replace == with != in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::each_review_cap_refuses_on_its_own",
+      "killer_at": "base"
+    },
+    "59:35 replace + with - in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_narration_is_shown_in_quoted_parts_below_the_dashes",
+      "killer_at": "base"
+    },
+    "59:35 replace + with * in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_narration_is_shown_in_quoted_parts_below_the_dashes",
+      "killer_at": "base"
+    },
+    "60:63 replace <= with > in VoucherText<'a>::of": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "71:9 replace VoucherText<'a>::parts -> &[&'a str] with Vec::leak(Vec::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+      "killer_at": "base"
+    },
+    "71:9 replace VoucherText<'a>::parts -> &[&'a str] with Vec::leak(vec![\"\"])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+      "killer_at": "base"
+    },
+    "71:9 replace VoucherText<'a>::parts -> &[&'a str] with Vec::leak(vec![\"xyzzy\"])": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+      "killer_at": "base"
+    },
+    "77:5 replace quoted -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+      "killer_at": "base"
+    },
+    "77:5 replace quoted -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "81:5 replace quoted_chars -> usize with 0": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "81:5 replace quoted_chars -> usize with 1": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "88:5 replace has_dash_run -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "88:5 replace has_dash_run -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
+      "killer_at": "base"
+    },
+    "93:13 replace || with && in has_dash_run": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "92:13 replace || with && in has_dash_run": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
+      "killer_at": "base"
+    },
+    "91:33 replace == with != in has_dash_run": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "92:26 replace == with != in has_dash_run": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "97:45 replace + with - in has_dash_run": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "97:45 replace + with * in has_dash_run": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
+      "killer_at": "base"
+    },
+    "98:13 replace >= with < in has_dash_run": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "106:5 replace has_bracketed_number -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "106:5 replace has_bracketed_number -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "110:51 replace && with || in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "110:15 replace == with != in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "111:35 replace + with - in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "111:35 replace + with * in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "113:43 replace == with != in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "115:24 replace && with || in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "115:20 replace > with == in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "115:20 replace > with < in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "115:20 replace > with >= in has_bracketed_number": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "115:54 replace == with != in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "115:44 replace + with - in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "115:44 replace + with * in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "115:40 replace + with - in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "115:40 replace + with * in has_bracketed_number": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "T01": {
+      "what": "MOST_CHARS: the cap admits four characters more (boundary moved)",
+      "edits": [
+        {
+          "from": "const MOST_CHARS: usize = 1_600;",
+          "to": "const MOST_CHARS: usize = 1_604;"
+        }
+      ],
+      "mutation": "5655e6efed23248500cc67a46551d8c8",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read",
+      "killer_at": "this_commit"
+    },
+    "T02": {
+      "what": "MOST_CHARS: the cap admits one character fewer (boundary moved)",
+      "edits": [
+        {
+          "from": "const MOST_CHARS: usize = 1_600;",
+          "to": "const MOST_CHARS: usize = 1_599;"
+        }
+      ],
+      "mutation": "fa8c09d27b282352c9e4d251baa6bcf3",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::the_cap_counts_the_value_itself_and_refuses_from_one_character_over",
+      "killer_at": "this_commit"
+    },
+    "T03": {
+      "what": "DASH_RUN: five dashes needed, not four (boundary moved)",
+      "edits": [
+        {
+          "from": "const DASH_RUN: usize = 4;",
+          "to": "const DASH_RUN: usize = 5;"
+        }
+      ],
+      "mutation": "0ba2da5e1a845b0e62f758d553a4e1b5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
+      "killer_at": "base"
+    },
+    "T04": {
+      "what": "DASH_RUN: three dashes suffice (boundary moved)",
+      "edits": [
+        {
+          "from": "const DASH_RUN: usize = 4;",
+          "to": "const DASH_RUN: usize = 3;"
+        }
+      ],
+      "mutation": "68f2e5b8aa84df53e35a819a5e66a1fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "T05": {
+      "what": "of: the one-line test measures the raw text, not its quoted form",
+      "edits": [
+        {
+          "from": "if quoted_chars(text) <= one_line {",
+          "to": "if text.chars().count() <= one_line {"
+        }
+      ],
+      "mutation": "8f6288ead875e84a6a7281348e8a00f0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::widths_are_measured_on_the_quoted_form",
+      "killer_at": "base"
+    },
+    "T06": {
+      "what": "of: the cap is measured on the quoted form, not the raw text",
+      "edits": [
+        {
+          "from": "if text.chars().count() > MOST_CHARS {",
+          "to": "if quoted_chars(text) > MOST_CHARS {"
+        }
+      ],
+      "mutation": "71e1645bb8dd2b48704eda8dd407990d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::the_cap_counts_the_value_itself_and_refuses_from_one_character_over",
+      "killer_at": "this_commit"
+    },
+    "T07": {
+      "what": "of: the layout check is skipped for a dash run (guard dropped)",
+      "edits": [
+        {
+          "from": "if has_dash_run(text) || has_bracketed_number(text) {",
+          "to": "if has_bracketed_number(text) {"
+        }
+      ],
+      "mutation": "5aa187497fdb9c45f11cf3828f20c0fb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
+      "killer_at": "base"
+    },
+    "T08": {
+      "what": "of: the layout check is skipped for a bracketed number (guard dropped)",
+      "edits": [
+        {
+          "from": "if has_dash_run(text) || has_bracketed_number(text) {",
+          "to": "if has_dash_run(text) {"
+        }
+      ],
+      "mutation": "65eff7f23a7affdc6b8a392dbc0ba109",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "T09": {
+      "what": "of: the cap is checked after the layout check (two arms swapped)",
+      "edits": [
+        {
+          "from": "        if text.chars().count() > MOST_CHARS {\n            return Err(VoucherTextRefusal::DoesNotFit);\n        }\n        if has_dash_run(text) || has_bracketed_number(text) {\n            return Err(VoucherTextRefusal::Layout);\n        }",
+          "to": "        if has_dash_run(text) || has_bracketed_number(text) {\n            return Err(VoucherTextRefusal::Layout);\n        }\n        if text.chars().count() > MOST_CHARS {\n            return Err(VoucherTextRefusal::DoesNotFit);\n        }"
+        }
+      ],
+      "mutation": "9501df84969a875a134829766eccdd7b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read",
+      "killer_at": "this_commit"
+    },
+    "T10": {
+      "what": "of: an over-cap value is refused as layout (verdict swapped)",
+      "edits": [
+        {
+          "from": "        if text.chars().count() > MOST_CHARS {\n            return Err(VoucherTextRefusal::DoesNotFit);",
+          "to": "        if text.chars().count() > MOST_CHARS {\n            return Err(VoucherTextRefusal::Layout);"
+        }
+      ],
+      "mutation": "92fa246b961070ed1a52fb374370a8c6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_over_the_dialog_cap_is_refused_before_splitting",
+      "killer_at": "base"
+    },
+    "T11": {
+      "what": "of: a layout refusal is reported as does-not-fit (verdict swapped)",
+      "edits": [
+        {
+          "from": "            return Err(VoucherTextRefusal::Layout);",
+          "to": "            return Err(VoucherTextRefusal::DoesNotFit);"
+        }
+      ],
+      "mutation": "5cd41b59c5d5419b9ba1b3498fb0228f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "T12": {
+      "what": "of: a part's width is asked one number too high",
+      "edits": [
+        {
+          "from": "let width = part_width(parts.len() + 1);",
+          "to": "let width = part_width(parts.len() + 2);"
+        }
+      ],
+      "mutation": "c52365bd5004691c1908962866869d53",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::the_width_of_each_part_is_asked_by_its_number",
+      "killer_at": "base"
+    },
+    "T13": {
+      "what": "of: the shortest fitting prefix is taken, not the longest",
+      "edits": [
+        {
+          "from": "                .last()\n",
+          "to": "                .next()\n"
+        }
+      ],
+      "mutation": "5b83fcf5b3742fbd47e32a3f3d6aa4ec",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "T14": {
+      "what": "of: a split falls before the space, not after it",
+      "edits": [
+        {
+          "from": ".map(|(at, _)| at + 1)",
+          "to": ".map(|(at, _)| at)"
+        }
+      ],
+      "mutation": "86478955f9eecfd17f27223d5694290a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_narration_is_shown_in_quoted_parts_below_the_dashes",
+      "killer_at": "base"
+    },
+    "T15": {
+      "what": "of: any whitespace splits, not only a space",
+      "edits": [
+        {
+          "from": ".filter(|(_, character)| *character == ' ')",
+          "to": ".filter(|(_, character)| character.is_whitespace())"
+        }
+      ],
+      "mutation": "4ec9f3ab270161c4544e11339b9483be",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::only_a_space_splits_a_value",
+      "killer_at": "this_commit"
+    },
+    "T16": {
+      "what": "of: the last part's own width is not checked (guard dropped)",
+      "edits": [
+        {
+          "from": "            if quoted_chars(rest) <= width {\n                parts.push(rest);\n                break;\n            }",
+          "to": "            if !rest.contains(' ') {\n                parts.push(rest);\n                break;\n            }"
+        }
+      ],
+      "mutation": "31368dd5bc421f2ff2178fbc2dac6d7c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "T17": {
+      "what": "quoted: a value is wrapped in quotes without escaping",
+      "edits": [
+        {
+          "from": "serde_json::to_string(text).expect(\"string serialization\")",
+          "to": "format!(\"\\\"{text}\\\"\")"
+        }
+      ],
+      "mutation": "3c8ae847547020652f13d2adfd7bfb35",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_in_parts_holding_a_quote_and_a_backslash_reads_back_whole",
+      "killer_at": "base"
+    },
+    "T18": {
+      "what": "has_dash_run: the minus sign is not dash-like (arm dropped)",
+      "edits": [
+        {
+          "from": "|| character == '\\u{2212}'",
+          "to": "|| character == '\\u{2213}'"
+        }
+      ],
+      "mutation": "f342fddc6712db2105146f2e035f24c1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "T19": {
+      "what": "has_dash_run: the last box-drawing character is not dash-like (range end moved)",
+      "edits": [
+        {
+          "from": "('\\u{2500}'..='\\u{257F}')",
+          "to": "('\\u{2500}'..'\\u{257F}')"
+        }
+      ],
+      "mutation": "1f9b3d500aa13e6dcbd5307a30ffc791",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "T20": {
+      "what": "has_dash_run: the first box-drawing character is not dash-like (range start moved)",
+      "edits": [
+        {
+          "from": "('\\u{2500}'..='\\u{257F}')",
+          "to": "('\\u{2501}'..='\\u{257F}')"
+        }
+      ],
+      "mutation": "aa2d44b6f164794d68f8a87fdfd855bb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "T21": {
+      "what": "has_dash_run: dash punctuation is not dash-like (category swapped)",
+      "edits": [
+        {
+          "from": "GeneralCategory::DashPunctuation",
+          "to": "GeneralCategory::ConnectorPunctuation"
+        }
+      ],
+      "mutation": "93c1ccd22a808aab0de1720d88e725c7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_long_voucher_text_that_cannot_be_shown_in_parts_is_refused_whole",
+      "killer_at": "base"
+    },
+    "T22": {
+      "what": "has_dash_run: a run is not reset by another character (guard dropped)",
+      "edits": [
+        {
+          "from": "run = if dash_like(character) { run + 1 } else { 0 };",
+          "to": "run = if dash_like(character) { run + 1 } else { run };"
+        }
+      ],
+      "mutation": "f11218e6f750a910cf2b3ffe35f9295b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "T23": {
+      "what": "has_bracketed_number: an opening bracket is any open-or-initial punctuation (category widened)",
+      "edits": [
+        {
+          "from": "*kind == GeneralCategory::OpenPunctuation &&",
+          "to": "(*kind == GeneralCategory::OpenPunctuation || *kind == GeneralCategory::InitialPunctuation) &&"
+        }
+      ],
+      "mutation": "7c22eeb354696bc3646eb1b296209e10",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "T24": {
+      "what": "has_bracketed_number: the closing bracket is not checked (guard dropped)",
+      "edits": [
+        {
+          "from": "digits > 0 && chars.get(at + 1 + digits) == Some(&GeneralCategory::ClosePunctuation)",
+          "to": "digits > 0"
+        }
+      ],
+      "mutation": "0560f532e7e64a34eb12ca4211d5e6b8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::voucher_text::tests::a_value_in_parts_may_not_hold_dashes_or_a_bracketed_number",
+      "killer_at": "base"
+    },
+    "T25": {
+      "what": "has_bracketed_number: digits are any number, not decimal digits (category swapped)",
+      "edits": [
+        {
+          "from": "**kind == GeneralCategory::DecimalNumber",
+          "to": "**kind == GeneralCategory::OtherNumber"
+        }
+      ],
+      "mutation": "a5d21cf6edfdaf9e87dff1d7e48233e9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    },
+    "T26": {
+      "what": "has_bracketed_number: open and close brackets swapped (two arms swapped)",
+      "edits": [
+        {
+          "from": "*kind == GeneralCategory::OpenPunctuation &&",
+          "to": "*kind == GeneralCategory::ClosePunctuation &&"
+        },
+        {
+          "from": "Some(&GeneralCategory::ClosePunctuation)",
+          "to": "Some(&GeneralCategory::OpenPunctuation)"
+        }
+      ],
+      "mutation": "889b77aae1e73a920da7bc986e161e10",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {}
+}

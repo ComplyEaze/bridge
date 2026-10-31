@@ -233,6 +233,7 @@ def state():
         "surface_merge_base": None,      # None: the merge base is the base tip
         "surface_at": {},                # commit sha -> surface served at that ref (branch history)
         "surface_at_fail": set(),        # commit shas whose pin list cannot be read
+        "surface_at_flaky": {},          # commit sha -> (failures before a success, gh's error line); counted in $GATE_STATE
         "merge_base_fail": False,
         "ack_text": None,
         "ack_fail": False,
@@ -733,13 +734,35 @@ def state():
             commit["parents"] = [{"sha": p} for p in parents]
             return commit
 
-        if scenario == "history-merge-parent-compared-with-all":
+        # A pin-list read that fails the first N times with gh's own error line, then answers (#2179).
+        flaky = {
+            "history-flaky-502-once": (c1, 1, "gh: Server Error (HTTP 502)"),
+            "history-flaky-502-always": (c1, 99, "gh: Server Error (HTTP 502)"),
+            "history-flaky-rate-limit-once": (c1, 1, "gh: You have exceeded a secondary rate limit. (HTTP 403)"),
+            "history-flaky-rate-limit-always": (c1, 99, "\ngh: You have exceeded a secondary rate limit for user ID 12345678. (HTTP 403)"),
+            "history-flaky-404-own-commit-once": (c1, 1, "gh: Not Found (HTTP 404)"),
+            "history-flaky-403-not-a-rate-limit": (c1, 99, "gh: Resource not accessible by integration (HTTP 403)"),
+            "history-flaky-404-outside-the-pr": (p2, 99, "gh: Not Found (HTTP 404)"),
+        }
+        if scenario in ("history-merge-parent-compared-with-all", "history-flaky-404-outside-the-pr"):
             # The pin z reached the branch through a merge's second parent, a master-side commit.
             merge = "e3" * 20
             s["commits"] = [commit_at(merge, [BASE_TIP, p2]), commit_at(HEAD, [merge])]
             s["surface_at"] = {merge: with_own, p2: with_own}
             set_changes(s, ("modified", "src/example.rs"))
             with_ack(s, ack_text(["src/example.rs"]))
+            if scenario in flaky:
+                sha, failures, message = flaky[scenario]
+                s["surface_at_flaky"] = {sha: (failures, message)}
+        elif scenario in flaky:
+            # As history-pin-kept-at-the-head, which passes, with one commit's read failing first.
+            s["commits"] = [commit_at(c1, [BASE_TIP]), commit_at(HEAD, [c1])]
+            s["surface_at"] = {c1: with_own}
+            s["surface_head"] = with_own
+            set_changes(s, ("modified", "src/example.rs"), ("modified", SURFACE_PATH))
+            with_ack(s, ack_text(["src/example.rs", own]))
+            sha, failures, message = flaky[scenario]
+            s["surface_at_flaky"] = {sha: (failures, message)}
         else:
             s["commits"] = [commit_at(c1, [BASE_TIP]), commit_at(HEAD, [c1])]
             s["surface_at"] = {c1: with_own}
@@ -1372,6 +1395,16 @@ elif args and args[0] == "api":
             if history_ref is not None:
                 if history_ref in S["surface_at_fail"]:
                     fail("controlled history surface read failure")
+                if history_ref in S["surface_at_flaky"]:
+                    failures, message = S["surface_at_flaky"][history_ref]
+                    state = os.environ.get("GATE_STATE")
+                    if not state:
+                        fail("a flaky scenario needs GATE_STATE, the file that counts its calls")
+                    calls = int(open(state).read() or "0") if os.path.exists(state) else 0
+                    with open(state, "w") as handle:
+                        handle.write(str(calls + 1))
+                    if calls < failures:
+                        fail(message)
                 emit({"encoding": "base64", "content": b64(S["surface_at"][history_ref])})
             elif f"ref={HEAD}" in joined:
                 if S["surface_head_fail"]:

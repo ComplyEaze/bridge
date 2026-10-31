@@ -161,9 +161,15 @@ fn before_approval_with_currencies(currencies: String) -> Vec<ScenarioPlan> {
 /// numbering pair, and identity and mode again. The types in `manual` read
 /// Manual, the rest Automatic.
 fn numbering_read(manual: &[&str]) -> Vec<ScenarioPlan> {
-    let (masters, numbering) =
-        crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, manual);
-    let mut plans = paired(marks());
+    numbering_read_of(
+        marks(),
+        crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, manual),
+    )
+}
+
+/// The master mark read `mark` and the numbering read of `(masters, numbering)`.
+fn numbering_read_of(mark: String, (masters, numbering): (String, String)) -> Vec<ScenarioPlan> {
+    let mut plans = paired(mark);
     plans.extend([status(), xml(companies()), xml(companies())]);
     for body in [masters, numbering] {
         plans.extend([xml(body.clone()), status(), xml(body), status()]);
@@ -2070,6 +2076,106 @@ async fn refused_busy_at_lease_send(lease_send: usize) {
         server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
         "post_refused_before_intent"
     );
+}
+
+/// #2142: a post whose own lock finds Tally still draining after a cut request
+/// is refused before its intent, like a busy lock: nothing recorded or sent,
+/// the approval lapsed, and the next step names the drain.
+#[tokio::test]
+async fn a_draining_endpoint_at_the_posts_own_lock_refuses_before_the_intent() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    // The POST is the last of the plans: its lock is the one found owed.
+    let post_send = plans.len() - 1;
+    plans.truncate(post_send);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends(vec![post_send]),
+    );
+    let (line, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "tally_endpoint_draining",
+        "{response}"
+    );
+    assert_eq!(result["error"]["retry_after_s"], 10, "{response}");
+    assert_eq!(
+        result["error"]["next_step"],
+        super::DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    // A refusal before the intent carries no dispatch: nothing was sent.
+    assert!(result["dispatch_response"].is_null(), "{response}");
+    assert!(result.get("dispatch").is_none(), "{response}");
+    assert_eq!(observed.len(), post_send, "no POST was sent: {response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+}
+
+/// #2142: a batch post whose marks readback finds Tally draining, and again on
+/// its one retry, records the drain as the readback's cause; the verdict stays
+/// a doubt.
+#[tokio::test]
+async fn a_batch_post_whose_readback_found_tally_draining_names_it_in_its_doubt() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    let readback = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends(vec![readback, readback + 1]),
+    );
+    let (line, args) = saved_batch_of_two(&server);
+    let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let response = super::MARKS_READS
+        .scope(
+            std::sync::Arc::clone(&reads),
+            SCRIPTED_APPROVAL.scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            ),
+        )
+        .await;
+    // Read once, then once more after the refusal's own wait.
+    assert_eq!(reads.lock().unwrap().len(), 2, "{response}");
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["post_location"]["after_read_failure"], "tally_endpoint_draining",
+        "{response}"
+    );
+    // The readback, refused twice, sent no marks read; the post's one later
+    // read still went.
+    assert_eq!(observed.len(), readback + 1, "{response}");
+    let imports = server.imports_dir().unwrap();
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{}.batch_step_doubt.json", line.batch_id))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(doubt["cause"], "tally_endpoint_draining", "{doubt}");
+    assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
 }
 
 #[tokio::test]
@@ -6444,6 +6550,104 @@ async fn a_journal_into_a_manual_journal_type_is_refused_before_the_approval() {
         appended_kinds(&before, &journal(directory.path())),
         ["verification_status"]
     );
+}
+
+/// Duplicate numbers prevented do not admit a voucher without a number into a
+/// Manual type: a native post sends every voucher but an invoice without one, so
+/// the Journal is refused as under Manual alone, and nothing is asked or sent.
+#[tokio::test]
+async fn a_journal_into_a_manual_journal_type_preventing_duplicates_is_refused_before_the_approval()
+{
+    let plans = before_approval_numbering(numbering_read_of(
+        marks(),
+        crate::agent::agent_import::numbering_fixtures::manual_answers_preventing_duplicates(
+            GUID,
+            &["Journal"],
+        ),
+    ));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_voucher_numbering_not_automatic",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"manual","duplicates":"prevented"}}]),
+        "{response}"
+    );
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the numbering read");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
+/// A voucher-type answer that is cut short fails the numbering read under the
+/// masters read's own code, not as a numbering refusal, and the dialog is never
+/// asked.
+#[tokio::test]
+async fn a_numbering_read_whose_answer_is_cut_short_fails_as_a_masters_read() {
+    let (masters, numbering) =
+        crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, &[]);
+    let cut = masters[..masters.len() / 2].to_string();
+    let plans = before_approval_numbering(numbering_read_of(marks(), (cut, numbering)));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "masters_read_failed", "{response}");
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
+/// The master mark read before the numbering read is in the refusal's evidence:
+/// a voucher mark of 100 for 10 makes each of the paired read's two answers one
+/// UTF-16 character, two bytes, longer, and the evidence four bytes larger.
+#[tokio::test]
+async fn the_master_mark_read_before_the_numbering_is_in_the_refusals_evidence() {
+    let mut bytes = Vec::new();
+    for mark in [marks_at(10), marks_at(100)] {
+        let plans = before_approval_numbering(numbering_read_of(
+            mark,
+            crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, &["Journal"]),
+        ));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (_, args) = saved_batch(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"],
+            "import_voucher_numbering_not_automatic",
+            "{response}"
+        );
+        bytes.push(
+            response["structuredContent"]["evidence"]["bytes"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("the refusal carries its evidence: {response}")),
+        );
+    }
+    assert_eq!(bytes[1], bytes[0] + 4, "{bytes:?}");
 }
 
 /// The Journal type reads Automatic with its series set to renumber: refused

@@ -260,6 +260,23 @@ fn posted_others_than<'a>(v: &'a Voucher, ledger: &str) -> BTreeSet<&'a str> {
         .collect()
 }
 
+/// #1875 rule 3, shape (a): every posted line is on a configured loan or a TDS ledger, the loan
+/// lines are all on one side, and the TDS lines net to their sum (Loan 1 Dr / Loan 2 Dr / TDS
+/// Payable Cr). Each loan's own line is then the TDS on it. A voucher that also crosses the loan,
+/// or carries any other posted line, is not this shape. A declared difference from the reference,
+/// which counts such a voucher's TDS on none of its loans.
+fn tds_split_across_loans(
+    v: &Voucher,
+    is_loan: impl Fn(&str) -> bool,
+    tds: &BTreeSet<String>,
+) -> bool {
+    let posted = || v.lines.iter().filter(|l| l.amount_paise != 0);
+    let on_loans = || posted().filter(|l| is_loan(&l.ledger));
+    posted().all(|l| is_loan(&l.ledger) || tds.contains(&l.ledger))
+        && (on_loans().all(|l| l.amount_paise > 0) || on_loans().all(|l| l.amount_paise < 0))
+        && on_loans().map(|l| i128::from(l.amount_paise)).sum::<i128>() + net_on(v, tds) == 0
+}
+
 /// A Python list of strings as `repr()` prints it.
 fn py_repr_list(items: &[String]) -> String {
     let inner: Vec<String> = items.iter().map(|s| py_repr_str(s)).collect();
@@ -1472,7 +1489,8 @@ classified as TDS payable, counted before that TDS."
         // loan. A voucher that also posts to another configured loan counts for neither; a nil line
         // on the other loan is not a posting (bridge#1201; the opposite-loan test gives it no side
         // either), and a nil line on this loan is not one either (bridge#1259: with a nil line on
-        // each of two loans, one deduction was read as on both).
+        // each of two loans, one deduction was read as on both). The exception is a voucher of
+        // loans on one side and TDS alone ([`tds_split_across_loans`], #1875 rule 3).
         let tds_by_voucher: Vec<(usize, i128)> = pop
             .iter()
             .enumerate()
@@ -1481,26 +1499,68 @@ classified as TDS payable, counted before that TDS."
                     && v.lines
                         .iter()
                         .any(|l| l.ledger == *loan_ledger && l.amount_paise != 0)
-                    && !v
-                        .lines
-                        .iter()
-                        .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)
             })
-            .map(|(at, v)| (at, -net_on(v, &tds_here)))
+            .filter_map(|(at, v)| {
+                let on_other_loan = v
+                    .lines
+                    .iter()
+                    .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0);
+                let is_loan = |x: &str| x == loan_ledger || other_loans.contains(x);
+                if !on_other_loan {
+                    Some((at, -net_on(v, &tds_here)))
+                } else if tds_split_across_loans(v, is_loan, &tds_here) {
+                    Some((at, net(v, loan_ledger)))
+                } else {
+                    None
+                }
+            })
             .filter(|&(_, x)| x != 0)
             .collect();
-        let tds_on_loan: i128 = tds_by_voucher.iter().map(|&(_, x)| x).sum();
+        // A voucher whose TDS nets to a debit stays out of the TDS deducted, named in its text,
+        // because a TDS debit can reverse an earlier deduction (#1875 rule 4, a declared
+        // difference from the reference, which nets it in). LOAN-1 adds it back to its tie.
+        let (deducted, debited): (Vec<(usize, i128)>, Vec<(usize, i128)>) =
+            tds_by_voucher.iter().partition(|&&(_, x)| x > 0);
+        let tds_on_loan: i128 = deducted.iter().map(|&(_, x)| x).sum();
         let ev_tds = voucher_refs(tds_by_voucher.iter().map(|&(at, _)| pop[at]));
+        let left_out = if debited.is_empty() {
+            String::new()
+        } else {
+            let named: BTreeSet<String> = debited
+                .iter()
+                .map(|&(at, _)| voucher_label(pop[at]))
+                .collect();
+            format!(
+                " Left out: {}, whose TDS lines net to a debit, since a TDS debit can reverse an \
+earlier deduction (tds_debited_on_loan_{h}).",
+                named.into_iter().collect::<Vec<_>>().join("; ")
+            )
+        };
         let f_tds = r.fig(
             &format!("tds_on_loan_{h}"),
             paise(tds_on_loan)?,
             Unit::Paise,
             &format!(
                 "TDS deducted on loan ledger (tag {h}): the lines on ledgers in the client's \
-statutory dues classified as TDS payable, on every voucher that posts to the loan."
+statutory dues classified as TDS payable, on every voucher that posts to the loan.{left_out}"
             ),
-            ev_tds.clone(),
+            voucher_refs(deducted.iter().map(|&(at, _)| pop[at])),
         )?;
+        if !debited.is_empty() {
+            r.fig(
+                &format!("tds_debited_on_loan_{h}"),
+                paise(-debited.iter().map(|&(_, x)| x).sum::<i128>())?,
+                Unit::Paise,
+                &format!(
+                    "TDS debited on loan ledger (tag {h}): on each voucher that posts to the loan \
+and whose lines on ledgers in the client's statutory dues classified as TDS payable net to a debit, \
+that debit, summed. It is not in the TDS deducted beside it, since a debit can reverse an earlier \
+deduction; it is shown so the loan's movement can be checked against the Trial Balance. Where such \
+a voucher is counted in the taken or repaid totals, its debit is inside tds_in_principal_{h} too."
+                ),
+                voucher_refs(debited.iter().map(|&(at, _)| pop[at])),
+            )?;
+        }
         // A voucher counted in taken or repaid already holds its TDS in its loan line (Loan Dr
         // 10,000 / TDS Cr 1,000 / Bank Cr 9,000 is a repayment of 10,000): LOAN-1 adds
         // tds_on_loan for the deductions outside those totals, so it is told what to leave out.
@@ -3523,9 +3583,11 @@ narrated with ACH, NACH, ECS or EMI (each has a notice)."
 /// taken and repaid totals already hold of it (`tds_in_principal_<tag>`, published where a taken
 /// or repaid voucher carries TDS lines that net to an amount on that voucher, at 0 when those
 /// vouchers' TDS offsets across them): a repayment booked net of TDS carries its deduction in its
-/// loan line (bridge#1259 item 2). Its re-derivation reads vouchers by GUID, as the reference does: on a GUID
-/// a voucher outside the taken and repaid rows shares, it reads that voucher too and the line can
-/// fire while the tie holds. It reads the published TDS ledger names as the figure holds them (an
+/// loan line (bridge#1259 item 2). The tie also adds back the TDS debits left out of the TDS
+/// deducted (`tds_debited_on_loan_<tag>`, #1875 rule 4). The re-derivation of
+/// `tds_in_principal_<tag>` reads vouchers by GUID, as the reference does: on a GUID a voucher
+/// outside the taken and repaid rows shares, it reads that voucher too and the line can fire while
+/// the tie holds. It reads the published TDS ledger names as the figure holds them (an
 /// empty name among others too; an empty figure as none), where LOAN-4 leaves the empty name out.
 /// Refs go in (id, label) order; the reference's, per id, is not fixed.
 pub fn check_invariants(book: &Book, result: &TestResult) -> Result<Vec<String>> {
@@ -3626,7 +3688,9 @@ pub fn check_invariants_with(
         let repaid_total = value(format!("{prefix}clause31_repaid_total_{h}"));
         // interest_total is gross of the TDS on its journals, and a TDS journal debits the loan
         // outside taken/repaid: the loan moved by the interest net of every TDS deduction on it.
-        let tds_on_loan = value(format!("{prefix}tds_on_loan_{h}"));
+        // The TDS debits run() left out of tds_on_loan moved the loan too (#1875 rule 4).
+        let tds_on_loan = value(format!("{prefix}tds_on_loan_{h}"))
+            - value(format!("{prefix}tds_debited_on_loan_{h}"));
         let interest = int_of(fig);
         // ... except the TDS on a voucher counted in taken or repaid, whose loan line holds it
         // (bridge#1259 item 2). It is re-derived from the vouchers the figure cites, by GUID, on
@@ -4245,7 +4309,7 @@ book the interest against its loan.",
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::book::{Ledger, LedgerLine, VoucherStatus};
+    use crate::book::{Ledger, LedgerLine, TbRow, VoucherStatus};
 
     fn table(text: &str) -> BTreeMap<String, toml::Value> {
         let t: toml::Table = toml::from_str(text).unwrap();
@@ -4597,6 +4661,260 @@ mod tests {
             matches!(&err, AuditError::Config(m) if m.contains("needs rules [s194a]")),
             "{err}"
         );
+    }
+
+    // #1875 rules 3 and 4, declared differences from the reference (parity spec section 12): each
+    // test below is the invented book its provenance note names.
+
+    /// Loans A and B (Loan A's interest ledger Interest A), TDS Payable as the TDS ledger and Bank
+    /// A, each loan's Trial Balance row moving by exactly its lines in `vouchers`, so LOAN-1 fires
+    /// only where its tie reads a voucher wrongly. Gives the result and its LOAN-1 lines.
+    fn two_loans_run(vouchers: Vec<Voucher>) -> (Book, TestResult, Vec<String>) {
+        let mut b = book(vouchers);
+        for (name, group) in [
+            ("Loan B", "Unsecured Loans"),
+            ("Interest A", "Indirect Expenses"),
+            ("TDS Payable", "Duties & Taxes"),
+            ("Bank A", "Bank Accounts"),
+            ("Suspense", "Suspense A/c"),
+        ] {
+            let mut l = b.ledgers["Cash"].clone();
+            (l.name, l.parent, l.chain) = (name.to_string(), group.to_string(), vec![group.into()]);
+            b.ledgers.insert(name.to_string(), l);
+        }
+        for loan in ["Loan A", "Loan B"] {
+            let moved: i64 = b
+                .vouchers
+                .iter()
+                .flat_map(|v| &v.lines)
+                .filter(|l| l.ledger == loan)
+                .map(|l| l.amount_paise)
+                .sum();
+            let row = TbRow {
+                opening_paise: 0,
+                debit_paise: moved.max(0),
+                credit_paise: (-moved).max(0),
+                closing_paise: moved,
+            };
+            b.tb.insert(loan.to_string(), row);
+        }
+        let loans = loan_config(&table(
+            "[\"Loan A\"]\nlender = \"a\"\nlender_type = \"person\"\ninterest_ledger = \"Interest A\"\n\
+             [\"Loan B\"]\nlender = \"b\"\nlender_type = \"person\"\n",
+        ))
+        .unwrap();
+        let set = |items: &[&str]| -> BTreeSet<String> {
+            items.iter().map(|s| (*s).to_string()).collect()
+        };
+        let (bank, tds, none) = (set(&["Bank A"]), set(&["TDS Payable"]), BTreeSet::new());
+        let r = run(
+            &b,
+            &Rules::vendored().unwrap(),
+            "firm",
+            &loans,
+            &Inputs {
+                previous_year_turnover_paise: None,
+                cash: &set(&["Cash"]),
+                bank: &bank,
+                shared_interest_ledgers: &none,
+                tds_payable_ledgers: &tds,
+                deductor_activity: None,
+                turnover_is_placeholder: false,
+            },
+        )
+        .unwrap();
+        let loan1: Vec<String> = check_invariants(&b, &r)
+            .unwrap()
+            .into_iter()
+            .filter(|x| x.starts_with("LOAN-1"))
+            .collect();
+        (b, r, loan1)
+    }
+
+    fn loan_figure<'a>(
+        b: &Book,
+        r: &'a TestResult,
+        name: &str,
+        loan: &str,
+    ) -> Option<&'a crate::findings::Figure> {
+        let id = format!("{TEST_ID}.{name}_{}", stable_ledger_tag(b, loan).unwrap());
+        r.figures.iter().find(|f| f.id == id)
+    }
+
+    fn paise_of(b: &Book, r: &TestResult, name: &str, loan: &str) -> Option<i128> {
+        loan_figure(b, r, name, loan).map(int_of)
+    }
+
+    /// Rule 3, shape (a): Loan A Dr 8,502 / Loan B Dr 164.25 / TDS Payable Cr 8,666.25, also beside
+    /// a nil bank line. Each loan takes its own line as its TDS and LOAN-1 ties on both.
+    #[test]
+    fn tds_on_two_loans_on_one_side_is_each_loans_own_line() {
+        let base = [
+            ("Loan A", 850_200),
+            ("Loan B", 16_425),
+            ("TDS Payable", -866_625),
+        ];
+        let with_nil = [&base[..], &[("Bank A", 0)]].concat();
+        for lines in [&base[..], &with_nil[..]] {
+            let (b, r, loan1) = two_loans_run(vec![journal("t1", lines)]);
+            assert_eq!(
+                paise_of(&b, &r, "tds_on_loan", "Loan A"),
+                Some(850_200),
+                "{lines:?}"
+            );
+            assert_eq!(paise_of(&b, &r, "tds_on_loan", "Loan B"), Some(16_425));
+            assert_eq!(loan1, Vec::<String>::new(), "{lines:?}");
+        }
+    }
+
+    /// Rule 3's controls: a voucher on two loans that is not shape (a) still counts its TDS on
+    /// neither loan, as before #1875. Loans on opposite sides; another posted line beside lines
+    /// that would otherwise net; TDS that does not net to the loans' sum.
+    #[test]
+    fn tds_on_two_loans_not_of_shape_a_counts_on_neither() {
+        for lines in [
+            &[
+                ("Loan A", 1_000_000),
+                ("Loan B", -400_000),
+                ("TDS Payable", -600_000),
+            ][..],
+            &[
+                ("Loan A", 100_000),
+                ("Loan B", 50_000),
+                ("TDS Payable", -150_000),
+                ("Bank A", 10_000),
+                ("Suspense", -10_000),
+            ][..],
+            &[
+                ("Loan A", 100_000),
+                ("Loan B", 50_000),
+                ("TDS Payable", -120_000),
+            ][..],
+        ] {
+            let (b, r, _) = two_loans_run(vec![journal("t1", lines)]);
+            for loan in ["Loan A", "Loan B"] {
+                assert_eq!(
+                    paise_of(&b, &r, "tds_on_loan", loan),
+                    Some(0),
+                    "{loan} {lines:?}"
+                );
+            }
+        }
+    }
+
+    /// Rule 3, shape (b): a voucher whose lines on Loan A net to nil, with Loan A's interest and
+    /// TDS on it, is in neither the taken nor the repaid rows, and LOAN-1 still fires on it, as
+    /// #1259 left it.
+    #[test]
+    fn loan_1_still_fires_on_a_zero_net_loan_voucher_carrying_tds() {
+        let (b, r, loan1) = two_loans_run(vec![journal(
+            "z1",
+            &[
+                ("Loan A", 200_000),
+                ("Loan A", -200_000),
+                ("Interest A", 50_000),
+                ("TDS Payable", -50_000),
+            ],
+        )]);
+        assert_eq!(paise_of(&b, &r, "tds_on_loan", "Loan A"), Some(50_000));
+        assert_eq!(loan1.len(), 1, "{loan1:?}");
+        assert!(
+            loan1[0].contains("expected FY movement 50000p"),
+            "{loan1:?}"
+        );
+    }
+
+    /// Rule 3, shape (c): a voucher both crediting and debiting Loan A and carrying TDS is listed,
+    /// and LOAN-1 still fires on it, as `edge-books/loans_interest_two_sided_tds.json` pins.
+    #[test]
+    fn loan_1_still_fires_on_a_two_sided_loan_voucher_carrying_tds() {
+        let (b, r, loan1) = two_loans_run(vec![journal(
+            "c1",
+            &[
+                ("Bank A", 400_000),
+                ("Loan A", -400_000),
+                ("Loan A", 300_000),
+                ("TDS Payable", -100_000),
+                ("Bank A", -200_000),
+            ],
+        )]);
+        assert_eq!(paise_of(&b, &r, "tds_on_loan", "Loan A"), Some(100_000));
+        assert_eq!(loan1.len(), 1, "{loan1:?}");
+        assert!(loan1[0].contains("expected FY movement 0p"), "{loan1:?}");
+    }
+
+    /// Rule 4: a loan taken with a TDS-payable debit (Loan A Cr 10,000 / Bank A Dr 9,000 / TDS
+    /// Payable Dr 1,000) and a TDS journal debiting TDS Payable stay out of the TDS deducted, which
+    /// holds only the deduction beside them and names both in its text; their debits are their own
+    /// figure, and LOAN-1 ties with it.
+    #[test]
+    fn a_tds_debit_stays_out_of_the_tds_deducted_and_is_named() {
+        let (b, r, loan1) = two_loans_run(vec![
+            journal(
+                "d1",
+                &[
+                    ("Loan A", -1_000_000),
+                    ("Bank A", 900_000),
+                    ("TDS Payable", 100_000),
+                ],
+            ),
+            journal("d2", &[("Loan A", -30_000), ("TDS Payable", 30_000)]),
+            journal("k1", &[("Loan A", 50_000), ("TDS Payable", -50_000)]),
+        ]);
+        let deducted = loan_figure(&b, &r, "tds_on_loan", "Loan A").unwrap();
+        assert_eq!(int_of(deducted), 50_000);
+        let cited: Vec<&str> = deducted.evidence.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(cited, ["k1"]);
+        assert!(
+            deducted
+                .definition
+                .contains("Left out: Journal d1 on 2025-06-01; Journal d2 on 2025-06-01,"),
+            "{}",
+            deducted.definition
+        );
+        let debited = loan_figure(&b, &r, "tds_debited_on_loan", "Loan A").unwrap();
+        assert_eq!(int_of(debited), 130_000);
+        let cited: Vec<&str> = debited.evidence.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(cited, ["d1", "d2"]);
+        assert_eq!(
+            paise_of(&b, &r, "tds_in_principal", "Loan A"),
+            Some(-100_000)
+        );
+        assert_eq!(loan1, Vec::<String>::new());
+        // The control: with no debit, neither the figure nor the sentence is there.
+        let (b, r, _) = two_loans_run(vec![journal(
+            "k1",
+            &[("Loan A", 50_000), ("TDS Payable", -50_000)],
+        )]);
+        assert_eq!(paise_of(&b, &r, "tds_debited_on_loan", "Loan A"), None);
+        assert!(!loan_figure(&b, &r, "tds_on_loan", "Loan A")
+            .unwrap()
+            .definition
+            .contains("Left out"));
+    }
+
+    /// Rules 3 and 4 together: two loans credited on one side with a TDS debit netting to their
+    /// sum is shape (a), and each loan's share is a debit, so it is debited, not deducted.
+    #[test]
+    fn tds_debited_across_two_loans_on_one_side_is_each_loans_own_line() {
+        let (b, r, loan1) = two_loans_run(vec![journal(
+            "t2",
+            &[
+                ("Loan A", -70_000),
+                ("Loan B", -30_000),
+                ("TDS Payable", 100_000),
+            ],
+        )]);
+        assert_eq!(paise_of(&b, &r, "tds_on_loan", "Loan A"), Some(0));
+        assert_eq!(
+            paise_of(&b, &r, "tds_debited_on_loan", "Loan A"),
+            Some(70_000)
+        );
+        assert_eq!(
+            paise_of(&b, &r, "tds_debited_on_loan", "Loan B"),
+            Some(30_000)
+        );
+        assert_eq!(loan1, Vec::<String>::new());
     }
 
     /// A Journal on 2025-06-01 with no number, so its label is "Journal <guid> on 2025-06-01".

@@ -180,7 +180,7 @@
     },
     {
       "id": "loans_interest.s194a_tds_coverage_35dc58d9",
-      "value": "none",
+      "value": "covered",
       "unit": "text",
       "definition_sha256_16": "9a44c67331989bde",
       "definition_text": "Whether the TDS on loan ledger (tag 35dc58d9) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
@@ -230,6 +230,20 @@
       "evidence": []
     },
     {
+      "id": "loans_interest.tds_debited_on_loan_35dc58d9",
+      "value": 100000,
+      "unit": "paise",
+      "definition_sha256_16": "d4a54ff13c506811",
+      "definition_text": "TDS debited on loan ledger (tag 35dc58d9): on each voucher that posts to the loan and whose lines on ledgers in the client's statutory dues classified as TDS payable net to a debit, that debit, summed. It is not in the TDS deducted beside it, since a debit can reverse an earlier deduction; it is shown so the loan's movement can be checked against the Trial Balance. Where such a voucher is counted in the taken or repaid totals, its debit is inside tds_in_principal_35dc58d9 too.",
+      "evidence": [
+        {
+          "kind": "voucher",
+          "id": "k02",
+          "label": "Receipt k02 on 2025-06-12"
+        }
+      ]
+    },
+    {
       "id": "loans_interest.tds_in_principal_35dc58d9",
       "value": 0,
       "unit": "paise",
@@ -250,20 +264,15 @@
     },
     {
       "id": "loans_interest.tds_on_loan_35dc58d9",
-      "value": 0,
+      "value": 100000,
       "unit": "paise",
-      "definition_sha256_16": "a91c8e33e06985f6",
-      "definition_text": "TDS deducted on loan ledger (tag 35dc58d9): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan.",
+      "definition_sha256_16": "3b63ffbedebf5628",
+      "definition_text": "TDS deducted on loan ledger (tag 35dc58d9): the lines on ledgers in the client's statutory dues classified as TDS payable, on every voucher that posts to the loan. Left out: Receipt k02 on 2025-06-12, whose TDS lines net to a debit, since a TDS debit can reverse an earlier deduction (tds_debited_on_loan_35dc58d9).",
       "evidence": [
         {
           "kind": "voucher",
           "id": "k01",
           "label": "Payment k01 on 2025-06-10"
-        },
-        {
-          "kind": "voucher",
-          "id": "k02",
-          "label": "Receipt k02 on 2025-06-12"
         }
       ]
     },

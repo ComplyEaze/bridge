@@ -839,7 +839,7 @@ first day",
             (OpeningStockUnknown::Unreadable, "unreadable"),
             (
                 OpeningStockUnknown::NoStockItems,
-                "not taken: the read's stock items part lists no stock item",
+                "not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil",
             ),
             (
                 OpeningStockUnknown::NoOpeningValues,

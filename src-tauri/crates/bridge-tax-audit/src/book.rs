@@ -279,7 +279,7 @@ impl OpeningStockUnknown {
                 "not taken: the read does not show the trial balance starting on the books' first day"
             }
             Self::Unreadable => "unreadable",
-            Self::NoStockItems => "not taken: the read's stock items part lists no stock item",
+            Self::NoStockItems => "not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil",
             Self::NoOpeningValues => "not taken: no stock item carries an opening value",
             Self::TooLarge => {
                 "not taken: the stock items' opening values add up to more than can be held"

@@ -14332,7 +14332,7 @@
   "by": "author",
   "what": "#1602: the no-item reason loses its words",
   "file": "src/book.rs",
-  "from": "            Self::NoStockItems => \"not taken: the read's stock items part lists no stock item\",\n",
+  "from": "            Self::NoStockItems => \"not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil\",\n",
   "to": "            Self::NoStockItems => \"not taken\",\n"
  },
  {

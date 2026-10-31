@@ -1,0 +1,1 @@
+- The connection check lists companies only through Tally's ordinary company list, as every read and post already did. When Tally does not answer that list in its ordinary form, the check no longer sends a second, older company request built as a custom report; it reports the answer it got, which is Tally's own failure reason or `xml_export_shape_unrecognized` (part of #1872).

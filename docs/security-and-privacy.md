@@ -3,8 +3,8 @@
 This page answers, in one place, what a CA or a firm's IT person asks before
 installing ComplyEaze Bridge next to client books. It describes the source of
 release 0.5.0, read at commit `eb6983ffe` (the tag `mcp-v0.5.0` was made afterwards, and this
-page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026) and 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) were
-published after the pull requests named here; this page was not read again at either tag. Seven
+page was not read again at it, except as said below). Releases 0.6.0 (tag `mcp-v0.6.0`, 16 October 2026), 0.6.1 (tag `mcp-v0.6.1`, 27 October 2026) and 0.7.0 (tag `mcp-v0.7.0`, 30 October 2026) were
+published after the pull requests named here; this page was not read again at any of those tags. Seven
 changes were added after that commit, and the page describes each as read in the
 pull request that adds it: the cost centre and cost category lists of the
 masters read, in sections 1 and 2 (#1398), the note on how long a
@@ -95,8 +95,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
   Claude Desktop is the host, and it sends tool results to the AI provider you
   use as part of the conversation; that is the host's behaviour, which this
   repository cannot show. ComplyEaze Bridge can shorten party and ledger names,
-  bank account numbers and, from the release that includes #1490 (not 0.6.1 or
-  earlier), the address printed for a party ledger, to their first two and last two
+  bank account numbers and, from release 0.7.0 (#1490), the address printed for a
+  party ledger, to their first two and last two
   characters, or drop
   narrations (`BRIDGE_AGENT_REDACTION`, or the Response redaction setting; one
   value, not both), but neither hides amounts, company names, PAN, GSTIN, IFSC,
@@ -116,9 +116,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     item names and their parents, godown, stock-group, cost-centre and cost-category
     names and their parents, the category a cost centre belongs to,
     and three fields of a ledger's details: the name on the PAN, the bank account
-    holder's name and the bank details; from the release that includes #1490 (not
-    0.6.1 or earlier) also the name a mailing address is printed under and the
-    address itself (each line of the mailing address, and the flat address field).
+    holder's name and the bank details; from release 0.7.0 (#1490) also the name a
+    mailing address is printed under and the address itself (each line of the mailing address, and the flat address field).
     A line is shortened to its first two and last two characters, so a house number
     or a town at either end of a line can stay readable. Every `ledger_masters` call
     with `fields=compliance` reads and returns the older flat fields (the address
@@ -272,8 +271,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       is flagged as in a shape the read does not recognise. No captured item
       invoice carries allocations, so where Tally prints them there is not
       measured.
-    - Bank allocations of a voucher's ledger entries (in source and not yet in a
-      published build), only when `vouchers` is asked for them with
+    - Bank allocations of a voucher's ledger entries (added in release 0.7.0),
+      only when `vouchers` is asked for them with
       `bank_allocations: true`: for each allocation, at most eight per entry, its
       bank date, instrument number and date, transaction type and status. The
       payee, bank, branch and account details an allocation can carry are not
@@ -281,8 +280,8 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       stays as it is: it is sent under every setting, as the voucher's own
       reference is. An entry whose allocations cannot be read whole says so with
       a reason and sends none of them.
-    - Goods lines of a voucher's ledger entries (in source and not yet in a
-      published build), only when `vouchers` is asked for them with
+    - Goods lines of a voucher's ledger entries (added in release 0.7.0),
+      only when `vouchers` is asked for them with
       `goods_lines: true`: for each line of an invoice voucher, the stock item,
       quantities, rate and amount, and each godown and batch row with its
       quantities and amount. Item, godown and batch names are masked under
@@ -380,14 +379,48 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 | macOS: `~/Library/Application Support/Bridge` | the files below |
 
 On a Microsoft Store install of Claude Desktop, Windows may keep some of these
-files under `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`,
-and a given file can be in either place (seen on one computer, #1459;
-**Not measured:** when Windows puts a file in which place). For the import file
-that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
-Windows reports for that file, with a `path_state` beside it that says whether
-Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
-still prints the folder as built (the Windows location in the table above,
-unless you set another data folder), whichever place the files are in. On that
+files under
+`%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`, and a
+given file can be in either place. Measured on one computer (30 October 2026,
+#1584), with ComplyEaze Bridge started from a shell that Claude Desktop runs:
+the files it created went to that second folder; a copy started outside Claude
+Desktop created `%LOCALAPPDATA%\Bridge\agent` and its files there; and once both
+had run, each kept its own import journal. For the import file that the
+`build_import_xml` tool reports, ComplyEaze Bridge shows the location Windows
+reports for that file, with a `path_state` beside it that says whether Windows
+reported it; there it named the second folder, and a process outside Claude
+Desktop opened the file there with the same sha256. The command-line report
+(`bridge_mcp --local-data-report --show-paths`) prints each folder as built (the
+Windows location in the table above, unless you set another data folder); beside
+it, where the files directly in that folder are as Windows reports each file
+(`folder_file_locations` and `lock_folder_file_locations`, read from the first
+64 files by name, with how many were read of how many; not the files in its
+subfolders, such as `imports`; the listing stops at 100,000 entries, and
+`listing_capped` says so; a lock folder's `native-dispatch-leases` that is
+itself a link is not entered and reads `link_not_followed`); the import
+journal's own location (`journal_path`; a journal file that is itself a link is
+shown as built, its target not followed, with `journal_path_state`
+`link_not_followed`); and, on Windows, each copy of the data folder inside a
+Store app's package that exists (`package_copies`). It does not print a folder
+where Windows reports the folder itself to be: once both folders existed,
+Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed the
+second folder's files. Seen from inside Claude Desktop, a file both copies held
+named the second folder and a file only `%LOCALAPPDATA%\Bridge\agent` held named
+that folder; from outside, every file named `%LOCALAPPDATA%\Bridge\agent`. So a
+file in both copies is shown only by the copy that side reads, and a file in one
+copy by that copy. `package_copies` is what shows that the second copy exists,
+and a terminal outside Claude Desktop does not see that copy as part of the
+folder. The report does not record which side ran it; run from inside Claude
+Desktop on that computer, `package_copies` and the data folder's file locations
+would both name the second folder (inferred from the lab's probe, not from a run
+of this report), so such a run cannot tell whether `%LOCALAPPDATA%\Bridge\agent`
+also exists. Check both folders before you archive or delete. **Not measured:**
+ComplyEaze Bridge as Claude Desktop starts the extension (the measured copies
+carried no package identity, yet Windows redirected their files); a copy outside
+Claude Desktop running first; another Claude Desktop version; Windows 11; this
+build, its file locations once both folders exist (the lab read them with a
+probe making the same Windows call), and `package_copies`, which lists
+`%LOCALAPPDATA%\Packages`, on a real computer. On that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).

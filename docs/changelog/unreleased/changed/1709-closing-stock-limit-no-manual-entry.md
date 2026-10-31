@@ -1,1 +1,0 @@
-- The tax-audit financial statements limitation about closing stock on books not integrated with inventory no longer calls the Stock-in-Hand ledger value "manually-entered"; it describes the balance the client recorded in the books, and its meaning is unchanged (#1709).

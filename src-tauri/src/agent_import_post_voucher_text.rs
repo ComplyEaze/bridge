@@ -199,6 +199,7 @@ mod tests {
             "----",
             "\u{2014}\u{2014}\u{2014}\u{2014}",
             "\u{2500}\u{2500}\u{2500}\u{2500}",
+            "\u{257F}\u{257F}\u{257F}\u{257F}",
             "-\u{2212}-\u{2013}",
             "(1)",
             "(12)",
@@ -211,9 +212,45 @@ mod tests {
                 "{inner:?}"
             );
         }
-        for inner in ["---", "(a1)", "( 1)", "(1", "1)", "-- --"] {
+        // Empty brackets, and an opening quotation mark (Initial_Punctuation,
+        // not an opening bracket) before a number.
+        for inner in ["---", "(a1)", "( 1)", "(1", "1)", "-- --", "()", "\u{ab}1)"] {
             assert!(split(&long(inner), 30).is_ok(), "{inner:?}");
         }
+    }
+
+    #[test]
+    fn the_cap_counts_the_value_itself_and_refuses_from_one_character_over() {
+        // The cap is the one-voucher text's 1,600 characters, written out so
+        // that a cap moved anywhere fails here.
+        let at_cap = "word ".repeat(320);
+        assert_eq!(at_cap.chars().count(), 1_600);
+        assert_eq!(split(&at_cap, 50).unwrap().concat(), at_cap);
+        let over = format!("{at_cap}x");
+        assert_eq!(split(&over, 50), Err(VoucherTextRefusal::DoesNotFit));
+        // Under the cap as typed and over it quoted: each `"` quotes as two
+        // characters, and this check splits it. (The approval refuses a
+        // one-voucher text this long by its own cap, apart from this check.)
+        let quotes = "a\" ".repeat(500);
+        assert!(quotes.chars().count() < 1_600 && quoted_chars(&quotes) > 1_600);
+        assert_eq!(split(&quotes, 50).unwrap().concat(), quotes);
+    }
+
+    #[test]
+    fn a_value_over_the_cap_is_refused_as_not_fitting_before_its_layout_is_read() {
+        let text = format!("{}----", "word ".repeat(320));
+        assert_eq!(split(&text, 50), Err(VoucherTextRefusal::DoesNotFit));
+    }
+
+    #[test]
+    fn only_a_space_splits_a_value() {
+        // A no-break space would fit the first part's width; no space does.
+        // (A tab or other control character is refused before this check.)
+        let text = "ab\u{a0}cdefgh ij";
+        assert_eq!(
+            VoucherText::of(text, 0, |k| if k == 1 { 5 } else { 20 }),
+            Err(VoucherTextRefusal::DoesNotFit)
+        );
     }
 
     #[test]

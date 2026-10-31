@@ -136,7 +136,9 @@ jobs:
             if [[ "$lookup_status" -ne 0 ]]; then decision=''; fi
             printf '%s\n' "$decision"
             { echo '### Master push reuse'; echo '```'; printf '%s\n' "$decision"; echo '```'; echo "Lookup exit status: $lookup_status"; } >> "$GITHUB_STEP_SUMMARY"
-            reused() { printf '%s\n' "$decision" | head -n 2 | grep -qx "reuse_$1=true"; }
+            # The first two lines are read with no pipe: under pipefail, a reader that stops at its match could end
+            # a writer still writing, and the step then read a reuse line as none.
+            reused() { local first='' second=''; { IFS= read -r first; IFS= read -r second; } <<< "$decision" || true; [[ "$first" == "reuse_$1=true" || "$second" == "reuse_$1=true" ]]; }
             packaging=true
             if [[ -n "$BEFORE_SHA" && ! "$BEFORE_SHA" =~ ^0+$ ]] && pushed_files="$(git diff --name-only --no-renames -z "$BEFORE_SHA" "$GITHUB_SHA" | tr '\0' '\n')" && ! grep -Eq "$packaging_paths" <<< "$pushed_files"; then
               packaging=false

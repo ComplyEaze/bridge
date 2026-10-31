@@ -272,7 +272,7 @@ async fn truncated_declared_body_is_never_partial_success() {
 }
 
 /// A body that stalls after its head is cut by the same deadline, and told as one (#2214: the
-/// party/ledger master export reads again only after a deadline or the response cap).
+/// party/ledger master export decides by the transport's error whether to read again).
 #[tokio::test]
 async fn whole_request_deadline_covers_a_body_that_stalls_after_its_head() {
     let (simulator, result) = post_synthetic(

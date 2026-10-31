@@ -281,11 +281,11 @@ the counted ledgers, each allowed four further mailing entries the mark may not 
 with one more entry allowed for each alteration beyond them (#2074). These are allowances from one lab row, not
 bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490; its header
 then says that no ledger's mailing details were observed and the status column reads not observed. A counted book that
-the standard request exported before can now be sent the larger mailing request. Where that read fails by its deadline
-or size, the workbook reads the book once more with the standard request, after waiting at most about a minute for a cut
-read to drain, and its header says the larger read failed (#2214). While it waits, the desktop app's other reads of that
-Tally wait behind it. Where its answer broke off, or Tally was still working after that wait, the export fails and its
-error says the mailing addresses were part of the failed read. The retry has not been run against Tally. `ledger_masters` with
+the standard request exported before can now be sent the larger mailing request. Where Tally declares that read's
+answer past the 32 MiB response limit, the workbook reads the book once more with the standard request, and its header
+says the larger read failed (#2214); the retry has not been run against Tally. Where the larger read runs out of time
+or its answer breaks off, the export fails and its error says the mailing addresses were part of the failed read: a
+mailing read cut by its deadline, and the drain after one, have not been seen live. `ledger_masters` with
 `include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default

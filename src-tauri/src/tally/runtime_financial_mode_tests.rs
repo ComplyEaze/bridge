@@ -776,16 +776,21 @@ fn stalled_master() -> ScenarioPlan {
         ))
 }
 
-/// The captured book's plans with `failing` answering the master request first, then `then`
-/// (status answers), then the captured book's master pair and everything after it.
-fn plans_after_a_failed_master(
-    failing: ScenarioPlan,
-    then: Vec<ScenarioPlan>,
-) -> Vec<ScenarioPlan> {
+/// The captured master answer, its head declaring a length past the response cap.
+fn declared_too_large_master() -> ScenarioPlan {
+    compliance_plans(ADMITTED_PROFILE_VARIANTS[0])[MASTER]
+        .clone()
+        .with_framing(ResponseFraming::DeclaredContentLength {
+            bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
+        })
+}
+
+/// The captured book's plans with `failing` answering the master request first, then the
+/// captured book's master pair and everything after it.
+fn plans_after_a_failed_master(failing: ScenarioPlan) -> Vec<ScenarioPlan> {
     let mut plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
     let rest = plans.split_off(MASTER);
     plans.push(failing);
-    plans.extend(then);
     plans.extend(rest);
     plans
 }
@@ -847,14 +852,15 @@ fn transport_errors(error: &anyhow::Error) -> Vec<&bridge_tally_transport::Tally
         .collect()
 }
 
-/// bridge#2214: the export's mailing read cut by its deadline, or refused past the response
-/// cap that Tally declared, is sent once more as the standard request, and the source is that
+/// bridge#2214: the export's mailing read refused past the response cap that Tally declared, the
+/// one case measured live, is sent once more as the standard request, and the source is that
 /// read's: every row, the standard requests' commitment, and the failure named. The mailing
-/// request was sent once, and nothing before the master pair was sent again. The declared
-/// oversize is read under the measured drain policy: it owes no drain, so no `/status` probe
-/// comes before the standard read.
+/// request was sent once, and nothing before the master pair was sent again. It is read under the
+/// measured drain policy: a declared oversize owes no drain, so no `/status` probe comes before
+/// the standard read.
 #[tokio::test]
-async fn an_export_whose_mailing_read_ran_too_long_is_read_again_without_the_details() {
+async fn an_export_whose_mailing_answer_tally_declared_too_large_is_read_again_without_the_details()
+{
     use crate::endpoint_wire::WireGateConfig;
     use crate::tally::connection::{
         ComplianceRead::{Standard, WithMailingDetailsWhereWholeReadFits as Export},
@@ -868,31 +874,15 @@ async fn an_export_whose_mailing_read_ran_too_long_is_read_again_without_the_det
     .await;
     let standard = standard.unwrap();
     assert_eq!(standard.mailing_details_read_failed, None);
-    let declared_too_large = compliance_plans(ADMITTED_PROFILE_VARIANTS[0])[MASTER]
-        .clone()
-        .with_framing(ResponseFraming::DeclaredContentLength {
-            bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
-        });
-    for (failing, cause, wire) in [
-        (
-            stalled_master(),
-            MailingReadFailure::Deadline,
-            WireGateConfig::default(),
-        ),
-        (
-            declared_too_large,
+    {
+        let (failing, cause, wire) = (
+            declared_too_large_master(),
             MailingReadFailure::ResponseTooLarge {
                 declared_by_peer: true,
             },
             WireGateConfig::default().with_drain(bridge_tally_transport::DrainPolicy::MEASURED),
-        ),
-    ] {
-        let (source, seen) = export_read(
-            Export,
-            plans_after_a_failed_master(failing, Vec::new()),
-            wire,
-        )
-        .await;
+        );
+        let (source, seen) = export_read(Export, plans_after_a_failed_master(failing), wire).await;
         let source = source.unwrap_or_else(|error| panic!("{cause:?}: {error:#}"));
         assert_eq!(seen.len(), standard_seen.len() + 1, "{cause:?}");
         let mailing = &seen[MASTER].request_body_sha256;
@@ -924,7 +914,7 @@ async fn an_export_whose_mailing_read_ran_too_long_is_read_again_without_the_det
 #[tokio::test]
 async fn a_failed_standard_read_after_a_failed_mailing_read_is_reported_as_itself() {
     use crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export;
-    let mut plans = plans_ending_with_a_failed_master(stalled_master());
+    let mut plans = plans_ending_with_a_failed_master(declared_too_large_master());
     plans.push(stalled_master());
     let (result, seen) = export_read(
         Export,
@@ -948,10 +938,11 @@ async fn a_failed_standard_read_after_a_failed_mailing_read_is_reported_as_itsel
     );
 }
 
-/// bridge#2214: only the export's own kind is read again, and only after a deadline or the
-/// response cap. A `ledger_masters` call that asked for the mailing details by name, a standard
-/// or GST-details read that timed out, and an export whose mailing answer broke off keep their
-/// failure, and nothing is sent after it.
+/// bridge#2214: only the export's own kind is read again, and only after an answer Tally
+/// declared past the response cap. A `ledger_masters` call that asked for the mailing details by
+/// name, with either failure; a standard or GST-details read that timed out; and an export whose
+/// mailing read timed out or whose answer broke off keep their failure, and nothing is sent after
+/// it. A deadline is not read again until a cut mailing read has been seen live.
 #[tokio::test]
 async fn no_other_read_or_failure_is_read_again_without_the_details() {
     use crate::tally::connection::{
@@ -973,8 +964,16 @@ async fn no_other_read_or_failure_is_read_again_without_the_details() {
             stalled_master(),
             Some(MailingReadFailure::Deadline),
         ),
+        (
+            WithMailingDetails,
+            declared_too_large_master(),
+            Some(MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: true,
+            }),
+        ),
         (Standard, stalled_master(), None),
         (WithGstDetails, stalled_master(), None),
+        (Export, stalled_master(), Some(MailingReadFailure::Deadline)),
         (Export, broke_off, Some(MailingReadFailure::Truncated)),
     ] {
         let (result, seen) = export_read(
@@ -1056,104 +1055,6 @@ async fn a_balance_pair_that_times_out_after_the_mailing_master_is_not_read_agai
         "{error:#}"
     );
     assert_eq!(seen.len(), BALANCE + 1, "nothing after the balance post");
-}
-
-/// bridge#2214: a draining refusal is waited out only where nothing of the standard read was
-/// sent. Refused at the standard master pair's second post, or at the balance pair after the
-/// master pair answered, the standard read fails as itself and nothing is sent again. The
-/// mailing read failed past a declared cap, which owes no drain, so the refusal is the only one.
-#[tokio::test]
-async fn a_draining_refusal_after_part_of_the_standard_read_was_sent_is_not_waited_out() {
-    use crate::tally::connection::{
-        ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export, MailingRetryHeldByDrain,
-    };
-    let declared_too_large = compliance_plans(ADMITTED_PROFILE_VARIANTS[0])[MASTER]
-        .clone()
-        .with_framing(ResponseFraming::DeclaredContentLength {
-            bytes: bridge_tally_transport::XML_RESPONSE_MAX_BYTES + 1,
-        });
-    // The standard master post is send 8, its second post 10, the balance post 12.
-    for refused in [MASTER + 3, MASTER + 5] {
-        let mut plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
-        let standard = plans.split_off(MASTER);
-        plans.push(declared_too_large.clone());
-        plans.extend(standard.into_iter().take(refused - MASTER - 1));
-        let (result, seen) = export_read(
-            Export,
-            plans,
-            crate::endpoint_wire::WireGateConfig::default().owe_at_sends(vec![refused]),
-        )
-        .await;
-        let error = result.unwrap_err();
-        assert!(
-            matches!(
-                crate::endpoint_wire::wire_refusal(&error),
-                Some(bridge_tally_transport::WireRefusal::Draining { .. })
-            ),
-            "send {refused}: {error:#}"
-        );
-        assert_eq!(mailing_cause(&error), None, "send {refused}: {error:#}");
-        assert!(!error
-            .chain()
-            .any(|cause| cause.downcast_ref::<MailingRetryHeldByDrain>().is_some()));
-        assert_eq!(seen.len(), refused, "send {refused}: nothing sent again");
-    }
-}
-
-/// bridge#2214: after a mailing read cut by its deadline, the standard read's send is refused
-/// as draining before anything is sent while Tally works on; the export waits the refusal out
-/// and sends it once `/status` has answered three times in a row (the measured drain policy).
-#[tokio::test]
-async fn an_export_waits_out_the_drain_of_its_cut_mailing_read_before_reading_again() {
-    use crate::tally::connection::{
-        ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export, MailingReadFailure,
-    };
-    // The cut mailing request is send 7; the standard read's first try, send 8, finds the drain
-    // owed with a probe sent just now.
-    let wire = crate::endpoint_wire::WireGateConfig::default().owe_at_sends(vec![MASTER + 1]);
-    let (source, seen) = export_read(
-        Export,
-        plans_after_a_failed_master(stalled_master(), vec![status(), status(), status()]),
-        wire,
-    )
-    .await;
-    let source = source.unwrap();
-    assert_eq!(
-        source.mailing_details_read_failed,
-        Some(MailingReadFailure::Deadline)
-    );
-    assert!(seen[MASTER + 1..MASTER + 4]
-        .iter()
-        .all(|request| request.method == "GET" && request.path == "/status"));
-    assert_eq!(seen[MASTER + 4].method, "POST");
-}
-
-/// bridge#2214: a drain still owed at the end of the export's wait (3 s in a unit test) leaves
-/// the book unread: the export fails with the mailing read's own failure, marked as held, and
-/// sends nothing after the cut, not even a probe.
-#[tokio::test]
-async fn a_drain_past_the_export_wait_fails_it_with_the_mailing_failure() {
-    use crate::tally::connection::{
-        ComplianceRead::WithMailingDetailsWhereWholeReadFits as Export, MailingReadFailure,
-        MailingRetryHeldByDrain,
-    };
-    let wire =
-        crate::endpoint_wire::WireGateConfig::default().owe_at_sends(vec![MASTER + 1, MASTER + 2]);
-    let (result, seen) = export_read(
-        Export,
-        plans_ending_with_a_failed_master(stalled_master()),
-        wire,
-    )
-    .await;
-    let error = result.unwrap_err();
-    assert!(
-        error
-            .chain()
-            .any(|cause| cause.downcast_ref::<MailingRetryHeldByDrain>().is_some()),
-        "{error:#}"
-    );
-    assert_eq!(mailing_cause(&error), Some(MailingReadFailure::Deadline));
-    assert_eq!(seen.len(), MASTER + 1);
 }
 
 #[path = "runtime_outstandings_currency_tests.rs"]

@@ -1855,8 +1855,8 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
 }
 
 /// The mailing marker carries how the read failed, decided by the master post's own transport
-/// error; only a deadline or the response cap send the export's read again without the details,
-/// and a failure that is none of these is not marked (bridge#2214). A `/status` check of the
+/// error; only an answer Tally declared past the response cap sends the export's read again
+/// without the details, and a failure that is none of these is not marked (bridge#2214). A `/status` check of the
 /// pair that failed is not the post's failure, though it sits in the same chain.
 #[test]
 fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
@@ -1867,7 +1867,7 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
     use bridge_tally_transport::TallyTransportError as T;
     let limit = bridge_tally_transport::XML_RESPONSE_MAX_BYTES;
     for (error, cause, again) in [
-        (T::RequestTimedOut, Some(F::Deadline), true),
+        (T::RequestTimedOut, Some(F::Deadline), false),
         (
             T::ResponseTooLarge {
                 limit,
@@ -1886,7 +1886,7 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
             Some(F::ResponseTooLarge {
                 declared_by_peer: false,
             }),
-            true,
+            false,
         ),
         (T::ResponseTruncated, Some(F::Truncated), false),
         (T::ResponseReadFailed, Some(F::ReadFailed), false),
@@ -1909,20 +1909,6 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
             .context("Tally health check between paired native report reads failed");
         assert_eq!(found(checked), None, "{error:?}");
     }
-}
-
-/// The export waits at most a minute for a cut mailing read to drain; a unit test keeps to 3 s
-/// so it reaches the bound in seconds (bridge#2214).
-#[test]
-fn the_export_waits_at_most_a_minute_for_a_cut_mailing_read_to_drain() {
-    assert_eq!(
-        super::MAILING_RETRY_DRAIN_WAIT_UNVERIFIED,
-        std::time::Duration::from_secs(60)
-    );
-    assert_eq!(
-        super::mailing_retry_drain_wait(),
-        std::time::Duration::from_secs(3)
-    );
 }
 
 /// By the mark alone, the party/ledger master export asks for the mailing details only where

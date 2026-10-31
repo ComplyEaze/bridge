@@ -140,19 +140,13 @@ impl PartyLedgerMasterSource {
     /// read failed, not because Tally returned none.
     pub(crate) fn mailing_details_read_failed_note(&self) -> Option<String> {
         use crate::tally::connection::MailingReadFailure;
-        let failed = match self.mailing_details_read_failed? {
-            MailingReadFailure::Deadline => {
-                "Tally did not answer that read within its 20-second limit"
-            }
-            MailingReadFailure::ResponseTooLarge { .. } => {
-                "Tally's answer to that read passed the 32 MiB limit"
-            }
+        match self.mailing_details_read_failed? {
+            MailingReadFailure::ResponseTooLarge { .. } => Some("The mailing details were asked for, and Tally's answer to that read passed the 32 MiB limit, so this workbook was read again without them. The Mailing columns are empty and their status says not observed: that is not the same as a party having no mailing address. Read the address in Tally.".to_owned()),
             // Never read again: such a read fails the export instead.
-            MailingReadFailure::Truncated | MailingReadFailure::ReadFailed => return None,
-        };
-        Some(format!(
-            "The mailing details were asked for, and {failed}, so this workbook was read again without them. The Mailing columns are empty and their status says not observed: that is not the same as a party having no mailing address. Read the address in Tally."
-        ))
+            MailingReadFailure::Deadline
+            | MailingReadFailure::Truncated
+            | MailingReadFailure::ReadFailed => None,
+        }
     }
 
     /// The notes of this source, the moved date first.

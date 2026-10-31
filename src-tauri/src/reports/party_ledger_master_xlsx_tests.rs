@@ -863,18 +863,14 @@ fn a_workbook_read_again_after_its_mailing_read_failed_says_that_read_failed() {
         mailing_row("A", "1", MailingDetailsHistory::NotObserved),
         mailing_row("B", "2", MailingDetailsHistory::NotObserved),
     ];
-    for (cause, said) in [
-        (
-            MailingReadFailure::Deadline,
-            "Tally did not answer that read within its 20-second limit",
-        ),
-        (
+    // The one failure that is read again (bridge#2214).
+    {
+        let (cause, said) = (
             MailingReadFailure::ResponseTooLarge {
                 declared_by_peer: true,
             },
             "Tally's answer to that read passed the 32 MiB limit",
-        ),
-    ] {
+        );
         source.mailing_details_read_failed = Some(cause);
         let text = workbook_text(source.clone());
         assert!(!text.contains(NOT_OBSERVED), "{cause:?}");

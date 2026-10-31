@@ -273,7 +273,10 @@ fn one_row_of_the_real_answer_changed_is_refused() {
 
     let mut unnamed = rows;
     unnamed[0].guid = None;
-    assert_eq!(scope.prove(&unnamed), differs("row_without_guid"));
+    assert_eq!(
+        scope.prove(&unnamed),
+        differs("ledger_scope_row_without_guid")
+    );
 }
 
 /// An invoice that names no ledger plans no read.

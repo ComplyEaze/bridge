@@ -111,7 +111,7 @@ impl InvoiceLedgerScope {
             let guid = row
                 .guid
                 .as_deref()
-                .ok_or_else(|| differs("row_without_guid"))?
+                .ok_or_else(|| differs("ledger_scope_row_without_guid"))?
                 .to_ascii_lowercase();
             let Some(expected) = self.expected.get(&guid) else {
                 return Err(differs("ledger_scope_row_not_named"));

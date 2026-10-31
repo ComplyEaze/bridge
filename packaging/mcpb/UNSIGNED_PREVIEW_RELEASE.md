@@ -1,6 +1,6 @@
 ComplyEaze Bridge is still being developed, and this release is not yet
-code-signed or notarized, so your computer may warn you before opening it.
-Compare each download with its .sha256 file.
+code-signed or notarized. Compare each download with its .sha256 file: that
+shows the file arrived whole, not who made it.
 
 It includes an unsigned third-party PDFium shared library
 (bblanchon/pdfium-binaries, pinned by SHA-256 in

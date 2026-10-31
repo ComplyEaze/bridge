@@ -2,7 +2,7 @@
 
 ComplyEaze Bridge lets Claude, on your computer, read your TallyPrime books when you ask it a question.
 These steps take you from nothing to your first answer. Do them in order. The steps themselves make no entry in your
-books. The [Download page](https://bridge.complyeaze.com/download.html) chooses the current GitHub Release file for your
+books. The [Download page](https://bridge.complyeaze.com/download.html) lists the current GitHub Release file for each
 operating system and gives the same setup steps in short form; this guide is the fallback when that page is unavailable.
 
 ComplyEaze Bridge is made by SPMS Comply Eaze Solutions LLP (ComplyEaze). Its source code is public.
@@ -22,7 +22,7 @@ other companies' programs and they change, so a screen of yours may differ a lit
 - **Partly:** profit and loss and the balance sheet (a book with stock items is read only when Tally's own closing stock closes every gap, measured on one synthetic book; a book with several currencies is refused); closing stock value at a month's last day, and its closing quantity (compared with Tally's own Stock Summary for an item on a line of its own, the item list's own for an item inside a stock group), on small books, checked on two lab books; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags (one test, the cash share of receipts and payments against the s.44AB(a) limit, is off by default and not yet run against a live TallyPrime), and Tally's Funds Flow and Ratio Analysis reports.
 
-"You can ask" means it answered on the books and builds we ran it on; the program inside the published Windows x64 0.7.0 file (checked against its `.sha256` file) has had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 30 October 2026, started directly by our test client rather than installed in Claude Desktop; it reported version 0.7.0, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted; the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; the program inside the published Windows x64 0.7.0 file (checked against its `.sha256` file) has had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 30 October 2026, started directly by our test client rather than installed in Claude Desktop; it reported version 0.7.0, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted; the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
 ## Before you start
 
@@ -135,8 +135,7 @@ addresses appear, delete what is there, type exactly this, and press **Enter**. 
 3. The file goes to your **Downloads** folder. Its name starts with `bridge-tally` and ends with `.mcpb`. You do not
    need to open it; Step 3 does that.
 
-Your browser or your computer may warn you about the file. The package is not yet code-signed or notarized, so your
-computer cannot confirm who made it. Keep the file only if you got it from the page above.
+The package is not yet code-signed or notarized, so your computer cannot confirm who made it. Keep the file only if you got it from the page above.
 
 ## Step 3. Add it to Claude Desktop
 
@@ -235,7 +234,7 @@ the voucher, for a saved batch a summary:
 - **Windows:** the window asks "post this voucher?" with **Yes**, **No** and **Cancel**. Only **Yes** posts. **No**
   is the button already chosen, so pressing Enter does not post. **When you ask the assistant to post, stop typing in
   Tally until you have answered this window.** It also takes the keyboard: in our tests (Windows 10,
-  TallyPrime 7.1 full screen, one screen, each tried once; #1780) a Down arrow moved its buttons on the 0.6.0 release
+  TallyPrime 7.1 full screen, one screen, each tried once; [#1780](https://github.com/ComplyEaze/bridge/issues/1780)) a Down arrow moved its buttons on the 0.6.0 release
   candidate, and on the published 0.6.0 a typed **n** declined it and a typed **y** approved it. Answer it with the mouse. The Mac window has not been measured for this.
 - **Mac:** the window says "approve one voucher" with **Post voucher** and **Cancel**. Only **Post voucher** posts; pressing Return may leave the window open.
 
@@ -301,7 +300,7 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
   Windows or `shasum -a 256 "<file>"` on a Mac, in the folder that holds the file (a command window opens in your
   home folder, so `cd Downloads` first), with the file's name in place of `<file>`, brackets included, and keep the quotes (a file
   downloaded twice can get a name with "(1)" in it, which needs them). Compare the 64-character code it prints with the code
-  at the start of the `.sha256` file (open that file in Notepad or TextEdit).
+  at the start of the `.sha256` file (open that file in Notepad or TextEdit). That shows the file arrived whole; it does not show who made it.
 - **Build attestation.** From 0.4.0 each archive also has a build attestation, which `gh attestation verify` can
   check. It says which workflow run and commit produced those bytes. It is not a code signature, no client checks it
   yet, and it does not show that the code is safe.

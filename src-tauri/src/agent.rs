@@ -29,8 +29,6 @@ mod lab;
 mod bank_statement;
 #[path = "agent_catalog.rs"]
 mod catalog;
-// Nothing calls the pairing view until the import journal is wired to it.
-#[allow(dead_code)]
 #[path = "agent_transfer_pairing.rs"]
 mod transfer_pairing;
 #[cfg(test)]

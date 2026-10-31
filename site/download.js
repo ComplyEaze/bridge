@@ -78,7 +78,7 @@ function platformCard(release, platformKey, kind) {
 
   card.appendChild(el("p", "dl-note", info.note));
   // beside every download, and only this
-  card.appendChild(el("p", "dl-note", "Not yet code-signed; your computer may warn you."));
+  card.appendChild(el("p", "dl-note", "Not yet code-signed."));
   return card;
 }
 

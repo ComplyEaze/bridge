@@ -223,3 +223,34 @@ fn the_registry_passes_a_refused_statement_reason_to_bank_reconciliation() {
         "a statement that was read is reconciled, not refused"
     );
 }
+
+/// `gst_ledgers_3b` through the registry, the route a caller's documents take: a GSTR-3B the
+/// caller holds, named as loaded or as `applicability_44ab`'s comparison turnover, is refused with
+/// the typed error; with neither, the test runs.
+#[test]
+fn the_registry_refuses_gst_ledgers_3b_when_the_caller_holds_a_gstr3b() {
+    use bridge_tax_audit::applicability_44ab::ComparisonTurnover;
+    use bridge_tax_audit::error::AuditError;
+    let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    let rules = rules_for(&e).unwrap();
+    let run = |c: &CallerData| registry::run_canonical("gst_ledgers_3b", &e, &rules, c);
+    assert!(run(&CallerData::default()).is_ok());
+    let named = CallerData {
+        named_documents: [CallerNamedDocument::Gstr3b].into(),
+        ..Default::default()
+    };
+    let mut turnover = CallerData::default();
+    turnover.turnover_inputs.gstr3b = Some(ComparisonTurnover {
+        turnover_paise: 1,
+        coverage: "full".to_string(),
+    });
+    for c in [named, turnover] {
+        assert!(matches!(
+            run(&c),
+            Err(AuditError::DocumentNotPorted {
+                test: "gst_ledgers_3b",
+                document: "GSTR-3B"
+            })
+        ));
+    }
+}

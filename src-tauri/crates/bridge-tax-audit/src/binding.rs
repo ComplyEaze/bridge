@@ -6,7 +6,8 @@
 //! `interest_ledger` and `[loans].shared_interest_ledgers`,
 //! `[depreciation].block_by_ledger`'s keys, `[depreciation].dep_expense_ledgers`,
 //! `[partners.*].interest_ledger`, every list under `[related_parties.*].ledgers_by_nature`,
-//! `[roles].no_supplier_expense_ledgers`, `[roles.gst_registration_type_by_ledger]`'s and
+//! `[roles].no_supplier_expense_ledgers`, `[roles].payable_ledgers`, `[roles].rcm_tax_ledgers`,
+//! `[roles.gst_registration_type_by_ledger]`'s and
 //! `[clause44].money_category_by_ledger`'s keys,
 //! `[tds_tcs_26as]`'s three ledger lists and its
 //! `deductor_aliases` values (the keys are TANs),
@@ -481,6 +482,22 @@ fn raw_at<'a>(cfg: &'a toml::Table, path: &[&str]) -> Option<&'a toml::Value> {
     Some(node)
 }
 
+/// A `[roles]` list of ledger names, bound when present; `None` when absent (a test that needs it
+/// then refuses). A value that is not a list of names is refused `BIND-ID-MALFORMED`.
+fn bind_role_list(
+    binder: &mut Binder,
+    roles: Option<&toml::Table>,
+    key: &str,
+) -> Result<Option<Vec<String>>> {
+    roles
+        .and_then(|r| r.get(key))
+        .map(|value| {
+            let location = format!("roles.{key}");
+            binder.bind_list(&names_at(value, &location)?, &location)
+        })
+        .transpose()
+}
+
 /// The names a list location holds (empty when absent), or `BIND-ID-MALFORMED` when it is not a
 /// list of names -- the reference's `names_at(..., "list", ...)`.
 fn list_at(cfg: &toml::Table, path: &[&str]) -> Result<Vec<String>> {
@@ -620,14 +637,18 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
     let round_off_ledgers =
         lbinder.bind_list(&engagement.round_off_ledgers, "roles.round_off_ledgers")?;
 
-    // `book_keeping_quality`'s name locations, in the reference's `LEDGER_PATHS` order (after
-    // `round_off_ledgers`, before `[tds]`): the three lists, then every `tax_ledgers` head.
-    // Read from the raw config, as the reference's binding reads its own; typed lazily
-    // (`BookKeepingQualityConfig`).
     let roles = engagement
         .raw_cfg
         .get("roles")
         .and_then(toml::Value::as_table);
+    // `[roles].payable_ledgers` (`gst_ledgers_3b`), after `round_off_ledgers` and before the
+    // `book_keeping_quality` lists, as in the reference's `LEDGER_PATHS`.
+    let payable_ledgers = bind_role_list(&mut lbinder, roles, "payable_ledgers")?;
+
+    // `book_keeping_quality`'s name locations, in the reference's `LEDGER_PATHS` order (after
+    // `round_off_ledgers`, before `[tds]`): the three lists, then every `tax_ledgers` head.
+    // Read from the raw config, as the reference's binding reads its own; typed lazily
+    // (`BookKeepingQualityConfig`).
     let mut book_keeping_quality = crate::BookKeepingQualityConfig::default();
     for (key, slot) in [
         (
@@ -658,12 +679,13 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             Some(lbinder.bind_list(&names_at(value, location)?, location)?)
         }
     };
-    // `[roles].narration_payee_ledgers` (`narration_payees`), after `no_supplier_expense_ledgers`
-    // and before `bank_reconciliation_ledger`, as in the reference's `LEDGER_PATHS`. That list also
-    // has `roles.rcm_tax_ledgers` between `no_supplier_expense_ledgers` and this location, which
-    // the crate does not bind; if it is ever ported, this location must come after it. Read from
-    // the raw config so that a value that is not a list of names refuses here, as the reference's
-    // binding refuses it.
+    // `[roles].rcm_tax_ledgers` (`gst_ledgers_3b`), between `no_supplier_expense_ledgers` and
+    // `narration_payee_ledgers`, as in the reference's `LEDGER_PATHS`.
+    let rcm_tax_ledgers = bind_role_list(&mut lbinder, roles, "rcm_tax_ledgers")?;
+    // `[roles].narration_payee_ledgers` (`narration_payees`), after `rcm_tax_ledgers` and before
+    // `bank_reconciliation_ledger`, as in the reference's `LEDGER_PATHS`. Read from the raw config
+    // so that a value that is not a list of names refuses here, as the reference's binding refuses
+    // it.
     let narration_payee_ledgers = lbinder.bind_list(
         &list_at(&engagement.raw_cfg, &["roles", "narration_payee_ledgers"])?,
         "roles.narration_payee_ledgers",
@@ -1130,6 +1152,10 @@ pub fn bind(engagement: &Engagement, book: &Book) -> Result<(Engagement, Binding
             no_supplier_expense_ledgers,
             registration_type_by_ledger,
             money_category_by_ledger,
+        },
+        gst_ledgers_3b: crate::GstLedgers3bConfig {
+            payable_ledgers,
+            rcm_tax_ledgers,
         },
         party_identity,
         party_groups,
@@ -1608,6 +1634,49 @@ mod tests {
                 "{err:?}"
             );
         }
+    }
+
+    /// `gst_ledgers_3b`'s two lists bind where the reference's `LEDGER_PATHS` puts them:
+    /// `payable_ledgers` after `round_off_ledgers` and before `book_keeping_quality`'s lists,
+    /// `rcm_tax_ledgers` after `no_supplier_expense_ledgers` and before `narration_payee_ledgers`.
+    /// Absent, each is `None`; not a list of names, refused.
+    #[test]
+    fn gst_ledgers_3b_lists_bind_in_the_references_order() {
+        let b = book("Cash-in-Hand", "", None);
+        let first = |earlier: &str, later: &str| {
+            let e = engagement(&format!(
+                "{later} = [\"Nowhere B\"]\n{earlier} = [\"Nowhere A\"]\n"
+            ));
+            match e.bind(&b).unwrap_err() {
+                AuditError::Refused {
+                    code: BIND_NAME_UNKNOWN,
+                    detail,
+                } => {
+                    assert_eq!(
+                        detail.split_once(':').unwrap().0,
+                        format!("roles.{earlier}")
+                    );
+                }
+                other => panic!("{other:?}"),
+            }
+        };
+        first("round_off_ledgers", "payable_ledgers");
+        first("payable_ledgers", "payment_channel_debtors");
+        first("no_supplier_expense_ledgers", "rcm_tax_ledgers");
+        first("rcm_tax_ledgers", "narration_payee_ledgers");
+        let err = engagement("rcm_tax_ledgers = \"Nowhere\"\n")
+            .bind(&b)
+            .unwrap_err();
+        assert_eq!(err.code(), Some(BIND_ID_MALFORMED));
+        let cfg = engagement("payable_ledgers = []\n")
+            .bind(&b)
+            .unwrap()
+            .0
+            .gst_ledgers_3b;
+        assert_eq!(
+            (cfg.payable_ledgers, cfg.rcm_tax_ledgers),
+            (Some(Vec::new()), None)
+        );
     }
 
     /// `narration_payees_on` runs the TDS payee test first, refusing without its two inputs as

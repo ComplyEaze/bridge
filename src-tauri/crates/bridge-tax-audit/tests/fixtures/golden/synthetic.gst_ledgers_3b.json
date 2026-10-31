@@ -1,0 +1,1404 @@
+{
+  "spec_version": "1.0.0",
+  "test_id": "gst_ledgers_3b",
+  "test_version": "1",
+  "rules_version": "2026-09-17.1",
+  "population_note_sha256_16": "82b04c375c56488a",
+  "population_note_text": "Books population (optional, cancelled and post-dated vouchers excluded). Per-head figures classify every population voucher line touching a configured tax ledger into output/input/payment/other by voucher base type and (for a Credit/Debit Note) which ledger group its other lines fall under -- never by ledger name.",
+  "figures": [
+    {
+      "id": "gst_ledgers_3b.annual_books_taxable_paise",
+      "value": 29750000,
+      "unit": "paise",
+      "definition_sha256_16": "a239a36e9d2752bd",
+      "definition_text": "Sum of the sales-ledger-movement monthly figures below across the year.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.annual_gstr3b_taxable_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "0c126a6a899f96e8",
+      "definition_text": "Sum of the 3B sheet's own monthly Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.annual_output_books_taxable_residual_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d0065a192ace6d57",
+      "definition_text": "Sum of the OLD residual definition above across the year -- NOT the 3B comparison basis (see annual_books_taxable_paise for that); reported for the record, not hidden.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.annual_output_tax_diff_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3dd2ea5c2d8656d9",
+      "definition_text": "Sum of every month's books-minus-3B output-tax gap; reported even when the components net close to it, never hidden.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.annual_output_taxable_diff_paise",
+      "value": 29750000,
+      "unit": "paise",
+      "definition_sha256_16": "493303ed9b807461",
+      "definition_text": "Sum of every month's books-minus-3B taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.annual_rcm_tax_diff_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "651f9e3bc51dc0a7",
+      "definition_text": "Not computed: no RCM tax ledger is set, so the books' reverse-charge tax was not read; this 0 is not a measurement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.annual_taxable_tie_diff_paise",
+      "value": 29750000,
+      "unit": "paise",
+      "definition_sha256_16": "5a1a3358a65421db",
+      "definition_text": "annual_books_taxable_paise minus annual_gstr3b_taxable_paise; reported even when zero.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.goods_carriage_ledgers_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "567e3680a46154da",
+      "definition_text": "Ledgers the CA marks as payments for goods carriage: none, so the goods transport agency question is not asked here.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.gstr3b_outward_months_available_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "d34945e0e1c548d0",
+      "definition_text": "Distinct months with a GSTR-3B offset/summary row for outward supply/output tax (0 when this client has no such document -- see module docstring).",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.gstr3b_rcm_months_available_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "15990ed670ceb190",
+      "definition_text": "Distinct months with a GSTR-3B reverse-charge liability row (0 when this document has no such block, or the client has none at all).",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-04_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c1510a1e62baeff5",
+      "definition_text": "Books output tax for 2025-04: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-05_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f957224fac5ad011",
+      "definition_text": "Books output tax for 2025-05: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-06_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "356469e71dc4704f",
+      "definition_text": "Books output tax for 2025-06: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-07_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c179f75d4f56674a",
+      "definition_text": "Books output tax for 2025-07: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-08_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "cc8e2d0cbb6619e8",
+      "definition_text": "Books output tax for 2025-08: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-09_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f5fac2cf6471bbf4",
+      "definition_text": "Books output tax for 2025-09: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-10_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c7bd6dec609293d6",
+      "definition_text": "Books output tax for 2025-10: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-11_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ed8be36fb004e225",
+      "definition_text": "Books output tax for 2025-11: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2025-12_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2fc5f710848074c1",
+      "definition_text": "Books output tax for 2025-12: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2026-01_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "e6630a64ea3244f2",
+      "definition_text": "Books output tax for 2026-01: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2026-02_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "01818729a4028ab1",
+      "definition_text": "Books output tax for 2026-02: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_tax_2026-03_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "744914f7032cf29c",
+      "definition_text": "Books output tax for 2026-03: tax-ledger lines on CAT_OUTPUT-classified population vouchers.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-04_paise",
+      "value": 4200000,
+      "unit": "paise",
+      "definition_sha256_16": "56d8662911c77094",
+      "definition_text": "Books taxable outward turnover for 2025-04: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-05_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "805b5e0d55daffd3",
+      "definition_text": "Books taxable outward turnover for 2025-05: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-06_paise",
+      "value": 20000000,
+      "unit": "paise",
+      "definition_sha256_16": "02711476becb8f4d",
+      "definition_text": "Books taxable outward turnover for 2025-06: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-07_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "897d22489e1a58a4",
+      "definition_text": "Books taxable outward turnover for 2025-07: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-08_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "33449a7a45c47ad2",
+      "definition_text": "Books taxable outward turnover for 2025-08: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-09_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "de4fd8c8349c6a9a",
+      "definition_text": "Books taxable outward turnover for 2025-09: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-10_paise",
+      "value": 5550000,
+      "unit": "paise",
+      "definition_sha256_16": "43d5139d726bf06f",
+      "definition_text": "Books taxable outward turnover for 2025-10: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-11_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "378eee478dda431a",
+      "definition_text": "Books taxable outward turnover for 2025-11: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2025-12_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2e65ed9cf101bb86",
+      "definition_text": "Books taxable outward turnover for 2025-12: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2026-01_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "80f8415b8aa86360",
+      "definition_text": "Books taxable outward turnover for 2026-01: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2026-02_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c3e02e0d301cc61d",
+      "definition_text": "Books taxable outward turnover for 2026-02: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_2026-03_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "09a170df6720e761",
+      "definition_text": "Books taxable outward turnover for 2026-03: Sales-Accounts-group ledger movement.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-04",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "7bdd0d8f771aed07",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-04 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-05",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "b0a363c41d43fc8e",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-05 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-06",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "250a654a9f8df4cb",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-06 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-07",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a99acd86dcd94446",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-07 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-08",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f17f865e097f0a24",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-08 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-09",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "bebf4cee8f837bd2",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-09 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-10",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "5a221acadd631d8a",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-10 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-11",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "7a1eb381163febfe",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-11 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2025-12",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "4e70523121abd3c6",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2025-12 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2026-01",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "4d97dc856795bc9a",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2026-01 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2026-02",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "89960a7e8e9939b4",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2026-02 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_books_taxable_residual_paise_2026-03",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "12c9be71f041d0ce",
+      "definition_text": "OLD definition (party credit - tax - round-off, gst_outward_gstr1's own residual) for 2026-03 -- NOT comparable to the 3B column above; kept only for cross-reference against GSTR-1.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-04_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "9b796e05e0cc30cf",
+      "definition_text": "GSTR-3B output tax filed for 2025-04.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-05_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f92384309e3de5c5",
+      "definition_text": "GSTR-3B output tax filed for 2025-05.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-06_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1d84377749785c08",
+      "definition_text": "GSTR-3B output tax filed for 2025-06.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-07_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "29142591ecb18f12",
+      "definition_text": "GSTR-3B output tax filed for 2025-07.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-08_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "65928adf0657dedf",
+      "definition_text": "GSTR-3B output tax filed for 2025-08.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-09_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1466059e7f05fb0f",
+      "definition_text": "GSTR-3B output tax filed for 2025-09.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-10_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a21ecdd3720583dd",
+      "definition_text": "GSTR-3B output tax filed for 2025-10.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-11_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "de99acb61b3e3c8d",
+      "definition_text": "GSTR-3B output tax filed for 2025-11.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2025-12_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "501bd02c8a494519",
+      "definition_text": "GSTR-3B output tax filed for 2025-12.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2026-01_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "97da56adda6c0ebc",
+      "definition_text": "GSTR-3B output tax filed for 2026-01.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2026-02_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ac5da5334423514f",
+      "definition_text": "GSTR-3B output tax filed for 2026-02.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_tax_2026-03_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "34244ab05b287393",
+      "definition_text": "GSTR-3B output tax filed for 2026-03.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-04_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "b16faadf390ed4c6",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-04 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-05_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1258d4552ccc6c21",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-05 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-06_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "55a83b7821ba388d",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-06 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-07_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d2d85e01515a8dad",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-07 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-08_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "e49ba2ac5c385a79",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-08 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-09_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "aa2bc698be61a008",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-09 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-10_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "24960c867fe6bcd4",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-10 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-11_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1ab51fafd615a21c",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-11 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2025-12_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a6d49dbc33940f4e",
+      "definition_text": "GSTR-3B outward turnover filed for 2025-12 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2026-01_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "a0d214b81e94e7d3",
+      "definition_text": "GSTR-3B outward turnover filed for 2026-01 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2026-02_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "fb022f2e3456f65a",
+      "definition_text": "GSTR-3B outward turnover filed for 2026-02 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_gstr3b_taxable_2026-03_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "373164bd1fd0dc3f",
+      "definition_text": "GSTR-3B outward turnover filed for 2026-03 -- the sheet's own Total (NRC+RC+Non-Taxable) column.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-04_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "65265acbffb455fd",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-04; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-05_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d3c9a558812ef95a",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-05; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-06_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "67b615ac5ea863cb",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-06; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-07_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "61a9092bf1557697",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-07; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-08_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "6bb0d7943b2f92f2",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-08; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-09_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "b71d349727a7b962",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-09; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-10_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f789ee961bc3de6d",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-10; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-11_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "95a5e0fde736eef3",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-11; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2025-12_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "52ee4e927f56014f",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2025-12; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2026-01_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "60b1ac393195775a",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2026-01; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2026-02_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8d67c7291c7c80a2",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2026-02; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_2026-03_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1f28f1fbdab585bd",
+      "definition_text": "Books output tax minus GSTR-3B output tax for 2026-03; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-04",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "a3b96f0c34fc2d9d",
+      "definition_text": "Closed-set reason for the 2025-04 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-05",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "e0e8ebc13ce87380",
+      "definition_text": "Closed-set reason for the 2025-05 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-06",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "de12e6a203ff5795",
+      "definition_text": "Closed-set reason for the 2025-06 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-07",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "a762c78bceb00116",
+      "definition_text": "Closed-set reason for the 2025-07 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-08",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "73a8fbe86ad8c22d",
+      "definition_text": "Closed-set reason for the 2025-08 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-09",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "06e84cca80bbb9d7",
+      "definition_text": "Closed-set reason for the 2025-09 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-10",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "b14af962ff378005",
+      "definition_text": "Closed-set reason for the 2025-10 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-11",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "d991fd939609be7d",
+      "definition_text": "Closed-set reason for the 2025-11 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2025-12",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "b4f1c7bcb2084238",
+      "definition_text": "Closed-set reason for the 2025-12 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2026-01",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "0e279dc03b0c5fd6",
+      "definition_text": "Closed-set reason for the 2026-01 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2026-02",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "a75a5051863dc5fb",
+      "definition_text": "Closed-set reason for the 2026-02 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_diff_reason_2026-03",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "cbffa149659d767d",
+      "definition_text": "Closed-set reason for the 2026-03 output-tax gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_amendment_after_filing_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "5b6c40598143ce72",
+      "definition_text": "Months whose output-tax gap classifies 'amendment_after_filing'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_credit_note_reported_other_month_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "131d58826e53d990",
+      "definition_text": "Months whose output-tax gap classifies 'credit_note_reported_other_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_no_3b_document_for_month_count",
+      "value": 12,
+      "unit": "count",
+      "definition_sha256_16": "c17a8f8b6156610b",
+      "definition_text": "Months whose output-tax gap classifies 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_non_gst_charges_on_invoice_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "8c26dd5369bfe1ee",
+      "definition_text": "Months whose output-tax gap classifies 'non_gst_charges_on_invoice'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_timing_invoice_reported_other_month_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f72ebc571b1d9717",
+      "definition_text": "Months whose output-tax gap classifies 'timing_invoice_reported_other_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_unclassified_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "004e8a20c205d3f4",
+      "definition_text": "Months whose output-tax gap classifies 'unclassified'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_unreconciled_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "c0a1f3709c15c89a",
+      "definition_text": "Months whose output-tax gap classifies 'unreconciled'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_tax_reason_within_tolerance_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "e71bbb64bc339f56",
+      "definition_text": "Months whose output-tax gap classifies 'within_tolerance'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-04_paise",
+      "value": 4200000,
+      "unit": "paise",
+      "definition_sha256_16": "d6609b02138e1a4f",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-04; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-05_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3e18d249a7ddc11b",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-05; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-06_paise",
+      "value": 20000000,
+      "unit": "paise",
+      "definition_sha256_16": "c6c24897d4444bef",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-06; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-07_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "45c05e9c295ca695",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-07; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-08_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2356e73bc905f613",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-08; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-09_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "4e2633ce8e3f0110",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-09; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-10_paise",
+      "value": 5550000,
+      "unit": "paise",
+      "definition_sha256_16": "22a5b8e148a9078a",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-10; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-11_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1fa4b0ffaedb4e87",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-11; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2025-12_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "4b5ab9c802ab1341",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2025-12; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2026-01_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c47969223c240b5e",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2026-01; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2026-02_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "c086653ec7722340",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2026-02; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_2026-03_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "ab4fd3ea7e0fb28a",
+      "definition_text": "Books taxable minus GSTR-3B taxable for 2026-03; reason 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-04",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "bac7a3176f85786b",
+      "definition_text": "Closed-set reason for the 2025-04 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-05",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "2c9d631d06c6c88f",
+      "definition_text": "Closed-set reason for the 2025-05 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-06",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "c313ca5c6f2ee113",
+      "definition_text": "Closed-set reason for the 2025-06 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-07",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "d8e5c4b6bba18364",
+      "definition_text": "Closed-set reason for the 2025-07 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-08",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "c582124f904dee22",
+      "definition_text": "Closed-set reason for the 2025-08 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-09",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "e47d0a34641bed37",
+      "definition_text": "Closed-set reason for the 2025-09 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-10",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "99aef96274ba63b5",
+      "definition_text": "Closed-set reason for the 2025-10 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-11",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "247a5dfcd55faa81",
+      "definition_text": "Closed-set reason for the 2025-11 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2025-12",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "c28c7d17a0599f18",
+      "definition_text": "Closed-set reason for the 2025-12 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2026-01",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "5766b9f34b6e42a9",
+      "definition_text": "Closed-set reason for the 2026-01 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2026-02",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "bc6c4b23d5030dfd",
+      "definition_text": "Closed-set reason for the 2026-02 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_diff_reason_2026-03",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "1f0026063d7225bc",
+      "definition_text": "Closed-set reason for the 2026-03 taxable gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_amendment_after_filing_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "9ef322b1a144ec2c",
+      "definition_text": "Months whose taxable-turnover gap classifies 'amendment_after_filing'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_credit_note_reported_other_month_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "9fda2a3c104ed7e9",
+      "definition_text": "Months whose taxable-turnover gap classifies 'credit_note_reported_other_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_no_3b_document_for_month_count",
+      "value": 12,
+      "unit": "count",
+      "definition_sha256_16": "43680830b1bdbbf8",
+      "definition_text": "Months whose taxable-turnover gap classifies 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_non_gst_charges_on_invoice_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "ad259b178d4f791f",
+      "definition_text": "Months whose taxable-turnover gap classifies 'non_gst_charges_on_invoice'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_timing_invoice_reported_other_month_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "a8f7fa66ec06a684",
+      "definition_text": "Months whose taxable-turnover gap classifies 'timing_invoice_reported_other_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_unclassified_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "5950a41a8847059d",
+      "definition_text": "Months whose taxable-turnover gap classifies 'unclassified'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_unreconciled_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "0b5ad5841a7addd3",
+      "definition_text": "Months whose taxable-turnover gap classifies 'unreconciled'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_output_taxable_reason_within_tolerance_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "256ef4563a72e413",
+      "definition_text": "Months whose taxable-turnover gap classifies 'within_tolerance'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-04_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "83ad738d93e36d36",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-04.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-05_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "f9c1d82f33a77089",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-05.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-06_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "9b2e69377748e979",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-06.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-07_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "d747c87324b4324e",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-07.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-08_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "cac11ff46c31fdf7",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-08.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-09_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "3a30b0049d0f312f",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-09.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-10_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "2ed23782579d9f30",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-10.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-11_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "1312eea3134df127",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-11.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2025-12_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "4b4f8a1d59463221",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2025-12.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2026-01_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "8fc51cf291bf546f",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2026-01.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2026-02_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "707243b47a31398f",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2026-02.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_gstr3b_tax_2026-03_paise",
+      "value": 0,
+      "unit": "paise",
+      "definition_sha256_16": "b5083c04226c67af",
+      "definition_text": "GSTR-3B reverse-charge tax filed for 2026-03.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-04",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "a1e40b2213a18aa7",
+      "definition_text": "Closed-set reason for the 2025-04 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-05",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "3c64d2404b2e4612",
+      "definition_text": "Closed-set reason for the 2025-05 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-06",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "10712c1900e5e830",
+      "definition_text": "Closed-set reason for the 2025-06 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-07",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "78e968ed095248a7",
+      "definition_text": "Closed-set reason for the 2025-07 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-08",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "c43efb9e5040a91c",
+      "definition_text": "Closed-set reason for the 2025-08 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-09",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "41716f4d0f4b3b90",
+      "definition_text": "Closed-set reason for the 2025-09 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-10",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "4bc823e434b15901",
+      "definition_text": "Closed-set reason for the 2025-10 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-11",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "1881d01a33ea6de3",
+      "definition_text": "Closed-set reason for the 2025-11 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2025-12",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "22900c387b826857",
+      "definition_text": "Closed-set reason for the 2025-12 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2026-01",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "8198ee8bc846c204",
+      "definition_text": "Closed-set reason for the 2026-01 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2026-02",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "16a2e6228319aabe",
+      "definition_text": "Closed-set reason for the 2026-02 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_diff_reason_2026-03",
+      "value": "no_3b_document_for_month",
+      "unit": "text",
+      "definition_sha256_16": "818afd95d7833fff",
+      "definition_text": "Closed-set reason for the 2026-03 RCM gap.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_reason_month_shift_indicative_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "4878d5c8b703287d",
+      "definition_text": "Months whose RCM-tax gap classifies 'month_shift_indicative'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_reason_no_3b_document_for_month_count",
+      "value": 12,
+      "unit": "count",
+      "definition_sha256_16": "e3c5834f6709a69f",
+      "definition_text": "Months whose RCM-tax gap classifies 'no_3b_document_for_month'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_reason_not_computed_no_rcm_ledger_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "582b829cfb6be138",
+      "definition_text": "Months whose RCM-tax gap classifies 'not_computed_no_rcm_ledger'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_reason_unclassified_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "cce676a107d210ee",
+      "definition_text": "Months whose RCM-tax gap classifies 'unclassified'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_reason_unreconciled_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "f63b14c53344b593",
+      "definition_text": "Months whose RCM-tax gap classifies 'unreconciled'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_rcm_tax_reason_within_tolerance_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "fc9dbf1f2de04b02",
+      "definition_text": "Months whose RCM-tax gap classifies 'within_tolerance'.",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.monthly_unclassified_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "c30b3e6aac2a1be9",
+      "definition_text": "Output-tax + taxable + RCM monthly gaps with no reason from the closed set (LEDGER-3: must be 0).",
+      "evidence": []
+    },
+    {
+      "id": "gst_ledgers_3b.rcm_tax_ledger_count",
+      "value": 0,
+      "unit": "count",
+      "definition_sha256_16": "7e6dfb254056052d",
+      "definition_text": "RCM tax ledgers set for this client (none means this section reports nothing to compare, not a missing RCM liability).",
+      "evidence": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "gst_ledgers_3b/no_3b_document",
+      "clauses": [],
+      "confidence": "needs_document",
+      "facts": [
+        {
+          "name": "gstr3b_outward_months_available_count",
+          "figure_id": "gst_ledgers_3b.gstr3b_outward_months_available_count"
+        }
+      ],
+      "evidence": [],
+      "title_sha256_16": "add202785f4bf61a",
+      "title_text": "No GSTR-3B offset/summary document was available for this engagement; the monthly comparisons of the books with GSTR-3B, reverse charge included, are not performed",
+      "limits_sha256_16": "6d19fea27a3c52ad",
+      "limits_text": [
+        "The per-head opening/output/input/payment/closing figures above still stand (TB- and voucher-based, no GSTR-3B document required); only the monthly comparison to what was actually filed is unavailable."
+      ],
+      "ask_client_sha256_16": "b405a10b48c5aa11",
+      "ask_client_text": [
+        "The firm's own GSTR-3B offset/summary workbook (or the filed GSTR-3B returns themselves), month by month, for FY 2025-04-01 to 2026-03-31."
+      ]
+    }
+  ],
+  "book_invariants_evaluated": [
+    "ID-1",
+    "MAP-0",
+    "MAP-1",
+    "POP-0",
+    "POP-1",
+    "POP-2",
+    "POP-3",
+    "POP-5"
+  ],
+  "book_invariant_violations": [
+    {
+      "invariant": "MAP-1",
+      "subject": "Unmapped Holding",
+      "detail": "chain incomplete: Legacy Holding"
+    },
+    {
+      "invariant": "POP-1",
+      "subject": "Electricity",
+      "detail": "vouchers 365050 vs TB movement 365550 paise"
+    },
+    {
+      "invariant": "POP-2",
+      "subject": "6f1c2a3e-8b4d-4c5e-9a7f-0d1e2f3a4b5c-0000000c",
+      "detail": "Journal J/1 2025-09-28 lines sum 200"
+    },
+    {
+      "invariant": "POP-3",
+      "subject": "closing_paise",
+      "detail": "TB closing_paise sums to 700 paise"
+    }
+  ],
+  "result_invariants_evaluated": [
+    "EVID-1",
+    "POP-4",
+    "REND-0"
+  ],
+  "result_invariant_violations": [],
+  "module_invariants_evaluated": [
+    "gst_ledgers_3b.check_invariants"
+  ],
+  "module_invariant_violations": []
+}

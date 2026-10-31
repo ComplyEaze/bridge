@@ -1961,7 +1961,11 @@ async fn a_second_journal_made_while_the_dialog_is_open_is_refused_under_the_loc
     let observed = sent(simulator).len();
     let result = &response["structuredContent"]["result"];
     let refusal = UnderLockRefusal::JournalSplit(SplitJournal::OtherHoldsBatches.cause());
-    assert_eq!(scripted.previews().len(), 1, "the dialog was shown: {response}");
+    assert_eq!(
+        scripted.previews().len(),
+        1,
+        "the dialog was shown: {response}"
+    );
     assert_eq!(result["error"]["code"], refusal.code(), "{response}");
     assert_eq!(refusal.code(), IMPORT_JOURNAL_SPLIT);
     assert_eq!(

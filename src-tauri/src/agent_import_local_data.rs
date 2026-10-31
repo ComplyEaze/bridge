@@ -409,19 +409,37 @@ fn file_sample(mut files: Vec<PathBuf>) -> Vec<PathBuf> {
 
 /// Where the files directly in `folder` are, as `resolve` reports each file
 /// (the sample of [`file_sample`]): each folder once, with its state, and how
-/// many files were read of how many; `"not_listed"` when the folder cannot be
+/// many files were read of how many. Files in its subfolders (`imports`,
+/// `bank-statements`) are not looked at. `"not_listed"` when it cannot be
 /// listed. From inside a Store install's package this names the copy whose
-/// files the report counted; it does not show another copy (see
+/// files the report reads; it does not show another copy (see
 /// [`package_copies`]).
 fn file_locations(folder: &Path, resolve: &dyn Fn(&Path) -> VisiblePath) -> serde_json::Value {
+    file_locations_capped(folder, resolve, ENTRY_CAP)
+}
+
+/// [`file_locations`], listing at most `cap` entries of the folder (files and
+/// subfolders alike); past it the count stops, `files` is then a lower bound,
+/// the sample is taken from the entries listed, and `listing_capped` says so.
+fn file_locations_capped(
+    folder: &Path,
+    resolve: &dyn Fn(&Path) -> VisiblePath,
+    cap: usize,
+) -> serde_json::Value {
     let Ok(entries) = fs::read_dir(folder) else {
         return serde_json::json!("not_listed");
     };
-    let files: Vec<PathBuf> = entries
-        .filter_map(Result::ok)
-        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
-        .map(|entry| entry.path())
-        .collect();
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut capped = false;
+    for (listed, entry) in entries.filter_map(Result::ok).enumerate() {
+        if listed == cap {
+            capped = true;
+            break;
+        }
+        if entry.file_type().is_ok_and(|kind| kind.is_file()) {
+            files.push(entry.path());
+        }
+    }
     let total = files.len();
     let sample = file_sample(files);
     let mut seen = std::collections::BTreeSet::new();
@@ -436,7 +454,29 @@ fn file_locations(folder: &Path, resolve: &dyn Fn(&Path) -> VisiblePath) -> serd
             folders.push(serde_json::json!({"path": parent, "state": shown.state()}));
         }
     }
-    serde_json::json!({"folders": folders, "files_read": sample.len(), "files": total})
+    serde_json::json!({
+        "folders": folders,
+        "files_read": sample.len(),
+        "files": total,
+        "listing_capped": capped,
+    })
+}
+
+/// The part of `path` under `base`, comparing component by component in lower
+/// case, close to how Windows compares names (a `/` and a `\` are the same
+/// separator there). An 8.3 short name in one of the two is not matched to its
+/// long form, nor a verbatim `\\?\` path to its plain one.
+fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
+    let mut rest = path.components();
+    for want in base.components() {
+        let got = rest.next()?;
+        if got.as_os_str().to_string_lossy().to_lowercase()
+            != want.as_os_str().to_string_lossy().to_lowercase()
+        {
+            return None;
+        }
+    }
+    Some(rest.as_path().to_path_buf())
 }
 
 /// The copies of `folder` inside Store apps' packages, for a folder under
@@ -446,7 +486,9 @@ fn file_locations(folder: &Path, resolve: &dyn Fn(&Path) -> VisiblePath) -> serd
 /// `"not_under_local_app_data"` for a folder set elsewhere, `"not_listed"`
 /// when the packages folder cannot be listed.
 fn package_copies(local_app_data: &Path, folder: &Path) -> serde_json::Value {
-    let Ok(rest) = folder.strip_prefix(local_app_data) else {
+    let Some(rest) =
+        relative_to(local_app_data, folder).filter(|rest| !rest.as_os_str().is_empty())
+    else {
         return serde_json::json!("not_under_local_app_data");
     };
     let Ok(packages) = fs::read_dir(local_app_data.join("Packages")) else {
@@ -454,7 +496,7 @@ fn package_copies(local_app_data: &Path, folder: &Path) -> serde_json::Value {
     };
     let mut found: Vec<String> = packages
         .filter_map(Result::ok)
-        .map(|package| package.path().join("LocalCache").join("Local").join(rest))
+        .map(|package| package.path().join("LocalCache").join("Local").join(&rest))
         .filter(|copy| copy.is_dir())
         .map(|copy| copy.display().to_string())
         .collect();
@@ -647,9 +689,10 @@ fn to_json_resolving(
         // A folder's own final path is not trusted: once both copies of a
         // Microsoft Store install's data folder exist, Windows names the real
         // folder for a view that merges it with the package's copy (#1584's lab
-        // sheet). So each folder is printed as built, beside where its files
-        // are as Windows reports each file (from inside the package, a file in
-        // both copies names the package's copy, a file in one copy that copy),
+        // sheet). So each folder is printed as built, beside where the files
+        // directly in it are as Windows reports each file (from inside the
+        // package, a file in both copies names the package's copy, a file in
+        // one copy that copy),
         // and the package copies of the data folder that exist, since one side
         // does not see the other.
         value["folder_path"] = json!(folder.display().to_string());
@@ -658,7 +701,15 @@ fn to_json_resolving(
             value["package_copies"] = package_copies(local_app_data, folder);
         }
         if matches!(report.root, Root::Present) && !matches!(report.journal, Journal::Absent) {
-            resolve(&folder.join(JOURNAL_FILE)).put_into(&mut value, "journal_path");
+            let journal = folder.join(JOURNAL_FILE);
+            if is_link(&journal) {
+                // The report follows no link (the journal one is refused as
+                // unreadable): its target is not resolved, and could be a share.
+                value["journal_path"] = json!(journal.display().to_string());
+                value["journal_path_state"] = json!("link_not_followed");
+            } else {
+                resolve(&journal).put_into(&mut value, "journal_path");
+            }
         }
         // the first, as before; every one, in the order the locks are taken
         if let Some(first) = locks.first() {
@@ -669,7 +720,17 @@ fn to_json_resolving(
                 .collect::<Vec<_>>());
             value["lock_folder_file_locations"] = json!(locks
                 .iter()
-                .map(|locks| file_locations(&locks.join(LEASES_FOLDER), resolve))
+                .map(|locks| {
+                    // A lease folder that is a link is not entered, as the
+                    // lease scan refuses it; a data folder that is a link is
+                    // the person's own (a folder moved to another disk).
+                    let leases = locks.join(LEASES_FOLDER);
+                    if is_link(&leases) {
+                        json!("link_not_followed")
+                    } else {
+                        file_locations(&leases, resolve)
+                    }
+                })
                 .collect::<Vec<_>>());
         }
     }

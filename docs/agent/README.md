@@ -3403,14 +3403,25 @@ import journal keeps a record of it whenever it covers a post no earlier record
 covers, so a second restore is recorded too (`post_span_binding.rollback_recorded`,
 with `other_batches_covered`: how many of the company's other native posts it
 covers, and the first ten, to verify again). A record that cannot be written
-fails the check, to be run again.
+fails the check, to be run again. A post sees a restore too: when the voucher
+mark its last read before the send gives is below such a floor, the record is
+written before the post's own dispatch intent and before its approval is spent,
+and the post's answer gives `rollback_recorded_at_post` (the count and the first
+ten of the native posts it covers, to verify again). That record names one of
+the posts it covers, not the post that read the mark, which has no intent yet;
+the journal does not say which post saw it. A record a post cannot write
+refuses the post as `post_rollback_unrecorded`, with nothing recorded for it
+and nothing sent, and the approval withdrawn, so the next call asks again:
+once that post's vouchers raised the mark, no later check could see the
+restore.
 From then on no native post of the same company (name, GUID, company number
 and books-from date) at the same Tally address reads `posted_verified` if it
 was sent before that check read the journal and the vouchers it had proved by
 then (its binding, else Tally's answer unless it reported `STATUS` 0, else
 its mark before the post) put it above the mark read:
 `post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
-(the batch whose check saw it), its vouchers read as matching content, not as
+(the batch whose check saw it, or, for a restore a post saw, one of the posts
+the record covers, possibly this one), its vouchers read as matching content, not as
 its own, and the plain line says to check them in Tally. The check still sees a
 rollback only while the mark reads below some post's: a book restored and then
 keyed or edited past the mark before any check is not seen, and a native voucher

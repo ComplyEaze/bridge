@@ -1432,6 +1432,32 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    // TallyPrime 7.2, BRIDGE FOREXGROUP LAB, the later sitting (#2071): composites with a rate
+    // that has decimals, set aside by name like the others.
+    Row {
+        fixture: "tests/fixtures/native/ledger_snapshot_forex_decimal_rate.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_classified_for_company(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_ledger_snapshot_classified_for_company(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/native/trial_balance_forex_decimal_rate.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_trial_balance_with_currency(FOREXGROUP base)",
+        parse: |_, text| {
+            typed(parse_native_trial_balance_with_currency(
+                text,
+                FOREXGROUP_GUID,
+                &forexgroup_base(),
+            ))
+        },
+    },
     // TallyPrime 7.2, BRIDGE FOREXGROUP LAB (#2071): the dollar party's Bills Payable report (its
     // row a sales bill settled in dollars at another rate, sent with an empty `BILLCL`, which the
     // strict parse refuses), and the rupee-control sitting's ledger and group snapshots.

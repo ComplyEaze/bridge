@@ -1170,7 +1170,7 @@ The request, as the build writes it (the run kept it by hash only), was one `LED
 - **The new ledger's party fields** read `TAXTYPE` `Others`, no `GSTDUTYHEAD`, no `PARTYGSTIN`, `OPENINGBALANCE` 0.00, and an empty registration-details list.
 - **After it, nothing moved:** the master mark read 237 after a repeat call for the same batch (ComplyEaze Bridge answered from its record and sent nothing to Tally) and after a second prepare of the same name (refused by ComplyEaze Bridge before any send).
 
-**Not established:** the dialog answered by a person's press; other ledger kinds and parents; more than one ledger in one request; Gold and Education; other releases; a company with Tally's security on; the dialog's own text, which was read on screen and not captured as text.
+**Not established:** the dialog answered by a person's press; other ledger kinds and parents; more than one ledger in one request (three in one request are measured on 7.2 in §9.4k); Gold and Education; other releases; a company with Tally's security on; the dialog's own text, which was read on screen and not captured as text.
 
 ### 9.4j Each gateway master write moved the master mark by one, to the written ledger's `ALTERID`
 
@@ -1183,5 +1183,16 @@ The request, as the build writes it (the run kept it by hash only), was one `LED
 
 **Not measured:** an answer lost on its way back; a create Tally ran after the client stopped waiting; a master keyed on Tally's screen (whether it moves the mark the same way); a `Create` of an existing ledger identical in every field (whether a change that alters nothing moves the mark); groups and other master types; two writes at once from different clients; Gold, Education and other releases.
 
+### 9.4k Three ledger `Create`s in one request: one create counted for each, the mark stepped by three, in request order
 
-#
+**Measured 2026-10-29, licensed TallyPrime 7.2 Silver on Windows, one synthetic company (`BRIDGE LEDGERBOX CI LAB`) loaded alone, no vouchers, two import requests sent with `curl`, once. Confidence: PARTIAL (one sitting, one book).** Sheet `lab/690-batch-ledger-create-l0` at `83a5c989`; answers `lab/690-batch-ledger-create-l0-answers` at `078db03e` (not for merge), each answer kept byte for byte with its sha256. Each request was one `Import Data` envelope (`REPORTNAME` `All Masters`) holding three `LEDGER` messages with `ACTION="Create"`, rendered by ComplyEaze Bridge's own ledger `Create` message and import envelope: parties under Sundry Creditors, not bill-wise, no opening, no GSTIN. Before and after each request the company's marks, the V3 ledger catalogue and the group snapshot were read. The company was backed up before the first request and restored after; the marks and the ledger catalogue then read back byte-identical to the first read.
+
+- **Three new names in one request counted `CREATED` 3**, and `ALTERED`, `DELETED`, `COMBINED`, `IGNORED`, `ERRORS`, `CANCELLED` and `EXCEPTIONS` 0, with no `LINEERROR`.
+- **`ALTMSTID` stepped by exactly three** (208 to 211), and the three new ledgers took `ALTERID`s 209, 210 and 211 **in request order**. Every ledger and group read before kept its GUID and `ALTERID`.
+- **One name already a ledger, in a request of three, was altered in place and the other two were created:** `CREATED` 2, `ALTERED` 1, every other counter 0, no `LINEERROR`. The existing ledger was sent with the fields it already had. It kept its GUID, and its `ALTERID` still moved (210 to 213).
+- **The mark stepped by three for that request too** (211 to 214). Each master the request wrote, the altered one included, took the mark's next value in request order: 212, 213 (the altered ledger) and 214.
+- **So a write into an existing ledger inside a batch does not change the step:** it shows only as `ALTERED` and in a read-back of the masters that existed before. It answers one item of §9.4j's not-measured list for this book and release: an alteration that changed no field moved the ledger's `ALTERID` and the mark.
+
+ComplyEaze Bridge does not yet send more than one ledger in a request: a stored batch of more than one is refused before anything is sent. #690's batching slice is to rest on this measurement: up to three ledgers in one approved request, verified only with one create counted per ledger, a mark step of exactly the batch's size straight after the send, and, on a later read, the ledgers' `ALTERID`s being `M`+1 to `M`+3. That slice is to compare them as a set, not in request order, until a repeat of this sitting measures the order again.
+
+**Not measured:** a request of more than three ledgers; ledgers of other kinds and parents in one request; a request carrying an alias or a fold of an existing name; Gold, Education and other releases; a repeat of this sitting.

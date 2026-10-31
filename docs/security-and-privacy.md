@@ -379,14 +379,48 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
 | macOS: `~/Library/Application Support/Bridge` | the files below |
 
 On a Microsoft Store install of Claude Desktop, Windows may keep some of these
-files under `%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`,
-and a given file can be in either place (seen on one computer, #1459;
-**Not measured:** when Windows puts a file in which place). For the import file
-that the `build_import_xml` tool reports, ComplyEaze Bridge shows the location
-Windows reports for that file, with a `path_state` beside it that says whether
-Windows reported it. The command-line report (`bridge_mcp --local-data-report --show-paths`)
-still prints the folder as built (the Windows location in the table above,
-unless you set another data folder), whichever place the files are in. On that
+files under
+`%LOCALAPPDATA%\Packages\<Claude package>\LocalCache\Local\Bridge\agent`, and a
+given file can be in either place. Measured on one computer (30 October 2026,
+#1584), with ComplyEaze Bridge started from a shell that Claude Desktop runs:
+the files it created went to that second folder; a copy started outside Claude
+Desktop created `%LOCALAPPDATA%\Bridge\agent` and its files there; and once both
+had run, each kept its own import journal. For the import file that the
+`build_import_xml` tool reports, ComplyEaze Bridge shows the location Windows
+reports for that file, with a `path_state` beside it that says whether Windows
+reported it; there it named the second folder, and a process outside Claude
+Desktop opened the file there with the same sha256. The command-line report
+(`bridge_mcp --local-data-report --show-paths`) prints each folder as built (the
+Windows location in the table above, unless you set another data folder); beside
+it, where the files directly in that folder are as Windows reports each file
+(`folder_file_locations` and `lock_folder_file_locations`, read from the first
+64 files by name, with how many were read of how many; not the files in its
+subfolders, such as `imports`; the listing stops at 100,000 entries, and
+`listing_capped` says so; a lock folder's `native-dispatch-leases` that is
+itself a link is not entered and reads `link_not_followed`); the import
+journal's own location (`journal_path`; a journal file that is itself a link is
+shown as built, its target not followed, with `journal_path_state`
+`link_not_followed`); and, on Windows, each copy of the data folder inside a
+Store app's package that exists (`package_copies`). It does not print a folder
+where Windows reports the folder itself to be: once both folders existed,
+Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed the
+second folder's files. Seen from inside Claude Desktop, a file both copies held
+named the second folder and a file only `%LOCALAPPDATA%\Bridge\agent` held named
+that folder; from outside, every file named `%LOCALAPPDATA%\Bridge\agent`. So a
+file in both copies is shown only by the copy that side reads, and a file in one
+copy by that copy. `package_copies` is what shows that the second copy exists,
+and a terminal outside Claude Desktop does not see that copy as part of the
+folder. The report does not record which side ran it; run from inside Claude
+Desktop on that computer, `package_copies` and the data folder's file locations
+would both name the second folder (inferred from the lab's probe, not from a run
+of this report), so such a run cannot tell whether `%LOCALAPPDATA%\Bridge\agent`
+also exists. Check both folders before you archive or delete. **Not measured:**
+ComplyEaze Bridge as Claude Desktop starts the extension (the measured copies
+carried no package identity, yet Windows redirected their files); a copy outside
+Claude Desktop running first; another Claude Desktop version; Windows 11; this
+build, its file locations once both folders exist (the lab read them with a
+probe making the same Windows call), and `package_copies`, which lists
+`%LOCALAPPDATA%\Packages`, on a real computer. On that
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).

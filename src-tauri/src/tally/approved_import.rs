@@ -1153,6 +1153,15 @@ pub(crate) mod test_seam {
             }
         }
 
+        /// A held post dialog that runs `while_pending` as it opens, on the
+        /// dialog's own task, before it waits for [`ScriptedApproval::answer`].
+        pub(crate) fn held_after(while_pending: impl Fn() + Send + Sync + 'static) -> Self {
+            Self {
+                while_pending: Some(Arc::new(while_pending)),
+                ..Self::held()
+            }
+        }
+
         /// Whether a held post dialog is still open: its task is waiting for
         /// an answer. False once the task was aborted, which closes it.
         pub(crate) fn is_waiting(&self) -> bool {
@@ -2815,12 +2824,13 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the post's box (`show_review`): topmost with
@@ -2856,12 +2866,13 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the review's box: topmost with MB_SYSTEMMODAL, taking
@@ -2896,12 +2907,13 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the review's box: topmost with MB_SYSTEMMODAL, taking
@@ -2975,13 +2987,14 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // The box cannot scroll: `guarded` measures it when it opens and, if it is
     // not wholly on the screen, never returns (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: Both buffers are NUL-terminated and live for the synchronous
-        // dialog; no parent HWND is borrowed. No application state is exposed
+        // dialog; the owner is `guarded`'s hidden window, alive until the box
+        // returns. No application state is exposed
         // to callbacks.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
@@ -2993,7 +3006,9 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // click and a key while the box was open (#1780). That run did
                 // not test what else a system-modal box changes: the taskbar
                 // showed no task buttons while it was open, cause not tested
-                // (#2161). When Windows lets it,
+                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // window, the other way a stand-in box was seen to stay on top
+                // (#1780); an owned box has no taskbar button. When Windows lets it,
                 // MB_SETFOREGROUND also gives the box the foreground, so a key
                 // typed for Tally can answer it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
@@ -3049,12 +3064,13 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     // line tells the person to press Y or N, and in one lab run on Windows 10
     // MB_SETFOREGROUND alone did not give it the keyboard when it opened
     // seconds after the last input went to Tally (#1780).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the post's box (`show_review`): topmost with

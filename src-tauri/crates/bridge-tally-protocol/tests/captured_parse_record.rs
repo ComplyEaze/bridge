@@ -2860,8 +2860,9 @@ const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tes
 const FOREX_OPEN_BILL: &str = "a Bills Receivable answer of BRIDGE FOREXGROUP LAB (30 Oct 2026, \
      #2071), with no row here: its rendering would hold the dollar customer's rupee amount, which \
      the merge gate's privacy scan reads as an identifier shape; the tests in \
-     src/native_outstandings/wire_settled_bill_tests.rs parse it and pin each row's party, \
-     reference and kind";
+     src/native_outstandings/wire_settled_bill_tests.rs parse it, pinning each row's party, \
+     reference and kind for the settled-supplier answer and, for the rupee-control answer, the \
+     party and reference of the one row admitted";
 const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRANSFER LAB and \
      BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
      yet, and the pull request that renders the census as a span replays it and changes this \

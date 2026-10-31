@@ -24,12 +24,12 @@ full in dollars at a rate other than its own is sent in the other side's report 
   - the group snapshot (`render_native_group_snapshot_request`).
 - **Sources:**
   - `bills_payable_forex_settled_empty_closing`: `raw/bills-payable.response` on
-    `lab/2071-forex-rerun-answers` at `0d7eb0bf5cae` (2026-10-29, 02:17 UTC). The same 476 bytes
+    `lab/2071-forex-rerun-answers` at `0d7eb0bf` (2026-10-29, 02:17 UTC). The same 476 bytes
     were answered three more times in the second sitting, in rounds A, B1 and B2.
   - `bills_receivable_forex_rupee_control`, `ledger_snapshot_forex_rupee_control` and
     `group_snapshot_forexgroup_lab`: `raw/b1-bills-receivable.response`,
     `raw/b1-ledger-snapshot.response` and `raw/b1-group-snapshot.response` on
-    `lab/2071-forex-reads-answers` at `ea28bde038b3` (2026-10-30, 19:56 UTC, after stage 1).
+    `lab/2071-forex-reads-answers` at `ea28bde0` (2026-10-30, 19:56 UTC, after stage 1).
   - `bills_receivable_forex_settled_supplier`: `raw/b2-bills-receivable.response` on the same
     branch (2026-10-30, 20:11 UTC, after stage 2).
 - **Encoding:** BOM-less UTF-16LE, the undecoded wire bytes. Each sha256 equals the lab's own

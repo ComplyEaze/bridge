@@ -3132,8 +3132,8 @@
   "by": "author (Lane E2)",
   "what": "TDS on a voucher that also posts to another loan is counted",
   "file": "src/loans_interest.rs",
-  "from": "                        .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0)",
-  "to": "                        .any(|l| l.ledger.is_empty())"
+  "from": "                    .any(|l| other_loans.contains(l.ledger.as_str()) && l.amount_paise != 0);",
+  "to": "                    .any(|l| l.ledger.is_empty());"
  },
  {
   "id": "LR-07",
@@ -3380,8 +3380,8 @@
   "by": "author (Lane E2)",
   "what": "coverage allows no rupee of rounding per deduction",
   "file": "src/loans_interest.rs",
-  "from": "                if tds_on_loan > 0 && covering >= expected - tolerance {",
-  "to": "                if tds_on_loan > 0 && covering >= expected {"
+  "from": "                } else if tds_on_loan > 0 && covering >= expected - tolerance {",
+  "to": "                } else if tds_on_loan > 0 && covering >= expected {"
  },
  {
   "id": "LR-38",
@@ -11614,6 +11614,110 @@
   "file": "src/loans_interest.rs",
   "from": "                            .any(|l| l.ledger == **name && l.amount_paise != 0)",
   "to": "                            .filter(|l| l.ledger == **name)\n                            .map(|l| i128::from(l.amount_paise))\n                            .sum::<i128>()\n                            != 0"
+ },
+ {
+  "id": "L1875-TDS-01",
+  "by": "author",
+  "what": "loans_interest: a voucher of loans on one side and TDS alone counts its TDS on neither loan (#1875 rule 3)",
+  "file": "src/loans_interest.rs",
+  "from": "                } else if tds_split_across_loans(v, is_loan, &tds_here) {",
+  "to": "                } else if false {"
+ },
+ {
+  "id": "L1875-TDS-02",
+  "by": "author",
+  "what": "loans_interest: each loan of a shape (a) voucher takes the voucher's whole TDS, not its own line",
+  "file": "src/loans_interest.rs",
+  "from": "                    Some((at, net(v, loan_ledger)))",
+  "to": "                    Some((at, -net_on(v, &tds_here)))"
+ },
+ {
+  "id": "L1875-TDS-03",
+  "by": "author",
+  "what": "loans_interest: shape (a) admits loans on opposite sides",
+  "file": "src/loans_interest.rs",
+  "from": "        && (on_loans().all(|l| l.amount_paise > 0) || on_loans().all(|l| l.amount_paise < 0))",
+  "to": "        && true"
+ },
+ {
+  "id": "L1875-TDS-04",
+  "by": "author",
+  "what": "loans_interest: shape (a) admits a voucher with another posted line",
+  "file": "src/loans_interest.rs",
+  "from": "    posted().all(|l| is_loan(&l.ledger) || tds.contains(&l.ledger))\n",
+  "to": "    true\n"
+ },
+ {
+  "id": "L1875-TDS-05",
+  "by": "author",
+  "what": "loans_interest: shape (a) admits TDS that does not net to the loans' sum",
+  "file": "src/loans_interest.rs",
+  "from": "\n        && on_loans().map(|l| i128::from(l.amount_paise)).sum::<i128>() + net_on(v, tds) == 0",
+  "to": ""
+ },
+ {
+  "id": "L1875-TDS-06",
+  "by": "author",
+  "what": "loans_interest: a nil line is a posting when shape (a) is read",
+  "file": "src/loans_interest.rs",
+  "from": "    let posted = || v.lines.iter().filter(|l| l.amount_paise != 0);",
+  "to": "    let posted = || v.lines.iter();"
+ },
+ {
+  "id": "L1875-TDS-07",
+  "by": "author",
+  "what": "loans_interest: a TDS debit is netted into the TDS deducted again (#1875 rule 4)",
+  "file": "src/loans_interest.rs",
+  "from": "            tds_by_voucher.iter().copied().partition(|&(_, x)| x > 0);",
+  "to": "            tds_by_voucher.iter().copied().partition(|&(_, x)| x != 0);"
+ },
+ {
+  "id": "L1875-TDS-08",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 leaves the TDS debits out of its tie",
+  "file": "src/loans_interest.rs",
+  "from": "        let tds_on_loan = value(format!(\"{prefix}tds_on_loan_{h}\"))\n            - value(format!(\"{prefix}tds_debited_on_loan_{h}\"));",
+  "to": "        let tds_on_loan = value(format!(\"{prefix}tds_on_loan_{h}\"));"
+ },
+ {
+  "id": "L1875-TDS-09",
+  "by": "author",
+  "what": "loans_interest: LOAN-1 adds the TDS debits with their sign turned",
+  "file": "src/loans_interest.rs",
+  "from": "            - value(format!(\"{prefix}tds_debited_on_loan_{h}\"));",
+  "to": "            + value(format!(\"{prefix}tds_debited_on_loan_{h}\"));"
+ },
+ {
+  "id": "L1875-TDS-10",
+  "by": "author",
+  "what": "loans_interest: the TDS debited figure is not published",
+  "file": "src/loans_interest.rs",
+  "from": "        if !debited.is_empty() {\n            r.fig(",
+  "to": "        if false {\n            r.fig("
+ },
+ {
+  "id": "L1875-TDS-11",
+  "by": "author",
+  "what": "loans_interest: the TDS deducted figure's text does not name the vouchers left out",
+  "file": "src/loans_interest.rs",
+  "from": "        let left_out = if debited.is_empty() {",
+  "to": "        let left_out = if true {"
+ },
+ {
+  "id": "L1875-TDS-12",
+  "by": "author",
+  "what": "loans_interest: the TDS deducted figure cites the vouchers left out of it",
+  "file": "src/loans_interest.rs",
+  "from": "            voucher_refs(deducted.iter().map(|&(at, _)| pop[at])),",
+  "to": "            ev_tds.clone(),"
+ },
+ {
+  "id": "L1875-TDS-13",
+  "by": "author",
+  "what": "loans_interest: the TDS in principal says it is inside the TDS deducted where a debit among it is not",
+  "file": "src/loans_interest.rs",
+  "from": "            let definition = if principal_tds.iter().any(|&(_, x)| x < 0) {",
+  "to": "            let definition = if false {"
  },
  {
   "id": "P1243-DEP-01",

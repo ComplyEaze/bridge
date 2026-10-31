@@ -36,7 +36,8 @@ lender and ledger name is invented ("Invented Finance Ltd", "NBFC Loan", ...).
   TDS payable, which never makes it a TDS line; interest whose s.194A rate ends in half a paisa (rounded up),
   TDS on a separate voucher the same day (read after the interest) and a TDS reversal, covered only within
   the rupee of tolerance; and one TDS journal debiting two loans, counted for neither, which LOAN-1 names
-  for both.
+  for both. Since #1875 the twin loans and the reversal read differently in the crate (the twins'
+  coverage reads not checked), a declared behaviour difference (`loans-tds-rules-3-4-1875.md`).
 - `edge-books/loans_interest_questions.json` (an individual whose previous-year turnover is a placeholder
   below both limits, activity not recorded: not a deductor, made unknown by the placeholder; added at the
   re-pin below) reaches: an
@@ -197,7 +198,7 @@ and regenerating all seven goldens there gives byte-identical files.
 | `loans_interest_questions.json` | 16,159 | `6511dbaf9cee8e2c0586099715bb90a48793b7eb1ae8449c280085f25a74e823` | `edge-books/loans_interest_questions.json` |
 | `loans_interest_shared.json` | 3,883 | `f714219e6bf0aa29a66e109cc1be1523b6549e686c5bf4521a60b871b238b90b` | `edge-books/loans_interest_shared.json` |
 | `loans_interest_shared_reversals.json` | 3,907 | `3e58ab5517e605380cbf4a2f502e700f62fd87ee9ecac4441149286790f88208` | `edge-books/loans_interest_shared_reversals.json` |
-| `loans_interest_tds_coverage.json` | 11,385 | `d1a32587660d4f9de320f0ba575c38d8321a067159195dd80b7a784c2bc1f175` | `edge-books/loans_interest_tds_coverage.json` |
+| `loans_interest_tds_coverage.json` | 11,803 | `612ca45870ac6b7b767d0c006eccf9915ba6d0d102ddf3404058278a38726519` | `edge-books/loans_interest_tds_coverage.json` |
 | `edge.loans_interest_core.loans_interest.json` | 78,702 | `46e30e4b1bf493c91407fdc675d6f8cdfa51f2fa14a65556722adde65108356f` | `golden/edge.loans_interest_core.loans_interest.json` |
 | `edge.loans_interest_individual_at.loans_interest.json` | 15,815 | `d9cacbf44985888197ec43e933844c349afb6f9de5c09c9c89c6fbf0487c89d5` | `golden/edge.loans_interest_individual_at.loans_interest.json` |
 | `edge.loans_interest_individual_over.loans_interest.json` | 14,577 | `d42bdc09a333cdd70ce8fee54ad376a93a882fb1d174869c91c5bb6b26e4dbf6` | `golden/edge.loans_interest_individual_over.loans_interest.json` |
@@ -205,13 +206,13 @@ and regenerating all seven goldens there gives byte-identical files.
 | `edge.loans_interest_questions.loans_interest.json` | 135,486 | `e7d49f9c089658ee3f6e1d327261ba0629658521f002b64177b8996f4f361419` | `golden/edge.loans_interest_questions.loans_interest.json` |
 | `edge.loans_interest_shared.loans_interest.json` | 15,641 | `347dfb628fcc4de2023776d0f8033d3c4a6b91a0cc8d1f7ff49c7421137d888e` | `golden/edge.loans_interest_shared.loans_interest.json` |
 | `edge.loans_interest_shared_reversals.loans_interest.json` | 16,630 | `80ed225dc149bb0a861a6679b1bbe2c015f4bb90e65155b5dcb81dee481e378b` | `golden/edge.loans_interest_shared_reversals.loans_interest.json` |
-| `edge.loans_interest_tds_coverage.loans_interest.json` | 68,199 | `ab8f851a6e7616c81c95c8f35f301a0a825dc390ec6561e96666ac8d30f796fe` | `golden/edge.loans_interest_tds_coverage.loans_interest.json` |
+| `edge.loans_interest_tds_coverage.loans_interest.json` | 69,772 | `ec5fa59969ab34cef0ba25d27d2c4955179d048fd64943af026bb808a25ff50c` | `golden/edge.loans_interest_tds_coverage.loans_interest.json` |
 | `synthetic.loans_interest.json` | 22,080 | `3c5402f9211b75092eb66b976fdfcc92cf02b27f1f19b2dea7b877f6a2377c69` | `golden/synthetic.loans_interest.json` |
 | `loans_interest_phase_a.json` | 11,102 | `8a26c7645ec4b0deb6081d96e3c028cf53d019f78e3586d61d3a257aceb914f8` | `edge-books/loans_interest_phase_a.json` |
 | `loans_interest_phase_a_s194a.json` | 10,335 | `2cfd9fb1ad4f59aee46cbc4f3e729b0915f21281a225ef0c3e68e690c8a66134` | `edge-books/loans_interest_phase_a_s194a.json` |
 | `loans_interest_phase_a_unbalanced.json` | 1,838 | `e46eb5bfd5bac1cc5bd68f0ae1b37608b8ec9ac66ee0256a840531ec4157fc47` | `edge-books/loans_interest_phase_a_unbalanced.json` |
 | `edge.loans_interest_phase_a.loans_interest.json` | 122,763 | `af646fe37cc7b402dd156a132f60d62be79ce24657de35c298d499ece3039965` | `golden/edge.loans_interest_phase_a.loans_interest.json` |
-| `edge.loans_interest_phase_a_s194a.loans_interest.json` | 94,994 | `10e7576a6a86ff8bf2dce072dd84c06835efbc00ce71860dd4c12a1b8438fcad` | `golden/edge.loans_interest_phase_a_s194a.loans_interest.json` |
+| `edge.loans_interest_phase_a_s194a.loans_interest.json` | 96,078 | `d652c3e1c8f50dfe385f88e9cf0e2da05d5f272a9c33aa4a76cd0f7933345622` | `golden/edge.loans_interest_phase_a_s194a.loans_interest.json` |
 | `edge.loans_interest_phase_a_unbalanced.loans_interest.json` | 19,454 | `95e219d47d5f3b5e179df42b67ebad2d0b672694082c8d16bc12158887ce121f` | `golden/edge.loans_interest_phase_a_unbalanced.loans_interest.json` |
 | `loans_interest_phase_a_refund_no_rate.json` | 5,820 | `f6ae1a827dfa5ab45a4e37408229376fe2351485f067b5f5d23b713459277c0d` | `edge-books/loans_interest_phase_a_refund_no_rate.json` |
 | `loans_interest_phase_a_unknown_deductor.json` | 4,533 | `1a7b049ac2b7b66a1c1b6309a78b06b26054cf95642f8a99241ef7107f0f259e` | `edge-books/loans_interest_phase_a_unknown_deductor.json` |

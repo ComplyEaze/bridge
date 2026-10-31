@@ -55,8 +55,12 @@ fn the_formula_names_each_ledger_once_in_guid_order() {
     assert_eq!(part.guids().len(), 5);
 }
 
+/// The bound is the invoice's entry cap, six; a `$GUID` filter has been sent
+/// live with five terms. Raising it needs live evidence for the new count, so
+/// the value is pinned here as well.
 #[test]
-fn a_part_names_at_least_one_and_at_most_the_measured_count() {
+fn a_part_names_at_least_one_and_at_most_the_invoice_cap() {
+    assert_eq!(LEDGER_GUID_PART_MAX_GUIDS, 6);
     assert_eq!(
         LedgerGuidPart::new(Vec::new()),
         Err(LedgerGuidPartError::Empty)

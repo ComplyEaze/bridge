@@ -27,12 +27,14 @@ pub const LEDGER_GUID_FORMULA_NAME: &str = "BridgeInvoiceLedgers";
 /// characters) and a hyphenated hexadecimal suffix.
 pub const LEDGER_GUID_MAX_CHARS: usize = 64;
 
-/// The most GUIDs one part may name: the most terms an OR filter formula has
-/// been sent with, on parent filters of the ledger catalogue (protocol
-/// reference section 11e). A `$GUID` filter has been sent with five terms only
-/// (#1331). The invoice, the only caller, names at most six ledgers, so six is
-/// the bound reached in practice.
-pub const LEDGER_GUID_PART_MAX_GUIDS: usize = 200;
+/// The most GUIDs one part may name: the most ledgers its only caller, a Sales
+/// invoice, names (the invoice's entry cap in the app crate is defined as this
+/// constant). A `$GUID` filter has been sent live with five terms only (#1331);
+/// a six-term `$GUID` filter has not been sent. A caller that needs more terms
+/// raises this bound with live evidence for the new count (AGENTS.md P1); the
+/// 200-term OR formulas of protocol reference section 11e were parent filters,
+/// not `$GUID` ones.
+pub const LEDGER_GUID_PART_MAX_GUIDS: usize = 6;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LedgerGuidError {

@@ -397,8 +397,11 @@ fn ledger_count_refusal(ledgers: Option<u64>, mark: u64) -> Option<InvoiceRefusa
 /// The most legs an invoice may carry: the customer, up to three Sales Accounts
 /// ledgers, the two tax heads (or two sales ledgers, the heads and a round off).
 /// What the approval window can show, with its blank line dropped when nothing
-/// stands under the entries.
-const MAX_INVOICE_ENTRIES: usize = 6;
+/// stands under the entries. It is the bound of the ledger part the rate read
+/// names (#1331), so every ledger an admitted invoice names fits one read; the
+/// part's own documentation says what has been sent live.
+const MAX_INVOICE_ENTRIES: usize =
+    bridge_tally_protocol::ledger_guid_part::LEDGER_GUID_PART_MAX_GUIDS;
 
 /// The IGST rates GST has, in thousandths of a percent: the slab list the check
 /// admitted before it read ledgers (5, 12, 18, 28 and 40 percent). A ledger at

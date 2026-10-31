@@ -552,6 +552,11 @@ fn counted(mark: u64, items_census: String, flags: String) -> Vec<ScenarioPlan> 
         flags,
         ..Book::at_mark(mark)
     };
+    counted_book(&book, items_census)
+}
+
+/// As [`counted`], with every read but the censuses answered from `book`.
+fn counted_book(book: &Book, items_census: String) -> Vec<ScenarioPlan> {
     let mut plans = book.through_flags();
     plans.push(xml(items_census));
     plans.push(xml(stock_lab_census(
@@ -640,6 +645,49 @@ async fn a_counted_read_returning_more_rows_than_the_census_refuses() {
         "{error:?}"
     );
     assert_eq!(observed.len(), AT_CLOSING_EXTENT + 2);
+}
+
+/// The censuses count 55 items and three groups, so the report is admitted at 58 worst-case
+/// lines. The captured report, with blanks between its elements past that estimate, refuses on
+/// the report's admitted size after the closing extent is read; a closing extent that moved is
+/// reported as moved instead.
+#[tokio::test]
+async fn a_counted_report_larger_than_its_admitted_estimate_refuses_after_the_closing_extent() {
+    let estimate = 58 * stock_report_worst_line_bytes();
+    // Two bytes a character on the wire, so half the estimate in blanks is over it.
+    let blanks = " ".repeat(usize::try_from(estimate / 2).unwrap());
+    let padded = replaced(&report(), "<ENVELOPE>", &format!("<ENVELOPE>{blanks}"));
+    for (closing_mark, moved) in [(875, false), (876, true)] {
+        let book = Book {
+            report: padded.clone(),
+            closing_extent: extent_with_mark(closing_mark),
+            ..Book::at_mark(875)
+        };
+        let census = stock_lab_census("stock_item_census_slice_stock_lab_200_300_live");
+        let (result, observed) = run(counted_book(&book, census)).await;
+        let error = result.err().expect("refused");
+        if moved {
+            assert!(
+                matches!(
+                    cause::<PairedReadValidationError>(&error),
+                    Some(PairedReadValidationError::StockSummaryExtent)
+                ),
+                "{error:?}"
+            );
+            assert!(cause::<StockSummaryReadError>(&error).is_none());
+        } else {
+            assert!(
+                matches!(
+                    cause::<StockSummaryReadError>(&error),
+                    Some(StockSummaryReadError::PremiseViolated(
+                        "stock_report_over_admitted_bytes"
+                    ))
+                ),
+                "{error:?}"
+            );
+        }
+        assert_eq!(observed.len(), AT_CLOSING_EXTENT + 2);
+    }
 }
 
 /// Tally's own count above the census refuses before any item request, and the extent is read

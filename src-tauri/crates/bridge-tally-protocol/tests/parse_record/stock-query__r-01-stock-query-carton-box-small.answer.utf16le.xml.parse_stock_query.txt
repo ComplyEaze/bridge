@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/stock-query/r-01-stock-query-carton-box-small.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "100",
+                ),
+                unit: "Box",
+            },
+        },
+    ],
+))

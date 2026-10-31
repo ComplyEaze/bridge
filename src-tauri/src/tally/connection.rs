@@ -1228,6 +1228,20 @@ const ENCODING_UTF16_LE: u8 = 3;
 const ENCODING_UTF16_LE_BOM: u8 = 4;
 const ENCODING_UTF16_BE_BOM: u8 = 5;
 
+/// `http` gated on `wire`'s lock and retry bound, and drained after a cut post
+/// when `wire` has a drain policy (#2142).
+fn gated(
+    http: TallyHttpTransport,
+    config: &TallyConfig,
+    wire: &WireGateConfig,
+) -> TallyHttpTransport {
+    let http = http.with_wire_gate(wire.gate_for(config), wire.retry());
+    match wire.drain() {
+        Some(policy) => http.with_drain(policy),
+        None => http,
+    }
+}
+
 impl TallyClient {
     /// Every send takes the endpoint's wire lock (`endpoint_wire`), at the
     /// shared per-user coordination root.
@@ -1238,8 +1252,7 @@ impl TallyClient {
 
     /// As [`Self::new`], gating every send on `wire`'s root and retry bound.
     pub(crate) fn with_wire(config: TallyConfig, wire: &WireGateConfig) -> anyhow::Result<Self> {
-        let http = TallyHttpTransport::new(config.clone())?
-            .with_wire_gate(wire.gate_for(&config), wire.retry())
+        let http = gated(TallyHttpTransport::new(config.clone())?, &config, wire)
             .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
@@ -1277,13 +1290,16 @@ impl TallyClient {
     #[cfg(test)]
     fn with_http_builder(config: TallyConfig, builder: reqwest::ClientBuilder) -> Self {
         let wire = WireGateConfig::default();
-        let http = TallyHttpTransport::with_builder(
-            config.clone(),
-            bridge_tally_transport::TransportPolicy::default(),
-            builder,
+        let http = gated(
+            TallyHttpTransport::with_builder(
+                config.clone(),
+                bridge_tally_transport::TransportPolicy::default(),
+                builder,
+            )
+            .expect("build synthetic Tally HTTP transport"),
+            &config,
+            &wire,
         )
-        .expect("build synthetic Tally HTTP transport")
-        .with_wire_gate(wire.gate_for(&config), wire.retry())
         .with_send_observer(crate::request_trail::observer());
         Self {
             http,
@@ -1297,10 +1313,12 @@ impl TallyClient {
         policy: bridge_tally_transport::TransportPolicy,
         wire: &WireGateConfig,
     ) -> anyhow::Result<Self> {
-        let http =
-            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?
-                .with_wire_gate(wire.gate_for(&config), wire.retry())
-                .with_send_observer(crate::request_trail::observer());
+        let http = gated(
+            TallyHttpTransport::with_builder(config.clone(), policy, reqwest::Client::builder())?,
+            &config,
+            wire,
+        )
+        .with_send_observer(crate::request_trail::observer());
         Ok(Self {
             http,
             observed_encoding: Arc::new(AtomicU8::new(ENCODING_UNAVAILABLE)),
@@ -1356,6 +1374,12 @@ impl TallyClient {
         // `/status` is useful local diagnostics but is not part of Tally's
         // documented third-party XML contract. Never gate the POST probe or
         // authoritative product metadata on this unauthenticated heuristic.
+        // The one exception is the drain after a cut post (#2142), which holds
+        // the next post until `/status` has answered three times in a row,
+        // whatever its answer, and at most 10 minutes: two lab rows measured
+        // that `/status` waits while Tally works on a cut read, and that a data
+        // read sent after three quick probes answered at its rest speed
+        // (`bridge_tally_transport::DrainPolicy::MEASURED`).
         let (mut connection, mut wire_evidence) =
             match self.check_connection_strict_with_wire_evidence().await {
                 Ok(observation) => observation,

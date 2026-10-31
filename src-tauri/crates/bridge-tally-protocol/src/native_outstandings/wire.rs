@@ -1689,7 +1689,7 @@ fn read_element_text(
 use super::model::{CompanyCurrency, CurrencyMaster};
 
 /// Parses the company currency collection into the company's currency
-/// ([`CompanyCurrency::from_masters`]).
+/// (`CompanyCurrency::from_masters`).
 pub fn parse_company_currency(xml: &str) -> Result<CompanyCurrency, NativeOutstandingsError> {
     Ok(CompanyCurrency::from_masters(&parse_currency_masters(xml)?))
 }

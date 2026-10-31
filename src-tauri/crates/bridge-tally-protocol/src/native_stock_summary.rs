@@ -645,7 +645,7 @@ pub(crate) fn read_row_fields(
 /// sibling shares the GUID, §9.11b) or another company's refuse
 /// `company_flags_not_one_row`. A flag is `Yes`, `No`, or `Unknown` when absent
 /// or empty; any other text refuses. The stock item count is read as
-/// [`item_count`] reads it; the other `NUM*` counts are not read.
+/// `item_count` reads it; the other `NUM*` counts are not read.
 pub fn parse_company_inventory_flags(
     response: &str,
     company_guid: &str,

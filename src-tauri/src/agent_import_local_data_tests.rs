@@ -373,11 +373,28 @@ fn no_path_is_in_the_json_unless_asked() {
     // backslash of the path, so a substring check on it proves nothing.
     let shown = to_json(&report, SystemTime::now(), Some((root, &[root])));
     let path = root.display().to_string();
+    // each folder as built (#1459): its own final path is not trusted
     assert_eq!(shown["folder_path"], path, "{shown}");
     assert_eq!(shown["lock_folder_path"], path, "{shown}");
     assert_eq!(
         shown["lock_folder_paths"],
         serde_json::json!([path]),
+        "{shown}"
+    );
+    // no file directly in the folder (imports is a folder); no lease folder
+    assert_eq!(
+        shown["folder_file_locations"],
+        serde_json::json!({"folders": [], "files_read": 0, "files": 0}),
+        "{shown}"
+    );
+    // package copies are looked for only on Windows, under %LOCALAPPDATA%
+    #[cfg(not(windows))]
+    assert!(shown.get("package_copies").is_none(), "{shown}");
+    #[cfg(windows)]
+    assert!(shown.get("package_copies").is_some(), "{shown}");
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!(["not_listed"]),
         "{shown}"
     );
     // two lock folders: the first is still lock_folder_path, both are listed in order
@@ -394,6 +411,189 @@ fn no_path_is_in_the_json_unless_asked() {
         "{two}"
     );
     assert!(names_the_path(&shown.to_string(), root), "{shown}");
+    assert!(shown.get("journal_path").is_none(), "{shown}");
+}
+
+/// #1459, #1584: a path is shown where the operating system reports each file
+/// to be, never where the folder resolves. The resolver stands in for Windows
+/// as the lab observed it inside a Store install's package once the real folder
+/// also existed: the folder names the real one, while a file the package's copy
+/// holds names that copy, the journal included, even where the real folder
+/// holds a file of the same name.
+#[test]
+fn a_folder_is_shown_by_where_its_files_are_not_where_it_resolves() {
+    let directory = tempfile::tempdir().unwrap();
+    let local = directory.path().join("local");
+    let root = local.join("Bridge").join("agent");
+    let locks = directory.path().join("locks");
+    write(&root.join("agent-import-ledger.jsonl"), &journal(true));
+    write(&root.join("terms-acceptance.jsonl"), b"{}\n");
+    write(&locks.join("native-dispatch-leases").join("a.lock"), b"");
+    // one package holds a copy of the data folder, another does not
+    let copy = local
+        .join("Packages")
+        .join("Store.App_1")
+        .join("LocalCache")
+        .join("Local")
+        .join("Bridge")
+        .join("agent");
+    fs::create_dir_all(&copy).unwrap();
+    fs::create_dir_all(
+        local
+            .join("Packages")
+            .join("Other.App_2")
+            .join("LocalCache"),
+    )
+    .unwrap();
+    let package = PathBuf::from("/package/agent");
+    let real = PathBuf::from("/real/agent");
+    let leases = PathBuf::from("/package/leases");
+    let resolve = |path: &Path| -> VisiblePath {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        match name.as_str() {
+            "a.lock" => VisiblePath::Resolved(leases.join(&name)),
+            _ if path.is_file() => VisiblePath::Resolved(package.join(&name)),
+            _ => VisiblePath::Resolved(real.clone()),
+        }
+    };
+    let report = build(&root, &[]);
+    let shown = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&root, &[locks.as_path()])),
+        &resolve,
+        Some(&local),
+    );
+    assert_eq!(shown["folder_path"], root.display().to_string(), "{shown}");
+    // the journal by its own location, not the resolved folder plus its name
+    assert_eq!(
+        shown["journal_path"],
+        package
+            .join("agent-import-ledger.jsonl")
+            .display()
+            .to_string(),
+        "{shown}"
+    );
+    assert_eq!(shown["journal_path_state"], "resolved", "{shown}");
+    // two files in one copy: that copy once, and both files read
+    assert_eq!(
+        shown["folder_file_locations"],
+        serde_json::json!({
+            "folders": [{"path": package.display().to_string(), "state": "resolved"}],
+            "files_read": 2,
+            "files": 2,
+        }),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_file_locations"],
+        serde_json::json!([{
+            "folders": [{"path": leases.display().to_string(), "state": "resolved"}],
+            "files_read": 1,
+            "files": 1,
+        }]),
+        "{shown}"
+    );
+    assert_eq!(
+        shown["lock_folder_path"],
+        locks.display().to_string(),
+        "{shown}"
+    );
+    // the copy a process on the other side of the package would not see
+    assert_eq!(
+        shown["package_copies"],
+        serde_json::json!([copy.display().to_string()]),
+        "{shown}"
+    );
+    // a data folder set outside %LOCALAPPDATA% has no package copy to look for
+    let elsewhere = to_json_resolving(
+        &report,
+        SystemTime::now(),
+        Some((&locks, &[locks.as_path()])),
+        &resolve,
+        Some(&local),
+    );
+    assert_eq!(
+        elsewhere["package_copies"], "not_under_local_app_data",
+        "{elsewhere}"
+    );
+
+    // a data folder that could not be read: no journal path, whatever is there
+    let not_a_folder = root.join("agent-import-ledger.jsonl");
+    let unreadable = build(&not_a_folder, &[]);
+    assert!(matches!(unreadable.root, Root::Unreadable));
+    let shown = to_json_resolving(
+        &unreadable,
+        SystemTime::now(),
+        Some((&not_a_folder, &[locks.as_path()])),
+        &resolve,
+        None,
+    );
+    assert!(shown.get("journal_path").is_none(), "{shown}");
+}
+
+/// Files that resolve to two folders list both, in the order of the files'
+/// names, each once (the lab did not observe this from either side: each side
+/// saw its own copy only).
+#[test]
+fn files_in_two_folders_list_both_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    for name in ["a.jsonl", "b.jsonl", "c.jsonl"] {
+        write(&root.join(name), b"");
+    }
+    let resolve = |path: &Path| -> VisiblePath {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let folder = if name == "b.jsonl" { "/two" } else { "/one" };
+        VisiblePath::Resolved(PathBuf::from(folder).join(&name))
+    };
+    assert_eq!(
+        file_locations(root, &resolve),
+        serde_json::json!({
+            "folders": [
+                {"path": PathBuf::from("/one").display().to_string(), "state": "resolved"},
+                {"path": PathBuf::from("/two").display().to_string(), "state": "resolved"},
+            ],
+            "files_read": 3,
+            "files": 3,
+        })
+    );
+}
+
+/// The locations come from the first `FILE_LOCATION_SAMPLE` files by name,
+/// whatever order the folder lists them in, and the JSON says how many were read.
+#[test]
+fn the_sample_is_the_first_files_by_name() {
+    let names: Vec<PathBuf> = (0..FILE_LOCATION_SAMPLE + 6)
+        .rev()
+        .map(|n| PathBuf::from(format!("f{n:03}")))
+        .collect();
+    let sample = file_sample(names);
+    assert_eq!(sample.len(), FILE_LOCATION_SAMPLE);
+    assert_eq!(sample[0], PathBuf::from("f000"));
+    assert_eq!(
+        sample[FILE_LOCATION_SAMPLE - 1],
+        PathBuf::from(format!("f{:03}", FILE_LOCATION_SAMPLE - 1))
+    );
+    // through the folder: a file past the sample does not show its folder
+    let directory = tempfile::tempdir().unwrap();
+    for n in 0..=FILE_LOCATION_SAMPLE {
+        write(&directory.path().join(format!("f{n:03}")), b"");
+    }
+    let last = format!("f{FILE_LOCATION_SAMPLE:03}");
+    let resolve = |path: &Path| -> VisiblePath {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let folder = if name == last { "/late" } else { "/early" };
+        VisiblePath::Resolved(PathBuf::from(folder).join(&name))
+    };
+    assert_eq!(
+        file_locations(directory.path(), &resolve),
+        serde_json::json!({
+            "folders": [{"path": PathBuf::from("/early").display().to_string(), "state": "resolved"}],
+            "files_read": FILE_LOCATION_SAMPLE,
+            "files": FILE_LOCATION_SAMPLE + 1,
+        })
+    );
 }
 
 fn server_over(directory: &Path) -> crate::agent::Server {

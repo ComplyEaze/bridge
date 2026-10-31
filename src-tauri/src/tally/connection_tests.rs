@@ -2013,3 +2013,23 @@ fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
         assert!(part.ledger_count() <= with.max_ledgers_per_part);
     }
 }
+
+/// #2142: every gated client posts under its wire config's drain policy, and
+/// none when the config has none.
+#[test]
+fn a_gated_client_drains_by_its_wire_configs_policy() {
+    use crate::endpoint_wire::WireGateConfig;
+    use bridge_tally_transport::DrainPolicy;
+    let config = super::TallyConfig {
+        host: "127.0.0.1".into(),
+        port: 9,
+    };
+    let plain = super::TallyClient::with_wire(config.clone(), &WireGateConfig::default()).unwrap();
+    assert_eq!(plain.http.drain_policy(), None);
+    let draining = super::TallyClient::with_wire(
+        config,
+        &WireGateConfig::default().with_drain(DrainPolicy::MEASURED),
+    )
+    .unwrap();
+    assert_eq!(draining.http.drain_policy(), Some(DrainPolicy::MEASURED));
+}

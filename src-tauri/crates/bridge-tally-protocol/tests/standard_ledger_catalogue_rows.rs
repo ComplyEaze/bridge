@@ -584,6 +584,10 @@ const CAFE_ALIAS: &str = "Lab Caf\u{e9} Sales";
 const SCRIPT_ALIAS: &str = "\u{932}\u{948}\u{92c} \u{916}\u{93e}\u{924}\u{93e}";
 
 /// The aliases keyed on Tally's screen, each beside the ledger that carries it, in keyed order.
+///
+/// The one ledger with two aliases has them in alphabetical order as well as keyed order, so these
+/// tests cannot tell keyed order from sorted order: that Tally lists aliases in keyed order rests on
+/// the lab result (protocol reference §9.4h), not on these tests.
 const SCREEN_ALIASES: [(&str, &str); 4] = [
     ("Lab Other Ledger", "Lab Other First"),
     ("Lab Other Ledger", "Lab Other Second"),
@@ -616,7 +620,7 @@ fn expected(extra: &[(&str, &str)]) -> Vec<(String, String)> {
 }
 
 /// The screen's aliases, read by the import catalogue (V2), each after its ledger's own name, in
-/// keyed order, byte for byte.
+/// Tally's order (keyed order per the lab result, see `SCREEN_ALIASES`), byte for byte.
 #[test]
 fn aliases_keyed_on_tallys_screen_are_read_as_tally_listed_them() {
     let v2 = parse_standard_ledger_catalog_v2_with_identities(
@@ -650,7 +654,6 @@ fn imported_aliases_are_read_by_both_catalogues_with_their_code_points() {
     )
     .expect("the captured import catalogue parses");
     assert_eq!(by_ledger(v2.catalog().aliases()), six);
-    assert_eq!(CAFE_ALIAS.chars().filter(|c| *c == '\u{e9}').count(), 1);
 }
 
 /// The name index (V3) holds every alias among its ledger's names, after the own name.

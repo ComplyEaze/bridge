@@ -6473,6 +6473,7 @@ fn each_captured_alias_names_its_ledger_and_a_case_variant_names_none() {
     ] {
         let names = rows.iter().map(|(name, _, _)| *name).collect::<Vec<_>>();
         let report = alias_report(&names, catalogue.catalog());
+        assert_eq!(report.len(), rows.len());
         for ((name, owner, state), entry) in rows.iter().zip(&report) {
             assert_eq!(alias_of(entry), *owner, "{name}: {entry}");
             assert_eq!(entry["match_state"], *state, "{name}: {entry}");

@@ -1,0 +1,2 @@
+loaded 18 request templates
+relay: 127.0.0.1:9011 -> 127.0.0.1:9001, recording into <LAB_DIR>\relay; Ctrl+C to stop

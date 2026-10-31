@@ -1,0 +1,11 @@
+Restore plan (#1866-L4 step 9, LAB-COMMON C6), written before the restore, on the run lead's recorded RESTORE word (given before the sitting, used after steps 4-8):
+- Source folder: the lab's 1866-l4\bk folder (holds one file only; checked before the restore).
+- File: TDBK1800_<company number>.001, 81,611 B, sha256 ff0ec77b8304a4f8625300815fbd116533e58c177c2c8548bf28a554a7ebf869, taken 31 Oct 2026 05:35:02 local (00:05Z) at step 3.
+- THE COMPANY: BRIDGE GST LEDGER LAB, number <company number>, GUID aae372c5-a894-491c-8843-5532e43d2d2f.
+- Restore Data Path: Tally's data folder (TallyPrimeEditLog\data). Source: Specify Path, the backup's folder.
+- The Restore list must show BRIDGE GST LEDGER LAB with its number and 31-Oct-26 5:35 am; it is selected alone; End of List before Accept.
+- Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Skip ... Replace ..." = Replace.
+- A listing of the company's data folder is kept on the lab PC before and after the restore (names, sizes, times).
+- THE COMPANY is shut first (Tally's own Shut Company).
+- After (as the sheet says): load THE COMPANY alone; a screenshot of the whole window and of the Gateway; MARKS first (EXPECT ms0: 228 / 71); by Display the Day Book for December 2025 (step 1's six vouchers, nothing on 7 December); the List of Ledgers under Indirect Expenses (no GS1 Round Off) and the List of Ledgers (19 ledgers).
+- Fallback: none beyond BK-1866L4.

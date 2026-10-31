@@ -12,6 +12,7 @@ use crate::native_masters::{
 use crate::native_outstandings::NativeLedgerSnapshotPeriod;
 use crate::native_statement_reports::render_report_envelope;
 use crate::native_stock_summary::{quantity, NativeStockQuantity};
+use crate::standard_ledger_catalog::unsafe_display_character;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
 use crate::xml_text::escape_text as xml_escape;
 use quick_xml::{events::Event, Reader};
@@ -65,13 +66,20 @@ pub enum StockQueryError {
     /// A godown, batch and quantity triple cut short, out of order, or followed by a group.
     PartialLine,
     /// A godown or batch name that is empty, has space at either end, holds the sanitiser's
-    /// marker, or is past the assumed name bound.
+    /// marker or a character that is a control or hides or reorders the text around it, or is
+    /// past the assumed name bound.
     NameInvalid,
-    /// A quantity that is empty, has space at either end, holds the sanitiser's marker, or is not
-    /// `<number> <unit>`: never read as zero.
+    /// A quantity that is empty, has space at either end, holds the sanitiser's marker or such a
+    /// character, or is not `<number> <unit>`: never read as zero.
     QuantityUnparseable,
     /// A second line for a godown and batch already read.
     LineRepeated,
+    /// A last-purchase or last-sale group with no line after it. No capture holds one, and read
+    /// as no lines it could not be told from a name Tally does not know.
+    GroupsWithoutLines,
+    /// Lines in more than one unit. Every capture writes an item's lines in its base unit, and
+    /// a sum of lines in two units is no quantity.
+    UnitsDiffer,
 }
 
 impl StockQueryError {
@@ -87,6 +95,8 @@ impl StockQueryError {
             Self::NameInvalid => "stock_query_name_invalid",
             Self::QuantityUnparseable => "stock_query_quantity_unparseable",
             Self::LineRepeated => "stock_query_line_repeated",
+            Self::GroupsWithoutLines => "stock_query_groups_without_lines",
+            Self::UnitsDiffer => "stock_query_units_differ",
         }
     }
 }
@@ -167,9 +177,9 @@ pub struct StockQueryLine {
     pub quantity: NativeStockQuantity,
 }
 
-/// What an answer held. `NoLines` is the empty answer: Tally sends it for an item with no stock
-/// at the period end and for a name it does not know alike, so it is never read as zero on its
-/// own.
+/// What an answer held. `NoLines` is the empty answer, with no group and no line: Tally sends it
+/// for an item with no stock at the period end and for a name it does not know alike, so it is
+/// never read as zero on its own. Every line of `Lines` is in one unit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StockQueryAnswer {
     NoLines,
@@ -306,7 +316,10 @@ fn read_fields(fields: &[(Vec<u8>, String)]) -> Result<StockQueryAnswer, StockQu
         }
         let amount = &fields[at + 2].1;
         // Not trimmed as the stock read's grammar would: no captured quantity is padded.
-        if amount.contains(TALLY_SANITIZED_MARKER) || amount.trim() != amount {
+        if amount.contains(TALLY_SANITIZED_MARKER)
+            || amount.trim() != amount
+            || amount.chars().any(unsafe_display_character)
+        {
             return Err(StockQueryError::QuantityUnparseable);
         }
         lines.push(StockQueryLine {
@@ -323,11 +336,20 @@ fn read_fields(fields: &[(Vec<u8>, String)]) -> Result<StockQueryAnswer, StockQu
         });
         at += LINE.len();
     }
-    Ok(if lines.is_empty() {
-        StockQueryAnswer::NoLines
-    } else {
-        StockQueryAnswer::Lines(lines)
-    })
+    if lines.is_empty() {
+        return if kinds.is_empty() {
+            Ok(StockQueryAnswer::NoLines)
+        } else {
+            Err(StockQueryError::GroupsWithoutLines)
+        };
+    }
+    if lines
+        .iter()
+        .any(|line| line.quantity.unit != lines[0].quantity.unit)
+    {
+        return Err(StockQueryError::UnitsDiffer);
+    }
+    Ok(StockQueryAnswer::Lines(lines))
 }
 
 /// `fields[at..]` start with `expected`, in order. A captured element out of place is `cut`; an
@@ -348,10 +370,17 @@ fn expect(
     Ok(())
 }
 
-/// A godown or batch name as Tally sent it: never empty, with no space at either end and no
-/// sanitiser's marker (a forbidden reference such as `&#4;` was in it), within the name bound.
+/// A godown or batch name as Tally sent it: never empty, with no space at either end, no
+/// sanitiser's marker (a forbidden reference such as `&#4;` was in it) and no character that is a
+/// control or hides or reorders the text around it (a raw `U+0004`, a zero-width space, a
+/// byte-order mark; the crate's rule for names that would display as another), within the name
+/// bound.
 fn line_name(text: &str) -> Result<String, StockQueryError> {
-    if text.trim().is_empty() || text.trim() != text || text.contains(TALLY_SANITIZED_MARKER) {
+    if text.trim().is_empty()
+        || text.trim() != text
+        || text.contains(TALLY_SANITIZED_MARKER)
+        || text.chars().any(unsafe_display_character)
+    {
         return Err(StockQueryError::NameInvalid);
     }
     within_name_bound(text).map_err(|_| StockQueryError::NameInvalid)?;

@@ -40,18 +40,20 @@ test("desktop command invokes the one shared selected-voucher operation", async 
   assert.match(agent, /pub\(crate\) async fn desktop_selected_vouchers[\s\S]*?vouchers::selected_voucher_operation_for_verified\([\s\S]*?&server/);
   assert.match(commands, /fetch_selected_ledger_entries[\s\S]*?desktop_selected_vouchers/);
   // The voucher source read is bounded before it is sent (protocol reference
-  // §11c): `read_entry_window_rows`, which hands the agent's own paired reader
-  // to `read_entry_window_rows_with`, which parses each row under the composite
-  // policy (#674) and plans it through `read_voucher_window_with` with the shape's
-  // limits, as `read_entry_window_shaped` does through `read_voucher_window` (no
-  // pattern may cross into another function); a type filter alone switches it
+  // §11c): `read_entry_window_rows`, which hands the agent's own paired reader and
+  // the call's GST-details choice (#2027) to `read_entry_window_rows_reading_gst`,
+  // which parses each row under the composite policy (#674) and plans it through
+  // `read_voucher_window_with` with the shape's limits; `read_entry_window_rows_with`
+  // reaches the same function with the details withheld; as `read_entry_window_shaped`
+  // does through `read_voucher_window` (no pattern may cross into another function); a type filter alone switches it
   // to the class-resolving shape (#625). The ledger catalogue is read before
   // and again after it: before, `read_resolvable_ledgers` keeps both spellings of
   // each ledger so a typed name resolves by either (#1085); after, the drift check
   // `read_ledger_catalogue` stays on the spelling the voucher rows carry.
   assert.match(vouchers, /read_resolvable_ledgers\b(?:(?!\bfn\s)[\s\S])*?read_entry_window_rows\((?:(?!\bfn\s)[\s\S])*?read_ledger_catalogue\b/);
-  assert.match(vouchers, /async fn read_entry_window_rows\((?:(?!\bfn\s)[\s\S])*?read_entry_window_rows_with\(\s*&AgentReader\(self\)/);
-  assert.match(vouchers, /async fn read_entry_window_rows_with(?:(?!\bfn\s)[\s\S])*?read_voucher_window_with\((?:(?!\bfn\s)[\s\S])*?WindowReadLimits::for_shape\(shape\)/);
+  assert.match(vouchers, /async fn read_entry_window_rows\((?:(?!\bfn\s)[\s\S])*?read_entry_window_rows_reading_gst\(\s*&AgentReader\(self\),(?:(?!\bfn\s)[\s\S])*?\bgst,?\s*\)/);
+  assert.match(vouchers, /async fn read_entry_window_rows_with(?:(?!\bfn\s)[\s\S])*?read_entry_window_rows_reading_gst\((?:(?!\bfn\s)[\s\S])*?GstDetailsShown::Withheld,?\s*\)/);
+  assert.match(vouchers, /async fn read_entry_window_rows_reading_gst(?:(?!\bfn\s)[\s\S])*?read_voucher_window_with\((?:(?!\bfn\s)[\s\S])*?WindowReadLimits::for_shape\(shape\)/);
   assert.match(vouchers, /type_selector\.is_some\(\) \{\s*VoucherReadShape::ClassEntryWildcard\s*\} else \{\s*VoucherReadShape::EntryWildcard/);
   assert.match(vouchers, /fn read_entry_wildcard_window[\s\S]*?VoucherReadShape::EntryWildcard/);
   // The page is taken from the filtered and selected rows: the ledger filter runs first, then the rows are held for later

@@ -10,6 +10,10 @@
 //!
 //! The bill credit-period type and its parser ([`CreditPeriod`],
 //! [`parse_credit_period`]) also live here, used by the agent `vouchers` read.
+//!
+//! [`OutstandingsReport`]: crate::outstandings_shared::OutstandingsReport
+//! [`CreditPeriod`]: crate::outstandings_shared::CreditPeriod
+//! [`parse_credit_period`]: crate::outstandings_shared::parse_credit_period
 
 use std::{fmt, sync::Arc};
 

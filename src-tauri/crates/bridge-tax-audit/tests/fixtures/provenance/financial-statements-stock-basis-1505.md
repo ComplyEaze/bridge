@@ -25,6 +25,17 @@ At the reference engine, commit `6168aeaa` (its change for #1505: the stock basi
 
 The books are hand-written scenarios, not generated from any data. The maintainers generated the goldens and handed them over as files.
 
+## Declared behaviour difference (#1602)
+
+The reference reads a book's opening stock as a known zero in two cases, and this crate no longer does (parity-spec §12, ruling of 26 October 2026):
+
+- a stock-items part that parses but lists no stock item: the opening stock is unknown, with the reason "not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil";
+- a part whose items carry no opening value at all: unknown, with the reason "not taken: no stock item carries an opening value". One item without a value beside valued ones still counts as nothing, and an opening value of 0.00 is a value.
+
+The crate also refuses a total of opening values that does not fit in its paise total ("not taken: the stock items' opening values add up to more than can be held") instead of wrapping it; the reference sums without a bound, so no real book differs there.
+
+No committed golden or edge book reaches either case (edge books set the opening stock directly, and the one committed read has `ISINTEGRATED` set to `No`), so no golden moves and the divergence registry holds no record. The test book is the unit test `book::tests::opening_stock_is_taken_only_for_a_trial_balance_from_the_books_first_day`, on stock-items parts written in the test; it pins the change until a Chartered Accountant's hand-worked answer for such a book is recorded. Not measured: whether Tally omits an opening value of zero, which would make a book with no opening stock read as "no stock item carries an opening value".
+
 ## Bytes
 
 | File | Bytes | SHA-256 | Path |

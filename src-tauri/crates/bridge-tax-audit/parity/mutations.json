@@ -13516,8 +13516,8 @@
   "by": "author",
   "what": "book.rs: an item with no opening value counted as one paisa",
   "file": "src/book.rs",
-  "from": "                .map(|m| m.opening_value_paise.unwrap_or(0))",
-  "to": "                .map(|m| m.opening_value_paise.unwrap_or(1))"
+  "from": "                total.checked_add(m.opening_value_paise.unwrap_or(0))",
+  "to": "                total.checked_add(m.opening_value_paise.unwrap_or(1))"
  },
  {
   "id": "OS-6",
@@ -14278,5 +14278,69 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "S1602-1",
+  "by": "author",
+  "what": "#1602: the opening total wraps instead of being refused",
+  "file": "src/book.rs",
+  "from": "                total.checked_add(m.opening_value_paise.unwrap_or(0))\n",
+  "to": "                Some(total.wrapping_add(m.opening_value_paise.unwrap_or(0)))\n"
+ },
+ {
+  "id": "S1602-2",
+  "by": "author",
+  "what": "#1602: an opening total too large to hold reads as a known zero",
+  "file": "src/book.rs",
+  "from": "            .map_or(\n                OpeningStock::Unknown(OpeningStockUnknown::TooLarge),\n",
+  "to": "            .map_or(\n                OpeningStock::Valued(0),\n"
+ },
+ {
+  "id": "S1602-3",
+  "by": "author",
+  "what": "#1602: the too-large reason loses its words",
+  "file": "src/book.rs",
+  "from": "                \"not taken: the stock items' opening values add up to more than can be held\"\n",
+  "to": "                \"not taken\"\n"
+ },
+ {
+  "id": "S1602-4",
+  "by": "author",
+  "what": "#1602: a stock-items part that lists no item reads as a known zero opening",
+  "file": "src/book.rs",
+  "from": "        Ok(masters) if masters.is_empty() => {\n            OpeningStock::Unknown(OpeningStockUnknown::NoStockItems)\n",
+  "to": "        Ok(masters) if masters.is_empty() => {\n            OpeningStock::Valued(0)\n"
+ },
+ {
+  "id": "S1602-5",
+  "by": "author",
+  "what": "#1602: items none of which carries an opening value read as a known zero opening",
+  "file": "src/book.rs",
+  "from": "            OpeningStock::Unknown(OpeningStockUnknown::NoOpeningValues)\n        }\n",
+  "to": "            OpeningStock::Valued(0)\n        }\n"
+ },
+ {
+  "id": "S1602-6",
+  "by": "author",
+  "what": "#1602: one item without an opening value makes the whole opening unknown",
+  "file": "src/book.rs",
+  "from": "        Ok(masters) if masters.values().all(|m| m.opening_value_paise.is_none()) => {\n",
+  "to": "        Ok(masters) if masters.values().any(|m| m.opening_value_paise.is_none()) => {\n"
+ },
+ {
+  "id": "S1602-7",
+  "by": "author",
+  "what": "#1602: the no-item reason loses its words",
+  "file": "src/book.rs",
+  "from": "            Self::NoStockItems => \"not taken: the read's stock items part lists no stock item; if the company keeps no stock, this is nil\",\n",
+  "to": "            Self::NoStockItems => \"not taken\",\n"
+ },
+ {
+  "id": "S1602-8",
+  "by": "author",
+  "what": "#1602: the no-value reason loses its words",
+  "file": "src/book.rs",
+  "from": "            Self::NoOpeningValues => \"not taken: no stock item carries an opening value\",\n",
+  "to": "            Self::NoOpeningValues => \"not taken\",\n"
  }
 ]

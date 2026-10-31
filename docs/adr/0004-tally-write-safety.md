@@ -957,7 +957,7 @@ A stored batch is admitted through the same constructor again before it is sent,
 
 The owner's acceptance of condition 4 carries over unchanged: the overwritten ledger's earlier values were never read, so nothing can restore them.
 
-**A lost answer, and the absent states.** A batch of more than one whose answer from Tally was lost is never `posted_unattributed`: that state places one ledger by `FirstChangeAfterIntent`, and a batch stays open for a person instead. `confirmed_absent` and `confirmed_absent_after_change` need every name of the batch absent, with their other conditions unchanged.
+**A lost answer, and the absent states.** A batch of more than one whose answer from Tally was lost is never `posted_unattributed`: that state places one ledger by `FirstChangeAfterIntent`, and a batch stays open for a person instead. `confirmed_absent` and `confirmed_absent_after_change` need every name of the batch absent, with their other conditions unchanged. Without Tally's counters, a name that resolves to a master that existed before, or another loaded company's moved mark, places no ledger of the batch that reads absent, and that ledger's create may still be waiting in Tally. So a batch of more than one with no counters on file and any name absent is not settled by either: it stays `reconciliation_required` with `batch_ledger_absent_without_counters`, holding every name, where a batch of one still reads `posted_into_existing_master` or `master_write_located_elsewhere`. The verdict takes this from one type (`WriteLocated` in `agent_master_verdict.rs`), not from a condition at each step.
 
 **What it rests on.**
 

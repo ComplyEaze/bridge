@@ -2178,6 +2178,98 @@ fn a_batch_is_confirmed_absent_only_when_every_name_is() {
     assert_ne!(world.judge().state, MasterVerdictState::ConfirmedAbsent);
 }
 
+/// A batch of three whose answer was lost, Alpha read back and Bravo and
+/// Charlie absent: the later read, with no counters.
+fn lost_batch_with_two_absent() -> BatchWorld {
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    world.counters = None;
+    world.answer_held = false;
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(1) && master.guid != batch_guid(2));
+    world
+}
+
+fn assert_held_open(judgement: &Judgement, step_reason: &str) {
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    // Not terminal: the journal's `is_settled` stays false, and the batch
+    // keeps blocking every name it holds.
+    assert!(!judgement.state.is_terminal());
+    assert!(judgement.reasons.contains(&step_reason), "{judgement:?}");
+    assert!(judgement
+        .reasons
+        .contains(&"batch_ledger_absent_without_counters"));
+    assert!(judgement.guids.is_empty());
+}
+
+#[test]
+fn a_lost_answer_batch_with_absent_names_is_not_settled_by_one_name_on_an_existing_master() {
+    let mut world = lost_batch_with_two_absent();
+    // Alpha's name resolves to the pre-image's Cash ledger.
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(0));
+    world.masters()[0].names.push(BATCH_NAMES[0].into());
+    world.target_mark(7);
+    assert_held_open(&world.judge(), "name_resolves_to_existing_master");
+}
+
+#[test]
+fn a_lost_answer_batch_with_absent_names_is_not_settled_by_another_companys_mark() {
+    let mut world = lost_batch_with_two_absent();
+    world.target_mark(8);
+    world.read.marks.as_mut().unwrap()[1] = mark(other(), 4);
+    assert_held_open(&world.judge(), "other_company_mark_moved");
+    // Every name absent: still held, and the step says so.
+    world.masters().truncate(2);
+    world.target_mark(7);
+    let judgement = world.judge();
+    assert_held_open(&judgement, "other_company_mark_moved");
+    assert!(judgement.name_absent_in_read_book);
+}
+
+#[test]
+fn a_located_write_still_settles_one_ledger_or_a_batch_with_counters_or_none_absent() {
+    // One ledger, answer lost, its name on an existing master.
+    let mut world = World::untouched(suspense());
+    world.masters()[0].names.push(NAME.into());
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+    // One ledger, answer lost, absent, another company's mark moved.
+    let mut world = World::untouched(suspense());
+    world.marks()[1] = mark(other(), 4);
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::MasterWriteLocatedElsewhere
+    );
+    // A batch with counters on file: the request ran, and its absent names
+    // were not written.
+    let mut world = lost_batch_with_two_absent();
+    world
+        .masters()
+        .retain(|master| master.guid != batch_guid(0));
+    world.masters()[0].names.push(BATCH_NAMES[0].into());
+    world.counters = Some(counters(0, 1, 0, 0));
+    world.answer_held = true;
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::PostedIntoExistingMaster
+    );
+    // A batch with its answer lost and no name absent.
+    let mut world = BatchWorld::clean();
+    world.moment = Moment::Reconcile;
+    world.counters = None;
+    world.answer_held = false;
+    world.read.marks.as_mut().unwrap()[1] = mark(other(), 4);
+    assert_eq!(
+        world.judge().state,
+        MasterVerdictState::MasterWriteLocatedElsewhere
+    );
+}
+
 #[test]
 fn the_party_read_is_needed_when_any_ledger_of_the_batch_is_new() {
     let world = BatchWorld::clean();

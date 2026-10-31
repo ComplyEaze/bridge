@@ -20,7 +20,9 @@
 //! 2. a pre-image master's `ALTERID` changed, `ALTERED` above zero, or the name
 //!    resolves to a pre-image master: `posted_into_existing_master`;
 //! 3. another loaded company's `ALTMSTID` moved:
-//!    `master_write_located_elsewhere`;
+//!    `master_write_located_elsewhere`; for steps 2 and 3, a batch of more than
+//!    one ledger with no counters on file and any name absent stays
+//!    `reconciliation_required` instead ([`WriteLocated`]);
 //! 4. on a reconcile only, the name absent under every key of the index, no pre-image
 //!    master changed or missing, no loaded company's mark moved and no counter
 //!    claiming a create: `confirmed_absent`; the same, but with the target
@@ -602,6 +604,37 @@ struct ItemRead {
     checks: Checks,
 }
 
+/// Whether a write that steps 2 and 3 located settles the whole batch. Both
+/// states are terminal, so either releases every name the batch holds.
+///
+/// With Tally's counters on file, the request is known to have run, and an
+/// item that reads absent was not written. Without them (the answer was lost,
+/// or came without counters), the evidence is one master or one company's
+/// mark: it places no item that reads absent, and that item's create may
+/// still be waiting in Tally. For a batch of more than one ledger with any
+/// item absent, the write therefore settles nothing, and the batch stays
+/// `reconciliation_required` before step 4's coverage gate is reached. A
+/// batch of one is judged as before: its one item is the write located, or
+/// it reads absent and the write is elsewhere, as for a single create.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WriteLocated {
+    ForTheBatch,
+    NotForAbsentItems,
+}
+
+impl WriteLocated {
+    fn over(facts: &Facts<'_>, item_reads: &[ItemRead]) -> Self {
+        if item_reads.len() > 1
+            && facts.counters.is_none()
+            && item_reads.iter().any(|item| item.absent)
+        {
+            Self::NotForAbsentItems
+        } else {
+            Self::ForTheBatch
+        }
+    }
+}
+
 /// Every check of `checks`: failed when any failed, passed when all passed,
 /// otherwise not checked. An empty list is not checked.
 fn all_of(checks: impl IntoIterator<Item = Check>) -> Check {
@@ -797,7 +830,8 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     // to this create (another person's edit during the window) is not called
     // a write into it: it fails the pre-image check and is left to a person
     // below, holding the names, and it never reads absent (step 4).
-    if altered || any_into_pre_image {
+    // 3. Another loaded company's master mark moved.
+    let located = if altered || any_into_pre_image {
         if altered {
             reasons.push("tally_reported_altered");
         }
@@ -812,25 +846,29 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
                     .filter(|guid| is_canonical_guid(guid))
             })
             .collect();
-        return Judgement::read(
-            MasterVerdictState::PostedIntoExistingMaster,
-            guids,
-            checks,
-            reasons,
-            name_absent,
-        );
-    }
-
-    // 3. Another loaded company's master mark moved.
-    if others_moved {
+        Some((MasterVerdictState::PostedIntoExistingMaster, guids))
+    } else if others_moved {
         reasons.push("other_company_mark_moved");
-        return Judgement::read(
-            MasterVerdictState::MasterWriteLocatedElsewhere,
-            Vec::new(),
-            checks,
-            reasons,
-            name_absent,
-        );
+        Some((MasterVerdictState::MasterWriteLocatedElsewhere, Vec::new()))
+    } else {
+        None
+    };
+    if let Some((state, guids)) = located {
+        return match WriteLocated::over(facts, &item_reads) {
+            WriteLocated::ForTheBatch => {
+                Judgement::read(state, guids, checks, reasons, name_absent)
+            }
+            WriteLocated::NotForAbsentItems => {
+                reasons.push("batch_ledger_absent_without_counters");
+                Judgement::read(
+                    MasterVerdictState::ReconciliationRequired,
+                    Vec::new(),
+                    checks,
+                    reasons,
+                    name_absent,
+                )
+            }
+        };
     }
 
     // 4. After an unknown outcome: nothing was written anywhere we can see.

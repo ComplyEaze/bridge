@@ -34,120 +34,124 @@ fn period(from: &str, to: &str) -> NativeLedgerSnapshotPeriod {
     .unwrap()
 }
 
+/// The captured requests naming an item that the builder renders byte for byte: file, item,
+/// period start and end.
+const BUILDER_REQUESTS: &[(&str, &str, &str, &str)] = &[
+    (
+        "r-4-stock-query-stockitemname",
+        "Hydrochloric Acid 33pc",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "r-01-stock-query-carton-box-small",
+        "Carton Box Small",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "r-02-stock-query-caustic-soda-flakes",
+        "Caustic Soda Flakes",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "r-03-stock-query-cleaning-kit-a",
+        "Cleaning Kit A",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "r-09-stock-query-soda-ash-light",
+        "Soda Ash Light",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "r-11-stock-query-zero-stock-item",
+        "Zero Stock Item",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "r-12-stock-query-hcl-to-20250401",
+        "Hydrochloric Acid 33pc",
+        "20250401",
+        "20250401",
+    ),
+    (
+        "r-14-stock-query-cleaning-kit-a-to-20250401",
+        "Cleaning Kit A",
+        "20250401",
+        "20250401",
+    ),
+    (
+        "r-15-stock-query-unknown-item",
+        "Bridge Probe Item",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "w-02-stock-query-kit-co-item-f1",
+        "Kit & Co Item",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "w-03-stock-query-gauge-test-50l-f1",
+        "Gauge (Test) 50L",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "w-05-stock-query-owner-s-item-f2",
+        "Owner's Item",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "w-07-stock-query-quote-q-item-f2",
+        "Quote \"Q\" Item",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "w-08-stock-query-alt-unit-item-f1",
+        "Alt Unit Item",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "w-09-stock-query-mix-5-set-large-f1",
+        "Mix 5% / Set, Large",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "w-10-stock-query-dash-item-7-f1",
+        "Dash-Item 7",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "alt-a-04-stock-query-alt-unit-probe-a",
+        "Alt Unit Probe A",
+        "20250401",
+        "20260331",
+    ),
+    (
+        "alt-a-05-stock-query-alt-unit-probe-b",
+        "Alt Unit Probe B",
+        "20250401",
+        "20260331",
+    ),
+];
+
 /// Every captured request naming an item is the builder's rendering, byte for byte, as the
 /// product would send it.
 #[test]
 fn every_captured_request_is_the_builders_bytes() {
-    for (file, item, from, to) in [
-        (
-            "r-4-stock-query-stockitemname",
-            "Hydrochloric Acid 33pc",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "r-01-stock-query-carton-box-small",
-            "Carton Box Small",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "r-02-stock-query-caustic-soda-flakes",
-            "Caustic Soda Flakes",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "r-03-stock-query-cleaning-kit-a",
-            "Cleaning Kit A",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "r-09-stock-query-soda-ash-light",
-            "Soda Ash Light",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "r-11-stock-query-zero-stock-item",
-            "Zero Stock Item",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "r-12-stock-query-hcl-to-20250401",
-            "Hydrochloric Acid 33pc",
-            "20250401",
-            "20250401",
-        ),
-        (
-            "r-14-stock-query-cleaning-kit-a-to-20250401",
-            "Cleaning Kit A",
-            "20250401",
-            "20250401",
-        ),
-        (
-            "r-15-stock-query-unknown-item",
-            "Bridge Probe Item",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "w-02-stock-query-kit-co-item-f1",
-            "Kit & Co Item",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "w-03-stock-query-gauge-test-50l-f1",
-            "Gauge (Test) 50L",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "w-05-stock-query-owner-s-item-f2",
-            "Owner's Item",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "w-07-stock-query-quote-q-item-f2",
-            "Quote \"Q\" Item",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "w-08-stock-query-alt-unit-item-f1",
-            "Alt Unit Item",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "w-09-stock-query-mix-5-set-large-f1",
-            "Mix 5% / Set, Large",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "w-10-stock-query-dash-item-7-f1",
-            "Dash-Item 7",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "alt-a-04-stock-query-alt-unit-probe-a",
-            "Alt Unit Probe A",
-            "20250401",
-            "20260331",
-        ),
-        (
-            "alt-a-05-stock-query-alt-unit-probe-b",
-            "Alt Unit Probe B",
-            "20250401",
-            "20260331",
-        ),
-    ] {
+    for &(file, item, from, to) in BUILDER_REQUESTS {
         let rendered = render_stock_query_request(
             LAB,
             &MeasuredItemName::new(item).unwrap(),
@@ -730,7 +734,8 @@ fn captured_item_names() -> Vec<(String, String)> {
 
 /// Every character the alphabet admits beyond letters, digits and the space is in a captured name,
 /// and every such character in a captured name is admitted: the alphabet is exactly the measured
-/// one. For each, a capture holding it is the builder's bytes (the first test).
+/// one. For each, a request in `BUILDER_REQUESTS` names an item holding it, so a capture holding it
+/// is the builder's bytes (the first test).
 #[test]
 fn the_admitted_punctuation_is_exactly_the_captured_punctuation() {
     let named = captured_item_names();
@@ -747,6 +752,12 @@ fn the_admitted_punctuation_is_exactly_the_captured_punctuation() {
     assert_eq!(captured, admitted);
     for name in &names {
         assert!(MeasuredItemName::new(name).is_ok(), "{name:?}");
+    }
+    for c in STOCK_QUERY_MEASURED_PUNCTUATION {
+        assert!(
+            BUILDER_REQUESTS.iter().any(|(_, item, _, _)| item.contains(c)),
+            "no request the first test checks names an item holding {c:?}"
+        );
     }
 }
 

@@ -137,3 +137,19 @@ Every file is a live capture, never hand-written.
 | `stock_items_nested_lab_to_20250930_live.utf16le.xml` | 13952 | `53aa65c8e27e84aa9af0cffe29f2fd3679c7c44518ea89e8c90fbb59ed86e74e` | stock items |
 | `stock_summary_report_nested_lab_to_20250930_request.utf16le.xml` | 772 | `cbdd7658148f83352f33d54560eab3c99fdab604b9c1460774686f5cbca01909` | request |
 | `stock_summary_report_nested_lab_to_20250930_live.utf16le.xml` | 948 | `338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937` | Stock Summary |
+
+## A stock-item and a stock-group census on BRIDGE STOCK LAB (captured 2026-10-29)
+
+- **What:** the AlterID census requests of #1233 (`render_stock_item_census_slice_request` and `render_stock_group_census_slice_request`), sent to the synthetic lab company `BRIDGE STOCK LAB` (company number 100027; marks `ALTMSTID` 292, `ALTVCHID` 4; `NUMSTOCKITEMS` 55) by a lab script, one request at a time, reads only. The requests are the bytes the builders render; the answers are the bytes Tally sent, BOM-less UTF-16LE, unedited. Request sheet `lab/1233-stock-census-slice` at `bcee293e`; answers `lab/1233-stock-census-slice-answers` at `8775a22a`, each sha256 equal to that sitting's send log.
+- **The census:** three stock-item slices, (0, 100], (100, 200] and (200, 300], answered 0, 0 and 55 rows. The 55 are the book's items, each once, every row carrying `GUID` and `BRIDGECOMPANYGUID` only, under `NAME` and `RESERVEDNAME` attributes; no `LANGUAGENAME.LIST`. A slice past every item, (400000, 400010], answered the same empty collection (`MSTDEPTYPE` 512), byte-identical to the two empty slices and to `stock_items_empty_book_fy_live.utf16le.xml` above. A repeated read of (0, 100] was byte-identical.
+- **Stock groups:** one slice, (0, 300], answered the book's three groups (`MSTDEPTYPE` 128), the same GUIDs as the `masters` tool's stock-group answer from the same sitting (its request is that tool's own).
+- **Not measured:** a census on a book whose mark is past the single-read limit, and any book with more than one slice of items or groups.
+
+| file | bytes | sha256 | content |
+|---|---|---|---|
+| `stock_item_census_slice_stock_lab_200_300_request.utf16le.xml` | 1282 | `7a6be97b852389f583a6b1a34588c70fb543f390a7b022c30e79e7a635e6d9e7` | request |
+| `stock_item_census_slice_stock_lab_200_300_live.utf16le.xml` | 30262 | `db77a9065fea6813f888ab2e9ca27475ea18286e31aaa275a58a21bf30b6d374` | stock-item census slice, 55 rows |
+| `stock_item_census_slice_stock_lab_empty_live.utf16le.xml` | 2998 | `cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a` | stock-item census slice, 0 rows |
+| `stock_group_census_slice_stock_lab_0_300_request.utf16le.xml` | 1284 | `fde31f91ddc6ba716be5abb31a14f3649ab2631bf9ba72585cd416c79e84ab62` | request |
+| `stock_group_census_slice_stock_lab_0_300_live.utf16le.xml` | 4496 | `b3204c318fe38b1379541843ca30ce643bee59a3439d8af11c8259749425d167` | stock-group census slice, 3 rows |
+| `stock_groups_masters_stock_lab_live.utf16le.xml` | 6296 | `31a5b8979f1bed4e52698183ceebf8760763e0c41c33c56a1f3b6e3a718b12a6` | masters stock groups, 3 rows |

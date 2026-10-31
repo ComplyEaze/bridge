@@ -484,13 +484,13 @@ const LEDGER_CATALOGUE_RESPONSE_LIMIT_BYTES_UNVERIFIED: u64 = 32_000_000;
 /// the longest name Bridge assumes fits [`COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED`]
 /// (asserted by a test), which is about half the transport's cap. Measured at
 /// 800, 1,000, 4,000 and 8,000 wide, on three books (section 11e, PARTIAL).
-const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
+pub(crate) const LEDGER_CENSUS_SLICE_WIDTH_UNVERIFIED: u64 = 4_000;
 
 /// Most slices one census makes (#679): Bridge's own bound on the serial
 /// requests a census may spend, not a measured limit. With the slice width it
 /// admits a master mark of 400,000, so a book whose mark is above that is
 /// refused before anything is sent after the extent.
-const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
+pub(crate) const LEDGER_CENSUS_MAX_SLICES_UNVERIFIED: usize = 100;
 
 /// Characters of a GUID-only census row that do not depend on the ledger's
 /// name, counting the row's separators: 391 in the committed eight-row capture
@@ -1609,6 +1609,17 @@ impl TallyClient {
         let encoded_sha256 = response.encoded_sha256().to_string();
         self.record_observed_encoding(response.encoding());
         Ok((response.into_text(), encoded_bytes, encoded_sha256))
+    }
+
+    /// One AlterID census slice of a master collection other than ledgers (#1233), read once and
+    /// not paired, as the ledger census reads its slices: the census's own checks and the extent
+    /// read around it stand in for a second read. Returns the text, its encoded bytes and their
+    /// SHA-256.
+    pub(crate) async fn fetch_census_slice(
+        &self,
+        request_xml: String,
+    ) -> anyhow::Result<(String, usize, String)> {
+        self.post_xml_with_encoded_bytes(request_xml).await
     }
 
     /// Discovers companies through Tally's documented `Company` collection

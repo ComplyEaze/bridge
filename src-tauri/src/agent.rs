@@ -983,6 +983,9 @@ struct ReadSize {
     estimated_bytes: u64,
     limit_bytes: u64,
     limit_master_alter_id: u64,
+    /// For a `stock_summary` refused on its censuses' count (#1233): the items counted and the
+    /// most one read is admitted for. `None` for every other refusal, whose `size` is unchanged.
+    counted_items: Option<(u64, u64)>,
 }
 
 fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
@@ -1015,6 +1018,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         if let Some(crate::tally::runtime::StockSummaryReadError::TooLarge {
@@ -1029,6 +1033,23 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
+            });
+        }
+        if let Some(crate::tally::runtime::StockSummaryReadError::TooManyItems {
+            master_alter_id,
+            counted_items,
+            estimated_bytes,
+            limit_bytes,
+            limit_items,
+        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_items,
+                counted_items: Some((*counted_items, *limit_items)),
             });
         }
         if let Some(crate::tally::runtime::NegativeStockReadError::TooLarge {
@@ -1043,6 +1064,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         match cause
@@ -1058,6 +1080,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *mark_limit,
+                counted_items: None,
             }),
             _ => None,
         }
@@ -1205,8 +1228,10 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(stock.code());
         }
-        if let Some(crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)) =
-            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        if let Some(
+            crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)
+            | crate::tally::runtime::StockSummaryReadError::CensusRefused(reason),
+        ) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
         {
             return Some(reason);
         }
@@ -1491,13 +1516,37 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              whole-book read of its own, on a different basis: not literal voucher \
              movement).",
         ),
-        // The stock summary read's own size refusal (`size` carries the mark).
+        // The stock summary read's own size refusal (`size` carries the mark, and the counted
+        // items when the census counted them, #1233).
         "stock_summary_too_large" => Some(
-            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
-             worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
-             so no request for stock items was sent. The mark counts masters of every kind, so \
-             a company with few stock items may be refused. A larger book refuses; retrying \
-             this call refuses again.",
+            "The company holds more stock items than one read is admitted for: with \
+             `size.counted_items`, the census counted them, and an assumed worst-case row for \
+             each is over ComplyEaze Bridge's response budget (`size.limit_bytes`; at most \
+             `size.limit_items` items), so no request for stock items was sent. A larger book \
+             refuses; retrying this call refuses again.",
+        ),
+        // #1233: the census that counts a book past the single-read mark could not finish.
+        "stock_summary_census_refused" => Some(
+            "ComplyEaze Bridge could not count the company's stock items or stock groups, so no \
+             request for stock items was sent; `error.cause` names why (a census slice holding \
+             more rows than its span, a GUID twice, no item found, or an answer that did not \
+             read). No item found (`stock_item_span_census_empty`) also follows from a company \
+             that holds no stock item. A master-alteration mark past 400,000 always refuses \
+             (`stock_item_span_too_many_slices`), so calling again will not help. Otherwise check \
+             that the company is open in Tally and unchanged, then call again once.",
+        ),
+        // #1233: the report, sized from the counted items and groups, is over the budget.
+        "stock_summary_report_too_large" => Some(
+            "The company's stock items and stock groups together, times an assumed worst-case \
+             line of Tally's Stock Summary, are over ComplyEaze Bridge's response budget, so \
+             no stock request was sent. A larger book refuses; retrying this call refuses again.",
+        ),
+        // #1233: Tally counts more stock items than the census found.
+        "stock_summary_item_count_company_higher" => Some(
+            "Tally's own stock item count is higher than ComplyEaze Bridge counted, so a read \
+             sized from that count could be too small and none was sent. An item may have been \
+             added during the call: call again once; if it refuses again, the count cannot be \
+             trusted on this book.",
         ),
         // The Negative Stock read's own size refusal (`size` carries the mark).
         "negative_stock_too_large" => Some(
@@ -2846,6 +2895,10 @@ impl Server {
                             "limit_bytes": size.limit_bytes,
                             "limit_master_alter_id": size.limit_master_alter_id,
                         });
+                        if let Some((counted, limit)) = size.counted_items {
+                            error["size"]["counted_items"] = json!(counted);
+                            error["size"]["limit_items"] = json!(limit);
+                        }
                     }
                 }
                 // #629: the endpoint that was tried, so a wrong or reset port

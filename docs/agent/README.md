@@ -1272,16 +1272,29 @@ A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before an
 item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
 `limit` and `snapshot_id` behave as in `masters`, and the result reports `snapshot`.
 
-Small books only. The items are read whole only when the master-alteration mark
+At most 874 stock items. The items are read whole only when the master-alteration mark
 (`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
-a mark of at most 874. A larger book is refused before any item request as
-`stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
-`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. Typical stock-heavy client books refuse
-today (the two measured had marks of about 100,000 and 300,000, protocol reference
-§12a.12), until a counted read lands. After a read, the row count and the response
-size are checked against the mark and the admitted size, and a breach refuses the
-whole read as `stock_summary_bound_premise_violated`, unless the closing extent
-shows the book moved (`stock_summary_extent_changed`). The stock-item request does
+a mark of at most 874. Past that mark the stock items and the stock groups are first
+counted by AlterID span, in slices of 4,000 AlterIDs (a mark of at most 400,000), and
+those counts admit the same single read: at most 874 counted items, and the items and
+groups together, times an assumed worst report line of 5,208 bytes (a guess from short
+names, not a measurement), within 16,000,000 bytes, which sizes the Stock Summary report
+before it is read. Tally's own item count only refuses, when it is higher than the
+count (`stock_summary_item_count_company_higher`), and counts above the mark refuse as
+`stock_summary_bound_premise_violated`. More items are refused before any item request
+as `stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes` and `limit_master_alter_id`, and for a counted book `counted_items` and
+`limit_items`, `limit_master_alter_id` then carrying the same item limit), and retrying
+refuses again; a report too large refuses as
+`stock_summary_report_too_large`, and a count that could not be made as
+`stock_summary_census_refused`, with the census's own code (for example
+`stock_item_span_census_empty`, or `stock_census_slice_invalid` for a slice answer that
+did not read) in `error.cause`; a book with no stock group counts none. A refusal from the
+count is reported as `stock_summary_extent_changed` instead when the book moved meanwhile. The counted path has not yet
+run against a live book with a mark past 874. After a read, the row count and the
+response size are checked against the mark (and the count) and the admitted size, and a
+breach refuses the whole read as `stock_summary_bound_premise_violated`, unless the
+closing extent shows the book moved (`stock_summary_extent_changed`). The stock-item request does
 not fetch `ALTERID`, so the rows' AlterIDs are not checked as they are for `masters`.
 
 Evidence: one synthetic book on one licensed TallyPrime 7.1

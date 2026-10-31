@@ -62,7 +62,8 @@ use bridge_tally_protocol::{
     parse_native_voucher_type_source_records_with_evidence,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    ExpectedTallyTextEncoding, TallyImportApplicationStatus, TallyImportResult,
+    parse_stock_group_census_slice, parse_stock_item_census_slice, ExpectedTallyTextEncoding,
+    TallyImportApplicationStatus, TallyImportResult,
 };
 use sha2::{Digest, Sha256};
 
@@ -466,6 +467,55 @@ const ROWS: &[Row] = &[
                 "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
                 8,
             ))
+        },
+    },
+    // tests/ledger_census_slice.rs: the stock censuses of #1233 on BRIDGE STOCK LAB
+    Row {
+        fixture: "tests/fixtures/stock_item_census_slice_stock_lab_200_300_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_item_census_slice(max 100)",
+        parse: |_, text| {
+            typed(parse_stock_item_census_slice(
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+                100,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_item_census_slice(max 100)",
+        parse: |_, text| {
+            typed(parse_stock_item_census_slice(
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+                100,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/stock_group_census_slice_stock_lab_0_300_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_group_census_slice(max 300)",
+        parse: |_, text| {
+            typed(parse_stock_group_census_slice(
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+                300,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/stock_groups_masters_stock_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockGroups)",
+        parse: |_, text| {
+            masters(
+                NativeMasterKind::StockGroups,
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+            )
         },
     },
     // src/native_stock_query_tests.rs: Tally's Stock Query for one item (#2018)

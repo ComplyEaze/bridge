@@ -430,8 +430,9 @@ Store app's copy of the data folder holds an import journal, other than the one
 the running process uses, with a batch; neither journal is moved, merged or
 deleted (#2233). Seen from inside Claude Desktop, a journal in
 `%LOCALAPPDATA%\Bridge\agent` is hidden behind the package's own copy, so only
-the side outside Claude Desktop is refused by it. **Not measured:** this refusal
-on a real computer.
+the side outside Claude Desktop is refused by it. Ledger creates, which keep
+their own journal, are not covered. **Not measured:** this refusal on a real
+computer.
 Microsoft's documentation says that uninstalling or resetting a Store app
 (here Claude Desktop itself; this is not the removal of the extension that
 section 8 describes) removes that second folder and everything in it.

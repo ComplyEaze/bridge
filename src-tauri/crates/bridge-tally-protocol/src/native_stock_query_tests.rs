@@ -755,7 +755,9 @@ fn the_admitted_punctuation_is_exactly_the_captured_punctuation() {
     }
     for c in STOCK_QUERY_MEASURED_PUNCTUATION {
         assert!(
-            BUILDER_REQUESTS.iter().any(|(_, item, _, _)| item.contains(c)),
+            BUILDER_REQUESTS
+                .iter()
+                .any(|(_, item, _, _)| item.contains(c)),
             "no request the first test checks names an item holding {c:?}"
         );
     }

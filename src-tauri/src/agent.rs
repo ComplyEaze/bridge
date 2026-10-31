@@ -2098,19 +2098,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              customer's GST registration applies from in Tally. Then build again.",
         ),
         "invoice_ledger_parent_unnameable"
-        | "invoice_scope_parent_folds"
-        | "invoice_ledger_scope_too_large"
+        | "invoice_ledger_guid_unnameable"
         | "invoice_ledger_scope_unplannable" => Some(
-            "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers under the groups \
-             of the ledgers this invoice names, and it could not name that read safely: a \
-             ledger's group has no name it can write into a request (it is empty, holds a \
-             quote or a control character, or starts or ends with a space), or another group \
-             of the book differs from one of these only in letter case (the filter Tally was \
-             measured to apply would return both), or the groups hold more ledgers than one \
-             read may. Where `detail` is shown it names the ledger, the group or the cause. \
-             Nothing was written, and building again gives the same refusal until the book \
-             changes. Ask the user to check the group of the ledgers on the invoice in Tally, \
-             or tell them this invoice has to be entered in Tally itself.",
+            "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers this invoice \
+             names, by the identifier Tally gave each, and it could not name that read \
+             safely: a ledger has no group it can check the answer against (none, or one the \
+             ledger list could not carry: blank, over 1,024 bytes, or holding a control or \
+             invisible character), or Tally gave it an identifier of another form. \
+             Where `detail` is shown it names the ledger or the cause. Nothing was written, and \
+             building again gives the same refusal until the book changes. Ask the user to \
+             check the group of the ledgers on the invoice in Tally, or tell them this invoice \
+             has to be entered in Tally itself.",
         ),
         "invoice_ledger_rates_rows_differ" => Some(
             "Tally's answer about the tax rates of this invoice's ledgers did not hold exactly \

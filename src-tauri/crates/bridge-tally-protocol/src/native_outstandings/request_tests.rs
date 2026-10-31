@@ -379,6 +379,58 @@ fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
     }
 }
 
+/// bridge#1331: a ledger part adds one `$GUID` formula and its filter
+/// reference to the otherwise unchanged master and balance requests, in the
+/// place a parent part's go: the shape of the lab sheet's `g4` and `g5`
+/// requests (three GUIDs here, five there).
+#[test]
+fn ledger_part_requests_differ_from_the_whole_read_only_by_the_guid_filter() {
+    use crate::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
+    let from = TallyDate::parse("20260401").unwrap();
+    let to = TallyDate::parse("20260801").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from.clone(), to.clone())
+            .unwrap();
+    let snapshot =
+        NativeLedgerSnapshotPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let company = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+    let part = LedgerGuidPart::new(
+        ["000000d8", "000000d0", "000000d5"]
+            .map(|suffix| LedgerGuid::parse(&format!("{company}-{suffix}")).unwrap()),
+    )
+    .unwrap();
+    let formula = format!(
+        r#"<SYSTEM TYPE="Formulae" NAME="BridgeInvoiceLedgers">$GUID = "{company}-000000d0" OR $GUID = "{company}-000000d5" OR $GUID = "{company}-000000d8"</SYSTEM>"#
+    );
+    let master = render_party_ledger_master_request_for_ledgers("BRIDGE PILOT LAB", &export, &part);
+    let balance =
+        render_native_ledger_snapshot_request_for_ledgers("BRIDGE PILOT LAB", &snapshot, &part);
+    for (filtered, whole) in [
+        (
+            &master,
+            render_party_ledger_master_request("BRIDGE PILOT LAB", &export),
+        ),
+        (
+            &balance,
+            render_native_ledger_snapshot_request("BRIDGE PILOT LAB", &snapshot),
+        ),
+    ] {
+        let expected = whole
+            .replacen(
+                "<TDLMESSAGE><COLLECTION ",
+                &format!("<TDLMESSAGE>{formula}<COLLECTION "),
+                1,
+            )
+            .replacen(
+                "</COMPUTE></COLLECTION>",
+                "</COMPUTE><FILTERS>BridgeInvoiceLedgers</FILTERS></COLLECTION>",
+                1,
+            );
+        assert_ne!(expected, whole);
+        assert_eq!(*filtered, expected);
+    }
+}
+
 #[test]
 fn the_reserved_root_part_carries_tallys_own_root_literal() {
     let from = TallyDate::parse("20250401").unwrap();

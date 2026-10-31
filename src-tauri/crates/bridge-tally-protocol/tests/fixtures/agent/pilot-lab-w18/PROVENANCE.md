@@ -74,17 +74,17 @@ The code now sends three reads the lab was not asked on this book, and the repla
 answer for each (named DERIVED where it is built, in `agent_import_tests.rs` and
 `agent_import_w18_replay_tests.rs`). None is Tally's bytes.
 
-- **`Q`, the rates read restricted to the invoice's parents, with the three HSN/SAC fields.** The request is
-  the code's, SHA-256 `3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc`; the lab was not
-  sent it on this book's state (it answered it on 21 Oct 2026, on the book as it then stood, and its
-  answer is equal row for row to this derived one: `../pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml`).
-  The answer is the unrestricted answer
-  (`../pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml`, byte-equal to what W18 read) cut to the ledgers
-  this directory's catalogue (`w18-ledger-catalogue-v2`) holds under the four parents the invoice's ledgers
-  sit under (`Duties & Taxes`, `Indirect Expenses`, `Sales Accounts`, `Sundry Debtors`), the removal
-  counted and the rows left asserted equal to the catalogue's, name for name. Not sent to the lab on this state; derived
-  from W16 by the parent filter (protocol reference section 11e, PARTIAL: the lab's 10 Oct restricted read
-  held exactly the unrestricted read's rows under the parents it named, on one book and one spelling).
+- **`Q`, the rates read restricted to the invoice's ledgers by GUID, with the three HSN/SAC fields (#1331).** The request is
+  the code's, SHA-256 `a7ced791a7af67b3bcda6de614970891ebfb1ff82da8b9a580fafc6e12b654b2`; it names this invoice's six
+  ledgers and was never sent to the lab. The lab answered the same request naming five other ledgers of this book on
+  31 Oct 2026 (`../pilot-lab/pilot-lab-ledger-rates-guid.request.utf16le.xml`), and a test derives this request's
+  SHA-256 from that one with only its GUIDs changed. The answer is the lab's 21 Oct 2026 answer to the request
+  restricted to the four parents the invoice's ledgers sit under
+  (`../pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml`, whose catalogue of the same minute is byte-equal to
+  this directory's `w18-ledger-catalogue-v2`, and which the lab answered byte for byte the same on 31 Oct 2026), cut to
+  the invoice's six ledgers by `rates_cut_to`: each other row removed with the whitespace after it, in answer order.
+  On 31 Oct 2026 the lab's GUID answers for five and for four ledgers were, byte for byte, that answer cut this way;
+  a six-term filter was not measured.
 - **`X` and `Y`, the voucher-type numbering reads.** The requests are the code's, `229f54c9...` and
   `e83a1df1...`; the lab answered them on 16 Oct 2026 (`../pilot-lab/pilot-lab-numbering-masters.utf16le.xml`
   and `...-series.utf16le.xml`), when its book stood at master mark 245, not at W18's 243. The replay serves

@@ -634,16 +634,16 @@ pub(super) fn invoice_readback_read(
 }
 
 /// The ledger listing with each ledger's GST rate and rounding, for the tax
-/// check of an invoice, restricted to the ledgers under one scope's parents
+/// check of an invoice, restricted to the ledgers the invoice names, by GUID
 /// (#1331). Its window is the invoice's financial year start and the invoice
 /// date.
 pub(super) fn invoice_ledger_rates_scoped_read(
     company: &str,
     window: (&TallyDate, &TallyDate),
-    part: &bridge_tally_protocol::parent_partition::ParentPart,
+    part: &bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
 ) -> ReadRequest {
     ReadRequest(
-        agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part),
+        agent_import::invoice::render_ledger_rates_request_for_ledgers(company, window, part),
     )
 }
 

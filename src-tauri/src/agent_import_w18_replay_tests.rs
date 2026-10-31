@@ -6,8 +6,9 @@
 //! Every answer is Tally's own bytes, taken from one book state (the marks of
 //! W18 and of the books W18b and W18c restored are the same), except three,
 //! which are DERIVED and say so where they are built: the rates answer `Q` (the
-//! lab answered the scoped rates request with the HSN/SAC fields on 21 Oct 2026
-//! on the book as it stood then, not on W18's state: `w18_scoped_rates_hsn`) and the two voucher-numbering
+//! code's request names this invoice's six ledgers by GUID and was never sent to
+//! the lab; the answer is the lab's 21 Oct 2026 answer to the request restricted
+//! to their parents, cut to the six: `w18_scoped_rates_hsn`) and the two voucher-numbering
 //! answers `X` and `Y` (the lab was not asked them on this book: the 16 Oct
 //! answers with the rows above this book's mark removed). The order below is the
 //! order the build, the post's reads before its dialog and a verification each
@@ -41,8 +42,9 @@ const W18_GUID: &str = PILOT_GUID;
 /// a request the lab answered, as in the 9 Oct replay, except: the number
 /// read, which is `w18-number-0040.xml` (`../r09-number-new-invoice.xml` with
 /// the number changed only); the two listings named below; `Q`, the rates
-/// request, which the lab answered on 21 Oct 2026 but not on W18's state (see
-/// `w18_scoped_rates_hsn`); and `X` and `Y`, which are the code's requests the
+/// request by GUID, which is the code's and was never sent with these GUIDs (a
+/// test derives its pin from the lab's 31 Oct 2026 request naming five other
+/// ledgers; see `w18_scoped_rates_hsn`); and `X` and `Y`, which are the code's requests the
 /// lab answered on 16 Oct 2026 on a later state of the book (see
 /// `w18_types_as_of_the_book`).
 fn w18_request_sha256(letter: char) -> &'static str {
@@ -56,6 +58,12 @@ fn w18_request_sha256(letter: char) -> &'static str {
         // fixtures/agent/pilot-lab-w18/PROVENANCE.md).
         'L' => "b0c02fc724502e10dc23a9d6b430c9cbb20c191df948082f06fab9d7e4c8f9bc",
         'P' => "41b2de3ed4488e5943d25fe36b2c2727f397ca01bae4082d7af36f787bb4b4b5",
+        // The rates read names the invoice's ledgers by GUID (#1331), and this
+        // invoice names `BRIDGE Svc 4D 5%` where `BP/26-27/0010` names
+        // `BRIDGE Svc 998313 5%`: the request the lab answered on 31 Oct 2026
+        // (`pilot-lab-ledger-rates-guid.request`) with only its GUIDs changed to
+        // these six ledgers' (DERIVED: not sent with these GUIDs).
+        'Q' => super::super::super::tests::W18_INVOICE_GUID_RATES_SHA256,
         other => pilot_request_sha256(other),
     }
 }
@@ -102,8 +110,8 @@ fn w18_types_as_of_the_book(answer: &str) -> String {
 /// Tally's answer to one kind of read, from the W18 sittings, except the
 /// three DERIVED ones named below (`Q`, `X`, `Y`). The company list and the
 /// currencies are byte-equal to the 9 Oct answers the earlier replay already
-/// holds, and are read from there; so is the unrestricted rates listing (12 Oct
-/// 2026) that `Q` is cut from.
+/// holds, and are read from there; so is the 21 Oct 2026 answer to the rates
+/// read restricted to the invoice ledgers' parents, which `Q` is cut from.
 fn w18_plan(letter: char) -> ScenarioPlan {
     let bytes: &[u8] = match letter {
         's' => return status(),

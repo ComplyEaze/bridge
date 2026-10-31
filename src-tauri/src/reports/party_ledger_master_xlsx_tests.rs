@@ -863,14 +863,23 @@ fn a_workbook_read_again_after_its_mailing_read_failed_says_that_read_failed() {
         mailing_row("A", "1", MailingDetailsHistory::NotObserved),
         mailing_row("B", "2", MailingDetailsHistory::NotObserved),
     ];
-    // The one failure that is read again (bridge#2214).
-    {
-        let (cause, said) = (
+    // The failures after which the book is read again (bridge#2214), each said as itself.
+    for (cause, said) in [
+        (
             MailingReadFailure::ResponseTooLarge {
                 declared_by_peer: true,
             },
             "Tally's answer to that read passed the 32 MiB limit",
-        );
+        ),
+        (
+            MailingReadFailure::Truncated,
+            "Tally's answer to that read broke off before it ended",
+        ),
+        (
+            MailingReadFailure::ReadFailed,
+            "Tally's answer to that read could not be read",
+        ),
+    ] {
         source.mailing_details_read_failed = Some(cause);
         let text = workbook_text(source.clone());
         assert!(!text.contains(NOT_OBSERVED), "{cause:?}");

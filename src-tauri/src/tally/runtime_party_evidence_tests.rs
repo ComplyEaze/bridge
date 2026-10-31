@@ -382,17 +382,28 @@ async fn the_export_decides_by_the_ledgers_a_catalogue_counted_for_a_marked_book
     );
 }
 
-/// bridge#2074: a master read the export sent with the mailing details, whose answer
-/// was cut short, is marked as that larger read, so the export can say so; the same
-/// failure of the standard read is not, nor is the mailing read's damaged answer. The
-/// read's own kind decides, after the count: the 3,309 ledgers the export asked about
-/// are sent the standard request and are not marked.
+/// bridge#2074: a master read sent with the mailing details after the count, whose
+/// answer was cut short, is marked as that larger read; the same failure of the standard
+/// read is not, nor is the mailing read's damaged answer. The read's own kind decides,
+/// after the count: the 3,309 ledgers the export asked about are sent the standard
+/// request and are not marked. The export's own mailing read, cut short, is not the
+/// export's failure (bridge#2214, the maintainers' ruling on bridge#2074): it goes on
+/// with the standard request, here to an endpoint that has closed, and that read's
+/// failure is told unmarked.
 #[tokio::test]
 async fn a_mailing_read_cut_short_is_marked_as_the_mailing_read() {
     use crate::tally::connection::ComplianceRead::{
-        Standard, WithMailingDetailsWhereWholeReadFits as Export,
+        Standard, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Export,
     };
     use crate::tally::connection::MailingDetailsReadFailed;
+    use bridge_tally_transport::TallyTransportError;
+    let transport = |error: &anyhow::Error| {
+        error
+            .chain()
+            .filter_map(|cause| cause.downcast_ref::<TallyTransportError>())
+            .cloned()
+            .collect::<Vec<_>>()
+    };
     let units = CATALOGUE.strip_prefix(&[0xff, 0xfe]).unwrap_or(CATALOGUE);
     let captured = String::from_utf16(
         &units
@@ -429,8 +440,25 @@ async fn a_mailing_read_cut_short_is_marked_as_the_mailing_read() {
         .await
         .0
     };
-    let mailing = cut_short(few, Export).await;
+    let mailing = cut_short(few, WithMailingDetails).await;
     assert!(marked(&mailing), "{mailing:#}");
+    assert!(
+        transport(&mailing).contains(&TallyTransportError::ResponseTruncated),
+        "{mailing:#}"
+    );
+    let continued = cut_short(few, Export).await;
+    assert!(!marked(&continued), "{continued:#}");
+    assert!(
+        matches!(
+            transport(&continued)[..],
+            [TallyTransportError::ConnectionFailed, ..]
+        ),
+        "{continued:#}"
+    );
+    assert!(
+        !transport(&continued).contains(&TallyTransportError::ResponseTruncated),
+        "{continued:#}"
+    );
     let standard = cut_short(few, Standard).await;
     assert!(!marked(&standard), "{standard:#}");
     let counted_standard = cut_short(many, Export).await;

@@ -1855,19 +1855,22 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
 }
 
 /// The mailing marker carries how the read failed, decided by the master post's own transport
-/// error; only an answer Tally declared past the response cap sends the export's read again
-/// without the details, and a failure that is none of these is not marked (bridge#2214). A `/status` check of the
-/// pair that failed is not the post's failure, though it sits in the same chain.
+/// error, and each cause has one decision for the export (bridge#2214 and the maintainers'
+/// ruling on bridge#2074): an answer that broke off or could not be read continues without the
+/// details, an answer Tally declared past the response cap is read again without them, and a
+/// deadline or an oversize Tally did not declare refuses. A failure that is none of these is not
+/// marked. A `/status` check of the pair that failed is not the post's failure, though it sits in
+/// the same chain.
 #[test]
 fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
     use super::{
-        mailing_details_read_error, MailingDetailsReadFailed, MailingReadFailure as F,
-        PairedNativeReportResponseFailure,
+        mailing_details_read_error, MailingDetailsReadFailed, MailingReadDecision as D,
+        MailingReadFailure as F, PairedNativeReportResponseFailure,
     };
     use bridge_tally_transport::TallyTransportError as T;
     let limit = bridge_tally_transport::XML_RESPONSE_MAX_BYTES;
-    for (error, cause, again) in [
-        (T::RequestTimedOut, Some(F::Deadline), false),
+    for (error, cause, decision) in [
+        (T::RequestTimedOut, Some(F::Deadline), Some(D::Refuse)),
         (
             T::ResponseTooLarge {
                 limit,
@@ -1876,7 +1879,7 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
             Some(F::ResponseTooLarge {
                 declared_by_peer: true,
             }),
-            true,
+            Some(D::Retry),
         ),
         (
             T::ResponseTooLarge {
@@ -1886,12 +1889,16 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
             Some(F::ResponseTooLarge {
                 declared_by_peer: false,
             }),
-            false,
+            Some(D::Refuse),
         ),
-        (T::ResponseTruncated, Some(F::Truncated), false),
-        (T::ResponseReadFailed, Some(F::ReadFailed), false),
-        (T::ConnectionFailed, None, false),
-        (T::HttpStatus { status: 503 }, None, false),
+        (T::ResponseTruncated, Some(F::Truncated), Some(D::Continue)),
+        (
+            T::ResponseReadFailed,
+            Some(F::ReadFailed),
+            Some(D::Continue),
+        ),
+        (T::ConnectionFailed, None, None),
+        (T::HttpStatus { status: 503 }, None, None),
     ] {
         let found = |error: anyhow::Error| {
             mailing_details_read_error(error)
@@ -1903,7 +1910,7 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
             anyhow::Error::new(error.clone()),
         )));
         assert_eq!(posted, cause, "{error:?}");
-        assert_eq!(posted.is_some_and(F::read_again_without_details), again);
+        assert_eq!(posted.map(F::decision), decision, "{error:?}");
         // The same transport error from the pair's health check, not from its post.
         let checked = anyhow::Error::new(error.clone())
             .context("Tally health check between paired native report reads failed");

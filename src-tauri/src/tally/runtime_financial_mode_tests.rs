@@ -785,6 +785,14 @@ fn declared_too_large_master() -> ScenarioPlan {
         })
 }
 
+/// The captured master answer, its head declaring two bytes more than its body, so the body
+/// ends before its declared length and the read is cut short.
+fn broken_off_master() -> ScenarioPlan {
+    let master = compliance_plans(ADMITTED_PROFILE_VARIANTS[0])[MASTER].clone();
+    let declared = master.response_bytes().len() + 2;
+    master.with_framing(ResponseFraming::DeclaredContentLength { bytes: declared })
+}
+
 /// The captured book's plans with `failing` answering the master request first, then the
 /// captured book's master pair and everything after it.
 fn plans_after_a_failed_master(failing: ScenarioPlan) -> Vec<ScenarioPlan> {
@@ -909,6 +917,162 @@ async fn an_export_whose_mailing_answer_tally_declared_too_large_is_read_again_w
     }
 }
 
+/// The maintainers' ruling on bridge#2074: the export's mailing read whose answer came back but
+/// broke off before its declared length does not fail the export. The book is read once with the
+/// standard request, the source is that read's (every row, no ledger's mailing details, the
+/// standard requests' commitment), and the failure is named in the workbook's note. The cut owes a
+/// drain (#2142): under the measured drain policy the transport sends its `/status` probes before
+/// the standard master post, and with no drain policy that post is sent at once.
+#[tokio::test]
+async fn an_export_whose_mailing_answer_broke_off_continues_without_the_details() {
+    use crate::endpoint_wire::WireGateConfig;
+    use crate::tally::connection::{
+        ComplianceRead::{Standard, WithMailingDetailsWhereWholeReadFits as Export},
+        MailingReadDecision, MailingReadFailure,
+    };
+    let (standard, standard_seen) = export_read(
+        Standard,
+        compliance_plans(ADMITTED_PROFILE_VARIANTS[0]),
+        WireGateConfig::default(),
+    )
+    .await;
+    let standard = standard.unwrap();
+    let cause = MailingReadFailure::Truncated;
+    assert_eq!(cause.decision(), MailingReadDecision::Continue);
+    for (wire, probes) in [
+        (WireGateConfig::default(), 0),
+        (
+            WireGateConfig::default().with_drain(bridge_tally_transport::DrainPolicy::MEASURED),
+            3,
+        ),
+    ] {
+        let mut plans = plans_after_a_failed_master(broken_off_master());
+        for _ in 0..probes {
+            plans.insert(MASTER + 1, status());
+        }
+        let (source, seen) = export_read(Export, plans, wire).await;
+        let source = source.unwrap_or_else(|error| panic!("{probes} probes: {error:#}"));
+        assert_eq!(
+            seen.len(),
+            standard_seen.len() + 1 + probes,
+            "{probes} probes"
+        );
+        assert!(
+            seen[MASTER + 1..=MASTER + probes]
+                .iter()
+                .all(|request| request.path == "/status"),
+            "{probes} probes"
+        );
+        let mailing = &seen[MASTER].request_body_sha256;
+        assert_ne!(mailing, &standard_seen[MASTER].request_body_sha256);
+        assert_eq!(
+            seen.iter()
+                .filter(|request| &request.request_body_sha256 == mailing)
+                .count(),
+            1,
+            "{probes} probes: the mailing request is sent once"
+        );
+        assert_eq!(
+            seen[MASTER + 1 + probes].request_body_sha256,
+            standard_seen[MASTER].request_body_sha256,
+            "{probes} probes: the standard master follows"
+        );
+        assert_eq!(source.rows.len(), standard.rows.len());
+        assert!(source.rows.iter().all(|row| matches!(
+            row.fields.mailing_details,
+            bridge_tally_protocol::mailing_details::MailingDetailsHistory::NotObserved
+        )));
+        assert_eq!(source.request_sha256, standard.request_sha256);
+        assert_eq!(source.mailing_details_read_failed, Some(cause));
+        let note = source
+            .notes()
+            .into_iter()
+            .find(|note| note.kind == SourceNoteKind::MailingDetailsReadFailed)
+            .expect("the failed mailing read's note");
+        assert!(
+            note.text.contains("broke off before it ended"),
+            "{}",
+            note.text
+        );
+    }
+}
+
+/// bridge#2214: the mailing pair's first post answers and its second is declared past the
+/// response cap. The book is read again with the standard request, as after a first post that
+/// failed, and the first post's completed answer is kept in the read's evidence: where that
+/// standard read then fails, its evidence holds one more answer than when the mailing pair's first
+/// post failed, the bytes of that answer.
+#[tokio::test]
+async fn an_oversize_on_the_mailing_pairs_second_post_is_read_again_with_its_first_answer_kept() {
+    use crate::endpoint_wire::WireGateConfig;
+    use crate::tally::connection::{
+        ComplianceRead::{Standard, WithMailingDetailsWhereWholeReadFits as Export},
+        MailingReadFailure,
+    };
+    let master = compliance_plans(ADMITTED_PROFILE_VARIANTS[0])[MASTER].clone();
+    let answered = master.response_bytes().len();
+    let second_post_failed = |mut plans: Vec<ScenarioPlan>| {
+        plans.splice(
+            MASTER..MASTER,
+            [master.clone(), status(), declared_too_large_master()],
+        );
+        plans
+    };
+    // The outcome: the standard read's source, with the failure named.
+    let (standard, standard_seen) = export_read(
+        Standard,
+        compliance_plans(ADMITTED_PROFILE_VARIANTS[0]),
+        WireGateConfig::default(),
+    )
+    .await;
+    let standard = standard.unwrap();
+    let mut plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
+    let rest = plans.split_off(MASTER);
+    plans = second_post_failed(plans);
+    plans.extend(rest);
+    let (source, seen) = export_read(Export, plans, WireGateConfig::default()).await;
+    let source = source.unwrap_or_else(|error| panic!("{error:#}"));
+    assert_eq!(
+        seen[MASTER].request_body_sha256,
+        seen[MASTER + 2].request_body_sha256
+    );
+    assert_eq!(seen.len(), standard_seen.len() + 3);
+    assert_eq!(
+        seen[MASTER + 3].request_body_sha256,
+        standard_seen[MASTER].request_body_sha256
+    );
+    assert_eq!(source.rows.len(), standard.rows.len());
+    assert_eq!(source.request_sha256, standard.request_sha256);
+    assert_eq!(
+        source.mailing_details_read_failed,
+        Some(MailingReadFailure::ResponseTooLarge {
+            declared_by_peer: true,
+        })
+    );
+    // The evidence: compare a standard read that fails after each failed mailing pair.
+    let failed_evidence = |plans: Vec<ScenarioPlan>| async move {
+        let (result, _) = export_read(Export, plans, WireGateConfig::default()).await;
+        let error = result.unwrap_err();
+        assert_eq!(mailing_cause(&error), None, "{error:#}");
+        error
+            .downcast_ref::<RuntimeReadFailure>()
+            .expect("the read's evidence")
+            .evidence
+            .clone()
+    };
+    let mut first_failed = plans_ending_with_a_failed_master(declared_too_large_master());
+    first_failed.push(stalled_master());
+    let mut second_failed = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
+    second_failed.truncate(MASTER);
+    let mut second_failed = second_post_failed(second_failed);
+    second_failed.push(stalled_master());
+    let without = failed_evidence(first_failed).await;
+    let with = failed_evidence(second_failed).await;
+    assert_eq!(with.bytes, without.bytes + answered);
+    assert_ne!(with.request_sha256, without.request_sha256);
+    assert_ne!(with.response_sha256, without.response_sha256);
+}
+
 /// bridge#2214: a standard read that fails after the mailing read did is reported as itself,
 /// with no mailing marker, and is not sent a third time.
 #[tokio::test]
@@ -938,11 +1102,11 @@ async fn a_failed_standard_read_after_a_failed_mailing_read_is_reported_as_itsel
     );
 }
 
-/// bridge#2214: only the export's own kind is read again, and only after an answer Tally
-/// declared past the response cap. A `ledger_masters` call that asked for the mailing details by
-/// name, with either failure; a standard or GST-details read that timed out; and an export whose
-/// mailing read timed out or whose answer broke off keep their failure, and nothing is sent after
-/// it. A deadline is not read again until a cut mailing read has been seen live.
+/// bridge#2214: only the export's own kind is read again, and never after a deadline. A
+/// `ledger_masters` call that asked for the mailing details by name, with either failure; a
+/// standard or GST-details read that timed out; and an export whose mailing read timed out keep
+/// their failure, and nothing is sent after it. A deadline is not read again until a cut mailing
+/// read has been seen live.
 #[tokio::test]
 async fn no_other_read_or_failure_is_read_again_without_the_details() {
     use crate::tally::connection::{
@@ -952,12 +1116,6 @@ async fn no_other_read_or_failure_is_read_again_without_the_details() {
         },
         MailingReadFailure,
     };
-    let master = compliance_plans(ADMITTED_PROFILE_VARIANTS[0])[MASTER].clone();
-    let broke_off = master
-        .clone()
-        .with_framing(ResponseFraming::DeclaredContentLength {
-            bytes: master.response_bytes().len() + 2,
-        });
     for (read, failing, cause) in [
         (
             WithMailingDetails,
@@ -974,7 +1132,6 @@ async fn no_other_read_or_failure_is_read_again_without_the_details() {
         (Standard, stalled_master(), None),
         (WithGstDetails, stalled_master(), None),
         (Export, stalled_master(), Some(MailingReadFailure::Deadline)),
-        (Export, broke_off, Some(MailingReadFailure::Truncated)),
     ] {
         let (result, seen) = export_read(
             read,

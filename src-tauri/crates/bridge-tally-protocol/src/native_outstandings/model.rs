@@ -2,6 +2,7 @@ use std::fmt;
 
 use bridge_tally_primitives::{ExactDecimal, TallyDate};
 
+use super::ForeignCurrencyLedger;
 use crate::outstandings_shared::OutstandingsReport;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -207,27 +208,32 @@ impl UnadmittedBillRow {
 }
 
 /// One Bills report's rows, read but not yet admitted (bridge#2071). The only
-/// way to a [`NativeBillRow`] is through an admission, which refuses an
-/// `Empty` closing amount naming its row, as the parse did before.
+/// way from these rows to a [`NativeBillRow`] is through an admission, which
+/// refuses an `Empty` closing amount naming its row, as the parse did before.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnadmittedBillRows(pub(super) Vec<UnadmittedBillRow>);
 
 impl UnadmittedBillRows {
     /// Admits every row.
     pub fn admit_all(self) -> Result<Vec<NativeBillRow>, NativeOutstandingsError> {
-        self.admit_except(|_| false)
+        self.admit_except(&[], &[])
     }
 
-    /// Drops the rows of every party `set_aside` names, whatever their
-    /// closing amount, then admits the rest. A set-aside party's bills leave
-    /// every figure (bridge#551, bridge#642), so their amounts are never read.
+    /// Drops the rows of every party the ledger snapshot set aside, a
+    /// foreign-currency ledger or a mixed one, whatever their closing amount,
+    /// then admits the rest. A set-aside party's bills leave every figure
+    /// (bridge#551, bridge#642), so their amounts are never read.
     pub fn admit_except(
         self,
-        set_aside: impl Fn(&str) -> bool,
+        foreign: &[ForeignCurrencyLedger],
+        mixed: &[String],
     ) -> Result<Vec<NativeBillRow>, NativeOutstandingsError> {
         self.0
             .into_iter()
-            .filter(|row| !set_aside(&row.party))
+            .filter(|row| {
+                !foreign.iter().any(|ledger| ledger.ledger == row.party)
+                    && !mixed.contains(&row.party)
+            })
             .map(UnadmittedBillRow::admit)
             .collect()
     }

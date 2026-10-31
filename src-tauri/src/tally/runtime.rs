@@ -4619,15 +4619,11 @@ impl TallyRuntime {
                     // figure, the statement rows included.
                     let foreign = snapshot.foreign;
                     let mixed = snapshot.mixed;
-                    let set_aside = |party: &str| {
-                        foreign.iter().any(|ledger| ledger.ledger == party)
-                            || mixed.iter().any(|ledger| ledger == party)
-                    };
                     let receivable_rows = receivable_rows
-                        .admit_except(set_aside)
+                        .admit_except(&foreign, &mixed)
                         .map_err(|error| error.in_report("receivable"))?;
                     let payable_rows = payable_rows
-                        .admit_except(set_aside)
+                        .admit_except(&foreign, &mixed)
                         .map_err(|error| error.in_report("payable"))?;
                     let ledger_rows = snapshot.base;
                     let group_rows =

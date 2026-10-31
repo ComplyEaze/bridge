@@ -150,7 +150,7 @@ fn an_empty_closing_amount_still_refuses_when_its_party_is_not_set_aside() {
     assert!(is_invalid_amount_in_row(&error, 3), "{error:?}");
     // Setting aside the customer alone does not cover the supplier's row.
     let error = rows(&receivable_settled_supplier())
-        .admit_except(|party| party == CUSTOMER)
+        .admit_except(&[], &[CUSTOMER.to_owned()])
         .unwrap_err();
     assert!(is_invalid_amount_in_row(&error, 3), "{error:?}");
 }
@@ -169,11 +169,12 @@ fn the_rupee_control_book_reads_its_rupee_bill_and_sets_the_dollar_party_aside()
         .collect::<Vec<_>>();
     assert_eq!(base, ["BRIDGE INR Customer", "Cash"]);
 
-    let set_aside = |party: &str| snapshot.mixed.iter().any(|name| name == party);
     let receivable = rows(&receivable_rupee_control())
-        .admit_except(set_aside)
+        .admit_except(&snapshot.foreign, &snapshot.mixed)
         .unwrap();
-    let payable = rows(&payable()).admit_except(set_aside).unwrap();
+    let payable = rows(&payable())
+        .admit_except(&snapshot.foreign, &snapshot.mixed)
+        .unwrap();
     assert_eq!(payable, []);
     assert_eq!(receivable.len(), 1);
     assert_eq!(receivable[0].party, RUPEE_PARTY);
@@ -220,7 +221,7 @@ fn the_rupee_control_book_reads_its_rupee_bill_and_sets_the_dollar_party_aside()
 #[test]
 fn the_settled_suppliers_row_is_dropped_with_its_party() {
     let receivable = rows(&receivable_settled_supplier())
-        .admit_except(|party| party == CUSTOMER || party == SUPPLIER)
+        .admit_except(&[], &[CUSTOMER.to_owned(), SUPPLIER.to_owned()])
         .unwrap();
     assert_eq!(receivable.len(), 1);
     assert_eq!(receivable[0].party, RUPEE_PARTY);

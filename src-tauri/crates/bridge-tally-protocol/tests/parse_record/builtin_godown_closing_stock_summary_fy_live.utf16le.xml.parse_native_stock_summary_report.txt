@@ -1,0 +1,73 @@
+# fixture: tests/fixtures/builtin_godown_closing_stock_summary_fy_live.utf16le.xml
+# parser: parse_native_stock_summary_report
+# source: captured
+Ok(Lines {
+    total: Some(
+        ExactDecimal(
+            "2292.01",
+        ),
+    ),
+    present: 5,
+    empty: 0,
+    lines: [
+        NativeReportLine {
+            name: "Finished Kits",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "18750.00",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Packaging",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "14500.00",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Raw Chemicals",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "-30249.99",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Godown Single Item",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "15",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            amount: Some(
+                ExactDecimal(
+                    "-150.00",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Godown Split Item",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "50",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            amount: Some(
+                ExactDecimal(
+                    "-558.00",
+                ),
+            ),
+        },
+    ],
+})

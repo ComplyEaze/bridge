@@ -25,6 +25,7 @@ use bridge_tally_protocol::audit_company_part::admit_audit_company_part;
 use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonthWindow};
 use bridge_tally_protocol::native_company_features::{parse_company_features, ExpectedCompany};
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
+use bridge_tally_protocol::native_godown_summary::parse_native_godown_summary;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
 use bridge_tally_protocol::native_month_register::parse_native_month_register;
 use bridge_tally_protocol::native_negative_ledgers::parse_native_negative_ledgers;
@@ -41,7 +42,8 @@ use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, NativeStatementKind,
 };
 use bridge_tally_protocol::native_stock_summary::{
-    parse_company_inventory_flags, parse_native_stock_items, parse_native_stock_summary_report,
+    parse_company_inventory_flags, parse_native_stock_items, parse_native_stock_summary_exploded,
+    parse_native_stock_summary_report,
 };
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
@@ -528,6 +530,103 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_stock_query",
         parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-02-stock-query-kit-co-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-03-stock-query-gauge-test-50l-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-04-stock-query-owner-s-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-05-stock-query-owner-s-item-f2.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-06-stock-query-quote-q-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-07-stock-query-quote-q-item-f2.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-08-stock-query-alt-unit-item-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-09-stock-query-mix-5-set-large-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-10-stock-query-dash-item-7-f1.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-04-stock-query-alt-unit-probe-a.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-05-stock-query-alt-unit-probe-b.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    // The stock-item collection beside those Stock Query answers, same sittings (#2018)
+    Row {
+        fixture: "tests/fixtures/stock-query/a-01-items-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/a-02-items-to-20250501.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/a-03-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/w-01-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/alt-a-01-items-fy-s4.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
     },
     // tests/simulator_corpus.rs, src/agent_tests.rs (an empty collection's export status)
     Row {
@@ -1422,6 +1521,50 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_negative_ledgers",
         parse: |_, text| typed(parse_native_negative_ledgers(text)),
+    },
+    // Built-in Godown Summary report, read with the Stock Summary's grammar: src/native_godown_summary_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_godown_summary_shape_lab_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    // Closing stock by godown after keying, with the exploded Stock Summary: src/native_godown_summary_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_godown_summary_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_godown_summary",
+        parse: |_, text| typed(parse_native_godown_summary(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_exploded_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_exploded",
+        parse: |_, text| typed(parse_native_stock_summary_exploded(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_godown_summary_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_godown_summary",
+        parse: |_, text| typed(parse_native_godown_summary(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_exploded_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_exploded",
+        parse: |_, text| typed(parse_native_stock_summary_exploded(text)),
     },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {

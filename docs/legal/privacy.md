@@ -1,8 +1,8 @@
 # ComplyEaze Bridge Privacy Policy
 
-**Version:** 2026-10.3
+**Version:** 2026-10.4
 
-**Effective:** 16 October 2026
+**Effective:** 31 October 2026
 
 **Describes:** ComplyEaze Bridge builds that include or link to this version of the policy, the desktop app built from the same source, and the Bridge website at bridge.complyeaze.com.
 
@@ -115,7 +115,7 @@ Bridge writes Local Files so that you can see what it did, and so that a posting
 **Where to find them:**
 
 - **Mac:** in Finder, choose Go, then Go to Folder, and type `~/Library/Application Support/Bridge`.
-- **Windows:** in File Explorer, type `%LOCALAPPDATA%\Bridge\agent` in the address bar. On some computers it is `%APPDATA%\Bridge\agent` instead. On a Microsoft Store install of Claude Desktop, Windows may keep some of these files in the Claude package's own folder under `%LOCALAPPDATA%\Packages`, at `LocalCache\Local\Bridge\agent`, instead, and a given file can be in either place (seen on one computer; which file goes where is not measured). The location that `build_import_xml` reports for an import file is the one Windows reports for it. Check both folders before you archive or delete. Microsoft's documentation says that uninstalling or resetting a Store app (here Claude Desktop itself) removes that second folder and everything in it.
+- **Windows:** in File Explorer, type `%LOCALAPPDATA%\Bridge\agent` in the address bar. On some computers it is `%APPDATA%\Bridge\agent` instead. On a Microsoft Store install of Claude Desktop, Windows may keep these files in the Claude package's own folder under `%LOCALAPPDATA%\Packages`, at `LocalCache\Local\Bridge\agent`, instead. On one computer we measured, Bridge started from inside the Claude package, as the extension is, wrote its files to that package folder, while Bridge started outside the package used `%LOCALAPPDATA%\Bridge\agent`, so the two kept separate files. The location that `build_import_xml` reports for an import file is the file's real location, and it opened from outside the package. Check both folders before you archive or delete. Microsoft's documentation says that uninstalling or resetting a Store app (here Claude Desktop itself) removes that second folder and everything in it.
 
 If someone set Bridge up by hand to use a different folder,³ that folder holds the files below. Small, empty lock files still go in the default folder. On Windows, Bridge also puts lock files in a second folder, `%USERPROFILE%\.complyeaze-bridge`, so that every copy of Bridge you run finds the same ones. They keep two copies of Bridge from sending to Tally at the same time, and Bridge does not delete them.
 
@@ -245,9 +245,9 @@ In the builds this version describes, Bridge does the following to reduce risk:
 
 No software is completely secure.
 
-**We check each release before we publish it: the release check confirms that each package launches, lists its tools and parses a synthetic encrypted bank statement. It does not run against TallyPrime, and nothing we can run covers every Tally edition, set of books or setting.** Run by us in a controlled test against a real TallyPrime, once, on 16 October 2026: posting with the release candidate's package on one synthetic company of TallyPrime 7.1 Silver on Windows 10 (each of the four voucher types, and one batch of three), with the approval window showing in front of Tally and Claude Desktop on one screen. Not yet run by us in a controlled test against a real TallyPrime: posting with the published package (the files tested were the release candidate's package and a rehearsal build of the release recipe, not the tagged file); the approval window on a second screen; posting on TallyPrime Education; posting on TallyPrime Gold with its approval step recorded; the upgrade from 0.5.1. What has been run, on which Tally edition and operating system, is listed in the README and each release's notes. Builds are not signed with a verified publisher identity or notarised: Apple and Microsoft have not certified them as coming from us, so your computer may warn you before opening them.
+**We check each release before we publish it: the release check confirms that each package launches, lists its tools and parses a synthetic encrypted bank statement. It does not run against TallyPrime, and nothing we can run covers every Tally edition, set of books or setting.** Run by us in a controlled test against a real TallyPrime, once, on 16 October 2026: posting with the release candidate's package on one synthetic company of TallyPrime 7.1 Silver on Windows 10 (each of the four voucher types, and one batch of three), with the approval window showing in front of Tally and Claude Desktop on one screen. Not yet run by us in a controlled test against a real TallyPrime: posting with the published package (the files tested were the release candidate's package and a rehearsal build of the release recipe, not the tagged file); the approval window on a second screen; posting on TallyPrime Education; posting on TallyPrime Gold with its approval step recorded; the upgrade from 0.5.1. What has been run, on which Tally edition and operating system, is listed in the README and each release's notes. Builds are not signed with a verified publisher identity or notarised: Apple and Microsoft have not certified them as coming from us.
 
-Download builds only from the official release page (https://github.com/ComplyEaze/bridge/releases), or from the Bridge website, which downloads from it. Each build has a matching fingerprint file (a `.sha256` checksum) on the same release; compare it with your download before opening it.
+Download builds only from the official release page (https://github.com/ComplyEaze/bridge/releases), or from the Bridge website, which downloads from it. Each build has a matching fingerprint file (a `.sha256` checksum) on the same release; compare it with your download before opening it. That shows the file arrived whole; it does not show who made it.
 
 To report a security issue, write to security@complyeaze.com (section 16). If we fix a security issue, the fix will be in a new release; we are not obliged to make one (Terms of Use, section 4.4).
 

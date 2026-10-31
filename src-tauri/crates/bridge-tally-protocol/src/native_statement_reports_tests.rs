@@ -268,6 +268,7 @@ fn every_built_in_report_id_is_distinct_and_needs_no_xml_escaping() {
             "Negative Ledgers",
             "Negative Stock",
             "Stock Summary",
+            "Godown Summary",
         ]
     );
     assert_eq!(ids.iter().collect::<HashSet<_>>().len(), ids.len());

@@ -221,6 +221,12 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       chose (`kind`) and the report's name, the window's dates, and for each
       month, Tally's debit, credit and closing amounts. It holds no
       party, ledger or narration, and `mask_parties` has nothing to shorten in it.
+    - The stock-by-godown read (`stock_by_godown`) sends the company name and
+      its identifier and the dates, each godown's name (shortened under
+      `mask_parties`), value and quantity, and for each item directly under
+      the root, its name and each godown's name (both shortened under
+      `mask_parties`), quantity and value. The figures are not masked under
+      any setting. It holds no rates or narrations.
     - The Negative Stock read (`negative_stock`) sends the company name and
       its identifier and the dates, and for each item on Tally's Negative
       Stock list, the item's name (shortened under `mask_parties`), its closing
@@ -572,7 +578,7 @@ The approval window is a system dialog. On macOS it is titled "ComplyEaze Bridge
 — approve one voucher" with the buttons Cancel and Post voucher. On Windows it
 is titled "ComplyEaze Bridge — post this voucher?" with Yes, No and Cancel, and
 No is the default. Only the positive button approves. On Windows the window
-also takes the keyboard (#1780). In tests on Windows 10 with TallyPrime 7.1 full
+also takes the keyboard ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)). In tests on Windows 10 with TallyPrime 7.1 full
 screen and one screen, each tried once, a Down arrow moved its buttons on the
 0.6.0 release candidate, and on the published 0.6.0 a typed n declined it and a
 typed y approved it, so a key typed for Tally can answer it. When you ask for a post, stop typing in Tally

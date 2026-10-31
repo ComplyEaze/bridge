@@ -1004,6 +1004,7 @@ fn each_dialog_answers_with_its_own_token() {
 /// must change this gate. This pins text, not the platform's behaviour.
 const REVIEW_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(review_title(count))
         .set_description(preview)
@@ -1061,6 +1062,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     if count != ONE_ITEM {
         return false;
     }
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(MASTERS_TITLE)
         .set_description(preview)
@@ -1119,6 +1121,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
 
 const POST_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
@@ -1235,6 +1238,7 @@ fn release_question() -> String {
 /// The invoice-stop release dialogs (#1828), pinned as the review's are.
 const RELEASE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(release_title())
         .set_description(preview)
@@ -1296,6 +1300,7 @@ fn settle_question() -> String {
 /// The settle dialogs (#1709), pinned as the release's are.
 const SETTLE_ACK_DIALOG: &str = r#"#[cfg(not(windows))]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(settle_title())
         .set_description(preview)
@@ -1428,6 +1433,80 @@ const DISPLAYED_TEXT: &str = r#"fn displayed_text(shown: Shown, count: VoucherCo
         }
         _ => format!("{answer}\n\n{preview}"),
     }
+}"#;
+
+const MAC_ALERT_CHECK: &str = r#"#[cfg(not(windows))]
+fn alert_top(screen: ScreenSpan) -> f64 {
+    ALERT_TOP_FROM_SCREEN_TOP
+        .max(screen.visible_top + ALERT_TOP_BELOW_VISIBLE_TOP)
+        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)
+}"#;
+
+const MAC_ALERT_FITS: &str = r#"#[cfg(not(windows))]
+fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
+    text_height.is_finite()
+        && text_height >= 0.0
+        && alert_top(screen) + ALERT_CHROME + text_height + ALERT_SLACK <= screen.visible_bottom
+}"#;
+
+const MAC_ALERT_EXIT: &str = r#"#[cfg(not(windows))]
+fn exit_unless_the_alert_fits(text: &str) {
+    match measured_alert(text) {
+        Some((height, screens)) if alert_fits_every_screen(height, &screens) => {}
+        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
+        None => std::process::exit(0),
+    }
+}"#;
+
+const MAC_ALERT_EVERY_SCREEN: &str = r#"#[cfg(not(windows))]
+fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
+    !screens.is_empty()
+        && screens
+            .iter()
+            .all(|screen| alert_fits(text_height, *screen))
+}"#;
+
+const MAC_ALERT_TEXT_HEIGHT: &str = r#"#[cfg(target_os = "macos")]
+fn alert_text_height(text: &str) -> f64 {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{
+        NSFont, NSFontAttributeName, NSStringDrawingOptions, NSStringNSExtendedStringDrawing,
+    };
+    use objc2_foundation::{NSDictionary, NSSize, NSString};
+    let font = NSFont::systemFontOfSize(ALERT_FONT_POINTS);
+    // SAFETY: an AppKit constant, read once.
+    let key = unsafe { NSFontAttributeName };
+    let attributes = NSDictionary::<_, AnyObject>::from_slices(&[key], &[font.as_ref()]);
+    // SAFETY: the attributes map the font key to an `NSFont`, the type AppKit
+    // reads for it.
+    let rect = unsafe {
+        NSString::from_str(text).boundingRectWithSize_options_attributes_context(
+            NSSize::new(ALERT_TEXT_WIDTH, 1.0e7),
+            NSStringDrawingOptions::UsesLineFragmentOrigin
+                | NSStringDrawingOptions::UsesFontLeading,
+            Some(&attributes),
+            None,
+        )
+    };
+    rect.size.height.ceil()
+}"#;
+
+const MAC_ALERT_SCREENS: &str = r#"#[cfg(target_os = "macos")]
+fn alert_screens() -> Option<Vec<ScreenSpan>> {
+    let main_thread = objc2::MainThreadMarker::new()?;
+    let screens = objc2_app_kit::NSScreen::screens(main_thread)
+        .iter()
+        .map(|screen| {
+            let (frame, visible) = (screen.frame(), screen.visibleFrame());
+            let top = frame.origin.y + frame.size.height;
+            ScreenSpan {
+                height: frame.size.height,
+                visible_top: top - (visible.origin.y + visible.size.height),
+                visible_bottom: top - visible.origin.y,
+            }
+        })
+        .collect::<Vec<_>>();
+    (!screens.is_empty()).then_some(screens)
 }"#;
 
 const FITS_THE_BOX: &str = r#"fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
@@ -2068,7 +2147,7 @@ const CONFIRM_MASTERS_WITH: &str = r#"async fn confirm_masters_with(executable: 
     }
 }"#;
 
-const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
+const DIALOG_ANSWER_PINS: [(&str, usize); 51] = [
     ("const POST_LABEL: &str = \"Post voucher\";", 1),
     (
         "pub(crate) const REVIEW_BUTTON: &str = \"I reviewed it\";",
@@ -2083,6 +2162,21 @@ const DIALOG_ANSWER_PINS: [(&str, usize); 44] = [
     (ANSWER_TEXT, 1),
     (ANSWER_TEXT_WINDOWS, 1),
     (DISPLAYED_TEXT, 1),
+    // The Mac alert's measured check, with which each Mac dialog ends its child
+    // unshown when its text would run past the screen (#1780, option (c2)): where
+    // its top is taken to sit, the comparison, and the exit. Its figures are the
+    // lab rows', so they are not pinned here; the five calls are in the dialogs'
+    // own pins.
+    (MAC_ALERT_CHECK, 1),
+    (MAC_ALERT_FITS, 1),
+    (MAC_ALERT_EXIT, 1),
+    (MAC_ALERT_EVERY_SCREEN, 1),
+    (MAC_ALERT_TEXT_HEIGHT, 1),
+    (MAC_ALERT_SCREENS, 1),
+    (
+        "#[cfg(not(windows))]\nconst ALERT_TEXT_WIDTH: f64 = 402.0;",
+        1,
+    ),
     (FITS_THE_BOX, 1),
     (POST_DIALOG_WINDOWS, 1),
     (REVIEW_ACK_DIALOG, 1),
@@ -2199,8 +2293,13 @@ const CFG_CENSUS: [(&str, usize); 6] = [
     // its title, dialog and button on a Mac. #1709: the same for the settle
     // window.
     ("#[cfg(windows)]", 12),
-    ("#[cfg(not(windows))]", 17),
-    ("cfg", 43),
+    // #1780's Mac check (c2): the seven measured figures, the screen span,
+    // where the top sits, the comparison, the fit on every screen, the child's
+    // exit and their two tests;
+    // and four `cfg(target_os = "macos")` items (the text's height, the screens,
+    // the two together, and the height's test) with one other-platform arm.
+    ("#[cfg(not(windows))]", 31),
+    ("cfg", 62),
 ];
 
 fn dialog_answer_problems(source: &str) -> Vec<String> {
@@ -2276,6 +2375,44 @@ fn each_dialog_answers_only_on_its_positive_button() {
             1,
         ),
         source.replacen("let (extra_lines, extra_chars) = answer_reserve();", "let (extra_lines, extra_chars) = (0, 0);", 1),
+        // A Mac dialog stops measuring its alert, or the measure drops the
+        // lowest top, the slack or the visible bottom, shows an alert it could
+        // not measure, or ends the child with a status the parent does not read
+        // as a box that did not fit (#1780, option (c2)).
+        source.replacen("    exit_unless_the_alert_fits(preview);\n", "", 1),
+        replace_last(&source, "    exit_unless_the_alert_fits(preview);\n", ""),
+        source.replacen(
+            "fn show_review(count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_review(count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen(
+            "fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n    exit_unless_the_alert_fits(preview);\n",
+            "fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {\n",
+            1,
+        ),
+        source.replacen("        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)\n", "", 1),
+        source.replacen(" + ALERT_SLACK <= screen.visible_bottom", " <= screen.visible_bottom", 1),
+        source.replacen("<= screen.visible_bottom", "<= screen.height", 1),
+        source.replacen("        None => std::process::exit(0),", "        None => {}", 1),
+        // The check passes on any one screen, lets an empty list of screens
+        // through, reads only the first, takes the column as wide as Part A's
+        // A4e disproved, or measures no text.
+        source.replacen(".all(|screen| alert_fits(text_height, *screen))", ".any(|screen| alert_fits(text_height, *screen))", 1),
+        source.replacen("    !screens.is_empty()\n        && screens", "    screens", 1),
+        source.replacen("(!screens.is_empty()).then_some(screens)", "Some(screens.into_iter().take(1).collect())", 1),
+        source.replacen("const ALERT_TEXT_WIDTH: f64 = 402.0;", "const ALERT_TEXT_WIDTH: f64 = 406.0;", 1),
+        source.replacen("    rect.size.height.ceil()\n}", "    rect.size.height.ceil() * 0.0\n}", 1),
+        source.replacen(
+            "        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),",
+            "        Some(_) => std::process::exit(0),",
+            1,
+        ),
         // The parent stops reading a box that did not fit as a refusal, or
         // the dialog stops measuring its box (#1832).
         source.replacen(

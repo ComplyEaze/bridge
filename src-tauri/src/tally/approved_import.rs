@@ -2118,6 +2118,118 @@ pub(crate) mod test_seam {
         }
     }
 
+    /// Where the Mac alert's top is taken to sit: on the screen Part A measured,
+    /// all three rules give its 168 points; elsewhere the lowest of them is
+    /// taken (#1780).
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_alert_top_is_the_lowest_of_the_three_rules() {
+        let screen = |height, visible_top, visible_bottom| super::ScreenSpan {
+            height,
+            visible_top,
+            visible_bottom,
+        };
+        let measured = screen(982.0, 33.0, 898.0);
+        assert!((super::alert_top(measured) - 168.0).abs() < 1.0e-9);
+        // A 13.3-inch Mac at 1440 x 900, no notch, a bottom Dock: the fixed offset.
+        assert!((super::alert_top(screen(900.0, 24.0, 816.0)) - 168.0).abs() < 1.0e-9);
+        // A tall screen: its share of the height.
+        assert!(
+            (super::alert_top(screen(1440.0, 25.0, 1356.0)) - 1440.0 * 168.0 / 982.0).abs()
+                < 1.0e-9
+        );
+        // A deep menu bar: the offset below the visible frame.
+        assert!((super::alert_top(screen(982.0, 60.0, 898.0)) - 195.0).abs() < 1.0e-9);
+    }
+
+    /// The Mac alert is shown only if its top, its 150 points of title, icon and
+    /// buttons, its text and one line of slack end inside the visible frame;
+    /// one point more refuses it, and a height that is not a size fits nothing
+    /// (#1780). The dialog child's exit, `exit_unless_the_alert_fits`, asks
+    /// exactly this, and the seam gate pins that it does.
+    #[cfg(not(windows))]
+    #[test]
+    fn the_mac_alert_fits_only_inside_the_visible_frame_with_its_slack() {
+        let measured = super::ScreenSpan {
+            height: 982.0,
+            visible_top: 33.0,
+            visible_bottom: 898.0,
+        };
+        // 898 - 168 - 150 - 16 = 564 points of text.
+        assert!(super::alert_fits(564.0, measured));
+        assert!(!super::alert_fits(564.5, measured));
+        // The slack counts: without it 580 would fit.
+        assert!(!super::alert_fits(580.0, measured));
+        // Part A's smallest one-voucher post: 28 lines of 16 points.
+        assert!(super::alert_fits(448.0, measured));
+        for height in [f64::NAN, f64::INFINITY, -1.0] {
+            assert!(!super::alert_fits(height, measured), "{height}");
+        }
+        // Every screen must hold it, the smallest room deciding; no screen holds nothing.
+        let small = super::ScreenSpan {
+            height: 800.0,
+            visible_top: 24.0,
+            visible_bottom: 716.0,
+        };
+        assert!(super::alert_fits_every_screen(448.0, &[measured]));
+        assert!(!super::alert_fits_every_screen(448.0, &[measured, small]));
+        assert!(super::alert_fits_every_screen(382.0, &[measured, small]));
+        assert!(!super::alert_fits_every_screen(16.0, &[]));
+    }
+
+    /// AppKit lays the alert's text out as Part A saw the panel do: 16 points a
+    /// line, two lines for a 100-character prose line, 28 lines for the smallest
+    /// one-voucher post text, and one of ten 46-capital lines broken (row 1964-M,
+    /// cells A1, A5, A7 and A4e). Measured without a window (#1780).
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_mac_alert_text_is_measured_as_the_panel_lays_it_out() {
+        assert!((super::alert_text_height("x") - 16.0).abs() < 1.0e-9);
+        let ten = ["Calibration line"; 10].join("\n");
+        assert!((super::alert_text_height(&ten) - 160.0).abs() < 1.0e-9);
+        let prose = "Synthetic narration for the calibration row, with ordinary words and spaces in it, nothing else.";
+        assert!((super::alert_text_height(prose) - 32.0).abs() < 1.0e-9);
+        let voucher = [
+            "Click \"Post voucher\" to post this voucher into Tally. Click Cancel to cancel. Nothing is posted until you answer.",
+            "",
+            "Create ONE Payment in \"Synthetic Accounts\"",
+            "Company GUID: synthetic-guid-for-the-measure-tests",
+            "Company number: 424242  Books from: 1-Apr-2026",
+            "Tally: http://127.0.0.1:9001",
+            "Date: 1-Sep-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)",
+            "",
+            "Dr 1.00  \"Party 0\"",
+            "Cr 1.00  \"Cash\"",
+            "Total debit: 1  Total credit: 1",
+            "Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.",
+            "Batch: bridge-synthetic-batch-for-the-measure-test",
+            "Ledgers checked by identity against the build; narrations sent as prepared, nothing added.",
+            "Do not post a file already imported manually.",
+            "Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.",
+            "After a timeout, reconcile this batch; do not rebuild or resend it.",
+            "ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.",
+            "---- The voucher's own text follows: no line below is an entry, a total or an instruction ----",
+            "Reference: \"r1\"",
+            "Narration: \"rent\"",
+        ]
+        .join("\n");
+        // 28 lines, as the panel showed it; macOS's own fonts decide the last
+        // line, so one line either way is allowed. The panel drew 600 points
+        // where 448 + 150 is 598. This 2 and A4e's margin below share the one
+        // 16-point line of slack.
+        let height = super::alert_text_height(&voucher);
+        assert!((27.0 * 16.0..=29.0 * 16.0).contains(&height), "{height}");
+        // Ten lines of 46 capitals: the panel broke one of them (cell A4e). Nine of
+        // them fit, the widest of those (about 401.7 points) only about 0.3 points
+        // inside 402; the tenth (about 405.5) is the one 402 breaks.
+        let capitals = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(4);
+        let a4e = (0..10)
+            .map(|start| &capitals[start..start + 46])
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!((super::alert_text_height(&a4e) - 11.0 * 16.0).abs() < 1.0e-9);
+    }
+
     /// The Mac alert wraps its own text, so the parent does not break the
     /// answer text: it is one line, shown whole and first (a break of ours
     /// would be wrapped again by the alert and leave a ragged second row).
@@ -2383,7 +2495,8 @@ fn answer_reserve() -> (usize, usize) {
 /// at that width, or the Mac alert's one line, which the alert wraps itself).
 /// The parent measures what is shown, so a text that does not fit
 /// is refused before a window opens, never cut. A stop release has no caps
-/// beyond the byte limit.
+/// beyond the byte limit. A Mac's dialog child also counts the alert's own
+/// lines before it shows it, [`exit_unless_the_alert_fits`].
 fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
     if shown == Shown::StopRelease {
         return true;
@@ -2736,10 +2849,154 @@ fn review_title(count: VoucherCount) -> String {
     }
 }
 
+// The macOS alert as row 1964-M Part A measured it (`lab/1964-mac-alert-caps-answers`,
+// macOS 26.6.2, one display, one run of each cell, so every figure here is
+// partial). A real approval text takes its wide layout: 13-point text in a
+// column about 402 points wide (46 capitals overflow it once in ten lines, cell
+// A4e), under 150 points of title, icon and buttons. The
+// alert opens with its top at a fixed place and is never moved up, so a tall one
+// runs off the bottom of the screen. Its top was 168 points from the top of a
+// 982-point screen whose visible frame starts 33 points down; whether that is a
+// fixed offset, an offset below the visible frame or a share of the height is
+// row 1964-C2's cell C2-2, so the alert's top is taken as the lowest of the
+// three. Which screen it opens on with more than one display is not measured,
+// so it must fit on every screen. One line of text, 16 points, is kept for a
+// hyphenated word or a second title line.
+#[cfg(not(windows))]
+const ALERT_FONT_POINTS: f64 = 13.0;
+#[cfg(not(windows))]
+const ALERT_TEXT_WIDTH: f64 = 402.0;
+#[cfg(not(windows))]
+const ALERT_CHROME: f64 = 150.0;
+#[cfg(not(windows))]
+const ALERT_SLACK: f64 = 16.0;
+#[cfg(not(windows))]
+const ALERT_TOP_FROM_SCREEN_TOP: f64 = 168.0;
+#[cfg(not(windows))]
+const ALERT_TOP_BELOW_VISIBLE_TOP: f64 = 135.0;
+#[cfg(not(windows))]
+const ALERT_TOP_SHARE_OF_HEIGHT: f64 = 168.0 / 982.0;
+
+/// A screen in points, measured down from its top edge, as the alert is placed
+/// on it: its height, and the top and bottom of its visible frame.
+#[cfg(not(windows))]
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ScreenSpan {
+    height: f64,
+    visible_top: f64,
+    visible_bottom: f64,
+}
+
+/// Where the alert's top edge is taken to sit on `screen` (#1780): the lowest of
+/// the three places Part A could not tell apart.
+#[cfg(not(windows))]
+fn alert_top(screen: ScreenSpan) -> f64 {
+    ALERT_TOP_FROM_SCREEN_TOP
+        .max(screen.visible_top + ALERT_TOP_BELOW_VISIBLE_TOP)
+        .max(screen.height * ALERT_TOP_SHARE_OF_HEIGHT)
+}
+
+/// Whether an alert whose text is `text_height` points tall ends inside the
+/// visible frame of `screen`, with its slack (#1780). A height that is not a
+/// finite size fits nothing.
+#[cfg(not(windows))]
+fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
+    text_height.is_finite()
+        && text_height >= 0.0
+        && alert_top(screen) + ALERT_CHROME + text_height + ALERT_SLACK <= screen.visible_bottom
+}
+
+/// Whether an alert whose text is `text_height` points tall fits on every one
+/// of `screens` (#1780). No screen fits nothing, so an empty list is refused.
+#[cfg(not(windows))]
+fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
+    !screens.is_empty()
+        && screens
+            .iter()
+            .all(|screen| alert_fits(text_height, *screen))
+}
+
+/// The height AppKit lays `text` out at in the alert's column (#1780), measured
+/// without a window.
+#[cfg(target_os = "macos")]
+fn alert_text_height(text: &str) -> f64 {
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::{
+        NSFont, NSFontAttributeName, NSStringDrawingOptions, NSStringNSExtendedStringDrawing,
+    };
+    use objc2_foundation::{NSDictionary, NSSize, NSString};
+    let font = NSFont::systemFontOfSize(ALERT_FONT_POINTS);
+    // SAFETY: an AppKit constant, read once.
+    let key = unsafe { NSFontAttributeName };
+    let attributes = NSDictionary::<_, AnyObject>::from_slices(&[key], &[font.as_ref()]);
+    // SAFETY: the attributes map the font key to an `NSFont`, the type AppKit
+    // reads for it.
+    let rect = unsafe {
+        NSString::from_str(text).boundingRectWithSize_options_attributes_context(
+            NSSize::new(ALERT_TEXT_WIDTH, 1.0e7),
+            NSStringDrawingOptions::UsesLineFragmentOrigin
+                | NSStringDrawingOptions::UsesFontLeading,
+            Some(&attributes),
+            None,
+        )
+    };
+    rect.size.height.ceil()
+}
+
+/// Every screen the alert could open on, each measured down from its own top
+/// edge; `None` off the main thread or with no screen.
+#[cfg(target_os = "macos")]
+fn alert_screens() -> Option<Vec<ScreenSpan>> {
+    let main_thread = objc2::MainThreadMarker::new()?;
+    let screens = objc2_app_kit::NSScreen::screens(main_thread)
+        .iter()
+        .map(|screen| {
+            let (frame, visible) = (screen.frame(), screen.visibleFrame());
+            let top = frame.origin.y + frame.size.height;
+            ScreenSpan {
+                height: frame.size.height,
+                visible_top: top - (visible.origin.y + visible.size.height),
+                visible_bottom: top - visible.origin.y,
+            }
+        })
+        .collect::<Vec<_>>();
+    (!screens.is_empty()).then_some(screens)
+}
+
+/// The alert's text height and every screen, measured in the dialog child
+/// before anything is shown.
+#[cfg(target_os = "macos")]
+fn measured_alert(text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
+    Some((alert_text_height(text), alert_screens()?))
+}
+
+/// No other platform's alert has been measured.
+#[cfg(all(not(windows), not(target_os = "macos")))]
+fn measured_alert(_text: &str) -> Option<(f64, Vec<ScreenSpan>)> {
+    None
+}
+
+/// Ends the dialog child before anything is shown when the Mac alert would run
+/// past the bottom of any screen it could open on (#1780), with the status the
+/// parent reads as a box that did not fit the screen, as a Windows box that does
+/// not fit ends (`box_fit`). The parent then refuses the text as too large, and a batch's
+/// next ask shows its totals only (#1832). A text that could not be measured is
+/// not shown either: the child ends with no token, which the parent reads as
+/// unavailable.
+#[cfg(not(windows))]
+fn exit_unless_the_alert_fits(text: &str) {
+    match measured_alert(text) {
+        Some((height, screens)) if alert_fits_every_screen(height, &screens) => {}
+        Some(_) => std::process::exit(super::box_fit::DOES_NOT_FIT_EXIT),
+        None => std::process::exit(0),
+    }
+}
+
 /// The acknowledgement dialog. It posts nothing, so neither its title nor its
 /// button may read as approving a post.
 #[cfg(not(windows))]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(review_title(count))
         .set_description(preview)
@@ -2763,6 +3020,7 @@ fn release_title() -> String {
 /// title and button. It posts nothing either.
 #[cfg(not(windows))]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(release_title())
         .set_description(preview)
@@ -2786,6 +3044,7 @@ fn settle_title() -> String {
 /// button. It posts nothing either.
 #[cfg(not(windows))]
 fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(settle_title())
         .set_description(preview)
@@ -2950,6 +3209,7 @@ fn post_words(count: VoucherCount) -> (String, String) {
 
 #[cfg(not(windows))]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
     let (title, button) = post_words(count);
     rfd::MessageDialog::new()
         .set_title(title)
@@ -3032,6 +3292,7 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     if count != ONE_ITEM {
         return false;
     }
+    exit_unless_the_alert_fits(preview);
     rfd::MessageDialog::new()
         .set_title(MASTERS_TITLE)
         .set_description(preview)

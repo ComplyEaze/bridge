@@ -42,3 +42,21 @@ fn a_tool_failure_from_a_declared_code_carries_its_string() {
         assert_eq!(super::super::ToolFailure::from(*code).code, *string);
     }
 }
+
+/// Every declared code is one the receipt keeps as it stands: 1 to 64 bytes of lower-case ASCII
+/// letters, digits and underscores, with no colon, so the receipt never drops a declared code. No
+/// two variants share a string.
+#[test]
+fn every_declared_code_has_the_receipts_code_shape_and_is_unique() {
+    let mut seen = std::collections::BTreeSet::new();
+    for code in GstUncertainCode::ALL {
+        let text = code.as_str();
+        assert!((1..=64).contains(&text.len()), "{text}");
+        assert!(
+            text.bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+            "{text}"
+        );
+        assert!(seen.insert(text), "{text} is declared twice");
+    }
+}

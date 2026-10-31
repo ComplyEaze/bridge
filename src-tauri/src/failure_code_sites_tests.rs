@@ -5,6 +5,12 @@
 //! `format!` with a name after its colon. Each file's pin is an upper bound that may only be
 //! lowered; a converted site lowers its file's pin. Test modules (`#[cfg(test)] mod name {` to
 //! the end of a file, and `*tests.rs`) never count.
+//!
+//! Not counted yet, so not held by this test: a code kept in a `const NAME: &str` and made into a
+//! `String` where the name is used, a code chosen by a `match` whose result is made into a
+//! `String` after the match, and a code built by `format!` with its name before an underscore
+//! (`"{key}_invalid"`). The steps of #1942 that convert those sites remove them without a count;
+//! the last step deletes `From<String>` for `ToolFailure` and the receipt's string checks.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -103,7 +109,7 @@ fn string_code_sites(source: &str) -> usize {
         .into_iter()
         .filter(|(open, close, literal)| {
             let before = source[..*open].trim_end();
-            let after = &source[*close..];
+            let after = source[*close..].trim_start();
             let made_into_string = [".to_string()", ".to_owned()", ".into()"]
                 .iter()
                 .any(|call| after.starts_with(call))
@@ -124,10 +130,9 @@ fn scan(
     found: &mut BTreeMap<String, usize>,
     visited: &mut BTreeSet<String>,
 ) {
-    let Ok(entries) = fs::read_dir(directory) else {
-        return;
-    };
-    for entry in entries.flatten() {
+    let entries = fs::read_dir(directory).expect("a source directory is readable");
+    for entry in entries {
+        let entry = entry.expect("a source directory entry is readable");
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         let relative_path = format!("{relative}/{name}");
@@ -172,6 +177,18 @@ fn the_scan_counts_string_codes_and_nothing_else() {
         1
     );
     assert_eq!(string_code_sites(r#"String::from("some_code")"#), 1);
+    assert_eq!(
+        string_code_sites("Err(\"some_code\"\n        .to_string())"),
+        1,
+        "a call wrapped onto the next line still counts"
+    );
+    // Shapes the module documentation lists as not counted yet: these pin that gap, so widening the
+    // scan changes them on purpose.
+    assert_eq!(
+        string_code_sites(r#"const CODE: &str = "some_code"; ToolFailure::from(CODE.to_string())"#),
+        0
+    );
+    assert_eq!(string_code_sites(r#"format!("{key}_invalid")"#), 0);
     assert_eq!(
         string_code_sites(r#"format!("argument_invalid:{name}")"#),
         1

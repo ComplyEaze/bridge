@@ -1983,6 +1983,42 @@ async fn a_second_journal_made_while_the_dialog_is_open_is_refused_under_the_loc
     assert_eq!(intents, 0, "no intent from this post: {response}");
 }
 
+/// #2233: a batch already dispatched still reconciles beside a second journal:
+/// `post_import` on it goes to the readback before the split-journal check,
+/// since a sent batch is reconciled, never refused into a rebuild.
+#[tokio::test]
+async fn a_dispatched_batch_beside_a_second_journal_still_reconciles() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (line, args) = saved_batch(&server);
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
+                &line, &native, None,
+            ))
+            .unwrap();
+    }
+    std::fs::write(
+        at.copy.join("agent-import-ledger.jsonl"),
+        crate::agent::agent_import::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let response = LOCAL_APP_DATA
+        .scope(at.local.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_ne!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{response}");
+    assert_ne!(result["attempt_recorded"], json!(false), "{response}");
+    assert!(observed > 0, "the readback reads Tally: {response}");
+}
+
 /// #1234: a batch saved before the build recorded its bill-wise approvals is
 /// refused before any Tally request and must be rebuilt, as above.
 #[tokio::test]

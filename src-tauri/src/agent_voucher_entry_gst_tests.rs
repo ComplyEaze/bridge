@@ -436,9 +436,9 @@ fn a_per_unit_rate_that_is_not_a_decimal_is_unreadable() {
 }
 
 /// The catalog's sentence on item invoices, against the one captured item invoice with freight
-/// (`fixtures/agent/gst-ledger-l1`, the window for 17 Nov 2025, V3): the entry holding the goods
-/// line carries no rates of its own, while the freight entry of the same invoice carries five
-/// zero rates. So it is the goods line's entry, not every entry of an item invoice, that has none.
+/// (`fixtures/agent/gst-ledger-l1`, the window for 17 Nov 2025, V3): the goods line's five rates
+/// sit under its `INVENTORYALLOCATIONS.LIST` and are not returned, so the entry holding it lists
+/// an empty rate list, while the freight entry of the same invoice carries five zero rates.
 #[test]
 fn the_entry_holding_an_item_invoices_goods_line_carries_no_rates() {
     let bytes = include_bytes!(
@@ -495,7 +495,9 @@ fn the_entry_holding_an_item_invoices_goods_line_carries_no_rates() {
         .unwrap()
         .to_string();
     assert!(
-        description.contains("The entry holding an item invoice's goods line carries no rates."),
+        description.contains(
+            "An item invoice's goods-line rates sit under that line and are not returned."
+        ),
         "{description}"
     );
 }

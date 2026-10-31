@@ -11576,6 +11576,30 @@
   "to": "            let counter: Vec<&str> = posted_others_than(v, loan_ledger)\n"
  },
  {
+  "id": "L1875-1",
+  "by": "author",
+  "what": "loans_interest: a TDS ledger only on a nil line of an interest journal is listed as one of its TDS ledgers",
+  "file": "src/loans_interest.rs",
+  "from": "            .filter(|l| l.amount_paise != 0 && tds_here.contains(&l.ledger))\n",
+  "to": "            .filter(|l| tds_here.contains(&l.ledger))\n"
+ },
+ {
+  "id": "L1875-2",
+  "by": "author",
+  "what": "loans_interest: another loan's interest ledger only on a nil line is named as booked to",
+  "file": "src/loans_interest.rs",
+  "from": "                    .filter(|l| l.amount_paise != 0 && foreign_interest.contains(&l.ledger))\n",
+  "to": "                    .filter(|l| foreign_interest.contains(&l.ledger))\n"
+ },
+ {
+  "id": "L1875-3",
+  "by": "author",
+  "what": "loans_interest: a nil line on a paired loan takes the voucher out of LOAN-3's outside set",
+  "file": "src/loans_interest.rs",
+  "from": "                    .any(|l| l.amount_paise != 0 && paired.contains(l.ledger.as_str()))\n",
+  "to": "                    .any(|l| paired.contains(l.ledger.as_str()))\n"
+ },
+ {
   "id": "L1259-27",
   "by": "reviewer-opus",
   "what": "loans_interest: tds_in_principal is published only where the principal vouchers' TDS does not net to nil",

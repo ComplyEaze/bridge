@@ -1693,7 +1693,7 @@ higher rate is not applied, and the books do not show a PAN."
             .interest
             .iter()
             .flat_map(|&(at, _)| pop[at].lines.iter())
-            .filter(|l| tds_here.contains(&l.ledger))
+            .filter(|l| l.amount_paise != 0 && tds_here.contains(&l.ledger))
             .map(|l| l.ledger.as_str())
             .collect();
         if !tds_seen_ledgers.is_empty() {
@@ -1998,7 +1998,7 @@ or as not computed where that is not decided."
                     .misposted
                     .iter()
                     .flat_map(|&(at, _)| pop[at].lines.iter())
-                    .filter(|l| foreign_interest.contains(&l.ledger))
+                    .filter(|l| l.amount_paise != 0 && foreign_interest.contains(&l.ledger))
                     .map(|l| l.ledger.as_str())
                     .collect();
                 let tags = booked_to
@@ -4216,7 +4216,12 @@ loan's interest total cites give {value}p",
         let outside: Vec<(&Voucher, i128)> = pop
             .iter()
             .copied()
-            .filter(|v| !v.lines.iter().any(|l| paired.contains(l.ledger.as_str())))
+            // A nil line on a paired loan is no posting to it (#1875 item 5).
+            .filter(|v| {
+                !v.lines
+                    .iter()
+                    .any(|l| l.amount_paise != 0 && paired.contains(l.ledger.as_str()))
+            })
             .map(|v| (v, net(v, interest_ledger)))
             .filter(|&(_, a)| a != 0)
             .collect();
@@ -4726,5 +4731,144 @@ record cites it: it was netted into one entry or dropped."
 which does not both credit and debit the loan in the books population."
             )]
         );
+    }
+    /// #1875: a book of three loans with their own interest ledgers, a bank and two TDS ledgers.
+    fn nil_line_book(vouchers: Vec<Voucher>) -> Book {
+        let mut b = book(vouchers);
+        for (name, group) in [
+            ("Loan B", "Unsecured Loans"),
+            ("Loan C", "Unsecured Loans"),
+            ("Interest A", "Indirect Expenses"),
+            ("Interest B", "Indirect Expenses"),
+            ("Interest C", "Indirect Expenses"),
+            ("Bank", "Bank Accounts"),
+            ("TDS", "Duties & Taxes"),
+            ("TDS Two", "Duties & Taxes"),
+        ] {
+            b.ledgers.insert(
+                name.to_string(),
+                Ledger {
+                    name: name.to_string(),
+                    parent: group.to_string(),
+                    chain: vec![group.to_string()],
+                    chain_complete: true,
+                    master_opening_paise: 0,
+                    pan: String::new(),
+                    gstin: String::new(),
+                    guid: String::new(),
+                    masterid: None,
+                },
+            );
+        }
+        b
+    }
+
+    fn run_nil_line_book(b: &Book) -> TestResult {
+        let loans = loan_config(&table(
+            "[\"Loan A\"]\nlender = \"x\"\nlender_type = \"person\"\ninterest_ledger = \"Interest A\"\n\
+             [\"Loan B\"]\nlender = \"y\"\nlender_type = \"nbfc\"\ninterest_ledger = \"Interest B\"\n\
+             [\"Loan C\"]\nlender = \"z\"\nlender_type = \"nbfc\"\ninterest_ledger = \"Interest C\"\n",
+        ))
+        .unwrap();
+        let none = BTreeSet::new();
+        let bank: BTreeSet<String> = ["Bank".to_string()].into_iter().collect();
+        let tds: BTreeSet<String> = ["TDS".to_string(), "TDS Two".to_string()]
+            .into_iter()
+            .collect();
+        run(
+            b,
+            &Rules::vendored().unwrap(),
+            "firm",
+            &loans,
+            &Inputs {
+                previous_year_turnover_paise: None,
+                cash: &none,
+                bank: &bank,
+                shared_interest_ledgers: &none,
+                tds_payable_ledgers: &tds,
+                deductor_activity: None,
+                turnover_is_placeholder: false,
+            },
+        )
+        .unwrap()
+    }
+
+    /// #1875 item 2: a TDS ledger carried only on a nil line of an interest journal is not one of
+    /// the journal's TDS ledgers.
+    #[test]
+    fn a_tds_ledger_only_on_a_nil_line_is_not_listed() {
+        let listed = |two: i64| {
+            let b = nil_line_book(vec![journal(
+                "i1",
+                &[
+                    ("Interest A", 1_200_000),
+                    ("Loan A", -1_100_000 - two),
+                    ("TDS", -100_000),
+                    ("TDS Two", two),
+                ],
+            )]);
+            let h = stable_ledger_tag(&b, "Loan A").unwrap();
+            run_nil_line_book(&b)
+                .figures
+                .into_iter()
+                .find(|f| f.id == format!("{TEST_ID}.interest_tds_ledgers_{h}"))
+                .map(|f| f.value)
+        };
+        assert_eq!(listed(0), Some(Value::Text("TDS".to_string())));
+        assert_eq!(
+            listed(-50_000),
+            Some(Value::Text("TDS\nTDS Two".to_string()))
+        );
+    }
+
+    /// #1875 item 2: another loan's interest ledger on a nil line of a misposted entry is not one
+    /// it was booked to.
+    #[test]
+    fn a_foreign_interest_ledger_only_on_a_nil_line_is_not_booked_to() {
+        let limits = |c: i64| {
+            let b = nil_line_book(vec![journal(
+                "m1",
+                &[
+                    ("Interest B", 100_000 - c),
+                    ("Loan A", -100_000),
+                    ("Interest C", c),
+                ],
+            )]);
+            let h = stable_ledger_tag(&b, "Loan A").unwrap();
+            let r = run_nil_line_book(&b);
+            let finding = r
+                .findings
+                .iter()
+                .find(|f| f.id == format!("{TEST_ID}/possible_misposted_interest/{h}"))
+                .expect("the entry is read as misposted");
+            (finding.limits[0].clone(), b)
+        };
+        let (nil, b) = limits(0);
+        let (tag_b, tag_c) = (
+            stable_ledger_tag(&b, "Interest B").unwrap(),
+            stable_ledger_tag(&b, "Interest C").unwrap(),
+        );
+        assert!(nil.contains(&format!("(tag {tag_b})")), "{nil}");
+        let (both, _) = limits(10_000);
+        assert!(both.contains(&tag_b) && both.contains(&tag_c), "{both}");
+    }
+
+    /// #1875 item 5: interest on a ledger not declared shared, booked against the bank with only a
+    /// nil line on its loan, is in no loan's interest total, and LOAN-3 says so.
+    #[test]
+    fn a_nil_line_on_the_paired_loan_does_not_silence_loan_3() {
+        let fires = |lines: &[(&str, i64)]| {
+            let b = nil_line_book(vec![journal("o1", lines)]);
+            let r = run_nil_line_book(&b);
+            check_invariants(&b, &r).unwrap().iter().any(|m| {
+                m.starts_with("LOAN-3: interest ledger 'Interest A' (not declared shared)")
+            })
+        };
+        assert!(fires(&[
+            ("Interest A", 50_000),
+            ("Bank", -50_000),
+            ("Loan A", 0)
+        ]));
+        assert!(fires(&[("Interest A", 50_000), ("Bank", -50_000)]));
     }
 }

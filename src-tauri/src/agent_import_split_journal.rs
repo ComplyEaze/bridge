@@ -19,8 +19,9 @@ use super::local_data::{self, Journal, PackageCopies, JOURNAL_FILE};
 /// The import journal of this side's data folder is the only one found.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum OneJournal {
-    /// Off Windows, or a data folder outside `%LOCALAPPDATA%`: Windows keeps no
-    /// package copy of it, and nothing was looked for.
+    /// Off Windows, or a data folder outside `%LOCALAPPDATA%`: nothing was looked
+    /// for. Windows also keeps package copies of `%APPDATA%` and of `LocalLow`, so
+    /// a `BRIDGE_AGENT_DATA_DIR` there leaves this check inert, not satisfied.
     NotRedirected,
     /// No package copy of the data folder holds a journal other than this side's.
     NoOtherJournal,
@@ -38,9 +39,14 @@ pub(super) enum SplitJournal {
     OtherNotRead,
     /// The Store apps' packages folder exists and could not be listed.
     PackagesNotListed,
-    /// This side's journal exists, and Windows did not say where it is, so it
-    /// cannot be told apart from a package copy's.
+    /// This side's journal exists, or whether it exists could not be read, and
+    /// Windows did not say where it is, so it cannot be told apart from a
+    /// package copy's.
     OwnNotLocated,
+    /// A package copy holds a journal with a batch, or one that could not be
+    /// read, and Windows did not say where that journal is, so it cannot be
+    /// told apart from this side's own.
+    CopyNotLocated,
 }
 
 /// The refusal code of every [`SplitJournal`]; the cause says which.
@@ -53,6 +59,7 @@ impl SplitJournal {
             Self::OtherNotRead => "other_journal_not_read",
             Self::PackagesNotListed => "package_copies_not_listed",
             Self::OwnNotLocated => "journal_not_located",
+            Self::CopyNotLocated => "package_copy_journal_not_located",
         }
     }
 }
@@ -103,18 +110,28 @@ fn admit_at(
     };
     let own_path = data_dir.join(JOURNAL_FILE);
     let own = resolve(&own_path);
-    if own.is_none() && std::fs::symlink_metadata(&own_path).is_ok() {
-        return Err(SplitJournal::OwnNotLocated);
+    if own.is_none() {
+        // Only "not found" says there is no journal of this side; any other
+        // error leaves it unknown, and unknown is refused.
+        match std::fs::symlink_metadata(&own_path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            _ => return Err(SplitJournal::OwnNotLocated),
+        }
     }
     for copy in copies {
-        if own.is_some() && resolve(&copy.join(JOURNAL_FILE)) == own {
+        let located = resolve(&copy.join(JOURNAL_FILE));
+        if own.is_some() && located == own {
             continue;
         }
+        // With a journal of this side to compare against, a copy's journal
+        // Windows did not locate might be that same journal.
+        let unlocated = own.is_some() && located.is_none();
         match local_data::read_journal(&copy, || {
             std::thread::sleep(std::time::Duration::from_millis(100));
         }) {
             Journal::Absent => {}
             Journal::Read(settlement) if settlement.batches == 0 => {}
+            _ if unlocated => return Err(SplitJournal::CopyNotLocated),
             Journal::Read(_) => return Err(SplitJournal::OtherHoldsBatches),
             Journal::NotRead(_) => return Err(SplitJournal::OtherNotRead),
         }

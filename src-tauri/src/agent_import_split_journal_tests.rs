@@ -105,6 +105,32 @@ fn what_cannot_be_told_is_refused() {
     assert_eq!(at.admit(&|_| None), Err(SplitJournal::OwnNotLocated));
 }
 
+/// A copy's journal with a batch that Windows did not locate, beside a journal
+/// of this side it did, may be this side's own: refused under its own cause,
+/// never as another journal's batches. One without a batch is still no refusal.
+#[test]
+fn a_copy_journal_not_located_is_refused_under_its_own_cause() {
+    let at = layout();
+    fs::write(at.data.join(JOURNAL_FILE), journal(false)).unwrap();
+    fs::write(at.copy.join(JOURNAL_FILE), journal(true)).unwrap();
+    let copy_journal = at.copy.join(JOURNAL_FILE);
+    let unlocated = |path: &Path| (path != copy_journal).then(|| path.to_path_buf());
+    assert_eq!(at.admit(&unlocated), Err(SplitJournal::CopyNotLocated));
+    fs::write(at.copy.join(JOURNAL_FILE), b"").unwrap();
+    assert_eq!(at.admit(&unlocated), Ok(OneJournal::NoOtherJournal));
+}
+
+/// Whether this side's journal exists could not be read (here its folder is a
+/// file): unknown, so refused as not located, never taken as absent.
+#[cfg(unix)]
+#[test]
+fn a_journal_whose_presence_cannot_be_read_is_not_located() {
+    let at = layout();
+    fs::remove_dir_all(&at.data).unwrap();
+    fs::write(&at.data, b"").unwrap();
+    assert_eq!(at.admit(&outside), Err(SplitJournal::OwnNotLocated));
+}
+
 /// A packages folder that cannot be listed is refused too. A file in its place
 /// stands in for it on Unix; Windows may report that as not found.
 #[cfg(unix)]
@@ -146,6 +172,7 @@ fn each_refusal_is_one_code_with_its_own_cause() {
         SplitJournal::OtherNotRead,
         SplitJournal::PackagesNotListed,
         SplitJournal::OwnNotLocated,
+        SplitJournal::CopyNotLocated,
     ]
     .map(|split| {
         let failure = super::super::ToolFailure::from(split);

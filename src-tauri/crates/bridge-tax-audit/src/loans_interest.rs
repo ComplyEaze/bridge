@@ -3698,7 +3698,7 @@ pub fn check_invariants_with(
         let repaid_total = value(format!("{prefix}clause31_repaid_total_{h}"));
         // interest_total is gross of the TDS on its journals, and a TDS journal debits the loan
         // outside taken/repaid: the loan moved by the interest net of every TDS deduction on it.
-        // The TDS debits run() left out of tds_on_loan moved the loan too (#1875 rule 4).
+        // #1875 rule 4: run() keeps these TDS debits out of tds_on_loan; they still moved the loan.
         let tds_on_loan = value(format!("{prefix}tds_on_loan_{h}"))
             - value(format!("{prefix}tds_debited_on_loan_{h}"));
         let interest = int_of(fig);

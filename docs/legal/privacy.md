@@ -1,8 +1,8 @@
 # ComplyEaze Bridge Privacy Policy
 
-**Version:** 2026-10.3
+**Version:** 2026-10.4
 
-**Effective:** 16 October 2026
+**Effective:** 31 October 2026
 
 **Describes:** ComplyEaze Bridge builds that include or link to this version of the policy, the desktop app built from the same source, and the Bridge website at bridge.complyeaze.com.
 
@@ -115,7 +115,7 @@ Bridge writes Local Files so that you can see what it did, and so that a posting
 **Where to find them:**
 
 - **Mac:** in Finder, choose Go, then Go to Folder, and type `~/Library/Application Support/Bridge`.
-- **Windows:** in File Explorer, type `%LOCALAPPDATA%\Bridge\agent` in the address bar. On some computers it is `%APPDATA%\Bridge\agent` instead. On a Microsoft Store install of Claude Desktop, Windows may keep some of these files in the Claude package's own folder under `%LOCALAPPDATA%\Packages`, at `LocalCache\Local\Bridge\agent`, instead, and a given file can be in either place (seen on one computer; which file goes where is not measured). The location that `build_import_xml` reports for an import file is the one Windows reports for it. Check both folders before you archive or delete. Microsoft's documentation says that uninstalling or resetting a Store app (here Claude Desktop itself) removes that second folder and everything in it.
+- **Windows:** in File Explorer, type `%LOCALAPPDATA%\Bridge\agent` in the address bar. On some computers it is `%APPDATA%\Bridge\agent` instead. On a Microsoft Store install of Claude Desktop, Windows may keep these files in the Claude package's own folder under `%LOCALAPPDATA%\Packages`, at `LocalCache\Local\Bridge\agent`, instead. On one computer we measured, Bridge started from inside the Claude package, as the extension is, wrote its files to that package folder, while Bridge started outside the package used `%LOCALAPPDATA%\Bridge\agent`, so the two kept separate files. The location that `build_import_xml` reports for an import file is the file's real location, and it opened from outside the package. Check both folders before you archive or delete. Microsoft's documentation says that uninstalling or resetting a Store app (here Claude Desktop itself) removes that second folder and everything in it.
 
 If someone set Bridge up by hand to use a different folder,³ that folder holds the files below. Small, empty lock files still go in the default folder. On Windows, Bridge also puts lock files in a second folder, `%USERPROFILE%\.complyeaze-bridge`, so that every copy of Bridge you run finds the same ones. They keep two copies of Bridge from sending to Tally at the same time, and Bridge does not delete them.
 

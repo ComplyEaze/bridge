@@ -1,0 +1,6 @@
+003-s1-ledgers-gst.json vs 029-s17-ledgers-gst.json: state None/None total 6/6; items equal: True
+  other keys that differ (snapshot left out): []
+  snapshot {"id": "b555934e-9e78-43e1-9a9c-b32e42b30d1f", "master_alter_id": 213, "read_at": "2026-10-31T06:15:25.459Z", "reused": false, "voucher_alter_id": null} | {"id": "7d4cc7c6-94d3-45e5-b48d-3e84a1b8da73", "master_alter_id": 213, "read_at": "2026-10-31T07:04:05.877Z", "reused": false, "voucher_alter_id": null}
+004-s1-vchtypes-call1.json vs 030-s17-vchtypes-call1.json: state observed/observed total 24/24; masters equal: True
+  other keys that differ (snapshot left out): []
+  snapshot {"id": "54fcb1b0-5798-4ce0-a8f5-5eee635e89e5", "master_alter_id": 213, "read_at": "2026-10-31T06:15:36.872Z", "reused": false, "voucher_alter_id": null} | {"id": "f6adc0d4-8069-40d3-8565-8df8ac35688b", "master_alter_id": 213, "read_at": "2026-10-31T07:04:07.652Z", "reused": false, "voucher_alter_id": null}

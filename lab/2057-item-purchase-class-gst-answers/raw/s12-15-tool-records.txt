@@ -1,0 +1,37 @@
+== answers\019-s12-vouchers-20250610.json isError=False state=complete total=1
+ voucher Purchase no=1 date=20250610 alter_id=1 is_invoice=True party=Lab Supplier party_gstin=27ZZZZZ0000Z2ZP ref=LAB-2057-1
+   entry ledger=Lab Supplier amount=500.00 deemed+=No bills=[('New Ref', 'LAB-2057-1', '500.00')]
+     goods_lines: <key absent>
+   entry ledger=Lab Purchases amount=-500.00 deemed+=Yes bills=[]
+     goods_line item=Lab Class Item actual=5 Nos billed=5 Nos rate=100.00/Nos amount=-500.00 batches=[('Main Location', 'Primary Batch', '-500.00')]
+== answers\020-s12-vouchers-20250611.json isError=False state=complete total=1
+ voucher Purchase no=2 date=20250611 alter_id=2 is_invoice=True party=Lab Supplier party_gstin=27ZZZZZ0000Z2ZP ref=LAB-2057-2
+   entry ledger=Lab Supplier amount=545.00 deemed+=No bills=[('New Ref', 'LAB-2057-2', '545.00')]
+     goods_lines: <key absent>
+   entry ledger=Lab Purchases amount=-500.00 deemed+=Yes bills=[]
+     goods_line item=Lab Class Item actual=5 Nos billed=5 Nos rate=100.00/Nos amount=-500.00 batches=[('Main Location', 'Primary Batch', '-500.00')]
+   entry ledger=Lab SGST amount=-45.00 deemed+=Yes bills=[]
+     goods_lines: <key absent>
+== answers\021-s12-vouchers-20250612.json isError=False state=complete total=1
+ voucher Purchase no=3 date=20250612 alter_id=3 is_invoice=True party=Lab Supplier party_gstin=27ZZZZZ0000Z2ZP ref=LAB-2057-3
+   entry ledger=Lab Supplier amount=103.54 deemed+=No bills=[('New Ref', 'LAB-2057-3', '103.54')]
+     goods_lines: <key absent>
+   entry ledger=Lab Purchases amount=-94.99 deemed+=Yes bills=[]
+     goods_line item=Lab Class Item actual=7 Nos billed=7 Nos rate=13.57/Nos amount=-94.99 batches=[('Main Location', 'Primary Batch', '-94.99')]
+   entry ledger=Lab SGST amount=-8.55 deemed+=Yes bills=[]
+     goods_lines: <key absent>
+== answers\022-s13-purchase-register.json isError=False state=complete total=2 register_classes=['Purchase', 'Debit Note'] vouchers_observed=3 ledger_masters_observed=6
+ item {"voucher_type": "Purchase", "voucher_number": "2", "date": "20250611", "status": "complete", "has_taxable_entry": true}
+   tax_in_books: [{"ledger": "Lab SGST", "amount": "-45.00", "head": "state_tax", "raw_head": "State Tax"}]
+   taxable_entries: [{"ledger": "Lab Purchases", "amount": "-500.00", "head": null, "raw_head": null}]
+   party_entries: [{"ledger": "Lab Supplier", "amount": "545.00", "head": null, "raw_head": null}]
+   other_entries: []
+ item {"voucher_type": "Purchase", "voucher_number": "3", "date": "20250612", "status": "complete", "has_taxable_entry": true}
+   tax_in_books: [{"ledger": "Lab SGST", "amount": "-8.55", "head": "state_tax", "raw_head": "State Tax"}]
+   taxable_entries: [{"ledger": "Lab Purchases", "amount": "-94.99", "head": null, "raw_head": null}]
+   party_entries: [{"ledger": "Lab Supplier", "amount": "103.54", "head": null, "raw_head": null}]
+   other_entries: []
+ purchase_vouchers_without_duties_taxes_entry: total=1 listed=[('Purchase', '1', '20250610')]
+ vouchers_with_unplaced_ledgers: total=0 listed=[]
+ other_voucher_types_touching_duties_taxes: total=0 listed=[]
+ unclassified_voucher_type: total=0 listed=[]

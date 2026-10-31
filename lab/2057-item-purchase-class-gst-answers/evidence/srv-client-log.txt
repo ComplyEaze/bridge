@@ -1,0 +1,35 @@
+2026-10-31T06:14:58Z exe sha256 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d ok; launch-env.json sha256 4d7d7f8d480642925918d3ad46071256ec7a4bbc55fe7d53b57df11c0d6dc6c3; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-10-31T06:14:58Z launched pid 26676; stderr to server-stderr-20261031T061458Z.log
+2026-10-31T06:14:58Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-10-31T06:15:07Z 000-tools-list.json tool=list secs=0.010 isError=None error=None saved_sha256=cc864f56e05078d51fd5ae19645df69dc48e840b472091ebce8814fc98f0ddf9
+2026-10-31T06:15:09Z 001-list-companies.json tool=list_companies secs=0.084 isError=False error=None saved_sha256=a985a146678b2c23aa73544390372af5068a714be27bebaffc9537bd41be7ddd
+2026-10-31T06:15:16Z 002-marks-s1-M0V0.json tool=ledger_masters secs=0.733 isError=False error=None saved_sha256=3ee9d50a67e99306ed8c4ceaa1c0b36ca2394f89cbd8846c93a8426971c2e6a5
+2026-10-31T06:15:25Z 003-s1-ledgers-gst.json tool=ledger_masters secs=1.527 isError=False error=None saved_sha256=36ad3f3c2bc5fb55c78b31dad8a92e38402d72431607739c4b0fbdab2161fffd
+2026-10-31T06:15:37Z 004-s1-vchtypes-call1.json tool=masters secs=0.821 isError=False error=None saved_sha256=e748a24a4717918f92c50764cef5e42698c83e0fe8228efc1c081960b41f6ff1
+2026-10-31T06:15:44Z 005-marks-s2-before-bk2.json tool=ledger_masters secs=0.736 isError=False error=None saved_sha256=615a6be99a8d5c26d5e19e3f02ea775822a7fad193de179dfcc7310994ef85d3
+2026-10-31T06:17:48Z 006-marks-s2-after-bk2.json tool=ledger_masters secs=0.789 isError=False error=None saved_sha256=b21836b41a932c2edcee98c3cefbc00b03ac9c28d9430e80b33f2ca771a636bf
+2026-10-31T06:19:15Z 007-marks-s3-after-state.json tool=ledger_masters secs=0.753 isError=False error=None saved_sha256=04db17cbd61d0059626dfcdefa057b334bf5deb5b582e01a27542c1e53ca83da
+2026-10-31T06:19:56Z 008-marks-s3-after-f11.json tool=ledger_masters secs=0.795 isError=False error=None saved_sha256=f62e2db896b52da92a3be8bebf5bee873872712130d6738d06e7e53a80a6dc2e
+2026-10-31T06:21:32Z 009-marks-s4-after-gstreg.json tool=ledger_masters secs=0.798 isError=False error=None saved_sha256=385ba39bd85d3cfd4b0727b8f18b54df2abc6c52fa41fb581716c54a0473353d
+2026-10-31T06:24:45Z 010-marks-s5-after-supplier.json tool=ledger_masters secs=0.726 isError=False error=None saved_sha256=70769b29b1d18b5fada664a64c6030c3784463e90aa3da169fc1b4d38c98d26f
+2026-10-31T06:28:09Z 011-marks-s6-after-item.json tool=ledger_masters secs=0.777 isError=False error=None saved_sha256=cbcb7ea0e12daea3068e8a3b046c76f47327d899137db919531118a9eb8426dd
+2026-10-31T06:30:05Z 012-marks-s7-after-slip.json tool=ledger_masters secs=0.799 isError=False error=None saved_sha256=0aa0dac943f464c614150c1202b2d900563a8efb444342df0212b01f6d2a7204
+2026-10-31T06:31:19Z 013-marks-s7-after-view.json tool=ledger_masters secs=0.754 isError=False error=None saved_sha256=7ff10302567d3ec9efa414f1f47961198cac969fdb8347360aad0939a465095f
+2026-10-31T06:36:03Z 014-marks-s8-after-class.json tool=ledger_masters secs=0.816 isError=False error=None saved_sha256=623647a17faf4c33a27a95b99fff8441de97825206022166de405dbff42305e5
+2026-10-31T06:41:51Z 015-marks-s9-after-i1.json tool=ledger_masters secs=0.771 isError=False error=None saved_sha256=71a0092daee618019c971408d7004b393000976d49639a027bf8952f1d3a9b64
+2026-10-31T06:46:51Z 016-marks-s10-after-c1.json tool=ledger_masters secs=0.779 isError=False error=None saved_sha256=29b576b792d93480ed7e1772087d19a6c7fb945d92076dc11107cb8b1fecf424
+2026-10-31T06:50:19Z 017-marks-s11-after-i2.json tool=ledger_masters secs=0.749 isError=False error=None saved_sha256=16531f78f391cc9b4e47e96bac84942d9119fb6afb9c3e7623b349645972d9b5
+2026-10-31T06:50:47Z 018-marks-s12-M1V1.json tool=ledger_masters secs=0.742 isError=False error=None saved_sha256=9164df0d8c1a701b70e7ddf586191f3c0901a994cd548cb6cc2b71b33e1a0f8e
+2026-10-31T06:51:25Z 019-s12-vouchers-20250610.json tool=vouchers secs=2.005 isError=False error=None saved_sha256=a0383bcf2f19c5ca5d44ca855f7382ac64c30cbf2649ef75bb21d35fdcf6b08c
+2026-10-31T06:51:47Z 020-s12-vouchers-20250611.json tool=vouchers secs=1.990 isError=False error=None saved_sha256=62627fb3dc32dac66c78e1b8a1fa1419f83bab67bccce5751a250b5aaef33486
+2026-10-31T06:52:05Z 021-s12-vouchers-20250612.json tool=vouchers secs=2.005 isError=False error=None saved_sha256=7675fe68f44d831155ef206524c7275ca007ac3bf02ee10eefcc49442369bbf4
+2026-10-31T06:52:10Z 022-s13-purchase-register.json tool=purchase_register secs=4.488 isError=False error=None saved_sha256=d4126035579ee93925a849c9b2c9eadd86592abdc33c5d7f764829eef28c9c2c
+2026-10-31T06:52:13Z 023-s14-ledgers-gst.json tool=ledger_masters secs=1.381 isError=False error=None saved_sha256=b1b5ddf10ce8729928101d0d58f6ba06857ab86469404af4b3301665d004c2fd
+2026-10-31T06:52:15Z 024-s14-vchtypes.json tool=masters secs=0.747 isError=False error=None saved_sha256=af47df8c7ec72bdc14a66be889175b97534db50757842d2a27829eeb0fec3c61
+2026-10-31T06:52:16Z 025-marks-s15-after-group.json tool=ledger_masters secs=0.716 isError=False error=None saved_sha256=8d734e04f4289f612a78ba027699a78c55990655db4c329ef08fffeeaf728f34
+2026-10-31T06:58:37Z 026-marks-s16-after-screens.json tool=ledger_masters secs=0.806 isError=False error=None saved_sha256=a39a661065c0f3e3a168a2b6ae36eb94c1bbb73422e4b6bee533268a4c9bb0fe
+2026-10-31T07:03:45Z 027-s17-list-companies.json tool=list_companies secs=0.107 isError=False error=None saved_sha256=0f68a860022ad1b55afabded78b8f9e9dfb54234f11d2316bfc8944049f309aa
+2026-10-31T07:03:57Z 028-marks-s17-marks-after-restore.json tool=ledger_masters secs=0.771 isError=False error=None saved_sha256=7f39bd38d33110d56f4004a0ac9dfbaadd8544b4026f43688dc86b45d11c2ce9
+2026-10-31T07:04:05Z 029-s17-ledgers-gst.json tool=ledger_masters secs=1.408 isError=False error=None saved_sha256=cd051d633ac24517b279aab3fc79c603464133bf0932d8443aa0b5334598dfbf
+2026-10-31T07:04:07Z 030-s17-vchtypes-call1.json tool=masters secs=0.791 isError=False error=None saved_sha256=6a35147826eb65259b6e8e9c4efe3c57bcf3b2dc2cf5c987928c640749017dd8
+2026-10-31T07:04:45Z session ended; server pid 26676 exit code 0

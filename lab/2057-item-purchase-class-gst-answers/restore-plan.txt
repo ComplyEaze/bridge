@@ -1,0 +1,17 @@
+Restore plan for #2057 step 17 (LAB-COMMON C6), on the run lead's explicit RESTORE for 2057 (given 31 Oct after the step-16 report).
+
+Source, identified by all of:
+- folder: <LAB_DIR>\backups\bk2 (holds this one file only; checked before the restore)
+- file: TDBK1800_<company number>.001
+- bytes: 24,100
+- sha256: 8ca808192ec97a4015b73aad7fd83b64d8d60e16e917c3c9b570454cae0d1405 (checked before the restore; = recorded at step 2)
+- the date and time the Restore list shows for it: 31-Oct-2026, 11:47 local (BK2's, step 2)
+Company: BRIDGE CLASS PURCHASE LAB, GUID 92a7ef97-dd28-4286-b02c-c059fcb8690e, number <company number>.
+Restore Data Path: Tally's data folder, <Tally data folder> (THE COMPANY's own folder is the one named by its number there).
+Order: Company > Shut (THE COMPANY alone loaded); Data > Backup & Restore > Restore; Restore Data Path = the data folder above; source = Specify Path, the bk2 folder; select THE COMPANY only (its number, BK2's date and time); screenshot; accept.
+The two prompts expected, and the only ones answered:
+1. "Accept ?" = Yes
+2. "Company data folder (<company number>) already exists ... Replace will overwrite the existing folder." = Replace
+Any other prompt, an offer to repair, rewrite or migrate, or a list that differs from this plan: no key, screenshot, stop.
+After: THE COMPANY loaded alone; a capture of the Gateway compared byte for byte with step 0's (s0-gateway.png; any difference stops the row); then list_companies (exactly THE COMPANY, verified_tuple, the same GUID), marks (EXPECT 213/null, BK2's), ledger_masters and masters voucher_types as in step 1, equal.
+Listings of THE COMPANY's data folder (names, sizes, times) are kept before and after the restore, on the lab PC.

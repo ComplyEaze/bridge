@@ -1997,8 +1997,10 @@ fn verify_observed_company_tuple_from_companies(
 /// (bridge#2074), and is the
 /// standard request otherwise (bridge#1490); the workbook says when they were not
 /// read. The count's choice is an allowance, so where Tally declares the larger read's
-/// answer past its size limit, or that answer breaks off or cannot be read, the book is read
-/// again without them, once (bridge#2214); a larger read that runs out of time fails. A
+/// answer past its size limit, or that answer breaks off, cannot be read, does not decode
+/// or does not parse, the book is read again without them, once (bridge#2214). A larger
+/// read that runs out of time, or past the size limit without Tally declaring it, fails,
+/// and so does any other failure of it or of the read again, each as itself. A
 /// grouping-decision save uses none of them and sends the standard request.
 const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
     crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits;

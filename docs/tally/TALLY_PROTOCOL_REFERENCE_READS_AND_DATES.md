@@ -904,9 +904,13 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   drain after one, were not reached on this book. After an oversize Tally declares, the party/ledger master export
   reads the book once more with the standard request inside the same operation (#2214); that retry itself has not been
   run against Tally. It does the same after any answer that came back broken, cut short or unreadable (it broke off,
-  could not be read, did not decode or did not parse), once the drain a cut owes has cleared (the maintainers' ruling
-  on #2074; not reached on this book). It refuses only after a deadline or an oversize Tally did not declare, since
-  Tally may still be working on that read, until such a cut mailing read is seen live.
+  could not be read, did not decode or did not parse; the maintainers' ruling on #2074; not reached on this book). An
+  answer that broke off or could not be read owes a drain: the transport clears it with the standard post's own
+  `/status` probes, with no wait beyond them, or refuses that post as draining, and the export fails. The export
+  refuses after a deadline or an oversize Tally did not declare, since Tally may still be working on that read, until
+  such a cut mailing read is seen live. Any other refusal of that read's answer (Tally's own failure answer, a missing
+  STATUS, an HTTP error status, the pair's two answers differing, or a row the grammar refuses, which markup inside a
+  mailing field alone can cause) fails the export as itself.
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
   `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one

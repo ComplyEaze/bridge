@@ -285,8 +285,12 @@ the standard request exported before can now be sent the larger mailing request.
 answer past the 32 MiB response limit, the workbook reads the book once more with the standard request, and its header
 says the larger read failed (#2214); the retry has not been run against Tally. It does the same where that answer came
 back broken, cut short or unreadable (it broke off, could not be read, did not decode or did not parse), and its header
-says so. The export fails only where the larger read runs out of time, or passes the limit without Tally declaring it,
-since Tally may still be working on it; its error says the mailing addresses were part of the failed read. Neither cut
+says so. The export fails where the larger read runs out of time, or passes the limit without Tally declaring it,
+since Tally may still be working on it; its error says the mailing addresses were part of the failed read. It also
+fails where, after an answer that broke off or could not be read, the transport refuses the standard post as draining
+because Tally has not settled within that post's own `/status` probes, and on any other refusal of the larger read's
+answer (Tally's own failure answer, a missing STATUS, an HTTP error status, the pair's two answers differing, or a row
+the grammar refuses, which markup inside a mailing field alone can cause), each told as itself. Neither cut
 of a mailing read, nor the drain after one, has been seen live. `ledger_masters` with
 `include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.

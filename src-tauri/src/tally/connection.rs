@@ -138,24 +138,31 @@ pub(crate) enum MailingReadFailure {
     Truncated,
     /// A body that could not be read.
     ReadFailed,
-    /// A whole answer whose bytes did not decode as the text Tally declared.
+    /// An answer whose bytes did not decode as the text Tally declared, found at
+    /// its head or partway through its body, so not always a whole answer.
     Undecodable,
     /// A whole, decoded answer whose XML did not parse.
     Malformed,
 }
 
 /// What the party/ledger master export does after its own mailing read failed
-/// (bridge#2214, and the maintainers' ruling on bridge#2074): a book the
-/// standard request reads still exports, and only a read that may have left
-/// Tally working on it refuses. [`Self::Continue`] and [`Self::Retry`] both
-/// send the standard request once; they differ in why, which the workbook says.
+/// in one of the ways [`MailingReadFailure`] names (bridge#2214, and the
+/// maintainers' ruling on bridge#2074). [`Self::Continue`] and [`Self::Retry`]
+/// both send the standard request once; they differ in why, which the workbook
+/// says. Any failure not named there is not marked and fails the export as
+/// itself, as does the standard read's own failure, a refusal of its post as
+/// draining among them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum MailingReadDecision {
     /// An answer came back but broke off, could not be read, did not decode or
     /// did not parse: the export goes on without the mailing details, reading
-    /// the book as a read that never asked for them. A cut owes a drain
-    /// (#2142), which the transport clears before the standard read is posted,
-    /// or refuses that post as draining; a whole answer owes none.
+    /// the book as a read that never asked for them. An answer that broke off
+    /// or could not be read owes a drain (#2142): the transport clears it with
+    /// the standard post's own `/status` probes, or refuses that post as
+    /// draining, which fails the export. One that did not decode or did not
+    /// parse owes none by the transport's drain rule, so the standard post
+    /// follows at once, though a decode failure partway through a body with no
+    /// declared length may leave Tally still sending it.
     Continue,
     /// Tally declared the answer past the response cap, the one case seen live
     /// (protocol reference §8.4, lab row 2214): it had finished the work, so
@@ -212,8 +219,8 @@ impl MailingReadFailure {
 }
 
 /// Marks a master read that asked for the mailing details and whose answer took
-/// too long, ran too large, broke off or could not be read, keeping the read
-/// evidence a failed pair carries at the chain's root, as
+/// too long, ran too large, broke off, could not be read or did not decode,
+/// keeping the read evidence a failed pair carries at the chain's root, as
 /// [`parent_part_response_error`] does. Any other failure is returned as it is.
 /// The cause is the master post's own failure: the pair's `/status` checks fail
 /// in the same chain, and a slow check is not the mailing answer's.

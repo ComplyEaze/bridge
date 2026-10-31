@@ -1202,9 +1202,9 @@ fn desktop_messages_name_the_product_in_full() {
 
 /// A party/ledger master read that asked for the mailing details and timed out, or came
 /// back too large, names that larger read and says what to do; only the size limit says the
-/// estimate may have been too low. One whose answer broke off or could not be read is told
-/// exactly as a read without them, and the same failure of a read without them is told as
-/// before (bridge#2074). Which failures are marked is decided where the read is sent, and
+/// estimate may have been too low. One whose answer broke off, could not be read, did not
+/// decode or did not parse is told exactly as a read without them, and the same failure of a
+/// read without them is told as before (bridge#2074). Which failures are marked is decided where the read is sent, and
 /// tested there; this matches on the marked cause, not on text.
 #[test]
 fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
@@ -1279,5 +1279,42 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
         } else {
             assert_eq!(named.remediation, REMEDIATION, "{error:?}");
         }
+    }
+    // An answer that did not decode, or whose XML did not parse, is marked too, and is told
+    // exactly as the same failure unmarked: neither sentence, nor the remediation.
+    use crate::tally::connection::{mailing_details_answer_error, MailingDetailsReadFailed};
+    let undecodable = || TallyTransportError::InvalidEncoding {
+        code: "response_encoding_invalid",
+    };
+    let malformed = || bridge_tally_protocol::NativeCollectionError::MalformedResponse;
+    for (plain, named) in [
+        (
+            anyhow::Error::new(undecodable()),
+            marked(posted(anyhow::Error::new(undecodable()))),
+        ),
+        (
+            anyhow::Error::new(malformed()),
+            mailing_details_answer_error(anyhow::Error::new(malformed())),
+        ),
+    ] {
+        assert!(
+            named
+                .chain()
+                .any(|cause| cause.is::<MailingDetailsReadFailed>()),
+            "{named:#}"
+        );
+        let plain = party_ledger_master_runtime_command_error(with_read_evidence(
+            plain,
+            RuntimeReadEvidence::empty(),
+        ));
+        let named = party_ledger_master_runtime_command_error(with_read_evidence(
+            named,
+            RuntimeReadEvidence::empty(),
+        ));
+        assert_eq!(named.code, plain.code);
+        assert_eq!(named.message, plain.message);
+        assert_eq!(named.remediation, plain.remediation);
+        assert!(!named.message.contains(SENTENCE), "{}", named.message);
+        assert_ne!(named.remediation, REMEDIATION);
     }
 }

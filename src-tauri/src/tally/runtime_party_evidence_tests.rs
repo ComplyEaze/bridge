@@ -461,9 +461,19 @@ async fn a_mailing_read_cut_short_is_marked_as_the_mailing_read() {
     );
     let standard = cut_short(few, Standard).await;
     assert!(!marked(&standard), "{standard:#}");
+    // Resolved to the standard request by the count, its cut is not the mailing read's and
+    // is not read again: its own cut is the only transport error, where a read marked and
+    // continued would end on the closed endpoint.
     let counted_standard = cut_short(many, Export).await;
     assert!(!marked(&counted_standard), "{counted_standard:#}");
-    // A damaged answer to the mailing read is told as itself.
+    assert_eq!(
+        transport(&counted_standard),
+        [TallyTransportError::ResponseTruncated],
+        "{counted_standard:#}"
+    );
+    // A whole answer to the mailing read that the parser refuses for a reason other than
+    // its XML not parsing (here a missing STATUS) is told as itself and not read again: no
+    // transport error, where a read continued would end on the closed endpoint.
     let (damaged, _) = refusal_with(
         &extent_with_master_mark(8_000),
         Export,
@@ -472,4 +482,11 @@ async fn a_mailing_read_cut_short_is_marked_as_the_mailing_read() {
     )
     .await;
     assert!(!marked(&damaged), "{damaged:#}");
+    assert!(
+        damaged.chain().any(|cause| cause
+            .downcast_ref::<bridge_tally_protocol::NativeCollectionError>()
+            == Some(&bridge_tally_protocol::NativeCollectionError::StatusAbsent)),
+        "{damaged:#}"
+    );
+    assert!(transport(&damaged).is_empty(), "{damaged:#}");
 }

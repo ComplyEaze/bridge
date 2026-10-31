@@ -467,11 +467,10 @@ fn the_entry_holding_an_item_invoices_goods_line_carries_no_rates() {
     };
     let goods = entry("Purchase - Goods");
     assert!(goods.get("gst_details_unreadable").is_none(), "{goods}");
-    assert_eq!(
-        goods["gst_details"]["rates"].as_array().map_or(0, Vec::len),
-        0,
-        "{goods}"
-    );
+    let goods_rates = goods["gst_details"]["rates"]
+        .as_array()
+        .unwrap_or_else(|| panic!("the goods entry lists its rates: {goods}"));
+    assert!(goods_rates.is_empty(), "{goods}");
     let freight = entry("GS1 Freight Inward");
     let rates = freight["gst_details"]["rates"]
         .as_array()

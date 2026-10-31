@@ -147,7 +147,9 @@ impl PartyLedgerMasterSource {
             MailingReadFailure::Truncated => {
                 "Tally's answer to that read broke off before it ended"
             }
-            MailingReadFailure::ReadFailed => "Tally's answer to that read could not be read",
+            MailingReadFailure::ReadFailed
+            | MailingReadFailure::Undecodable
+            | MailingReadFailure::Malformed => "Tally's answer to that read could not be read",
             // Never read again: such a read fails the export instead.
             MailingReadFailure::Deadline => return None,
         };

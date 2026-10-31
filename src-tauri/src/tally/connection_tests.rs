@@ -1856,10 +1856,10 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
 
 /// The mailing marker carries how the read failed, decided by the master post's own transport
 /// error, and each cause has one decision for the export (bridge#2214 and the maintainers'
-/// ruling on bridge#2074): an answer that broke off or could not be read continues without the
-/// details, an answer Tally declared past the response cap is read again without them, and a
-/// deadline or an oversize Tally did not declare refuses. A failure that is none of these is not
-/// marked. A `/status` check of the pair that failed is not the post's failure, though it sits in
+/// ruling on bridge#2074): an answer that broke off, could not be read or did not decode
+/// continues without the details, an answer Tally declared past the response cap is read again
+/// without them, and a deadline or an oversize Tally did not declare refuses. A failure that is
+/// none of these, an unsupported content encoding among them, is not marked. A `/status` check of the pair that failed is not the post's failure, though it sits in
 /// the same chain.
 #[test]
 fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
@@ -1897,8 +1897,16 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
             Some(F::ReadFailed),
             Some(D::Continue),
         ),
+        (
+            T::InvalidEncoding {
+                code: "invalid_utf16le",
+            },
+            Some(F::Undecodable),
+            Some(D::Continue),
+        ),
         (T::ConnectionFailed, None, None),
         (T::HttpStatus { status: 503 }, None, None),
+        (T::UnsupportedContentEncoding, None, None),
     ] {
         let found = |error: anyhow::Error| {
             mailing_details_read_error(error)
@@ -1915,6 +1923,47 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
         let checked = anyhow::Error::new(error.clone())
             .context("Tally health check between paired native report reads failed");
         assert_eq!(found(checked), None, "{error:?}");
+    }
+}
+
+/// The maintainers' ruling on bridge#2074: a mailing master answer that came back whole and
+/// decoded but whose XML did not parse is marked, and its decision is to continue without the
+/// details. Every other refusal of that answer is not marked, so it fails as on master: a wrong
+/// company, Tally's own failure answer, a missing STATUS, a row the grammar refuses and a passed
+/// bound.
+#[test]
+fn a_mailing_answer_whose_xml_does_not_parse_is_marked_to_continue() {
+    use super::{
+        mailing_details_answer_error, party_ledger_master_master_snapshot_error,
+        MailingDetailsReadFailed, MailingReadDecision as D, MailingReadFailure as F,
+    };
+    use bridge_tally_protocol::NativeCollectionError as N;
+    for (error, cause) in [
+        (N::MalformedResponse, Some(F::Malformed)),
+        (N::NotSuccess, None),
+        (N::StatusAbsent, None),
+        (N::RowUnusable, None),
+        (N::CompanyIdentityMismatch, None),
+        (N::BoundsViolation, None),
+    ] {
+        let marked = mailing_details_answer_error(party_ledger_master_master_snapshot_error(
+            anyhow::Error::new(error),
+        ));
+        let found = marked
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+            .map(MailingDetailsReadFailed::cause);
+        assert_eq!(found, cause, "{error:?}");
+        assert_eq!(
+            found.map(F::decision),
+            cause.map(|_| D::Continue),
+            "{error:?}"
+        );
+        // The refusal is still the master answer's, whatever the mark.
+        assert!(marked.chain().any(|cause| matches!(
+            cause.downcast_ref::<super::PartyLedgerMasterSourceValidationError>(),
+            Some(super::PartyLedgerMasterSourceValidationError::MasterResponseInvalid { .. })
+        )));
     }
 }
 

@@ -438,11 +438,11 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
     // causes, only a deadline and an answer past the size limit are named as that
     // larger read here, with the remediation for it; only the size limit says the
     // estimate may have been too low, since a deadline does not show the answer's
-    // size. An answer that broke off or could not be read says the connection
-    // broke, so it is told exactly as a read without the details would be. The
+    // size. An answer that broke off, could not be read, did not decode or did
+    // not parse is told exactly as a read without the details would be. The
     // export reads the book again without the details after a declared oversize
-    // or a broken answer (bridge#2214), so a marked failure that reaches here is
-    // a deadline or an oversize Tally did not declare.
+    // or any such answer (bridge#2214), so a marked failure of the export that
+    // reaches here is a deadline or an oversize Tally did not declare.
     match mailing_read_failed {
         Some(MailingReadFailure::Deadline) => {
             mapped
@@ -459,7 +459,13 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
                 .push_str(MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE);
             mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
         }
-        Some(MailingReadFailure::Truncated | MailingReadFailure::ReadFailed) | None => {}
+        Some(
+            MailingReadFailure::Truncated
+            | MailingReadFailure::ReadFailed
+            | MailingReadFailure::Undecodable
+            | MailingReadFailure::Malformed,
+        )
+        | None => {}
     }
     mapped
 }

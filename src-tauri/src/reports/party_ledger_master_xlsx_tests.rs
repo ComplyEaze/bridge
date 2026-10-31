@@ -879,6 +879,14 @@ fn a_workbook_read_again_after_its_mailing_read_failed_says_that_read_failed() {
             MailingReadFailure::ReadFailed,
             "Tally's answer to that read could not be read",
         ),
+        (
+            MailingReadFailure::Undecodable,
+            "Tally's answer to that read could not be read",
+        ),
+        (
+            MailingReadFailure::Malformed,
+            "Tally's answer to that read could not be read",
+        ),
     ] {
         source.mailing_details_read_failed = Some(cause);
         let text = workbook_text(source.clone());

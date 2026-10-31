@@ -284,9 +284,10 @@ then says that no ledger's mailing details were observed and the status column r
 the standard request exported before can now be sent the larger mailing request. Where Tally declares that read's
 answer past the 32 MiB response limit, the workbook reads the book once more with the standard request, and its header
 says the larger read failed (#2214); the retry has not been run against Tally. It does the same where that answer came
-back but broke off or could not be read, and its header says so. Where the larger read runs out of time, the export
-fails and its error says the mailing addresses were part of the failed read: a mailing read cut by its deadline, and
-the drain after one, have not been seen live. `ledger_masters` with
+back broken, cut short or unreadable (it broke off, could not be read, did not decode or did not parse), and its header
+says so. The export fails only where the larger read runs out of time, or passes the limit without Tally declaring it,
+since Tally may still be working on it; its error says the mailing addresses were part of the failed read. Neither cut
+of a mailing read, nor the drain after one, has been seen live. `ledger_masters` with
 `include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default

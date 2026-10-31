@@ -997,6 +997,79 @@ async fn an_export_whose_mailing_answer_broke_off_continues_without_the_details(
     }
 }
 
+/// The maintainers' ruling on bridge#2074: the export's mailing pair whose answers came back
+/// whole and decoded, but whose XML does not parse (here, the captured answer with its envelope
+/// left open), does not fail the export. The book is read once more with the standard request,
+/// the source is that read's, and the workbook is produced, its note saying the mailing answer
+/// could not be read. A whole answer owes no drain, so the standard master follows at once.
+#[tokio::test]
+async fn an_export_whose_mailing_answer_does_not_parse_still_yields_a_workbook() {
+    use crate::endpoint_wire::WireGateConfig;
+    use crate::reports::party_ledger_master::build_party_ledger_master_workbook;
+    use crate::reports::party_ledger_master_xlsx::render_party_ledger_master_xlsx;
+    use crate::reports::schedule_iii::{DecisionInput, DecisionsUnavailable};
+    use crate::tally::connection::{
+        ComplianceRead::{Standard, WithMailingDetailsWhereWholeReadFits as Export},
+        MailingReadDecision, MailingReadFailure,
+    };
+    let (standard, standard_seen) = export_read(
+        Standard,
+        compliance_plans(ADMITTED_PROFILE_VARIANTS[0]),
+        WireGateConfig::default(),
+    )
+    .await;
+    let standard = standard.unwrap();
+    let cause = MailingReadFailure::Malformed;
+    assert_eq!(cause.decision(), MailingReadDecision::Continue);
+    let captured = decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters.utf16le.xml"
+    ));
+    assert_eq!(captured.matches("</ENVELOPE>").count(), 1);
+    let unparsable = xml(captured.replace("</ENVELOPE>", ""));
+    let mut plans = compliance_plans(ADMITTED_PROFILE_VARIANTS[0]);
+    let rest = plans.split_off(MASTER);
+    pair(&mut plans, unparsable);
+    plans.extend(rest);
+    let wire = WireGateConfig::default().with_drain(bridge_tally_transport::DrainPolicy::MEASURED);
+    let (source, seen) = export_read(Export, plans, wire).await;
+    let source = source.unwrap_or_else(|error| panic!("{error:#}"));
+    assert_eq!(seen.len(), standard_seen.len() + 4);
+    let mailing = &seen[MASTER].request_body_sha256;
+    assert_ne!(mailing, &standard_seen[MASTER].request_body_sha256);
+    assert_eq!(
+        seen.iter()
+            .filter(|request| &request.request_body_sha256 == mailing)
+            .count(),
+        2,
+        "the mailing pair's two posts, and no more"
+    );
+    assert_eq!(
+        seen[MASTER + 4].request_body_sha256,
+        standard_seen[MASTER].request_body_sha256,
+        "the standard master follows at once"
+    );
+    assert_eq!(source.rows.len(), standard.rows.len());
+    assert!(source.rows.iter().all(|row| matches!(
+        row.fields.mailing_details,
+        bridge_tally_protocol::mailing_details::MailingDetailsHistory::NotObserved
+    )));
+    assert_eq!(source.request_sha256, standard.request_sha256);
+    assert_eq!(source.mailing_details_read_failed, Some(cause));
+    let note = source
+        .notes()
+        .into_iter()
+        .find(|note| note.kind == SourceNoteKind::MailingDetailsReadFailed)
+        .expect("the failed mailing read's note");
+    assert!(note.text.contains("could not be read"), "{}", note.text);
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let bytes = render_party_ledger_master_xlsx(
+        &workbook,
+        DecisionInput::Unavailable(DecisionsUnavailable::StoreUnavailable),
+    )
+    .unwrap();
+    assert!(bytes.starts_with(b"PK"), "an xlsx archive");
+}
+
 /// bridge#2214: the mailing pair's first post answers and its second is declared past the
 /// response cap. The book is read again with the standard request, as after a first post that
 /// failed, and the first post's completed answer is kept in the read's evidence: where that

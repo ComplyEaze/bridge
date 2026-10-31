@@ -350,6 +350,8 @@ fn every_refusal_has_its_own_code() {
         StockQueryError::NameInvalid,
         StockQueryError::QuantityUnparseable,
         StockQueryError::LineRepeated,
+        StockQueryError::GroupsWithoutLines,
+        StockQueryError::UnitsDiffer,
     ]
     .map(StockQueryError::code);
     let distinct: std::collections::HashSet<_> = codes.iter().collect();
@@ -604,5 +606,118 @@ fn unmeasured_shapes_refuse_and_either_group_order_reads() {
     );
     assert!(
         matches!(parse_stock_query(&soda), Ok(StockQueryAnswer::Lines(lines)) if lines.len() == 2)
+    );
+}
+
+/// A name or quantity holding a raw control character, or one that hides or reorders the text
+/// around it, raw or as a legal reference, is refused: the sanitiser marks only the reference form
+/// of a forbidden character, so the raw form reached the parser before. A joiner, which Indic
+/// spelling needs, is read.
+#[test]
+fn a_hidden_character_in_a_name_or_quantity_refuses() {
+    let kit = answer("r-03-stock-query-cleaning-kit-a");
+    let soda = answer("r-09-stock-query-soda-ash-light");
+    let batch = "<STQBATCHNAME>K-2504-A</STQBATCHNAME>";
+    let godown = "<STQGODOWNNAME>Factory Floor</STQGODOWNNAME>";
+    let quantity = "<STQGODOWNQTY>-13 Nos</STQGODOWNQTY>";
+    let cases = [
+        (
+            damaged(
+                &kit,
+                batch,
+                "<STQBATCHNAME>\u{4} Primary Batch</STQBATCHNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &soda,
+                godown,
+                "<STQGODOWNNAME>Factory\u{200B} Floor</STQGODOWNNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &soda,
+                godown,
+                "<STQGODOWNNAME>Factory&#8203; Floor</STQGODOWNNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &kit,
+                batch,
+                "<STQBATCHNAME>\u{FEFF}K-2504-A</STQBATCHNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &soda,
+                godown,
+                "<STQGODOWNNAME>Factory\u{202E} Floor</STQGODOWNNAME>",
+                1,
+            ),
+            StockQueryError::NameInvalid,
+        ),
+        (
+            damaged(
+                &kit,
+                quantity,
+                "<STQGODOWNQTY>-13\u{FEFF} Nos</STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+        (
+            damaged(
+                &kit,
+                quantity,
+                "<STQGODOWNQTY>-13 Nos\u{7}</STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+    ];
+    for (text, expected) in cases {
+        assert_eq!(parse_stock_query(&text), Err(expected), "{text:?}");
+    }
+    let joined = "\u{915}\u{94D}\u{200D}\u{937} Godown";
+    let read = parse_stock_query(&damaged(
+        &soda,
+        godown,
+        &format!("<STQGODOWNNAME>{joined}</STQGODOWNNAME>"),
+        1,
+    ));
+    assert!(
+        matches!(&read, Ok(StockQueryAnswer::Lines(lines)) if lines.iter().any(|line| line.godown == joined)),
+        "{read:?}"
+    );
+}
+
+/// A group with no line after it, and lines in two units, are refused: no capture holds either.
+/// Read as no lines, a group alone could not be told from a name Tally does not know; summed, lines
+/// in two units are no quantity.
+#[test]
+fn a_group_without_a_line_and_lines_in_two_units_refuse() {
+    let zero = answer("r-11-stock-query-zero-stock-item");
+    let kit = answer("r-03-stock-query-cleaning-kit-a");
+    let line = " <STQGODOWNNAME>Main Location</STQGODOWNNAME>\r\n <STQBATCHNAME>Primary Batch</STQBATCHNAME>\r\n <STQGODOWNQTY>-50.000 Kgs</STQGODOWNQTY>\r\n";
+    assert_eq!(
+        parse_stock_query(&damaged(&zero, line, "", 1)),
+        Err(StockQueryError::GroupsWithoutLines)
+    );
+    assert_eq!(
+        parse_stock_query(&damaged(&kit, "-13 Nos", "-13 Box", 1)),
+        Err(StockQueryError::UnitsDiffer)
+    );
+    assert!(
+        matches!(parse_stock_query(&zero), Ok(StockQueryAnswer::Lines(lines)) if lines.len() == 1)
     );
 }

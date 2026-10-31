@@ -390,7 +390,7 @@ fn scan_leases(report: &mut Report, root: &Path, coordination: &[&Path]) {
 const DATA_FOLDER_UNREADABLE: &str = "data_folder_unreadable";
 
 /// The import journal's file name in the data folder.
-const JOURNAL_FILE: &str = "agent-import-ledger.jsonl";
+pub(super) const JOURNAL_FILE: &str = "agent-import-ledger.jsonl";
 
 /// The lease folder under each coordination root (`endpoint_coordination`).
 const LEASES_FOLDER: &str = "native-dispatch-leases";
@@ -479,33 +479,59 @@ fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
     Some(rest.as_path().to_path_buf())
 }
 
+/// The copies of a folder inside Store apps' packages.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum PackageCopies {
+    /// The folder is not under `%LOCALAPPDATA%`, so Windows keeps no copy of it.
+    NotUnderLocalAppData,
+    /// The packages folder exists and could not be listed: a copy may exist.
+    NotListed,
+    /// Each copy that exists, in name order; none when there is no packages folder.
+    Found(Vec<PathBuf>),
+}
+
 /// The copies of `folder` inside Store apps' packages, for a folder under
 /// `local_app_data`: `<local_app_data>\Packages\<package>\LocalCache\Local\<the
 /// rest>`, where Windows puts the new files a process inside that package
-/// creates under AppData (#1459, #2233). Each existing one, by name;
-/// `"not_under_local_app_data"` for a folder set elsewhere, `"not_listed"`
-/// when the packages folder cannot be listed.
-fn package_copies(local_app_data: &Path, folder: &Path) -> serde_json::Value {
+/// creates under AppData (#1459, #2233).
+pub(super) fn package_copy_folders(local_app_data: &Path, folder: &Path) -> PackageCopies {
     let Some(rest) =
         relative_to(local_app_data, folder).filter(|rest| !rest.as_os_str().is_empty())
     else {
-        return serde_json::json!("not_under_local_app_data");
+        return PackageCopies::NotUnderLocalAppData;
     };
-    let Ok(packages) = fs::read_dir(local_app_data.join("Packages")) else {
-        return serde_json::json!("not_listed");
+    let packages = match fs::read_dir(local_app_data.join("Packages")) {
+        Ok(packages) => packages,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return PackageCopies::Found(Vec::new())
+        }
+        Err(_) => return PackageCopies::NotListed,
     };
-    let mut found: Vec<String> = packages
+    let mut found: Vec<PathBuf> = packages
         .filter_map(Result::ok)
         .map(|package| package.path().join("LocalCache").join("Local").join(&rest))
         .filter(|copy| copy.is_dir())
-        .map(|copy| copy.display().to_string())
         .collect();
     found.sort();
-    serde_json::json!(found)
+    PackageCopies::Found(found)
+}
+
+/// [`package_copy_folders`] for the report: each copy by name,
+/// `"not_under_local_app_data"` for a folder set elsewhere, `"not_listed"`
+/// when the packages folder cannot be listed.
+fn package_copies(local_app_data: &Path, folder: &Path) -> serde_json::Value {
+    match package_copy_folders(local_app_data, folder) {
+        PackageCopies::NotUnderLocalAppData => serde_json::json!("not_under_local_app_data"),
+        PackageCopies::NotListed => serde_json::json!("not_listed"),
+        PackageCopies::Found(found) => serde_json::json!(found
+            .iter()
+            .map(|copy| copy.display().to_string())
+            .collect::<Vec<_>>()),
+    }
 }
 
 /// `%LOCALAPPDATA%`, where Store apps keep their package copies (Windows only).
-fn local_app_data() -> Option<PathBuf> {
+pub(super) fn local_app_data() -> Option<PathBuf> {
     #[cfg(windows)]
     {
         std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
@@ -544,7 +570,7 @@ fn read_journal_once(path: &Path) -> Journal {
 /// line, so a failed read is tried once more (after `between`, 100 ms in the
 /// report) before it is reported. A record rolled back after a failed append may
 /// be counted once: this is a report.
-fn read_journal(root: &Path, between: impl FnOnce()) -> Journal {
+pub(super) fn read_journal(root: &Path, between: impl FnOnce()) -> Journal {
     let path = root.join(JOURNAL_FILE);
     let first = read_journal_once(&path);
     if matches!(
@@ -805,4 +831,4 @@ fn exit_status(report: &Report, printed: bool) -> i32 {
 
 #[cfg(test)]
 #[path = "agent_import_local_data_tests.rs"]
-mod tests;
+pub(super) mod tests;

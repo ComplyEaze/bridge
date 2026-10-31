@@ -984,6 +984,11 @@ pub(crate) enum UnderLockRefusal {
     /// before the person was asked.
     #[error("{0}")]
     Transfers(&'static str),
+    /// A Store package's copy of the data folder holds a second import journal,
+    /// or whether it does could not be told, found again after the approval
+    /// dialog (#2233). The field is the cause; nothing was recorded or sent.
+    #[error("import_journal_split")]
+    JournalSplit(&'static str),
 }
 
 impl UnderLockRefusal {
@@ -1005,6 +1010,7 @@ impl UnderLockRefusal {
             Self::MasterJournalUnavailable => "master_ledger_unavailable",
             Self::CompanyStopped => "invoice_company_stopped",
             Self::Transfers(reason) => reason,
+            Self::JournalSplit(_) => "import_journal_split",
         }
     }
 }

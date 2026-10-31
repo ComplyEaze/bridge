@@ -272,7 +272,7 @@ measured (4,902 bytes: a party with two short dated entries; UNVERIFIED for a po
 or longer address lines is larger), so a read holds at most 3,200 ledgers
 (the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
 refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
-repeat `include_mailing_details` on later pages. Measured on one synthetic book (TallyPrime 7.1, and 7.2 for a second dated entry
+repeat `include_mailing_details` on later pages. Measured on synthetic books (TallyPrime 7.1, and 7.2 for a second dated entry
 on one party, oldest first, and in lab row 2074-L for ten dated entries on one party, at about 924 bytes each beyond the
 first); an entry with no date, a book of many populated parties and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
 local file, names the mailing details only where the whole read is estimated to fit their bound: a
@@ -282,9 +282,10 @@ with one more entry allowed for each alteration beyond them (#2074). These are a
 bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490; its header
 then says that no ledger's mailing details were observed and the status column reads not observed. A counted book that
 the standard request exported before can now be sent the larger mailing request. Where that read fails by its deadline
-or size, the workbook reads the book once more with the standard request, after waiting at most a minute for a cut read
-to drain, and its header says the larger read failed (#2214). Where its answer broke off, or Tally was still working after
-that wait, the export fails and its error says the mailing addresses were part of the failed read. `ledger_masters` with
+or size, the workbook reads the book once more with the standard request, after waiting at most about a minute for a cut
+read to drain, and its header says the larger read failed (#2214). While it waits, the desktop app's other reads of that
+Tally wait behind it. Where its answer broke off, or Tally was still working after that wait, the export fails and its
+error says the mailing addresses were part of the failed read. The retry has not been run against Tally. `ledger_masters` with
 `include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default

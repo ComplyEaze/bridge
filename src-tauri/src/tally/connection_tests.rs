@@ -1854,12 +1854,16 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     );
 }
 
-/// The mailing marker carries how the read failed, decided by the transport's own error; only
-/// a deadline or the response cap send the export's read again without the details, and a
-/// failure that is none of these is not marked (bridge#2214).
+/// The mailing marker carries how the read failed, decided by the master post's own transport
+/// error; only a deadline or the response cap send the export's read again without the details,
+/// and a failure that is none of these is not marked (bridge#2214). A `/status` check of the
+/// pair that failed is not the post's failure, though it sits in the same chain.
 #[test]
 fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
-    use super::{mailing_details_read_error, MailingDetailsReadFailed, MailingReadFailure as F};
+    use super::{
+        mailing_details_read_error, MailingDetailsReadFailed, MailingReadFailure as F,
+        PairedNativeReportResponseFailure,
+    };
     use bridge_tally_transport::TallyTransportError as T;
     let limit = bridge_tally_transport::XML_RESPONSE_MAX_BYTES;
     for (error, cause, again) in [
@@ -1889,14 +1893,36 @@ fn a_mailing_read_failure_is_marked_by_its_transport_cause() {
         (T::ConnectionFailed, None, false),
         (T::HttpStatus { status: 503 }, None, false),
     ] {
-        let marked = mailing_details_read_error(anyhow::Error::new(error));
-        let found = marked
-            .chain()
-            .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
-            .map(MailingDetailsReadFailed::cause);
-        assert_eq!(found, cause, "{marked:#}");
-        assert_eq!(found.is_some_and(F::read_again_without_details), again);
+        let found = |error: anyhow::Error| {
+            mailing_details_read_error(error)
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+                .map(MailingDetailsReadFailed::cause)
+        };
+        let posted = found(anyhow::Error::new(PairedNativeReportResponseFailure::new(
+            anyhow::Error::new(error.clone()),
+        )));
+        assert_eq!(posted, cause, "{error:?}");
+        assert_eq!(posted.is_some_and(F::read_again_without_details), again);
+        // The same transport error from the pair's health check, not from its post.
+        let checked = anyhow::Error::new(error.clone())
+            .context("Tally health check between paired native report reads failed");
+        assert_eq!(found(checked), None, "{error:?}");
     }
+}
+
+/// The export waits at most a minute for a cut mailing read to drain; a unit test keeps to 3 s
+/// so it reaches the bound in seconds (bridge#2214).
+#[test]
+fn the_export_waits_at_most_a_minute_for_a_cut_mailing_read_to_drain() {
+    assert_eq!(
+        super::MAILING_RETRY_DRAIN_WAIT_UNVERIFIED,
+        std::time::Duration::from_secs(60)
+    );
+    assert_eq!(
+        super::mailing_retry_drain_wait(),
+        std::time::Duration::from_secs(3)
+    );
 }
 
 /// By the mark alone, the party/ledger master export asks for the mailing details only where
@@ -1973,6 +1999,10 @@ fn the_export_takes_the_mailing_details_where_the_counted_ledgers_fit_their_boun
     let nine = 9 + (budget - 9 * per_counted) / per_entry;
     assert_eq!(Ask.resolved_for_count(9, nine), WithMailingDetails);
     assert_eq!(Ask.resolved_for_count(9, nine + 1), Standard);
+    // A book whose estimate is the budget exactly is given the details; one entry more is not.
+    assert_eq!(2 * per_counted + (13_319 - 2) * per_entry, budget);
+    assert_eq!(Ask.resolved_for_count(2, 13_319), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_count(2, 13_320), Standard);
     // 3,000 ledgers in a book near the catalogue's limit could hold more entries than fit.
     assert_eq!(Ask.resolved_for_count(3_000, 22_857), Standard);
     // A count is taken only for a mark past the standard bound; a read the mailing request is

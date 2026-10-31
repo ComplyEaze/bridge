@@ -435,12 +435,13 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
         "ComplyEaze Bridge withheld the party/ledger master: {}",
         mapped.message
     );
-    // A master read that asked for each party's mailing details too and timed
-    // out or came back too large is named as that larger read: the export decides
-    // to ask for them on an allowance (bridge#2074). The marker is set only for
-    // those failures, so the code does not decide it. Such a read that ran out of
-    // time or past its size limit is read again without them (bridge#2214), so
-    // one reaches here only when its answer broke off, or when Tally was still
+    // A master read that asked for each party's mailing details too and whose
+    // answer took too long, came back too large, broke off or could not be read
+    // is named as that larger read: the export decides to ask for them on an
+    // allowance (bridge#2074). The marker is set only for those failures, so the
+    // code does not decide it. Such a read that ran out of time or past its size
+    // limit is read again without them (bridge#2214), so one reaches here only
+    // when its answer broke off or could not be read, or when Tally was still
     // working on it past the export's wait.
     if mailing_read_failed {
         mapped
@@ -459,7 +460,7 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
 
 /// What a CA is told when a party/ledger master read that asked for the mailing
 /// details failed (bridge#2074).
-const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them. ComplyEaze Bridge asks for them only where it estimates the answer fits, and for this company the estimate may have been too low.";
+const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them.";
 const MAILING_DETAILS_READ_FAILED_REMEDIATION: &str = "Do not retry the unchanged export at once: it sends the same larger read. Try again once Tally is less busy; if its answer breaks off again, report it to ComplyEaze Bridge, which reads the workbook again without the mailing addresses only when the larger read runs out of time or past its size limit.";
 /// What a CA is also told when Tally was still working on that read when the
 /// export's wait for it ended, so the book was not read again (bridge#2214).

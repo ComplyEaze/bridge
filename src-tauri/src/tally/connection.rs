@@ -106,8 +106,8 @@ fn party_ledger_master_openings_agree(
 }
 
 /// A master read that asked Tally for each ledger's dated mailing details and
-/// timed out or ran too large (bridge#2074), so the export can say that the
-/// larger request is what failed.
+/// whose answer took too long, ran too large, broke off or could not be read
+/// (bridge#2074), so the export can say that the larger request is what failed.
 /// Its text is the failure's own, so every reading of the error's message is as
 /// it was; only its type marks the read.
 #[derive(Debug, thiserror::Error)]
@@ -182,11 +182,17 @@ impl MailingReadFailure {
 /// Marks a master read that asked for the mailing details and whose answer ran
 /// too long, keeping the read evidence a failed pair carries at the chain's
 /// root, as [`parent_part_response_error`] does. Any other failure is returned
-/// as it is.
+/// as it is. The cause is the master post's own failure: the pair's `/status`
+/// checks fail in the same chain, and a slow check is not the mailing answer's.
 pub(crate) fn mailing_details_read_error(error: anyhow::Error) -> anyhow::Error {
     let Some(cause) = error
         .chain()
-        .find_map(|cause| MailingReadFailure::of(cause.downcast_ref::<TallyTransportError>()?))
+        .find_map(|cause| cause.downcast_ref::<PairedNativeReportResponseFailure>())
+        .and_then(|post| {
+            post.0.chain().find_map(|cause| {
+                MailingReadFailure::of(cause.downcast_ref::<TallyTransportError>()?)
+            })
+        })
     else {
         return error;
     };
@@ -223,12 +229,19 @@ pub(crate) fn mailing_retry_held_by_drain(mailing: anyhow::Error) -> anyhow::Err
 /// sends only `/status` probes. UNVERIFIED on this read: a cut mailing read was
 /// never reached in the lab (2214 lab row: Tally declared every oversize, which
 /// owes no drain). It rests on the outstandings drains, which ran 8.9 s to
-/// 25.4 s past a 20 s cut, so 60 s covers about twice the longest. A unit test
-/// reaches the bound in 3 s instead.
-#[cfg(not(test))]
+/// 25.4 s past a 20 s cut, so 60 s covers about twice the longest. No try starts
+/// past it, but the last one can spend its own drain probes, about 11 s more.
 const MAILING_RETRY_DRAIN_WAIT_UNVERIFIED: std::time::Duration = std::time::Duration::from_secs(60);
-#[cfg(test)]
-const MAILING_RETRY_DRAIN_WAIT_UNVERIFIED: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// The wait a retry keeps to: [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], or 3 s in
+/// a unit test, so a test reaches the bound in seconds.
+const fn mailing_retry_drain_wait() -> std::time::Duration {
+    if cfg!(test) {
+        std::time::Duration::from_secs(3)
+    } else {
+        MAILING_RETRY_DRAIN_WAIT_UNVERIFIED
+    }
+}
 
 /// The paired sources answered successfully but cannot be reconciled into one
 /// safe workbook source. This is distinct from endpoint or XML failure.
@@ -494,19 +507,24 @@ const COMPLIANCE_MASTER_BYTES_PER_LEDGER_UNVERIFIED: u64 = 3_750;
 /// above) with two entries is about 5,190 bytes, over the figure; so is a party with
 /// three entries (about 950 more each, extrapolated) or with longer address lines,
 /// and a book of such parties can still be admitted and overrun. No such book has
-/// been read. The 20 s request deadline leaves no slack over the 16 MB budget, so
-/// an under-estimate can be an abandoned read, not only a refusal. It was 4,700
-/// before the second entry was measured.
+/// been read. An under-estimate is a read that fails, not only a refusal. On the
+/// one book read with many entries a party (protocol reference §8.4, lab row
+/// 2214), the 32 MiB response cap came first, not the 20 s deadline: an entry
+/// added about 940 bytes and 0.13 ms. A book of slower rows may time out instead.
+/// It was 4,700 before the second entry was measured.
 const COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED: u64 = 5_000;
 
 // A further dated mailing entry's cost, and how many entries a counted ledger
-// is allowed that the master mark does not show (bridge#2074). Each is an
-// allowance from one observation (lab row 2074-L, TallyPrime 7.2, 2026-10-30;
-// partial), not a bound. A4: nine further entries on one party cost 923.6 bytes
-// each, short two-line addresses, and 1,200 leaves about 30 percent over that.
-// A4b: one save of five dated entries moved the mark by one, so the mark missed
-// four of them; a party given its history in one save can hold more than four,
-// and a longer address costs more, so a book can still be admitted and overrun.
+// is allowed that the master mark does not show (bridge#2074; protocol
+// reference §8.4). Each is an allowance, not a bound. A4 of lab row 2074-L
+// (partial): nine further entries on one party cost 923.6 bytes each, short
+// two-line addresses, and 1,200 leaves about 30 percent over that. A4b: one save
+// of five dated entries moved the mark by one, so the mark missed four of them.
+// Lab row 2214 created parties with about 200 entries each, one create apiece,
+// and each moved the mark by one: about fifty times the four allowed. A party
+// given its history in one save can hold more than four, and a longer address
+// costs more, so a book can still be admitted and overrun; the export then reads
+// it again without the details (bridge#2214).
 const MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED: u64 = 1_200;
 const MAILING_DETAILS_UNSEEN_ENTRIES_PER_LEDGER_UNVERIFIED: u64 = 4;
 
@@ -2504,10 +2522,13 @@ impl TallyClient {
     /// (bridge#2214). A cut mailing read can leave Tally working on it: the
     /// transport then probes `/status` before the send, and refuses it as
     /// draining while Tally does not answer them, before anything is sent. Each
-    /// such refusal is waited out and the read tried again, within
-    /// [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`] in all; past it, the export fails
-    /// with the mailing read's own failure, `mailing`. Any other failure of the
-    /// standard read is returned as itself, with no mailing marker.
+    /// such refusal is waited out and the read tried again, starting no try once
+    /// [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`] has passed; past it, the export
+    /// fails with the mailing read's own failure, `mailing`. Any other failure of
+    /// the standard read is returned as itself, with no mailing marker. The wait
+    /// holds this process's queue for the endpoint (the runtime's gate), so
+    /// another operation on it waits behind the export, up to its own queue
+    /// deadline; the wire lock other processes share is not held while waiting.
     #[allow(clippy::too_many_arguments)]
     async fn read_party_ledger_master_parts_once_drained(
         &self,
@@ -2550,7 +2571,7 @@ impl TallyClient {
                 }
                 _ => return Err(error),
             };
-            if started.elapsed() + wait > MAILING_RETRY_DRAIN_WAIT_UNVERIFIED {
+            if started.elapsed() + wait > mailing_retry_drain_wait() {
                 return Err(mailing_retry_held_by_drain(mailing));
             }
             tokio::time::sleep(wait).await;

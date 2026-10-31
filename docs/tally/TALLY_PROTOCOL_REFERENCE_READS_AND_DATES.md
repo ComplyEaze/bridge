@@ -880,21 +880,35 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   that did not name it. By ledger row (UTF-16 bytes, counted by structure): the one party that holds an address grew
   from 3,010 to 3,958 (its mailing element is 934 bytes), and each of the other seven rows by 122 (an empty element is
   108 bytes). A second entry on that party was then measured (TallyPrime 7.2, 2026-10-29, `lab/1490-mailing-captures-answers`): the answer grew from 20,896 to 21,840 bytes, so the second entry added 944 bytes and the party's row is 4,902; the eight ledgers average 2,612 bytes a ledger with one entry (20,896 / 8) and 2,730 with two (21,840 / 8). Bridge's per-ledger budget for a read that names the list is
-  5,000 bytes (above that largest row; it was 4,700 before the second entry was measured) against 3,750 for one that does not (UNVERIFIED: a party with three entries, longer address lines or a book of many populated parties has not been read). `ledger_masters` sends it only when asked (`include_mailing_details`, refused with `include_gst_details` because the request naming both has not been captured).
-- **An answer past the response cap is refused at its head, owes no drain, and the standard read after it answers
-  whole. PARTIAL: TallyPrime 7.2 Silver, 2026-10-30, one synthetic book, one sitting
-  (`lab/2214-mailing-cut-drain-answers`).** Parties holding many dated mailing entries were added to the book step by
-  step. The mailing master answer grew by about 940 bytes an entry and answered whole at every step up to about 32,000
-  entries (about 30 MB), never reaching the 20 s limit. At about 40,000 entries (an answer of about 37.6 MB) Tally
-  declared the answer's length in its head, so Bridge refused it there, about 5 s into the post, as past its 32 MiB cap
-  (`ResponseTooLarge`, declared by the peer), with no drain owed. A standard read sent about half a second later
-  answered whole, every row equal to the read at rest and the marks unchanged, in three of three tries. A mailing read
-  cut at the 20 s limit, and the drain after one, were not reached on this book. After either failure the party/ledger
-  master export reads the book once more with the standard request (#2214).
+  5,000 bytes (above that largest row; it was 4,700 before the second entry was measured) against 3,750 for one that does not (UNVERIFIED: longer address lines and a book of many populated parties with short histories have not been read; parties of ten entries and of about 200 are read below). `ledger_masters` sends it only when asked (`include_mailing_details`, refused with `include_gst_details` because the request naming both has not been captured).
+- **A further entry costs about 924 bytes, and one save of several entries moves the master mark by one. PARTIAL:
+  TallyPrime 7.2 Silver, 2026-10-30, one synthetic book of 11 ledgers, one sitting
+  (`lab/2074-mailing-by-count-answers`).** Ten dated entries keyed on one party, one save each, with two-line
+  addresses, added 923.6 bytes a further entry to the read (A4); the first entry added 816. A second party created on
+  Tally's screen with five dated entries in one save moved the master-alteration mark by one (A4b), so the mark does
+  not show four of them. The mark moved by one for each save and each alteration (4,164 alterations, from 236 to
+  4,400), and every entry read back exactly as keyed, oldest first. At a mark of 4,400 with 13 ledgers the count path
+  read the book whole, in one part (A6). The party/ledger master export's count allowance (1,200 bytes a further entry
+  and four entries a ledger the mark does not show) rests on these; the workbook itself was not read in this row.
+- **An answer past the response cap is refused at its head and owes no drain, and a standard read sent after it
+  answers whole. PARTIAL: TallyPrime 7.2 Silver, 2026-10-30, one synthetic book, one sitting
+  (`lab/2214-mailing-cut-drain-answers`).** 201 parties with about 200 dated entries each were created by import,
+  one create a party, and each create moved the master mark by one: about fifty times the four entries a ledger the
+  allowance above gives the mark's undercount. The mailing master answer grew by about 940 bytes an entry and answered
+  whole at every step up to about 32,000 entries (about 30 MB), never reaching the 20 s limit; at this cost a 20 s
+  cut would need more than three times the entries that passed the cap. At about 40,000 entries (an answer of about 37.6 MB) the read
+  was refused as past Bridge's 32 MiB cap, 3.4 s to 5.4 s into the post, with no drain owed. Tally declared the
+  length in the head (measured on a capped `curl` of the same request), which is why nothing was owed. A separate
+  standard `ledger_masters` call sent about half a second later answered whole, every row equal to the standard read
+  at the same state and the marks unchanged, in three of three tries. A mailing read cut at the 20 s limit, and the
+  drain after one, were not reached on this book. After a deadline or the cap, the party/ledger master export reads
+  the book once more with the standard request inside the same operation, after waiting for a cut read's drain for at
+  most a minute (#2214); that retry itself has not been run against Tally.
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally
   sends them, was not measured there: Bridge sorts by `APPLICABLEFROM` and reads the one in force on a date), an entry with no
   `APPLICABLEFROM`, another release, Gold, and any answer larger than eight ledgers. The 7.2 read above has two entries on one
-  party, sent oldest first; three or more entries, an entry with no date and a book of many populated parties are not measured.
+  party, sent oldest first. Lab rows 2074-L (ten entries on one party) and 2214 (about 200 on each of 201 parties) read more, below;
+  an entry with no date, longer addresses and other releases are not measured.
 
 Bridge reads the list into a dated history (`compliance.mailing_details` of `ledger_masters` with `include_mailing_details`, and the mailing columns of
 the party/ledger master workbook) and leaves the flat fields as returned. A response that carries no such element is

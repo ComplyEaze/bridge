@@ -271,6 +271,28 @@ async fn truncated_declared_body_is_never_partial_success() {
     simulator.finish().expect("finish truncated simulator");
 }
 
+/// A body that stalls after its head is cut by the same deadline, and told as one (#2214: the
+/// party/ledger master export reads again only after a deadline or the response cap).
+#[tokio::test]
+async fn whole_request_deadline_covers_a_body_that_stalls_after_its_head() {
+    let (simulator, result) = post_synthetic(
+        // Chunks of 32 bytes, as the wire-gate test reads: the first carries the encoding's mark.
+        ScenarioPlan::new(Fixture::ExportStatusOne)
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_delivery(Delivery::SlowBody {
+                chunk_bytes: 32,
+                delay: Duration::from_millis(150),
+            }),
+        Some(policy(1024, Duration::from_millis(30))),
+        "<E />",
+    )
+    .await;
+    let error = result.expect_err("a stalled body must time out");
+    assert_eq!(error, TallyTransportError::RequestTimedOut);
+    simulator.cancel();
+    simulator.finish().expect("cancel slow simulator");
+}
+
 #[tokio::test]
 async fn whole_request_deadline_covers_slow_headers() {
     let (simulator, result) = post_synthetic(

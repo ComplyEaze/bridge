@@ -1206,7 +1206,11 @@ fn desktop_messages_name_the_product_in_full() {
 /// the read is sent, and tested there.
 #[test]
 fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
-    use crate::tally::connection::mailing_details_read_error as marked;
+    use crate::tally::connection::{
+        mailing_details_read_error as marked, PairedNativeReportResponseFailure,
+    };
+    // The marker reads the master post's own failure, which the paired read wraps.
+    let posted = |error| anyhow::Error::new(PairedNativeReportResponseFailure::new(error));
     use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
     use bridge_tally_transport::TallyTransportError;
     let failures = || {
@@ -1238,7 +1242,7 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
     }
     for (error, code) in failures() {
         let named = party_ledger_master_runtime_command_error(with_read_evidence(
-            marked(error),
+            marked(posted(error)),
             RuntimeReadEvidence::empty(),
         ));
         // The marker keeps the failure's own code and message, and adds the sentence.
@@ -1262,7 +1266,7 @@ fn a_failed_mailing_read_is_named_in_the_party_master_export_error() {
     // sentences, and the wait's remediation.
     for (error, code) in failures() {
         let held = party_ledger_master_runtime_command_error(with_read_evidence(
-            crate::tally::connection::mailing_retry_held_by_drain(marked(error)),
+            crate::tally::connection::mailing_retry_held_by_drain(marked(posted(error))),
             RuntimeReadEvidence::empty(),
         ));
         assert_eq!(held.code, code);

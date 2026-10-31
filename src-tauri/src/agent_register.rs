@@ -126,6 +126,9 @@ struct RegisterLedger {
     /// chain resolves to one. Reported for a voucher's party so a Debit Note to a customer can
     /// be told from a purchase return; it says nothing about which tax ledger is input or output.
     reserved: Option<String>,
+    /// The ledger's own parent group as named in the book, reported beside a ledger the GST
+    /// totals name so a CA can map it by the book's own sub-groups.
+    parent: Option<String>,
     tax_type: Option<String>,
     head: GstDutyHeadObservation,
 }
@@ -138,6 +141,9 @@ pub(super) struct MasterIndex {
     /// Ledgers the compliance read set aside by currency (foreign, or a base-currency
     /// ledger whose balance is a composite). A voucher that touches one cannot be classified.
     excluded: BTreeSet<String>,
+    /// Each ledger's GUID by name, so an answer names a ledger by what does not change with a
+    /// mask or a rename; empty where the listing carried none.
+    guids: BTreeMap<String, String>,
 }
 
 impl MasterIndex {
@@ -155,6 +161,7 @@ impl MasterIndex {
             let ledger = RegisterLedger {
                 group: ledger_group(&chain),
                 reserved: nearest_reserved(&chain),
+                parent: parent.clone(),
                 tax_type: record.fields.tax_type.returned_text().map(str::to_string),
                 head: record.fields.gst_duty_head.clone(),
             };
@@ -165,7 +172,16 @@ impl MasterIndex {
         Ok(Self {
             by_name,
             excluded: excluded.into_iter().collect(),
+            guids: BTreeMap::new(),
         })
+    }
+
+    pub(super) fn with_guids(self, guids: BTreeMap<String, String>) -> Self {
+        Self { guids, ..self }
+    }
+
+    pub(super) fn guid_of(&self, name: &str) -> Option<&str> {
+        self.guids.get(name).map(String::as_str)
     }
 
     pub(super) fn len(&self) -> usize {
@@ -514,6 +530,9 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
         if let Some(entries) = row.get_mut(list).and_then(Value::as_array_mut) {
             for entry in entries {
                 mark_entry_party_names(entry);
+                withhold_entry_bank_allocations(entry);
+                withhold_entry_goods_lines(entry);
+                withhold_entry_gst_details(entry);
             }
         }
     }
@@ -522,13 +541,16 @@ pub(super) fn mark_register_row(mut row: Value) -> Value {
 
 /// A side-list item names ledgers: the ones it could not place, and the Duties & Taxes ledgers
 /// the voucher touches; any of them can be named for a party.
-fn mark_register_side_item(mut item: Value) -> Value {
+pub(super) fn mark_register_side_item(mut item: Value) -> Value {
     if let Some(entries) = item
         .get_mut("unplaced_ledgers")
         .and_then(Value::as_array_mut)
     {
         for entry in entries {
             mark_entry_party_names(entry);
+            withhold_entry_bank_allocations(entry);
+            withhold_entry_goods_lines(entry);
+            withhold_entry_gst_details(entry);
         }
     }
     if let Some(names) = item
@@ -547,7 +569,7 @@ fn mark_register_side_item(mut item: Value) -> Value {
 /// The window was planned against the marks the masters were read under; the marks read after
 /// it must be those marks, or the book moved while the window was read. (An undivided window
 /// read reports no marks of its own, so this closing read is the check.)
-fn window_drift(pinned: CompanyMarks, closing: CompanyMarks) -> Option<&'static str> {
+pub(super) fn window_drift(pinned: CompanyMarks, closing: CompanyMarks) -> Option<&'static str> {
     (closing != pinned).then_some("voucher_window_changed_during_read")
 }
 
@@ -555,9 +577,9 @@ fn window_drift(pinned: CompanyMarks, closing: CompanyMarks) -> Option<&'static 
 /// decides a classification, and under the same marks. A voucher mark that moved is the
 /// window's problem, not the masters'.
 fn masters_drifted(first: &RegisterMasters, second: &RegisterMasters) -> Option<&'static str> {
-    if second.marks.vouchers != first.marks.vouchers {
+    if second.marks.vouchers() != first.marks.vouchers() {
         Some("voucher_window_changed_during_read")
-    } else if second.index != first.index || second.marks.masters != first.marks.masters {
+    } else if second.index != first.index || second.marks.masters() != first.marks.masters() {
         Some("ledger_snapshot_drifted")
     } else {
         None
@@ -637,6 +659,15 @@ fn paginate(rows: Vec<Value>, offset: usize, limit: usize) -> (Vec<Value>, bool,
     (page, truncated, next_offset)
 }
 
+/// What one register-shaped read saw: the masters it classifies against, the window's rows as
+/// read (not yet checked against the window's dates) and the window's label.
+pub(super) struct RegisterWindow {
+    pub(super) index: MasterIndex,
+    pub(super) rows: Vec<Value>,
+    pub(super) state: &'static str,
+    pub(super) reason: Option<&'static str>,
+}
+
 /// The masters as one read saw them, with the marks the read was pinned under.
 struct RegisterMasters {
     index: MasterIndex,
@@ -658,63 +689,14 @@ impl Server {
         }
         let (company, identity, mut evidence) = self.verified_company(guid).await?;
         let result: Result<ToolOutcome, ToolFailure> = async {
-            // The masters first, pinned under the marks of their own read; the window is then
-            // planned against those marks, and the company's marks are read once more after
-            // it. An undivided window read takes opening marks only, so this closing read is
-            // what shows a master or voucher that changed while the window was read.
-            let first = self.read_register_masters(&identity).await?;
-            evidence = combine_evidence(evidence.clone(), first.evidence.clone());
-            let window = self
-                .read_entry_window_shaped(
-                    &identity,
-                    &company.name,
-                    &from,
-                    &to,
-                    Some(first.marks),
-                    VoucherReadShape::ClassEntryWildcard,
-                    SmallBooks::Count,
-                )
+            let RegisterWindow {
+                index,
+                rows,
+                state,
+                reason,
+            } = self
+                .read_register_window(&identity, &company.name, (&from, &to), &mut evidence)
                 .await?;
-            evidence = combine_evidence(evidence.clone(), window.all_evidence());
-            let (marks_xml, closing_evidence, _) = self
-                .post_read_observing_boundary(&identity, company_high_water_read(&company.name))
-                .await?;
-            evidence = combine_evidence(evidence.clone(), closing_evidence);
-            let (vouchers, masters) = parse_company_marks(&marks_xml, identity.company_guid())?;
-            let closing = CompanyMarks { vouchers, masters };
-            if let Some(code) = window_drift(first.marks, closing) {
-                return Err(code.to_string().into());
-            }
-            // The two marks can be unchanged by an edit that does not move them (a duty head
-            // or a parent changed in Tally's own screens is unmeasured), so the masters are
-            // read again and must classify exactly as they did.
-            let second = self.read_register_masters(&identity).await?;
-            evidence = combine_evidence(evidence.clone(), second.evidence.clone());
-            if let Some(code) = masters_drifted(&first, &second) {
-                return Err(code.to_string().into());
-            }
-            // The window's label is the one rule `vouchers` and `voucher_presence` use
-            // (`window_read`, #985, #1031): a non-empty window is `complete` only when every
-            // row was admitted against a census of the window, and an empty one when its
-            // corroboration read confirms it. A row's own `status` is about how its entries
-            // classified and is not decided here.
-            let counted = window.counted();
-            let empty_window = if window.rows.is_empty() {
-                let (corroboration, partial, corroboration_reason) = self
-                    .corroborate_empty_voucher_read(
-                        &identity,
-                        &company.name,
-                        &from,
-                        &to,
-                        Some(first.marks),
-                    )
-                    .await?;
-                evidence = combine_evidence(evidence.clone(), corroboration);
-                Some((partial, corroboration_reason))
-            } else {
-                None
-            };
-            let (state, reason) = register_window_label(counted, empty_window);
             if state == "partial" {
                 evidence.state = "partial";
                 evidence.reason_code = reason.map(str::to_string);
@@ -727,8 +709,8 @@ impl Server {
                 truncated,
             } = register_result(
                 kind,
-                &first.index,
-                window.rows,
+                &index,
+                rows,
                 (from.as_str(), to.as_str()),
                 (offset, limit),
                 self.settings.redaction,
@@ -750,6 +732,75 @@ impl Server {
         result.map_err(|failure| failure.with_prior_evidence(evidence))
     }
 
+    /// The read every register-shaped tool makes, in one order: the masters, pinned under the
+    /// marks of their own read; the class-entry window, planned against those marks; the
+    /// company's marks once more after it (an undivided window read takes opening marks only,
+    /// so this closing read is what shows a master or voucher that changed while the window was
+    /// read); and the masters again, which must classify exactly as they did. Each read's
+    /// evidence is added to `evidence` as it is made, so a refusal carries what was read.
+    pub(super) async fn read_register_window(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company_name: &str,
+        (from, to): (&bridge_tally_core::TallyDate, &bridge_tally_core::TallyDate),
+        evidence: &mut Evidence,
+    ) -> Result<RegisterWindow, ToolFailure> {
+        let first = self.read_register_masters(identity).await?;
+        *evidence = combine_evidence(evidence.clone(), first.evidence.clone());
+        let window = self
+            .read_entry_window_shaped(
+                identity,
+                company_name,
+                from,
+                to,
+                Some(first.marks),
+                VoucherReadShape::ClassEntryWildcard,
+                SmallBooks::Count,
+            )
+            .await?;
+        *evidence = combine_evidence(evidence.clone(), window.all_evidence());
+        let (marks_xml, closing_evidence, _) = self
+            .post_read_observing_boundary(identity, company_high_water_read(company_name))
+            .await?;
+        *evidence = combine_evidence(evidence.clone(), closing_evidence);
+        let (vouchers, masters) =
+            parse_company_marks_as_answered(&marks_xml, identity.company_guid())?;
+        let closing = CompanyMarks::new(vouchers, masters);
+        if let Some(code) = window_drift(first.marks, closing) {
+            return Err(code.to_string().into());
+        }
+        // The two marks can be unchanged by an edit that does not move them (a duty head or a
+        // parent changed in Tally's own screens is unmeasured), so the masters are read again
+        // and must classify exactly as they did.
+        let second = self.read_register_masters(identity).await?;
+        *evidence = combine_evidence(evidence.clone(), second.evidence.clone());
+        if let Some(code) = masters_drifted(&first, &second) {
+            return Err(code.to_string().into());
+        }
+        // The window's label is the one rule `vouchers` and `voucher_presence` use
+        // (`window_read`, #985, #1031): a non-empty window is `complete` only when every row
+        // was admitted against a census of the window, and an empty one when its corroboration
+        // read confirms it. A row's own `status` is about how its entries classified and is not
+        // decided here.
+        let counted = window.counted();
+        let empty_window = if window.rows.is_empty() {
+            let (corroboration, partial, corroboration_reason) = self
+                .corroborate_empty_voucher_read(identity, company_name, from, to, Some(first.marks))
+                .await?;
+            *evidence = combine_evidence(evidence.clone(), corroboration);
+            Some((partial, corroboration_reason))
+        } else {
+            None
+        };
+        let (state, reason) = register_window_label(counted, empty_window);
+        Ok(RegisterWindow {
+            index: first.index,
+            rows: window.rows,
+            state,
+            reason,
+        })
+    }
+
     /// One fresh compliance read of the ledger masters, classified, with the marks of the
     /// extent the read was pinned under.
     async fn read_register_masters(
@@ -768,24 +819,25 @@ impl Server {
             )
             .await
             .map_err(|error| ToolFailure::from_runtime("party_ledger_master_read_failed", error))?;
-        let marks = CompanyMarks {
-            vouchers: listing
+        let marks = CompanyMarks::new(
+            listing
                 .extent
                 .voucher_alter_id_high_water()
-                .map_or(0, |mark| mark.get()),
-            masters: listing
+                .map(|mark| mark.get()),
+            listing
                 .extent
                 .master_alter_id_high_water()
                 .map(|mark| mark.get())
                 .ok_or_else(|| ToolFailure::from("register_master_mark_unavailable".to_string()))?,
-        };
+        );
         let groups = GroupIndex::build(listing.groups);
         let excluded = listing
             .foreign_currency_ledgers_excluded
             .into_iter()
             .map(|ledger| ledger.ledger)
             .chain(listing.mixed_currency_ledgers_excluded);
-        let index = MasterIndex::build(listing.records.iter(), &groups, excluded)?;
+        let index = MasterIndex::build(listing.records.iter(), &groups, excluded)?
+            .with_guids(listing.ledger_guids);
         Ok(RegisterMasters {
             index,
             marks,
@@ -808,6 +860,9 @@ fn register_window_label(
         (WindowRead::Partial, reason) => ("partial", reason),
     }
 }
+
+#[path = "agent_gst_by_ledger.rs"]
+pub(in crate::agent) mod gst_by_ledger;
 
 #[cfg(test)]
 #[path = "agent_register_tests.rs"]

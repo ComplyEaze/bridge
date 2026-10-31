@@ -109,13 +109,12 @@ impl ValidatedDateRange {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadOnlyProfileId {
-    CompanyListV1,
     CompanyListV2,
     CompanyBookExtentV2,
     StandardLedgerIdentityV1,
     StandardLedgerCatalogV1,
     StandardLedgerCatalogV2,
-    LedgersV1,
+    StandardLedgerCatalogV3,
     AuditCompanyObjectV1,
     InvoiceCompanyHsnV1,
     AuditLedgersV1,
@@ -126,13 +125,12 @@ pub enum ReadOnlyProfileId {
 impl ReadOnlyProfileId {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::CompanyListV1 => "company_list_v1",
             Self::CompanyListV2 => "company_list_v2",
             Self::CompanyBookExtentV2 => "company_book_extent_v2",
             Self::StandardLedgerIdentityV1 => "standard_ledger_identity_v1",
             Self::StandardLedgerCatalogV1 => "standard_ledger_catalog_v1",
             Self::StandardLedgerCatalogV2 => "standard_ledger_catalog_v2",
-            Self::LedgersV1 => "ledgers_v1",
+            Self::StandardLedgerCatalogV3 => "standard_ledger_catalog_v3",
             Self::AuditCompanyObjectV1 => "audit_company_object_v1",
             Self::InvoiceCompanyHsnV1 => "invoice_company_hsn_v1",
             Self::AuditLedgersV1 => "audit_ledgers_v1",
@@ -148,29 +146,29 @@ impl ReadOnlyProfileId {
         sha256_hex(&encode_tally_xml_request_utf16le(&self.template()))
     }
 
-    /// Whether this profile must not be sent to an Education-mode Tally. Only
-    /// `ledgers_v1` is: a custom report (`TYPE=Data`) whose `$$` function takes
-    /// a spaced identifier (IMPLEMENTATION_GUIDE I1). Education answered it
+    /// Whether this profile must not be sent to an Education-mode Tally: a
+    /// custom report (`TYPE=Data`) whose `$$` function takes a spaced
+    /// identifier (IMPLEMENTATION_GUIDE I1). Education answered such a read
     /// with a blocking dialog on the Tally screen, which holds the XML gateway
-    /// until someone dismisses it (bridge#45). A caller that knows the endpoint
-    /// is in Education must refuse such a read before sending it, with
-    /// [`EDUCATION_REPORT_FAMILY_UNSUPPORTED`]. A test renders every profile
-    /// and checks this against [`first_spaced_function_argument`].
+    /// until someone dismisses it (bridge#45). No profile is one since
+    /// `ledgers_v1` was deleted (#1570). A test renders every profile and
+    /// checks this against [`first_spaced_function_argument`], so a new
+    /// profile of that kind fails until it is listed here and a caller refuses
+    /// it with [`EDUCATION_REPORT_FAMILY_UNSUPPORTED`].
     pub fn education_refuses_report_formula(self) -> bool {
-        matches!(self, Self::LedgersV1)
+        false
     }
 
     /// The exact request rendered with fixed safe sentinels in every dynamic
     /// slot.
     fn template(self) -> String {
         match self {
-            Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
             Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
             Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
             Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
-            Self::LedgersV1 => render_ledgers(TEMPLATE_COMPANY),
+            Self::StandardLedgerCatalogV3 => render_standard_ledger_catalog_v3(TEMPLATE_COMPANY),
             Self::AuditCompanyObjectV1 => {
                 render_company_object(TEMPLATE_COMPANY, &AUDIT_COMPANY_FETCH)
             }
@@ -240,52 +238,38 @@ pub fn first_spaced_function_argument(tdl: &str) -> Option<String> {
 
 #[derive(Debug, Clone, Copy)]
 pub enum ReadOnlyProfile<'a> {
-    CompanyListV1,
     /// Tally's documented `Company` collection (`TYPE=Collection`), fetching
-    /// identity plus fixed gateway product/mode evidence. Unlike
-    /// `CompanyListV1`'s custom TDL report,
-    /// this returns the ordinary shaped `HEADER/STATUS=1` success envelope,
-    /// so it can satisfy the trust check instead of being parsed as an
-    /// unverified direct report.
+    /// identity plus fixed gateway product/mode evidence. It returns the
+    /// ordinary shaped `HEADER/STATUS=1` success envelope, so it satisfies
+    /// the trust check.
     CompanyListV2,
     /// A versioned Company collection that includes the observed company
     /// number required to distinguish year-split sibling books.
-    CompanyBookExtentV2 {
-        company: &'a ValidatedCompanyName,
-    },
-    /// A narrow compatibility bootstrap for Tally responders that reject
-    /// Bridge's custom report profile but accept the documented built-in
+    CompanyBookExtentV2 { company: &'a ValidatedCompanyName },
+    /// A narrow compatibility bootstrap through the documented built-in
     /// `List of Ledgers` collection. Its output is parsed only for repeated
     /// computed company context; ledger data is discarded.
-    StandardLedgerIdentityV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    StandardLedgerIdentityV1 { company: &'a ValidatedCompanyName },
     /// A scoped compatibility catalog that returns only ledger names and
     /// parents after independently validating the repeated company context.
     /// It is not the custom Bridge ledger export and cannot qualify a sync.
-    StandardLedgerCatalogV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    StandardLedgerCatalogV1 { company: &'a ValidatedCompanyName },
     /// V1's request with each ledger's `ISBILLWISEON` fetched in the same row,
     /// so the import family learns which ledgers are maintained bill by bill from the
     /// catalogue read it already makes. Not for `source_draft`, presence or
     /// the voucher and bill reads, which keep V1.
-    StandardLedgerCatalogV2 {
-        company: &'a ValidatedCompanyName,
-    },
-    LedgersV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    StandardLedgerCatalogV2 { company: &'a ValidatedCompanyName },
+    /// V2's request with each ledger's `ALTERID` fetched in the same row, so a
+    /// later read can tell which ledgers changed since the catalogue was taken.
+    /// Request only: no response parser exists for it yet, because no V3
+    /// answer has been captured from a real Tally.
+    StandardLedgerCatalogV3 { company: &'a ValidatedCompanyName },
     /// The `company` part of a tally-read v1 read: a single-object export of
     /// the one named company. See [`AUDIT_COMPANY_FETCH`].
-    AuditCompanyObjectV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    AuditCompanyObjectV1 { company: &'a ValidatedCompanyName },
     /// The company object an invoice build reads for the company-level
     /// HSN/SAC and its settings. See [`INVOICE_COMPANY_FETCH`].
-    InvoiceCompanyHsnV1 {
-        company: &'a ValidatedCompanyName,
-    },
+    InvoiceCompanyHsnV1 { company: &'a ValidatedCompanyName },
     /// The `ledgers` part of a tally-read v1 read, for the audit period.
     AuditLedgersV1 {
         company: &'a ValidatedCompanyName,
@@ -306,13 +290,12 @@ pub enum ReadOnlyProfile<'a> {
 impl ReadOnlyProfile<'_> {
     pub fn id(self) -> ReadOnlyProfileId {
         match self {
-            Self::CompanyListV1 => ReadOnlyProfileId::CompanyListV1,
             Self::CompanyListV2 => ReadOnlyProfileId::CompanyListV2,
             Self::CompanyBookExtentV2 { .. } => ReadOnlyProfileId::CompanyBookExtentV2,
             Self::StandardLedgerIdentityV1 { .. } => ReadOnlyProfileId::StandardLedgerIdentityV1,
             Self::StandardLedgerCatalogV1 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV1,
             Self::StandardLedgerCatalogV2 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV2,
-            Self::LedgersV1 { .. } => ReadOnlyProfileId::LedgersV1,
+            Self::StandardLedgerCatalogV3 { .. } => ReadOnlyProfileId::StandardLedgerCatalogV3,
             Self::AuditCompanyObjectV1 { .. } => ReadOnlyProfileId::AuditCompanyObjectV1,
             Self::InvoiceCompanyHsnV1 { .. } => ReadOnlyProfileId::InvoiceCompanyHsnV1,
             Self::AuditLedgersV1 { .. } => ReadOnlyProfileId::AuditLedgersV1,
@@ -327,7 +310,6 @@ impl ReadOnlyProfile<'_> {
 
     pub fn render(self) -> String {
         match self {
-            Self::CompanyListV1 => render_company_list(),
             Self::CompanyListV2 => render_company_list_v2(),
             Self::CompanyBookExtentV2 { company } => {
                 render_company_book_extent_v2(company.as_str())
@@ -341,7 +323,9 @@ impl ReadOnlyProfile<'_> {
             Self::StandardLedgerCatalogV2 { company } => {
                 render_standard_ledger_catalog_v2(company.as_str())
             }
-            Self::LedgersV1 { company } => render_ledgers(company.as_str()),
+            Self::StandardLedgerCatalogV3 { company } => {
+                render_standard_ledger_catalog_v3(company.as_str())
+            }
             Self::AuditCompanyObjectV1 { company } => {
                 render_company_object(company.as_str(), &AUDIT_COMPANY_FETCH)
             }
@@ -366,18 +350,10 @@ impl ReadOnlyProfile<'_> {
 }
 
 /// Compatibility seam for the native app's existing function signatures.
-/// These functions still expose only the three fixed read-only profiles and
+/// These functions still expose only the two fixed read-only profiles and
 /// XML-escape every dynamic value; no caller-provided XML can be dispatched.
 #[doc(hidden)]
 pub mod compatibility {
-    pub fn company_list_request() -> String {
-        super::render_company_list()
-    }
-
-    pub fn ledgers_request(company: &str) -> String {
-        super::render_ledgers(company)
-    }
-
     pub fn standard_ledger_identity_request(company: &str) -> String {
         super::render_standard_ledger_identity(company)
     }
@@ -387,75 +363,13 @@ pub mod compatibility {
     }
 }
 
-fn render_company_list() -> String {
-    r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>Export</TALLYREQUEST>
-        <TYPE>Data</TYPE>
-        <ID>Company Report</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="Company Report">
-                        <FORMS>Company Form</FORMS>
-                        <TITLE>"Company Details"</TITLE>
-                    </REPORT>
-                    <FORM NAME="Company Form">
-                        <TOPPARTS>Company Part</TOPPARTS>
-                        <HEIGHT>100% Page</HEIGHT>
-                        <WIDTH>100% Page</WIDTH>
-                    </FORM>
-                    <PART NAME="Company Part">
-                        <TOPLINES>Company Header, Company Details</TOPLINES>
-                        <REPEAT>Company Details : CompanyCollection</REPEAT>
-                        <SCROLLED>Vertical</SCROLLED>
-                        <COMMONBORDERS>Yes</COMMONBORDERS>
-                    </PART>
-                    <LINE NAME="Company Header">
-                        <LEFTFIELDS>
-                            Company Name Header, Company GUID Header
-                        </LEFTFIELDS>
-                    </LINE>
-                    <FIELD NAME="Company Name Header"><SET>"Company Name"</SET></FIELD>
-                    <FIELD NAME="Company GUID Header"><SET>"Company GUID"</SET></FIELD>
-                    <LINE NAME="Company Details">
-                        <LEFTFIELDS>
-                            Company Name Field, Company GUID Field
-                        </LEFTFIELDS>
-                        <XMLTAG>"CompanyInfo"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="Company Name Field"><SET>$Name</SET></FIELD>
-                    <FIELD NAME="Company GUID Field"><SET>$GUID</SET></FIELD>
-                    <COLLECTION NAME="CompanyCollection">
-                        <TYPE>Company</TYPE>
-                        <FETCH>Name, GUID</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#
-    .trim()
-    .to_string()
-}
-
 /// Tally's documented `Company` collection. It returns company identity plus
 /// endpoint-wide product/mode facts from fixed, no-space `$$LicenseInfo`
 /// functions. Those facts are parsed separately so a missing capability field
 /// cannot make ordinary company discovery unavailable.
-/// Unlike `render_company_list`'s custom TDL report — which Tally answers
-/// with a bare `<ENVELOPE><COMPANYINFO>...` document carrying no
-/// `HEADER`/`STATUS` at all — a `TYPE=Collection` export returns the
-/// ordinary shaped success envelope, so its response can satisfy the same
-/// `HEADER/STATUS=1` trust check every other export profile requires.
+/// A `TYPE=Collection` export returns the ordinary shaped success envelope,
+/// so its response can satisfy the same `HEADER/STATUS=1` trust check every
+/// other export profile requires.
 // Product, mode, tier and release are observed endpoint facts; see
 // TALLY_PROTOCOL_REFERENCE.md §3.1 for the captured qualification scope.
 fn render_company_list_v2() -> String {
@@ -508,6 +422,14 @@ fn render_standard_ledger_catalog_v2(company: &str) -> String {
     )
 }
 
+/// V2's request with `ALTERID` as one more native method.
+fn render_standard_ledger_catalog_v3(company: &str) -> String {
+    render_standard_ledger_collection(
+        company,
+        "\n                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>\n                        <NATIVEMETHOD>AlterID</NATIVEMETHOD>",
+    )
+}
+
 fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> String {
     format!(
         r#"
@@ -541,100 +463,6 @@ fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> Stri
 "#,
         xml_escape(company),
         extra_methods
-    )
-    .trim()
-    .to_string()
-}
-
-fn render_ledgers(company: &str) -> String {
-    format!(
-        r#"
-<ENVELOPE>
-    <HEADER>
-        <VERSION>1</VERSION>
-        <TALLYREQUEST>EXPORT</TALLYREQUEST>
-        <TYPE>DATA</TYPE>
-        <ID>BRIDGE Ledger Export V1</ID>
-    </HEADER>
-    <BODY>
-        <DESC>
-            <STATICVARIABLES>
-                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-                <SVCURRENTCOMPANY>{}</SVCURRENTCOMPANY>
-            </STATICVARIABLES>
-            <TDL>
-                <TDLMESSAGE>
-                    <REPORT NAME="BRIDGE Ledger Export V1">
-                        <FORMS>BRIDGE Ledger Export Form V1</FORMS>
-                        <PLAINXML>Yes</PLAINXML>
-                    </REPORT>
-                    <FORM NAME="BRIDGE Ledger Export Form V1">
-                        <TOPPARTS>BRIDGE Ledger Context Part V1, BRIDGE Ledger Rows Part V1</TOPPARTS>
-                    </FORM>
-                    <PART NAME="BRIDGE Ledger Context Part V1">
-                        <TOPLINES>BRIDGE Ledger Context Line V1</TOPLINES>
-                    </PART>
-                    <PART NAME="BRIDGE Ledger Rows Part V1">
-                        <TOPLINES>BRIDGE Ledger Row Line V1</TOPLINES>
-                        <REPEAT>BRIDGE Ledger Row Line V1 : BRIDGE Ledger Collection V1</REPEAT>
-                    </PART>
-                    <LINE NAME="BRIDGE Ledger Context Line V1">
-                        <LEFTFIELDS>BRIDGE Ledger Schema V1, BRIDGE Ledger Object Type V1, BRIDGE Ledger Company Name V1, BRIDGE Ledger Company GUID V1, BRIDGE Ledger Record Count V1</LEFTFIELDS>
-                        <XMLTAG>"COMPANYCONTEXT"</XMLTAG>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Ledger Schema V1">
-                        <SET>"bridge.tally.ledgers/1"</SET>
-                        <XMLTAG>"SCHEMA"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Ledger Object Type V1">
-                        <SET>"LEDGER"</SET>
-                        <XMLTAG>"OBJECTTYPE"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Ledger Company Name V1">
-                        <SET>##SVCurrentCompany</SET>
-                        <XMLTAG>"NAME"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Ledger Company GUID V1">
-                        <SET>$GUID:Company:##SVCurrentCompany</SET>
-                        <XMLTAG>"GUID"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Ledger Record Count V1">
-                        <SET>$$NumItems:BRIDGE Ledger Collection V1</SET>
-                        <XMLTAG>"RECORDCOUNT"</XMLTAG>
-                    </FIELD>
-                    <LINE NAME="BRIDGE Ledger Row Line V1">
-                        <LEFTFIELDS>BRIDGE Ledger Parent V1, BRIDGE Ledger GSTIN V1, BRIDGE Ledger Opening Balance V1</LEFTFIELDS>
-                        <XMLTAG>"LEDGER"</XMLTAG>
-                        <XMLATTR>"NAME" : $Name</XMLATTR>
-                        <XMLATTR>"GUID" : $GUID</XMLATTR>
-                        <XMLATTR>"REMOTEID" : $RemoteID</XMLATTR>
-                        <XMLATTR>"MASTERID" : $MasterID</XMLATTR>
-                        <XMLATTR>"ALTERID" : $AlterID</XMLATTR>
-                    </LINE>
-                    <FIELD NAME="BRIDGE Ledger Parent V1">
-                        <SET>$Parent</SET>
-                        <XMLTAG>"PARENT"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Ledger GSTIN V1">
-                        <SET>$PartyGSTIN</SET>
-                        <XMLTAG>"PARTYGSTIN"</XMLTAG>
-                    </FIELD>
-                    <FIELD NAME="BRIDGE Ledger Opening Balance V1">
-                        <SET>$OpeningBalance</SET>
-                        <TYPE>Amount</TYPE>
-                        <XMLTAG>"OPENINGBALANCE"</XMLTAG>
-                    </FIELD>
-                    <COLLECTION ISMODIFY="No" ISFIXED="No" ISINITIALIZE="No" ISOPTION="No" ISINTERNAL="No" NAME="BRIDGE Ledger Collection V1">
-                        <TYPE>Ledger</TYPE>
-                        <FETCH>Name, GUID, RemoteID, MasterID, AlterID, Parent, PartyGSTIN, OpeningBalance</FETCH>
-                    </COLLECTION>
-                </TDLMESSAGE>
-            </TDL>
-        </DESC>
-    </BODY>
-</ENVELOPE>
-"#,
-        xml_escape(company)
     )
     .trim()
     .to_string()

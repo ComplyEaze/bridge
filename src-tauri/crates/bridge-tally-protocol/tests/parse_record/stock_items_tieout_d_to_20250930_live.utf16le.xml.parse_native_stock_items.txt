@@ -1,0 +1,49 @@
+# fixture: tests/fixtures/stock_items_tieout_d_to_20250930_live.utf16le.xml
+# parser: parse_native_stock_items
+# source: captured
+Ok(NativeStockItems {
+    rows: [
+        NativeStockItem {
+            name: "Lab Gadget",
+            guid: "6a9518b2-a88c-417c-a700-40243f9d9119-000000d3",
+            parent: Some(
+                "�#4; Primary",
+            ),
+            base_unit: Some(
+                "Nos",
+            ),
+            opening: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "10",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-1000.00",
+                    ),
+                ),
+            },
+            closing: NativeStockPosition {
+                quantity: Read(
+                    NativeStockQuantity {
+                        amount: ExactDecimal(
+                            "22",
+                        ),
+                        unit: "Nos",
+                    },
+                ),
+                agreement: NotCompared,
+                value: Some(
+                    ExactDecimal(
+                        "-2640.00",
+                    ),
+                ),
+            },
+        },
+    ],
+})

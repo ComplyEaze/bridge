@@ -248,19 +248,20 @@ fn party_master_opening_balance_comparison_rejects_an_unparseable_master_value()
 
 /// A `/status` read that fails is reported by the transport's own safe code (#1299): an HTTP
 /// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The probe reports it
-/// while its XML reads find no company list (a list found replaces the code with
+/// while its one company read finds no company list (a list found replaces the code with
 /// `status_heuristic_unavailable`).
 #[tokio::test]
 async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
     let failed_status =
         b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             .to_vec();
-    // Not a company list in either discovery shape.
+    // Not a company list. Nothing further is queued, so a second company
+    // request would hang and fail this test.
     let no_list = utf16_xml_response("<ENVELOPE></ENVELOPE>");
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
-        for response in [failed_status, no_list.clone(), no_list] {
+        for response in [failed_status, no_list] {
             let (mut socket, _) = listener.accept().await.unwrap();
             let request = read_complete_http_request(&mut socket).await;
             assert!(!request.is_empty());
@@ -915,9 +916,6 @@ async fn capability_probe_records_unavailable_product_mode_evidence_without_refu
             utf16_xml_response(
                 "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Capability collection unavailable</LINEERROR></DATA></BODY></ENVELOPE>",
             ),
-            utf16_xml_response(
-                "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-            ),
         ];
         for response in responses {
             let (mut socket, _) = listener.accept().await.expect("accept Tally request");
@@ -959,9 +957,8 @@ async fn capability_probe_records_unavailable_product_mode_evidence_without_refu
     );
 }
 
-/// `fetch_companies` now requests the native `Company` collection
-/// (`ReadOnlyProfile::CompanyListV2`) instead of the legacy `CompanyListV1`
-/// custom TDL report. This asserts the request itself carries that shape --
+/// `fetch_companies` requests the native `Company` collection
+/// (`ReadOnlyProfile::CompanyListV2`). This asserts the request itself carries that shape --
 /// `TYPE=Collection`, no `REPORT`/`FORM`/`PART`/`LINE`/`FIELD` stack, and no
 /// `SVCURRENTCOMPANY` scoping a discovery read to one company -- and that a
 /// company row's `NAME` attribute and nested `GUID` are trimmed and returned.
@@ -1057,10 +1054,9 @@ async fn direct_company_bootstrap_uses_only_the_shaped_collection_identity() {
         .await
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
-    // `fetch_companies` (the first of the two reads below) now requests the
+    // `fetch_companies` (the first of the two reads below) requests the
     // native `Company` collection (`ReadOnlyProfile::CompanyListV2`), so its
-    // response carries that shape rather than the legacy `CompanyListV1`
-    // direct report. Its GUID must still not escape into the returned
+    // response carries that shape. Its GUID must still not escape into the returned
     // identity -- only the second, scoped `standard` read may do that.
     let discovered = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">scoped-guid</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#;
     let standard = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO /></DESC><DATA><COLLECTION MSTDEPTYPE=\"Ledger\" ISMSTDEPTYPE=\"Yes\"><SyntheticLedger NAME=\"synthetic-ledger\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">ledger-guid</GUID><PARENT TYPE=\"String\">Primary</PARENT><BRIDGECOMPANYGUID TYPE=\"String\">scoped-guid</BRIDGECOMPANYGUID><BRIDGECOMPANYNAME TYPE=\"String\">Synthetic Company</BRIDGECOMPANYNAME><LANGUAGENAME.LIST><LANGUAGEID>1033</LANGUAGEID></LANGUAGENAME.LIST></SyntheticLedger></COLLECTION></DATA></BODY></ENVELOPE>";
@@ -1099,14 +1095,12 @@ async fn capability_probe_does_not_promote_a_direct_company_report() {
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
     let server = tokio::spawn(async move {
-        // This responder gives the same untrusted bare direct company
-        // report regardless of what is requested: once for the `V2`
-        // collection attempt (which the collection parser rejects, since
-        // it never satisfies `HEADER/STATUS`), and once more for the
-        // `V1` fallback that follows.
+        // This responder answers the `V2` collection with an untrusted bare
+        // direct company report, which the collection parser rejects since
+        // it never satisfies `HEADER/STATUS`. Nothing further is queued, so
+        // a second company request would hang and fail this test.
         for (index, body) in [
             "<RESPONSE>LOCAL STATUS HEURISTIC UNRECOGNIZED</RESPONSE>",
-            "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
             "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
         ]
         .into_iter()
@@ -1147,7 +1141,7 @@ async fn capability_probe_does_not_promote_a_direct_company_report() {
         probe.profile.transports[&TransportId::XmlHttp]
             .safe_reason_code
             .as_deref(),
-        Some("direct_company_report_untrusted")
+        Some("xml_export_shape_unrecognized")
     );
     assert_eq!(
         probe.profile.features[&CapabilityFeatureId::CompanyRead].state,
@@ -1162,11 +1156,11 @@ async fn capability_probe_does_not_promote_a_shaped_company_failure_to_xml_suppo
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
     let server = tokio::spawn(async move {
-        // Same shaped `STATUS=0` failure for both the `V2` collection
-        // attempt and the `V1` fallback that follows it.
+        // A shaped `STATUS=0` failure for the `V2` collection, reported
+        // from that one answer: nothing further is queued, so a second
+        // company request would hang and fail this test.
         for (index, body) in [
             "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Could not find Company ''</LINEERROR></DATA></BODY></ENVELOPE>",
             "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Could not find Company ''</LINEERROR></DATA></BODY></ENVELOPE>",
         ]
         .into_iter()
@@ -1215,9 +1209,9 @@ async fn capability_probe_does_not_promote_a_shaped_company_failure_to_xml_suppo
 /// A gateway-shaped `Company` collection response with two loaded
 /// synthetic companies and the `CMPINFO` counter trap included. Proves
 /// `probe` requests `CompanyListV2` on the happy path
-/// and trusts its success without ever falling back to the legacy
-/// `CompanyListV1` report: the mock server has exactly one POST response
-/// queued, so a fallback request would hang and fail this test.
+/// and trusts its success with no second company request: the mock server
+/// has exactly one POST response queued, so another request would hang and
+/// fail this test.
 #[tokio::test]
 async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous() {
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -1810,6 +1804,82 @@ fn a_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     assert!(!super::compliance_estimate_unverified(with + 1, WithGstDetails).fits);
 }
 
+/// The read that names the mailing details (`include_mailing_details`, the workbook) is
+/// sized by its own estimate, above the shared one the registers keep and below
+/// the GST details read's; the limits are the constants' own quotients (#1490).
+#[test]
+fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
+    use super::ComplianceRead::{Standard, WithGstDetails, WithMailingDetails};
+    assert_eq!(
+        super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED,
+        5_000
+    );
+    // The figure stays above the largest row measured with the list named: the party with two
+    // dated entries (TallyPrime 7.2, 4,902 UTF-16 bytes), so a read of rows no larger than that
+    // stays under the budget it is divided from, with room for the response's envelope. It is
+    // not a bound on a row (#1490).
+    const {
+        assert!(super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED >= 4_902);
+    }
+    let standard = super::compliance_master_ledgers_per_read(Standard);
+    let mailing = super::compliance_master_ledgers_per_read(WithMailingDetails);
+    let details = super::compliance_master_ledgers_per_read(WithGstDetails);
+    assert_eq!(
+        (standard, mailing, details),
+        (4_266, 3_200, 2_000),
+        "the registers keep their limit; the others are the budget over their own estimates"
+    );
+    // A mark the registers admit is counted first when the mailing details are named.
+    assert_eq!(
+        super::admit_compliance_master_read(standard, None, Standard).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(mailing, None, WithMailingDetails).unwrap(),
+        super::ComplianceAdmission::Admitted
+    );
+    assert_eq!(
+        super::admit_compliance_master_read(mailing + 1, None, WithMailingDetails).unwrap(),
+        super::ComplianceAdmission::CountFirst
+    );
+    assert_eq!(
+        super::parent_partition_limits(WithMailingDetails).max_ledgers_per_part,
+        mailing
+    );
+}
+
+/// The party/ledger master export asks for the mailing details only where the whole read
+/// fits their bound, so a book the standard request read before is never refused for the
+/// larger per-ledger estimate: a mark inside 3,200 is sent the mailing request, any larger
+/// mark (a group of 3,201 to 4,266 ledgers included) the standard one, and no other kind of
+/// read is changed (#1490).
+#[test]
+fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
+    use super::ComplianceRead::{
+        Standard, WithGstDetails, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Ask,
+    };
+    let bound = super::compliance_master_ledgers_per_read(WithMailingDetails);
+    assert_eq!(bound, 3_200);
+    assert_eq!(Ask.resolved_for_mark(0), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_mark(bound), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_mark(bound + 1), Standard);
+    // The standard read admits 4,266 ledgers whole; none of them is refused on this path.
+    let standard_bound = super::compliance_master_ledgers_per_read(Standard);
+    assert_eq!(standard_bound, 4_266);
+    for mark in [bound + 1, standard_bound, standard_bound + 1, 400_000] {
+        let resolved = Ask.resolved_for_mark(mark);
+        assert_eq!(resolved, Standard, "mark {mark}");
+        assert_eq!(
+            super::admit_compliance_master_read(mark, None, resolved).is_ok(),
+            super::admit_compliance_master_read(mark, None, Standard).is_ok(),
+            "mark {mark}: the same admission as a standard read"
+        );
+    }
+    for other in [Standard, WithMailingDetails, WithGstDetails] {
+        assert_eq!(other.resolved_for_mark(bound + 1), other);
+    }
+}
+
 /// A book read in parts is split by the read's own ledger bound; every other
 /// limit is the shared one.
 #[test]
@@ -1870,4 +1940,24 @@ fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
     for part in parts.parts() {
         assert!(part.ledger_count() <= with.max_ledgers_per_part);
     }
+}
+
+/// #2142: every gated client posts under its wire config's drain policy, and
+/// none when the config has none.
+#[test]
+fn a_gated_client_drains_by_its_wire_configs_policy() {
+    use crate::endpoint_wire::WireGateConfig;
+    use bridge_tally_transport::DrainPolicy;
+    let config = super::TallyConfig {
+        host: "127.0.0.1".into(),
+        port: 9,
+    };
+    let plain = super::TallyClient::with_wire(config.clone(), &WireGateConfig::default()).unwrap();
+    assert_eq!(plain.http.drain_policy(), None);
+    let draining = super::TallyClient::with_wire(
+        config,
+        &WireGateConfig::default().with_drain(DrainPolicy::MEASURED),
+    )
+    .unwrap();
+    assert_eq!(draining.http.drain_policy(), Some(DrainPolicy::MEASURED));
 }

@@ -104,7 +104,7 @@ DEFAULT_COMMIT = {
     "commit": {
         "message": "safe commit metadata",
         "author": {"name": "Maintainer", "email": "maintainer@example.invalid"},
-        "committer": {"name": "Maintainer", "email": "maintainer@example.invalid"},
+        "committer": {"name": "Maintainer", "email": "maintainer@example.invalid", "date": "2026-10-01T09:00:00Z"},
     },
     "author": {"login": "author"},
     "committer": {"login": "author"},
@@ -233,6 +233,7 @@ def state():
         "surface_merge_base": None,      # None: the merge base is the base tip
         "surface_at": {},                # commit sha -> surface served at that ref (branch history)
         "surface_at_fail": set(),        # commit shas whose pin list cannot be read
+        "surface_at_flaky": {},          # commit sha -> (failures before a success, gh's error line); counted in $GATE_STATE
         "merge_base_fail": False,
         "ack_text": None,
         "ack_fail": False,
@@ -536,6 +537,9 @@ def state():
     elif scenario == "changes-the-review-tier":
         set_changes(s, ("modified", "scripts/review-tier-paths.json"))
 
+    elif scenario == "changes-the-attribution-check":
+        set_changes(s, ("modified", "scripts/check-ai-attribution.mjs"))
+
     elif scenario == "changes-a-workflow":
         set_changes(s, ("modified", ".github/workflows/ci.yml"))
 
@@ -730,13 +734,35 @@ def state():
             commit["parents"] = [{"sha": p} for p in parents]
             return commit
 
-        if scenario == "history-merge-parent-compared-with-all":
+        # A pin-list read that fails the first N times with gh's own error line, then answers (#2179).
+        flaky = {
+            "history-flaky-502-once": (c1, 1, "gh: Server Error (HTTP 502)"),
+            "history-flaky-502-always": (c1, 99, "gh: Server Error (HTTP 502)"),
+            "history-flaky-rate-limit-once": (c1, 1, "gh: You have exceeded a secondary rate limit. (HTTP 403)"),
+            "history-flaky-rate-limit-always": (c1, 99, "\ngh: You have exceeded a secondary rate limit for user ID 12345678. (HTTP 403)"),
+            "history-flaky-404-own-commit-once": (c1, 1, "gh: Not Found (HTTP 404)"),
+            "history-flaky-403-not-a-rate-limit": (c1, 99, "gh: Resource not accessible by integration (HTTP 403)"),
+            "history-flaky-404-outside-the-pr": (p2, 99, "gh: Not Found (HTTP 404)"),
+        }
+        if scenario in ("history-merge-parent-compared-with-all", "history-flaky-404-outside-the-pr"):
             # The pin z reached the branch through a merge's second parent, a master-side commit.
             merge = "e3" * 20
             s["commits"] = [commit_at(merge, [BASE_TIP, p2]), commit_at(HEAD, [merge])]
             s["surface_at"] = {merge: with_own, p2: with_own}
             set_changes(s, ("modified", "src/example.rs"))
             with_ack(s, ack_text(["src/example.rs"]))
+            if scenario in flaky:
+                sha, failures, message = flaky[scenario]
+                s["surface_at_flaky"] = {sha: (failures, message)}
+        elif scenario in flaky:
+            # As history-pin-kept-at-the-head, which passes, with one commit's read failing first.
+            s["commits"] = [commit_at(c1, [BASE_TIP]), commit_at(HEAD, [c1])]
+            s["surface_at"] = {c1: with_own}
+            s["surface_head"] = with_own
+            set_changes(s, ("modified", "src/example.rs"), ("modified", SURFACE_PATH))
+            with_ack(s, ack_text(["src/example.rs", own]))
+            sha, failures, message = flaky[scenario]
+            s["surface_at_flaky"] = {sha: (failures, message)}
         else:
             s["commits"] = [commit_at(c1, [BASE_TIP]), commit_at(HEAD, [c1])]
             s["surface_at"] = {c1: with_own}
@@ -976,7 +1002,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n"
         )
         s["commits"] = [commit]
 
@@ -985,8 +1011,43 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\r\n\r\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
         )
+        s["commits"] = [commit]
+
+    elif scenario in ("attribution-body-plain", "attribution-body-link", "attribution-body-comment", "attribution-title"):
+        # The line the owner banned on 25 Oct 2026, in both of its forms, in the body (visible and inside an HTML comment) and the title.
+        plain = "\U0001F916 Generated with Claude Code"
+        link = "\U0001F916 Generated with [Claude Code](https://claude.com/claude-code)"
+        if scenario == "attribution-title":
+            s["title"] = "Fix a thing " + plain
+        else:
+            s["body"] = DEFAULT_BODY + {"attribution-body-plain": plain, "attribution-body-link": link, "attribution-body-comment": "<!-- " + link + " -->"}[scenario] + "\n"
+
+    elif scenario in ("attribution-body-trailer", "attribution-body-markdown", "attribution-body-with-unproven-commits"):
+        # The body is copied into the commit on master by a squash merge, so a co-author line there counts; Markdown does not hide the line.
+        line = {"attribution-body-trailer": "Co-Authored-By: Claude",
+                "attribution-body-markdown": "Generated with **[Claude Code](https://claude.com/claude-code)**",
+                "attribution-body-with-unproven-commits": "Generated with Claude Code"}[scenario]
+        s["body"] = DEFAULT_BODY + line + "\n"
+        if scenario == "attribution-body-with-unproven-commits":
+            s["commits"] = []
+
+    elif scenario == "attribution-identity":
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        commit["commit"]["committer"] = {"name": "Claude", "email": PUBLIC_AGENT_ADDRESS, "date": "2026-10-01T09:00:00Z"}
+        s["commits"] = [commit]
+
+    elif scenario in ("attribution-trailer-after", "attribution-trailer-before", "attribution-trailer-undated", "attribution-trailer-human-after"):
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = dict(DEFAULT_COMMIT["commit"])
+        committer = dict(DEFAULT_COMMIT["commit"]["committer"])
+        co_author = "Co-Authored-By: " + ("A Person <person@example.invalid>" if scenario == "attribution-trailer-human-after" else "Claude <" + PUBLIC_AGENT_ADDRESS + ">")
+        commit["commit"]["message"] = "Keep the ledger-tag refusal typed.\n\n" + co_author + "\n"
+        committer["date"] = {"attribution-trailer-after": "2026-10-25T13:00:00Z", "attribution-trailer-human-after": "2026-10-26T09:00:00Z",
+                             "attribution-trailer-before": "2026-10-25T12:59:59Z", "attribution-trailer-undated": ""}[scenario]
+        commit["commit"]["committer"] = committer
         s["commits"] = [commit]
 
     elif scenario == "customer-coauthor-trailer":
@@ -1042,7 +1103,7 @@ def state():
         extra = "#\tdocs/x.json\n" if scenario == "merge-commit-conflict-comment-block" else "# contact customer" + "@" + "company.test\n"
         commit["commit"]["message"] = (
             "Merge master into the lane branch\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
             "# Conflicts:\n" + extra
         )
         s["commits"] = [commit]
@@ -1052,7 +1113,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "X-Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n"
+            "X-Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n"
         )
         s["commits"] = [commit]
 
@@ -1060,7 +1121,7 @@ def state():
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\n\n"
             "This is ordinary commit body text, not a trailer footer.\n"
         )
         s["commits"] = [commit]
@@ -1069,7 +1130,7 @@ def state():
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\r\n\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\r\n\r\n"
             "This is ordinary commit body text, not a trailer footer.\r\n"
         )
         s["commits"] = [commit]
@@ -1079,7 +1140,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + ">\r\n"
         )
         s["commits"] = [commit]
 
@@ -1088,7 +1149,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + "\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + "\n"
         )
         s["commits"] = [commit]
 
@@ -1097,7 +1158,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\r\n\r\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + "\r\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + "\r\n"
         )
         s["commits"] = [commit]
 
@@ -1106,7 +1167,7 @@ def state():
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])
         commit["commit"]["message"] = (
             "Keep the ledger-tag refusal typed.\n\n"
-            "Co-Authored-By: Claude Opus 5 <" + PUBLIC_AGENT_ADDRESS + "> extra\n"
+            "Co-Authored-By: Claude <" + PUBLIC_AGENT_ADDRESS + "> extra\n"
         )
         s["commits"] = [commit]
 
@@ -1334,6 +1395,16 @@ elif args and args[0] == "api":
             if history_ref is not None:
                 if history_ref in S["surface_at_fail"]:
                     fail("controlled history surface read failure")
+                if history_ref in S["surface_at_flaky"]:
+                    failures, message = S["surface_at_flaky"][history_ref]
+                    state = os.environ.get("GATE_STATE")
+                    if not state:
+                        fail("a flaky scenario needs GATE_STATE, the file that counts its calls")
+                    calls = int(open(state).read() or "0") if os.path.exists(state) else 0
+                    with open(state, "w") as handle:
+                        handle.write(str(calls + 1))
+                    if calls < failures:
+                        fail(message)
                 emit({"encoding": "base64", "content": b64(S["surface_at"][history_ref])})
             elif f"ref={HEAD}" in joined:
                 if S["surface_head_fail"]:

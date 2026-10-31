@@ -22,15 +22,13 @@ const PHRASES: [&str; 4] = ["entry screen", "by hand", "manually", "gateway of t
 
 /// Hits per production source file, relative to the crate directory. May only shrink.
 const PINNED: &[(&str, usize)] = &[
-    ("crates/bridge-tax-audit/src/financial_statements.rs", 1),
     ("src/agent_bank_statement.rs", 1),
-    ("src/agent_catalog.rs", 21),
+    ("src/agent_catalog.rs", 20),
     ("src/agent_desktop_journal_review.rs", 4),
     ("src/agent_gst_status.rs", 1),
     ("src/agent_import.rs", 8),
     ("src/agent_import_numbering.rs", 2),
     ("src/agent_import_post.rs", 5),
-    ("src/agent_masters.rs", 1),
 ];
 
 /// The text of every string literal in `source`, in order. Comments are skipped; a backslash at

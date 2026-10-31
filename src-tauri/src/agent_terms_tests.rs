@@ -17,6 +17,7 @@ fn settings(data_dir: &Path) -> Settings {
         redaction: Redaction::None,
         import_enabled: true,
         posting: Posting::On,
+        master_writes_enabled: false,
         audit_enabled: false,
     }
 }
@@ -156,13 +157,31 @@ async fn an_acceptance_that_cannot_be_recorded_refuses_every_tool() {
     }
 }
 
+/// A last line that stops before its newline, as a process killed mid-append leaves it, is
+/// repaired when the server records the acceptance again (#2172): the server answers.
+#[tokio::test]
+async fn a_torn_last_line_is_repaired_and_the_acceptance_recorded() {
+    let directory = tempfile::tempdir().unwrap();
+    let torn = "{\"terms_version\":\"2026";
+    std::fs::write(directory.path().join(RECORD_FILE), torn).unwrap();
+    let server = Server::for_mcp_with(settings(directory.path()), Some("true"));
+    let response = server.call_tool_response("voucher_schema", json!({})).await;
+    assert_ne!(
+        error_code(&response).as_deref(),
+        Some("terms_record_unavailable")
+    );
+    assert_ne!(error_code(&response).as_deref(), Some("terms_not_accepted"));
+    let bytes = std::fs::read(directory.path().join(RECORD_FILE)).unwrap();
+    assert!(bytes.starts_with(torn.as_bytes()), "nothing is removed");
+}
+
 #[tokio::test]
 async fn a_damaged_record_file_refuses_and_names_the_file() {
     let directory = tempfile::tempdir().unwrap();
-    // A last line that stops before its newline, as a process killed mid-append leaves it.
+    // A whole line Bridge did not write.
     std::fs::write(
         directory.path().join(RECORD_FILE),
-        "{\"terms_version\":\"2026",
+        "not a record\n{\"a\":1}\n",
     )
     .unwrap();
     let server = Server::for_mcp_with(settings(directory.path()), Some("true"));

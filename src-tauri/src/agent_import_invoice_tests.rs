@@ -1,5 +1,6 @@
 use super::*;
 use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
+use crate::agent::agent_import::VoucherAction;
 use crate::agent::agent_import::VoucherType;
 use serde_json::json;
 
@@ -690,8 +691,14 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     let mut v = voucher();
     v.invoice.as_mut().unwrap().observed = Some(observed());
     let id = sentinel_uuid(0x1a);
-    let xml =
-        render_sales_invoice_xml(&v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
+    let xml = render_sales_invoice_xml(
+        &v,
+        id,
+        "20260310",
+        "<NARRATION>Invoice 278</NARRATION>",
+        VoucherAction::Create,
+    )
+    .unwrap();
     let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"@ID@\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11800.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11800.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
     assert_eq!(
         xml,
@@ -714,11 +721,13 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
         .unwrap()
         .party_bill_wise = false;
     assert!(
-        !render_sales_invoice_xml(&not_bill_wise, id, "20260310", "")
+        !render_sales_invoice_xml(&not_bill_wise, id, "20260310", "", VoucherAction::Create)
             .unwrap()
             .contains("BILLALLOCATIONS")
     );
-    assert!(render_sales_invoice_xml(&voucher(), id, "20260310", "").is_none());
+    assert!(
+        render_sales_invoice_xml(&voucher(), id, "20260310", "", VoucherAction::Create).is_none()
+    );
 }
 
 #[test]
@@ -727,7 +736,7 @@ fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
     v.entries[0].ledger = "A & B \"Co\" <x>".to_string();
     v.invoice.as_mut().unwrap().observed = Some(observed());
     let id = sentinel_uuid(0x1a);
-    let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&v, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(!xml.contains("A & B"));
     assert!(xml.contains("A &amp; B"));
     assert!(!xml.contains("<x>"));
@@ -737,12 +746,12 @@ fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
     seen.party_state = "Jammu & Kashmir".to_string();
     let mut in_jk = v.clone();
     in_jk.invoice.as_mut().unwrap().observed = Some(seen);
-    let xml = render_sales_invoice_xml(&in_jk, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&in_jk, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(!xml.contains("Jammu & Kashmir"));
     assert!(xml.contains("<CONSIGNEESTATENAME>Jammu &amp; Kashmir</CONSIGNEESTATENAME>"));
     // The type's name is also written as an attribute: a quote in it stays inside.
     v.invoice.as_mut().unwrap().voucher_type_name = "Sales \"A\"".to_string();
-    let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&v, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(
         xml.contains("VCHTYPE=\"Sales &quot;A&quot;\" ACTION="),
         "{xml}"
@@ -826,7 +835,7 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
     seen.party_bill_wise = false;
     v.invoice.as_mut().unwrap().observed = Some(seen);
     let id = sentinel_uuid(0x1a);
-    let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&v, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(!xml.contains("PARTYGSTIN"));
     assert!(xml.contains("<GSTREGISTRATIONTYPE>Unregistered/Consumer</GSTREGISTRATIONTYPE>"));
     // The buyer and consignee block as the keyed unregistered invoice read it:
@@ -846,8 +855,14 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// five HSN/SAC elements each sales line carries (`resolved_hsn_elements`).
 fn readback_xml(v: &ImportVoucher) -> String {
     let id = sentinel_uuid(0x1a);
-    let mut rendered =
-        render_sales_invoice_xml(v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
+    let mut rendered = render_sales_invoice_xml(
+        v,
+        id,
+        "20260310",
+        "<NARRATION>Invoice 278</NARRATION>",
+        VoucherAction::Create,
+    )
+    .unwrap();
     let sales = v
         .invoice
         .as_ref()
@@ -865,6 +880,37 @@ fn readback_xml(v: &ImportVoucher) -> String {
         // The export also gives every leg an empty allocation container.
         .replace("</ISDEEMEDPOSITIVE>", "</ISDEEMEDPOSITIVE><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>");
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{voucher}</COLLECTION></DATA></ENVELOPE>")
+}
+
+/// #2062: an invoice's cancel candidate is its native request with only its
+/// `ACTION` changed.
+#[test]
+fn the_cancel_candidate_of_an_invoice_changes_only_its_action() {
+    let mut v = observed_voucher();
+    let cancel_of = |v: &ImportVoucher| {
+        crate::agent::agent_import::cancel::tests::assert_cancel_changes_only_the_action(
+            "Synthetic company",
+            &[(v, sentinel_uuid(0x1a))],
+        )
+    };
+    cancel_of(&v);
+    // A quote in the type's name stays escaped inside the attribute.
+    v.invoice.as_mut().unwrap().voucher_type_name = "Sales \"A\"".to_string();
+    assert!(cancel_of(&v).contains("VCHTYPE=\"Sales &quot;A&quot;\" ACTION=\"Cancel\""));
+}
+
+/// #2062: an invoice with nothing observed renders as nothing natively, so its
+/// cancel is refused rather than sent as a request with no voucher.
+#[test]
+fn an_invoice_with_nothing_observed_has_no_cancel_request() {
+    use crate::agent::agent_import::cancel::{
+        render_native_cancel_xml, CancelRenderRefusal, RemoteId,
+    };
+    let id = RemoteId::parse(&uuid::Uuid::new_v4().to_string()).unwrap();
+    assert_eq!(
+        render_native_cancel_xml("Synthetic company", &voucher(), id),
+        Err(CancelRenderRefusal::VoucherNotRenderable)
+    );
 }
 
 fn observed_voucher() -> ImportVoucher {
@@ -2123,9 +2169,14 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
         with(&|r| r.gst_rows[0].applicable_from = None),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
-    // The date it starts is digits: text that sorts before them is no date.
+    // The date it starts is a calendar day: text that sorts before one is no date.
     assert_eq!(
         with(&|r| r.gst_rows[0].applicable_from = Some("!!!!!!!!".into())),
+        Err("invoice_sales_ledger_rate_not_in_force")
+    );
+    // Eight digits that name no calendar day are no date either (#2009).
+    assert_eq!(
+        with(&|r| r.gst_rows[0].applicable_from = Some("20251340".into())),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
     // A row that starts on the invoice date is in force on it.

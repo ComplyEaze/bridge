@@ -35,7 +35,7 @@ pub(in crate::agent) fn voucher_input_schema() -> Value {
     let ledger = json!({
         "type":"string", "minLength":1, "maxLength":MAX_MASTER_NAME_CHARS,
         "not":{"anyOf":[{"pattern":LEDGER_CONTROLS},{"pattern":INTERIOR_LINE_BREAK},{"pattern":BLANK_LEDGER}]},
-        "description":"The ledger's exact live name. It may end in one CR LF only when the live ledger's stored name does, as validate_masters reports it in exact_live_spelling; no other control character is accepted. A name that folds equal to another live ledger (case, spacing, dashes, slashes or quotes, a trailing line break) is refused as ledger_has_folded_twin."
+        "description":"The ledger's exact live name. It may end in one CR LF only when the live ledger's stored name does, as validate_masters reports it in exact_live_spelling; no other control character is accepted. A name that folds equal to another live ledger's name or to one of its aliases (case, spacing, dashes, slashes or quotes, a trailing line break) is refused as ledger_has_folded_twin; a ledger in the refusal only because of an alias carries through_alias."
     });
     let entry = json!({
         "type":"object", "additionalProperties":false,

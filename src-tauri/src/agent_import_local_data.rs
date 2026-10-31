@@ -11,6 +11,8 @@ use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
+use crate::local_files::visible_path::{user_visible_path, VisiblePath};
+
 /// Files and bytes of one class.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Class {
@@ -300,7 +302,7 @@ pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
         "data_folder",
         root,
         |name| match name {
-            "agent-import-ledger.jsonl" => "journal",
+            JOURNAL_FILE => "journal",
             // The skip-only file sits beside the import journal and is read with it.
             super::statement_facts::SKIPS_FILE => "journal",
             // The master write journal and its pre-image sidecars are import
@@ -386,6 +388,133 @@ fn scan_leases(report: &mut Report, root: &Path, coordination: &[&Path]) {
 
 /// The data folder could not be listed, so the journal was not looked for.
 const DATA_FOLDER_UNREADABLE: &str = "data_folder_unreadable";
+
+/// The import journal's file name in the data folder.
+const JOURNAL_FILE: &str = "agent-import-ledger.jsonl";
+
+/// The lease folder under each coordination root (`endpoint_coordination`).
+const LEASES_FOLDER: &str = "native-dispatch-leases";
+
+/// Files of a folder whose locations `--show-paths` reads: the first, by name.
+/// A folder holds a few data files, or many lock files that share a folder.
+const FILE_LOCATION_SAMPLE: usize = 64;
+
+/// The files `--show-paths` reads the locations of, from all of a folder's
+/// files: the first `FILE_LOCATION_SAMPLE` by name.
+fn file_sample(mut files: Vec<PathBuf>) -> Vec<PathBuf> {
+    files.sort();
+    files.truncate(FILE_LOCATION_SAMPLE);
+    files
+}
+
+/// Where the files directly in `folder` are, as `resolve` reports each file
+/// (the sample of [`file_sample`]): each folder once, with its state, and how
+/// many files were read of how many. Files in its subfolders (`imports`,
+/// `bank-statements`) are not looked at. `"not_listed"` when it cannot be
+/// listed. From inside a Store install's package this names the copy whose
+/// files the report reads; it does not show another copy (see
+/// [`package_copies`]).
+fn file_locations(folder: &Path, resolve: &dyn Fn(&Path) -> VisiblePath) -> serde_json::Value {
+    file_locations_capped(folder, resolve, ENTRY_CAP)
+}
+
+/// [`file_locations`], listing at most `cap` entries of the folder (files and
+/// subfolders alike); past it the count stops, `files` is then a lower bound,
+/// the sample is taken from the entries listed, and `listing_capped` says so.
+fn file_locations_capped(
+    folder: &Path,
+    resolve: &dyn Fn(&Path) -> VisiblePath,
+    cap: usize,
+) -> serde_json::Value {
+    let Ok(entries) = fs::read_dir(folder) else {
+        return serde_json::json!("not_listed");
+    };
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut capped = false;
+    for (listed, entry) in entries.filter_map(Result::ok).enumerate() {
+        if listed == cap {
+            capped = true;
+            break;
+        }
+        if entry.file_type().is_ok_and(|kind| kind.is_file()) {
+            files.push(entry.path());
+        }
+    }
+    let total = files.len();
+    let sample = file_sample(files);
+    let mut seen = std::collections::BTreeSet::new();
+    let mut folders = Vec::new();
+    for file in &sample {
+        let shown = resolve(file);
+        let parent = shown
+            .path()
+            .parent()
+            .map_or_else(String::new, |parent| parent.display().to_string());
+        if seen.insert((parent.clone(), shown.state())) {
+            folders.push(serde_json::json!({"path": parent, "state": shown.state()}));
+        }
+    }
+    serde_json::json!({
+        "folders": folders,
+        "files_read": sample.len(),
+        "files": total,
+        "listing_capped": capped,
+    })
+}
+
+/// The part of `path` under `base`, comparing component by component in lower
+/// case, close to how Windows compares names (a `/` and a `\` are the same
+/// separator there). An 8.3 short name in one of the two is not matched to its
+/// long form, nor a verbatim `\\?\` path to its plain one.
+fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
+    let mut rest = path.components();
+    for want in base.components() {
+        let got = rest.next()?;
+        if got.as_os_str().to_string_lossy().to_lowercase()
+            != want.as_os_str().to_string_lossy().to_lowercase()
+        {
+            return None;
+        }
+    }
+    Some(rest.as_path().to_path_buf())
+}
+
+/// The copies of `folder` inside Store apps' packages, for a folder under
+/// `local_app_data`: `<local_app_data>\Packages\<package>\LocalCache\Local\<the
+/// rest>`, where Windows puts the new files a process inside that package
+/// creates under AppData (#1459, #2233). Each existing one, by name;
+/// `"not_under_local_app_data"` for a folder set elsewhere, `"not_listed"`
+/// when the packages folder cannot be listed.
+fn package_copies(local_app_data: &Path, folder: &Path) -> serde_json::Value {
+    let Some(rest) =
+        relative_to(local_app_data, folder).filter(|rest| !rest.as_os_str().is_empty())
+    else {
+        return serde_json::json!("not_under_local_app_data");
+    };
+    let Ok(packages) = fs::read_dir(local_app_data.join("Packages")) else {
+        return serde_json::json!("not_listed");
+    };
+    let mut found: Vec<String> = packages
+        .filter_map(Result::ok)
+        .map(|package| package.path().join("LocalCache").join("Local").join(&rest))
+        .filter(|copy| copy.is_dir())
+        .map(|copy| copy.display().to_string())
+        .collect();
+    found.sort();
+    serde_json::json!(found)
+}
+
+/// `%LOCALAPPDATA%`, where Store apps keep their package copies (Windows only).
+fn local_app_data() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
 /// The journal could not be opened (no permission, a link, another owner).
 const JOURNAL_UNREADABLE: &str = "journal_unreadable";
 /// The journal was opened but could not be read as a journal, twice: an I/O
@@ -416,7 +545,7 @@ fn read_journal_once(path: &Path) -> Journal {
 /// report) before it is reported. A record rolled back after a failed append may
 /// be counted once: this is a report.
 fn read_journal(root: &Path, between: impl FnOnce()) -> Journal {
-    let path = root.join("agent-import-ledger.jsonl");
+    let path = root.join(JOURNAL_FILE);
     let first = read_journal_once(&path);
     if matches!(
         first,
@@ -471,6 +600,25 @@ pub(super) fn to_json(
     now: SystemTime,
     paths: Option<(&Path, &[&Path])>,
 ) -> serde_json::Value {
+    to_json_resolving(
+        report,
+        now,
+        paths,
+        &user_visible_path,
+        local_app_data().as_deref(),
+    )
+}
+
+/// [`to_json`], with where a path is shown taken from `resolve`, and the
+/// folder package copies are looked for under (a test passes its own, since
+/// only Windows resolves a path or has package copies).
+fn to_json_resolving(
+    report: &Report,
+    now: SystemTime,
+    paths: Option<(&Path, &[&Path])>,
+    resolve: &dyn Fn(&Path) -> VisiblePath,
+    local_app_data: Option<&Path>,
+) -> serde_json::Value {
     use serde_json::json;
     let root = match report.root {
         Root::Missing => "missing",
@@ -501,9 +649,14 @@ pub(super) fn to_json(
             "not_settled": settlement.unsettled,
             "not_settled_no_response": settlement.unsettled_no_response,
             "not_settled_binding_refused": settlement.unsettled_binding_refused,
+            "not_settled_reviewed_not_attributed": settlement.unsettled_reviewed,
+            "not_settled_restored": settlement.unsettled_restored,
+            "settled_by_person": settlement.settled_by_person,
             "not_settled_not_verified": settlement.unsettled
                 - settlement.unsettled_no_response
-                - settlement.unsettled_binding_refused,
+                - settlement.unsettled_binding_refused
+                - settlement.unsettled_reviewed
+                - settlement.unsettled_restored,
             "no_dispatch_never_verified": settlement.no_dispatch_never_verified,
         }),
     };
@@ -535,13 +688,51 @@ pub(super) fn to_json(
         "app_files_outside_this_folder_covered": false,
     });
     if let Some((folder, locks)) = paths {
+        // A folder's own final path is not trusted: once both copies of a
+        // Microsoft Store install's data folder exist, Windows names the real
+        // folder for a view that merges it with the package's copy (#1584's lab
+        // sheet). So each folder is printed as built, beside where the files
+        // directly in it are as Windows reports each file (from inside the
+        // package, a file in both copies names the package's copy, a file in
+        // one copy that copy),
+        // and the package copies of the data folder that exist, since one side
+        // does not see the other.
         value["folder_path"] = json!(folder.display().to_string());
+        value["folder_file_locations"] = file_locations(folder, resolve);
+        if let Some(local_app_data) = local_app_data {
+            value["package_copies"] = package_copies(local_app_data, folder);
+        }
+        if matches!(report.root, Root::Present) && !matches!(report.journal, Journal::Absent) {
+            let journal = folder.join(JOURNAL_FILE);
+            if is_link(&journal) {
+                // The report follows no link (the journal one is refused as
+                // unreadable): its target is not resolved, and could be a share.
+                value["journal_path"] = json!(journal.display().to_string());
+                value["journal_path_state"] = json!("link_not_followed");
+            } else {
+                resolve(&journal).put_into(&mut value, "journal_path");
+            }
+        }
         // the first, as before; every one, in the order the locks are taken
         if let Some(first) = locks.first() {
             value["lock_folder_path"] = json!(first.display().to_string());
             value["lock_folder_paths"] = json!(locks
                 .iter()
                 .map(|locks| locks.display().to_string())
+                .collect::<Vec<_>>());
+            value["lock_folder_file_locations"] = json!(locks
+                .iter()
+                .map(|locks| {
+                    // A lease folder that is a link is not entered, as the
+                    // lease scan refuses it; a data folder that is a link is
+                    // the person's own (a folder moved to another disk).
+                    let leases = locks.join(LEASES_FOLDER);
+                    if is_link(&leases) {
+                        json!("link_not_followed")
+                    } else {
+                        file_locations(&leases, resolve)
+                    }
+                })
                 .collect::<Vec<_>>());
         }
     }

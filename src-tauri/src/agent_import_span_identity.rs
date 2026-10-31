@@ -58,6 +58,8 @@ pub(super) struct PostedVoucherIdentity {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum SpanRefusal {
     EmptyBatch,
+    /// The reply reported `STATUS=0`, which fails whatever the counters say.
+    StatusFailure,
     CountersNotClean,
     CreatedNotCount {
         created: u64,
@@ -100,6 +102,7 @@ impl SpanRefusal {
     pub(super) fn code(&self) -> &'static str {
         match self {
             Self::EmptyBatch => "span_empty_batch",
+            Self::StatusFailure => "span_response_status_failure",
             Self::CountersNotClean => "span_counters_not_clean",
             Self::CreatedNotCount { .. } => "span_created_not_count",
             Self::LastVchIdAbsent => "span_lastvchid_absent",
@@ -114,6 +117,34 @@ impl SpanRefusal {
             Self::IdentityReused { .. } => "span_identity_reused",
         }
     }
+}
+
+/// What a person reads when a post's vouchers could not be confirmed because
+/// the company's voucher mark moved by another amount than the post created
+/// (more or less), or a read, then or later, found another number of vouchers
+/// in the post's span. It says what was observed, then what can do that, as
+/// examples and never as the established cause (one GST return export raised
+/// the mark with no voucher change, #1633; an edit of a posted voucher empties
+/// its slot), and claims only what the post itself established: one dispatch,
+/// and Tally's counters reporting each voucher created once. Whether the book
+/// holds a duplicate is not checked here.
+pub(super) const CONCURRENT_CHANGE_LINE: &str = "The company's voucher mark moved by a different amount than this post created, or the post's span later held another number of vouchers: another change in the company can do that, for example a GST return exported from Tally, an edit of one of these vouchers, or another user's entry. ComplyEaze Bridge sent this post once, and Tally reported creating each voucher once.";
+
+/// The concurrent-change line for a refusal recorded by its code.
+pub(super) fn concurrent_change_line_for(code: &str) -> Option<&'static str> {
+    (code
+        == SpanRefusal::StepNotCreated {
+            step: 0,
+            created: 0,
+        }
+        .code()
+        || code
+            == SpanRefusal::SpanCount {
+                expected: 0,
+                observed: 0,
+            }
+            .code())
+    .then_some(CONCURRENT_CHANGE_LINE)
 }
 
 /// Why a binding could not be decided: nothing was refused, and the bind may
@@ -162,6 +193,10 @@ fn clean_create(
     if count == 0 {
         return Err(SpanRefusal::EmptyBatch);
     }
+    if outcome.application_status() == bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    {
+        return Err(SpanRefusal::StatusFailure);
+    }
     let counters = outcome.counters();
     if !counters.counter_presence.all_reported()
         || counters.altered != 0
@@ -190,8 +225,13 @@ impl PostSpan {
     /// timeout or a crash), and by every later verification, including one
     /// after a bind left unsettled (as by a read without `EFFECTIVEDATE`). No
     /// step is checked here, because none was journaled; a later voucher change
-    /// always takes an AlterID above the mark, so the slots can only empty, and
-    /// `bind`'s count, positions and `LASTVCHID` decide. The caller must first have read
+    /// that raises the mark takes an AlterID above it, so the slots can only
+    /// empty, and `bind`'s count, positions and `LASTVCHID` decide. Not every
+    /// change raises the mark: on TallyPrime 7.2, answering Yes to GST Annual
+    /// Computation's prompt that it would update the GST status of vouchers
+    /// moved neither mark on a synthetic book (lab run of 25 Oct 2026); what
+    /// else that changed is not established. `bind` does not compare GST
+    /// status. The caller must first have read
     /// the company's mark at or above `before + count`; below it, the book was
     /// rolled back and nothing may bind.
     pub(super) fn after_clean_response(
@@ -211,10 +251,11 @@ impl PostSpan {
         })
     }
 
-    /// The span of a clean POST of `count` vouchers. Refused unless every one
-    /// of the seven counters was reported, `CREATED == count`, every other
-    /// counter is zero with no `LINEERROR`, `LASTVCHID` was reported, and the
-    /// target's voucher mark moved by exactly `CREATED`.
+    /// The span of a clean POST of `count` vouchers. Refused unless the reply
+    /// did not report `STATUS=0`, every one of the seven counters was
+    /// reported, `CREATED == count`, every other counter is zero with no
+    /// `LINEERROR`, `LASTVCHID` was reported, and the target's voucher mark
+    /// moved by exactly `CREATED`.
     pub(super) fn after_clean_post(
         before: PreMark,
         after_mark: u64,

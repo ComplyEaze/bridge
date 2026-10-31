@@ -249,3 +249,29 @@ fn an_empty_element_amount_is_empty_like_an_open_close_pair() {
         vec![line("Capital Account", Empty, Empty)]
     );
 }
+
+#[test]
+fn every_built_in_report_id_is_distinct_and_needs_no_xml_escaping() {
+    let ids: Vec<&str> = BuiltInReport::ALL
+        .iter()
+        .map(|report| report.id())
+        .collect();
+    assert_eq!(
+        ids,
+        [
+            "Balance Sheet",
+            "Profit and Loss",
+            "Sales Register",
+            "Purchase Register",
+            "Cash Flow",
+            "Funds Flow",
+            "Negative Ledgers",
+            "Negative Stock",
+            "Stock Summary",
+        ]
+    );
+    assert_eq!(ids.iter().collect::<HashSet<_>>().len(), ids.len());
+    for id in ids {
+        assert_eq!(xml_escape(id), id);
+    }
+}

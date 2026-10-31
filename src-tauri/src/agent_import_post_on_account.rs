@@ -42,11 +42,26 @@ pub(in super::super) struct OnAccountMarks<'a> {
 
 /// The text of an approval dialog as `review_text` returns it. Its field is
 /// private to this module, so only `OnAccountMarks::seal` makes one.
-pub(super) struct ReviewText(String);
+pub(super) struct ReviewText {
+    text: String,
+    lists_vouchers: bool,
+}
 
 impl ReviewText {
     pub(super) fn into_string(self) -> String {
-        self.0
+        self.text
+    }
+
+    /// This text lists the batch's vouchers one line each (#1832); a text that
+    /// stands in for them does not.
+    pub(super) fn listing_vouchers(mut self) -> Self {
+        self.lists_vouchers = true;
+        self
+    }
+
+    /// Whether the text lists the batch's vouchers one line each.
+    pub(super) fn lists_vouchers(&self) -> bool {
+        self.lists_vouchers
     }
 }
 
@@ -130,7 +145,10 @@ impl<'a> OnAccountMarks<'a> {
         if !line_break_names_are_marked(&preview, named) {
             return Err(LINE_BREAK_UNMARKED.into());
         }
-        Ok(ReviewText(preview))
+        Ok(ReviewText {
+            text: preview,
+            lists_vouchers: false,
+        })
     }
 }
 

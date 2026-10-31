@@ -245,6 +245,46 @@ $commit_messages
 $commit_identity_names"
   fi
 fi
+# AI attribution in public text (the owner's practice of 25 Oct 2026, not a mandate): a "Generated with" signature line or a
+# Co-authored-by line naming an assistant in the title or body (comments included), or such a trailer or an author or committer
+# identity naming one on a commit, is reported as a note and never blocks a merge. The note says that GitHub's squash merge copies
+# the body into the commit on master. scripts/check-ai-attribution.mjs decides. The title and body are checked even when the commit
+# list is not proven complete (that case is already INDETERMINATE above): then no commit is read. A check that did not run to its
+# end is INDETERMINATE: an unreadable result is an unknown, not a clean one.
+# The commit list goes in on stdin (a long list would not fit an argument); the title and body are arguments, and one too long for
+# that makes the whole check INDETERMINATE, never a pass.
+attribution_source="[]"
+[ "${metadata_commits_proven:-0}" -eq 1 ] && attribution_source="$metadata_commits"
+attribution_input=$(jq -c --arg title "$title" --arg body "$raw_prbody" '{
+    title: $title, body: $body,
+    commits: ((if all(.[]; type == "array") then flatten else . end) |
+      map({sha: .sha, message: .commit.message,
+           identities: [.commit.author.name, .commit.author.email, .commit.committer.name, .commit.committer.email]}))}' <<<"$attribution_source" 2>/dev/null) || attribution_input=""
+if [ -z "$attribution_input" ]; then
+  unknown "could not prepare the AI attribution check"
+else
+  : >"$errfile"
+  attribution_status=0
+  attribution_output=$(printf '%s' "$attribution_input" | node "$script_dir/check-ai-attribution.mjs" 2>"$errfile") || attribution_status=$?
+  # The check's last line must say how many commits it read, and that number must be the number sent; every line before it must be
+  # a note. Anything else (a crash, an old node, a missing module, a replaced file that prints nothing or refuses) is not an answer.
+  attribution_expected=$(jq -r '.commits | length' <<<"$attribution_input" 2>/dev/null) || attribution_expected=""
+  attribution_last=$(printf '%s\n' "$attribution_output" | tail -n 1)
+  attribution_other=$(printf '%s\n' "$attribution_output" | sed '$d' | grep -vc '^NOTE ' || true)
+  if [ "$attribution_status" -eq 0 ] && [ -n "$attribution_expected" ] && [ "$attribution_last" = "CHECKED $attribution_expected" ] && [ "$attribution_other" -eq 0 ]; then
+    attribution_notes=0
+    while IFS= read -r attribution_line; do
+      case "$attribution_line" in
+        "NOTE "*) say "note" "AI attribution: ${attribution_line#NOTE }"; attribution_notes=$((attribution_notes + 1)) ;;
+      esac
+    done <<<"$attribution_output"
+    if [ "$attribution_notes" -eq 0 ] && [ "${metadata_commits_proven:-0}" -eq 1 ]; then
+      say "ok" "no AI attribution in the title, body or commits"
+    fi
+  else
+    unknown "could not run the AI attribution check"
+  fi
+fi
 # Paginate changed files through the REST endpoint; gh pr view hard-codes a
 # first:100 GraphQL fragment in some versions. Retain the line counts as well:
 # the privacy scan can only be complete when the textual diff describes every
@@ -454,15 +494,49 @@ is_sorted_unique() {
 # list cannot be read and parsed makes the answer indeterminate (fail closed).
 withdrawn_pins=""
 history_cache="$tmpdir/pin-history"
+# The PR's own commits, space-separated: a 404 for one of these may be the contents API lagging a push.
+pr_commit_shas=""
+# Why the last pin-list read failed, for the INDETERMINATE line below: the commit, the HTTP status and
+# the first line of the error, and how many tries were made.
+pin_read_failure=""
+# Read the pin list at one commit through the contents API into $contents_text_result. A failure that
+# a second try can cure is tried again: a server error (HTTP 5xx), a rate-limit answer (HTTP 403 or 429
+# whose error names a rate limit), or a 404 for one of the PR's own commits, pushed moments before
+# (#2179). At most 3 tries, 2 s then 4 s apart. Any other failure, or the third, fails closed.
+read_pin_list_retrying() {
+  local sha="$1" try=1 status detail transient
+  while :; do
+    read_contents_text "$sha" "$SURFACE" && return 0
+    status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
+    # The first non-blank error line, printable ASCII only, a long digit run (an account id in a
+    # rate-limit message) masked, at most 160 characters.
+    detail=$(grep -m 1 -v '^[[:space:]]*$' "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | sed -E 's/[0-9]{6,}/<n>/g' | cut -c 1-160)
+    transient=0
+    case "$status" in
+      5[0-9][0-9]) transient=1 ;;
+      403|429) grep -qi 'rate limit' "$errfile" 2>/dev/null && transient=1 ;;
+      404) case " $pr_commit_shas " in *" $sha "*) transient=1 ;; esac ;;
+    esac
+    if [ "$transient" -ne 1 ] || [ "$try" -ge 3 ]; then
+      pin_read_failure="commit ${sha:0:12}, ${status:+HTTP $status, }after $try $([ "$try" -eq 1 ] && echo try || echo tries): ${detail:-no error text (the answer itself was unreadable)}"
+      return 1
+    fi
+    sleep $((try * 2))
+    try=$((try + 1))
+  done
+}
 # The sorted, unique pin paths at one commit, in the file named by $pins_at_result.
 pins_at_commit() {
   local sha="$1"
   local file="$history_cache/$sha"
   pins_at_result=""
   if ! [ -f "$file" ]; then
-    read_contents_text "$sha" "$SURFACE" || return 1
-    jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
-      <<<"$contents_text_result" >/dev/null 2>&1 || return 1
+    read_pin_list_retrying "$sha" || return 1
+    if ! jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
+      <<<"$contents_text_result" >/dev/null 2>&1; then
+      pin_read_failure="commit ${sha:0:12}: the pin list there is not a list of paths"
+      return 1
+    fi
     jq -r '.files[].path' <<<"$contents_text_result" | LC_ALL=C sort -u >"$file.tmp" || return 1
     mv "$file.tmp" "$file"
   fi
@@ -477,12 +551,13 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       if (.parents | type) == "array" and all(.parents[]; (.sha | type == "string") and (.sha | test("^[0-9a-fA-F]{40}$"))) then
         ([.sha] + [.parents[].sha]) | join(" ")
       else "NOPARENTS " + .sha end' <<<"$metadata_commits" 2>/dev/null) || commit_records="NOPARENTS unreadable"
+    pr_commit_shas=$(cut -d ' ' -f 1 <<<"$commit_records" | grep -E '^[0-9a-fA-F]{40}$' | tr '\n' ' ')
     history_status=0
     collected=""
     parents_union="$tmpdir/parents-union"
     while read -r -a record; do
       [ "${#record[@]}" -gt 0 ] || continue
-      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; break; fi
+      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; pin_read_failure="a commit's parent list could not be read"; break; fi
       pins_at_commit "${record[0]}" || { history_status=1; break; }
       own_file="$pins_at_result"
       : >"$parents_union"
@@ -494,7 +569,7 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       collected="$collected"$'\n'"$(LC_ALL=C comm -23 "$own_file" "$parents_union")"
     done <<<"$commit_records"
     if [ "$history_status" -ne 0 ]; then
-      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out"
+      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out (${pin_read_failure:-no detail recorded})"
     else
       withdrawn_pins=$(LC_ALL=C comm -23 <(path_set "$collected") <(path_set "$base_pinned") | LC_ALL=C comm -23 - <(path_set "$pinned"))
     fi
@@ -1291,7 +1366,7 @@ PY
   fi
 fi
 gate_paths=$(printf '%s\n%s\n' "$changed" "$(awk -F '\t' '$5 != "" { print $5 }' "$changed_records" 2>/dev/null)")
-if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
+if grep -iE '^(scripts/merge-gate|scripts/merge_gate[^/]*\.py$|scripts/review-tier|scripts/check-ai-attribution|\.github/)' <<<"$gate_paths" >/dev/null 2>&1; then
   bad "this pull request changes the merge gate or a workflow: a verdict about the gate cannot clear a change to the gate, so the merge is the owner's own act"
 fi
 echo

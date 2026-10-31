@@ -2,8 +2,10 @@
 //! stock item count, its stock items with their closing value, and Tally's own
 //! Stock Summary report. Items are returned only when their closing values add
 //! up to the report's top-level lines and are not fewer than the count
-//! ([`gate_stock_summary`]). A quantity is returned only where one line of the
-//! plain Stock Summary agrees with the item row ([`NativeQuantityAgreement`]).
+//! ([`gate_stock_summary`]). A quantity under the root is returned only where one
+//! line of the plain Stock Summary agrees with the item row; one inside a stock
+//! group, which that report has no line for, is returned as the item row's own
+//! figure, not compared ([`NativeQuantityAgreement`]).
 //!
 //! Evidence: one synthetic book on one licensed `TallyPrime` 7.1
 //! (`tests/fixtures/STOCK_CAPTURE_PROVENANCE.md`; PARTIAL), and, by role, one
@@ -24,7 +26,7 @@ use crate::native_masters::{
     MASTERS_ASSUMED_ALIASES, MASTERS_ASSUMED_NAME_CHARS, MASTERS_RESPONSE_BUDGET_BYTES,
 };
 use crate::native_outstandings::NativeLedgerSnapshotPeriod;
-use crate::native_statement_reports::render_built_in_report_request;
+use crate::native_statement_reports::{render_built_in_report_request, BuiltInReport};
 use crate::native_trial_balance::guid_suffix_is_valid;
 use crate::outstandings_shared::COMPANY_EXTENT_V2_FETCH;
 use crate::tolerant_xml::sanitize_invalid_numeric_references;
@@ -86,23 +88,25 @@ pub fn render_native_stock_summary_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
-    render_built_in_report_request("Stock Summary", company, period)
+    render_built_in_report_request(BuiltInReport::StockSummary, company, period)
 }
 
-/// The date a stock summary is read as of. Only a 31 March is constructible,
-/// because only a 31 March period end (a financial-year end) has been measured
-/// for stock, the report tie-out included. Any other date, one that the boundary
-/// rule of Bridge's other reads would admit included, is refused as
-/// [`NativeStockError::AsOfNotMeasured`]. Of the 31 Marches, only the period
-/// ending 31 March 2026 has been measured: another year's 31 March is admitted
-/// here, sharing the request shape but not the measurement. Other dates will be
-/// admitted in a later change, once captures back them.
+/// The date a stock summary is read as of: the last day of a month, the shape
+/// of every period end measured for stock (31 March, 31 May, 31 August and 30
+/// September, on two synthetic books, §12a.13). Any other date, one that the
+/// boundary rule of Bridge's other reads would admit included, is refused as
+/// [`NativeStockError::AsOfNotMeasured`], and so is a date whose next day cannot
+/// be formed. The rule is the calendar's, not a list: February's end is admitted
+/// by it, unmeasured.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StockSummaryAsOf(TallyDate);
 
 impl StockSummaryAsOf {
     pub fn new(date: TallyDate) -> Result<Self, NativeStockError> {
-        if matches!(&date.as_str()[4..8], "0331") {
+        let month_end = date
+            .next_day()
+            .is_ok_and(|next| next.as_str().ends_with("01"));
+        if month_end {
             Ok(Self(date))
         } else {
             Err(NativeStockError::AsOfNotMeasured)
@@ -155,10 +159,9 @@ pub struct NativeStockQuantity {
     pub unit: String,
 }
 
-/// What a quantity element held. A quantity leaves Bridge only where the report
-/// agrees with it ([`NativeQuantityAgreement`]); one Bridge cannot read (a
-/// compound unit, or a unit with a space in it) is counted and does not refuse
-/// the read.
+/// What a quantity element held. A quantity leaves Bridge only through
+/// [`NativeQuantityAgreement`]; one Bridge cannot read (a compound unit, or a
+/// unit with a space in it) is counted and does not refuse the read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NativeQuantityRead {
     /// An empty or absent element: not zero.
@@ -177,12 +180,22 @@ impl NativeQuantityRead {
     }
 }
 
-/// Whether a closing quantity is returned, and why not when it is not. A
-/// quantity leaves Bridge only where Tally's own plain Stock Summary shows the
-/// same item by name with the same quantity and the same amount (`Agreed`); the
-/// report is the only second source, and in the captures it had a line only for
-/// what sits directly under the root (§12a.13; no capture yet holds a group and
-/// an item under the root side by side).
+/// An item's closing quantity as its own row in the stock item list gave it,
+/// which nothing compared: Tally's plain Stock Summary has no line for an item
+/// inside a stock group. A separate type from an agreed quantity, so that
+/// nothing that takes only compared quantities can take this one. Constructed
+/// only by the gate's comparison.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemListQuantity(NativeStockQuantity);
+
+/// Whether a closing quantity is returned, and on what. An item under the root
+/// gets one only where Tally's own plain Stock Summary shows the same item by
+/// name with the same quantity and the same amount (`Agreed`). The report is
+/// the only second source, and it has a line only for what sits directly under
+/// the root, so an item inside a stock group gets its row's own quantity,
+/// uncompared (`InsideStockGroup`): on one synthetic book, nested three deep,
+/// each such quantity equalled Tally's Stock Summary screen with every level
+/// expanded (§12a.13).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NativeQuantityAgreement {
     /// The rows as parsed: nothing has compared them with the report yet.
@@ -195,12 +208,15 @@ pub enum NativeQuantityAgreement {
     /// The row's quantity is not `<number> <unit>` (a compound unit, or a unit
     /// with a space in it).
     Unread,
-    /// The item's own `PARENT` is not the root (a stock group; any other text
-    /// gets this state too, which only withholds), so it is taken to have no line
-    /// of its own: in the captures the report listed only what sits directly
-    /// under the root. A line that carries its name is read as something else's
-    /// (a group of that name).
-    InsideStockGroup,
+    /// The item's own `PARENT` names a stock group, so the report has no line of
+    /// its own for it, and a line that carries its name is read as something
+    /// else's (a group of that name). Its quantity is its row's, not compared.
+    InsideStockGroup(ItemListQuantity),
+    /// The item's own `PARENT` is neither Tally's marked root nor plainly a
+    /// group's name: it reads `Primary` without the root marker (a group a person
+    /// named Primary, or a root Bridge did not recognise), or it carries a
+    /// marker. Nothing says which, so no quantity is returned.
+    ParentNotResolved,
     /// The item sits directly under the root and no line of the report carries its
     /// name: it has nothing to show, or the report shows it under another name (an
     /// alias, a spacing or entity difference), or the name differs in case. Also
@@ -220,7 +236,8 @@ impl NativeQuantityAgreement {
             Self::Agreed(_) => "agreed",
             Self::NoneSent => "none_sent",
             Self::Unread => "unread",
-            Self::InsideStockGroup => "inside_stock_group",
+            Self::InsideStockGroup(_) => "inside_stock_group",
+            Self::ParentNotResolved => "parent_not_resolved",
             Self::NoReportLine => "report_has_no_line",
             Self::NameNotUnique => "report_name_not_unique",
             Self::ReportDiffers => "report_differs",
@@ -231,15 +248,20 @@ impl NativeQuantityAgreement {
 impl Serialize for NativeQuantityAgreement {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
-        let agreed = match self {
-            Self::Agreed(quantity) => Some(quantity),
+        // An uncompared figure goes under its own keys, never `amount` and
+        // `unit`, which only an agreed quantity carries.
+        let figure = match self {
+            Self::Agreed(quantity) => Some((quantity, "amount", "unit")),
+            Self::InsideStockGroup(quantity) => {
+                Some((&quantity.0, "item_list_amount", "item_list_unit"))
+            }
             _ => None,
         };
-        let mut map = serializer.serialize_map(Some(if agreed.is_some() { 3 } else { 1 }))?;
+        let mut map = serializer.serialize_map(Some(if figure.is_some() { 3 } else { 1 }))?;
         map.serialize_entry("state", self.code())?;
-        if let Some(quantity) = agreed {
-            map.serialize_entry("amount", &quantity.amount)?;
-            map.serialize_entry("unit", &quantity.unit)?;
+        if let Some((quantity, amount, unit)) = figure {
+            map.serialize_entry(amount, &quantity.amount)?;
+            map.serialize_entry(unit, &quantity.unit)?;
         }
         map.end()
     }
@@ -247,7 +269,7 @@ impl Serialize for NativeQuantityAgreement {
 
 /// A quantity and a value. The value is `None` where Tally sent an empty or
 /// absent element: not zero. The quantity as read is never serialized by
-/// itself: it leaves only as `agreement`, and only where the report agrees.
+/// itself: it leaves only as `agreement`, which says whether it was compared.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct NativeStockPosition {
     #[serde(skip)]
@@ -313,7 +335,8 @@ pub enum NativeStockError {
     /// The company's stock item count is missing, empty or not a number, so
     /// nothing says whether every item was read.
     ItemCountUnavailable,
-    /// The `as_of` is not a 31 March, the only date measured for stock.
+    /// The `as_of` is not the last day of a month, the only shape of period end
+    /// measured for stock.
     AsOfNotMeasured,
 }
 
@@ -622,7 +645,7 @@ pub(crate) fn read_row_fields(
 /// sibling shares the GUID, §9.11b) or another company's refuse
 /// `company_flags_not_one_row`. A flag is `Yes`, `No`, or `Unknown` when absent
 /// or empty; any other text refuses. The stock item count is read as
-/// [`item_count`] reads it; the other `NUM*` counts are not read.
+/// `item_count` reads it; the other `NUM*` counts are not read.
 pub fn parse_company_inventory_flags(
     response: &str,
     company_guid: &str,
@@ -1263,28 +1286,29 @@ pub fn gate_stock_summary(
     })
 }
 
-/// Whether an item's closing quantity may be returned: only where exactly one
-/// line of Tally's plain Stock Summary carries the item's name and agrees with
-/// the item on the unit, the quantity and the amount (two empty amounts agree).
-/// In the captures the report listed only what sits directly under the root, so
-/// an item inside a stock group is taken to have no line of its own; one with
-/// nothing to show, or one the report names differently, has none either, and
-/// such an item's quantity is not returned.
+/// Whether an item's closing quantity may be returned, and on what. An item
+/// under the root gets one only where exactly one line of Tally's plain Stock
+/// Summary carries the item's name and agrees with the item on the unit, the
+/// quantity and the amount (two empty amounts agree); one with nothing to show,
+/// or one the report names differently, gets none. The report has no line for
+/// an item inside a stock group, so that item gets its row's own quantity,
+/// uncompared. A parent that is neither the marked root nor plainly a group's
+/// name gets none.
 fn agreement_of(item: &NativeStockItem, lines: &[NativeReportLine]) -> NativeQuantityAgreement {
     let own = match &item.closing.quantity {
         NativeQuantityRead::Empty => return NativeQuantityAgreement::NoneSent,
         NativeQuantityRead::Unread => return NativeQuantityAgreement::Unread,
         NativeQuantityRead::Read(quantity) => quantity,
     };
-    // In the captures the plain report listed only what sits directly under the root, so
-    // an item inside a stock group is taken to have no line of its own, whatever a line of
-    // the same name shows: that line is read as the group's (§12a.13). A parent that was
-    // not sent proves neither.
+    // The plain report has a line only for what sits directly under the root, so an item
+    // inside a stock group has none of its own, whatever a line of the same name shows: that
+    // line is read as the group's (§12a.13). A parent that was not sent proves neither.
     match item.parent.as_deref() {
-        Some(parent) if !crate::is_tally_reserved_root(parent) => {
-            return NativeQuantityAgreement::InsideStockGroup
+        Some(parent) if crate::is_tally_reserved_root(parent) => {}
+        Some(parent) if parent_is_unresolved(parent) => {
+            return NativeQuantityAgreement::ParentNotResolved
         }
-        Some(_) => {}
+        Some(_) => return NativeQuantityAgreement::InsideStockGroup(ItemListQuantity(own.clone())),
         None => return NativeQuantityAgreement::NoReportLine,
     }
     let mut named = lines.iter().filter(|line| line.name == item.name);
@@ -1308,6 +1332,13 @@ fn agreement_of(item: &NativeStockItem, lines: &[NativeReportLine]) -> NativeQua
     } else {
         NativeQuantityAgreement::ReportDiffers
     }
+}
+
+/// A parent that is not the marked root and yet may be it: it reads `Primary`
+/// without the marker, or it carries a marker. Such a parent is not taken for a
+/// group's name, because a group's quantity is not compared.
+fn parent_is_unresolved(parent: &str) -> bool {
+    parent.trim().eq_ignore_ascii_case("primary") || parent.contains('\u{fffd}')
 }
 
 #[cfg(test)]

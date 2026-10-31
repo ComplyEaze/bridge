@@ -11,16 +11,12 @@ if (rootArgument !== -1 && !process.argv[rootArgument + 1]) {
 }
 const repositoryRoot = rootArgument === -1 ? scriptRoot : resolve(process.argv[rootArgument + 1]);
 
-// These are legacy, deliberately quarantined request profiles. The match is
-// exact: removing one does not create capacity for another, and adding either
-// hazard anywhere else fails this gate. New exceptions require reviewed edits
-// to this list and a distinct request-profile decision.
-const expected = new Set([
-  "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_company_list|Company Report",
-  "custom-report|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|BRIDGE Ledger Export V1",
-  "custom-report|src-tauri/src/tally/tdl_engine.rs::legacy_company_list_request|Company Report",
-  "function-argument-with-space|src-tauri/crates/bridge-tally-protocol/src/xml_read_profiles.rs::render_ledgers|$$NumItems:BRIDGE Ledger Collection V1",
-]);
+// Legacy, deliberately quarantined request profiles. The last two, the
+// custom company report and its test-only twin, were deleted under #1872, so
+// the set is empty. The match is exact: adding any hazard of any kind anywhere
+// fails this gate. A new exception requires a reviewed edit to this list and a
+// distinct request-profile decision.
+const expected = new Set([]);
 
 // Method and function names whose value is money, by suffix. A money method
 // named otherwise is not caught, and a FIELD with no <SET> is not scanned.
@@ -31,6 +27,8 @@ const ATTRIBUTES = String.raw`((?:#\[[^\]]*\]\s*)*)(?:pub(?:\([^)]*\))?\s+)?mod\
 
 const actual = new Set();
 const sources = ["src-tauri"].flatMap((sourceRoot) => rustFiles(resolve(repositoryRoot, sourceRoot)));
+// With nothing pinned, a scan of no files would pass silently (AGENTS.md P5).
+if (sources.length === 0) throw new Error("Tally request-builder hazard scan found no Rust files under src-tauri");
 // A file reached only through a test-only module declaration is test code, by
 // its #[cfg(test)] attribute rather than by its name (#837).
 const quarantined = testOnlyFiles(sources);
@@ -52,7 +50,7 @@ if (unexpected.length || missing.length) {
 
 console.log(
   `Tally request-builder hazards match the pinned set (${actual.size} violations; ` +
-    `${quarantined.size} test-only file(s) skipped by their #[cfg(test)] mod declaration).`,
+    `${sources.length} file(s) found, ${quarantined.size} test-only file(s) skipped by their #[cfg(test)] mod declaration).`,
 );
 
 function rustFiles(directory) {
@@ -87,20 +85,18 @@ function scanRequestBuilderStrings(repositoryRoot, path, violations) {
   // tracked via brace-depth), inside a file under a tests/ directory
   // (integration tests), or in a file reached only through a test-only
   // `mod name;` declaration (testOnlyFiles(), by its #[cfg] attribute and never
-  // by the file's name: #837). This is deliberate, not incidental: unit tests such
-  // as `exact_report_collection_is_shared_by_count_and_rows`, which live
-  // inside `#[cfg(test)] mod tests { ... }`, assert against string literals
+  // by the file's name: #837). This is deliberate, not incidental: unit tests,
+  // which live inside `#[cfg(test)] mod tests { ... }`, may assert against string literals
   // containing `<REPORT NAME="...">` or `$$NumItems:... With Spaces` as
   // *expectations*, not as a dispatched request. Those are not request
   // builders and must not be scanned.
   //
   // Deliberately narrower than "skip anything under #[cfg(test)]": a bare
-  // #[cfg(test)] fn (not inside a mod) is still scanned, because this
-  // repository pins exactly that shape as a real hazard --
-  // `legacy_company_list_request` in tdl_engine.rs is a top-level
-  // `#[cfg(test)] fn` whose body *is* the rendered request, kept only to
-  // assert byte-parity with the production renderer. Excluding all
-  // #[cfg(test)] items would silently drop it from the pinned set.
+  // #[cfg(test)] fn (not inside a mod) is still scanned, because such a fn
+  // can hold a whole rendered request (the deleted
+  // `legacy_company_list_request` in tdl_engine.rs did, to assert
+  // byte-parity with the production renderer). Excluding all #[cfg(test)]
+  // items would let such a copy go unscanned.
   //
   // What this still cannot catch:
   //  - A hazard assembled at runtime via string concatenation across

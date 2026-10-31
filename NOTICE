@@ -46,6 +46,60 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -------------------------------------------------------------------------------
+OpenSSL
+Copyright 1995-2026 The OpenSSL Project Authors
+
+Every build of Bridge for a target other than macOS compiles OpenSSL 3.6.3 from
+source and links it statically, because SQLCipher (above) uses it for its
+cryptography; the only non-macOS build Bridge ships is the Windows one. The
+source is the openssl-src crate, version 300.6.1+3.6.3. The macOS build uses
+SQLCipher's CommonCrypto provider and does not include OpenSSL. OpenSSL is
+distributed under the Apache License, Version 2.0, the same licence as Bridge;
+its text is in the LICENSE file of this distribution. The OpenSSL source has no
+NOTICE file of its own. Some files in its crypto, engines and include
+directories carry other licence terms in their own headers, which apply to those
+files as the headers state: alternative BSD-style licences (for example the
+directory sources crypto/LPdir_*.c, the X.509 sources crypto/x509/v3_pci.c and
+v3_pcia.c, and assembler sources for RISC-V and LoongArch), a 2-clause BSD
+licence stated by the SPARC T4 assembler sources, the CRYPTOGAMS licence under
+which Andy Polyakov's assembler modules (among them
+engines/asm/e_padlock-x86*.pl) are also available, and public-domain notices on
+some reference code. Read the file headers in the openssl-src crate for any one
+file. The source files of the OpenSSL library (crypto, ssl and providers) state
+the following copyright holders, in addition to The OpenSSL Project Authors:
+
+  Oracle and/or its affiliates (2002-2019)
+  Intel Corporation (2012-2025)
+  Siemens AG (2015-2022)
+  Nokia (2005-2020)
+  Cryptography Research, Inc. (2014-2016)
+  Ribose Inc. (2017)
+  IBM Corp. (2018-2025)
+  Google Inc. (2011)
+  Akamai Technologies (2004-2014)
+  CloudFlare, Inc. (2015)
+  Red Hat, Inc. (2019)
+  BaishanCloud (2017)
+  Cavium Networks Ltd. (2016)
+  NTT (Nippon Telegraph and Telephone Corporation) (2006)
+  KISA (Korea Information Security Agency) (2007)
+  National Security Research Institute (2017)
+  Kungliga Tekniska Högskolan (2004)
+  Network Resonance, Inc. (2006) and RTFM, Inc. (2011)
+  EdelKey Project (2004)
+  Richard Levitte (2004-2018)
+  Christoph Müllner (2023)
+  Jerry Shih (2023)
+  Phoebe Chen (2023)
+  Julian Zhu (2025)
+  Hongren (Zenithal) Zheng (2022)
+  Samuel Neves (2012)
+  Andy Polyakov (2008)
+  Jean-Philippe Aumasson (2012-2016)
+  Daniel J. Bernstein (2012-2014)
+  Patrick Powell (1995)
+
+-------------------------------------------------------------------------------
 PDFium
 Copyright 2014 The PDFium Authors
 
@@ -60,99 +114,6 @@ Portions of this software are copyright (c) The FreeType Project
 (www.freetype.org). All rights reserved.
 
 This software is based in part on the work of the Independent JPEG Group.
-
--------------------------------------------------------------------------------
-AWS-LC (the aws-lc-sys crate, compiled into the Bridge binaries)
-
-The Bridge MCP server links AWS-LC, a cryptography library, through the
-aws-lc-sys crate (version 0.44.0 in the 0.6.0 packages). AWS-LC is a fork of
-BoringSSL, which is itself a fork of OpenSSL, and code in it keeps its original
-licence. The copyright holders and licences below are the ones the crate's own
-licence file (aws-lc/LICENSE) states:
-
-  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-    New AWS-LC files: Apache-2.0 OR ISC. The s2n-bignum code: Apache-2.0 OR ISC
-    OR MIT-0.
-  Copyright (c) 2014-2024 Google Inc., with contributions of Brian Smith (2016),
-    Robert Nagy (2022) and Arm Ltd (2020): code from BoringSSL, ISC License.
-  Copyright (c) 2025-2026 Google Inc.: newer code from BoringSSL, Apache-2.0.
-  Copyright (c) 1998-2011 The OpenSSL Project. All rights reserved. and
-    Copyright (c) 1995-1998 Eric Young (eay@cryptsoft.com). All rights reserved.,
-    with contributions of Sun Microsystems (2002), Nokia (2005) and Intel
-    Corporation (2012-2021): code derived from OpenSSL, Apache-2.0.
-  Copyright (c) The mlkem-native project authors and Copyright (c) The
-    mldsa-native project authors: Apache-2.0 OR ISC OR MIT.
-  Copyright (c) 2015-2020 the fiat-crypto authors: MIT.
-  Copyright (C) 2017 - 2025, Stephan Mueller <smueller@chronox.de>: the Jitter
-    Entropy library; the crate states that Amazon elects the BSD licence of its
-    source files and not the GNU General Public License Version 2.
-  Keccak and AES reference implementations: public domain (CC0).
-
-The Apache License 2.0 is in LICENSE; the MIT License text is in
-THIRD_PARTY_LICENSES_RUST.txt. The ISC License, as the crate's licence file
-states it, and the licence text in the Jitter Entropy library's own source files
-follow. The library's 19 files carry four distinct copyright notices, reproduced
-below exactly as they stand.
-
-ISC License (code from BoringSSL):
-
-Copyright (c) 2014-2024 Google Inc.
-
-Permission to use, copy, modify, and/or distribute this software for
-any purpose with or without fee is hereby granted, provided that the
-above copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
-WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
-AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-
-Jitter Entropy library. Its source files carry these copyright notices:
-
-Copyright Stephan Mueller <smueller@chronox.de>, 2013 - 2025
-Copyright Stephan Mueller <smueller@chronox.de>, 2014 - 2025
-Copyright (C) 2021 - 2025, Stephan Mueller <smueller@chronox.de>
-Copyright (C) 2021 - 2025, Joshua E. Hill <josh@keypair.us>
-
-Some of its source files carry the licence text below; the others refer to a
-LICENSE file in the library's root directory, which the aws-lc-sys crate does not
-ship.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, and the entire permission notice in its entirety,
-   including the disclaimer of warranties.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-3. The name of the author may not be used to endorse or promote
-   products derived from this software without specific prior
-   written permission.
-
-ALTERNATIVELY, this product may be distributed under the terms of
-the GNU General Public License, in which case the provisions of the GPL are
-required INSTEAD OF the above restrictions.  (This clause is
-necessary due to a potential bad interaction between the GPL and
-the restrictions contained in a BSD-style copyright.)
-
-THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED
-WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE, ALL OF
-WHICH ARE HEREBY DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE
-LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT
-OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
-BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-USE OF THIS SOFTWARE, EVEN IF NOT ADVISED OF THE POSSIBILITY OF SUCH
-DAMAGE.
 
 -------------------------------------------------------------------------------
 Website (site/)

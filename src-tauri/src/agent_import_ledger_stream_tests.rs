@@ -508,6 +508,9 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled: 4,
             unsettled_no_response: 2,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
+            unsettled_restored: 0,
+            settled_by_person: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -519,6 +522,9 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled: 0,
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
+            unsettled_reviewed: 0,
+            unsettled_restored: 0,
+            settled_by_person: 0,
             no_dispatch_never_verified: 0
         }
     );
@@ -1481,6 +1487,89 @@ fn a_rollback_seen_on_one_batch_covers_an_earlier_batch_of_the_company() {
         .is_empty());
 }
 
+/// #1050: in the local data report's count, a native post a recorded restore
+/// covers is not settled whatever its latest status reads, and counts in its
+/// own bucket and in no other part of `unsettled`.
+#[test]
+fn a_restored_post_is_not_settled_whatever_its_status_reads() {
+    let created = captured_outcome().counters().created;
+    assert!(created > 0);
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let verified = |line: &ImportLedgerLine| {
+        let mut read = line.clone();
+        read.status = "posted_verified".into();
+        record(&StatusRecord::from(&read))
+    };
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        verified(&p1),
+        record(&p2),
+        intent(&p2, Some(1 + created)),
+        answered(&p2),
+    ];
+    let before = settlement(Cursor::new(journal.concat())).unwrap();
+    // P1 verified and settled; P2 answered, not yet verified.
+    assert_eq!((before.unsettled, before.unsettled_restored), (1, 0));
+    let read = journal.len() as u64;
+    journal.push(seen(&p2, 1, read));
+    let after = settlement(Cursor::new(journal.concat())).unwrap();
+    assert_eq!(after.unsettled, 2, "{after:?}");
+    assert_eq!(after.unsettled_restored, 2, "{after:?}");
+    assert_eq!(
+        after.unsettled_no_response + after.unsettled_binding_refused + after.unsettled_reviewed,
+        0,
+        "{after:?}"
+    );
+    assert_eq!(after.settled_by_person, 0);
+    assert_eq!(after.sent_or_found, 2, "the rows stay held");
+}
+
+/// #1050: a cover reaches only native posts dispatched before its reading. A
+/// hand-imported batch beside it, with no dispatch intent, and a post sent
+/// after the record are counted as before, and the parts still sum to
+/// `unsettled`.
+#[test]
+fn a_restore_leaves_a_hand_import_and_a_later_post_where_they_were() {
+    let created = captured_outcome().counters().created;
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let hand = placed("hand", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let later = placed("later", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut hand_found = hand.clone();
+    hand_found.status = "posted_verified".into();
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        record(&hand_found),
+    ];
+    let read = journal.len() as u64;
+    journal.push(seen(&p1, 1, read));
+    journal.push(record(&later));
+    // Its floor is above the record's mark, so only its place after the
+    // record keeps it uncovered.
+    journal.push(intent(&later, Some(1 + created)));
+    let counted = settlement(Cursor::new(journal.concat())).unwrap();
+    assert!(created > 0);
+    // P1 restored; `later` sent after the record, no answer: no response;
+    // the hand import was never dispatched and was found posted.
+    assert_eq!(counted.unsettled_restored, 1, "{counted:?}");
+    assert_eq!(counted.unsettled_no_response, 1, "{counted:?}");
+    assert_eq!(counted.unsettled, 2, "{counted:?}");
+    assert_eq!(counted.sent_or_found, 3, "{counted:?}");
+    assert_eq!(counted.no_dispatch_never_verified, 0, "{counted:?}");
+    assert_eq!(
+        counted.unsettled,
+        counted.unsettled_no_response
+            + counted.unsettled_binding_refused
+            + counted.unsettled_reviewed
+            + counted.unsettled_restored,
+        "{counted:?}"
+    );
+}
+
 /// A record judges a batch only on what the journal held when its mark was
 /// read: a post written after that point, or answered after it, is not
 /// covered by a mark its own vouchers had not yet raised.
@@ -1522,6 +1611,48 @@ fn a_record_covers_only_what_the_journal_held_before_its_mark_was_read() {
             .map(|cover| cover.mark_read),
         Some(5)
     );
+}
+
+/// An answer that reported `STATUS=0` failed whatever its counters say
+/// (IMPLEMENTATION_GUIDE.md §3.2, I6), so its `CREATED` proves no voucher
+/// landed: the post's floor stays its pre-POST mark (#2035).
+#[test]
+fn an_answer_reporting_status_zero_raises_no_floor() {
+    let failed = bridge_tally_protocol::parse_import_outcome(
+        "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>10</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>11</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>",
+    )
+    .unwrap();
+    assert_eq!(failed.counters().created, 10);
+    assert_eq!(
+        failed.application_status(),
+        bridge_tally_protocol::TallyImportApplicationStatus::Failure
+    );
+    let refused = placed("refused", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let seer = placed("seer", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&refused),
+        intent(&refused, Some(1)),
+        record(&StatusRecord::response(
+            &refused,
+            DispatchResponse {
+                request_sha256: "c".repeat(64),
+                response_sha256: "d".repeat(64),
+                bytes: 1,
+                outcome: Some(failed),
+            },
+        )),
+        record(&seer),
+        intent(&seer, Some(1)),
+    ];
+    let read = journal.len() as u64;
+    // The mark still reads 1: Tally created nothing for the refused post, so
+    // no record would be written for it.
+    assert!(!rollback_record_extends(Cursor::new(journal.concat()), "seer", 1, read).unwrap());
+    journal.push(seen(&seer, 1, read));
+    assert_eq!(cover(&journal, "refused").covered_by, None);
+    assert!(covered_by_records_of(Cursor::new(journal.concat()), "seer")
+        .unwrap()
+        .is_empty());
 }
 
 /// Only the same company, by all four fields, at the same Tally address.
@@ -1645,4 +1776,609 @@ fn a_covered_posts_check_still_records_a_second_restore_that_reaches_a_later_pos
         10 + 2 * created,
         journal.len() as u64
     ));
+}
+
+fn refused_as(line: &ImportLedgerLine, code: &str) -> Vec<u8> {
+    record(&StatusRecord::post_span_verdict(
+        line,
+        &PostSpanVerdict::Refused(code.into()),
+    ))
+}
+
+fn reviewed(line: &ImportLedgerLine, state: ReviewedBinding) -> Vec<u8> {
+    record(&StatusRecord::content_review(line, state))
+}
+
+fn verified(line: &ImportLedgerLine) -> Vec<u8> {
+    record(
+        &serde_json::from_value::<StatusRecord>(json!({
+            "record_type":"verification_status","batch_id":line.batch_id,
+            "batch_sha256":line.sha256,"status":"posted_verified"
+        }))
+        .unwrap(),
+    )
+}
+
+/// The review that stands for `batch_id`, or the journal's refusal.
+fn review_of(journal: &[Vec<u8>], batch_id: &str) -> Result<Option<ReviewedBinding>, String> {
+    content_review(Cursor::new(journal.concat()), batch_id)
+}
+
+/// A content review (#1039) is admitted only after a native intent with a
+/// pre-POST mark, on a content-only state the journal holds: a refusal by any
+/// code but `span_identity_reused`, or no outcome and no verdict. Never while
+/// the batch reads verified, never twice while one stands, and never with a
+/// field of another record; no other record carries its field. It sets no
+/// status.
+#[test]
+fn a_content_review_is_admitted_only_on_a_content_only_state() {
+    use ReviewedBinding::{Refused, ResponseNotRecorded};
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let refused = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+    ];
+    let unanswered = vec![record(&p1), intent(&p1, Some(4))];
+    let with = |base: &[Vec<u8>], more: &[Vec<u8>]| [base, more].concat();
+
+    let admitted = with(&refused, &[reviewed(&p1, Refused)]);
+    assert_eq!(review_of(&admitted, "p1"), Ok(Some(Refused)));
+    let snapshot = read_snapshot(Cursor::new(admitted.concat()), Some("p1"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.batch.status, "response_received");
+    let admitted = with(&unanswered, &[reviewed(&p1, ResponseNotRecorded)]);
+    assert_eq!(review_of(&admitted, "p1"), Ok(Some(ResponseNotRecorded)));
+    // An answer whose outcome did not parse is no outcome: the state holds.
+    let unparsed = StatusRecord::response(
+        &p1,
+        DispatchResponse {
+            request_sha256: "c".repeat(64),
+            response_sha256: "d".repeat(64),
+            bytes: 1,
+            outcome: None,
+        },
+    );
+    let admitted = with(
+        &unanswered,
+        &[record(&unparsed), reviewed(&p1, ResponseNotRecorded)],
+    );
+    assert_eq!(review_of(&admitted, "p1"), Ok(Some(ResponseNotRecorded)));
+
+    let refused_invalid = |journal: Vec<Vec<u8>>, why: &str| {
+        assert_eq!(
+            review_of(&journal, "p1"),
+            Err("import_ledger_invalid".to_string()),
+            "{why}"
+        );
+    };
+    refused_invalid(
+        vec![
+            record(&p1),
+            intent(&p1, Some(4)),
+            answered(&p1),
+            refused_as(&p1, IDENTITY_REUSED),
+            reviewed(&p1, Refused),
+        ],
+        "a refusal no review covers",
+    );
+    refused_invalid(
+        with(&refused[..3], &[reviewed(&p1, Refused)]),
+        "no refusal on file",
+    );
+    refused_invalid(
+        with(&refused[..3], &[reviewed(&p1, ResponseNotRecorded)]),
+        "an outcome on file",
+    );
+    refused_invalid(
+        with(&refused, &[reviewed(&p1, ResponseNotRecorded)]),
+        "the other state",
+    );
+    refused_invalid(
+        vec![
+            record(&p1),
+            intent(&p1, None),
+            reviewed(&p1, ResponseNotRecorded),
+        ],
+        "an intent with no pre-POST mark",
+    );
+    refused_invalid(
+        vec![record(&p1), reviewed(&p1, ResponseNotRecorded)],
+        "never sent",
+    );
+    refused_invalid(
+        with(
+            &unanswered,
+            &[verified(&p1), reviewed(&p1, ResponseNotRecorded)],
+        ),
+        "while verified",
+    );
+    refused_invalid(
+        with(&refused, &[reviewed(&p1, Refused), reviewed(&p1, Refused)]),
+        "a second while the first stands",
+    );
+    let mut extra = StatusRecord::content_review(&p1, Refused);
+    extra.pre_post_voucher_mark = Some(4);
+    refused_invalid(
+        with(&refused, &[record(&extra)]),
+        "a field of another record",
+    );
+    let mut stray = StatusRecord::stop_release(&p1, ReleaseSeen::Found);
+    stray.reviewed_binding = Some(Refused);
+    refused_invalid(
+        with(&refused, &[record(&stray)]),
+        "its field on another record",
+    );
+    let mut misnamed = StatusRecord::content_review(&p1, Refused);
+    misnamed.status = "posted_verified".into();
+    refused_invalid(with(&refused, &[record(&misnamed)]), "another status");
+}
+
+/// The record is written as `content_review` with its state in snake case. A
+/// build that does not know a record kind or a state refuses the whole
+/// journal holding it, as an older build does this one, never skipping it.
+#[test]
+fn a_record_kind_or_state_the_build_does_not_know_refuses_the_whole_journal() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let review = serde_json::to_value(StatusRecord::content_review(
+        &p1,
+        ReviewedBinding::ResponseNotRecorded,
+    ))
+    .unwrap();
+    assert_eq!(review["record_type"], "content_review");
+    assert_eq!(review["status"], "content_reviewed");
+    assert_eq!(review["reviewed_binding"], "response_not_recorded");
+    for (field, unknown) in [
+        ("record_type", "content_review_v2"),
+        ("reviewed_binding", "reviewed"),
+    ] {
+        let mut changed = review.clone();
+        changed[field] = json!(unknown);
+        let journal = vec![record(&p1), intent(&p1, Some(4)), record(&changed)];
+        assert_eq!(
+            review_of(&journal, "p1"),
+            Err("import_ledger_invalid".to_string()),
+            "{field}"
+        );
+        assert!(
+            settlement(Cursor::new(journal.concat())).is_err(),
+            "{field}"
+        );
+    }
+}
+
+/// A review stands until the batch reads `posted_verified`, an answer with an
+/// outcome is recorded, or a rollback covers the batch; each voids it for good.
+/// After a verified read or an answer a new review may be recorded where the
+/// state allows; after a cover none is, since the batch then reads rolled back
+/// and the journal keeps refusing a second review of it.
+#[test]
+fn a_content_review_is_voided_by_a_verified_read_an_answer_or_a_rollback() {
+    use ReviewedBinding::{Refused, ResponseNotRecorded};
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        reviewed(&p1, ResponseNotRecorded),
+    ];
+    assert_eq!(review_of(&journal, "p1"), Ok(Some(ResponseNotRecorded)));
+    journal.push(verified(&p1));
+    assert_eq!(review_of(&journal, "p1"), Ok(None));
+    journal.push(incomplete(&p1));
+    assert_eq!(review_of(&journal, "p1"), Ok(None), "void for good");
+    journal.push(reviewed(&p1, ResponseNotRecorded));
+    assert_eq!(review_of(&journal, "p1"), Ok(Some(ResponseNotRecorded)));
+    journal.push(answered(&p1));
+    assert_eq!(review_of(&journal, "p1"), Ok(None), "an answer voids it");
+
+    // A later answer voids a review of a lost answer, so the refusal its
+    // binding then records can be reviewed in turn.
+    let mut late = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        reviewed(&p1, ResponseNotRecorded),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+        reviewed(&p1, Refused),
+    ];
+    assert_eq!(review_of(&late, "p1"), Ok(Some(Refused)));
+    // A full record that reads verified voids it as a status record does.
+    let mut found = p1.clone();
+    found.status = "posted_verified".into();
+    late.push(record(&found));
+    assert_eq!(review_of(&late, "p1"), Ok(None));
+
+    // A rollback that covers the batch voids its review; one that does not
+    // cover it leaves the review standing.
+    let refused = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+        reviewed(&p1, Refused),
+    ];
+    let floor = 4 + captured_outcome().counters().created;
+    let mut above = refused.clone();
+    above.push(seen(&p1, floor, refused.len() as u64));
+    assert_eq!(cover(&above, "p1").covered_by, None);
+    assert_eq!(review_of(&above, "p1"), Ok(Some(Refused)));
+    let mut below = refused.clone();
+    below.push(seen(&p1, floor - 1, refused.len() as u64));
+    assert!(cover(&below, "p1").covered_by.is_some());
+    assert_eq!(review_of(&below, "p1"), Ok(None));
+    // Reviews of other batches are their own.
+    assert_eq!(review_of(&refused, "p2"), Ok(None));
+}
+
+/// The local-data report counts a reviewed batch in its own bucket and in no
+/// other part of the unsettled batches; once voided, it is back where it was.
+#[test]
+fn a_reviewed_batch_is_counted_in_its_own_bucket_until_voided() {
+    use ReviewedBinding::{Refused, ResponseNotRecorded};
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let created = captured_outcome().counters().created;
+    let journal = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+        record(&p2),
+        intent(&p2, Some(4 + created)),
+    ];
+    let counts = |journal: &[Vec<u8>]| {
+        let counted = settlement(Cursor::new(journal.concat())).unwrap();
+        (
+            counted.unsettled,
+            counted.unsettled_binding_refused,
+            counted.unsettled_no_response,
+            counted.unsettled_reviewed,
+        )
+    };
+    assert_eq!(counts(&journal), (2, 1, 1, 0));
+    let mut both = journal.clone();
+    both.push(reviewed(&p1, Refused));
+    assert_eq!(counts(&both), (2, 0, 1, 1));
+    both.push(reviewed(&p2, ResponseNotRecorded));
+    assert_eq!(counts(&both), (2, 0, 0, 2));
+    // A restore below both posts' floors voids both reviews, and both posts
+    // then count as restored and in no other part (#1050).
+    let read = both.len() as u64;
+    both.push(seen(&p2, 1, read));
+    assert_eq!(counts(&both), (2, 0, 0, 0));
+    assert_eq!(
+        settlement(Cursor::new(both.concat()))
+            .unwrap()
+            .unsettled_restored,
+        2
+    );
+}
+
+/// The writer's check: the review a record would stand as if appended, or the
+/// journal's refusal of it, so the writer appends only what the reader admits.
+#[test]
+fn the_writer_appends_only_a_review_the_journal_admits_and_holds_standing() {
+    use ReviewedBinding::Refused;
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let refused = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        refused_as(&p1, "span_step_not_created"),
+    ];
+    let after = |journal: &[Vec<u8>]| {
+        content_review_after(
+            Cursor::new(journal.concat()),
+            &StatusRecord::content_review(&p1, Refused),
+        )
+    };
+    assert_eq!(after(&refused), Ok(Some(Refused)));
+    let mut standing = refused.clone();
+    standing.push(reviewed(&p1, Refused));
+    assert!(after(&standing).is_err());
+    let mut covered = refused.clone();
+    covered.push(seen(&p1, 1, refused.len() as u64));
+    assert_eq!(after(&covered), Ok(None));
+}
+
+/// The licensed 7.1 Silver answer to a rejected single voucher, committed byte
+/// for byte: every counter reported, `CREATED` 0, `EXCEPTIONS` 1.
+const REJECTED_ONE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/single-import-missing-ledger.utf16le.xml"
+);
+
+/// Its recorded answer: Tally created none of the batch's one voucher.
+fn rejected(line: &ImportLedgerLine) -> Vec<u8> {
+    let xml = bridge_tally_protocol::decode_tally_xml_response_bytes_limited(
+        REJECTED_ONE,
+        "text/xml; charset=utf-16",
+        bridge_tally_protocol::ExpectedTallyTextEncoding::Utf16Le,
+        REJECTED_ONE.len(),
+    )
+    .unwrap()
+    .text;
+    record(&StatusRecord::response(
+        line,
+        DispatchResponse {
+            request_sha256: "c".repeat(64),
+            response_sha256: "d".repeat(64),
+            bytes: REJECTED_ONE.len(),
+            outcome: Some(bridge_tally_protocol::parse_import_outcome(&xml).unwrap()),
+        },
+    ))
+}
+
+fn settled(line: &ImportLedgerLine) -> Vec<u8> {
+    record(&StatusRecord::person_settlement(line))
+}
+
+fn bound_as(line: &ImportLedgerLine) -> Vec<u8> {
+    let bound = line
+        .vouchers
+        .iter()
+        .map(
+            |voucher| super::super::span_identity::PostedVoucherIdentity {
+                bridge_txn_id: voucher.bridge_txn_id.clone(),
+                guid: "aaaa-00000064".into(),
+                master_id: 100,
+            },
+        )
+        .collect();
+    record(&StatusRecord::post_span_verdict(
+        line,
+        &PostSpanVerdict::Bound(bound),
+    ))
+}
+
+/// Whether a settlement of `batch_id` stands, or the journal's refusal.
+fn settlement_of(journal: &[Vec<u8>], batch_id: &str) -> Result<bool, String> {
+    person_settlement(Cursor::new(journal.concat()), batch_id)
+}
+
+/// A person settlement (#1709) is admitted only after a native intent with a
+/// pre-POST mark and an answer that reported none of the batch's vouchers
+/// created; never while the batch reads verified or is bound, never twice
+/// while one stands, and only with its own status. It sets no status.
+#[test]
+fn a_person_settlement_is_admitted_only_after_an_answer_that_created_none() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let not_created = vec![record(&p1), intent(&p1, Some(4)), rejected(&p1)];
+    let with = |base: &[Vec<u8>], more: &[Vec<u8>]| [base, more].concat();
+    let invalid = Err("import_ledger_invalid".to_string());
+
+    let admitted = with(&not_created, &[settled(&p1)]);
+    assert_eq!(settlement_of(&admitted, "p1"), Ok(true));
+    let snapshot = read_snapshot(Cursor::new(admitted.concat()), Some("p1"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.batch.status, "response_received");
+    // A refused binding leaves the state as it is.
+    let refused = with(&not_created, &[refused_as(&p1, "span_step_not_created")]);
+    assert_eq!(
+        settlement_of(&with(&refused, &[settled(&p1)]), "p1"),
+        Ok(true)
+    );
+
+    // No pre-POST mark, no answer, an answer that created something, or one
+    // whose outcome did not parse.
+    let unmarked = vec![record(&p1), intent(&p1, None), rejected(&p1), settled(&p1)];
+    assert_eq!(settlement_of(&unmarked, "p1"), invalid);
+    let unanswered = vec![record(&p1), intent(&p1, Some(4)), settled(&p1)];
+    assert_eq!(settlement_of(&unanswered, "p1"), invalid);
+    let created = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        answered(&p1),
+        settled(&p1),
+    ];
+    assert_eq!(settlement_of(&created, "p1"), invalid);
+    let unparsed = record(&StatusRecord::response(
+        &p1,
+        DispatchResponse {
+            request_sha256: "c".repeat(64),
+            response_sha256: "d".repeat(64),
+            bytes: 1,
+            outcome: None,
+        },
+    ));
+    let unparsed = vec![record(&p1), intent(&p1, Some(4)), unparsed, settled(&p1)];
+    assert_eq!(settlement_of(&unparsed, "p1"), invalid);
+    // A later answer that created something replaces the rejection.
+    let replaced = with(&not_created, &[answered(&p1), settled(&p1)]);
+    assert_eq!(settlement_of(&replaced, "p1"), invalid);
+    // One exception for a batch of two is not every voucher rejected.
+    let mut p2 = placed("p2", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let mut second = p2.vouchers[0].clone();
+    second.bridge_txn_id = "txn-2".into();
+    p2.vouchers.push(second);
+    p2.txn_ids.push("txn-2".into());
+    let partial = vec![
+        record(&p2),
+        intent(&p2, Some(4)),
+        rejected(&p2),
+        settled(&p2),
+    ];
+    assert_eq!(settlement_of(&partial, "p2"), invalid);
+
+    // Verified, bound, a second settlement, or another status.
+    assert_eq!(
+        settlement_of(&with(&not_created, &[verified(&p1), settled(&p1)]), "p1"),
+        invalid
+    );
+    assert_eq!(
+        settlement_of(&with(&not_created, &[bound_as(&p1), settled(&p1)]), "p1"),
+        invalid
+    );
+    assert_eq!(
+        settlement_of(&with(&admitted, &[settled(&p1)]), "p1"),
+        invalid
+    );
+    let mut renamed = serde_json::to_value(StatusRecord::person_settlement(&p1)).unwrap();
+    renamed["status"] = json!("content_reviewed");
+    assert_eq!(
+        settlement_of(&with(&not_created, &[record(&renamed)]), "p1"),
+        invalid
+    );
+}
+
+/// The record's shape, and a build that does not know it refuses the journal.
+#[test]
+fn a_person_settlement_kind_the_build_does_not_know_refuses_the_whole_journal() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let settlement_json = serde_json::to_value(StatusRecord::person_settlement(&p1)).unwrap();
+    assert_eq!(settlement_json["record_type"], "person_settlement");
+    assert_eq!(settlement_json["status"], "settled_by_person");
+    assert_eq!(settlement_json["batch_sha256"], p1.sha256.as_str());
+    let mut changed = settlement_json.clone();
+    changed["record_type"] = json!("person_settlement_v2");
+    let journal = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        rejected(&p1),
+        record(&changed),
+    ];
+    assert_eq!(
+        settlement_of(&journal, "p1"),
+        Err("import_ledger_invalid".to_string())
+    );
+    assert!(settlement(Cursor::new(journal.concat())).is_err());
+}
+
+/// A settlement stands until the batch reads `posted_verified`, an answer with
+/// an outcome is recorded, it is bound, or a rollback covers it; each voids it
+/// for good. A new settlement may then be recorded where the state allows.
+#[test]
+fn a_person_settlement_is_voided_by_a_verified_read_an_answer_a_bind_or_a_rollback() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let standing = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        rejected(&p1),
+        settled(&p1),
+    ];
+    let with = |more: &[Vec<u8>]| [standing.as_slice(), more].concat();
+    assert_eq!(settlement_of(&with(&[verified(&p1)]), "p1"), Ok(false));
+    let mut full = p1.clone();
+    full.status = "posted_verified".into();
+    assert_eq!(settlement_of(&with(&[record(&full)]), "p1"), Ok(false));
+    assert_eq!(settlement_of(&with(&[bound_as(&p1)]), "p1"), Ok(false));
+    // A later answer voids it, and a new rejection admits a new settlement.
+    assert_eq!(settlement_of(&with(&[rejected(&p1)]), "p1"), Ok(false));
+    assert_eq!(
+        settlement_of(&with(&[rejected(&p1), settled(&p1)]), "p1"),
+        Ok(true)
+    );
+    // A restore below the post's floor voids it; one of another batch that
+    // does not cover it does not.
+    let read = standing.len() as u64;
+    assert_eq!(settlement_of(&with(&[seen(&p1, 1, read)]), "p1"), Ok(false));
+    let other = with(&[record(&p2), intent(&p2, Some(9))]);
+    let read = other.len() as u64;
+    let mut uncovered = other.clone();
+    uncovered.push(seen(&p2, 8, read));
+    assert_eq!(settlement_of(&uncovered, "p1"), Ok(true));
+}
+
+/// A settled batch leaves `unsettled` and every part of it, beside a standing
+/// content review too, and comes back once the settlement is voided.
+#[test]
+fn a_settled_batch_leaves_every_not_settled_count_until_voided() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let journal = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        rejected(&p1),
+        refused_as(&p1, "span_step_not_created"),
+        record(&p2),
+        intent(&p2, Some(4)),
+    ];
+    let counts = |journal: &[Vec<u8>]| {
+        let counted = settlement(Cursor::new(journal.concat())).unwrap();
+        (
+            counted.unsettled,
+            counted.unsettled_binding_refused,
+            counted.unsettled_no_response,
+            counted.unsettled_reviewed,
+            counted.settled_by_person,
+            counted.sent_or_found,
+        )
+    };
+    assert_eq!(counts(&journal), (2, 1, 1, 0, 0, 2));
+    let mut settled_journal = journal.clone();
+    settled_journal.push(settled(&p1));
+    assert_eq!(counts(&settled_journal), (1, 0, 1, 0, 1, 2));
+    let mut reviewed_too = journal.clone();
+    reviewed_too.push(reviewed(&p1, ReviewedBinding::Refused));
+    assert_eq!(counts(&reviewed_too), (2, 0, 1, 1, 0, 2));
+    reviewed_too.push(settled(&p1));
+    assert_eq!(counts(&reviewed_too), (1, 0, 1, 0, 1, 2));
+    // A restore below the post's floor voids the settlement, and both posts
+    // then count as restored and in no other part (#1050).
+    let read = settled_journal.len() as u64;
+    settled_journal.push(seen(&p2, 1, read));
+    assert_eq!(counts(&settled_journal), (2, 0, 0, 0, 0, 2));
+    assert_eq!(
+        settlement(Cursor::new(settled_journal.concat()))
+            .unwrap()
+            .unsettled_restored,
+        2
+    );
+}
+
+/// The writer's check: whether a record would stand if appended, or the
+/// journal's refusal of it, so the writer appends only what the reader admits.
+#[test]
+fn the_writer_appends_only_a_settlement_the_journal_admits_and_holds_standing() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let not_created = vec![record(&p1), intent(&p1, Some(4)), rejected(&p1)];
+    let after = |journal: &[Vec<u8>]| {
+        person_settlement_after(
+            Cursor::new(journal.concat()),
+            &StatusRecord::person_settlement(&p1),
+        )
+    };
+    assert_eq!(after(&not_created), Ok(true));
+    let mut standing = not_created.clone();
+    standing.push(settled(&p1));
+    assert!(after(&standing).is_err());
+    let mut covered = not_created.clone();
+    covered.push(seen(&p1, 1, not_created.len() as u64));
+    assert_eq!(after(&covered), Ok(false));
+}
+
+/// A verified read voids a settlement for good, by a status record or a full
+/// record; once the batch reads unverified again and is still on record as
+/// rejected, a new settlement is admitted.
+#[test]
+fn a_settlement_voided_by_a_verified_read_can_be_made_again() {
+    let p1 = placed("p1", "BRIDGE CONCUR LAB", Some(PLACE_ENDPOINT));
+    let standing = vec![
+        record(&p1),
+        intent(&p1, Some(4)),
+        rejected(&p1),
+        settled(&p1),
+    ];
+    let unverified = record(
+        &serde_json::from_value::<StatusRecord>(json!({
+            "record_type":"verification_status","batch_id":p1.batch_id,
+            "batch_sha256":p1.sha256,"status":"reconciliation_required"
+        }))
+        .unwrap(),
+    );
+    let by_status = [
+        standing.clone(),
+        vec![verified(&p1), unverified, settled(&p1)],
+    ]
+    .concat();
+    assert_eq!(settlement_of(&by_status, "p1"), Ok(true));
+    let mut full = p1.clone();
+    full.status = "posted_verified".into();
+    let mut open = p1.clone();
+    open.status = "reconciliation_required".into();
+    let by_record = [standing, vec![record(&full), record(&open), settled(&p1)]].concat();
+    assert_eq!(settlement_of(&by_record, "p1"), Ok(true));
 }

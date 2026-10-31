@@ -104,8 +104,8 @@ export function TermsGate({ children, loadStatus = defaultLoadStatus, accept = d
           {status.state === "record_unavailable" && (
             <p role="alert">
               Bridge could not read or write its record of your acceptance. Check that its data folder (com.complyeaze.bridge, in your
-              Application Support or AppData folder) can be written, or remove its terms-acceptance.jsonl if the last
-              line is cut short, then try again.
+              Application Support or AppData folder) can be written, then try again. If that fails too, its
+              terms-acceptance.jsonl holds a line Bridge did not write: move that file aside and try again.
             </p>
           )}
           <label>

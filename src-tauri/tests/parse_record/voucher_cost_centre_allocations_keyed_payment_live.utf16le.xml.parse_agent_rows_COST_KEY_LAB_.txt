@@ -1,0 +1,67 @@
+# fixture: voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml
+# parser: parse_agent_rows(COST_KEY_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(1),
+        "amounts": Array [
+            Object {
+                "amount": String("-1000.00"),
+                "bill_allocations": Array [],
+                "cost_centre_allocations": Array [
+                    Object {
+                        "amount": String("-600.00"),
+                        "category": String("Primary Cost Category"),
+                        "cost_centre": String("CK North"),
+                    },
+                    Object {
+                        "amount": String("-400.00"),
+                        "category": String("Primary Cost Category"),
+                        "cost_centre": String("CK North East"),
+                    },
+                ],
+                "is_deemed_positive": String("Yes"),
+                "ledger": String("CK Expense"),
+            },
+            Object {
+                "amount": String("1000.00"),
+                "bank_allocations": Array [
+                    Object {
+                        "bank_date": Object {
+                            "state": String("empty"),
+                        },
+                        "instrument_date": Object {
+                            "state": String("value"),
+                            "value": String("20250515"),
+                        },
+                        "instrument_number": Object {
+                            "state": String("empty"),
+                        },
+                        "status": Object {
+                            "state": String("value"),
+                            "value": String("No"),
+                        },
+                        "transaction_type": Object {
+                            "state": String("value"),
+                            "value": String("Cheque"),
+                        },
+                    },
+                ],
+                "bill_allocations": Array [],
+                "is_deemed_positive": String("No"),
+                "ledger": String("CK Bank"),
+            },
+        ],
+        "cancelled": Bool(false),
+        "date": String("20250515"),
+        "guid": String("ddf3a557-704c-4f61-ae8d-46a3380062a1-00000001"),
+        "is_invoice": Bool(false),
+        "master_id": String("1"),
+        "narration": String("CK-K1"),
+        "optional": Bool(false),
+        "party": String("CK Bank"),
+        "post_dated": Bool(false),
+        "voucher_number": String("1"),
+        "voucher_type": String("Payment"),
+    },
+])

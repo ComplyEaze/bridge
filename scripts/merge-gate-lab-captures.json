@@ -142,6 +142,36 @@
       "size": 2568786
     },
     {
+      "blob": "9e1b4fd9f76862d853db15b5d5f97b7533097b45",
+      "capture_id": "native-party-masters-mailing-details.request.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "branch lab/1490-mailing-answers at b01ac6ded",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see native-party-masters-mailing-details.PROVENANCE.md",
+      "sha256": "1bf17a26c209253cb85a1725037cbf6000df4c6bc5ba77bfdd41ff65ab1ae8fa",
+      "size": 1792
+    },
+    {
+      "blob": "f163663784cddac319bfe329cb52785465ec282d",
+      "capture_id": "native-party-masters-mailing-details.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "branch lab/1490-mailing-answers at b01ac6ded",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml",
+      "seed_basis": "synthetic lab book; see native-party-masters-mailing-details.PROVENANCE.md",
+      "sha256": "ceaa6d789d1ce9a41c7bcf233e5d26cbe383dcd261e57fb804935d8845cc75d5",
+      "size": 20896
+    },
+    {
+      "blob": "6e912c80f9c90431628c009b63ce916f11b3222a",
+      "capture_id": "native-party-masters-without-mailing-details.utf16le.xml",
+      "company": "Bridge Lab Win 0.5.1",
+      "lab_ref": "branch lab/1490-mailing-answers at b01ac6ded",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-without-mailing-details.utf16le.xml",
+      "seed_basis": "synthetic lab book; see native-party-masters-mailing-details.PROVENANCE.md",
+      "sha256": "3c0d8c5b74d575fc192c5c8607b33463d692b49d75a0147e1c2223cb0d9d1915",
+      "size": 19094
+    },
+    {
       "blob": "f4d3821b01103737293d15993cba4e032cb15028",
       "capture_id": "builtin_negative_ledgers_bridge_lab_win_fy_live.utf16le.xml",
       "company": "Bridge Lab Win 0.5.1",
@@ -330,6 +360,46 @@
       "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_CAPTURE_PROVENANCE.md at that head",
       "sha256": "783a89f96e6c28ee9b575a1d871fbdcadcada8f7a44122b153d001a167ee71a8",
       "size": 1740
+    },
+    {
+      "blob": "4a2ff3afb2a26e46ad4110ba9c06412c1e9b8095",
+      "capture_id": "voucher_cost_centre_allocations_keyed_payment_request.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation at 23bca8b913f7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_payment_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "55ab4f02676e509232c833d2c8946509b50cc537cc5e06bf835b961aae29afdb",
+      "size": 1746
+    },
+    {
+      "blob": "128a96637345026c5e1cc3e833c4b1a3f45106e9",
+      "capture_id": "voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_payment_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "87924f5a91974bbd333c351a97b989175f1f9bfcea4d59a331b5516b47ed81fb",
+      "size": 42960
+    },
+    {
+      "blob": "3756bc031a4fb34eb5aebbe29ad8e8254a825d6a",
+      "capture_id": "voucher_cost_centre_allocations_keyed_journal_request.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation at 23bca8b913f7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_journal_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "0daaa90c969c286a5b4e47531eb0a1305848f5299ab09f79703c8d2b2a7a4357",
+      "size": 1746
+    },
+    {
+      "blob": "227a7bb0d614d3a0869768dd7067a65611376986",
+      "capture_id": "voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml",
+      "company": "BRIDGE COST KEY LAB",
+      "lab_ref": "branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_cost_centre_allocations_keyed_journal_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_COST_CENTRE_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "e6406e157365b11930940e8362b6e99ac181905d4b69df844519b175221ed29a",
+      "size": 43256
     },
     {
       "blob": "3473a00f48dd6229502aa83f52c92af58e2e394d",
@@ -750,6 +820,1656 @@
       "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md at that head",
       "sha256": "493256b22e131097da479f67d4280a272bec855d20c6314c6b37dfad530180c0",
       "size": 54280
+    },
+    {
+      "blob": "65506c22d5bb7e583a00d89057148daad8ca0cdd",
+      "capture_id": "voucher_contra_hand_keyed_bankref_lab_request.utf16le.xml",
+      "company": "BRIDGE BANKREF LAB",
+      "lab_ref": "branch lab/2006-bankref-recapture-answers at e49f2d0823a4",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_bankref_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d93946038f2ae6a40b48eb53d4e567352434533fc8b593a5aa766935ecbcc080",
+      "size": 1744
+    },
+    {
+      "blob": "c4637be80598b579516c037c1cb731ef0ed4b51e",
+      "capture_id": "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+      "company": "BRIDGE BANKREF LAB",
+      "lab_ref": "branch lab/2006-bankref-recapture-answers at e49f2d0823a4",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see VOUCHER_CONTRA_HAND_KEYED_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c5b465b3ebfec9df6950b8a520003e08de71c1be4438c95d1d2f64d410d1cc92",
+      "size": 211536
+    },
+    {
+      "blob": "8613e59eb759fbc4894ddfaccc3dca08d7514a4c",
+      "capture_id": "voucher_goods_lines_two_godowns_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/missing-reads-answers at 6ab1fffa680a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see GOODS_LINES_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "47cf36c300a5cc31297033dba27c6233729e93d3ad6e17d72022e73d28352d9c",
+      "size": 1740
+    },
+    {
+      "blob": "ea1deb5ec32086b04f5e3778bb12fc02bb2ce165",
+      "capture_id": "voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/missing-reads-answers at 6ab1fffa680a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see GOODS_LINES_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "393a49416675b03720b0a89700a9dc212179920326259725ed2df0523ac42c63",
+      "size": 110156
+    },
+    {
+      "blob": "2fd8b7f299cd2754e9cb1bdb3ca47a12193ddf81",
+      "capture_id": "whole-day-read-transfer-lab/d03-c1.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "2a7556e2e3793f04602e6813c83ed5ed97ce40650326f7875d75ca54d7d7382a",
+      "size": 1442
+    },
+    {
+      "blob": "c4728f23392038d7dbca6906d064dc92fe02210f",
+      "capture_id": "whole-day-read-transfer-lab/d03-c1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "d0164be8d50a8171295d0d5c69680e466bc03b34bbc4c0d4d9b682267a5dce02",
+      "size": 10240
+    },
+    {
+      "blob": "2bdb57a40cc0ea70c51117f1badc40ff9d3c5ca3",
+      "capture_id": "whole-day-read-transfer-lab/d03-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "f7081fa016149a816427ede832818c835c4dcd639bc722da913a2fad8e48e649",
+      "size": 1524
+    },
+    {
+      "blob": "c4728f23392038d7dbca6906d064dc92fe02210f",
+      "capture_id": "whole-day-read-transfer-lab/d03-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "d0164be8d50a8171295d0d5c69680e466bc03b34bbc4c0d4d9b682267a5dce02",
+      "size": 10240
+    },
+    {
+      "blob": "2a11fdd885911baa407347d008381c430c394311",
+      "capture_id": "whole-day-read-transfer-lab/d03-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "3198cfcb8302145a93f3f6b82ad5c063f136f6bc2347eec031e98efb00d296bd",
+      "size": 1746
+    },
+    {
+      "blob": "874d7cdb02040d66f44951a74baa4f5b7ed7abc4",
+      "capture_id": "whole-day-read-transfer-lab/d03-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d03-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "59caf01d40348413e3a4599556c565927fe424839ce1db3a0ba96334529d4355",
+      "size": 128174
+    },
+    {
+      "blob": "b462615c8aabfaa587056088aa57fdc641e76bd2",
+      "capture_id": "whole-day-read-transfer-lab/d04-c1.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "3fee75f65c0c46ae9089da977ca82a279f66adacd1d4861dc4bd9a6fa088ad27",
+      "size": 1442
+    },
+    {
+      "blob": "38e1216c6bb47d73a3b4e477ccd7d1a17983fa34",
+      "capture_id": "whole-day-read-transfer-lab/d04-c1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "a8aea6d104260c6e0b595d0686e4fe1f4232eff34eff9e479de5a7ac3f3c634e",
+      "size": 5430
+    },
+    {
+      "blob": "4582196bc3448a34f029bbf5fe38138af7dbf5ba",
+      "capture_id": "whole-day-read-transfer-lab/d04-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "c0d6b81a381000d289d5379a00c818cff1e8c11b37c66402c70c3ea5a2e8a09b",
+      "size": 1524
+    },
+    {
+      "blob": "38e1216c6bb47d73a3b4e477ccd7d1a17983fa34",
+      "capture_id": "whole-day-read-transfer-lab/d04-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "a8aea6d104260c6e0b595d0686e4fe1f4232eff34eff9e479de5a7ac3f3c634e",
+      "size": 5430
+    },
+    {
+      "blob": "5652d44e6cdbe9fe1bc381064da385e1aae5f58f",
+      "capture_id": "whole-day-read-transfer-lab/d04-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "406e3f77e2ac7a519d513ccd288918d0bbb0342c4e5d6915c9a1623704a68ddc",
+      "size": 1746
+    },
+    {
+      "blob": "a3d13c673ccf7a0a397429a7b9dc1e9a04624cfd",
+      "capture_id": "whole-day-read-transfer-lab/d04-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d04-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "6712759b59c693ffa227b34b4cf0420fba2fd3ac65136f57101afbd2c6a4ab5a",
+      "size": 44666
+    },
+    {
+      "blob": "0035a051ad3f5f501cdcd0ac21d3c9584af392db",
+      "capture_id": "whole-day-read-transfer-lab/d05-c1.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "8f5ff09d6b6bc8b657d857d8e52f2bfb724f1baf4e1f979b1823e000ff557a68",
+      "size": 1442
+    },
+    {
+      "blob": "543d78e41a86ca9f3b74f347c56b6aa7bed187e0",
+      "capture_id": "whole-day-read-transfer-lab/d05-c1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "c6338e1967a18dcc055ee6819b29863ee695e3510cb96c6d7904b3042ebc2821",
+      "size": 5432
+    },
+    {
+      "blob": "a173b82e79832d205edcf284880a1733be094013",
+      "capture_id": "whole-day-read-transfer-lab/d05-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "35ff2e272307d6a2c6a4cf4df56958bc2b75109f145072c98efcc22e748c5f47",
+      "size": 1524
+    },
+    {
+      "blob": "543d78e41a86ca9f3b74f347c56b6aa7bed187e0",
+      "capture_id": "whole-day-read-transfer-lab/d05-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "c6338e1967a18dcc055ee6819b29863ee695e3510cb96c6d7904b3042ebc2821",
+      "size": 5432
+    },
+    {
+      "blob": "780f82a15a8d13d62da58ceb210802e44df714d8",
+      "capture_id": "whole-day-read-transfer-lab/d05-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "522afad034310ec47d48747651d1b7400e3ec2e117f60c7de12d4e5e9e348bfe",
+      "size": 1746
+    },
+    {
+      "blob": "294021b8bcbe3b193d9fef4c30ad251048620fc6",
+      "capture_id": "whole-day-read-transfer-lab/d05-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d05-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "7c4ed54061e6ea0286d5cad19d2a0d04196607793120429753d6fe2d3c72a983",
+      "size": 44764
+    },
+    {
+      "blob": "b95a8edc218d6b894393f62a198a5b4e13cfa84f",
+      "capture_id": "whole-day-read-transfer-lab/d06-c1.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "a1f0f6d67701870e1b7732e2fa53acc966a6ff0a587f60a819d743555fc52461",
+      "size": 1442
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "whole-day-read-transfer-lab/d06-c1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
+      "blob": "cf7be8ea5cf0c727b1ccb7706a4fa4c76509cfc4",
+      "capture_id": "whole-day-read-transfer-lab/d06-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "927beb12eaab57024d75599ded2fffbca64aebd5a32f5dcc29c82231b9c70d18",
+      "size": 1524
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "whole-day-read-transfer-lab/d06-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
+      "blob": "e25d7eaf2de131d794fe850e0d552175cc9c9cae",
+      "capture_id": "whole-day-read-transfer-lab/d06-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "e9a59290bd553ffa4357f3ed63c016030e907ca272fa14c2590096a0933e5d61",
+      "size": 1746
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "whole-day-read-transfer-lab/d06-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/d06-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
+      "blob": "1019bbfacc0d4539d17b3f86ebb5a8dae38849c9",
+      "capture_id": "whole-day-read-transfer-lab/m.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read at e6215ca0a853",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "6101de34b05dfda57cadb0bc34e4cbe7383f0586f6f7cbc5186d7c9110b87a78",
+      "size": 982
+    },
+    {
+      "blob": "212991c8f8af4b479b88de3c1702886f957db273",
+      "capture_id": "whole-day-read-transfer-lab/m1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "c412f89ed1fcf9b70d4476d57f7fdea988e3311c23effad29431547953933129",
+      "size": 3398
+    },
+    {
+      "blob": "212991c8f8af4b479b88de3c1702886f957db273",
+      "capture_id": "whole-day-read-transfer-lab/m2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/1392-whole-day-read-answers at 226c53b3a86e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/whole-day-read-transfer-lab/PROVENANCE.md",
+      "sha256": "c412f89ed1fcf9b70d4476d57f7fdea988e3311c23effad29431547953933129",
+      "size": 3398
+    },
+    {
+      "blob": "530ee8c036d7ca28073b679a16390a88d4ece2ea",
+      "capture_id": "spanned-census-two-books/o-c1.request.utf16le.xml",
+      "company": "BRIDGE OUTSTANDINGS LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-captures at eeb25c8382a3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-c1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "fae42ea73fd39d464b298d6c71a81298f8bc7f87440befda272624ef51ee7b21",
+      "size": 1450
+    },
+    {
+      "blob": "8afd08e38dd0bdf74bd2c4386944c399b05818bd",
+      "capture_id": "spanned-census-two-books/o-c1.utf16le.xml",
+      "company": "BRIDGE OUTSTANDINGS LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "14fd798e88700df5a32ea6f9f0fc2c9bd3d354ecd0268d3e00307c4f94a53a31",
+      "size": 44036
+    },
+    {
+      "blob": "971ebc543cd086d8793c8035edc5f60144c330c7",
+      "capture_id": "spanned-census-two-books/o-c2.request.utf16le.xml",
+      "company": "BRIDGE OUTSTANDINGS LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-captures at eeb25c8382a3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "e4448f33c41e25f570feee87a14b3fc40fbc924d43b5d692e6cc59e05ac1018f",
+      "size": 1534
+    },
+    {
+      "blob": "8afd08e38dd0bdf74bd2c4386944c399b05818bd",
+      "capture_id": "spanned-census-two-books/o-c2.utf16le.xml",
+      "company": "BRIDGE OUTSTANDINGS LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "14fd798e88700df5a32ea6f9f0fc2c9bd3d354ecd0268d3e00307c4f94a53a31",
+      "size": 44036
+    },
+    {
+      "blob": "369420fd0ab1110c7700c4f2296c08876bbb165a",
+      "capture_id": "spanned-census-two-books/o-m.request.utf16le.xml",
+      "company": "BRIDGE OUTSTANDINGS LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-captures at eeb25c8382a3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-m.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "b9cb9d6314623c1fe52e4be71694832c719ddebd5ad3600e035265262f894606",
+      "size": 990
+    },
+    {
+      "blob": "53a10cb562f94f19b614ac07340368acd8381041",
+      "capture_id": "spanned-census-two-books/o-m1.utf16le.xml",
+      "company": "BRIDGE OUTSTANDINGS LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "ad1a9e1be89e38c5ec9d6da5c207895d4a408d635b9bf9b7b3316d804f12ee7f",
+      "size": 3408
+    },
+    {
+      "blob": "53a10cb562f94f19b614ac07340368acd8381041",
+      "capture_id": "spanned-census-two-books/o-m2.utf16le.xml",
+      "company": "BRIDGE OUTSTANDINGS LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-m2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "ad1a9e1be89e38c5ec9d6da5c207895d4a408d635b9bf9b7b3316d804f12ee7f",
+      "size": 3408
+    },
+    {
+      "blob": "1a0994393a428cf5c71918ee06f5740410f45454",
+      "capture_id": "spanned-census-two-books/t-c1.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-captures at eeb25c8382a3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/t-c1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "a9b1a50aa2e36f3ce07f9d2cc6f418c1cd0b28bcaddfe47865818cce9ad8106d",
+      "size": 1442
+    },
+    {
+      "blob": "f47d631c9b58852c0c585535478274a477c4aed1",
+      "capture_id": "spanned-census-two-books/t-c1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/t-c1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "c84420220f0b6794bbd3984fe3bfb02c3ed069346d6c7e081a40454616d0905b",
+      "size": 15050
+    },
+    {
+      "blob": "77e864974b897ea46b2423b1178b9e0c9ff6b9b0",
+      "capture_id": "spanned-census-two-books/t-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-captures at eeb25c8382a3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/t-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "d0ee23a20ce96f918a85f1a2f7a9ae9ace399019b87b254cfcbdf44817d44558",
+      "size": 1524
+    },
+    {
+      "blob": "f47d631c9b58852c0c585535478274a477c4aed1",
+      "capture_id": "spanned-census-two-books/t-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/t-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "c84420220f0b6794bbd3984fe3bfb02c3ed069346d6c7e081a40454616d0905b",
+      "size": 15050
+    },
+    {
+      "blob": "1019bbfacc0d4539d17b3f86ebb5a8dae38849c9",
+      "capture_id": "spanned-census-two-books/t-m.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-captures at eeb25c8382a3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/t-m.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "6101de34b05dfda57cadb0bc34e4cbe7383f0586f6f7cbc5186d7c9110b87a78",
+      "size": 982
+    },
+    {
+      "blob": "212991c8f8af4b479b88de3c1702886f957db273",
+      "capture_id": "spanned-census-two-books/t-m1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/t-m1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "c412f89ed1fcf9b70d4476d57f7fdea988e3311c23effad29431547953933129",
+      "size": 3398
+    },
+    {
+      "blob": "212991c8f8af4b479b88de3c1702886f957db273",
+      "capture_id": "spanned-census-two-books/t-m2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "lab branch lab/899-spanned-census-answers at 6c8ff7c779b8",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/t-m2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/spanned-census-two-books/PROVENANCE.md",
+      "sha256": "c412f89ed1fcf9b70d4476d57f7fdea988e3311c23effad29431547953933129",
+      "size": 3398
+    },
+    {
+      "blob": "51f7f4123adaa8fa3e58aaaeb2578d5ceaa19e92",
+      "capture_id": "company_marks_empty_company_no_voucher_mark_request.utf16le.xml",
+      "company": "BRIDGE HANDIMPORT LAB",
+      "lab_ref": "branch lab/sitting4-w2-answers at 9ed022285",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_marks_empty_company_no_voucher_mark_request.utf16le.xml",
+      "seed_basis": "synthetic lab book loaded empty; see COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md",
+      "sha256": "7ec76ad8d35e7c931ce920b400a275fba07e99de3d9b7d7d8f9d2da4c69577b4",
+      "size": 1650
+    },
+    {
+      "blob": "dcea4da9befdfe77e96a0ce1d7f2fea740f4ac83",
+      "capture_id": "company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+      "company": "BRIDGE HANDIMPORT LAB",
+      "lab_ref": "branch lab/sitting4-w2-answers at 9ed022285",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_marks_empty_company_no_voucher_mark_live.utf16le.xml",
+      "seed_basis": "synthetic lab book loaded empty; see COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md",
+      "sha256": "30ad5317b6fe566b420e435df73274286c21e365934227bc53cfcd8a232a7e88",
+      "size": 4818
+    },
+    {
+      "blob": "5bb1f14e88c5b1e770f0f93a278083e742dfebce",
+      "capture_id": "masters-m1-marks/ledger-index-after-m1-shapes.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/ledger-index-after-m1-shapes.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "847eefb5779cd19e909ec4d592b8165c62ba0ecb8fcdba0262e9d9b61aed0b7b",
+      "size": 26750
+    },
+    {
+      "blob": "b69724c2cc7de41f0245eac6c5d727f054f097a1",
+      "capture_id": "masters-m1-marks/ledger-index-after-probe-create.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/ledger-index-after-probe-create.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "8bc9b48b0c7ca0654b71f9db6e834b151a44c593b3868b0aac52f9e2571bdbdc",
+      "size": 28064
+    },
+    {
+      "blob": "b730feca57b653cc302ff00dcac409415bdb80ea",
+      "capture_id": "masters-m1-marks/marks-00-baseline.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-00-baseline.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "1d1d0d2a9c6c43e749624621578fd63ce4b884d5b430690555ce739718e5eea1",
+      "size": 3308
+    },
+    {
+      "blob": "8c58e1631e066b8816879c68e5a1515cfadbd559",
+      "capture_id": "masters-m1-marks/marks-01-n-0a.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-01-n-0a.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "4614d0f31e8651eaf1de59b9b72f1f945ba62403d560edaec69ea02a11252e0f",
+      "size": 3308
+    },
+    {
+      "blob": "7e0e82deb6d8cf277a6691ffda92151875b103b3",
+      "capture_id": "masters-m1-marks/marks-02-n-0b.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-02-n-0b.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "ea7b5d57faeab124496342624a26a9be9e4151a80509ffe12fb48b941f97d083",
+      "size": 3308
+    },
+    {
+      "blob": "7e0e82deb6d8cf277a6691ffda92151875b103b3",
+      "capture_id": "masters-m1-marks/marks-03-n-a.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-03-n-a.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "ea7b5d57faeab124496342624a26a9be9e4151a80509ffe12fb48b941f97d083",
+      "size": 3308
+    },
+    {
+      "blob": "108433f7b1587811e754ce96385663983d6f4575",
+      "capture_id": "masters-m1-marks/marks-04-n-b.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-04-n-b.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "e0ebd57615ea52e748c74a3f662bcb07b4c243bd8247da66fa9478a1e26c16f6",
+      "size": 3308
+    },
+    {
+      "blob": "03550a12a0002cf7b3902b5807ae6b5ac8ada64f",
+      "capture_id": "masters-m1-marks/marks-05-n-c.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-05-n-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "caaaccf44d2a36f1a1865ed1ebbeaf076f8937658330f9e1a22625898f7b1fe9",
+      "size": 3310
+    },
+    {
+      "blob": "60bb73f0aaf29e229f295e577c451b84461a3b3d",
+      "capture_id": "masters-m1-marks/marks-06-n-d.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-06-n-d.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "0e81363596c168fec435cf897adb9bbdaed8135d1799222fde000d1e93fec9ed",
+      "size": 3310
+    },
+    {
+      "blob": "53f9dd41c308831ff2735aff6959a0840553446a",
+      "capture_id": "masters-m1-marks/marks-07-n-f.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-07-n-f.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "35ad1bf55e9909e92fd7f65971ed4244bd00689d0619d294fe39478f25723a34",
+      "size": 3310
+    },
+    {
+      "blob": "05f9f0e707892fd1fd3479a3dd1aabb2e4314424",
+      "capture_id": "masters-m1-marks/marks-08-n-e.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-08-n-e.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "adad350a4fda5d435c6b2c401042c135c848f7b40715e517b5f41b92977448a7",
+      "size": 3310
+    },
+    {
+      "blob": "338102c9971bf658b7c9fe6dc00e142b18508c86",
+      "capture_id": "masters-m1-marks/marks-09-m1-party.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-09-m1-party.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "47f0cc36aa37492c07ae536af2107ec2a6c852144c5febc774a871ab1151bcbb",
+      "size": 3308
+    },
+    {
+      "blob": "c36b31382921456c81a7298638f45346e411bb66",
+      "capture_id": "masters-m1-marks/marks-10-m1-susp.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-10-m1-susp.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "01282f84d0b5a55ef5376ba41bd43efc5d0e1895f7173e28e85e8b8910058ee7",
+      "size": 3308
+    },
+    {
+      "blob": "8fb628cf82553ee0258d9d9b4507de7117f9867e",
+      "capture_id": "masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-11-m1-duty-cgst.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "aac88a06614c5832aa7ea12be7ead9c39c4ff0c941f3ecd3e9f72978a42c9e51",
+      "size": 3308
+    },
+    {
+      "blob": "c624b11c5a5cb1113692d290239672d56d23487d",
+      "capture_id": "masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-12-m1-duty-igst.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "95853e8ce37c245bcd59093c4fd7eeea4085d73b52feba686935efccef963785",
+      "size": 3308
+    },
+    {
+      "blob": "529fd89661899ba01ae5efad0fc5ae0845d57036",
+      "capture_id": "masters-m1-marks/marks-13-m1-duty-state.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-13-m1-duty-state.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "1bab57c9927dea5c6235fe0e55347b391095cb266ae2b381bb0930af1caef931",
+      "size": 3308
+    },
+    {
+      "blob": "0360d93755bb3d2c6412a15f3a982acc6551c911",
+      "capture_id": "masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-14-m1-duty-sgstutgst.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "207c8928d1baabc5963232245ed03834c5209a777c708ef9426f3470a1a2fe26",
+      "size": 3308
+    },
+    {
+      "blob": "da7b9c3f1e707d005b05ce28863753f91ee0c3b1",
+      "capture_id": "masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-15-m1-duty-ut.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "ac4f475ec4fa5816d26c2c7cb322134dbbe41aafa8ca6c80c27a8da697216e3d",
+      "size": 3308
+    },
+    {
+      "blob": "f87f7059021a14d71fa651590f7873abebc5afab",
+      "capture_id": "masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-16-m1-duty-cess.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "2a199d020a365fd8d16362df47e46b61c56e39afab97a4b7d25504d703805b42",
+      "size": 3308
+    },
+    {
+      "blob": "05a496c47fb86eac81870457f681d19a99540008",
+      "capture_id": "masters-m1-marks/marks-17-q-0.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-17-q-0.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "9891a16b28019a643ecf0e8fc67c6f89b741e26f98f52cfcda3e03f8aa78cd95",
+      "size": 3308
+    },
+    {
+      "blob": "1839d96c63673338630968980740d33b369d22be",
+      "capture_id": "masters-m1-marks/marks-18-q-r.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-18-q-r.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "bb7fa3fd79cf35a15256ce4414d69063fccb1c235e2cb66cbfbdbd7f074aa78d",
+      "size": 3310
+    },
+    {
+      "blob": "3e36f4ea269537228b53f61ca528b4fd9bdccb6f",
+      "capture_id": "masters-m1-marks/marks-19-q-a.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-19-q-a.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "b5fd82d94d3cfa6aaf68de162b0426fc9e603451748231723d4cb0a7e96119c6",
+      "size": 3310
+    },
+    {
+      "blob": "9cc0a612cde0ad6015054504c423bd745e9f47e5",
+      "capture_id": "masters-m1-marks/marks-20-q-c0.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-20-q-c0.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "c9ff9ecb12002d7a9ef11554d461634576763cadd242ea6d0967252e5f0a4595",
+      "size": 3310
+    },
+    {
+      "blob": "e3629ce0d0b4c0bd5f2841c0ee6e6e40cb43bc93",
+      "capture_id": "masters-m1-marks/marks-21-q-c.utf16le.xml",
+      "company": "BRIDGE MASTERS LAB",
+      "lab_ref": "lab branch lab/masters-m1-answers at e783e7cb214c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/masters-m1-marks/marks-21-q-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/masters-m1-marks/PROVENANCE.md in pull request 2073",
+      "sha256": "10f6c8127f5373ebf3a88e8691230e15368993c66a18ddf735047ce66e3a10b9",
+      "size": 3310
+    },
+    {
+      "blob": "f15b161fab9c4fc1a1aa73e9843b396cea02429d",
+      "capture_id": "statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "01113e741c2a22ced9e7aa2471a518a2b3931f2ff39579dc7e8e4d8efd7a61f8",
+      "size": 1850
+    },
+    {
+      "blob": "5c6eb2ace2767958ba7a64c00cf97d0851158b02",
+      "capture_id": "statement_balance_sheet_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_balance_sheet_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "140d2c4b42d0bf097108101eb9639fa80aab373a6011dbae7beeeab0d2f2fbc7",
+      "size": 756
+    },
+    {
+      "blob": "371e3a8863aa69ac5a315a2aefbe20928e1c5f21",
+      "capture_id": "statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4278ab03fd46f83350ac45b005d81aff1ae4a41d0242b06257f5a5ba624fb1e4",
+      "size": 1624
+    },
+    {
+      "blob": "0c4707779c8c59d5efbee1b459d4190c132bd152",
+      "capture_id": "statement_profit_and_loss_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_profit_and_loss_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ff2275a33834338811b0791778f46c0da0d6e479d2471689dd5e441d65267089",
+      "size": 760
+    },
+    {
+      "blob": "87ba0b33d89fcfb55c7942252de608b1c3350942",
+      "capture_id": "statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_opening_difference_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5a1d6ffbf61211d000217e91a1a7fa76bea0bcc6a9e429d25be05607540a40c2",
+      "size": 11128
+    },
+    {
+      "blob": "5adce8e8bcb3602834832f96858cc025daafd11a",
+      "capture_id": "statement_trial_balance_opening_difference_fy_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/692-opening-stock-d3-answers at 56f293fd7515",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/statement_trial_balance_opening_difference_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STATEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "71978ac472922d01e16864b61bb65ecf342e7070bb0ebbea068dd52abdad2559",
+      "size": 1142
+    },
+    {
+      "blob": "e1b44a826b19fbff97ce89036391b038965acd7f",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "16979f8194f45f385f5cc9e5809980c10ba530a82115832aee8d9837101f4d12",
+      "size": 1600
+    },
+    {
+      "blob": "3858b1ef7ef2ed1591ce1a6a62e496fd0bcc0591",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span1.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8aa7a6ce01d38f816c6af4a76d1178078163835e3ac363139e8d8d28031ab337",
+      "size": 201862
+    },
+    {
+      "blob": "c17818ebfd72e563782224285230ed86f1c07747",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b7e30f615fe1d22c886f5b8644ba2c1a564bf10fbbd039d1fc910e22f690fd9d",
+      "size": 1608
+    },
+    {
+      "blob": "0fda940388aa03c32e6169b6975bbff9e8696174",
+      "capture_id": "ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-sales-day-span2.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "52f69354f7d87de773f68e7d9856f2719374a24c920933f47283e4d662c4f40b",
+      "size": 2926
+    },
+    {
+      "blob": "6031ccc526491d7d04bfad4bbf9b9d9fab69fddd",
+      "capture_id": "ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a9d3eaff4191aa04c62987f3a27bc0c4ee70922ac0b99d1bef5b867e30e0ae2f",
+      "size": 1608
+    },
+    {
+      "blob": "be7a48eb4e0d75b7510168efe430e375e5520b46",
+      "capture_id": "ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/census-dn-party-year-span1.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "3d65d555487f2906d77d442168421e3faaf91272a3d77a372a3f0e79ee83b8a0",
+      "size": 165380
+    },
+    {
+      "blob": "c549d620ed9675bdcf96bf5042e4c49b696d4ca0",
+      "capture_id": "ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8060720ed68c5100600098959bfa68708fa72b07bf78589ec839411c3ce8af41",
+      "size": 1876
+    },
+    {
+      "blob": "e71e11c99d7916813ef3896d46ac978c2e69b258",
+      "capture_id": "ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-scoped-vouchers/movement-dn-party-month.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1dd5fac4e6c743adf46ad834f300f6713192872945680b75764faa60a3ee3f74",
+      "size": 108918
+    },
+    {
+      "blob": "7025e4dced559623e0bfcae0b2c8001bba828c31",
+      "capture_id": "voucher-cancel/journal-create.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture at 22ef7ff64036",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-create.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ba93bc46e1f88258a3109f085b8c272a94792dc80712119b26b6d3cfde88a658",
+      "size": 1798
+    },
+    {
+      "blob": "7ea0af75b3e028da93fea48ebe7bf1a6682a4342",
+      "capture_id": "voucher-cancel/journal-create.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture-answers at f91d20034f4b",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-create.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5eda5c4d127271d95fd2115bc692a4b039981cb35a1d3555937e087092b35e92",
+      "size": 540
+    },
+    {
+      "blob": "39ee575bdd964b3aa50f063a1d3d1384fb1ec229",
+      "capture_id": "voucher-cancel/journal-cancel.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture at 22ef7ff64036",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-cancel.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7e2967fe52c89e45e843ecdf167c26fd5601b38829ea7703feed6ff3349a62b2",
+      "size": 1798
+    },
+    {
+      "blob": "f3e9eb83927796fa9110bd2125aa48c2c05c2db7",
+      "capture_id": "voucher-cancel/journal-cancel.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2062-cancel-capture-answers at f91d20034f4b",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/voucher-cancel/journal-cancel.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7f3222109df767c5822f7871aa5af586e51f6971f57853889743e2f2b86441e4",
+      "size": 540
+    },
+    {
+      "blob": "1f150901ae7b0aa2226bb361edb7933dd0fb6c26",
+      "capture_id": "ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml",
+      "company": "BRIDGE BILLTRAIL LAB",
+      "lab_ref": "branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c5e1413c5b112ab114add489d48a811c85a7953da4a8f3dca664c2704fb0384a",
+      "size": 239294
+    },
+    {
+      "blob": "fde6ee13d78184060cf1350f5848af24732966aa",
+      "capture_id": "ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.request.utf16le.xml",
+      "company": "BRIDGE BILLTRAIL LAB",
+      "lab_ref": "branch lab/1356-ledger-filtered-allocations-run-sheet at fd02e22f5282",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-ledger-p1-fy-entries.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6a5ee4a9ec54980cd8b7c0cc137d6e7d1f42c1ce1a700670cbf3fcbb996da97d",
+      "size": 1830
+    },
+    {
+      "blob": "743bf54faa5edbe6b500dd9824e960aa7e76af45",
+      "capture_id": "ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml",
+      "company": "BRIDGE BILLTRAIL LAB",
+      "lab_ref": "branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "80c7896485de91655fb9ec872550cbd6a56a650702186e5187f4289d26dd87e8",
+      "size": 249288
+    },
+    {
+      "blob": "ceb95b648e17ebef95f1e9dd45b4e920c7acb901",
+      "capture_id": "ledger-filtered-allocations/billtrail-window-fy.request.utf16le.xml",
+      "company": "BRIDGE BILLTRAIL LAB",
+      "lab_ref": "branch lab/1356-ledger-filtered-allocations-run-sheet at fd02e22f5282",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/billtrail-window-fy.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "de90752d735e696032512d49bb3c3cedb1cf2500411d690bd7b34408606e038b",
+      "size": 3096
+    },
+    {
+      "blob": "08d126f4850ce79347a05218b43b213d28607568",
+      "capture_id": "ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/1356-ledger-filtered-allocations-run-sheet at fd02e22f5282",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6f499dc678f59f1c5faf702601964f19cd7ddb757b7d9af577294440a16b5ff5",
+      "size": 1820
+    },
+    {
+      "blob": "97ebe608217b72defa9495221aa8f61f6f10f960",
+      "capture_id": "ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/1356-ledger-filtered-allocations-answers at 8534253da1c9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-ledger-dn-sales-20250515-entries.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1b7b21735e8ada02227d2ac304aee9e88a48b62c9bc47f224555af8e236fec6e",
+      "size": 2785026
+    },
+    {
+      "blob": "59a08ce8355a03661441b0454991d3100d0c85c6",
+      "capture_id": "ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "3ece05acef1df81bdc6594a4df5638f024f29c7cd3a7076f8b37edfa028af649",
+      "size": 1610
+    },
+    {
+      "blob": "0fda940388aa03c32e6169b6975bbff9e8696174",
+      "capture_id": "ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span3.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "52f69354f7d87de773f68e7d9856f2719374a24c920933f47283e4d662c4f40b",
+      "size": 2926
+    },
+    {
+      "blob": "8ea0daf6a0575b66ee45177e8905ae578db5e546",
+      "capture_id": "ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.request.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans at 97fdc0635a43",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "07e768b3e79b5037dd62dffcbf382dfbdaff0795bf67a6d32704e1aa3eb9ccf8",
+      "size": 1610
+    },
+    {
+      "blob": "0fda940388aa03c32e6169b6975bbff9e8696174",
+      "capture_id": "ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml",
+      "company": "BRIDGE CORPUS DENSE",
+      "lab_ref": "branch lab/485-ledger-census-spans-answers at ba180df99d45",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/ledger-filtered-allocations/dense-census-dn-sales-20250515-span4.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "52f69354f7d87de773f68e7d9856f2719374a24c920933f47283e4d662c4f40b",
+      "size": 2926
+    },
+    {
+      "blob": "f8d04f6a1ab9da02bed4ab74a60fea55019c3742",
+      "capture_id": "stock-query/r-3-stock-query.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-with-item-answers at 263cc72c9c12",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-3-stock-query.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "de7408067d9140f3bf7aa7d516635441f4ec5f0efb0aa450b3dd838ce0225696",
+      "size": 754
+    },
+    {
+      "blob": "bf13397f868cd6e001a1ba1c172ef3ae91d47cb8",
+      "capture_id": "stock-query/r-3-stock-query.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-with-item-answers at 263cc72c9c12",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-3-stock-query.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3",
+      "size": 46
+    },
+    {
+      "blob": "cf6a70656dc7584fcc1fa582c3120ad246c1f2f4",
+      "capture_id": "stock-query/r-4-stock-query-stockitemname.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-with-item-answers at 263cc72c9c12",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-4-stock-query-stockitemname.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "fff4e42cb65b14100e0c271579a8e35b05d65f0a96e987b92407318f0261119d",
+      "size": 860
+    },
+    {
+      "blob": "7267dbcd0f0c7c04155aa59dce733ce7f86094e6",
+      "capture_id": "stock-query/r-4-stock-query-stockitemname.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-with-item-answers at 263cc72c9c12",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-4-stock-query-stockitemname.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c23c6d414d47f1d87b779a4a0afca47e4a0712ad2ce5b129a0e44ba41c66f213",
+      "size": 1354
+    },
+    {
+      "blob": "3972b9631cc04384951e58b83e6d9cd6a5cbe21f",
+      "capture_id": "stock-query/r-01-stock-query-carton-box-small.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-01-stock-query-carton-box-small.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "dc2b3afe5c542e1305868148facd0ca453796abf2cbb5c78ae1346b79e4be812",
+      "size": 848
+    },
+    {
+      "blob": "aaac06cbf157d8c7d7a07d65d106f902395e1e94",
+      "capture_id": "stock-query/r-01-stock-query-carton-box-small.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-01-stock-query-carton-box-small.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "53fe972f6a9abb14465495afbaf55af9cb934fe9b7fb309fa926925ba7ae4c9c",
+      "size": 312
+    },
+    {
+      "blob": "84caf8d48be4150b7201202319e36fb9f679d7be",
+      "capture_id": "stock-query/r-02-stock-query-caustic-soda-flakes.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-02-stock-query-caustic-soda-flakes.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a3ede12af36a1daca85527f43082919e07db9ee0511f819faf03cfaa747b22ae",
+      "size": 854
+    },
+    {
+      "blob": "08053af8ff36dc3bdff2309072ae8001f61b4d9f",
+      "capture_id": "stock-query/r-02-stock-query-caustic-soda-flakes.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-02-stock-query-caustic-soda-flakes.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ece7ccb544e832c89e52cde0b0425ba7941ff1a8e005511c546756668b1d674f",
+      "size": 1094
+    },
+    {
+      "blob": "cc1f82af069d48b0ba3d543331f6907c4d6f0218",
+      "capture_id": "stock-query/r-03-stock-query-cleaning-kit-a.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-03-stock-query-cleaning-kit-a.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8f948a388098391ac2012e38fcc2ee49b45f73ebe41d8c479d8baba08b5216b9",
+      "size": 844
+    },
+    {
+      "blob": "085dae0dba621552f2b3b4ec336d7ae61297ab6b",
+      "capture_id": "stock-query/r-03-stock-query-cleaning-kit-a.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-03-stock-query-cleaning-kit-a.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b4d01f265a2af3f8b4f9ebc2a876ebfcfd2773fa8112388d6dea85087310ee24",
+      "size": 1086
+    },
+    {
+      "blob": "871b84b81a62acde2197c1356d93b353dc3967e4",
+      "capture_id": "stock-query/r-09-stock-query-soda-ash-light.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-09-stock-query-soda-ash-light.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "75f8b60cd19b79268d680288ee1d6060556363068e030de25fbf375580e74798",
+      "size": 844
+    },
+    {
+      "blob": "6911a59cf4baaa3f532728a1f4b11d6ab7b98eff",
+      "capture_id": "stock-query/r-09-stock-query-soda-ash-light.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-09-stock-query-soda-ash-light.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "592f19e8057e6e759b92f8423cfbe568beee74ad676b22a25f7b4a3184cb4dbe",
+      "size": 3152
+    },
+    {
+      "blob": "1f92b8fdec0d9773e8eec15433f27eb5d2a749c9",
+      "capture_id": "stock-query/r-11-stock-query-zero-stock-item.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-11-stock-query-zero-stock-item.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "0ed3e1e9197132c8d56561aa71f11df2595dc8b91a4b4460f9ca2dfcb079ecd2",
+      "size": 846
+    },
+    {
+      "blob": "03063d3be3e07deb2385c73ac230eb115d1e4619",
+      "capture_id": "stock-query/r-11-stock-query-zero-stock-item.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-11-stock-query-zero-stock-item.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "83acc28947d35ddca4c4b49973b466b9d686882aeea3857fe2afb11f93f12d30",
+      "size": 848
+    },
+    {
+      "blob": "518221a7d47c5b62b879197a6b893ce318ed9f41",
+      "capture_id": "stock-query/r-12-stock-query-hcl-to-20250401.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-12-stock-query-hcl-to-20250401.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5096cf0d56c9c931f3134feb94fd9a0c6247a904bc421319e4890b179add6797",
+      "size": 860
+    },
+    {
+      "blob": "7b88c7778b0554df11d7634cf07a5f853c0b174c",
+      "capture_id": "stock-query/r-12-stock-query-hcl-to-20250401.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-12-stock-query-hcl-to-20250401.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6e8d7e5e2418f30dc2d2e89f3f4435dab784e9e17e510bdeb2ffe5230197fe55",
+      "size": 320
+    },
+    {
+      "blob": "a764c980b0d6c83402842bc26d8041250143049a",
+      "capture_id": "stock-query/r-14-stock-query-cleaning-kit-a-to-20250401.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-14-stock-query-cleaning-kit-a-to-20250401.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ad79239d98ef3692e8d0605465aada99a811d2ce737b09920f22f7a6933a8256",
+      "size": 844
+    },
+    {
+      "blob": "39b500b79e585d8f2c8b9df2e6241ff18b0c39fe",
+      "capture_id": "stock-query/r-14-stock-query-cleaning-kit-a-to-20250401.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-14-stock-query-cleaning-kit-a-to-20250401.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b78d85c0160f1c6426ed78ead117121ea245b1acb2fce81bdd6e6777a0c548fb",
+      "size": 310
+    },
+    {
+      "blob": "ac9449b272e9c1f5c75c3b28e06d94212cee3a74",
+      "capture_id": "stock-query/r-15-stock-query-unknown-item.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-15-stock-query-unknown-item.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "98c06d132ddf2347690a532c4b5760134db202531c5b5b9d6dbb5a0be7e04263",
+      "size": 850
+    },
+    {
+      "blob": "bf13397f868cd6e001a1ba1c172ef3ae91d47cb8",
+      "capture_id": "stock-query/r-15-stock-query-unknown-item.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-items-periods-answers at a5b369bfe3ea",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/r-15-stock-query-unknown-item.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3",
+      "size": 46
+    },
+    {
+      "blob": "2c6ba1a2874a0b8c6116a1227b23209cd1eb80d5",
+      "capture_id": "q-r-13-stock-query-zero-stock-item-to-20250401.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/q-r-13-stock-query-zero-stock-item-to-20250401.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5ddadc4080f9f593a012a9e1a85c733910c0f46e1111049b55b259b67f7921d9",
+      "size": 846
+    },
+    {
+      "blob": "bf13397f868cd6e001a1ba1c172ef3ae91d47cb8",
+      "capture_id": "q-r-13-stock-query-zero-stock-item-to-20250401.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/q-r-13-stock-query-zero-stock-item-to-20250401.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3",
+      "size": 46
+    },
+    {
+      "blob": "2e2dfbdf4b4e71cfacaf43e192f6f28f2d8532d0",
+      "capture_id": "q-r-04-stock-query-cleaning-kit-b.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/q-r-04-stock-query-cleaning-kit-b.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8729c40c156f7089fb6e73455d5bcd765c39171179c3ecaf24c20c460559433c",
+      "size": 844
+    },
+    {
+      "blob": "bf13397f868cd6e001a1ba1c172ef3ae91d47cb8",
+      "capture_id": "q-r-04-stock-query-cleaning-kit-b.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/q-r-04-stock-query-cleaning-kit-b.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3",
+      "size": 46
+    },
+    {
+      "blob": "054788b8164c0d6980e9e35277cfc99eb9a8718d",
+      "capture_id": "c-a-01-items-to-20250401.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/c-a-01-items-to-20250401.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "9a08f0c2d9ef30bbd1768eea8891994c3cf71b2d47ad728da6b9af6c01774c03",
+      "size": 1258
+    },
+    {
+      "blob": "a66e8f3b946e97f0977730a0b28006e973480b84",
+      "capture_id": "c-a-01-items-to-20250401.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/c-a-01-items-to-20250401.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ee8d0791f0521d6ef0ef8e123c2b3cf2e03c09dab5ea3db121ae5638166a1255",
+      "size": 17466
+    },
+    {
+      "blob": "3a762bbbca5720269d450495e73cceee4d0dea96",
+      "capture_id": "c-a-03-items-to-20260331.request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/c-a-03-items-to-20260331.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "dacd47b0b96772f220b97abf3714650c760a98f4e54197b681ba35cd69c9edab",
+      "size": 1258
+    },
+    {
+      "blob": "2e70377434bb41a183f1710b6924bf6a95ec9d6a",
+      "capture_id": "c-a-03-items-to-20260331.answer.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2018-stock-query-groups-batches-answers at c8e026cf",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock-query/c-a-03-items-to-20260331.answer.utf16le.xml",
+      "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5e39dbce396939cf0d3a2f2446352105b3f4e5fe88469e3f0c6bbe5614eb4ec4",
+      "size": 17480
+    },
+    {
+      "blob": "6f6a449957d8589fd629e253f58178d165f948e8",
+      "capture_id": "native/trial_balance_nonint_stock_ledger.utf16le.xml",
+      "company": "BRIDGE NONINT LAB",
+      "lab_ref": "branch lab/692-nonint-lab-answers at cbdc638d9537",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_nonint_stock_ledger.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "90bf8a9a2039e7d78ca94c18d2a63c7e86542bdab6bfd439d13f2f62b7edf24b",
+      "size": 12314
+    },
+    {
+      "blob": "00d9eddaeeade20f8a27416b148ab15d94b21e7c",
+      "capture_id": "native/trial_balance_integrated_stock_ledger.utf16le.xml",
+      "company": "BRIDGE INTEGRATED CTRL LAB",
+      "lab_ref": "branch lab/2068-integrated-write-control-answers at c539688fd75e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_integrated_stock_ledger.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5e13eee2bd16fe31bc7047ffe40942ff6b86583798a0aad7759a5a19df9f723f",
+      "size": 12314
+    },
+    {
+      "blob": "8375d53814c76925b85a735a54346a9f39f6cd6b",
+      "capture_id": "native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/2071-forex-rerun-answers at 0d7eb0bf5cae",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4d351a9fc1e8b974fbfb20b06edb19c71f5f664b3a74f2d387759b586092cecb",
+      "size": 9472
+    },
+    {
+      "blob": "fe4f92c021f6d80019979ce8817e0e054faace56",
+      "capture_id": "native/trial_balance_forex_unspaced_composite.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/2071-forex-rerun-answers at 0d7eb0bf5cae",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "263c3c19338afe0ed8184398bc472882b9243a66dbc96a10938b16b964e320ac",
+      "size": 9880
+    },
+    {
+      "blob": "480c969f2d1b8ef9a4f89ed4a8e6a366026ca18c",
+      "capture_id": "native/currency_masters_forex_72.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-forex-currency-reads-answers at 85d7d37257e9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_forex_72.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "f5a1414a195194ff4f8b46f4c65cae0e0f7567143c71c6a2c465532334b3439a",
+      "size": 3796
+    },
+    {
+      "blob": "55fd5abd2b22bce97ff76ac3acc27b413f5eb0ec",
+      "capture_id": "native/currency_masters_originalname_forex_72.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-forex-currency-reads-answers at 85d7d37257e9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "3f0bfbcbb3bc0def49de13a7ac918e5d20d6a1d6885aa0e17635eb5af694aaf0",
+      "size": 4000
+    },
+    {
+      "blob": "7e6e6ee1371b6c660c553d0f93a624dc249dc4ff",
+      "capture_id": "native/company_base_currency_forex_72.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-forex-currency-reads-answers at 85d7d37257e9",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml",
+      "seed_basis": "synthetic lab book; see PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "52c33f519c9e5ee390d44ef30223ad46f8b3bbbe2c71e02a5c995e0672043df3",
+      "size": 3434
+    },
+    {
+      "blob": "3b400a2333e01603da8d510e821540da376b8b63",
+      "capture_id": "stock_items_nested_lab_fy_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7c6770b2e18f146fd69c71d4f381bde63833366da99d69a0d54ef8e304d01b07",
+      "size": 1272
+    },
+    {
+      "blob": "cd7d4f52061edeadbbd33060594883be16d3070d",
+      "capture_id": "stock_items_nested_lab_fy_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ba77d8a0dc343b8eaf767803bbc4ee2cf5c4de2e22c4b0cee5a3527c3758fd41",
+      "size": 13954
+    },
+    {
+      "blob": "d6b2e4108c2eaabe9f88a078e60106404a896ba8",
+      "capture_id": "stock_summary_report_nested_lab_fy_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_fy_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d7d0b8c17f3c93f2f656baf3ec51cc1d37aabd601d4677632465aa4e7810c3f0",
+      "size": 772
+    },
+    {
+      "blob": "5a9b158e0912573133721a0b8f100687d0cbb62a",
+      "capture_id": "stock_summary_report_nested_lab_fy_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_fy_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937",
+      "size": 948
+    },
+    {
+      "blob": "62dcf13aa440ba0f653336dd614cd56783fa7492",
+      "capture_id": "company_inventory_flags_nested_lab_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_nested_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "bf5197c0ddac03788a1de135b1b99315b2fe612f6bc858e7e88307ae6b1b2640",
+      "size": 1654
+    },
+    {
+      "blob": "c838c4114efa89a5c1d9a0a3feb7f621e05a595b",
+      "capture_id": "company_inventory_flags_nested_lab_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-groups-capture-answers at c1a82ddd16cb",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_nested_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "425bfe9724052a00034755b5463db70a446f8c0586db41e9b4c8e58370865b5c",
+      "size": 4920
+    },
+    {
+      "blob": "fdab673ab710f752b1ea7531cd7992392a0c4295",
+      "capture_id": "company_inventory_flags_tieout_d_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_tieout_d_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "19a29941331fec29e44557eb964bd50623d0b7307d9951d987defc03dd5e1905",
+      "size": 1638
+    },
+    {
+      "blob": "2500c34db81ff612ebf08cd1df3c86b7327e8705",
+      "capture_id": "company_inventory_flags_tieout_d_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_tieout_d_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "84e0a5be2487af5d65029b3eb736c5fca7381de186d10bc3f0d7a9e29bf34104",
+      "size": 4886
+    },
+    {
+      "blob": "6fe14cd168bdd03664819e193d890563689deb55",
+      "capture_id": "stock_items_tieout_d_to_20250930_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250930_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "45445f60dfd7f10c668b8a0748bf90256d004572778e3fcceaeaaa525a90603a",
+      "size": 1256
+    },
+    {
+      "blob": "cf8bc2c76aa4387468caf82bebaebd355d35b358",
+      "capture_id": "stock_items_tieout_d_to_20250930_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250930_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2a85a2a3487cad003696f3ca893c024a53bfc8a7ae6f53b10c194053d3cd2c4a",
+      "size": 4356
+    },
+    {
+      "blob": "4225d6a447c0c7751aa06e4ccfc480da5598ec5f",
+      "capture_id": "stock_summary_report_tieout_d_to_20250930_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250930_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d621a687e49f41574c7d137f9a8d586d3a8027ceefa086cbf593a77ab654fccc",
+      "size": 756
+    },
+    {
+      "blob": "37cbdb257b75ebe4e430507e5530302be906ba8e",
+      "capture_id": "stock_summary_report_tieout_d_to_20250930_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250930_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6ea369d19adb9d08bf3883d186744d6d705e625e21516d876df131f0881516a7",
+      "size": 510
+    },
+    {
+      "blob": "988f42e6b3e92cbaa9bd446389679744ec260b1c",
+      "capture_id": "stock_items_tieout_d_to_20250531_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250531_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "47072bc7f8c1484953bde1e71d395d3611867c4800980a7f47e3836a4f02e384",
+      "size": 1256
+    },
+    {
+      "blob": "f67187aadcc0e2c211294302cc2cef6b68c1461e",
+      "capture_id": "stock_items_tieout_d_to_20250531_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_tieout_d_to_20250531_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c6414fcc1f628395d0a82cd474a548504655c77776799f9f707576cda996c3fc",
+      "size": 4356
+    },
+    {
+      "blob": "e5736cc433b2a17ca22b7bb027911042050588f0",
+      "capture_id": "stock_summary_report_tieout_d_to_20250531_request.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250531_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "db9f85b3a8aff078fba801f0fc8e1a6a37b68dd3841dee29c45536445e275c3e",
+      "size": 756
+    },
+    {
+      "blob": "fdbd7c8e208bde8649f112380956d381dcf3204e",
+      "capture_id": "stock_summary_report_tieout_d_to_20250531_live.utf16le.xml",
+      "company": "BRIDGE TIEOUT D",
+      "lab_ref": "branch lab/1233-stock-mid-year-answers at ba3b55cf1bc5",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_tieout_d_to_20250531_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "64f67059e3a921e4c96cd7bf059b7397e18ddea71cd79b4b4f715da7b68efe71",
+      "size": 510
+    },
+    {
+      "blob": "db6bcd986ab5aabd985aeae4b522b109f6ec70b7",
+      "capture_id": "company_inventory_flags_nested_lab_as_of_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of-answers at a2ff6c015524",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/company_inventory_flags_nested_lab_as_of_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "847d99be63bf40a84dc9378f38b02d57ddcb1fc74937dab0d7991be26166c083",
+      "size": 4918
+    },
+    {
+      "blob": "b7b50a51f17e5bb909e63685426e5fae3c60a326",
+      "capture_id": "stock_items_nested_lab_to_20250831_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of at c42cfeff5497",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_to_20250831_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8a527cab50a05dbbe5e12cd7c65ce42a3baa2fea9a7066558aa0cfe7963d3f63",
+      "size": 1272
+    },
+    {
+      "blob": "76d4e5da502cb7a2723a993d4fbc528a42357874",
+      "capture_id": "stock_items_nested_lab_to_20250831_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of-answers at a2ff6c015524",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_to_20250831_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1f012bcb94bb4fe3271590da85b42c6af0309daa6b83a1685201de94fb8928e4",
+      "size": 13952
+    },
+    {
+      "blob": "1bff2189c3735766517b73269fc2d17ceaff12d2",
+      "capture_id": "stock_summary_report_nested_lab_to_20250831_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of at c42cfeff5497",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_to_20250831_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b56c6bdc058f3c066116d11ace14b52381a9d31e22705b040c1c3fe9bf87353b",
+      "size": 772
+    },
+    {
+      "blob": "e5b55ea2f76c20618c13624cd533a4c520c46cba",
+      "capture_id": "stock_summary_report_nested_lab_to_20250831_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of-answers at a2ff6c015524",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_to_20250831_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "0ab20c1536d48bd75faacaf3ab45cea38ee6ba7e463e7fc443f7ca3eb553a365",
+      "size": 948
+    },
+    {
+      "blob": "c59bc211eeceb0a6092df6003c305954e42e775e",
+      "capture_id": "stock_items_nested_lab_to_20250930_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of at c42cfeff5497",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_to_20250930_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ac2818c36086ade4d9cfb28720f4d2b96b0b6f607278c5466bf076cc43bd70c6",
+      "size": 1272
+    },
+    {
+      "blob": "1de381389db3e1b39584de78f64f41e0b57d449a",
+      "capture_id": "stock_items_nested_lab_to_20250930_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of-answers at a2ff6c015524",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_items_nested_lab_to_20250930_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "53aa65c8e27e84aa9af0cffe29f2fd3679c7c44518ea89e8c90fbb59ed86e74e",
+      "size": 13952
+    },
+    {
+      "blob": "ba10847ec0e7b0fcf89607a354cb577c7689d67c",
+      "capture_id": "stock_summary_report_nested_lab_to_20250930_request.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of at c42cfeff5497",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_to_20250930_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "cbdd7658148f83352f33d54560eab3c99fdab604b9c1460774686f5cbca01909",
+      "size": 772
+    },
+    {
+      "blob": "5a9b158e0912573133721a0b8f100687d0cbb62a",
+      "capture_id": "stock_summary_report_nested_lab_to_20250930_live.utf16le.xml",
+      "company": "BRIDGE NESTED STOCK LAB",
+      "lab_ref": "branch lab/1233-nested-as-of-answers at a2ff6c015524",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_summary_report_nested_lab_to_20250930_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "338b20a3d4dbf9db10a9e6955a5d4f78b04440e10d1e3c1c2f1d36e0bd3b1937",
+      "size": 948
+    },
+    {
+      "blob": "5eb066d6d0b83279d9b42a182d78fd4682700ec2",
+      "capture_id": "stock_item_census_slice_stock_lab_200_300_request.utf16le.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/1233-stock-census-slice at bcee293e2534",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_item_census_slice_stock_lab_200_300_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7a6be97b852389f583a6b1a34588c70fb543f390a7b022c30e79e7a635e6d9e7",
+      "size": 1282
+    },
+    {
+      "blob": "71f89541319590ba1153dc24461d0e29a2ff719c",
+      "capture_id": "stock_item_census_slice_stock_lab_200_300_live.utf16le.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/1233-stock-census-slice-answers at 8775a22a064f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_item_census_slice_stock_lab_200_300_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "db77a9065fea6813f888ab2e9ca27475ea18286e31aaa275a58a21bf30b6d374",
+      "size": 30262
+    },
+    {
+      "blob": "670f83849d27a6852cfd430bf6cbee79bdb74309",
+      "capture_id": "stock_item_census_slice_stock_lab_empty_live.utf16le.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/1233-stock-census-slice-answers at 8775a22a064f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a",
+      "size": 2998
+    },
+    {
+      "blob": "4c2a51e91f10baea502cc2518521dbda02af2463",
+      "capture_id": "stock_group_census_slice_stock_lab_0_300_request.utf16le.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/1233-stock-census-slice at bcee293e2534",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_group_census_slice_stock_lab_0_300_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "fde31f91ddc6ba716be5abb31a14f3649ab2631bf9ba72585cd416c79e84ab62",
+      "size": 1284
+    },
+    {
+      "blob": "729dec437e78255ec6dbb4e7d3f8511afc092e8a",
+      "capture_id": "stock_group_census_slice_stock_lab_0_300_live.utf16le.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/1233-stock-census-slice-answers at 8775a22a064f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_group_census_slice_stock_lab_0_300_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b3204c318fe38b1379541843ca30ce643bee59a3439d8af11c8259749425d167",
+      "size": 4496
+    },
+    {
+      "blob": "b627b42aa3ef38bfb63e87b092844cbaec187356",
+      "capture_id": "stock_groups_masters_stock_lab_live.utf16le.xml",
+      "company": "BRIDGE STOCK LAB",
+      "lab_ref": "branch lab/1233-stock-census-slice-answers at 8775a22a064f",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_groups_masters_stock_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "31a5b8979f1bed4e52698183ceebf8760763e0c41c33c56a1f3b6e3a718b12a6",
+      "size": 6296
     }
   ]
 }

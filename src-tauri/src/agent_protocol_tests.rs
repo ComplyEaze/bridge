@@ -19,6 +19,7 @@ fn server(path: &Path) -> Server {
         redaction: Redaction::MaskParties,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled: false,
     })
 }
@@ -535,6 +536,49 @@ fn recovery_egress_error_falls_back_to_the_batch_when_the_compact_response_excee
     assert_eq!(response["error"]["data"], json!({"batch_id":batch_id}));
 }
 
+#[test]
+fn recovery_egress_error_keeps_the_counters_of_a_ledger_create() {
+    let batch_id = crate::synthetic_batch_id(1);
+    let counters = json!({"created":1,"altered":0,"deleted":0,"ignored":0,"errors":0,"cancelled":0,"exceptions":0});
+    let original = |counters: Value| {
+        json!({"result":{"structuredContent":{"result":{
+            "attempt_recorded":true,
+            "counters":counters,
+        }}}})
+    };
+    let kept = recovery_error_with_dispatch(
+        json!(1),
+        Some(batch_id),
+        "egress_record_write_failed",
+        &original(counters.clone()),
+        100_000,
+    );
+    assert_eq!(kept["error"]["data"]["counters"], counters);
+    assert_eq!(kept["error"]["data"]["attempt_recorded"], true);
+    // A counter Tally did not report, or none at all, is not made up.
+    let mut partial = counters.clone();
+    partial["errors"] = Value::Null;
+    for dropped in [partial, Value::Null, json!("1")] {
+        let response = recovery_error_with_dispatch(
+            json!(1),
+            Some(batch_id),
+            "egress_record_write_failed",
+            &original(dropped),
+            100_000,
+        );
+        assert!(response["error"]["data"].get("counters").is_none());
+    }
+    // Over the cap, the batch alone remains.
+    let capped = recovery_error_with_dispatch(
+        json!(1),
+        Some(batch_id),
+        "egress_record_write_failed",
+        &original(counters),
+        200,
+    );
+    assert_eq!(capped["error"]["data"], json!({"batch_id":batch_id}));
+}
+
 #[tokio::test]
 async fn unknown_tools_and_methods_return_protocol_errors_with_exact_refusal_receipts() {
     let directory = tempfile::tempdir().unwrap();
@@ -637,7 +681,9 @@ async fn oversized_untrusted_names_and_selectors_never_expand_receipts() {
 async fn incomplete_receipt_log_stops_session_but_preserves_durable_batch_recovery() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("agent-egress.jsonl");
-    fs::write(&path, b"{\"partial").unwrap();
+    // A whole line Bridge did not write, before a cut tail: no repair vouches for it (#2172), so
+    // the log stays unusable and the session must stop.
+    fs::write(&path, b"\0\0\0\n{\"partial").unwrap();
     let server = server(directory.path());
     let batch_id = "12345678-abcd-4abc-8abc-123456789012";
     let mut output = Vec::new();
@@ -661,7 +707,7 @@ async fn incomplete_receipt_log_stops_session_but_preserves_durable_batch_recove
     let response: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(response["error"]["message"], "egress_log_incomplete");
     assert_eq!(response["error"]["data"]["batch_id"], batch_id);
-    assert_eq!(fs::read(&path).unwrap(), b"{\"partial");
+    assert_eq!(fs::read(&path).unwrap(), b"\0\0\0\n{\"partial");
 
     // The stdio loop propagates the terminal receipt error before another call.
     let requests = [
@@ -685,7 +731,7 @@ async fn incomplete_receipt_log_stops_session_but_preserves_durable_batch_recove
         .collect();
     assert_eq!(responses.len(), 1);
     assert_eq!(responses[0]["id"], 1);
-    assert_eq!(fs::read(path).unwrap(), b"{\"partial");
+    assert_eq!(fs::read(path).unwrap(), b"\0\0\0\n{\"partial");
 }
 
 #[path = "agent_protocol_evidence_tests.rs"]

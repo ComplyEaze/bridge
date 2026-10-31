@@ -42,6 +42,7 @@ fn serve_with(
         redaction,
         import_enabled: false,
         posting: Posting::Off,
+        master_writes_enabled: false,
         audit_enabled,
     });
     OneServer {
@@ -105,49 +106,107 @@ fn strings(value: &Value, out: &mut Vec<String>) {
     }
 }
 
-/// The names the book holds: every group and ledger, and the company.
+/// Each text the part holds between `open` and `close`.
+fn texts_between(text: &str, open: &str, close: &str) -> Vec<String> {
+    text.match_indices(open)
+        .map(|(at, _)| {
+            let start = at + open.len();
+            text[start..start + text[start..].find(close).unwrap()].to_string()
+        })
+        .collect()
+}
+
+/// The names the book holds: every group (a group named only as a parent
+/// included), ledger and voucher type, and the company; and the vouchers' own
+/// numbers, GUIDs and narrations.
 fn book_names() -> Vec<String> {
-    let names_in = |bytes: &[u8], element: &str| {
-        let text = super::super::audit_read::tests::text_of(bytes);
-        let open = format!("<{element} NAME=\"");
-        text.match_indices(&open)
-            .map(|(at, _)| {
-                let start = at + open.len();
-                text[start..start + text[start..].find('"').unwrap()].to_string()
-            })
-            .collect::<Vec<_>>()
-    };
-    let mut names = names_in(
-        include_bytes!(
-            "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/ledgers.xml"
-        ),
-        "LEDGER",
-    );
-    names.extend(names_in(
-        include_bytes!("../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/groups.xml"),
-        "GROUP",
+    let part = |bytes: &[u8]| super::super::audit_read::tests::text_of(bytes);
+    let ledgers = part(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/ledgers.xml"
     ));
+    let groups = part(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/groups.xml"
+    ));
+    let types = part(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchertypes.xml"
+    ));
+    let vouchers = part(include_bytes!(
+        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchers_h1.xml"
+    ));
+    let mut names = texts_between(&ledgers, "<LEDGER NAME=\"", "\"");
+    names.extend(texts_between(&groups, "<GROUP NAME=\"", "\""));
+    names.extend(texts_between(&types, "<VOUCHERTYPE NAME=\"", "\""));
+    // A group named only as a parent (one missing from the masters), never
+    // the root marker every top group's parent is.
+    for text in [&ledgers, &groups] {
+        names.extend(
+            texts_between(text, "<PARENT TYPE=\"String\">", "</PARENT>")
+                .into_iter()
+                .filter(|parent| !parent.starts_with("&#4;")),
+        );
+    }
     names.push(super::super::audit_read::tests::FIXTURE_NAME.to_string());
+    for (open, close) in [
+        ("<VOUCHERNUMBER>", "</VOUCHERNUMBER>"),
+        ("<GUID>", "</GUID>"),
+        ("<NARRATION TYPE=\"String\">", "</NARRATION>"),
+    ] {
+        names.extend(texts_between(&vouchers, open, close));
+    }
     // The XML spells `&` as `&amp;`; the book's name is the unescaped text.
     let mut names: Vec<String> = names
         .into_iter()
         .map(|name| name.replace("&amp;", "&"))
         .collect();
-    // The vouchers' own numbers and GUIDs, narrations aside.
-    let vouchers = super::super::audit_read::tests::text_of(include_bytes!(
-        "../crates/bridge-tax-audit/tests/fixtures/synthetic-read/parts/vouchers_h1.xml"
-    ));
-    for element in ["VOUCHERNUMBER", "GUID"] {
-        let open = format!("<{element}>");
-        let close = format!("</{element}>");
-        for (at, _) in vouchers.match_indices(&open) {
-            let start = at + open.len();
-            names
-                .push(vouchers[start..start + vouchers[start..].find(&close).unwrap()].to_string());
-        }
+    names.sort();
+    names.dedup();
+    for parent_only in ["Legacy Holding", "Fixed Assets"] {
+        assert!(
+            names.iter().any(|name| name == parent_only),
+            "{parent_only}"
+        );
     }
     assert!(names.len() > 60, "the book's names were not found");
     names
+}
+
+/// Whether a string of a result is, or holds, a name of the book, in any case.
+/// A name of ten characters or more counts anywhere in a string. A shorter one
+/// (a voucher number such as `J/7`, a ledger such as `Round Off`) counts where
+/// it stands whole, with no letter or digit beside it, so `J/7` is found in
+/// "Journal J/7 on 2025-09-30" and `P/1` is not found in `P/10`.
+fn carries(held: &[String], name: &str) -> bool {
+    let name = name.to_lowercase();
+    let whole = |text: &str, at: usize| {
+        let before = text[..at].chars().next_back();
+        let after = text[at + name.len()..].chars().next();
+        [before, after]
+            .iter()
+            .all(|side| !side.is_some_and(char::is_alphanumeric))
+    };
+    held.iter().any(|text| {
+        let text = text.to_lowercase();
+        text == name
+            || if name.len() >= 10 {
+                text.contains(&name)
+            } else {
+                text.match_indices(&name).any(|(at, _)| whole(&text, at))
+            }
+    })
+}
+
+/// Whether the result carries a name of the book, where a name in `fixed` is
+/// also a word of the test's own wording and so counts only as a whole string
+/// (in any case).
+fn carries_any(held: &[String], names: &[String], fixed: &[&str]) -> bool {
+    names.iter().any(|name| {
+        if fixed.contains(&name.as_str()) {
+            held.iter()
+                .any(|text| text.to_lowercase() == name.to_lowercase())
+        } else {
+            carries(held, name)
+        }
+    })
 }
 
 #[tokio::test]
@@ -205,16 +264,15 @@ async fn a_completed_run_returns_figures_and_findings_and_no_name_of_the_book() 
 
     // No string of the result is, or holds, a name from the book. The company
     // object beside the result is the user's own company, named on purpose.
+    // `Cash` (the ledger Tally makes in every company) and `Contra` (one of
+    // its voucher types) are also words of the test's own wording ("Cash
+    // receipts as a share of ...", "Contra vouchers").
     let mut held = Vec::new();
     strings(run, &mut held);
-    for name in book_names() {
-        assert!(
-            !held
-                .iter()
-                .any(|text| text == &name || (name.len() >= 10 && text.contains(&name))),
-            "the result carries a name of the book"
-        );
-    }
+    assert!(
+        !carries_any(&held, &book_names(), &["Cash", "Contra"]),
+        "the result carries a name of the book"
+    );
     // The paired company list (four requests), then ten parts (the window's
     // census included), each between two company checks.
     assert_eq!(one.simulator.unwrap().finish().unwrap().len(), 34);
@@ -297,11 +355,154 @@ async fn marks_that_moved_during_the_read_refuse_it_with_a_rule_code() {
     // The refusal says nothing of the book.
     let mut held = Vec::new();
     strings(&response["structuredContent"]["result"]["error"], &mut held);
-    for name in book_names() {
-        assert!(!held
-            .iter()
-            .any(|text| text == &name || (name.len() >= 10 && text.contains(&name))));
+    assert!(!carries_any(&held, &book_names(), &[]));
+}
+
+/// `clause21a_candidates`' projection, whether or not the tool admits the test:
+/// the crate's test, through its registry, on the book the audit read admits
+/// from the replay's vouchers 14 to 43 under the engagement the tool builds,
+/// then `project`. Two candidates, one per path a match takes:
+/// - J/7, as captured, debits Interest to Partners (a P&L ledger) against a
+///   partner's capital; with no partner ledgers that is a personal candidate.
+/// - P/20 debits Round Off (a P&L ledger); its narration gains a penalty word
+///   here, a hand-written variant of the replay's own voucher, so a keyword in
+///   the narration makes a penalty candidate.
+#[tokio::test]
+async fn the_clause21a_projection_holds_its_candidates_and_no_name_of_the_book() {
+    let mut replay = Replay::cut(13..43);
+    let (plain, penalty) = (
+        "Synthetic voucher P/20</NARRATION>",
+        "Synthetic voucher P/20 penalty</NARRATION>",
+    );
+    for part in [&mut replay.vouchers, &mut replay.census] {
+        assert_eq!(part.matches(plain).count(), 1);
+        *part = part.replace(plain, penalty);
     }
+    let (audit, _) = super::super::audit_read::tests::read_replay(&replay).await;
+    let audit = audit.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+    let ported = registry::find("clause21a_candidates").unwrap();
+    let rules = bridge_tax_audit::rules_for(&audit.engagement).unwrap();
+    let dump = (ported.run_on)(
+        &audit.engagement,
+        &audit.book,
+        &rules,
+        &CallerData::default(),
+    )
+    .unwrap();
+    let run = project(&dump).unwrap();
+    let figures: Vec<(&str, i64)> = run["figures"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|figure| {
+            (
+                figure["id"].as_str().unwrap(),
+                figure["value"].as_i64().unwrap(),
+            )
+        })
+        .collect();
+    // The canonical dump lists figures by id.
+    assert_eq!(
+        figures,
+        [
+            (
+                "clause21a_candidates.candidate_total_penalty_or_fine",
+                2_000_000
+            ),
+            ("clause21a_candidates.candidate_total_personal", 750_000),
+            ("clause21a_candidates.credits_total_penalty_or_fine", 0),
+            ("clause21a_candidates.credits_total_personal", 0),
+        ]
+    );
+    for finding in run["findings"].as_array().unwrap() {
+        assert!(finding.get("evidence").is_none());
+    }
+
+    let mut names = book_names();
+    names.push(penalty.trim_end_matches("</NARRATION>").to_string());
+    // Names Tally gives every company that are also words of the test's fixed
+    // wording count only as a whole string: the three P&L primary groups it
+    // searches (`PL_GROUPS` in the crate's `clause21a_candidates`), the
+    // `Purchase` voucher type ("Purchase Accounts") and the `Cash` ledger
+    // ("the GST cash ledger", and the tool's own limitation on cash groups).
+    let fixed = [
+        "Purchase Accounts",
+        "Direct Expenses",
+        "Indirect Expenses",
+        "Purchase",
+        "Cash",
+    ];
+    // The control: the crate's own dump, evidence and all, carries the names
+    // of both candidates' vouchers, voucher types and ledgers, the short ones
+    // only inside its evidence labels, never as a whole string. (No dump of
+    // this cut names a group: the one named only as a parent, Legacy Holding,
+    // is on the name list but in no label.)
+    let mut raw = Vec::new();
+    strings(&dump, &mut raw);
+    for own in [
+        "Interest to Partners",
+        "Round Off",
+        "J/7",
+        "P/20",
+        "Journal",
+        "Payment",
+    ] {
+        assert!(names.iter().any(|name| name == own), "{own}");
+        assert!(carries_any(&raw, &[own.to_string()], &fixed), "{own}");
+    }
+    assert!(!raw
+        .iter()
+        .any(|text| ["J/7", "Round Off", "Journal", "Payment"].contains(&text.as_str())));
+    let mut held = Vec::new();
+    strings(&run, &mut held);
+    assert!(
+        !carries_any(&held, &names, &fixed),
+        "the result carries a name of the book"
+    );
+}
+
+/// Every committed golden of `clause21a_candidates`, the reference's own
+/// output, passes the projection whole: no figure or finding is refused, and
+/// no evidence is kept.
+#[test]
+fn every_committed_clause21a_golden_projects() {
+    for golden in [
+        include_str!("../crates/bridge-tax-audit/tests/fixtures/golden/synthetic.clause21a_candidates.json"),
+        include_str!("../crates/bridge-tax-audit/tests/fixtures/golden/edge.c21a_capital.clause21a_candidates.json"),
+        include_str!("../crates/bridge-tax-audit/tests/fixtures/golden/edge.c21a_default_threshold.clause21a_candidates.json"),
+        include_str!("../crates/bridge-tax-audit/tests/fixtures/golden/edge.c21a_fields.clause21a_candidates.json"),
+        include_str!("../crates/bridge-tax-audit/tests/fixtures/golden/edge.c21a_skips.clause21a_candidates.json"),
+        include_str!("../crates/bridge-tax-audit/tests/fixtures/golden/edge.c21a_words.clause21a_candidates.json"),
+    ] {
+        let dump: Value = serde_json::from_str(golden).unwrap();
+        let projected = project(&dump).unwrap_or_else(|code| panic!("{code}: {}", dump["test_id"]));
+        for key in ["figures", "findings"] {
+            assert!(!dump[key].as_array().unwrap().is_empty());
+            assert_eq!(projected[key].as_array().unwrap().len(), dump[key].as_array().unwrap().len());
+        }
+        assert!(!projected.to_string().contains("\"evidence\""));
+    }
+}
+
+/// `carries` finds a short name only where it stands whole, a longer one
+/// anywhere, and either in any case.
+#[test]
+fn a_short_name_is_carried_only_where_it_stands_whole() {
+    let held = |text: &str| vec![text.to_string()];
+    assert!(carries(&held("Journal J/7 on 2025-09-30"), "J/7"));
+    assert!(carries(&held("(J/7)"), "J/7"));
+    assert!(!carries(&held("Payment P/10 on 2025-06-10"), "P/1"));
+    assert!(!carries(&held("PJ/7"), "J/7"));
+    assert!(carries(&held("journal j/7 on 2025-09-30"), "J/7"));
+    // A name of ten characters or more counts inside a word too.
+    assert!(carries(
+        &held("xInterest to Partnersy"),
+        "Interest to Partners"
+    ));
+    assert!(carries(
+        &held("Interest to Partners, ₹7,500"),
+        "Interest to Partners"
+    ));
 }
 
 #[test]
@@ -485,7 +686,7 @@ fn a_result_past_the_bounds_is_refused_and_never_cut_short() {
 #[tokio::test]
 async fn the_tool_is_absent_and_refused_while_its_setting_is_off() {
     let listed = |audit| {
-        catalog::listed_tool_definitions(false, false, audit)
+        catalog::listed_tool_definitions(false, false, audit, false)
             .as_array()
             .unwrap()
             .iter()

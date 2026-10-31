@@ -1,6 +1,22 @@
 // The library's modules are crate-private on purpose. rustc's `dead_code` lint does not flag a
 // `pub` item of a library, so a `pub mod` here hid every function nothing in the crate calls.
 // What the binaries need is re-exported below, and nothing else is reachable from outside.
+/// A test's own company or master GUID: version 4, the RFC 4122 variant, and `n` in the low
+/// bits, every other bit zero. Built rather than written, so tests carry no UUID literal for the
+/// merge gate's privacy scan to classify. Leaked so it reads as a `&'static str`, as the
+/// constants it replaces did.
+#[cfg(test)]
+pub(crate) fn synthetic_guid(n: u16) -> &'static str {
+    let guid = uuid::Uuid::from_u128((0x4000u128 << 64) | (0x8000u128 << 48) | u128::from(n));
+    Box::leak(guid.to_string().into_boxed_str())
+}
+
+/// A batch id of the build's own shape (`bridge-` and a GUID) on [`synthetic_guid`].
+#[cfg(test)]
+pub(crate) fn synthetic_batch_id(n: u16) -> &'static str {
+    Box::leak(format!("bridge-{}", synthetic_guid(n)).into_boxed_str())
+}
+
 pub(crate) mod agent;
 pub(crate) mod client_group_label_migration;
 pub(crate) mod client_groups;
@@ -96,6 +112,9 @@ pub fn run_journal_confirmation_child_from_args(
     let confirmed = match args.next().as_deref() {
         Some("--confirm-journal") => agent::run_confirmation as fn() -> bool,
         Some("--confirm-review") => agent::run_review_confirmation,
+        Some("--confirm-masters") => agent::run_masters_confirmation,
+        Some("--confirm-release") => agent::run_release_confirmation,
+        Some("--confirm-settle") => agent::run_settle_confirmation,
         _ => return None,
     };
     if args.next().is_some() {

@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/stock-query/r-12-stock-query-hcl-to-20250401.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "150.000",
+                ),
+                unit: "Kgs",
+            },
+        },
+    ],
+))

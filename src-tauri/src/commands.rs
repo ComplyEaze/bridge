@@ -143,13 +143,21 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
             false,
             "Try again in a few seconds. Nothing was sent to Tally.",
         ),
+        WireRefusal::Draining { .. } => tally_command_error(
+            "tally_endpoint_draining",
+            "Operation",
+            "Tally was still busy with an earlier request that was stopped for time.",
+            "safe",
+            false,
+            "Try again in a few seconds; this clears by itself within 10 minutes. This request was not sent to Tally.",
+        ),
         WireRefusal::Unavailable => tally_command_error(
             "tally_endpoint_lock_unavailable",
             "Operation",
             "ComplyEaze Bridge could not open its local Tally coordination file, so it sent nothing to Tally.",
             "after_change",
             false,
-            "Check that ComplyEaze Bridge's Application Support folder is available and writable, then try again.",
+            "Check that ComplyEaze Bridge's Application Support folder is available and writable, then try again. If a file ending in .wire.debt in its coordination folder cannot be read, deleting that file clears it.",
         ),
     }
 }

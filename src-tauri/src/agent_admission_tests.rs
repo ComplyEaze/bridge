@@ -1825,7 +1825,9 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// every list: its entry is 1,421 bytes and a comma is 1. Its base measured 205,358, 231,174,
 /// 233,672 and 238,788 bytes, so with it the lists measure 206,780, 232,596, 235,094 and
 /// 240,210, over every budget by 780, 596, 1,094 and 1,210. Each budget went up by 1,500,
-/// leaving margins of 720, 904, 406 and 290.
+/// leaving margins of 720, 904, 406 and 290. Its review fixes then added 64 bytes to every
+/// list, 30 in its `as_of` text and 34 in its description, counted from the text rather
+/// than measured, which leaves margins of 656, 840, 342 and 226 before any other change.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 233_500, 235_500, 240_500];

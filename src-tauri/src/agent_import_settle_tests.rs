@@ -54,6 +54,19 @@ async fn posted_then_later(
     later_mark: u64,
     reads: usize,
 ) -> Posted {
+    let later = (0..reads)
+        .flat_map(|_| span_readback(empty_collection(), later_mark))
+        .collect();
+    posted_then_read(answer, batch, after_mark, later).await
+}
+
+/// As `posted_then_later`, with the later Tally answering `later`.
+async fn posted_then_read(
+    answer: String,
+    batch: bool,
+    after_mark: u64,
+    later: Vec<ScenarioPlan>,
+) -> Posted {
     let mut plans = before_approval();
     plans.extend(after_approval(xml(answer)));
     plans.push(xml(company_marks(after_mark, 50, "WR2 Unicode Lab")));
@@ -75,10 +88,7 @@ async fn posted_then_later(
         )
         .await;
     let _ = sent(simulator);
-    let later_plans = (0..reads)
-        .flat_map(|_| span_readback(empty_collection(), later_mark))
-        .collect();
-    let simulator = SequenceSimulator::spawn(with_sentinel(later_plans)).unwrap();
+    let simulator = SequenceSimulator::spawn(with_sentinel(later)).unwrap();
     let later_server = server_at(simulator.address(), directory.path());
     let origin =
         super::super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
@@ -125,8 +135,11 @@ async fn a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held
     assert_eq!(declined.review_kinds(), [ReviewKind::Settle]);
     assert_eq!(settlement_records(directory.path()), Vec::<Value>::new());
 
+    // The company's GUID is matched without regard to case.
+    let mut upper = settle_args(&line);
+    upper["company_guid"] = json!(GUID.to_uppercase());
     let approval = ScriptedApproval::approving();
-    let response = settle(&server, settle_args(&line), approval.clone()).await;
+    let response = settle(&server, upper, approval.clone()).await;
     assert_eq!(
         result(&response)["state"],
         "settled_by_person",
@@ -166,7 +179,11 @@ async fn a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held
     let verified = result(&verified);
     assert_eq!(verified["verification_status"], status, "{verified}");
     assert_eq!(verified["counts"]["sent_not_attributed"], 1, "{verified}");
-    assert_eq!(verified["person_settlement"]["state"], "settled");
+    assert_eq!(
+        verified["person_settlement"],
+        json!({"state": "settled", "next_step": super::super::super::settle::NEXT_STEP}),
+        "{verified}"
+    );
     assert_eq!(
         verified["post_span_binding"]["summary"],
         super::super::super::settle::SUMMARY
@@ -559,6 +576,8 @@ fn only_a_read_that_shows_the_batch_open_is_settled() {
 fn a_settled_invoice_keeps_its_stop_and_its_row() {
     let directory = tempfile::tempdir().unwrap();
     let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    // With no journal yet, no batch is settled.
+    assert_eq!(server.import_person_settlement("bridge-none"), Ok(false));
     let mut line: Value = serde_json::to_value(saved_captured_line(&server)).unwrap();
     line["batch_id"] = json!(format!("bridge-{}", uuid::Uuid::new_v4()));
     line["vouchers"][0]["voucher_type"] = json!("Sales");
@@ -603,20 +622,22 @@ fn a_settled_invoice_keeps_its_stop_and_its_row() {
 }
 
 /// The journal decides before any read: a native post with a pre-POST mark,
-/// answered as creating none of its one voucher, neither verified nor bound.
+/// answered as creating none of its vouchers, neither verified nor bound (a
+/// refused binding does not stop it). For a batch of two or more, the post
+/// must also have recorded its step matched.
 #[test]
 fn the_journaled_answer_is_read_from_the_batch_s_records() {
     use crate::agent::agent_import::settle::journaled_not_created;
-    let case = |pre: Option<u64>, after: &[&str]| {
+    let batch = |pre: Option<u64>, amounts: &[&str], after: &[&str], matched: bool| {
         let directory = tempfile::tempdir().unwrap();
         let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
-        let line = saved_captured_line(&server);
-        let native =
-            native_post_request(&line, RemoteIds::from_ids(vec![uuid::Uuid::new_v4()])).unwrap();
+        let (line, _) = saved_journal_batch(&server, amounts);
+        let ids = line.vouchers.iter().map(|_| uuid::Uuid::new_v4()).collect();
+        let native = native_post_request(&line, RemoteIds::from_ids(ids)).unwrap();
         let mut rejected = super::super::tests::dispatch_response("success", 0, 0);
         rejected.request_sha256 = native.request_sha256.clone();
         let mut outcome = serde_json::to_value(rejected.outcome.take().unwrap()).unwrap();
-        outcome["counters"]["exceptions"] = json!(1);
+        outcome["counters"]["exceptions"] = json!(amounts.len());
         rejected.outcome = Some(serde_json::from_value(outcome).unwrap());
         let _lock = server.lock_import_admission().unwrap();
         server
@@ -639,6 +660,10 @@ fn the_journaled_answer_is_read_from_the_batch_s_records() {
                         },
                     ]),
                 ),
+                "refused" => ledger::StatusRecord::post_span_verdict(
+                    &line,
+                    &ledger::PostSpanVerdict::Refused("span_content_mismatch".into()),
+                ),
                 status => serde_json::from_value(json!({
                     "record_type":"verification_status","batch_id":line.batch_id,
                     "batch_sha256":line.sha256,"status":status
@@ -651,13 +676,18 @@ fn the_journaled_answer_is_read_from_the_batch_s_records() {
             .import_snapshot_while_admitted(Some(&line.batch_id))
             .unwrap()
             .unwrap();
-        journaled_not_created(&snapshot, || false)
+        journaled_not_created(&snapshot, || matched)
     };
+    let case = |pre: Option<u64>, after: &[&str]| batch(pre, &["12.61"], after, false);
     assert!(case(Some(10), &[]));
     assert!(case(Some(10), &["reconciliation_required"]));
     assert!(!case(None, &[]));
     assert!(!case(Some(10), &["posted_verified"]));
     assert!(!case(Some(10), &["bound"]));
+    assert!(case(Some(10), &["refused"]));
+    let two = ["12.61", "13.61"];
+    assert!(batch(Some(10), &two, &[], true));
+    assert!(!batch(Some(10), &two, &[], false));
 }
 
 /// A settlement replaces the first line of the binding's summary only. A
@@ -766,4 +796,127 @@ fn only_the_next_steps_that_ask_for_the_settlement_are_replaced() {
     let mut open = json!({"vouchers": rows});
     settle_voucher_next_steps(&mut open);
     assert_eq!(open["vouchers"], rows);
+}
+
+/// The dialog names each voucher type with its count, the batch's first and
+/// last dates whatever their order, and a company that recorded no name by
+/// its GUID. A name too long for a line is broken so the box still takes it.
+#[test]
+fn the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name() {
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at("127.0.0.1:9".parse().unwrap(), directory.path());
+    let line = saved_captured_line(&server);
+    let read = json!({"counts":{"matching_content_observed":0}});
+    let mut mixed: Value = serde_json::to_value(&line).unwrap();
+    let template = mixed["vouchers"][0].clone();
+    mixed["vouchers"] = [
+        ("R-1-01", "20260909", "Journal"),
+        ("R-1-02", "20260905", "Payment"),
+        ("R-1-03", "20260907", "Journal"),
+    ]
+    .iter()
+    .map(|(id, date, kind)| {
+        let mut voucher = template.clone();
+        voucher["bridge_txn_id"] = json!(id);
+        voucher["date"] = json!(date);
+        voucher["voucher_type"] = json!(kind);
+        voucher
+    })
+    .collect();
+    let named = |name: Option<&str>| {
+        let mut batch = mixed.clone();
+        batch["company"] = match name {
+            Some(name) => {
+                let mut company = mixed["company"].clone();
+                company["name"] = json!(name);
+                company
+            }
+            None => Value::Null,
+        };
+        let batch: ImportLedgerLine = serde_json::from_value(batch).unwrap();
+        settle_preview(&batch, &read)
+    };
+    let three = VoucherCount::new(3).unwrap();
+    let preview = named(Some("WR2 Unicode Lab"));
+    let lines: Vec<&str> = preview.lines().collect();
+    assert_eq!(
+        lines[5..7],
+        [
+            "Batch: bridge-6c79872c-aab6-4be5-a181-18182c8148be",
+            "Sent to Tally: 3 vouchers (2 Journal, 1 Payment), dated 20260905 to 20260909.",
+        ],
+        "{preview}"
+    );
+    for unnamed in [None, Some("")] {
+        let preview = named(unnamed);
+        assert_eq!(
+            preview.lines().nth(4),
+            Some(format!("Company: {GUID}").as_str()),
+            "{preview}"
+        );
+    }
+    let long = "Q".repeat(250);
+    let preview = named(Some(&long));
+    assert_eq!(
+        preview.lines().skip(4).take(4).collect::<Vec<_>>(),
+        ["Company:", &long[..100], &long[100..200], &long[200..]],
+        "{preview}"
+    );
+    assert!(
+        review_fits(ReviewKind::Settle, three, &preview),
+        "{preview}"
+    );
+}
+
+/// The settled lines keep their words: the batch is never sent again, and a
+/// voucher wanted in the book is entered in Tally, never imported through
+/// Tally's Import menu.
+#[test]
+fn the_settled_summary_and_next_step_keep_their_words() {
+    use super::super::super::settle::{NEXT_STEP, SUMMARY};
+    assert_eq!(
+        SUMMARY,
+        "A person settled this batch after Tally reported that its post created none of its \
+         vouchers: ComplyEaze Bridge never sends them again."
+    );
+    assert_eq!(
+        NEXT_STEP,
+        "A person settled this batch in ComplyEaze Bridge's own dialog, saying each voucher is in \
+         the book or will not be posted. It is closed and counted as settled, but not marked \
+         posted, and its rows are never built or posted again. If a voucher is wanted in the book \
+         and is not there, it can only be entered in Tally; do not import its file through \
+         Tally's Import menu."
+    );
+}
+
+/// The dialog says what the read just found: a voucher of the same content
+/// in the accounts is counted, though the binding is refused.
+#[tokio::test]
+async fn the_settle_dialog_counts_what_the_read_found() {
+    let Posted {
+        directory,
+        server,
+        simulator: _simulator,
+        line,
+    } = posted_then_read(
+        rejected_one_silver(),
+        false,
+        10,
+        span_readback(tagged_capture_in_span(), 11),
+    )
+    .await;
+    let approval = ScriptedApproval::approving();
+    let response = settle(&server, settle_args(&line), approval.clone()).await;
+    assert_eq!(
+        result(&response)["state"],
+        "settled_by_person",
+        "{response}"
+    );
+    let shown = &approval.reviews()[0];
+    assert!(
+        shown.lines().any(|line| line
+            == "The read just now found, for 1 of the 1 voucher sent, a voucher in the book with the same date,"),
+        "{shown}"
+    );
+    assert_eq!(settlement_records(directory.path()).len(), 1);
 }

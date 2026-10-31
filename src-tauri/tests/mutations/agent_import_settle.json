@@ -1,0 +1,675 @@
+{
+  "file": "src-tauri/src/agent_import_settle.rs",
+  "base_commit": "a8317380",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. In every run the file and its test module were byte for byte as at base_commit (or as this change leaves the test module, for survivors_again). The rest of the tree was not always: tree says, for each run, what it was. A run not on base_commit itself measured the same file and tests beside other changes to the crate, and the runs that decide the record (survivors_again and the checks) were repeated on base_commit.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 1911,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_settle.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv/)'",
+      "time": "2026-10-31T06:19:51Z",
+      "tree": "master 2004a8b2 for about its first 50 minutes, then master at a8317380 merged into an unrelated branch for the rest"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 97,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/settle|acknowledge|ack_tests|verify/)'",
+      "tree": "master at a8317380 merged into an unrelated branch; A08 is recorded from its whole_set run on base_commit, after its edit text was changed to the equivalent one recorded (its id held a run of ten digits)"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 4550,
+      "tests_run_on_base_commit": 4541,
+      "command": "as the hand run with every bridge test (-E 'all()'), for the tool's four missed mutants and the twelve hand-written ones that survived",
+      "tree": "master at a8317380 merged into an unrelated branch; A08 again on base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 16,
+      "command": "as the hand run with -E 'test(/settle_tests/)', for the same sixteen",
+      "tree": "base_commit"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 43,
+      "missed": 1,
+      "unviable": 1
+    },
+    "hand": {
+      "caught": 26,
+      "missed": 2
+    },
+    "survived_at_base": {
+      "tool": 4,
+      "hand": 12
+    },
+    "equivalent": {
+      "tool": 1,
+      "hand": 1
+    },
+    "accepted_not_equivalent": {
+      "hand": 1
+    }
+  },
+  "tool_results": {
+    "42:5 replace journaled_not_created -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_batch_not_on_record_as_rejected_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "42:5 replace journaled_not_created -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_journaled_answer_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "44:9 replace || with && in journaled_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_journaled_answer_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "43:9 replace || with && in journaled_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_journaled_answer_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "43:34 replace == with != in journaled_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_journaled_answer_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "57:34 replace && with || in journaled_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "57:30 replace > with == in journaled_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "57:30 replace > with < in journaled_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "57:30 replace > with >= in journaled_not_created": {
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "59:9 replace == with != in journaled_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_batch_not_on_record_as_rejected_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "67:5 replace shown_open -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_a_read_that_shows_the_batch_open_is_settled",
+      "killer_at": "base"
+    },
+    "67:5 replace shown_open -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_a_read_that_shows_the_batch_open_is_settled",
+      "killer_at": "base"
+    },
+    "68:9 replace && with || in shown_open": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_a_read_that_shows_the_batch_open_is_settled",
+      "killer_at": "base"
+    },
+    "67:35 replace != with == in shown_open": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_a_read_that_shows_the_batch_open_is_settled",
+      "killer_at": "base"
+    },
+    "78:5 replace settle_preview -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_only_matches_in_the_accounts",
+      "killer_at": "base"
+    },
+    "78:5 replace settle_preview -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_only_matches_in_the_accounts",
+      "killer_at": "base"
+    },
+    "82:24 delete ! in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_says_what_it_closes_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "88:57 replace == with != in settle_preview": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name",
+      "killer_at": "this_commit"
+    },
+    "89:38 replace += with -= in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_says_what_it_closes_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "89:38 replace += with *= in settle_preview": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name",
+      "killer_at": "this_commit"
+    },
+    "102:9 delete match arm (Some(first), _) in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_says_what_it_closes_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "101:38 replace match guard first != last with true in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_says_what_it_closes_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "101:38 replace match guard first != last with false in settle_preview": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name",
+      "killer_at": "this_commit"
+    },
+    "101:44 replace != with == in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_says_what_it_closes_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "112:21 replace && with || in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_only_matches_in_the_accounts",
+      "killer_at": "base"
+    },
+    "111:35 replace == with != in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_only_matches_in_the_accounts",
+      "killer_at": "base"
+    },
+    "112:56 replace == with != in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_only_matches_in_the_accounts",
+      "killer_at": "base"
+    },
+    "116:40 replace == with != in settle_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_only_matches_in_the_accounts",
+      "killer_at": "base"
+    },
+    "182:5 replace report -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_settled_batch_s_verification_keeps_the_restore_line_after_its_own",
+      "killer_at": "base"
+    },
+    "189:5 replace asks_for_settlement -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_the_next_steps_that_ask_for_the_settlement_are_replaced",
+      "killer_at": "base"
+    },
+    "189:5 replace asks_for_settlement -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_the_next_steps_that_ask_for_the_settlement_are_replaced",
+      "killer_at": "base"
+    },
+    "197:5 replace settle_voucher_next_steps with ()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_the_next_steps_that_ask_for_the_settlement_are_replaced",
+      "killer_at": "base"
+    },
+    "197:8 delete ! in settle_voucher_next_steps": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_rejected_whole_verified_later_says_what_tally_reported_of_each_voucher",
+      "killer_at": "base"
+    },
+    "226:9 replace Server::settle_not_created -> Result<ToolOutcome, ToolFailure> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ToolOutcome: std::default::Default` is not satisfied"
+    },
+    "232:33 replace || with && in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_batch_not_on_record_as_rejected_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "232:12 delete ! in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_batch_not_on_record_as_rejected_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "235:12 delete ! in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_batch_not_on_record_as_rejected_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "245:67 replace == with != in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "247:12 delete ! in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_batch_not_on_record_as_rejected_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "262:12 delete ! in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "295:50 replace || with && in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "295:31 replace != with == in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "295:53 delete ! in Server::settle_not_created": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "315:9 replace Server::import_person_settlement -> Result<bool, String> with Ok(true)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_batch_tally_rejected_whole_reads_as_not_created_by_tally",
+      "killer_at": "base"
+    },
+    "315:9 replace Server::import_person_settlement -> Result<bool, String> with Ok(false)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_settled_invoice_keeps_its_stop_and_its_row",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "A01": {
+      "what": "NOT_CREATED_NOT_ESTABLISHED: the refusal takes the not-posted code (codes swapped)",
+      "edits": [
+        {
+          "from": "const NOT_CREATED_NOT_ESTABLISHED: &str = \"ack_not_created_not_established\";",
+          "to": "const NOT_CREATED_NOT_ESTABLISHED: &str = \"ack_batch_not_posted\";"
+        }
+      ],
+      "mutation": "e09493035e4c2baeadb47f94ea488148",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_batch_not_on_record_as_rejected_is_refused_before_any_read",
+      "killer_at": "base"
+    },
+    "A02": {
+      "what": "journaled_not_created: a post with no pre-POST mark is admitted (guard dropped)",
+      "edits": [
+        {
+          "from": "    if snapshot.pre_post_voucher_mark.is_none()\n        || snapshot",
+          "to": "    if snapshot"
+        }
+      ],
+      "mutation": "118f29dfee7b17239c8b1655f5267f48",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_journaled_answer_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "A03": {
+      "what": "journaled_not_created: any span verdict refuses, not only Bound",
+      "edits": [
+        {
+          "from": "            Some(ledger::PostSpanVerdict::Bound(_))",
+          "to": "            Some(_)"
+        }
+      ],
+      "mutation": "cd87cdedb471e986ef9c19038d58837f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "A04": {
+      "what": "journaled_not_created: a batch of two is read as one (count > 1 to count > 2)",
+      "edits": [
+        {
+          "from": "let step_matched = count > 1 && step_matched();",
+          "to": "let step_matched = count > 2 && step_matched();"
+        }
+      ],
+      "mutation": "a1a2a0924a0ccd194dbdc71c32c55445",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_journaled_answer_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "A05": {
+      "what": "journaled_not_created: the answer is judged as for one voucher sent",
+      "edits": [
+        {
+          "from": "verification::later_unmatched_cause(answer, count, step_matched)",
+          "to": "verification::later_unmatched_cause(answer, 1, step_matched)"
+        }
+      ],
+      "mutation": "8ceef3b654343a6d2e910cac0677697b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "A06": {
+      "what": "shown_open: a binding not_bound is not open (arm dropped)",
+      "edits": [
+        {
+          "from": "Some(\"refused\" | \"not_bound\")",
+          "to": "Some(\"refused\")"
+        }
+      ],
+      "mutation": "7ee5ce21f1c6878a10bb89d09d0c1ad7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_a_read_that_shows_the_batch_open_is_settled",
+      "killer_at": "base"
+    },
+    "A07": {
+      "what": "shown_open: a binding still unsettled is open (arm added)",
+      "edits": [
+        {
+          "from": "Some(\"refused\" | \"not_bound\")",
+          "to": "Some(\"refused\" | \"not_bound\" | \"unsettled\")"
+        }
+      ],
+      "mutation": "aceb3b53bc09c283a022ae2dc0701ab0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_a_read_that_shows_the_batch_open_is_settled",
+      "killer_at": "base"
+    },
+    "A08": {
+      "what": "settle_preview: a company with no name shows nothing, not its GUID",
+      "edits": [
+        {
+          "from": ".unwrap_or(&line.company_guid);",
+          "to": ".unwrap_or_else(|| \"\");"
+        }
+      ],
+      "mutation": "a9145a0e6c010c48f3a3f315dfa8b3a1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name",
+      "killer_at": "this_commit"
+    },
+    "A09": {
+      "what": "settle_preview: the first and last dates are swapped",
+      "edits": [
+        {
+          "from": "let (first, last) = (dates.clone().min(), dates.max());",
+          "to": "let (first, last) = (dates.clone().max(), dates.min());"
+        }
+      ],
+      "mutation": "9e6c45edb89e657f7243fe453a980baf",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name",
+      "killer_at": "this_commit"
+    },
+    "A10": {
+      "what": "settle_preview: a word longer than a line is not broken (chunks of 100 to 1000)",
+      "edits": [
+        {
+          "from": "                    .chunks(100)",
+          "to": "                    .chunks(1000)"
+        }
+      ],
+      "mutation": "bfd336d5430d2b3732b7ef0954be1f76",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name",
+      "killer_at": "this_commit"
+    },
+    "A11": {
+      "what": "settle_preview: the invoice stop line is shown for a batch with no invoice (condition inverted)",
+      "edits": [
+        {
+          "from": "if holds_an_invoice(line) {",
+          "to": "if !holds_an_invoice(line) {"
+        }
+      ],
+      "mutation": "468b5a200e6b27d07a19bd8341f979b5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_says_what_it_closes_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "A12": {
+      "what": "report: the standing settlement's next step is dropped",
+      "edits": [
+        {
+          "from": "json!({\"state\": \"settled\", \"next_step\": NEXT_STEP})",
+          "to": "json!({\"state\": \"settled\"})"
+        }
+      ],
+      "mutation": "40ab9513c6d12e542bbd5e972dae8fa2",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held",
+      "killer_at": "base"
+    },
+    "A13": {
+      "what": "NEXT_STEP: the closing warning against Tally's Import menu is dropped",
+      "edits": [
+        {
+          "from": " If a voucher is wanted in the \\\n    book and is not there, it can only be entered in Tally; do not import its file through \\\n    Tally's Import menu.\";",
+          "to": "\";"
+        }
+      ],
+      "mutation": "ac4444a9163ac9edca1257154b45a68d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settled_summary_and_next_step_keep_their_words",
+      "killer_at": "this_commit"
+    },
+    "A14": {
+      "what": "SUMMARY: the words that it is never sent again are dropped",
+      "edits": [
+        {
+          "from": "created none of its vouchers: ComplyEaze Bridge never sends them again.\";",
+          "to": "created none of its vouchers.\";"
+        }
+      ],
+      "mutation": "49c74968e6e2618b8f23b1437738d136",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settled_summary_and_next_step_keep_their_words",
+      "killer_at": "this_commit"
+    },
+    "A15": {
+      "what": "settle_not_created: the company GUID is compared case-sensitively",
+      "edits": [
+        {
+          "from": "            .eq_ignore_ascii_case(required_string(args, \"company_guid\")?)",
+          "to": "            .eq(required_string(args, \"company_guid\")?)"
+        }
+      ],
+      "mutation": "b0c8470e794a2ad919d81e7aa7cf212f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held",
+      "killer_at": "base"
+    },
+    "A16": {
+      "what": "settle_not_created: an already recorded settlement is not refused before the read (guard dropped)",
+      "edits": [
+        {
+          "from": "        if self.import_person_settlement(&line.batch_id)? {",
+          "to": "        if false && self.import_person_settlement(&line.batch_id)? {"
+        }
+      ],
+      "mutation": "f706844058e8d99ee42ac02ca24a6fcc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held",
+      "killer_at": "base"
+    },
+    "A17": {
+      "what": "settle_not_created: a record of the batch since the read is not refused (generation check dropped)",
+      "edits": [
+        {
+          "from": "if current.generation != held.generation || !admitted {",
+          "to": "if !admitted {"
+        }
+      ],
+      "mutation": "b9430704a69f2a85b1350f370c33edca",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "A18": {
+      "what": "settle_not_created: the journal's admission of the record is not required (check dropped)",
+      "edits": [
+        {
+          "from": "if current.generation != held.generation || !admitted {",
+          "to": "if current.generation != held.generation {"
+        }
+      ],
+      "mutation": "0aa060539b7d3229d022e9b26f121fbe",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "A19": {
+      "what": "settle_not_created: a journal read error admits the record",
+      "edits": [
+        {
+          "from": "ledger::person_settlement_after(reader, &record).unwrap_or(false)",
+          "to": "ledger::person_settlement_after(reader, &record).unwrap_or(true)"
+        }
+      ],
+      "mutation": "8bbd590ef39151a82554b40d67bd5c61",
+      "verdict": "missed",
+      "equivalent": false
+    },
+    "A20": {
+      "what": "settle_not_created: no journal admits the record",
+      "edits": [
+        {
+          "from": "            None => false,\n        };",
+          "to": "            None => true,\n        };"
+        }
+      ],
+      "mutation": "5ae402ad43af8210c756dea6228caa25",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A21": {
+      "what": "settle_not_created: the dialog is asked for one voucher whatever the batch holds",
+      "edits": [
+        {
+          "from": "VoucherCount::new(line.vouchers.len()).ok_or_else",
+          "to": "VoucherCount::new(1).ok_or_else"
+        }
+      ],
+      "mutation": "743d08daf4aaaed4d2332017a64e1480",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "A22": {
+      "what": "settle_not_created: the dialog is asked as a stop release",
+      "edits": [
+        {
+          "from": "ReviewAcknowledged::confirm(ReviewKind::Settle, count, &preview)",
+          "to": "ReviewAcknowledged::confirm(ReviewKind::StopRelease, count, &preview)"
+        }
+      ],
+      "mutation": "59b4f0cce872d6fd0a07a4027b601097",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held",
+      "killer_at": "base"
+    },
+    "A23": {
+      "what": "settle_not_created: the result reports no verification status",
+      "edits": [
+        {
+          "from": "\"verification_status\": result[\"verification_status\"],",
+          "to": "\"verification_status\": Value::Null,"
+        }
+      ],
+      "mutation": "90f1506f1db95c532bd22c18ca331577",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_voucher_is_settled_only_by_the_person_and_its_row_stays_held",
+      "killer_at": "base"
+    },
+    "A24": {
+      "what": "settle_not_created: the dialog preview is built from the read's absence (empty read)",
+      "edits": [
+        {
+          "from": "let preview = settle_preview(&line, result);",
+          "to": "let preview = settle_preview(&line, &Value::Null);"
+        }
+      ],
+      "mutation": "12ccf56744e62d9cc1857d8d490d9999",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::the_settle_dialog_counts_what_the_read_found",
+      "killer_at": "this_commit"
+    },
+    "A25": {
+      "what": "settle_not_created: the step-matched read takes the masters check's verdict field (batch_step to step)",
+      "edits": [
+        {
+          "from": ".is_some_and(|check| check[\"batch_step\"][\"state\"] == \"matched\")",
+          "to": ".is_some_and(|check| check[\"step\"][\"state\"] == \"matched\")"
+        }
+      ],
+      "mutation": "826f52793d8f2d11d627c452381f97a1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_rejected_batch_is_settled_only_when_its_post_recorded_the_step_matched",
+      "killer_at": "base"
+    },
+    "A26": {
+      "what": "import_person_settlement: no journal reads as settled",
+      "edits": [
+        {
+          "from": "            Some(reader) => ledger::person_settlement(reader, batch_id),\n            None => Ok(false),",
+          "to": "            Some(reader) => ledger::person_settlement(reader, batch_id),\n            None => Ok(true),"
+        }
+      ],
+      "mutation": "008478cd8c36192bb20ad20cf5200052",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::a_settled_invoice_keeps_its_stop_and_its_row",
+      "killer_at": "base"
+    },
+    "A27": {
+      "what": "asks_for_settlement: a line asks for it only where it starts with the call",
+      "edits": [
+        {
+          "from": ".is_some_and(|line| line.contains(\"call acknowledge_post_review with doubt not_created\"))",
+          "to": ".is_some_and(|line| line.starts_with(\"call acknowledge_post_review with doubt not_created\"))"
+        }
+      ],
+      "mutation": "e01b56327ac7d60654fa22fe2e91c247",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_the_next_steps_that_ask_for_the_settlement_are_replaced",
+      "killer_at": "base"
+    },
+    "A28": {
+      "what": "settle_voucher_next_steps: every voucher line gets the settled next step",
+      "edits": [
+        {
+          "from": "            if asks_for_settlement(row[\"next_step\"].as_str()) {",
+          "to": "            if true {"
+        }
+      ],
+      "mutation": "19a5b418a494a751ce9541415f0d1b6f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::settle_tests::only_the_next_steps_that_ask_for_the_settlement_are_replaced",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "57:30 replace > with >= in journaled_not_created": {
+      "reason": "equivalent: later_unmatched_cause ignores step_matched when one voucher was sent (sent == 1 || step_matched), so asking for the step of a one-voucher batch only reads its masters check and changes no answer"
+    },
+    "A19": {
+      "mutation": "8bbd590ef39151a82554b40d67bd5c61",
+      "reason": "not killed, and not equivalent: person_settlement_after fails when the journal would refuse the settlement, which only a record of this batch causes (verified, bound, answered, or settled). One written after the snapshot taken after the read is refused first by the generation check; one written between the first check and that snapshot, while the read runs, needs a test double that writes during a read, which the tests do not have yet"
+    },
+    "A20": {
+      "mutation": "5ae402ad43af8210c756dea6228caa25",
+      "reason": "equivalent, unreachable: import_snapshot_while_admitted has just found the batch in the journal under the same exclusive lock, so the journal exists and its reader is never None here"
+    }
+  }
+}

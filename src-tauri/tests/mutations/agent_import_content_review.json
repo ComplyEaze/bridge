@@ -1,0 +1,685 @@
+{
+  "file": "src-tauri/src/agent_import_content_review.rs",
+  "base_commit": "4be8dba732c2b426b732fb372120356f3ef1c543",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Left out as equivalent, and not run: the type list shown without stop::shown, since each name is one of the closed VoucherType set; the date range shown without it, since each date is a parsed TallyDate of digits; and another fallback for a refused binding's missing code, since review_content_only builds the dialog for a refused binding only after shown_state found its code as text.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 1911,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_content_review.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv/)'",
+      "time": "2026-10-31T06:13:11.12028Z"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 1911,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/import|numbering|post|approv/)'"
+    },
+    {
+      "run": "accepted_whole_set",
+      "tests_at": "base and this_commit",
+      "tests_at_base": 4535,
+      "tests_at_this_commit": 4538,
+      "command": "as the hand run with no filter, for the two hand-written mutants accepted as survivors, at base and again with this change's tests"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 1914,
+      "command": "as the hand run, for the eleven hand-written mutants that survived at base and are not accepted"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 36,
+      "unviable": 5
+    },
+    "hand": {
+      "caught": 30,
+      "missed": 2
+    },
+    "survived_at_base": {
+      "tool": 0,
+      "hand": 13
+    }
+  },
+  "tool_results": {
+    "36:5: replace journaled_state -> Option<ledger::ReviewedBinding> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "36:5: replace journaled_state -> Option<ledger::ReviewedBinding> with Some(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ReviewedBinding: std::default::Default` is not satisfied"
+    },
+    "36:49: replace || with && in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_journaled_state_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "36:74: replace == with != in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "44:57: replace match guard code != ledger::IDENTITY_REUSED with true in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::only_a_batch_matched_by_content_only_can_be_reviewed",
+      "killer_at": "base"
+    },
+    "44:57: replace match guard code != ledger::IDENTITY_REUSED with false in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "47:17: replace match guard !answered with true in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_journaled_state_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "47:17: replace match guard !answered with false in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "44:62: replace != with == in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "47:17: delete ! in journaled_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "57:5: replace shown_state -> Option<ledger::ReviewedBinding> with None": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "57:5: replace shown_state -> Option<ledger::ReviewedBinding> with Some(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ReviewedBinding: std::default::Default` is not satisfied"
+    },
+    "57:38: replace == with != in shown_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "65:9: delete match arm (Some(\"not_bound\"), Some(\"binding_response_not_recorded\")) in shown_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "62:42: replace match guard code != ledger::IDENTITY_REUSED with true in shown_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_lab_s_refused_batch_is_the_state_a_review_admits",
+      "killer_at": "base"
+    },
+    "62:42: replace match guard code != ledger::IDENTITY_REUSED with false in shown_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "62:47: replace != with == in shown_state": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "80:5: replace review_preview -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "80:5: replace review_preview -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "84:24: delete ! in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "90:57: replace == with != in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "91:38: replace += with -= in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "91:38: replace += with *= in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "104:9: delete match arm (Some(first), _) in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "103:38: replace match guard first != last with true in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "103:38: replace match guard first != last with false in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "103:44: replace != with == in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "121:34: replace == with != in review_preview": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "185:5: replace report -> Value with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_needs_the_person_and_is_reported_beside_the_verdict",
+      "killer_at": "base"
+    },
+    "202:9: replace Server::review_content_only -> Result<ToolOutcome, ToolFailure> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `agent::ToolOutcome: std::default::Default` is not satisfied"
+    },
+    "208:33: replace || with && in Server::review_content_only": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::only_a_batch_matched_by_content_only_can_be_reviewed",
+      "killer_at": "base"
+    },
+    "208:12: delete ! in Server::review_content_only": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "211:12: delete ! in Server::review_content_only": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "231:32: replace != with == in Server::review_content_only": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "263:50: replace || with && in Server::review_content_only": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "263:31: replace != with == in Server::review_content_only": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "263:62: replace != with == in Server::review_content_only": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "287:9: replace Server::import_content_review -> Result<Option<ledger::ReviewedBinding>, String> with Ok(None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_needs_the_person_and_is_reported_beside_the_verdict",
+      "killer_at": "base"
+    },
+    "287:9: replace Server::import_content_review -> Result<Option<ledger::ReviewedBinding>, String> with Ok(Some(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ReviewedBinding: std::default::Default` is not satisfied"
+    },
+    "295:9: replace Server::import_content_review_while_admitted -> Result<Option<ledger::ReviewedBinding>, String> with Ok(None)": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_needs_the_person_and_is_reported_beside_the_verdict",
+      "killer_at": "base"
+    },
+    "295:9: replace Server::import_content_review_while_admitted -> Result<Option<ledger::ReviewedBinding>, String> with Ok(Some(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ReviewedBinding: std::default::Default` is not satisfied"
+    }
+  },
+  "hand_mutations": {
+    "H01": {
+      "what": "journaled_state: a batch sent with no pre-POST mark is admitted (mark check dropped)",
+      "edits": [
+        {
+          "from": "    if snapshot.pre_post_voucher_mark.is_none() || snapshot.batch.status == \"posted_verified\" {",
+          "to": "    if snapshot.batch.status == \"posted_verified\" {"
+        }
+      ],
+      "mutation": "411da16ecc68e04c35f45e030f5091c8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::only_a_batch_matched_by_content_only_can_be_reviewed",
+      "killer_at": "base"
+    },
+    "H02": {
+      "what": "journaled_state: a batch that reads posted_verified is admitted (status check dropped)",
+      "edits": [
+        {
+          "from": "if snapshot.pre_post_voucher_mark.is_none() || snapshot.batch.status == \"posted_verified\" {",
+          "to": "if snapshot.pre_post_voucher_mark.is_none() {"
+        }
+      ],
+      "mutation": "4d241e575dfaa42ba992bd71caa091e0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::only_a_batch_matched_by_content_only_can_be_reviewed",
+      "killer_at": "base"
+    },
+    "H03": {
+      "what": "journaled_state: any recorded answer counts as answered, with or without an outcome",
+      "edits": [
+        {
+          "from": ".is_some_and(|response| response.outcome.is_some());",
+          "to": ".is_some_and(|_response| true);"
+        }
+      ],
+      "mutation": "6f85329702ff96a25a68eed3c8458914",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_lifts_no_stop_and_releases_no_row",
+      "killer_at": "base"
+    },
+    "H04": {
+      "what": "journaled_state: a refused binding reads as an answer not recorded (variant swapped)",
+      "edits": [
+        {
+          "from": "Some(ledger::PostSpanVerdict::Refused(code)) if code != ledger::IDENTITY_REUSED => {\n            Some(ledger::ReviewedBinding::Refused)",
+          "to": "Some(ledger::PostSpanVerdict::Refused(code)) if code != ledger::IDENTITY_REUSED => {\n            Some(ledger::ReviewedBinding::ResponseNotRecorded)"
+        }
+      ],
+      "mutation": "531db82f77404718efe9e51fdd2cb585",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "H05": {
+      "what": "journaled_state: an unanswered batch is admitted whatever its binding verdict (None to _)",
+      "edits": [
+        {
+          "from": "        None if !answered => Some(ledger::ReviewedBinding::ResponseNotRecorded),",
+          "to": "        _ if !answered => Some(ledger::ReviewedBinding::ResponseNotRecorded),"
+        }
+      ],
+      "mutation": "8e3bececc258bc9b66a9434544ac11c1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_journaled_state_is_read_from_the_batch_s_records",
+      "killer_at": "base"
+    },
+    "H06": {
+      "what": "shown_state: a result that reads posted_verified is not set aside (guard dropped)",
+      "edits": [
+        {
+          "from": "if result[\"verification_status\"] == \"posted_verified\" {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "48266b22d414d41f0967ad8a2ed3a463",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_lab_s_refused_batch_is_the_state_a_review_admits",
+      "killer_at": "base"
+    },
+    "H07": {
+      "what": "shown_state: a refusal with no code is admitted",
+      "edits": [
+        {
+          "from": "(Some(\"refused\"), Some(code)) if code != ledger::IDENTITY_REUSED => {",
+          "to": "(Some(\"refused\"), code) if code != Some(ledger::IDENTITY_REUSED) => {"
+        }
+      ],
+      "mutation": "db842f483b5a4301efaa209da22b6d69",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_lab_s_refused_batch_is_the_state_a_review_admits",
+      "killer_at": "base"
+    },
+    "H08": {
+      "what": "shown_state: a binding not bound for any code is admitted as an answer not recorded",
+      "edits": [
+        {
+          "from": "(Some(\"not_bound\"), Some(\"binding_response_not_recorded\")) => {",
+          "to": "(Some(\"not_bound\"), Some(_)) => {"
+        }
+      ],
+      "mutation": "60edb6c7c973aaf6cec79aca40589c4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_lab_s_refused_batch_is_the_state_a_review_admits",
+      "killer_at": "base"
+    },
+    "H09": {
+      "what": "shown_state: a refused binding reads as an answer not recorded (variant swapped)",
+      "edits": [
+        {
+          "from": "        (Some(\"refused\"), Some(code)) if code != ledger::IDENTITY_REUSED => {\n            Some(ledger::ReviewedBinding::Refused)",
+          "to": "        (Some(\"refused\"), Some(code)) if code != ledger::IDENTITY_REUSED => {\n            Some(ledger::ReviewedBinding::ResponseNotRecorded)"
+        }
+      ],
+      "mutation": "5cc397dd7cf9b7576c404ae71947432e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "H10": {
+      "what": "review_preview: a company with an empty name is shown empty, not by its GUID (filter dropped)",
+      "edits": [
+        {
+          "from": "        .filter(|name| !name.is_empty())\n        .unwrap_or(&line.company_guid);",
+          "to": "        .unwrap_or(&line.company_guid);"
+        }
+      ],
+      "mutation": "7f25dcef53caee05481d1ebf76b0b6cc",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_shows_only_what_the_batch_and_the_read_hold",
+      "killer_at": "this_commit"
+    },
+    "H11": {
+      "what": "review_preview: a batch with no company tuple shows no company, not its GUID",
+      "edits": [
+        {
+          "from": "        .unwrap_or(&line.company_guid);",
+          "to": "        .unwrap_or(\"\");"
+        }
+      ],
+      "mutation": "dc00bd3168e910ab889bd3874cc4c91d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_shows_only_what_the_batch_and_the_read_hold",
+      "killer_at": "this_commit"
+    },
+    "H12": {
+      "what": "review_preview: each type's count follows its name instead of preceding it",
+      "edits": [
+        {
+          "from": ".map(|(name, seen)| format!(\"{seen} {name}\"))",
+          "to": ".map(|(name, seen)| format!(\"{name} {seen}\"))"
+        }
+      ],
+      "mutation": "58b6ea656f53eaf60f1382ef7352a57a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "H13": {
+      "what": "review_preview: the first and last dates are swapped",
+      "edits": [
+        {
+          "from": "let (first, last) = (dates.clone().min(), dates.max());",
+          "to": "let (first, last) = (dates.clone().max(), dates.min());"
+        }
+      ],
+      "mutation": "9e6c45edb89e657f7243fe453a980baf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "H14": {
+      "what": "review_preview: a read with no matching count claims every voucher matched",
+      "edits": [
+        {
+          "from": "        .as_u64()\n        .unwrap_or(0);",
+          "to": "        .as_u64()\n        .unwrap_or(count as u64);"
+        }
+      ],
+      "mutation": "74fbb607282a7adadda1b886c5f3f3b3",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_shows_only_what_the_batch_and_the_read_hold",
+      "killer_at": "this_commit"
+    },
+    "H15": {
+      "what": "review_preview: a refused binding is described as an attempt with no answer recorded",
+      "edits": [
+        {
+          "from": "    ledger::ReviewedBinding::Refused => (\"Sent to Tally\", \"sent\"),",
+          "to": "    ledger::ReviewedBinding::Refused => (\"Attempted to post, no answer from Tally recorded\", \"in the batch\"),"
+        }
+      ],
+      "mutation": "538227e3272e4623be80d3195611e96a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "H16": {
+      "what": "review_preview: a word longer than a line is cut at 101 characters, not 100",
+      "edits": [
+        {
+          "from": "                    .chunks(100)",
+          "to": "                    .chunks(101)"
+        }
+      ],
+      "mutation": "b02fb9cde85bf65dd2961ef0e74c482b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "H17": {
+      "what": "review_preview: text is broken at spaces at 101 characters, not 100",
+      "edits": [
+        {
+          "from": "crate::tally::approved_import::wrapped(&text, 100)",
+          "to": "crate::tally::approved_import::wrapped(&text, 101)"
+        }
+      ],
+      "mutation": "413de61d6dab2e9e10d5c577ed5e9ce1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_shows_only_what_the_batch_and_the_read_hold",
+      "killer_at": "this_commit"
+    },
+    "H18": {
+      "what": "review_preview: the company name is shown as stored, unsafe characters included",
+      "edits": [
+        {
+          "from": "wrap(format!(\"Company: {}\", stop::shown(company))),",
+          "to": "wrap(format!(\"Company: {}\", company)),"
+        }
+      ],
+      "mutation": "460bce671d00d5e96c8712d1d32c6065",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_says_what_it_records_and_fits_the_box",
+      "killer_at": "base"
+    },
+    "H19": {
+      "what": "review_preview: the batch id is shown as stored, unsafe characters included",
+      "edits": [
+        {
+          "from": "wrap(format!(\"Batch: {}\", stop::shown(&line.batch_id))),",
+          "to": "wrap(format!(\"Batch: {}\", line.batch_id)),"
+        }
+      ],
+      "mutation": "16f78e92925c342afc82c1815d033d36",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_shows_only_what_the_batch_and_the_read_hold",
+      "killer_at": "this_commit"
+    },
+    "H20": {
+      "what": "review_content_only: the company GUID must match in case as well",
+      "edits": [
+        {
+          "from": ".eq_ignore_ascii_case(required_string(args, \"company_guid\")?)",
+          "to": ".eq(required_string(args, \"company_guid\")?)"
+        }
+      ],
+      "mutation": "17af5e4e063b1bdbfaee7fb527a6c534",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_naming_the_company_guid_in_capitals_is_recorded",
+      "killer_at": "this_commit"
+    },
+    "H21": {
+      "what": "review_content_only: a standing review does not refuse a second one before the read (guard dropped)",
+      "edits": [
+        {
+          "from": "if self.import_content_review(&line.batch_id)?.is_some() {",
+          "to": "if false && self.import_content_review(&line.batch_id)?.is_some() {"
+        }
+      ],
+      "mutation": "4b33884e074835adcc025a76dc6846df",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_needs_the_person_and_is_reported_beside_the_verdict",
+      "killer_at": "base"
+    },
+    "H22": {
+      "what": "review_content_only: the read may show another content-only state than the journal's",
+      "edits": [
+        {
+          "from": "if shown_state(result) != Some(reviewed) {",
+          "to": "if shown_state(result).is_none() {"
+        }
+      ],
+      "mutation": "d66166fed1071bd7ebdf00f2c396ba2d",
+      "verdict": "missed"
+    },
+    "H23": {
+      "what": "review_content_only: a change of generation while the dialog is open is not refused (arm dropped)",
+      "edits": [
+        {
+          "from": "if current.generation != held.generation || admitted != Some(reviewed) {",
+          "to": "if admitted != Some(reviewed) {"
+        }
+      ],
+      "mutation": "edbcd5c677ea04ea96ef8e2d580e7e2d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "H24": {
+      "what": "review_content_only: a journal that would no longer admit the record is not refused (arm dropped)",
+      "edits": [
+        {
+          "from": "    if current.generation != held.generation || admitted != Some(reviewed) {",
+          "to": "    if current.generation != held.generation {"
+        }
+      ],
+      "mutation": "04366fd466a6054a72f1c1c95ccb2d24",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_change_while_the_dialog_is_open_writes_nothing",
+      "killer_at": "base"
+    },
+    "H25": {
+      "what": "review_content_only: the dialog is told the batch has one voucher, whatever its count",
+      "edits": [
+        {
+          "from": "VoucherCount::new(line.vouchers.len())",
+          "to": "VoucherCount::new(1)"
+        }
+      ],
+      "mutation": "9059b750287dc9c5b40d1098be988c66",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_box_is_asked_for_every_voucher_of_the_batch",
+      "killer_at": "this_commit"
+    },
+    "H26": {
+      "what": "review_content_only: the dialog is the stop release's, not the review's",
+      "edits": [
+        {
+          "from": "ReviewAcknowledged::confirm(ReviewKind::Review, count, &preview)",
+          "to": "ReviewAcknowledged::confirm(ReviewKind::StopRelease, count, &preview)"
+        }
+      ],
+      "mutation": "3ca78db3b148299f2ad17c049d597460",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_needs_the_person_and_is_reported_beside_the_verdict",
+      "killer_at": "base"
+    },
+    "H27": {
+      "what": "review_content_only: the record always names a refused binding",
+      "edits": [
+        {
+          "from": "ledger::StatusRecord::content_review(&line, reviewed);",
+          "to": "ledger::StatusRecord::content_review(&line, ledger::ReviewedBinding::Refused);"
+        }
+      ],
+      "mutation": "bf5a8ed0238b03f1bf5279818cce1bcf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_review_lifts_no_stop_and_releases_no_row",
+      "killer_at": "base"
+    },
+    "H28": {
+      "what": "review_content_only: a refusal after the read carries none of the read's evidence",
+      "edits": [
+        {
+          "from": "|code: &str| ToolFailure::from(code.to_string()).with_prior_evidence(evidence.clone());",
+          "to": "|code: &str| ToolFailure::from(code.to_string());"
+        }
+      ],
+      "mutation": "3be81ea6df9868da4870789dee7fa3b9",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_read_that_shows_the_book_rolled_back_asks_nothing",
+      "killer_at": "base"
+    },
+    "H29": {
+      "what": "review_content_only: the outcome names no company for the egress record",
+      "edits": [
+        {
+          "from": "            company_guid: Some(line.company_guid.clone()),\n            truncated: false,",
+          "to": "            company_guid: None,\n            truncated: false,"
+        }
+      ],
+      "mutation": "642bdd97dc11a1320d9d2db1cf523511",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "H30": {
+      "what": "review_content_only: the outcome reports itself truncated",
+      "edits": [
+        {
+          "from": "            company_guid: Some(line.company_guid.clone()),\n            truncated: false,",
+          "to": "            company_guid: Some(line.company_guid.clone()),\n            truncated: true,"
+        }
+      ],
+      "mutation": "361a878e212d68ad6dbe22a247081241",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::a_refused_binding_is_reviewed_with_its_code_shown",
+      "killer_at": "base"
+    },
+    "H31": {
+      "what": "review_content_only: a batch never sent is not refused as not posted (dispatched check dropped)",
+      "edits": [
+        {
+          "from": "if !snapshot.dispatched || line.vouchers.is_empty() {",
+          "to": "if line.vouchers.is_empty() {"
+        }
+      ],
+      "mutation": "320cc0bba07852c5c600b76a6fae2549",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::only_a_batch_matched_by_content_only_can_be_reviewed",
+      "killer_at": "base"
+    },
+    "H32": {
+      "what": "review_content_only: the record is written under a shared lock, not the exclusive one",
+      "edits": [
+        {
+          "from": "        let _lock = self.lock_import_admission()?;\n        let current",
+          "to": "        let _lock = self.lock_import_admission_shared()?;\n        let current"
+        }
+      ],
+      "mutation": "216fd29921e7066a7622f5434841bd1c",
+      "verdict": "missed"
+    }
+  },
+  "accepted_survivors": {
+    "H22": {
+      "mutation": "d66166fed1071bd7ebdf00f2c396ba2d",
+      "reason": "the read can show another content-only state than the admission's only if another writer changes the journal between the admission's snapshot and the verification's own; a change during the read is refused by the verification itself (import_verification_conflict_retry, seen with a test that held the read's last answer), the window before it gives a test no point to act in, and the record-time check (ack_changed_while_reviewing) refuses a record the journal would no longer hold"
+    },
+    "H32": {
+      "mutation": "216fd29921e7066a7622f5434841bd1c",
+      "reason": "every test passes with either lock, since none holds the admission lock while the record is written; not tried: a test that holds a shared lock on the admission lock file from the dialog's approval until after the record could tell them apart, since the exclusive lock is taken without waiting"
+    }
+  }
+}

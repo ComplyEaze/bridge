@@ -576,8 +576,9 @@ pub fn parse_ledger_census_slice(
 
 /// The stock-item GUIDs of one slice of a stock-item census: the response to
 /// [`crate::ledger_census::render_stock_item_census_slice_request`], read by the ledger census's
-/// rules with `STOCKITEM` rows. A CANDIDATE (#1233): written before any answer to that request was
-/// captured, so its tests on a live answer are pending that capture.
+/// rules with `STOCKITEM` rows (#1233). Tested on that request's answers as a lab script captured
+/// them (`STOCK_CAPTURE_PROVENANCE.md`); a read past the single-read mark has not yet run through
+/// Bridge.
 pub fn parse_stock_item_census_slice(
     xml: &str,
     expected_company_guid: &str,
@@ -588,7 +589,7 @@ pub fn parse_stock_item_census_slice(
 
 /// The stock-group GUIDs of one slice of a stock-group census: the response to
 /// [`crate::ledger_census::render_stock_group_census_slice_request`], read by the ledger census's
-/// rules with `STOCKGROUP` rows. A CANDIDATE (#1233), like the stock-item parser.
+/// rules with `STOCKGROUP` rows (#1233). Tested on a captured answer, like the stock-item parser.
 pub fn parse_stock_group_census_slice(
     xml: &str,
     expected_company_guid: &str,

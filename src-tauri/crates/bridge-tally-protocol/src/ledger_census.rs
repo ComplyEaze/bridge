@@ -89,7 +89,9 @@ impl CensusCollection for Ledgers {
     };
 }
 
-/// A company's stock items (#1233). Its request is a candidate: no read sends it yet.
+/// A company's stock items (#1233), counted by the stock summary read past the mark one read
+/// admits. Its request's answers were captured by a lab script (`STOCK_CAPTURE_PROVENANCE.md`); a
+/// read past that mark has not yet run through Bridge on a lab book.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StockItems {}
 
@@ -106,8 +108,8 @@ impl CensusCollection for StockItems {
 }
 
 /// A company's stock groups (#1233), counted to size the Stock Summary report before it is read:
-/// its top-level lines are at most the stock items and stock groups together. Its request is a
-/// candidate: no read sends it yet.
+/// its top-level lines are at most the stock items and stock groups together. Captured, and not
+/// yet run through Bridge past that mark, as the stock-item census is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StockGroups {}
 
@@ -381,11 +383,12 @@ pub fn render_ledger_census_slice_request(company: &str, slice: &LedgerCensusSli
 
 /// The census request for one slice of stock items: a `StockItem` collection
 /// fetching each item's GUID, with the company's GUID computed on every row,
-/// restricted to the slice's AlterID span by the ledger census's formula. A
-/// CANDIDATE (#1233): a request of this kind (GUID only, the same formula and
-/// compute) was measured on two books by a lab script, not as these bytes, so
-/// no read sends it until it is observed through Bridge on a lab book. Like the
-/// ledger census, it has no period variables: AlterID is not period-scoped.
+/// restricted to the slice's AlterID span by the ledger census's formula. The
+/// stock summary read sends it past the mark one read admits (#1233). These
+/// bytes were sent to a lab book by a lab script and its answers captured
+/// (`STOCK_CAPTURE_PROVENANCE.md`); a read past that mark has not yet run
+/// through Bridge. Like the ledger census, it has no period variables: AlterID
+/// is not period-scoped.
 pub fn render_stock_item_census_slice_request(
     company: &str,
     slice: &CensusSlice<StockItems>,
@@ -394,8 +397,9 @@ pub fn render_stock_item_census_slice_request(
 }
 
 /// The census request for one slice of stock groups: the stock-item request's shape over a
-/// `StockGroup` collection. A CANDIDATE (#1233), never measured: no read sends it until it is
-/// observed through Bridge on a lab book.
+/// `StockGroup` collection, sent after it by the same read (#1233). Its bytes were sent to a lab
+/// book by a lab script and its answer captured (`STOCK_CAPTURE_PROVENANCE.md`); a read past the
+/// mark has not yet run through Bridge.
 pub fn render_stock_group_census_slice_request(
     company: &str,
     slice: &CensusSlice<StockGroups>,

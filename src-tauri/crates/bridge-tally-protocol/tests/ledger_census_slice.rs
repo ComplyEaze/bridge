@@ -264,7 +264,7 @@ fn a_census_slice_holding_rows_of_another_collection_is_refused() {
         Err(StandardLedgerCatalogError::MalformedResponse)
     );
     // The same rows under the stock-item tag are read by the stock-item parser, so the refusal
-    // above is the tag's alone. A live stock-item answer is pending its capture (#1233).
+    // above is the tag's alone. Captured stock-item answers are read below (#1233).
     assert_eq!(
         parse_stock_item_census_slice(&retagged, COMPANY_GUID, 8).map(|guids| guids.len()),
         Ok(8)

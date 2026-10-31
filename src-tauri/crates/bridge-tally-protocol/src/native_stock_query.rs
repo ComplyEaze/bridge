@@ -29,6 +29,24 @@ const DEFAULT_BATCH: &str = "Primary Batch";
 /// prefix (crate docs): a value holding it is not text Tally meant as a name or quantity.
 const TALLY_SANITIZED_MARKER: char = '\u{fffd}';
 
+/// The characters besides ASCII letters, digits and the space that a capture showed Stock Query
+/// selecting an item by, each escaped once as XML text (`lab/2018-stock-query-names-units-dates-answers`
+/// at `86ea5211`, committed under `tests/fixtures/stock-query/`):
+/// - `&`: `Kit & Co Item` (`w-02`);
+/// - `(` and `)`: `Gauge (Test) 50L` (`w-03`);
+/// - `'`: `Owner's Item` (`w-04` raw, `w-05` escaped as the builder sends it);
+/// - `"`: `Quote "Q" Item` (`w-06` raw, `w-07` escaped as the builder sends it);
+/// - `%`, `/` and `,`: `Mix 5% / Set, Large` (`w-09`);
+/// - `-`: `Dash-Item 7` (`w-10`).
+///
+/// A character joins only with a capture of its own.
+pub const STOCK_QUERY_MEASURED_PUNCTUATION: [char; 9] =
+    ['&', '(', ')', '\'', '"', '%', '/', ',', '-'];
+
+fn measured_punctuation(c: char) -> bool {
+    STOCK_QUERY_MEASURED_PUNCTUATION.contains(&c)
+}
+
 /// Why a Stock Query name could not be sent, or an answer could not be read. No variant
 /// carries data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -92,8 +110,9 @@ impl std::fmt::Display for StockQueryError {
 impl std::error::Error for StockQueryError {}
 
 /// A stock item's name in the alphabet Stock Query was captured selecting by: ASCII letters,
-/// digits and single spaces, none at either end, at most [`STOCK_QUERY_ITEM_NAME_MAX_CHARS`].
-/// Characters captured since (#2018) join only with their own fixtures.
+/// digits, [`STOCK_QUERY_MEASURED_PUNCTUATION`] and single spaces, at most
+/// [`STOCK_QUERY_ITEM_NAME_MAX_CHARS`]. It starts and ends with a letter or digit, and no two
+/// punctuation characters touch: every captured name has that form, and no capture shows another.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MeasuredItemName(String);
 
@@ -101,10 +120,16 @@ impl MeasuredItemName {
     pub fn new(name: &str) -> Result<Self, StockQueryError> {
         let admitted = !name.is_empty()
             && name.chars().count() <= STOCK_QUERY_ITEM_NAME_MAX_CHARS
-            && name.chars().all(|c| c.is_ascii_alphanumeric() || c == ' ')
-            && !name.starts_with(' ')
-            && !name.ends_with(' ')
-            && !name.contains("  ");
+            && name
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == ' ' || measured_punctuation(c))
+            && name.starts_with(|c: char| c.is_ascii_alphanumeric())
+            && name.ends_with(|c: char| c.is_ascii_alphanumeric())
+            && !name.contains("  ")
+            && !name
+                .chars()
+                .zip(name.chars().skip(1))
+                .any(|(a, b)| measured_punctuation(a) && measured_punctuation(b));
         if admitted {
             Ok(Self(name.to_string()))
         } else {

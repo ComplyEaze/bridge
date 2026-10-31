@@ -1,0 +1,17 @@
+# fixture: tests/fixtures/stock-query/w-02-stock-query-kit-co-item-f1.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(Lines(
+    [
+        StockQueryLine {
+            godown: "Main Location",
+            batch: Default,
+            quantity: NativeStockQuantity {
+                amount: ExactDecimal(
+                    "11",
+                ),
+                unit: "Nos",
+            },
+        },
+    ],
+))

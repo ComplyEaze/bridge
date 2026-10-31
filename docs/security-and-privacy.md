@@ -221,6 +221,12 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       chose (`kind`) and the report's name, the window's dates, and for each
       month, Tally's debit, credit and closing amounts. It holds no
       party, ledger or narration, and `mask_parties` has nothing to shorten in it.
+    - The stock-by-godown read (`stock_by_godown`) sends the company name and
+      its identifier and the dates, each godown's name (shortened under
+      `mask_parties`), value and quantity, and for each item directly under
+      the root, its name and each godown's name (both shortened under
+      `mask_parties`), quantity and value. The figures are not masked under
+      any setting. It holds no rates or narrations.
     - The Negative Stock read (`negative_stock`) sends the company name and
       its identifier and the dates, and for each item on Tally's Negative
       Stock list, the item's name (shortened under `mask_parties`), its closing

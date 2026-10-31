@@ -213,6 +213,21 @@ pub(crate) fn render_built_in_report_request(
     render_report_envelope(report.id(), company, period, "")
 }
 
+/// The same envelope with Tally's explode flag after the dates, the one
+/// variable measured on a built-in report (§12a.13, §12a.24). Only the Stock
+/// Summary is sent this way.
+pub(crate) fn render_exploded_stock_summary_request(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+) -> String {
+    render_report_envelope(
+        BuiltInReport::StockSummary.id(),
+        company,
+        period,
+        "<EXPLODEFLAG>Yes</EXPLODEFLAG>",
+    )
+}
+
 /// The built-in report envelope for the report `id`, with `extra` (already-rendered static
 /// variables, or nothing) after the period's. `id` and `extra` come only from this crate's own
 /// builders, never from data; the company is escaped here, once.

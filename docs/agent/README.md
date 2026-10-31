@@ -50,7 +50,7 @@ identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
 names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
-and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+and stock-group parents, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
 GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
@@ -110,6 +110,7 @@ The ordinary default tools, in name order:
 - `read_evidence`
 - `sales_register`
 - `statement_tie_out`
+- `stock_by_godown`
 - `stock_summary`
 - `tally_status`
 - `trial_balance`
@@ -124,7 +125,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
-not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_godown` is in the source after release 0.7.0 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -1106,6 +1107,43 @@ book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, whic
 unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
 Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
 Gold and other releases.
+
+### Stock by godown (`stock_by_godown`)
+
+Use `stock_by_godown` with `company_guid` and `as_of` (a month's last day, as for `stock_summary`)
+for closing stock by godown. It reads Tally's own Godown Summary, the plain Stock Summary and the Stock
+Summary with the explode flag over the same period, each twice, inside `stock_summary`'s bracket.
+
+`state` is `tied` when every godown carries a value and the godown values add up to the plain Stock
+Summary's total. It then returns `godowns`: each godown directly under Tally's root with its value and
+`quantity`, which is Tally's net of the godown's items that share a unit (`net_across_items`), never one
+item's closing, and is `empty` for a godown holding items in several units. A godown under another
+godown has no line of its own: its stock is in its parent's figures. Otherwise `state` is
+`not_established`, with `reason` `godown_totals_differ` or `godown_totals_not_comparable` (a total
+missing, or a value empty on either report: `tie_out` then also counts `godown_empty_amounts` and
+`stock_summary_empty_amounts`), `tie_out` holding both totals, and no godown or item.
+
+`root_items` gives, for each item directly under the root, its value and quantity in each godown, as
+Tally's exploded Stock Summary writes them: each godown at that godown's own cost, not the item's average
+rate times the quantity. They are returned (`state` `tied`) only where the godown values add up to the
+item's own value, and the quantities too where all are in the item's unit (`quantities`
+`added_to_the_item_quantity`, or `not_compared`), and where the plain Stock Summary shows the item's line
+with that value. Otherwise `state` says why and no godown line is returned: `values_differ` and
+`quantities_differ` (with both sides), `value_empty`, `batch_named` (a batch line, not measured),
+`godown_repeated` and `plain_report_differs`. `root_items` lists only the items Tally wrote godown lines
+for. Tally's export answer gives no value per godown for an item inside a stock group (its Stock Summary
+screen, Detailed with every level expanded, does show one), so none is returned for it
+(`checks.items_inside_stock_groups` is `not_available`). An empty exploded answer returns the godowns with
+`root_items` null and `root_items_reason` `exploded_stock_summary_empty_is_not_a_finding`; so does an
+answer that is the plain report line for line, which does not show the explode flag was honoured
+(`explode_flag_not_observed_is_not_a_finding`). Only average cost and simple units were measured.
+
+Refusals: `stock_by_godown_as_of_not_measured` (before any request), `stock_by_godown_as_of_before_books`,
+`stock_by_godown_as_of_in_future`, `stock_by_godown_period_not_honoured`, `stock_by_godown_education_unqualified`, `stock_by_godown_too_large`
+(with `size`), `stock_by_godown_bound_premise_violated` and `stock_by_godown_extent_changed`. Signs are
+kept as sent: a negative value is stock held. Godown and item names are masked under `mask_parties`.
+Measured on TallyPrime 7.2 on one synthetic book at two month ends (protocol reference §12a.24); the tool
+itself has not yet been run against a live Tally.
 
 ### Stock Summary
 

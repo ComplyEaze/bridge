@@ -25,6 +25,7 @@ use bridge_tally_protocol::audit_company_part::admit_audit_company_part;
 use bridge_tally_protocol::native_cash_flow::{parse_native_cash_flow, WholeMonthWindow};
 use bridge_tally_protocol::native_company_features::{parse_company_features, ExpectedCompany};
 use bridge_tally_protocol::native_funds_flow::parse_native_funds_flow;
+use bridge_tally_protocol::native_godown_summary::parse_native_godown_summary;
 use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKind};
 use bridge_tally_protocol::native_month_register::parse_native_month_register;
 use bridge_tally_protocol::native_negative_ledgers::parse_native_negative_ledgers;
@@ -41,7 +42,8 @@ use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, NativeStatementKind,
 };
 use bridge_tally_protocol::native_stock_summary::{
-    parse_company_inventory_flags, parse_native_stock_items, parse_native_stock_summary_report,
+    parse_company_inventory_flags, parse_native_stock_items, parse_native_stock_summary_exploded,
+    parse_native_stock_summary_report,
 };
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
@@ -1526,6 +1528,43 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_native_stock_summary_report",
         parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    // Closing stock by godown after keying, with the exploded Stock Summary: src/native_godown_summary_tests.rs.
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_godown_summary_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_godown_summary",
+        parse: |_, text| typed(parse_native_godown_summary(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_exploded_to_20250831_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_exploded",
+        parse: |_, text| typed(parse_native_stock_summary_exploded(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_godown_summary_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_godown_summary",
+        parse: |_, text| typed(parse_native_godown_summary(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_report",
+        parse: |_, text| typed(parse_native_stock_summary_report(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/builtin_godown_closing_stock_summary_exploded_fy_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_summary_exploded",
+        parse: |_, text| typed(parse_native_stock_summary_exploded(text)),
     },
     // Built-in Negative Stock report: src/native_negative_stock_tests.rs.
     Row {

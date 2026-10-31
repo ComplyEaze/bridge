@@ -841,6 +841,12 @@ pub(crate) enum PairedReadValidationError {
     NativeNegativeStock,
     #[error("Tally company book changed during the Negative Stock read")]
     NegativeStockExtent,
+    #[error("Tally's own Godown Summary changed between paired reads")]
+    NativeGodownSummary,
+    #[error("Tally's own Stock Summary with the explode flag changed between paired reads")]
+    NativeStockSummaryExploded,
+    #[error("Tally company book changed during the stock by godown read")]
+    StockByGodownExtent,
     /// The company's inventory flags, read beside a statement that offers
     /// Tally's own closing stock.
     #[error("Tally company inventory flags changed between paired reads beside a statement")]
@@ -878,6 +884,9 @@ impl PairedReadValidationError {
             Self::StockSummaryExtent => "stock_summary_extent_changed",
             Self::NativeNegativeStock => "native_negative_stock_changed",
             Self::NegativeStockExtent => "negative_stock_extent_changed",
+            Self::NativeGodownSummary => "native_godown_summary_changed",
+            Self::NativeStockSummaryExploded => "native_stock_summary_exploded_changed",
+            Self::StockByGodownExtent => "stock_by_godown_extent_changed",
             Self::StatementInventoryFlags => "statement_inventory_flags_changed",
         }
     }

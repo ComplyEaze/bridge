@@ -949,11 +949,31 @@ fn a_hidden_character_in_a_name_or_quantity_refuses() {
             ),
             StockQueryError::NameInvalid,
         ),
+        // In the unit, where the quantity grammar would read the character as part of the unit:
+        // only the character check refuses these.
         (
             damaged(
                 &kit,
                 quantity,
-                "<STQGODOWNQTY>-13\u{FEFF} Nos</STQGODOWNQTY>",
+                "<STQGODOWNQTY>-13 N\u{FEFF}os</STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+        (
+            damaged(
+                &kit,
+                quantity,
+                "<STQGODOWNQTY>-13 N\u{200B}os</STQGODOWNQTY>",
+                1,
+            ),
+            StockQueryError::QuantityUnparseable,
+        ),
+        (
+            damaged(
+                &kit,
+                quantity,
+                "<STQGODOWNQTY>-13 \u{202E}Nos</STQGODOWNQTY>",
                 1,
             ),
             StockQueryError::QuantityUnparseable,

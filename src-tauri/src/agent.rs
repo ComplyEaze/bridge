@@ -1532,7 +1532,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
             "ComplyEaze Bridge could not count the company's stock items or stock groups, so no \
              request for stock items was sent; `error.cause` names why (a census slice holding \
              more rows than its span, a GUID twice, no item found, or an answer that did not \
-             read). Check that the company is open in Tally and unchanged, then call again once.",
+             read). No item found (`stock_item_span_census_empty`) also follows from a company \
+             that holds no stock item. A master-alteration mark past 400,000 always refuses \
+             (`stock_item_span_too_many_slices`), so calling again will not help. Otherwise check \
+             that the company is open in Tally and unchanged, then call again once.",
         ),
         // #1233: the report, sized from the counted items and groups, is over the budget.
         "stock_summary_report_too_large" => Some(

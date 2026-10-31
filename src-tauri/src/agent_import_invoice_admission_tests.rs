@@ -236,14 +236,34 @@ fn pilot_catalogue_with_parent(
     ledger: &str,
     to: &str,
 ) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    pilot_catalogue_with_element(ledger, "PARENT", to)
+}
+
+/// DERIVED, not Tally's bytes: the lab's catalogue with the row of `ledger`
+/// given the GUID `to`, which stands for the ledger deleted and another created
+/// under its name and group. Its one `GUID` element is replaced and the GUID
+/// must have changed; nothing else differs.
+fn pilot_catalogue_with_guid(
+    ledger: &str,
+    to: &str,
+) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    pilot_catalogue_with_element(ledger, "GUID", to)
+}
+
+/// The catalogue with the first `element` of `ledger`'s row set to `to`.
+fn pilot_catalogue_with_element(
+    ledger: &str,
+    element: &str,
+    to: &str,
+) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
     let text = pilot_catalogue_text();
     let row = format!("<LEDGER NAME=\"{ledger}\"");
     assert_eq!(text.matches(&row).count(), 1, "{ledger}");
     let start = text.find(&row).unwrap();
     let end = start + text[start..].find("</LEDGER>").unwrap();
-    let open = start + text[start..end].find("<PARENT").unwrap();
+    let open = start + text[start..end].find(&format!("<{element}")).unwrap();
     let from = open + text[open..end].find('>').unwrap() + 1;
-    let to_end = from + text[from..end].find("</PARENT>").unwrap();
+    let to_end = from + text[from..end].find(&format!("</{element}>")).unwrap();
     assert_ne!(&text[from..to_end], to);
     let edited = format!("{}{to}{}", &text[..from], &text[to_end..]);
     pilot_catalogue_of(&edited)
@@ -1143,6 +1163,53 @@ fn a_ledger_regrouped_since_the_plan_is_a_change_not_a_fault() {
     assert_eq!(planned.rates, unnamed.rates);
     assert_eq!(planned.ledger_parents, unnamed.ledger_parents);
     assert_eq!(invoice::fit_plan(&planned, &unnamed), Ok(()));
+}
+
+/// A named ledger replaced under its name between the plan's catalogue and
+/// the queue's (deleted, and another created with the same name and group):
+/// its GUID, and so the rates request and the GUIDs the parents are recorded
+/// under, differ, while every request the invoice alone decides and every
+/// group are equal. That is a master
+/// that changed, named `ledger_scope`, not a wiring fault. The catalogues
+/// differ by a counted edit (DERIVED).
+#[test]
+fn a_ledger_replaced_under_its_name_since_the_plan_is_a_change_not_a_fault() {
+    use crate::tally::approved_import::ApprovedImportAdmissionError::InvoiceMastersChanged;
+    let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    let control = ledger::NumberControl::NoneStanding;
+    let planned = plan_of(&voucher, &control);
+    let replaced = plan_of_in(
+        &voucher,
+        &control,
+        &pilot_catalogue_with_guid(
+            "BRIDGE Walk-in",
+            "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ff",
+        ),
+    );
+    assert_ne!(planned.rates, replaced.rates);
+    // The parent the plan records is held by GUID, so that record differs too,
+    // though the groups the ledgers sit under did not.
+    assert_ne!(planned.ledger_parents, replaced.ledger_parents);
+    let parents = |plan: &InvoiceReadPlan| {
+        plan.ledger_parents
+            .iter()
+            .map(|(_, parent)| parent.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    assert_eq!(parents(&planned), parents(&replaced));
+    assert_eq!(planned.company_name, replaced.company_name);
+    assert_eq!(planned.number, replaced.number);
+    assert_eq!(planned.voucher_types, replaced.voucher_types);
+    assert_eq!(planned.registration, replaced.registration);
+    assert_eq!(planned.ledger_count, replaced.ledger_count);
+    for (wanted, carried) in [(&replaced, &planned), (&planned, &replaced)] {
+        assert_eq!(
+            invoice::fit_plan(wanted, carried),
+            Err(InvoiceMastersChanged {
+                field: "ledger_scope"
+            })
+        );
+    }
 }
 
 /// An invoice and its reads go to the queue together or not at all.

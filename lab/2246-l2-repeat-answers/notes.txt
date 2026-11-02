@@ -1,0 +1,14 @@
+2026-11-02 #2246 L2 repeat, UTC. Build digest and exe equal.
+15:55 BRIDGE CORPUS DENSE loaded alone; backup by Tally's screen.
+15:57 L2a out, fresh folder: built.
+15:58 L2b in: built; journal in place; report read.
+15:59 L2c out, L2d in: built. No leftover folder.
+15:59 T1: empty folder by hand; inside build: built; folder gone.
+16:00 T2: holder on the folder; inside build: built with a warning, os error 32; folder stayed, empty.
+16:01 T3: outside build after the holder let go: built; folder gone.
+16:02 s5 other_journal_holds_batches: stuck on build and post.
+16:02 s6 other_journal_not_read: stuck on build and post.
+16:03 s7 package_copy_journal_not_located: stuck on build and post.
+16:03 s8: lay-out made inside the package, landed in the copy; answered other_journal_not_read. Not the intended case.
+16:04 s9: lay-out made outside: import_ledger_unavailable; journal_not_located did not stick.
+16:05 Company shut. Exe hash equal. L3 not run.

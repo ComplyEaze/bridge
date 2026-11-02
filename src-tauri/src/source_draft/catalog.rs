@@ -268,7 +268,7 @@ pub(super) fn require_current_catalog_binding(
 ///
 /// `error.code` is an `&str`, not an enum, so the compiler cannot force this match to
 /// stay exhaustive the way `classify_transport_error` in `standard_ledger_catalog.rs`
-/// can be for `TallyTransportError`. The nine codes below are exactly the ones
+/// can be for `TallyTransportError`. The eight codes below are exactly the ones
 /// `tally_runtime_command_error` (`src-tauri/src/commands.rs`) can emit -- a string
 /// contract enforced only by this comment and by
 /// `catalogue_company_verification_preserves_typed_error_codes`. Each is listed and
@@ -283,7 +283,6 @@ fn company_verification_error_code(error: &crate::commands::TallyCommandError) -
         | "tally_request_deadline_exceeded"
         | "tally_runtime_temporarily_unavailable" => "source_draft_catalogue_transport_failed",
         "response_validation_failed" => "source_draft_catalogue_malformed_response",
-        "untrusted_discovery_limit_exceeded" => "source_draft_catalogue_bounds_invalid",
         // The endpoint configuration was never valid enough to evaluate a company at
         // all -- reporting this as an invalid company selection tells the operator to
         // fix the wrong thing.

@@ -509,12 +509,6 @@ fn tally_runtime_error_serialization_is_stable_and_redacted() {
     assert_eq!(deadline.code, "tally_request_deadline_exceeded");
     assert_eq!(deadline.retry, "after_change");
     assert!(deadline.remediation.contains("Do not retry"));
-
-    let discovery_limit = tally_runtime_command_error(anyhow::anyhow!(
-        "interactive discovery listing limit exceeded: synthetic company response"
-    ));
-    assert_eq!(discovery_limit.code, "untrusted_discovery_limit_exceeded");
-    assert_eq!(discovery_limit.category, "Discovery listing");
 }
 
 #[test]

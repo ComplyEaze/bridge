@@ -1178,29 +1178,42 @@ async fn a_sent_batch_whose_company_is_not_loaded_says_to_load_the_same_companie
 }
 
 /// One row of the table of next steps: the step a path gives, the one it should
-/// give, and whether it may tell the person to create the ledger by hand or must
-/// tell them to create nothing by hand meanwhile.
+/// give, and whether it must tell the person to create nothing by hand meanwhile.
 struct StepRow {
     path: String,
     given: String,
     expected: String,
-    may_key_by_hand: bool,
     keys_nothing: bool,
+}
+
+/// Whether a step asks the person to create, alter or key a ledger by hand. The
+/// steps that tell them not to are taken out first.
+fn asks_for_hand_work(step: &str) -> bool {
+    let step = step
+        .to_lowercase()
+        .replace("do not create the ledger in tally by hand", "")
+        .replace("do not create this ledger in tally by hand", "")
+        .replace("do not create it by hand", "")
+        .replace("create nothing in tally by hand", "");
+    ["by hand", "key the ledger", "alter the ledger"]
+        .iter()
+        .any(|ask| step.contains(ask))
 }
 
 /// Every state and path an answer can take after a send, with its next step:
 /// the verdicts judged and recorded, the verdicts judged and not recorded (with
 /// and without Tally's answer on file), a book that was not read back, the
 /// fallback after Tally answered, the failure answers, and the refusals for a
-/// held name. Only the row marked may be the step that creates by hand; the
-/// rows marked say to create nothing by hand meanwhile do say so.
+/// held name. No step asks for a ledger to be made by hand, and the rows marked
+/// say to create nothing by hand meanwhile do say so.
 #[test]
-fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand() {
+fn every_next_step_is_the_expected_one_and_none_asks_for_hand_work() {
     use super::verdict::{Checks, Judgement};
     use super::verify::unrecorded_next_step;
     use MasterVerdictState::{
-        ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
-        PostedIntoExistingMaster, PostedVerified, ReconciliationRequired,
+        ConfirmedAbsent, ConfirmedAbsentAfterChange, MasterWriteLocatedElsewhere,
+        MastersAfterPostUnconfirmed, PostedIntoExistingMaster, PostedUnattributed, PostedVerified,
+        ReconciliationRequired,
     };
     let judgement = |state: MasterVerdictState, found: bool, scope: bool, absent: bool| {
         Judgement::for_test(
@@ -1216,12 +1229,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         )
     };
     let mut rows: Vec<StepRow> = Vec::new();
-    let mut row = |path: &str, given: String, expected: &str, may: bool, nothing: bool| {
+    let mut row = |path: &str, given: String, expected: &str, nothing: bool| {
         rows.push(StepRow {
             path: path.to_string(),
             given,
             expected: expected.to_string(),
-            may_key_by_hand: may,
             keys_nothing: nothing,
         });
     };
@@ -1234,13 +1246,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         judged(&judgement(PostedVerified, true, false, false), p),
         verify::NEXT_VERIFIED,
         false,
-        false,
     );
     row(
         "into existing",
         judged(&judgement(PostedIntoExistingMaster, false, false, false), r),
         verify::NEXT_INTO_EXISTING,
-        false,
         false,
     );
     row(
@@ -1251,13 +1261,46 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         ),
         verify::NEXT_ELSEWHERE,
         false,
-        false,
     );
     row(
         "confirmed absent",
         judged(&judgement(ConfirmedAbsent, false, false, true), r),
         verify::NEXT_ABSENT,
         false,
+    );
+    row(
+        "confirmed absent after a change",
+        judged(
+            &judgement(ConfirmedAbsentAfterChange, false, false, true),
+            r,
+        ),
+        verify::NEXT_ABSENT_AFTER_CHANGE,
+        false,
+    );
+    row(
+        "unattributed",
+        judged(&judgement(PostedUnattributed, true, false, false), r),
+        verify::NEXT_UNATTRIBUTED,
+        false,
+    );
+    let not_measured = |reasons: Vec<&'static str>| {
+        let judgement =
+            Judgement::for_test(ReconciliationRequired, None, Checks::none(), reasons, true);
+        judged(&judgement, r)
+    };
+    row(
+        "name absent, order not measured",
+        not_measured(vec!["absent_not_measured_on_this_release"]),
+        verify::NEXT_ABSENT_UNCOVERED,
+        false,
+    );
+    row(
+        "elsewhere, order not measured",
+        not_measured(vec![
+            "other_company_mark_moved",
+            "absent_not_measured_on_this_release",
+        ]),
+        verify::NEXT_ELSEWHERE_UNCOVERED,
         false,
     );
     row(
@@ -1267,14 +1310,12 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             r,
         ),
         verify::NEXT_UNCONFIRMED,
-        false,
         true,
     );
     row(
         "scope changed",
         judged(&judgement(ReconciliationRequired, false, true, true), r),
         verify::NEXT_LOAD_SAME_COMPANIES,
-        false,
         true,
     );
     row(
@@ -1282,13 +1323,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         judged(&judgement(ReconciliationRequired, false, false, true), r),
         verify::NEXT_ABSENT_NOT_SETTLED,
         false,
-        false,
     );
     row(
         "reconcile, ledger present",
         judged(&judgement(ReconciliationRequired, true, false, false), r),
         verify::NEXT_PRESENT_NOT_VERIFIED,
-        false,
         false,
     );
     row(
@@ -1296,20 +1335,17 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         judged(&judgement(ReconciliationRequired, true, false, false), p),
         verify::NEXT_PRESENT_NOT_VERIFIED,
         false,
-        false,
     );
     row(
         "just posted, name absent",
         judged(&judgement(ReconciliationRequired, false, false, true), p),
         verify::NEXT_RECONCILE,
-        false,
         true,
     );
     row(
         "reconcile, index not usable",
         judged(&judgement(ReconciliationRequired, false, false, false), r),
         verify::NEXT_RECONCILE,
-        false,
         true,
     );
     // Judged and not recorded: the quiet final states say only that the verdict
@@ -1321,13 +1357,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         unrecorded(&judgement(PostedVerified, true, false, false), p, true),
         not_recorded,
         false,
-        false,
     );
     row(
         "unrecorded confirmed absent",
         unrecorded(&judgement(ConfirmedAbsent, false, false, true), r, true),
         not_recorded,
-        false,
         false,
     );
     row(
@@ -1339,7 +1373,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         ),
         &format!("{} {not_recorded}", verify::NEXT_INTO_EXISTING),
         false,
-        false,
     );
     row(
         "unrecorded unconfirmed",
@@ -1349,7 +1382,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             true,
         ),
         &format!("{} {not_recorded}", verify::NEXT_UNCONFIRMED),
-        false,
         true,
     );
     row(
@@ -1360,7 +1392,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             false,
         ),
         &format!("{} {not_recorded}", verify::NEXT_ABSENT_NOT_SETTLED),
-        false,
         false,
     );
     row(
@@ -1375,7 +1406,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             verify::NEXT_UNCONFIRMED,
             verify::NEXT_ANSWER_NOT_RECORDED
         ),
-        false,
         true,
     );
     // The book was not read back.
@@ -1383,7 +1413,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "not read back, company",
         not_read_back_next_step("company_identity_not_found").to_string(),
         verify::NEXT_LOAD_SAME_COMPANIES,
-        false,
         true,
     );
     row(
@@ -1391,13 +1420,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         not_read_back_next_step("master_batch_invalid").to_string(),
         verify::NEXT_RECORD_NOT_READABLE,
         false,
-        false,
     );
     row(
         "not read back, tally",
         not_read_back_next_step("tally_endpoint_busy").to_string(),
         verify::NEXT_UNCONFIRMED,
-        false,
         true,
     );
     // Tally answered and the call went no further.
@@ -1405,14 +1432,12 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "fallback, answer on file",
         fallback_next_step(true),
         NEXT_NOT_READ_BACK_AFTER_ANSWER,
-        false,
         true,
     );
     row(
         "fallback, answer not on file",
         fallback_next_step(false),
         &format!("{NEXT_NOT_READ_BACK_AFTER_ANSWER}{NEXT_ANSWER_NOT_RECORDED}"),
-        false,
         true,
     );
     // The failure answers.
@@ -1433,21 +1458,18 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "failure, may have been sent",
         failure(Some(true)),
         NEXT_UNCONFIRMED,
-        false,
         true,
     );
     row(
         "failure, journal unread",
         failure(None),
         "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.",
-        false,
         true,
     );
     row(
         "failure, nothing sent",
         failure(Some(false)),
         NOTHING_RECORDED_STEP,
-        false,
         false,
     );
     // An approval box that closed unanswered, or was declined: nothing was sent,
@@ -1470,15 +1492,30 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         unanswered("master_approval_timed_out"),
         "Nothing was sent: the approval box closed unanswered when its time ran out. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         false,
-        false,
     );
     row(
         "approval declined",
         unanswered("master_approval_declined"),
         "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         false,
+    );
+    row(
+        "a read before the create cut for time",
+        master_unanswered_next_step("request_deadline_exceeded")
+            .unwrap()
+            .to_string(),
+        NEXT_TALLY_BUSY,
         false,
     );
+    for code in [
+        "master_ledger_invalid",
+        "master_review_too_large",
+        "tally_endpoint_draining",
+        "master_pre_image_remove_failed",
+    ] {
+        let step = master_next_step(code).unwrap();
+        row(code, unanswered(code), step, false);
+    }
     // The refusals for a held name.
     let one = BlockingBatch {
         batch_id: "bridge-0001".into(),
@@ -1537,7 +1574,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             true,
         ),
     ] {
-        row(path, overlap_next_step(&view), &expected, false, keys);
+        row(path, overlap_next_step(&view), &expected, keys);
         // The step is what the answer carries.
         let carried = overlap_refusal_outcome("bridge-x", GUID, empty_evidence(), &view).payload
             ["result"]["error"]["next_step"]
@@ -1572,32 +1609,24 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         path: "journal report, settled".into(),
         given: report_step(&settled_state, None),
         expected: verify::NEXT_ABSENT.into(),
-        may_key_by_hand: false,
         keys_nothing: false,
     });
     rows.push(StepRow {
         path: "journal report, company not loaded".into(),
         given: report_step(&open_state, Some("company_identity_not_found")),
         expected: verify::NEXT_LOAD_SAME_COMPANIES.into(),
-        may_key_by_hand: false,
         keys_nothing: true,
     });
     rows.push(StepRow {
         path: "journal report, no verdict, nothing stopped it".into(),
         given: report_step(&open_state, None),
         expected: String::new(),
-        may_key_by_hand: false,
         keys_nothing: false,
     });
-    assert!(rows.len() >= 34, "{} rows", rows.len());
+    assert!(rows.len() >= 43, "{} rows", rows.len());
     for row in &rows {
         assert_eq!(row.given, row.expected, "{}", row.path);
-        assert_eq!(
-            row.given.contains("create it in Tally by hand"),
-            row.may_key_by_hand,
-            "{}",
-            row.path
-        );
+        assert!(!asks_for_hand_work(&row.given), "{}", row.path);
         assert_eq!(
             row.given
                 .contains("Do not create the ledger in Tally by hand meanwhile"),
@@ -1606,7 +1635,9 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             row.path
         );
     }
-    assert_eq!(rows.iter().filter(|row| row.may_key_by_hand).count(), 0);
+    assert!(asks_for_hand_work(
+        "Create the ledger in Tally by hand, then call again."
+    ));
 }
 
 /// The README carries the corrected sentences about `post_ledger_creates`,

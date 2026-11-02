@@ -26,7 +26,8 @@ fn review_args(line: &ImportLedgerLine) -> Value {
 /// dispatch intent with the pre-POST mark, and nothing after it. Returns the
 /// request's digest, which an answer recorded later must name.
 fn sent_unanswered(server: &Server, line: &ImportLedgerLine) -> String {
-    let native = native_post_request(line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    let ids = line.vouchers.iter().map(|_| Uuid::new_v4()).collect();
+    let native = native_post_request(line, RemoteIds::from_ids(ids)).unwrap();
     let _lock = server.lock_import_admission().unwrap();
     server
         .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
@@ -52,9 +53,23 @@ fn answered_late(server: &Server, line: &ImportLedgerLine, request_sha256: &str)
         .unwrap();
 }
 
-/// [`posted`], then the binding of its post refused by `code`.
-fn refused_with(server: &Server, line: &ImportLedgerLine, code: &str) {
-    posted(server, line);
+/// Tally's answer to `line`'s post, recorded late, with no outcome.
+fn answered_with_no_outcome(server: &Server, line: &ImportLedgerLine, request_sha256: &str) {
+    let _lock = server.lock_import_admission().unwrap();
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::response(
+            line,
+            ledger::DispatchResponse {
+                request_sha256: request_sha256.into(),
+                outcome: None,
+                ..super::super::tests::dispatch_response("success", 1, 0)
+            },
+        ))
+        .unwrap();
+}
+
+/// `line`'s span binding refused by `code`, recorded under the lock.
+fn binding_refused(server: &Server, line: &ImportLedgerLine, code: &str) {
     let _lock = server.lock_import_admission().unwrap();
     server
         .append_import_record_while_admitted(&ledger::StatusRecord::post_span_verdict(
@@ -62,6 +77,12 @@ fn refused_with(server: &Server, line: &ImportLedgerLine, code: &str) {
             &ledger::PostSpanVerdict::Refused(code.into()),
         ))
         .unwrap();
+}
+
+/// [`posted`], then the binding of its post refused by `code`.
+fn refused_with(server: &Server, line: &ImportLedgerLine, code: &str) {
+    posted(server, line);
+    binding_refused(server, line, code);
 }
 
 /// The journal's content review records, as written.
@@ -319,6 +340,7 @@ async fn a_review_needs_the_person_and_is_reported_beside_the_verdict() {
 }
 
 /// A refused binding is reviewed the same way; the dialog names its code.
+/// The outcome is whole, and names the batch's company for the egress record.
 #[tokio::test]
 async fn a_refused_binding_is_reviewed_with_its_code_shown() {
     let directory = tempfile::tempdir().unwrap();
@@ -327,7 +349,15 @@ async fn a_refused_binding_is_reviewed_with_its_code_shown() {
     refused_with(&server, &line, "span_step_not_created");
     assert_eq!(settled(&server).unsettled_binding_refused, 1);
     let approval = ScriptedApproval::approving();
-    let response = release(&server, review_args(&line), approval.clone()).await;
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            approval.clone(),
+            server.call_tool_response(ACK, review_args(&line)),
+        )
+        .await;
+    assert_eq!(response.egress.company_guid.as_deref(), Some(GUID));
+    let response = response.value;
+    assert_eq!(response["structuredContent"]["truncated"], false);
     assert_eq!(result(&response)["state"], "content_reviewed", "{response}");
     assert_eq!(result(&response)["reviewed_binding"], "refused");
     assert!(approval.reviews()[0].contains("was refused (span_step_not_created)."));
@@ -417,6 +447,14 @@ async fn a_read_that_shows_the_book_rolled_back_asks_nothing() {
     );
     assert!(approval.reviews().is_empty(), "no dialog: {response}");
     assert_eq!(review_records(&server), Vec::<Value>::new());
+    // The refusal carries the evidence of the read it was refused on.
+    assert!(
+        response["structuredContent"]["evidence"]["bytes"]
+            .as_u64()
+            .unwrap()
+            > 0,
+        "{response}"
+    );
 }
 
 /// What the person was shown must still hold when the record is written: a
@@ -481,19 +519,7 @@ fn the_journaled_state_is_read_from_the_batch_s_records() {
         journaled_state(&snapshot(&server)),
         Some(ResponseNotRecorded)
     );
-    {
-        let _lock = server.lock_import_admission().unwrap();
-        server
-            .append_import_record_while_admitted(&ledger::StatusRecord::response(
-                &line,
-                ledger::DispatchResponse {
-                    request_sha256: request.clone(),
-                    outcome: None,
-                    ..super::super::tests::dispatch_response("success", 1, 0)
-                },
-            ))
-            .unwrap();
-    }
+    answered_with_no_outcome(&server, &line, &request);
     assert_eq!(
         journaled_state(&snapshot(&server)),
         Some(ResponseNotRecorded),
@@ -501,6 +527,19 @@ fn the_journaled_state_is_read_from_the_batch_s_records() {
     );
     answered_late(&server, &line, &request);
     assert_eq!(journaled_state(&snapshot(&server)), None, "an outcome");
+    // A binding refused because another batch's voucher was bound in the
+    // post's span is never admitted, even when the answer on file last is
+    // one with no outcome.
+    let reused = saved(&server, "Journal");
+    let request = sent_unanswered(&server, &reused);
+    answered_late(&server, &reused, &request);
+    binding_refused(&server, &reused, ledger::IDENTITY_REUSED);
+    answered_with_no_outcome(&server, &reused, &request);
+    let reused = server
+        .latest_import_snapshot(&reused.batch_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(journaled_state(&reused), None, "span_identity_reused");
 }
 
 /// A lost answer recorded with no outcome is reviewed the same way, and the
@@ -512,19 +551,7 @@ async fn a_review_lifts_no_stop_and_releases_no_row() {
     let (_simulator, server) = server_reading(directory.path(), 1);
     let line = saved(&server, "Sales");
     let request = sent_unanswered(&server, &line);
-    {
-        let _lock = server.lock_import_admission().unwrap();
-        server
-            .append_import_record_while_admitted(&ledger::StatusRecord::response(
-                &line,
-                ledger::DispatchResponse {
-                    request_sha256: request,
-                    outcome: None,
-                    ..super::super::tests::dispatch_response("success", 1, 0)
-                },
-            ))
-            .unwrap();
-    }
+    answered_with_no_outcome(&server, &line, &request);
     assert_eq!(stop(&server), Some(line.batch_id.clone()));
     let approval = ScriptedApproval::approving();
     let response = release(&server, review_args(&line), approval.clone()).await;
@@ -597,4 +624,105 @@ async fn a_review_naming_another_company_is_refused_before_any_read() {
     );
     assert_eq!(simulator.received(), 0, "no request: {response}");
     assert!(approval.reviews().is_empty());
+}
+
+/// The dialog shows the batch's company by its GUID when the batch records
+/// no company name, a character of the batch id that could mislead as `?`,
+/// and no matching voucher when the read reports no count of them.
+#[test]
+fn the_review_dialog_shows_only_what_the_batch_and_the_read_hold() {
+    let lab = lab_result();
+    let preview = |line: &Value, result: &Value| {
+        let line: ImportLedgerLine = serde_json::from_value(line.clone()).unwrap();
+        review_preview(&line, Refused, result)
+    };
+    let shown = |preview: &str, opening: &str| {
+        preview
+            .lines()
+            .find(|text| text.starts_with(opening))
+            .map(str::to_string)
+    };
+    let mut line = serde_json::to_value(receipts(1, "")).unwrap();
+    let unnamed = preview(&line, &lab);
+    assert_eq!(
+        shown(&unnamed, "Company: "),
+        Some(format!("Company: {GUID}"))
+    );
+    line["company"] = Value::Null;
+    let untupled = preview(&line, &lab);
+    assert_eq!(
+        shown(&untupled, "Company: "),
+        Some(format!("Company: {GUID}"))
+    );
+    line["batch_id"] = json!("bridge-\u{202e}1");
+    let misleading = preview(&line, &lab);
+    assert_eq!(
+        shown(&misleading, "Batch: "),
+        Some("Batch: bridge-?1".to_string())
+    );
+    // A line one character over the limit is broken at its last space.
+    let wide = receipts(1, &format!("{} {}", "A".repeat(45), "B".repeat(46)));
+    let wide = review_preview(&wide, Refused, &lab);
+    let company = wide
+        .lines()
+        .position(|text| text.starts_with("Company: "))
+        .unwrap();
+    assert_eq!(
+        wide.lines().skip(company).take(2).collect::<Vec<_>>(),
+        [format!("Company: {}", "A".repeat(45)), "B".repeat(46)]
+    );
+    let mut uncounted = lab.clone();
+    uncounted["counts"] = Value::Null;
+    let uncounted = preview(&line, &uncounted).replace('\n', " ");
+    assert!(
+        uncounted.contains("found, for 0 of the 1 voucher sent, a voucher in the book"),
+        "{uncounted}"
+    );
+}
+
+/// The review box is asked for as many vouchers as the batch holds: its size
+/// and wording depend on the count.
+#[tokio::test]
+async fn the_review_box_is_asked_for_every_voucher_of_the_batch() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server) = server_reading(directory.path(), 1);
+    let origin =
+        crate::tally::connection::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let mut two = serde_json::to_value(batch("Journal", &origin)).unwrap();
+    let mut second = two["vouchers"][0].clone();
+    second["bridge_txn_id"] = json!("t2");
+    two["vouchers"].as_array_mut().unwrap().push(second);
+    two["txn_ids"] = json!(["t1", "t2"]);
+    let line: ImportLedgerLine = serde_json::from_value(two).unwrap();
+    server.append_import_ledger(&line).unwrap();
+    sent_unanswered(&server, &line);
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, review_args(&line), approval.clone()).await;
+    assert_eq!(result(&response)["state"], "content_reviewed", "{response}");
+    assert_eq!(approval.review_counts(), [2]);
+    assert_eq!(review_records(&server).len(), 1);
+}
+
+/// A company GUID that differs from the batch's only in letter case names
+/// the same company: the review is not refused as naming another one.
+#[tokio::test]
+async fn a_review_naming_the_company_guid_in_capitals_is_recorded() {
+    let directory = tempfile::tempdir().unwrap();
+    let (_simulator, server) = server_reading(directory.path(), 1);
+    let origin =
+        crate::tally::connection::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let lettered = "61c6de69-1748-461c-ad3f-162cb949df9f";
+    let mut line = serde_json::to_value(batch("Journal", &origin)).unwrap();
+    line["company_guid"] = json!(lettered);
+    line["company"]["guid"] = json!(lettered);
+    let line: ImportLedgerLine = serde_json::from_value(line).unwrap();
+    server.append_import_ledger(&line).unwrap();
+    sent_unanswered(&server, &line);
+    let mut args = review_args(&line);
+    args["company_guid"] = json!(lettered.to_ascii_uppercase());
+    let approval = ScriptedApproval::approving();
+    let response = release(&server, args, approval.clone()).await;
+    assert_eq!(result(&response)["state"], "content_reviewed", "{response}");
+    assert_eq!(approval.review_kinds(), [ReviewKind::Review]);
+    assert_eq!(review_records(&server).len(), 1);
 }

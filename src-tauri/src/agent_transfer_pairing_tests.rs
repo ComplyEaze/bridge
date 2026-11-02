@@ -2955,7 +2955,8 @@ pub(crate) mod whole_day {
     }
 
     /// An empty day of a window counts only beside a window day that holds a
-    /// voucher (#985). The days are the run's 12 (empty) and 13 April.
+    /// voucher, a rule that departs from the `vouchers` tool's verdict (#985;
+    /// see `corroborated`). The days are the run's 12 (empty) and 13 April.
     #[tokio::test]
     async fn an_empty_day_counts_only_beside_a_day_that_holds_a_voucher() {
         let reader = Captured::of(run_days(&[13, 12]));

@@ -366,9 +366,9 @@ impl TallyDays {
     /// beside any ledger keeps the row out, not only a voucher on both of its
     /// ledgers: a transfer through a clearing ledger touches the two banks on
     /// two vouchers. A window day that holds no voucher counts only beside a
-    /// window day that holds one: an empty window is complete only when its
-    /// neighbouring days corroborate it (#985). A skip whose other ledger has
-    /// no name in `names` is left out.
+    /// window day that holds one ([`corroborated`]), which departs from the
+    /// `vouchers` tool's verdict on an empty window (#985). A skip whose other
+    /// ledger has no name in `names` is left out.
     pub(crate) fn from_windows(days: &[WholeDay], skips: &[SkipFact], names: &LedgerNames) -> Self {
         Self(
             skips
@@ -442,7 +442,17 @@ impl TallyDays {
 }
 
 /// Whether every day of a window holds a voucher or lies beside a day of the
-/// window that does (#985).
+/// window that does. This departs from the `vouchers` tool's verdict (#985,
+/// `corroborate_empty_by_days` in `agent.rs`), where rows found only beside an
+/// empty window leave it `partial` (`empty_window_wider_read_nonempty`): they
+/// give no independent count of the window. A day read here gives none either,
+/// as its census and its vouchers request carry the same one-day filter. The
+/// day is taken as read on its own census and vouchers answers agreeing, with
+/// a day beside it read whole in the same call through the same request shape;
+/// that is partial confidence (#1392): no capture shows Tally answering an
+/// empty census for a day that holds vouchers, and none rules it out. Without
+/// it no row could read `NotFound`, as the days beside a transfer are often
+/// empty. Whether to keep it is the maintainers' decision.
 fn corroborated(window: &[&WholeDay]) -> bool {
     let holds = |at: usize| window.get(at).is_some_and(|day| !day.vouchers.is_empty());
     (0..window.len()).all(|at| holds(at) || at.checked_sub(1).is_some_and(holds) || holds(at + 1))

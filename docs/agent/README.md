@@ -2600,8 +2600,15 @@ refused as `proposals_legacy` (parse the statement again).
   dates a call within 31 days of the newest. A date is read in full only when its
   census counted it, no voucher was withheld and no row is dated another day. A
   date that holds no voucher counts only beside a read date of the same window
-  that holds one, as an empty `vouchers` window is complete only when its
-  neighbouring days corroborate it. Ledger names are compared exactly as Tally
+  that holds one. That departs from `vouchers`, which leaves an empty window
+  `partial` (`empty_window_wider_read_nonempty`) when only the days beside it hold
+  rows, since those rows give no independent count of the window (#985). A date
+  read here gives none either: its census and its vouchers request carry the same
+  one-day filter. It is taken as read on its own two answers agreeing, beside a
+  date read whole in the same call; no capture shows Tally answering an empty
+  census for a date that holds vouchers, and none rules it out, so this is
+  partial confidence and the maintainers' decision (#1392). Without it no row
+  could read `not_found`. Ledger names are compared exactly as Tally
   sent them, and a date whose entries name a ledger the call's ledger list does
   not hold rules nothing out. No date is read for a book whose voucher mark needs
   more than one census request a day. Each read is one window of one date: the

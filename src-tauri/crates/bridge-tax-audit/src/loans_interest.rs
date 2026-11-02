@@ -5147,6 +5147,19 @@ this interest."
         );
     }
 
+    /// With no debit on the loan, a deduction within a rupee of the s.194A rate reads "covered".
+    #[test]
+    fn a_deduction_within_a_rupee_of_the_rate_reads_covered() {
+        let (b, r, _) = two_loans_run(vec![
+            journal("i1", &[("Interest A", 8_502_000), ("Loan A", -8_502_000)]),
+            journal("t1", &[("Loan A", 850_150), ("TDS Payable", -850_150)]),
+        ]);
+        assert_eq!(
+            loan_figure(&b, &r, "s194a_tds_coverage", "Loan A").map(|f| f.value.clone()),
+            Some(Value::Text("covered".to_string()))
+        );
+    }
+
     /// A voucher listed as both crediting and debiting the loan leaves the coverage "not computed"
     /// on any TDS on the loan: a deduction and its reversal netting to nil, and a debit alone.
     #[test]

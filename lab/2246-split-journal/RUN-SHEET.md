@@ -1,6 +1,6 @@
 # 2246 split journal on a real Store install (#2246, #2233): which refusal each side of the package boundary gets through this build, and what an inside append does to a journal it did not create
 
-Not for merge. About 45 minutes. Nothing is written to Tally: no post reaches it, no ledger is created, nothing is keyed. `build_import_xml` reads Tally and writes an import file and a journal line on this PC. `SHA256.txt` lists every file here with its bytes; check it before step 0.
+Not for merge. About an hour. Nothing is written to Tally: no post reaches it, no ledger is created, nothing is keyed. `build_import_xml` reads Tally and writes an import file and a journal line on this PC. `SHA256.txt` lists every file here with its bytes; check it before step 0.
 
 `LAB-COMMON.md` in this folder applies in full (v3, sha256 `5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6`). Where it and this sheet differ, the stricter holds. It runs alone, after the run coordinator's yes to download the build.
 
@@ -19,7 +19,7 @@ Marks: V = read at a named source; U = not measured. Every outcome is recorded a
 
 **L2, a new data folder, from nothing:** when the outside side creates a journal and the inside side then appends to it, does the journal grow in place or does a package copy start? Then what does the next build on each side get?
 
-**Limit, whatever the result:** one computer, one Store package, processes started from the lab shell and by WMI. The extension as Claude Desktop starts it is U.
+**Limit, whatever the result:** one computer, one Store package, processes started from the lab shell and by WMI, and at L3 the extension as Claude Desktop starts it.
 
 ## Rules and company
 
@@ -31,7 +31,7 @@ Differences from LAB-COMMON (the stricter rule holds everywhere else):
 1. **Tools only.** Requests to port 9001 are tool calls through `client.py`, one at a time, except C2's `GET /status` and MARKS. C2 d's MARKS read: use `ledger_masters` basic, first page, and record `snapshot.master_alter_id` and `snapshot.voucher_alter_id`, as this sheet sends no raw request.
 2. **Tools sent:** `tools/list`, `tally_status`, `list_companies`, `ledger_masters`, `build_import_xml`, `local_data_report`, `egress_log`, and `post_import` ONLY at L1d. `client.py` refuses any other.
 3. **No approval is given.** Every post here is expected to be refused before a box. If any approval box opens: screenshot, answer **No**, STOP. Never Yes.
-4. **Delete nothing.** Built files, journal lines and probe files stay where they land. Claude Desktop is never quit, restarted or reconfigured.
+4. **Delete nothing.** Built files, journal lines and probe files stay where they land. Claude Desktop is never quit, restarted or reconfigured, except L3's install.
 5. **Existence** is decided by `probe.ps1`, never by `Test-Path`. An error is recorded as an error, never as "absent".
 6. **Order matters.** Windows redirects only new files, so run the rows in the order written and stop each client before the next starts.
 7. **A refusal is a result.** Record its `code`, `cause` and the whole answer. It ends the row only where the row says so.
@@ -71,7 +71,7 @@ At `e9c780f3`, checked by reading, not by a run:
 
 ### Start
 
-0. LAB-COMMON C2 step 0 with THE COMPANY loaded alone. New folders `C:\bridge-lab\2246\{bin,run,evidence,l1-in,l1-out,l2-a,l2-b,l2-c,l2-d}`, each `l*` with `inbox\` and `answers\`. Copy `client.py` and `probe.ps1` there, and write a new `ka.txt` there holding any one line (step 2's instrument). Record Windows' version and build, and `whoami /groups` from the lab shell: EXPECT a standard user, Medium Mandatory Level; record it either way.
+0. LAB-COMMON C2 step 0 with THE COMPANY loaded alone. New folders `C:\bridge-lab\2246\{bin,run,evidence,l1-in,l1-out,l2-a,l2-b,l2-c,l2-d,l3-c}`, each `l*` with `inbox\` and `answers\`. Copy `client.py` and `probe.ps1` there, and write a new `ka.txt` there holding any one line (step 2's instrument). Record Windows' version and build, and `whoami /groups` from the lab shell: EXPECT a standard user, Medium Mandatory Level; record it either way.
 1. `Get-AppxPackage | Where-Object Name -like '*Claude*'`: record `Name`, `PackageFamilyName` (= `F`), `Version`, `SignatureKind`. Not exactly one = STOP. `(Get-Command python).Source`: record it; if it is under `LA`, use the `Q`-side copy for out steps as `lab/1584-msix-paths` step 0e did.
 
 ### Which side is which
@@ -129,9 +129,19 @@ At `e9c780f3`, checked by reading, not by a run:
     - After L2-C: record it.
 12. **L2d (in), folder `l2-d`:** build, id `lab2246-l2d`. EXPECT `result.batch_id` after either outcome: inside, the copy is this side's journal or no journal exists there. Then probe out then in, `-Step L2d`.
 
+### L3: inside Claude Desktop as the extension
+
+Owed by the review of #2246: the rows above start the program from a shell, and the extension is what a person runs. It runs last, and only on the run coordinator's word in this sitting, because it installs this build as the extension, the one exception to rule 4. Posting stays off, so a build is all that is sent. The check runs on a build alone (`agent_import.rs:1277`, under the admission lock), and L1c's batch means the extension's own journal `Q\J` already holds at least one.
+
+13. Screenshot Desktop's extension page: record the installed version of ComplyEaze Bridge and its posting setting. Install the `.mcpb` from this build's bundle through Desktop's own install screen. A prompt to quit or restart Desktop = decline it, STOP, report. Then, from the process list, EXPECT a `bridge_mcp.exe` started by Desktop whose sha256 equals `exe-sha256.txt`, and the posting setting off (another hash or setting = STOP).
+14. **L3a:** in a new test chat, send exactly `Call the ComplyEaze Bridge tool build_import_xml with these arguments, and nothing else:` followed by the voucher above, id `lab2246-l3a`, and allow that one call once. Take its result from Desktop's MCP log by the call's JSON-RPC id, not from the chat. **EXPECT** `result.batch_id`, no `import_journal_split`. **A refusal here is the lockout on a real install: record its `cause` whole, skip L3b, and #2246 stops.** No answer in 5 minutes, or no such line in the log, leaves L3 undecided: record it.
+15. **L3b:** the same in the same chat, id `lab2246-l3b`. EXPECT `result.batch_id`, with L3a's batch now on record.
+16. **L3c (out):** folder `l3-c`, the launch settings alone: one client, one `list_companies`, one build, id `lab2246-l3c`, then `stop`. EXPECT `import_journal_split`, cause `other_journal_holds_batches`. Probe out, `-Step L3c`: EXPECT `R\J` at the bytes step 7 left, and `Q\J` larger by L3a and L3b.
+17. Put back the extension version step 13 recorded, from its own package. If that package is not on the PC, leave this build installed and say so.
+
 ### Close
 
-13. Hash the exe. No `bridge_mcp.exe` of this item left running: `Get-CimInstance Win32_Process -Filter "Name='bridge_mcp.exe'"`, recording `ProcessId` and `ExecutablePath`. LAB-COMMON C10.
+18. Hash the exe. No `bridge_mcp.exe` of this item left running: `Get-CimInstance Win32_Process -Filter "Name='bridge_mcp.exe'"`, recording `ProcessId` and `ExecutablePath`. LAB-COMMON C10.
 
 **What this item leaves behind, never posted:** the `lab2246-*` batches and their journal lines in `Q`, `R2` and wherever L2 put them; two new folders; the `bridge-lab-1584` probe files. A later sheet's step 3 reads larger journals, and that is expected.
 
@@ -144,9 +154,10 @@ At `e9c780f3`, checked by reading, not by a run:
 **The finding it records:**
 - whether each of the four paths fired, per side;
 - that a real outside side is refused, for a build and a post, or what it got instead;
-- L2-A, L2-B or L2-C, which decides whether a person who posts from one side first can later be refused on the other.
+- L2-A, L2-B or L2-C, which decides whether a person who posts from one side first can later be refused on the other;
+- at L3, whether the extension itself builds, twice, with a process outside refused.
 
-**Not measured:** the extension as Claude Desktop starts it; Windows 11; a desktop app installed normally; two Store packages holding journals; the master-write journal; the under-lock check after an approval, since no box is answered Yes.
+**Not measured:** Windows 11; a desktop app installed normally; two Store packages holding journals; the master-write journal; the under-lock check after an approval, since no box is answered Yes.
 
 ## Evidence
 

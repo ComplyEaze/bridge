@@ -1,0 +1,7 @@
+2026-11-02 Part H, UTC. No id, date, folder or mark of THE BOOK is written here.
+~09:56Z The owner logged THE BOOK in at the PC; no key from the lab at the login box.
+~09:58Z Load done; the Gateway showed; /status 200.
+10:00Z Step 0's checks run again with the book loaded: one tally.exe owns 9001; /status 200.
+~10:01Z One look at the Day Book for W1's day; Escape back to the Gateway.
+10:01Z to 10:02Z Steps 2 to 9 by scripts/ladder2.py, in order: m0, W1, W2, W3, S2, R1, m1. W3 passed 20 s and ended the ladder. S2 used the widest window at or under 20 s. No stop rule met.
+10:02Z Marks equal. Book held loaded on the run lead's word; steps 10 and 11 not run.

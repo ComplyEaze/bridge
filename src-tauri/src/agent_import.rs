@@ -797,15 +797,7 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     // the first line says what the book holds without making it this post's.
     // A match that is cancelled or optional is not in the accounts, so it is
     // never counted as held.
-    let matched_by_content = vouchers.as_array().map_or(0, |vouchers| {
-        vouchers
-            .iter()
-            .filter(|voucher| {
-                voucher["status"] == "matching_content_observed"
-                    && voucher["accounting_effective"] == true
-            })
-            .count()
-    });
+    let matched_by_content = verification::content_matches_in_the_accounts(vouchers);
     let summary = if reported_not_created {
         "Tally reported that this post created none of its vouchers: follow each voucher's next step."
     } else if report["state"] != "refused" || matched_by_content == 0 {

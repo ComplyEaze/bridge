@@ -1824,7 +1824,9 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **An optional voucher and a cancelled one leave the balance alone (verified).** The window still lists both, flagged. A cancelled voucher's one entry list holds no ledger or amount.
 - **A post-dated voucher counts at a later date whatever the current date (verified, one voucher).** With the current date at 12 April, a Payment post-dated 25 April is in the closing at 25 and at 30 April, and the window lists it on its own date. Whether the date during keying affects the flag was not tested.
 - **The book's last entry date leaves that voucher out (verified, one voucher).** It read 11 April, so it cannot end a read meant to reach every dated voucher.
-- **Not measured:** a Trial Balance whose `from` is not the first day of the books, the Movement read on this book, and any of this on a book of real size.
+- **A `from` off the books' first day ties (verified, one read).** A Trial Balance from 12 April opened the cash ledger at 1,200.00 Dr and closed it at 300.00 Dr, and the ledger's vouchers read over the same days reached that closing (`lab/1761-l1-cash-box-answers` at c394d740).
+- **Through the build and the post (verified, one book).** On the same book, a deposit that kept every later day-end at or above zero built, one that took a later day below zero was refused, and one on a day already below zero was refused on the book's own figure. A Payment added after the build stopped the post before the approval, with no voucher. Once it was deleted, the same batch reached the approval and posted, and Tally's closing moved by the deposit.
+- **Not measured:** two or more cash ledgers in one batch, and any of this on a book of real size.
 - **What Bridge does with it.** A deposit from the cash box builds only if the ledger's opening and vouchers reach Tally's own closing, so the vouchers read must be the ones Tally counts. The window runs from the first deposit to the 31 March on or after the later of the last deposit and the last entry.
 
 ## 13. Open questions

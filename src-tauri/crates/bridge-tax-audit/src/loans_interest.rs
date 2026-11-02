@@ -5160,6 +5160,38 @@ this interest."
         );
     }
 
+    /// With no debit on the loan, a deduction at the rate dated before the interest is credited
+    /// reads short by date, in the figure and in the finding that lists the loan.
+    #[test]
+    fn a_deduction_before_the_credit_is_short_by_date() {
+        let mut early = journal("t1", &[("Loan A", 850_200), ("TDS Payable", -850_200)]);
+        early.date = TallyDate::parse("20250501".to_string()).unwrap();
+        let (b, r, _) = two_loans_run(vec![
+            early,
+            journal("i1", &[("Interest A", 8_502_000), ("Loan A", -8_502_000)]),
+        ]);
+        let h = stable_ledger_tag(&b, "Loan A").unwrap();
+        assert_eq!(
+            loan_figure(&b, &r, "s194a_tds_coverage", "Loan A").map(|f| f.value.clone()),
+            Some(Value::Text("covered by amount, not by date".to_string()))
+        );
+        let listed = r
+            .findings
+            .iter()
+            .find(|f| f.id == format!("{TEST_ID}/s194a/{h}"))
+            .unwrap();
+        assert!(
+            listed.title.contains("short of it by the date-aware count"),
+            "{}",
+            listed.title
+        );
+        assert!(
+            listed.limits.iter().any(|l| l.contains("credits only")),
+            "{:?}",
+            listed.limits
+        );
+    }
+
     /// A voucher listed as both crediting and debiting the loan leaves the coverage "not computed"
     /// on any TDS on the loan: a deduction and its reversal netting to nil, and a debit alone.
     #[test]

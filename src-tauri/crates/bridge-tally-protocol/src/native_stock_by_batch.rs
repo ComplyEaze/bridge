@@ -34,10 +34,9 @@ pub enum NotComparable {
     /// whose closing Tally writes as `<base> = <alternate>`, while Stock Query writes the base
     /// unit only.
     ClosingUnread,
-    /// The closing is in a unit other than the lines', compared as sent (case and dots included).
+    /// The units differ, among the lines or from the closing, compared as sent (case and dots
+    /// included).
     UnitsDiffer,
-    /// The lines are in more than one unit.
-    LinesInSeveralUnits,
 }
 
 impl NotComparable {
@@ -45,7 +44,6 @@ impl NotComparable {
         match self {
             Self::ClosingUnread => "closing_unread",
             Self::UnitsDiffer => "units_differ",
-            Self::LinesInSeveralUnits => "lines_in_several_units",
         }
     }
 }
@@ -131,9 +129,7 @@ pub fn tie_stock_query(
         StockQueryAnswer::Lines(lines) => lines.iter().collect::<Vec<_>>(),
     };
     let Some(total) = sum(&lines)? else {
-        return Ok(StockQueryTie::NotComparable(
-            NotComparable::LinesInSeveralUnits,
-        ));
+        return Ok(StockQueryTie::NotComparable(NotComparable::UnitsDiffer));
     };
     Ok(match closing {
         NativeQuantityRead::Empty => StockQueryTie::Differs {

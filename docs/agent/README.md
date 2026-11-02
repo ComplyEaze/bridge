@@ -1137,7 +1137,7 @@ Each item's lines are tied as a whole to its closing quantity in Tally's stock i
 period, and its `state` says how: `tied`, `differs` (both sides are returned, `lines_total` and
 `closing`, and neither is adjusted), `not_comparable` (`closing_unread` for an item with an alternate
 unit, whose closing Tally writes in both units while Stock Query writes the base unit only;
-`units_differ`; `lines_in_several_units`), `no_stock` (Tally's empty answer beside a closing of zero)
+`units_differ`), `no_stock` (Tally's empty answer beside a closing of zero)
 or `no_movement` (the empty answer beside no closing at all, which does not say the item holds none).
 Tally sends the same empty answer for an item with no stock, one that never moved and a name it does
 not know, so it is never read as zero on its own. An item can also be `item_not_found`,

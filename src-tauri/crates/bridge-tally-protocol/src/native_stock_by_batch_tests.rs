@@ -201,9 +201,7 @@ fn another_unit_is_not_comparable() {
             &StockQueryAnswer::Lines(lines),
             &closing("c-a-03-items-to-20260331", "Caustic Soda Flakes"),
         ),
-        Ok(StockQueryTie::NotComparable(
-            NotComparable::LinesInSeveralUnits
-        ))
+        Ok(StockQueryTie::NotComparable(NotComparable::UnitsDiffer))
     );
 }
 

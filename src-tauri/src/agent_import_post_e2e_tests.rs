@@ -1821,6 +1821,31 @@ async fn a_cash_book_changed_since_the_build_is_refused_before_approval() {
         .contains("\"dispatch_intent\""));
 }
 
+/// A book that moves while the dialog is open stops the deposit after the answer,
+/// with nothing sent: the read before the dialog is as old as the dialog.
+#[tokio::test]
+async fn a_cash_book_changed_while_the_dialog_is_open_is_refused_after_the_answer() {
+    let mut plans = cash_box_reads("-20.00", true);
+    plans.extend(cash_book_plans(GUID, "100004", &companies(), "-30.00"));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_cash_box_deposit(&server, unmoved_book_record("-20.00"));
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "cash_projection_stale", "{response}");
+    assert_eq!(scripted.previews().len(), 1, "{response}");
+    assert_eq!(observed.len(), expected, "{response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+}
+
 /// The same book as the build's goes on to the approval.
 #[tokio::test]
 async fn a_cash_book_unchanged_since_the_build_reaches_approval() {

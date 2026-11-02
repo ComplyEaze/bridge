@@ -433,11 +433,6 @@ impl Server {
         Ok((ledgers, evidence_from_runtime_read(evidence)))
     }
 
-    /// Read the movement window, bounded by the pre-flight of protocol
-    /// reference §11c. The returned evidence covers the voucher source alone —
-    /// what the two snapshot reads compare — and the pre-flight comes back
-    /// beside it, with the ranges read so the closing read can replay them and
-    /// be comparable part for part.
     /// Each day's net movement on `ledger` over a window, a debit positive, read
     /// once. The caller ties the sum to Tally's own closing, which a read that left
     /// a voucher out cannot pass (#1761).
@@ -484,6 +479,11 @@ impl Server {
         Ok((moves, evidence))
     }
 
+    /// Read the movement window, bounded by the pre-flight of protocol
+    /// reference §11c. The returned evidence covers the voucher source alone —
+    /// what the two snapshot reads compare — and the pre-flight comes back
+    /// beside it, with the ranges read so the closing read can replay them and
+    /// be comparable part for part.
     async fn read_movement_vouchers(
         &self,
         identity: &VerifiedCompanyIdentity,

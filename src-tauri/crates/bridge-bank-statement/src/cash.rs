@@ -177,7 +177,7 @@ impl CashAnswer {
                 "cash paid straight to someone needs a cash Payment to that person as well, which ComplyEaze Bridge does not build yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
             ),
             Self::UnbookedCashSales => Some(
-                "the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales, or the Contra from the cash box, yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
+                "the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move",
             ),
             _ => None,
         }

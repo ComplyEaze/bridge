@@ -1063,7 +1063,9 @@ impl Server {
                     return Err("cash_ledger_not_cash_in_hand".to_string().into());
                 }
                 // The book the deposit was projected on must still be the book
-                // (#1761); the queue's aim holds it from here to the send.
+                // (#1761). This asks before the dialog; the read is repeated
+                // after the answer, and from there to the send nothing watches
+                // the book.
                 if let Some(record) = &line.cash_projection {
                     let evidence =
                         Box::pin(self.cash_book_unmoved(&identity, &company.name, record))
@@ -1084,7 +1086,7 @@ impl Server {
                 .as_deref()
                 .is_some_and(|recorded| !recorded.is_empty())
             {
-                // A cash-in-hand ledger rides only on a business-cash Contra,
+                // A cash-in-hand ledger rides only on a Contra out of cash,
                 // a bank voucher: one recorded without one would skip the
                 // check above, so the record is refused as inconsistent (#815).
                 return Err("import_post_admission_inconsistent".to_string().into());
@@ -1215,6 +1217,17 @@ impl Server {
                         .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                         accumulated = combine_evidence(accumulated.clone(), evidence);
                         invoice_plan = Some(plan);
+                    }
+                    // And a deposit's cash book, with the approval unspent (#1761).
+                    if let Some(record) = &line.cash_projection {
+                        let evidence =
+                            Box::pin(self.cash_book_unmoved(&identity, &company.name, record))
+                                .await
+                                .map_err(|failure| {
+                                    ToolFailure::from(failure)
+                                        .with_prior_evidence(accumulated.clone())
+                                })?;
+                        accumulated = combine_evidence(accumulated.clone(), evidence);
                     }
                     let (taken, request, held) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;

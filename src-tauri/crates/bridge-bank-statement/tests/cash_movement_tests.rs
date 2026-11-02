@@ -615,7 +615,7 @@ fn every_not_built_reason_names_the_product_in_full() {
     assert_eq!(CashAnswer::OwnCashBox.not_built(), None);
     assert_eq!(
         CashAnswer::UnbookedCashSales.not_built(),
-        Some("the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales, or the Contra from the cash box, yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
+        Some("the cash sales or collections behind this deposit are not in the books, and ComplyEaze Bridge does not build those sales yet; answer dont_know and the line is built to the suspense ledger, marked for the CA to move")
     );
     for movement in [CashMovement::Withdrawal, CashMovement::Deposit] {
         for answer in movement.question().1 {

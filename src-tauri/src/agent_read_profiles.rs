@@ -49,6 +49,14 @@ pub(super) const AGENT_VOUCHER_FETCH: &str =
 GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
 REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
 
+/// [`AGENT_VOUCHER_FETCH`] with a voucher's e-invoice details, sent only when a `vouchers` call
+/// asks for them (#1378), so every other read's request stays the one the lab sent (protocol
+/// reference §8.2j).
+const AGENT_VOUCHER_E_INVOICE_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
+GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
+REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE,IRN,IRNACKNO,IRNACKDATE";
+
 /// The window read's list without `REFERENCEDATE`: the list every ledger-scoped window read the lab
 /// sent carried (the bill trail's, #1356, on two books), and the book-wide window reads it was
 /// compared with. [`AGENT_VOUCHER_FETCH`] added `REFERENCEDATE` later (#1363) and has not been
@@ -149,6 +157,29 @@ pub(super) fn render_agent_class_vouchers_in_span(
         &span.map(AlterIdSpan::filter).unwrap_or_default(),
         AGENT_VOUCHER_FETCH,
         &voucher_type_class_computes(),
+    )
+}
+
+/// [`render_agent_vouchers_in_span`] or, with `classes`, [`render_agent_class_vouchers_in_span`],
+/// naming the e-invoice details as well.
+pub(super) fn render_agent_e_invoice_vouchers_in_span(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: Option<AlterIdSpan>,
+    classes: bool,
+) -> Result<String, String> {
+    render_windowed_vouchers(
+        company,
+        from,
+        to,
+        &span.map(AlterIdSpan::filter).unwrap_or_default(),
+        AGENT_VOUCHER_E_INVOICE_FETCH,
+        &if classes {
+            voucher_type_class_computes()
+        } else {
+            String::new()
+        },
     )
 }
 
@@ -814,6 +845,8 @@ mod sealed_read_tests {
             super::super::voucher_window::VoucherReadShape::Movement,
             super::super::voucher_window::VoucherReadShape::EntryWildcard,
             super::super::voucher_window::VoucherReadShape::ClassEntryWildcard,
+            super::super::voucher_window::VoucherReadShape::EInvoiceEntryWildcard,
+            super::super::voucher_window::VoucherReadShape::EInvoiceClassEntryWildcard,
         ] {
             for part_span in [None, Some(span)] {
                 reads

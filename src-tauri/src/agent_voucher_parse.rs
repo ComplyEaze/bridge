@@ -146,6 +146,7 @@ pub(super) fn parse_import_verification_rows(
         company_guid,
         CompositePolicy::Refuse,
         GstDetailsShown::Withheld,
+        EInvoiceFields::NotAsked,
     )?)
 }
 
@@ -161,6 +162,7 @@ pub(super) fn parse_agent_rows_with_accounting_state(
         company_guid,
         CompositePolicy::Refuse,
         GstDetailsShown::Withheld,
+        EInvoiceFields::NotAsked,
     )?)
 }
 
@@ -170,6 +172,7 @@ pub(super) fn parse_agent_rows_reading_gst(
     xml: &str,
     company_guid: &str,
     gst: GstDetailsShown,
+    e_invoice: EInvoiceFields,
 ) -> Result<Vec<Value>, String> {
     refused_composites(parse_voucher_rows(
         xml,
@@ -178,6 +181,7 @@ pub(super) fn parse_agent_rows_reading_gst(
         company_guid,
         CompositePolicy::Refuse,
         gst,
+        e_invoice,
     )?)
 }
 
@@ -191,7 +195,12 @@ pub(super) fn parse_agent_rows_withholding(
     xml: &str,
     company_guid: &str,
 ) -> Result<Vec<VoucherRow>, String> {
-    parse_agent_rows_withholding_reading_gst(xml, company_guid, GstDetailsShown::Withheld)
+    parse_agent_rows_withholding_reading_gst(
+        xml,
+        company_guid,
+        GstDetailsShown::Withheld,
+        EInvoiceFields::NotAsked,
+    )
 }
 
 /// The `vouchers` rows, withheld as `parse_agent_rows_withholding` withholds them, with each
@@ -200,6 +209,7 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
     xml: &str,
     company_guid: &str,
     gst: GstDetailsShown,
+    e_invoice: EInvoiceFields,
 ) -> Result<Vec<VoucherRow>, String> {
     Ok(parse_voucher_rows(
         xml,
@@ -208,6 +218,7 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
         company_guid,
         CompositePolicy::Withhold,
         gst,
+        e_invoice,
     )?
     .into_iter()
     .map(|(row, withheld)| {
@@ -218,6 +229,77 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
         }
     })
     .collect())
+}
+
+/// One e-invoice detail of a voucher, as a read that asked for it found it.
+enum EInvoiceField<'row> {
+    Present(&'row str),
+    /// Tally sent the element, empty: the voucher does not carry this detail.
+    Absent,
+    /// Tally did not send the element, so this book or release does not say.
+    NotReported,
+}
+
+impl<'row> EInvoiceField<'row> {
+    fn of(row: &'row BTreeMap<String, String>, element: &str) -> Self {
+        match row.get(element).map(|value| value.trim()) {
+            None => Self::NotReported,
+            Some("") => Self::Absent,
+            Some(value) => Self::Present(value),
+        }
+    }
+
+    fn to_json(&self) -> Value {
+        match self {
+            Self::Present(value) => json!({"state": "present", "value": value}),
+            Self::Absent => json!({"state": "absent"}),
+            Self::NotReported => json!({"state": "not_reported"}),
+        }
+    }
+}
+
+/// Whether a read's fetch list named the e-invoice details (#1378). Absent is said only when they
+/// were asked for, so a read that did not ask returns exactly the rows it did before.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum EInvoiceFields {
+    Asked,
+    NotAsked,
+}
+
+impl EInvoiceFields {
+    /// From the `include_e_invoice` argument: absent or false does not ask.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        Ok(match optional_bool(args, "include_e_invoice")? {
+            Some(true) => Self::Asked,
+            Some(false) | None => Self::NotAsked,
+        })
+    }
+
+    /// An invoice's details, or a voucher's if it carries any (protocol reference §8.2j). Tally's
+    /// `IRNACKDATE` is `TYPE="Date"`: a present value must be a date, or the read is refused.
+    fn details(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
+        if self == Self::NotAsked {
+            return Ok(None);
+        }
+        let irn = EInvoiceField::of(row, "IRN");
+        let ack_no = EInvoiceField::of(row, "IRNACKNO");
+        let ack_date = EInvoiceField::of(row, "IRNACKDATE");
+        if let EInvoiceField::Present(date) = ack_date {
+            bridge_tally_core::TallyDate::parse(date.to_string())
+                .map_err(|_| "voucher_irn_ack_date_invalid".to_string())?;
+        }
+        let carried = [&irn, &ack_no, &ack_date]
+            .iter()
+            .any(|field| matches!(field, EInvoiceField::Present(_)));
+        if !carried && row.get("ISINVOICE").map(|value| value.trim()) != Some("Yes") {
+            return Ok(None);
+        }
+        Ok(Some(json!({
+            "irn": irn.to_json(),
+            "ack_no": ack_no.to_json(),
+            "ack_date": ack_date.to_json(),
+        })))
+    }
 }
 
 /// What an amount that is not a plain decimal does to its voucher.
@@ -437,6 +519,7 @@ fn parse_voucher_rows(
     company_guid: &str,
     composites: CompositePolicy,
     gst_details: GstDetailsShown,
+    e_invoice: EInvoiceFields,
 ) -> Result<Vec<(Value, bool)>, String> {
     // An entry's GST details are read only for a call that shows them (#2027): a read that does
     // not ask holds, sizes and returns exactly the rows it did before.
@@ -977,6 +1060,9 @@ fn parse_voucher_rows(
                             .filter(|value| !value.is_empty())
                         {
                             parsed["party_gstin"] = json!(party_gstin);
+                        }
+                        if let Some(details) = e_invoice.details(&row)? {
+                            parsed["e_invoice"] = details;
                         }
                         rows.push((parsed, withheld));
                     }

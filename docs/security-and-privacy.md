@@ -183,6 +183,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       a group total cannot be given, are shortened under `mask_parties`.
     - A voucher's reference date (the `reference_date` field) is a date, the
       same under every setting.
+    - An invoice's e-invoice details (the `e_invoice` field `vouchers` adds with
+      `include_e_invoice`: the IRN, the acknowledgement number and its date) are
+      sent as the book has them under every setting.
     - The cost centre and cost category lists (two new kinds of the masters
       read) send each one's name, its parent (a cost centre's parent is another
       cost centre or the top level), its category for a cost centre, three

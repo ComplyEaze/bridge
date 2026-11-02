@@ -4,4 +4,5 @@
   `not_comparable`, `no_stock` or `no_movement`); Tally's empty answer is never read as zero on its own. Nothing is
   compared with a voucher. A failed send stops the reads and the answer says it is partial; an answer that cannot be
   read refuses that item only. Item, godown and batch names are masked under `mask_parties`. Measured on TallyPrime
-  7.2 on one synthetic book, through the tool at two month ends of its first year.
+  7.2 on one synthetic book, through the tool at three month ends; a month in which
+  a closing moves is not measured.

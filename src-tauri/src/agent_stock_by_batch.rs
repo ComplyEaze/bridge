@@ -29,7 +29,7 @@ const LIMITATIONS: [&str; 9] = [
     "Units are compared as Tally writes them, and never converted. An item with an alternate unit is `not_comparable`: Stock Query writes its base unit only, and its closing is written in both",
     "Godown and batch names are compared as sent: two that differ only in letter case are two",
     "Tally's failure answer is read as Tally's failure (`stock_query_tally_reported_failure`); no Stock Query answer has been seen in that shape (UNVERIFIED)",
-    "Measured on TallyPrime 7.2 on one synthetic book, at two month ends of its first year; other releases and books are not measured",
+    "Measured on TallyPrime 7.2 on one synthetic book, at three month ends. A year after the books' first day it answered closings, in a month where no closing moved; a month where one moves is not measured, nor are other releases and books",
     "Under mask_parties an item's `name` and every godown and named batch are masked, because they are text a person types, which can carry a customer's or supplier's name; `Primary Batch` is Tally's own text and is not masked, and `guid` is not masked",
 ];
 

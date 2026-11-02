@@ -9,8 +9,9 @@
 
 use bridge_tally_primitives::TallyDate;
 
+use crate::ledger_guid_part::LedgerGuidPart;
 use crate::outstandings_shared::DateBoundaryProfile;
-use crate::parent_partition::ParentPart;
+use crate::parent_partition::{ParentPart, PartFormula};
 use crate::xml_text::escape_text as xml_escape;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -169,7 +170,7 @@ pub fn render_native_ledger_snapshot_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
-    render_native_ledger_snapshot(company, period, None)
+    render_native_ledger_snapshot(company, period, parent_filter_parts(None))
 }
 
 /// The same snapshot restricted to the ledgers under one [`ParentPart`]'s
@@ -180,15 +181,24 @@ pub fn render_native_ledger_snapshot_request_for_parents(
     period: &NativeLedgerSnapshotPeriod,
     part: &ParentPart,
 ) -> String {
-    render_native_ledger_snapshot(company, period, Some(part))
+    render_native_ledger_snapshot(company, period, parent_filter_parts(Some(part)))
+}
+
+/// The same snapshot restricted to the ledgers one [`LedgerGuidPart`] names
+/// (#1331).
+pub fn render_native_ledger_snapshot_request_for_ledgers(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+    part: &LedgerGuidPart,
+) -> String {
+    render_native_ledger_snapshot(company, period, ledger_guid_filter_parts(part))
 }
 
 fn render_native_ledger_snapshot(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
-    part: Option<&ParentPart>,
+    (formula, filters): (String, String),
 ) -> String {
-    let (formula, filters) = parent_filter_parts(part);
     format!(
         r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>List of Ledgers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE>{formula}<COLLECTION NAME="List of Ledgers" ISMODIFY="Yes"><FETCH>NAME, PARENT, CLOSINGBALANCE, OPENINGBALANCE, ISBILLWISEON, CURRENCYNAME</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>{filters}</COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
@@ -206,25 +216,32 @@ fn render_native_ledger_snapshot(
 pub fn parent_filter_parts(part: Option<&ParentPart>) -> (String, String) {
     match part {
         None => (String::new(), String::new()),
-        Some(part) => {
-            let formulas = part.formulas();
-            let systems = formulas
-                .iter()
-                .map(|formula| {
-                    format!(
-                        r#"<SYSTEM TYPE="Formulae" NAME="{}">{}</SYSTEM>"#,
-                        formula.name, formula.text
-                    )
-                })
-                .collect::<String>();
-            let names = formulas
-                .iter()
-                .map(|formula| formula.name.as_str())
-                .collect::<Vec<_>>()
-                .join(",");
-            (systems, format!("<FILTERS>{names}</FILTERS>"))
-        }
+        Some(part) => filter_parts(&part.formulas()),
     }
+}
+
+/// The `SYSTEM` formula and `FILTERS` element for a [`LedgerGuidPart`]
+/// (#1331): one `$GUID = "…" OR …` formula, carried exactly as a parent part's.
+pub fn ledger_guid_filter_parts(part: &LedgerGuidPart) -> (String, String) {
+    filter_parts(&[part.formula()])
+}
+
+fn filter_parts(formulas: &[PartFormula]) -> (String, String) {
+    let systems = formulas
+        .iter()
+        .map(|formula| {
+            format!(
+                r#"<SYSTEM TYPE="Formulae" NAME="{}">{}</SYSTEM>"#,
+                formula.name, formula.text
+            )
+        })
+        .collect::<String>();
+    let names = formulas
+        .iter()
+        .map(|formula| formula.name.as_str())
+        .collect::<Vec<_>>()
+        .join(",");
+    (systems, format!("<FILTERS>{names}</FILTERS>"))
 }
 
 /// Renders a native `List of Ledgers` collection for ordinary ledger export.
@@ -247,7 +264,7 @@ pub fn render_native_ledger_export_request(
         period,
         "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, OPENINGBALANCE",
         false,
-        None,
+        parent_filter_parts(None),
     )
 }
 
@@ -258,7 +275,7 @@ pub fn render_party_ledger_master_request(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
-    render_party_ledger_master(company, period, None, false, "")
+    render_party_ledger_master(company, period, parent_filter_parts(None), false, "")
 }
 
 /// The party-master request that also names each ledger's dated mailing details
@@ -271,7 +288,7 @@ pub fn render_party_ledger_master_request_with_mailing_details(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
-    render_party_ledger_master(company, period, None, true, "")
+    render_party_ledger_master(company, period, parent_filter_parts(None), true, "")
 }
 
 /// What [`render_party_ledger_master_request_with_gst_details`] appends to the
@@ -291,7 +308,13 @@ pub fn render_party_ledger_master_request_with_gst_details(
     company: &str,
     period: &NativeLedgerExportPeriod,
 ) -> String {
-    render_party_ledger_master(company, period, None, false, GST_DETAILS_FETCH_SUFFIX)
+    render_party_ledger_master(
+        company,
+        period,
+        parent_filter_parts(None),
+        false,
+        GST_DETAILS_FETCH_SUFFIX,
+    )
 }
 
 /// The compliance master read restricted to the ledgers under one
@@ -301,7 +324,17 @@ pub fn render_party_ledger_master_request_for_parents(
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
-    render_party_ledger_master(company, period, Some(part), false, "")
+    render_party_ledger_master(company, period, parent_filter_parts(Some(part)), false, "")
+}
+
+/// The compliance master read restricted to the ledgers one [`LedgerGuidPart`]
+/// names (#1331).
+pub fn render_party_ledger_master_request_for_ledgers(
+    company: &str,
+    period: &NativeLedgerExportPeriod,
+    part: &LedgerGuidPart,
+) -> String {
+    render_party_ledger_master(company, period, ledger_guid_filter_parts(part), false, "")
 }
 
 /// [`render_party_ledger_master_request_for_parents`] naming the mailing details,
@@ -312,7 +345,7 @@ pub fn render_party_ledger_master_request_for_parents_with_mailing_details(
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
-    render_party_ledger_master(company, period, Some(part), true, "")
+    render_party_ledger_master(company, period, parent_filter_parts(Some(part)), true, "")
 }
 
 /// [`render_party_ledger_master_request_for_parents`] with the same `FETCH`
@@ -324,13 +357,19 @@ pub fn render_party_ledger_master_request_for_parents_with_gst_details(
     period: &NativeLedgerExportPeriod,
     part: &ParentPart,
 ) -> String {
-    render_party_ledger_master(company, period, Some(part), false, GST_DETAILS_FETCH_SUFFIX)
+    render_party_ledger_master(
+        company,
+        period,
+        parent_filter_parts(Some(part)),
+        false,
+        GST_DETAILS_FETCH_SUFFIX,
+    )
 }
 
 fn render_party_ledger_master(
     company: &str,
     period: &NativeLedgerExportPeriod,
-    part: Option<&ParentPart>,
+    filter: (String, String),
     mailing_details: bool,
     fetch_suffix: &str,
 ) -> String {
@@ -342,7 +381,7 @@ fn render_party_ledger_master(
     let fetch = format!(
         "NAME, GUID, REMOTEID, MASTERID, ALTERID, PARENT, PARTYGSTIN, INCOMETAXNUMBER, NAMEONPAN, LEDPINCODE, LEDGSTPINCODE, MSMEREGNUMBER, LEDUDYAMREGNUMBER, BANKACCHOLDERNAME, BANKDETAILS, IFSCODE, EMAIL, LEDGERPHONE, STATENAME, LEDADDRESS.LIST, TAXTYPE, GSTDUTYHEAD, OPENINGBALANCE, LEDGSTREGDETAILS.LIST{mailing}{fetch_suffix}"
     );
-    render_native_ledger_collection_request(company, period, &fetch, true, part)
+    render_native_ledger_collection_request(company, period, &fetch, true, filter)
 }
 
 fn render_native_ledger_collection_request(
@@ -350,9 +389,8 @@ fn render_native_ledger_collection_request(
     period: &NativeLedgerExportPeriod,
     fetch: &str,
     include_response_company_guid: bool,
-    part: Option<&ParentPart>,
+    (formula, filters): (String, String),
 ) -> String {
-    let (formula, filters) = parent_filter_parts(part);
     let response_company_guid = if include_response_company_guid {
         "<COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE>"
     } else {

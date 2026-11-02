@@ -149,7 +149,7 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
         WireRefusal::Draining { .. } => tally_command_error(
             "tally_endpoint_draining",
             "Operation",
-            "Tally was still busy with an earlier request that was stopped for time.",
+            "Tally was still busy with an earlier request that did not finish.",
             "safe",
             false,
             "Try again in a few seconds; this clears by itself within 10 minutes. This request was not sent to Tally.",
@@ -291,15 +291,6 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
             "after_change",
             true,
             "Keep the result unverified and inspect redacted diagnostics before retrying.",
-        )
-    } else if lower.contains("interactive discovery listing limit exceeded") {
-        (
-            "untrusted_discovery_limit_exceeded",
-            "Discovery listing",
-            "The unverified local company listing exceeded ComplyEaze Bridge's display safety limit.",
-            "after_change",
-            true,
-            "Reduce the locally listed companies or use a strict probe for reviewed company evidence.",
         )
     } else if lower.contains("company") {
         (

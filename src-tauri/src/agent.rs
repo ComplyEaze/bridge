@@ -985,6 +985,9 @@ struct ReadSize {
     estimated_bytes: u64,
     limit_bytes: u64,
     limit_master_alter_id: u64,
+    /// For a `stock_summary` refused on its censuses' count (#1233): the items counted and the
+    /// most one read is admitted for. `None` for every other refusal, whose `size` is unchanged.
+    counted_items: Option<(u64, u64)>,
 }
 
 fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
@@ -1017,6 +1020,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         if let Some(crate::tally::runtime::StockSummaryReadError::TooLarge {
@@ -1031,6 +1035,23 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
+            });
+        }
+        if let Some(crate::tally::runtime::StockSummaryReadError::TooManyItems {
+            master_alter_id,
+            counted_items,
+            estimated_bytes,
+            limit_bytes,
+            limit_items,
+        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_items,
+                counted_items: Some((*counted_items, *limit_items)),
             });
         }
         if let Some(crate::tally::runtime::NegativeStockReadError::TooLarge {
@@ -1045,6 +1066,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         if let Some(crate::tally::runtime::StockByGodownReadError::TooLarge {
@@ -1059,6 +1081,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         match cause
@@ -1074,6 +1097,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *mark_limit,
+                counted_items: None,
             }),
             _ => None,
         }
@@ -1221,8 +1245,10 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         {
             return Some(stock.code());
         }
-        if let Some(crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)) =
-            cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        if let Some(
+            crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)
+            | crate::tally::runtime::StockSummaryReadError::CensusRefused(reason),
+        ) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
         {
             return Some(reason);
         }
@@ -1512,13 +1538,37 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              whole-book read of its own, on a different basis: not literal voucher \
              movement).",
         ),
-        // The stock summary read's own size refusal (`size` carries the mark).
+        // The stock summary read's own size refusal (`size` carries the mark, and the counted
+        // items when the census counted them, #1233).
         "stock_summary_too_large" => Some(
-            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
-             worst-case stock-item row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
-             so no request for stock items was sent. The mark counts masters of every kind, so \
-             a company with few stock items may be refused. A larger book refuses; retrying \
-             this call refuses again.",
+            "The company holds more stock items than one read is admitted for: with \
+             `size.counted_items`, the census counted them, and an assumed worst-case row for \
+             each is over ComplyEaze Bridge's response budget (`size.limit_bytes`; at most \
+             `size.limit_items` items), so no request for stock items was sent. A larger book \
+             refuses; retrying this call refuses again.",
+        ),
+        // #1233: the census that counts a book past the single-read mark could not finish.
+        "stock_summary_census_refused" => Some(
+            "ComplyEaze Bridge could not count the company's stock items or stock groups, so no \
+             request for stock items was sent; `error.cause` names why (a census slice holding \
+             more rows than its span, a GUID twice, no item found, or an answer that did not \
+             read). No item found (`stock_item_span_census_empty`) also follows from a company \
+             that holds no stock item. A master-alteration mark past 400,000 always refuses \
+             (`stock_item_span_too_many_slices`), so calling again will not help. Otherwise check \
+             that the company is open in Tally and unchanged, then call again once.",
+        ),
+        // #1233: the report, sized from the counted items and groups, is over the budget.
+        "stock_summary_report_too_large" => Some(
+            "The company's stock items and stock groups together, times an assumed worst-case \
+             line of Tally's Stock Summary, are over ComplyEaze Bridge's response budget, so \
+             no stock request was sent. A larger book refuses; retrying this call refuses again.",
+        ),
+        // #1233: Tally counts more stock items than the census found.
+        "stock_summary_item_count_company_higher" => Some(
+            "Tally's own stock item count is higher than ComplyEaze Bridge counted, so a read \
+             sized from that count could be too small and none was sent. An item may have been \
+             added during the call: call again once; if it refuses again, the count cannot be \
+             trusted on this book.",
         ),
         // The Negative Stock read's own size refusal (`size` carries the mark).
         "negative_stock_too_large" => Some(
@@ -1953,7 +2003,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              it; then call again.",
         ),
         "tally_endpoint_draining" => Some(
-            "Tally was still busy with an earlier request that was stopped for time, so this \
+            "Tally was still busy with an earlier request that did not finish, so this \
              request was not sent. Call again after retry_after_s seconds; the same request is \
              safe to repeat, and a different read would only wait behind the same work. It \
              clears by itself within 10 minutes of the earlier request.",
@@ -2136,19 +2186,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              customer's GST registration applies from in Tally. Then build again.",
         ),
         "invoice_ledger_parent_unnameable"
-        | "invoice_scope_parent_folds"
-        | "invoice_ledger_scope_too_large"
+        | "invoice_ledger_guid_unnameable"
         | "invoice_ledger_scope_unplannable" => Some(
-            "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers under the groups \
-             of the ledgers this invoice names, and it could not name that read safely: a \
-             ledger's group has no name it can write into a request (it is empty, holds a \
-             quote or a control character, or starts or ends with a space), or another group \
-             of the book differs from one of these only in letter case (the filter Tally was \
-             measured to apply would return both), or the groups hold more ledgers than one \
-             read may. Where `detail` is shown it names the ledger, the group or the cause. \
-             Nothing was written, and building again gives the same refusal until the book \
-             changes. Ask the user to check the group of the ledgers on the invoice in Tally, \
-             or tell them this invoice has to be entered in Tally itself.",
+            "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers this invoice \
+             names, by the identifier Tally gave each, and it could not name that read \
+             safely: a ledger has no group it can check the answer against (none, or one the \
+             ledger list could not carry: blank, over 1,024 bytes, or holding a control or \
+             invisible character), or Tally gave it an identifier of another form. \
+             Where `detail` is shown it names the ledger or the cause. Nothing was written, and \
+             building again gives the same refusal until the book changes. Ask the user to \
+             check the group of the ledgers on the invoice in Tally, or tell them this invoice \
+             has to be entered in Tally itself.",
         ),
         "invoice_ledger_rates_rows_differ" => Some(
             "Tally's answer about the tax rates of this invoice's ledgers did not hold exactly \
@@ -2888,6 +2936,10 @@ impl Server {
                             "limit_bytes": size.limit_bytes,
                             "limit_master_alter_id": size.limit_master_alter_id,
                         });
+                        if let Some((counted, limit)) = size.counted_items {
+                            error["size"]["counted_items"] = json!(counted);
+                            error["size"]["limit_items"] = json!(limit);
+                        }
                     }
                 }
                 // #629: the endpoint that was tried, so a wrong or reset port

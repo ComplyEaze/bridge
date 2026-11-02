@@ -16,9 +16,10 @@ use super::*;
 const COMPANY_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 
 /// One call's requests, in order: e company list, s status probe, b book extent, c currencies,
-/// L the compliance ledger listing, P the paired ledger listing, g groups, n voucher census,
-/// w voucher window, m company marks. The same for each of the 14 calls.
-const RECORDED_ORDER: &str = "esesebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseensnseewswseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese";
+/// L the compliance ledger listing, g groups, n voucher census, w voucher window, m company
+/// marks. The same for each of the 14 calls. The book keeps one Currency master, so the balance
+/// reads the calls were recorded with are not sent since #2265.
+const RECORDED_ORDER: &str = "esesebsbscscsbsbseseebsbsLsLsgsgsbsbseseensnseewswseemsmseebsbscscsbsbseseebsbsLsLsgsgsbsbsese";
 
 /// The request fingerprints that are the same in every call.
 fn recorded_request_sha256(letter: char) -> &'static str {
@@ -28,7 +29,6 @@ fn recorded_request_sha256(letter: char) -> &'static str {
         'b' => "901d0bb233609b7624cc5b769949f7b8c543a1b86eff17eec7fa59b85b0d05f0",
         'c' => "503b60c62d24438b6df782f9a438f5eb79227f52b4727116f71c4e53fee12e6a",
         'L' => "073be178727d46a46ffeb10fcc9c556a1503dba388b849ec814cd974c638d52d",
-        'P' => "6c8e5b96f83eefacac46f350ca5c3cb57fd5b0ecf6ef385c743af8e792aac9c2",
         'g' => "f2ca16e6a52141f81e384f20ce7d1fb2265d1eb608108bbf6f4ce80062c3db3a",
         'm' => "7a298350bd3c2c1f9809881b07fad6047195bb2108e12c2b67c6271d5d69f74a",
         other => panic!("kind {other} differs by day"),
@@ -217,7 +217,6 @@ fn shared_body(letter: char) -> String {
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-b-1.utf16le.xml").as_slice(),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-c-1.utf16le.xml").as_slice(),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-L-1.utf16le.xml").as_slice(),
-        'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-P-1.utf16le.xml").as_slice(),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-g-1.utf16le.xml").as_slice(),
         'm' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-m-1.utf16le.xml").as_slice(),
         other => panic!("kind {other} differs by day"),

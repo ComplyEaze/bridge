@@ -368,6 +368,42 @@ read_contents_text() {
   contents_text_result="$decoded"
 }
 
+# The PR's own commits, space-separated, filled in by the branch history check below: a 404 for one of
+# these, or for the head, may be the contents API lagging a push. The head, base-tip and merge-base
+# reads run before it is filled in, and the acknowledgement read may run without it, so the retry
+# matches $head on its own.
+pr_commit_shas=""
+# Why the last contents read failed, for the INDETERMINATE line that reports it: the commit, the HTTP
+# status, how many tries were made and the first line of the error. Empty after a read that answered.
+contents_read_failure=""
+# Read a repository file at a commit through read_contents_text, trying again a failure that a second
+# try can cure: a server error (HTTP 5xx), a rate-limit answer (HTTP 403 or 429 whose error names a rate
+# limit), or a 404 for the head or one of the PR's own commits, pushed moments before (#2179). At most
+# 3 tries, 2 s then 4 s apart. Any other failure, or the third, fails closed.
+read_contents_retrying() {
+  local ref="$1" path="$2" try=1 status detail transient
+  contents_read_failure=""
+  while :; do
+    read_contents_text "$ref" "$path" && return 0
+    status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
+    # The first non-blank error line, printable ASCII only, a long digit run (an account id in a
+    # rate-limit message) masked, at most 160 characters.
+    detail=$(grep -m 1 -v '^[[:space:]]*$' "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | sed -E 's/[0-9]{6,}/<n>/g' | cut -c 1-160)
+    transient=0
+    case "$status" in
+      5[0-9][0-9]) transient=1 ;;
+      403|429) grep -qi 'rate limit' "$errfile" 2>/dev/null && transient=1 ;;
+      404) case " $head $pr_commit_shas " in *" $ref "*) transient=1 ;; esac ;;
+    esac
+    if [ "$transient" -ne 1 ] || [ "$try" -ge 3 ]; then
+      contents_read_failure="commit ${ref:0:12}, ${status:+HTTP $status, }after $try $([ "$try" -eq 1 ] && echo try || echo tries): ${detail:-no error text (the answer itself was unreadable)}"
+      return 1
+    fi
+    sleep $((try * 2))
+    try=$((try + 1))
+  done
+}
+
 # $2 is "3" (head: schema 3 only) or "2or3" (base tip and merge base).
 read_surface_paths() {
   local ref="$1"
@@ -377,7 +413,7 @@ read_surface_paths() {
   surface_reasoned_result=""
   surface_bad_reason_result=""
   surface_seen_schema_result=""
-  read_contents_text "$ref" "$SURFACE" || return 1
+  read_contents_retrying "$ref" "$SURFACE" || return 1
   # Remember what schema the file claims, so a stale schema-2 head gets a useful message.
   surface_seen_schema_result=$(jq -r '.schema_version? // empty | tostring' <<<"$contents_text_result" 2>/dev/null || true)
   if ! jq -e --arg accepted "$accepted" '
@@ -412,7 +448,7 @@ if [ "$head_surface_status" -ne 0 ]; then
   if [ "$surface_seen_schema_result" = "2" ]; then
     unknown "could not read and validate compatibility surface at $short: it is still schema 2 (a branch that predates schema 3); merge master into the branch and migrate the pin list to schema 3, see docs/release-process.md"
   else
-    unknown "could not read and validate compatibility surface at $short"
+    unknown "could not read and validate compatibility surface at $short${contents_read_failure:+ ($contents_read_failure)}"
   fi
   pinned=""
   head_reasoned=""
@@ -429,7 +465,7 @@ if [ -n "$base_tip" ]; then
   read_surface_paths "$base_tip" 2or3 || base_surface_status=$?
 fi
 if [ -n "$base_tip" ] && [ "$base_surface_status" -ne 0 ]; then
-  unknown "could not read and validate compatibility surface at base ${base_tip:0:7}"
+  unknown "could not read and validate compatibility surface at base ${base_tip:0:7}${contents_read_failure:+ ($contents_read_failure)}"
   base_pinned=""
 elif [ -n "$base_tip" ]; then
   base_pinned="$surface_paths_result"
@@ -456,7 +492,7 @@ if [ -n "$base_tip" ] && [ -n "$base_pinned" ]; then
     merge_base_surface_status=0
     read_surface_paths "$merge_base" 2or3 || merge_base_surface_status=$?
     if [ "$merge_base_surface_status" -ne 0 ]; then
-      unknown "could not read and validate compatibility surface at merge base ${merge_base:0:7}"
+      unknown "could not read and validate compatibility surface at merge base ${merge_base:0:7}${contents_read_failure:+ ($contents_read_failure)}"
     else
       merge_base_pinned="$surface_paths_result"
       say "ok" "validated schema-$surface_schema_result compatibility surface at merge base ${merge_base:0:7}"
@@ -494,47 +530,16 @@ is_sorted_unique() {
 # list cannot be read and parsed makes the answer indeterminate (fail closed).
 withdrawn_pins=""
 history_cache="$tmpdir/pin-history"
-# The PR's own commits, space-separated: a 404 for one of these may be the contents API lagging a push.
-pr_commit_shas=""
-# Why the last pin-list read failed, for the INDETERMINATE line below: the commit, the HTTP status and
-# the first line of the error, and how many tries were made.
-pin_read_failure=""
-# Read the pin list at one commit through the contents API into $contents_text_result. A failure that
-# a second try can cure is tried again: a server error (HTTP 5xx), a rate-limit answer (HTTP 403 or 429
-# whose error names a rate limit), or a 404 for one of the PR's own commits, pushed moments before
-# (#2179). At most 3 tries, 2 s then 4 s apart. Any other failure, or the third, fails closed.
-read_pin_list_retrying() {
-  local sha="$1" try=1 status detail transient
-  while :; do
-    read_contents_text "$sha" "$SURFACE" && return 0
-    status=$(grep -Eo 'HTTP [0-9]{3}' "$errfile" 2>/dev/null | head -n 1 | cut -d ' ' -f 2)
-    # The first non-blank error line, printable ASCII only, a long digit run (an account id in a
-    # rate-limit message) masked, at most 160 characters.
-    detail=$(grep -m 1 -v '^[[:space:]]*$' "$errfile" 2>/dev/null | LC_ALL=C tr -cd '[:print:]' | sed -E 's/[0-9]{6,}/<n>/g' | cut -c 1-160)
-    transient=0
-    case "$status" in
-      5[0-9][0-9]) transient=1 ;;
-      403|429) grep -qi 'rate limit' "$errfile" 2>/dev/null && transient=1 ;;
-      404) case " $pr_commit_shas " in *" $sha "*) transient=1 ;; esac ;;
-    esac
-    if [ "$transient" -ne 1 ] || [ "$try" -ge 3 ]; then
-      pin_read_failure="commit ${sha:0:12}, ${status:+HTTP $status, }after $try $([ "$try" -eq 1 ] && echo try || echo tries): ${detail:-no error text (the answer itself was unreadable)}"
-      return 1
-    fi
-    sleep $((try * 2))
-    try=$((try + 1))
-  done
-}
 # The sorted, unique pin paths at one commit, in the file named by $pins_at_result.
 pins_at_commit() {
   local sha="$1"
   local file="$history_cache/$sha"
   pins_at_result=""
   if ! [ -f "$file" ]; then
-    read_pin_list_retrying "$sha" || return 1
+    read_contents_retrying "$sha" "$SURFACE" || return 1
     if ! jq -e '.files | type == "array" and all(.[]; type == "object" and (.path | type == "string" and length > 0))' \
       <<<"$contents_text_result" >/dev/null 2>&1; then
-      pin_read_failure="commit ${sha:0:12}: the pin list there is not a list of paths"
+      contents_read_failure="commit ${sha:0:12}: the pin list there is not a list of paths"
       return 1
     fi
     jq -r '.files[].path' <<<"$contents_text_result" | LC_ALL=C sort -u >"$file.tmp" || return 1
@@ -557,7 +562,7 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
     parents_union="$tmpdir/parents-union"
     while read -r -a record; do
       [ "${#record[@]}" -gt 0 ] || continue
-      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; pin_read_failure="a commit's parent list could not be read"; break; fi
+      if [ "${record[0]}" = "NOPARENTS" ]; then history_status=1; contents_read_failure="a commit's parent list could not be read"; break; fi
       pins_at_commit "${record[0]}" || { history_status=1; break; }
       own_file="$pins_at_result"
       : >"$parents_union"
@@ -569,7 +574,7 @@ if [ -n "$pinned" ] && [ -n "$base_pinned" ]; then
       collected="$collected"$'\n'"$(LC_ALL=C comm -23 "$own_file" "$parents_union")"
     done <<<"$commit_records"
     if [ "$history_status" -ne 0 ]; then
-      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out (${pin_read_failure:-no detail recorded})"
+      unknown "could not read and parse the pin list at every commit of the PR (and its parents), so a pin the branch added and then lost cannot be ruled out (${contents_read_failure:-no detail recorded})"
     else
       withdrawn_pins=$(LC_ALL=C comm -23 <(path_set "$collected") <(path_set "$base_pinned") | LC_ALL=C comm -23 - <(path_set "$pinned"))
     fi
@@ -622,8 +627,8 @@ if [ -n "$changed" ] && [ -n "$pinned" ] && [ -n "$base_pinned" ] && [ -n "$merg
       bad "acknowledgement files are append-only; the PR also changes: $other_acks"
     fi
     if [ "$have_ack" -eq 1 ]; then
-      if ! read_contents_text "$head" "$ACK_PATH"; then
-        unknown "could not read $ACK_PATH at $short"
+      if ! read_contents_retrying "$head" "$ACK_PATH"; then
+        unknown "could not read $ACK_PATH at $short${contents_read_failure:+ ($contents_read_failure)}"
       else
         ack_text="$contents_text_result"
         ack_problems=""

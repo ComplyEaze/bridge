@@ -1,7 +1,7 @@
 import React from "react";
 import { Building2, ChevronRight, Download, RefreshCw } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
-import { isNonRetryableOutstandingsBoundary, outstandingsAgeingAnchorLabel, outstandingsAgeingDisclosure, outstandingsPartialState, workingPaperUnavailableState, type ExcludedCurrencyLedger, type OutstandingsAgeingAnchor } from "./outstandings-copy";
+import { outstandingsAgeingAnchorLabel, outstandingsAgeingDisclosure, outstandingsPartialState, workingPaperUnavailableState, type ExcludedCurrencyLedger, type OutstandingsAgeingAnchor } from "./outstandings-copy";
 import { csvNumericCell, csvRow, csvTextCell, type CsvCell } from "./outstandings-csv";
 import { canStartOutstandingsRead, outstandingsCurrencySymbol } from "./outstandings-currency";
 import { groupOpenBillsByParty, type OpenBill, type PartyBillsState } from "./outstandings-bills";
@@ -143,7 +143,8 @@ type LoadResult =
       requested_as_of_yyyymmdd?: string;
       tally_as_of_yyyymmdd?: string;
       foreign_currency_ledger_name?: string;
-      // bridge#551, #642: both present with reason currency_ledgers_excluded.
+      // bridge#551, #642: both present with reason currency_ledgers_excluded,
+      // or beside the reason every figure was withheld for (bridge#2071).
       // The base-currency figures that come with them are not shown here.
       foreign_currency_ledgers_excluded?: Array<ExcludedCurrencyLedger>;
       base_currency_ledgers_mixed_excluded?: Array<string>;
@@ -327,7 +328,7 @@ export function OutstandingsScreen({
       result.base_currency_ledgers_mixed_excluded,
     )
     : null;
-  const outstandingsUnavailable = result?.state === "partial" && isNonRetryableOutstandingsBoundary(result.reason_code);
+  const outstandingsUnavailable = partialState?.retryable === false;
   const tallyReadAttempted = result?.state === "partial" && partialState?.tallyReadAttempted;
   const reportEvidence: OutstandingsEvidence | null = loading || !result || !currentCompanyIdentity
     ? null

@@ -1136,7 +1136,7 @@ fn every_admission_leaf_is_pinned_by_this_digest() {
     // and the schema change was deliberate, update the constant *and* add the
     // acknowledgement (docs/release-process.md) — that pairing is the point, not
     // an inconvenience.
-    const PINNED: &str = "72dd221ae400026089355e7f71c9da09e1ca255019a477d37937b67be60dee8b";
+    const PINNED: &str = "b3610236b0541bceb4aaf73a66f474e1119606e8ab7846d05275deb0c5bd0570";
     let definitions = tool_definitions(true, false);
     let schema = definitions
         .as_array()

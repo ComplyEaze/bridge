@@ -64,7 +64,8 @@ use bridge_tally_protocol::{
     parse_native_voucher_type_source_records_with_evidence,
     parse_standard_ledger_catalog_v2_with_identities,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
-    ExpectedTallyTextEncoding, TallyImportApplicationStatus, TallyImportResult,
+    parse_stock_group_census_slice, parse_stock_item_census_slice, ExpectedTallyTextEncoding,
+    TallyImportApplicationStatus, TallyImportResult,
 };
 use sha2::{Digest, Sha256};
 
@@ -470,6 +471,55 @@ const ROWS: &[Row] = &[
                 "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
                 8,
             ))
+        },
+    },
+    // tests/ledger_census_slice.rs: the stock censuses of #1233 on BRIDGE STOCK LAB
+    Row {
+        fixture: "tests/fixtures/stock_item_census_slice_stock_lab_200_300_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_item_census_slice(max 100)",
+        parse: |_, text| {
+            typed(parse_stock_item_census_slice(
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+                100,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_item_census_slice(max 100)",
+        parse: |_, text| {
+            typed(parse_stock_item_census_slice(
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+                100,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/stock_group_census_slice_stock_lab_0_300_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_group_census_slice(max 300)",
+        parse: |_, text| {
+            typed(parse_stock_group_census_slice(
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+                300,
+            ))
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/stock_groups_masters_stock_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(StockGroups)",
+        parse: |_, text| {
+            masters(
+                NativeMasterKind::StockGroups,
+                text,
+                "1edb9b05-8d35-4c0c-9959-dce655730463",
+            )
         },
     },
     // src/native_stock_query_tests.rs: Tally's Stock Query for one item (#2018)
@@ -3021,6 +3071,11 @@ const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slic
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
+const INVENTORY_FETCH_NO_PARSER: &str = "a voucher collection export whose FETCH asks for \
+     ALLINVENTORYENTRIES.* in place of ALLLEDGERENTRIES.*: neither the protocol crate's nor the app \
+     crate's record reads it yet (#2016); bridge-tax-audit's `inventory_lines` reads the same lists \
+     from an AuditVouchersV1 part, whose FETCH is field by field rather than this wildcard; \
+     STOCK_MOVEMENT_CAPTURE_PROVENANCE.md says what it holds";
 const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
@@ -3046,10 +3101,16 @@ const PILOT_LAB_COMPANY_HSN: &str = "an answer of the HSN/SAC check's reads on t
      pin what each parse returns; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_PARENT_FILTER: &str =
     "an answer of the pilot lab's parent-filter round (10 Oct 2026), \
-     with no row here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
-     src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_scope_tests.rs, \
-     and the replay in src/agent_import_post_e2e_tests.rs) pin what each parse returns; \
-     pilot-lab/PROVENANCE.md says what it is";
+     with no row here: the invoice's rate read no longer sends the parent filter (since #1331 \
+     it names the invoice's ledgers by GUID), and the file is kept as the evidence the protocol \
+     reference cites; the whole-book answer is still served by \
+     src/agent_import_invoice_admission_tests.rs; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_LEDGER_FILTER: &str = "an answer of the pilot lab's ledger-filter round \
+     (31 Oct 2026), with no row here: the app crate's invoice code parses it \
+     (src/agent_import_invoice_wire.rs, src/agent_import_invoice_scope.rs) and its tests \
+     (src/agent_import_invoice_scope_tests.rs, and `rates_cut_to` in \
+     src/agent_import_tests.rs) pin what each parse returns; the file is the answer whole as \
+     received; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_SCOPED_HSN: &str = "an answer of the pilot lab read on 21 Oct 2026, with no row \
      here: the app crate's invoice code parses it (src/agent_import_invoice_wire.rs, \
      src/agent_import_invoice_scope.rs) and its tests (src/agent_import_invoice_admission_tests.rs, \
@@ -3217,6 +3278,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml",
         PILOT_LAB_PARENT_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.utf16le.xml",
+        PILOT_LAB_LEDGER_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-one-absent.utf16le.xml",
+        PILOT_LAB_LEDGER_FILTER,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-none.utf16le.xml",
+        PILOT_LAB_LEDGER_FILTER,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-whole-10oct.utf16le.xml",
@@ -3887,6 +3960,38 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_live.utf16le.xml",
         APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_credit_note_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_delivery_note_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_receipt_note_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
+    ),
+    (
+        "tests/fixtures/stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
+    ),
+    (
+        "tests/fixtures/stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
+    ),
+    (
+        "tests/fixtures/stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml",
+        INVENTORY_FETCH_NO_PARSER,
     ),
     (
         "tests/fixtures/vouchers_agst_ref_reopen_live.utf16le.xml",

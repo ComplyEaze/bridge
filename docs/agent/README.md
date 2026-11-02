@@ -37,7 +37,7 @@ Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
 (default `500`), `BRIDGE_AGENT_MAX_BYTES` (default `200000`), and
 `BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`).
-`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer. Control replies (to
+`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer, so a page can end before `limit`, marked truncated with its `next_offset`. Control replies (to
 `initialize`, `ping` and `tools/list`), which the build fixes and which carry no
 book data, are held to 1,000,000 bytes, or to it if it is larger. The host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
 The resolved data path must be valid Unicode so saved artifact paths can be
@@ -338,8 +338,9 @@ When Bridge got no response it could read, the `cause` names why and the error a
 - An `endpoint_…` runtime code: Bridge held the request back and sent nothing. So do
   `tally_endpoint_busy` (with `retry_after_s`) and `tally_endpoint_lock_unavailable`, which
   come back as the `code` itself, and `tally_endpoint_draining` (with `retry_after_s`), when an
-  earlier post was cut for time and Tally has not yet answered `/status` three times in a row
-  since (#2142); a draining refusal may have sent `/status` checks, but not the request.
+  earlier request was cut, abandoned or refused at its head and Tally has not yet answered
+  `/status` three times in a row since (#2142); a draining refusal may have sent `/status`
+  checks, but not the request.
 
 A wrong or reset port therefore reads as an endpoint problem, not as a Tally data problem. A
 failed read without `endpoint` either received a response whose body then failed to read, decode,
@@ -1001,9 +1002,8 @@ redaction setting hides it, so the tool is refused as `audit_redaction_unsupport
 
 Refusals: `audit_part_deadline_exceeded` (a part ran past the 20 seconds a request is given; the same
 request would be sent again and Tally may still be building the abandoned answer, so do not retry as it
-stands), `audit_part_drain_required` (a previous request was abandoned, in this call or an earlier one,
-and Tally may still be building its answer: nothing was sent. ComplyEaze Bridge does not yet probe Tally to
-clear that, so the refusal stays until ComplyEaze Bridge is restarted; look at Tally first), `C6-moved`
+stands), `tally_endpoint_draining` (an earlier request was cut, and Tally has not yet answered that it has finished:
+the request was not sent. Call again after `retry_after_s` seconds), `C6-moved`
 and `voucher_window_changed_during_read` (someone changed the book during the read: it may be tried
 again), `audit_window_divided_by_alterid` (a day too heavy for one request: the read is refused, because
 the engine's windows must tile the period by date; refused before any voucher is read when the count
@@ -1326,16 +1326,29 @@ A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before an
 item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
 `limit` and `snapshot_id` behave as in `masters`, and the result reports `snapshot`.
 
-Small books only. The items are read whole only when the master-alteration mark
+At most 874 stock items. The items are read whole only when the master-alteration mark
 (`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
-a mark of at most 874. A larger book is refused before any item request as
-`stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
-`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. Typical stock-heavy client books refuse
-today (the two measured had marks of about 100,000 and 300,000, protocol reference
-§12a.12), until a counted read lands. After a read, the row count and the response
-size are checked against the mark and the admitted size, and a breach refuses the
-whole read as `stock_summary_bound_premise_violated`, unless the closing extent
-shows the book moved (`stock_summary_extent_changed`). The stock-item request does
+a mark of at most 874. Past that mark the stock items and the stock groups are first
+counted by AlterID span, in slices of 4,000 AlterIDs (a mark of at most 400,000), and
+those counts admit the same single read: at most 874 counted items, and the items and
+groups together, times an assumed worst report line of 5,208 bytes (a guess from short
+names, not a measurement), within 16,000,000 bytes, which sizes the Stock Summary report
+before it is read. Tally's own item count only refuses, when it is higher than the
+count (`stock_summary_item_count_company_higher`), and counts above the mark refuse as
+`stock_summary_bound_premise_violated`. More items are refused before any item request
+as `stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes` and `limit_master_alter_id`, and for a counted book `counted_items` and
+`limit_items`, `limit_master_alter_id` then carrying the same item limit), and retrying
+refuses again; a report too large refuses as
+`stock_summary_report_too_large`, and a count that could not be made as
+`stock_summary_census_refused`, with the census's own code (for example
+`stock_item_span_census_empty`, or `stock_census_slice_invalid` for a slice answer that
+did not read) in `error.cause`; a book with no stock group counts none. A refusal from the
+count is reported as `stock_summary_extent_changed` instead when the book moved meanwhile. The counted path has run
+once against a live book with a mark past 874. After a read, the row count and the
+response size are checked against the mark (and the count) and the admitted size, and a
+breach refuses the whole read as `stock_summary_bound_premise_violated`, unless the
+closing extent shows the book moved (`stock_summary_extent_changed`). The stock-item request does
 not fetch `ALTERID`, so the rows' AlterIDs are not checked as they are for `masters`.
 
 Evidence: one synthetic book on one licensed TallyPrime 7.1
@@ -1739,9 +1752,9 @@ rate or return section, and matches nothing against any portal.
   1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
   `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
   row has the sales and tax entries positive and the party entry negative.
-- **The cost varies by book.** A call sends 102 requests on a book with 8
-  ledgers and one currency (96 were recorded before a small book was counted, plus
-  the six the count adds; not measured since) and 118 on one with 44 ledgers and two
+- **The cost varies by book.** A call sends 94 requests on a book with 8
+  ledgers and one currency (96 recorded, six more to count a small book, eight fewer
+  with no balance reads; not measured since) and 118 on one with 44 ledgers and two
   currencies (base-currency reads are added). The result does not report the cost.
 - **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
   on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
@@ -3124,19 +3137,32 @@ Both absent states rest on the order Tally serves requests in: the read that fin
 the name absent is sent after the create's send ended, and Tally has been seen to
 serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection and with the
-create, the read or both on a reused connection (#2176). Their answers carry
+create, the read or both on a reused connection, behind a long read, and with every
+request on a new connection behind a long import (#2176). Their answers carry
 `verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
-absent state only when the read-back's Tally reports TallyPrime 7.2 Silver,
-licensed. On any other the batch stays open, its name held, with a reason that
-names what is not covered: `absent_not_measured_on_this_product` (the product is
-not exactly TallyPrime), `absent_not_measured_on_gold`,
+absent state only when the read-back's Tally reports TallyPrime 7.2, licensed,
+Silver or Gold: Gold is the same product with multi-user access, so the edition
+is no bound, though no order row ran on Gold. On any other the batch stays open,
+its name held, with a reason that names what is not covered:
+`absent_not_measured_on_this_product` (the product is not exactly TallyPrime),
 `absent_not_measured_on_this_release`, `absent_not_measured_in_education` or
 `absent_tally_release_not_known`, and a next step that says so: calling again
-on the same Tally will not close it, so on TallyPrime 7.1, Gold, Education or
-another product such a batch holds its name until the company is read back on
-7.2 Silver. Before this, `confirmed_absent` was given on any Tally. An absent
+on the same Tally will not close it, so on TallyPrime 7.1, Education or another
+product such a batch holds its name until the company is read back on licensed
+TallyPrime 7.2. Before this, `confirmed_absent` was given on any Tally. An absent
 name kept open also names what else the read showed (`master_new_since_intent`,
 `mark_went_back_since_intent`).
+
+`master_write_located_elsewhere` releases the name too, so the same limit applies
+when the read found the name absent and no answer from Tally is on file: on any
+other Tally the state is `reconciliation_required`, its reasons include
+`other_company_mark_moved` and one of the reasons above, and an answer that read
+the book back leads with the alert to check every loaded company. With Tally's
+answer on file no create is waiting, and `master_write_located_elsewhere` stands
+on any Tally. With a ledger of that name in the book it stands too, like the
+other verdicts that close a batch on a ledger found there
+(`posted_into_existing_master`, `posted_unattributed`): that company's book itself
+refuses a new create of that name for as long as that master stands.
 
 Later calls cannot settle these states, and their batches keep holding the name: a
 read that found the name absent while the company's master mark moved back, or
@@ -3154,7 +3180,7 @@ and judges it. A book whose set of loaded companies changed is read and judged:
 the answer is `reconciliation_required` with `company_scope_changed` among its
 reasons, and it says to load the same companies and call again; a read that shows
 a changed existing master or another company's mark moved keeps the state for
-that. A read-back that read the book,
+that, unless the limit above holds the batch open. A read-back that read the book,
 found the name absent and did not settle says that ComplyEaze Bridge cannot settle
 the batch now, because a create it sent may still be waiting in Tally; the name
 stays held, and a later call sends nothing, reads the book back, shows whether a
@@ -3993,7 +4019,8 @@ Per tool:
 - `purchase_register` and `sales_register`, which send the same requests
   (`register` in `src-tauri/src/agent_register.rs`):
   1. the company read;
-  2. a masters read, as `ledger_masters` with `fields=compliance`;
+  2. a masters read, as `ledger_masters` with `fields=compliance`, without its
+     balance read on a book of one Currency master;
   3. the window read, with the marks already known from that masters read;
   4. a scoped read of the closing marks;
   5. the masters read again;
@@ -4396,11 +4423,11 @@ the status record in its `update.json` with the journal's last line, as JSON
 - an earlier, whole record: the append never began, and the earlier proof is
   current;
 - a torn last line: the append stopped part-way. Keep a copy of the journal,
-  then remove only that partial line;
-- no `update.json`: the stop came before the record was written, and the
-  journal is as it was.
+  then remove only that partial line.
 
-Then remove the folder. Proof files that no journal record names are left
+Then remove the folder. A build or verification folder with nothing in it needs
+none of this: the next admission removes it, since it means either that nothing
+was published or that the publication finished (#2269). Proof files that no journal record names are left
 over from the stopped verification; nothing reads them. Preserve the journal
 and generated XML; do not delete it merely to retry. This is explicit
 recovery after a partial file transaction, not a power-loss atomicity guarantee.

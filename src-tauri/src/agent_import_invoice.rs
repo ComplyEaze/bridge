@@ -32,7 +32,7 @@ pub(super) use wire::HsnWarning;
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
     render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request_for_parents,
+    render_invoice_readback_request, render_ledger_rates_request_for_ledgers,
     render_voucher_types_request, VoucherTypeGuid,
 };
 
@@ -371,8 +371,8 @@ fn mark_admits(mark: u64) -> bool {
 /// and still be built on: the whole compliance listing is a few kilobytes a
 /// ledger, so this keeps one read of it to a few megabytes. The listing's own
 /// size gate stays in front of it. The rate read is already narrowed to the named
-/// ledgers' parent groups (#1331); narrowing this listing the same way, so that
-/// large books can be admitted, waits for its own measurement.
+/// ledgers themselves, by GUID (#1331); reading this listing for the same
+/// ledgers, so that large books can be admitted, is the next change.
 const INVOICE_MAX_LEDGERS: u64 = 2_000;
 
 /// Why a book over the mark is refused on the company's own ledger count, or
@@ -397,8 +397,11 @@ fn ledger_count_refusal(ledgers: Option<u64>, mark: u64) -> Option<InvoiceRefusa
 /// The most legs an invoice may carry: the customer, up to three Sales Accounts
 /// ledgers, the two tax heads (or two sales ledgers, the heads and a round off).
 /// What the approval window can show, with its blank line dropped when nothing
-/// stands under the entries.
-const MAX_INVOICE_ENTRIES: usize = 6;
+/// stands under the entries. It is the bound of the ledger part the rate read
+/// names (#1331), so every ledger an admitted invoice names fits one read; the
+/// part's own documentation says what has been sent live.
+const MAX_INVOICE_ENTRIES: usize =
+    bridge_tally_protocol::ledger_guid_part::LEDGER_GUID_PART_MAX_GUIDS;
 
 /// The IGST rates GST has, in thousandths of a percent: the slab list the check
 /// admitted before it read ledgers (5, 12, 18, 28 and 40 percent). A ledger at
@@ -1158,17 +1161,18 @@ pub(super) fn queued_invoice_for<'a>(
 /// part of it is a function of the invoice and the clock alone (the company,
 /// the date the listing is read as of, and each request, the ledger count's
 /// among them) apart from the number's control, which is the journal's, and the
-/// rates request, which is also a function of the catalogue: it names the
-/// parents of the ledgers the invoice names (#1331). A plan that differs in the
+/// rates request and its ledgers' parents, which are also functions of the
+/// catalogue: the request names the invoice's ledgers by GUID, and the plan
+/// records the parent the catalogue gave each (#1331). A plan that differs in the
 /// company or in any other request is a wiring fault. A listing date that is
 /// not the queue's day is not a fault but a clock that moved since the plan
 /// (midnight fell between the last re-read before the queue, which made the
 /// plan, and the queue's judgement; midnight while the dialog was open does
 /// not), a control that moved since the plan is a change,
-/// and so is a rates request that differs when every request the
-/// invoice alone decides is equal (a named ledger regrouped, or its group
-/// renamed, since the plan's catalogue was read): each is named by its own
-/// cause. The precheck is the invoice module's own function; the judge decides
+/// and so is a rates request or a ledger's parent that differs when every
+/// request the invoice alone decides is equal (a named ledger replaced under
+/// its name, regrouped, or its group renamed, since the plan's catalogue was
+/// read): each is named by its own cause. The precheck is the invoice module's own function; the judge decides
 /// again whatever it answered.
 pub(super) fn fit_plan(
     wanted: &InvoiceReadPlan,
@@ -1180,6 +1184,7 @@ pub(super) fn fit_plan(
         precheck: _,
         ledger_count,
         rates,
+        ledger_parents,
         voucher_types,
         number,
         number_control,
@@ -1207,7 +1212,7 @@ pub(super) fn fit_plan(
             field: "number_control",
         });
     }
-    if *rates != carried.rates {
+    if *rates != carried.rates || *ledger_parents != carried.ledger_parents {
         return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
             field: "ledger_scope",
         });
@@ -2093,10 +2098,9 @@ impl InvoiceJudge<'_> {
             .collect()
     }
 
-    /// The rate read asks only for the ledgers under the parents of the
-    /// ledgers this invoice names. The scope is planned from the catalogue the
-    /// caller has just read, so every refusal of it comes before any request
-    /// to Tally (#1331).
+    /// The rate read asks only for the ledgers this invoice names, by the GUID
+    /// the catalogue the caller has just read gave each, so every refusal of
+    /// the scope comes before any request to Tally (#1331).
     fn scope(&self) -> Result<scope::InvoiceLedgerScope, Verdict> {
         scope::InvoiceLedgerScope::from_catalogue(self.catalogue.catalog(), &self.named())
             .map_err(refusing)
@@ -2190,6 +2194,7 @@ impl InvoiceJudge<'_> {
             precheck: queued_precheck,
             ledger_count: self.request(Need::LedgerCount)?,
             rates: self.request(Need::Rates)?,
+            ledger_parents: self.scope()?.parents(),
             voucher_types: self.request(Need::VoucherTypes)?,
             number: self.request(Need::Number)?,
             number_control: self.number_control_request()?,
@@ -2248,8 +2253,8 @@ impl InvoiceJudge<'_> {
             &self.named(),
         )
         .map_err(|code| Verdict::Failed(code.to_string()))?;
-        // A scoped read is believed only when its rows are exactly the
-        // catalogue's ledgers under those parents.
+        // A scoped read is believed only when its rows are exactly the named
+        // ledgers, with the catalogue's names and parents.
         scope.prove(&listed).map_err(refusing)?;
         let mut facts = BTreeMap::new();
         for entry in &voucher.entries {

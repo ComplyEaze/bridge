@@ -2084,7 +2084,7 @@ const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port wa
 
 /// The same, when Tally was still busy with an earlier request cut for time
 /// (#2142): nothing was posted, and the approval has lapsed.
-const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that did not finish. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
 /// What a caller does when the port was busy and whether the post was sent
 /// could not be observed.
@@ -2106,8 +2106,9 @@ const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a nar
 /// What a caller is told when the approval window for a saved batch was too
 /// large to show whole, by the batch's length or for the screen it would open
 /// on, before any attempt (#1780). The desktop's Journal screen shows the
-/// message alone.
-const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
+/// message alone. A Mac measures its window against the screen before it opens
+/// it, so the screen's remedies are named for both.
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help; on a Mac, so may moving the Dock to the side or hiding it. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };

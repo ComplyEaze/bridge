@@ -172,6 +172,44 @@ fn the_request_is_the_one_the_vouchers_read_sends() {
 }
 
 #[test]
+fn the_stock_movement_requests_are_the_ones_the_vouchers_read_sends() {
+    let requests: [(&[u8], &str); 4] = [
+        (
+            include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_stock_journal_vouchers_shape_lab_request.utf16le.xml"
+            ),
+            "20260511",
+        ),
+        (
+            include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_delivery_note_vouchers_shape_lab_request.utf16le.xml"
+            ),
+            "20260512",
+        ),
+        (
+            include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_receipt_note_vouchers_shape_lab_request.utf16le.xml"
+            ),
+            "20260513",
+        ),
+        (
+            include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_credit_note_vouchers_shape_lab_request.utf16le.xml"
+            ),
+            "20260514",
+        ),
+    ];
+    for (request, day) in requests {
+        let request = utf16(request);
+        let day = bridge_tally_core::TallyDate::parse(day.to_string()).unwrap();
+        assert_eq!(
+            request.trim_start_matches('\u{feff}'),
+            render_agent_vouchers("BRIDGE SHAPE LAB", &day, &day, None).unwrap()
+        );
+    }
+}
+
+#[test]
 fn an_empty_field_is_empty_and_a_missing_one_is_absent() {
     let rows = parse(&changed("<RATE>30.00/Kgs</RATE>", "<RATE/>"));
     let (v, e) = goods_entry(&rows);

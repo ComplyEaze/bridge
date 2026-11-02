@@ -22,7 +22,6 @@ enum Kind {
     BookExtent,
     Currencies,
     LedgersCompliance,
-    LedgersPaired,
     Groups,
     Census,
     Window,
@@ -37,7 +36,6 @@ impl Kind {
             'b' => Self::BookExtent,
             'c' => Self::Currencies,
             'L' => Self::LedgersCompliance,
-            'P' => Self::LedgersPaired,
             'g' => Self::Groups,
             'n' => Self::Census,
             'w' => Self::Window,
@@ -47,10 +45,11 @@ impl Kind {
     }
 }
 
-/// The request kinds Bridge sent, in order, for one call: e company list, s status probe,
-/// b book extent, c currencies, L the compliance ledger listing, P the paired ledger listing,
-/// g groups, n voucher census, w voucher window, m company marks.
-const RECORDED_ORDER: &str = "esesebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbseseensnseewswseemsmseebsbscscsbsbseseebsbsLsLsPsPsgsgsbsbsese";
+/// The request kinds Bridge sends, in order, for one call: e company list, s status probe,
+/// b book extent, c currencies, L the compliance ledger listing, g groups, n voucher census,
+/// w voucher window, m company marks. The book keeps one Currency master, so the balance reads
+/// the call was recorded with are not sent since #2265.
+const RECORDED_ORDER: &str = "esesebsbscscsbsbseseebsbsLsLsgsgsbsbseseensnseewswseemsmseebsbscscsbsbseseebsbsLsLsgsgsbsbsese";
 
 /// The fingerprint of the window request this call recorded, which the STOCK LAB day's window
 /// request is checked against with only the company and the day changed.
@@ -75,7 +74,6 @@ fn pilot_request_sha256(kind: Kind) -> &'static str {
         Kind::LedgersCompliance => {
             "b0c02fc724502e10dc23a9d6b430c9cbb20c191df948082f06fab9d7e4c8f9bc"
         }
-        Kind::LedgersPaired => "41b2de3ed4488e5943d25fe36b2c2727f397ca01bae4082d7af36f787bb4b4b5",
         Kind::Groups => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f",
         Kind::Census => "93de22bb34b918c04683ea085947c5474317c2c0d7e53d8e2a308b15aad9a4c0",
         Kind::Window => "d093bfc36aa7ea10b07dd050ce6e33226d8b597baeb0986d4851a9c752c344a1",
@@ -93,7 +91,6 @@ fn pilot_body_of(kind: Kind) -> String {
         Kind::BookExtent => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml")),
         Kind::Currencies => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml")),
         Kind::LedgersCompliance => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml")),
-        Kind::LedgersPaired => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-ledgers-paired.utf16le.xml")),
         Kind::Groups => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-groups.utf16le.xml")),
         Kind::Census => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml")),
         Kind::Window => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-register/pilot-lab-register-window.utf16le.xml")),
@@ -118,7 +115,6 @@ fn body_of(kind: Kind) -> String {
         Kind::BookExtent => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-book-extent.utf16le.xml")),
         Kind::Currencies => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-currencies.utf16le.xml")),
         Kind::LedgersCompliance => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-compliance.utf16le.xml")),
-        Kind::LedgersPaired => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-ledgers-paired.utf16le.xml")),
         Kind::Groups => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-groups.utf16le.xml")),
         Kind::Census => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-census.utf16le.xml")),
         Kind::Window => utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/register-e2e/native-register-e2e-window.utf16le.xml")),
@@ -348,6 +344,61 @@ async fn a_duty_head_changed_between_the_two_masters_reads_refuses_and_releases_
     assert_eq!(requests, RECORDED_ORDER.len());
 }
 
+/// The recorded plans with a composite opening on `ledger`, in both masters reads.
+fn plans_with_composite_opening_on(ledger: &str) -> Vec<ScenarioPlan> {
+    let body = pilot_body_of(Kind::LedgersCompliance);
+    let row = body.find(&format!(r#"<LEDGER NAME="{ledger}""#)).unwrap();
+    let opening = r#"<OPENINGBALANCE TYPE="Amount">0.00<"#;
+    let at = row + body[row..].find(opening).unwrap();
+    let composite = format!(
+        r#"{}<OPENINGBALANCE TYPE="Amount">$10.00 @ ? 90.00/$ = ? 900.00<{}"#,
+        &body[..at],
+        &body[at + opening.len()..],
+    );
+    let mut plans = pilot_plans();
+    for (position, letter) in RECORDED_ORDER.chars().enumerate() {
+        if letter == 'L' {
+            plans[position] = plan(Kind::LedgersCompliance, composite.clone());
+        }
+    }
+    plans
+}
+
+/// With no balance read, a composite opening on a book of one Currency master still sets its
+/// ledger aside: a window that does not touch it answers, and one that does refuses as a
+/// set-aside ledger, with no row (#2265).
+#[tokio::test]
+async fn a_composite_master_opening_with_no_balance_read_is_still_set_aside() {
+    let (response, requests) = run(
+        plans_with_composite_opening_on("Cash"),
+        ("20260804", "20260805"),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    assert_eq!(requests, RECORDED_ORDER.len());
+    assert_eq!(
+        response["structuredContent"]["result"]["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2,
+        "{response}"
+    );
+
+    let (response, _) = run(
+        plans_with_composite_opening_on("BRIDGE CGST 2.5%"),
+        ("20260804", "20260805"),
+    )
+    .await;
+    assert_eq!(response["isError"], true, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "register_ledger_currency_excluded",
+        "{response}"
+    );
+    assert!(result.get("items").is_none(), "{response}");
+}
+
 #[tokio::test]
 async fn a_window_whose_dates_the_caller_did_not_ask_for_is_refused() {
     // The recorded answer is for 4 to 5 August 2026; asking for another day makes Tally's
@@ -535,6 +586,25 @@ fn with_census_a_small_book_now_sends(
     requests
 }
 
+/// The record of a book of one Currency master, without the balance reads a register no longer
+/// sends there (#2265): each of their posts and the status read after it. A record of a book
+/// with several masters holds no such fixture name, and is returned unchanged.
+fn without_balance_reads(requests: Vec<Value>) -> Vec<Value> {
+    let balance = |request: &Value| {
+        request["fixture"] == "stock_lab_taxed_day_ledgers_2_response.utf16le.xml"
+    };
+    let mut kept: Vec<Value> = Vec::with_capacity(requests.len());
+    let mut after_balance = false;
+    for request in requests {
+        let skip = balance(&request) || after_balance;
+        after_balance = balance(&request);
+        if !skip {
+            kept.push(request);
+        }
+    }
+    kept
+}
+
 /// Replays one recorded call (the files `<prefix>_sequence.json` and the responses it names, in
 /// `directory`) and returns the tool's response, the record and the requests that were not the
 /// recorded ones. `expected_requests` is what the call is known to have sent.
@@ -576,7 +646,11 @@ async fn replay_recorded(
     let requests = with_the_spanned_census(
         directory,
         prefix,
-        with_census_a_small_book_now_sends(recorded.clone(), prefix, &sequence["arguments"]),
+        without_balance_reads(with_census_a_small_book_now_sends(
+            recorded.clone(),
+            prefix,
+            &sequence["arguments"],
+        )),
     );
     let plans = requests
         .iter()
@@ -823,8 +897,9 @@ async fn a_taxed_sales_item_invoice_replays_through_the_sales_register_against_i
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["profile"], "agent_sales_register_v1");
     // This call was recorded in 96 requests with no voucher census; a register now counts a
-    // small book too (#1029), so the replay adds the census's six legs (102 requests) and the
-    // window's voucher is admitted against it: `complete`, by the rule `vouchers` uses (#1031).
+    // small book too (#1029), so the replay adds the census's six legs and leaves out the
+    // eight of the balance reads (94 requests, #2265), and the window's voucher is admitted
+    // against it: `complete`, by the rule `vouchers` uses (#1031).
     // The live answer recorded below carries the older label; only its rows are compared.
     assert_eq!(result["state"], "complete");
     assert!(result["reason"].is_null(), "{result}");

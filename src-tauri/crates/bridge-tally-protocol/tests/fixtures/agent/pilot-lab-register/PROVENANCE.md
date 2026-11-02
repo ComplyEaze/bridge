@@ -14,7 +14,7 @@ earlier record of the same call (`../register-e2e/PROVENANCE.md`) that holds onl
   20260401 and the last voucher dated 20260915.
 - **The requests** were rendered by Bridge's own code at `2da3a53d` through a throwaway test that drove the call and kept
   what it sent; no byte was typed by hand. The call sends ten kinds of request in the order the tests name
-  (`RECORDED_ORDER`, 102 exchanges); the lab sent each kind once, and a repeat is answered as the first. The window read
+  (`RECORDED_ORDER`, 102 exchanges then, 94 since #2265, which sends no balance read on a book of one Currency master; the paired ledger answer stays here as captured); the lab sent each kind once, and a repeat is answered as the first. The window read
   names REFERENCEDATE, and the census is spanned to `(0, 68]`.
 - **The answers** are as Tally sent them, BOM-less UTF-16LE. The evidence branch carries the company list and the book
   extent with their COMPANYNUMBER text redacted; the two files here hold Tally's value again (the company number

@@ -13,16 +13,16 @@ use crate::warning_codes::WarningCode;
 use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
 use bridge_tally_protocol::native_outstandings::{
     compute_native_outstandings_with_exclusions, parse_company_currency,
-    parse_company_currency_name, parse_currency_master_list, parse_native_bill_rows,
+    parse_company_currency_name, parse_currency_master_list, parse_native_bill_rows_unadmitted,
     parse_native_group_snapshot, parse_native_ledger_snapshot_classified,
     render_company_base_currency_request, render_company_currency_request,
     render_company_currency_request_with_originalname, render_native_bills_request,
     render_native_group_snapshot_request, render_native_ledger_export_request,
     render_native_ledger_snapshot_request, AgeingAnchor as NativeAgeingAnchor, BaseCurrencyName,
     ClassifiedLedgerSnapshot, CompanyCurrency, ForeignCurrencyLedger, IdentifiedBaseCurrency,
-    LedgerCurrencyRefusal, NativeBillRow, NativeBillsReportKind, NativeGroupSnapshot,
-    NativeLedgerExportPeriod, NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod,
-    NativeMasterSnapshot, NativeOutstandingsError, NativeOverdueCrosscheck,
+    LedgerCurrencyRefusal, NativeBillsReportKind, NativeGroupSnapshot, NativeLedgerExportPeriod,
+    NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod, NativeMasterSnapshot,
+    NativeOutstandingsError, NativeOverdueCrosscheck,
 };
 use bridge_tally_protocol::outstandings_shared::{
     CompanyBookExtent, DateBoundaryProfile, OutstandingsReport,
@@ -78,6 +78,10 @@ mod stock_summary_tests;
 #[path = "runtime_negative_stock.rs"]
 mod negative_stock;
 pub(crate) use negative_stock::{NegativeStockAnswer, NegativeStockReadError};
+
+#[path = "runtime_stock_by_godown.rs"]
+mod stock_by_godown;
+pub(crate) use stock_by_godown::{StockByGodownRead, StockByGodownReadError};
 
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
@@ -2325,20 +2329,6 @@ pub(crate) fn inr_witness_for_tests(
     }
 }
 
-/// Every bill row whose party is a foreign-currency ledger left out
-/// (bridge#551).
-fn without_excluded_parties(
-    rows: Vec<NativeBillRow>,
-    foreign: &[ForeignCurrencyLedger],
-    mixed: &[String],
-) -> Vec<NativeBillRow> {
-    rows.into_iter()
-        .filter(|row| {
-            !foreign.iter().any(|ledger| ledger.ledger == row.party) && !mixed.contains(&row.party)
-        })
-        .collect()
-}
-
 /// What a native outstandings read compares each ledger's own currency with
 /// (bridge#551).
 enum LedgerClassification {
@@ -4575,11 +4565,14 @@ impl TallyRuntime {
 
                     let closing_evidence = confirm_read_boundary(&client, boundary_profile).await?;
                     read_evidence = read_evidence.clone().combine(closing_evidence);
+                    // A bill's closing amount is admitted only once its
+                    // party is known not to be set aside below (bridge#2071).
                     let receivable_rows =
-                        parse_native_bill_rows(&receivable_body, &books_from, &as_of)
+                        parse_native_bill_rows_unadmitted(&receivable_body, &books_from, &as_of)
                             .map_err(|error| error.in_report("receivable"))?;
-                    let payable_rows = parse_native_bill_rows(&payable_body, &books_from, &as_of)
-                        .map_err(|error| error.in_report("payable"))?;
+                    let payable_rows =
+                        parse_native_bill_rows_unadmitted(&payable_body, &books_from, &as_of)
+                            .map_err(|error| error.in_report("payable"))?;
                     let snapshot = match classify_against {
                         LedgerClassification::Against(base) => {
                             parse_native_ledger_snapshot_classified(&ledger_body, &base)
@@ -4630,9 +4623,12 @@ impl TallyRuntime {
                     // figure, the statement rows included.
                     let foreign = snapshot.foreign;
                     let mixed = snapshot.mixed;
-                    let receivable_rows =
-                        without_excluded_parties(receivable_rows, &foreign, &mixed);
-                    let payable_rows = without_excluded_parties(payable_rows, &foreign, &mixed);
+                    let receivable_rows = receivable_rows
+                        .admit_except(&foreign, &mixed)
+                        .map_err(|error| error.in_report("receivable"))?;
+                    let payable_rows = payable_rows
+                        .admit_except(&foreign, &mixed)
+                        .map_err(|error| error.in_report("payable"))?;
                     let ledger_rows = snapshot.base;
                     let group_rows =
                         parse_native_group_snapshot(&group_body, expected_company_guid)?;

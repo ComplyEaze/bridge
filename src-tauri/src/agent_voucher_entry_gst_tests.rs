@@ -415,3 +415,88 @@ fn a_vouchers_page_shows_gst_details_only_when_asked() {
     assert!(!page(GstDetailsShown::Withheld).contains("gst_details"));
     assert!(page(GstDetailsShown::Shown).contains("\"gst_details\""));
 }
+
+/// A per-unit rate that is not a decimal leaves the entry with a reason, as a rate does.
+#[test]
+fn a_per_unit_rate_that_is_not_a_decimal_is_unreadable() {
+    let xml = captured();
+    let field = "<GSTRATEPERUNIT>0</GSTRATEPERUNIT>";
+    let at = xml.find(field).expect("the capture holds a per-unit rate");
+    let changed = format!(
+        "{}<GSTRATEPERUNIT>0,5</GSTRATEPERUNIT>{}",
+        &xml[..at],
+        &xml[at + field.len()..]
+    );
+    let entry = entry_with(&changed);
+    assert_eq!(
+        entry["gst_details_unreadable"],
+        "gst_details_rate_not_decimal"
+    );
+    assert!(entry.get("gst_details").is_none());
+}
+
+/// The catalog's sentence on item invoices, against the one captured item invoice with freight
+/// (`fixtures/agent/gst-ledger-l1`, the window for 17 Nov 2025, V3): the goods line's five rates
+/// sit under its `INVENTORYALLOCATIONS.LIST` and are not returned, so the entry holding it lists
+/// an empty rate list, while the freight entry of the same invoice carries five zero rates.
+#[test]
+fn the_entry_holding_an_item_invoices_goods_line_carries_no_rates() {
+    let bytes = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml"
+    );
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let rows = parse_agent_rows_reading_gst(
+        &xml,
+        "aae372c5-a894-491c-8843-5532e43d2d2f",
+        GstDetailsShown::Shown,
+    )
+    .expect("the read still succeeds");
+    assert_eq!(rows.len(), 1);
+    let entry = |ledger: &str| {
+        entries(&rows)
+            .into_iter()
+            .find(|entry| entry["ledger"] == ledger)
+            .cloned()
+            .unwrap_or_else(|| panic!("the invoice has an entry on {ledger}"))
+    };
+    let goods = entry("Purchase - Goods");
+    assert!(goods.get("gst_details_unreadable").is_none(), "{goods}");
+    let goods_rates = goods["gst_details"]["rates"]
+        .as_array()
+        .unwrap_or_else(|| panic!("the goods entry lists its rates: {goods}"));
+    assert!(goods_rates.is_empty(), "{goods}");
+    let freight = entry("GS1 Freight Inward");
+    let rates = freight["gst_details"]["rates"]
+        .as_array()
+        .expect("the freight entry lists its rates");
+    assert_eq!(rates.len(), 5, "{freight}");
+    assert!(
+        rates
+            .iter()
+            .all(|rate| rate["rate"] == json!({"kind": "zero"})),
+        "{freight}"
+    );
+    let catalog = crate::agent::catalog::tool_definitions(false, false);
+    let description = catalog
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "vouchers")
+        .expect("the vouchers tool")["inputSchema"]["properties"]["include_gst_details"]
+        ["description"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        description.contains(
+            "An item invoice's goods-line rates sit under that line and are not returned."
+        ),
+        "{description}"
+    );
+}

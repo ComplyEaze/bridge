@@ -2714,6 +2714,24 @@ fn saved_captured_batch(server: &Server) -> Value {
 }
 
 fn saved_captured_line(server: &Server) -> ImportLedgerLine {
+    saved_captured_line_edited(server, |_| {})
+}
+
+/// The captured batch saved under `batch_id`, its one voucher's transaction id
+/// `txn_id`: the same voucher content, another row.
+fn saved_line_as(server: &Server, batch_id: &str, txn_id: &str) -> ImportLedgerLine {
+    saved_captured_line_edited(server, |line| {
+        line.batch_id = batch_id.to_string();
+        line.txn_ids = vec![txn_id.to_string()];
+        line.vouchers[0].bridge_txn_id = txn_id.to_string();
+    })
+}
+
+/// The captured batch, with `edit` applied before it is rendered and saved.
+fn saved_captured_line_edited(
+    server: &Server,
+    edit: impl FnOnce(&mut ImportLedgerLine),
+) -> ImportLedgerLine {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-6c79872c-aab6-4be5-a181-18182c8148be", "identity_scheme":"batch_v1",
@@ -2730,6 +2748,7 @@ fn saved_captured_line(server: &Server) -> ImportLedgerLine {
                 {"ledger":"Cash","amount":"12.61","side":"Cr"}]}]
     }))
     .unwrap();
+    edit(&mut line);
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
     line.sha256 = sha256_hex(rendered.as_bytes());
     bind_to_captured_catalogue(&mut line);
@@ -8273,4 +8292,160 @@ async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
     );
     assert_eq!(observed.len(), 0);
     assert_eq!(journal(directory.path()), before);
+}
+
+/// #1050, a restore seen at the post: post A natively (its voucher mark 10
+/// before, one create, 11 after), then a restore puts the book back at 10, and
+/// a second batch B, of the same company at the same address, is posted with
+/// no verification between. B's aim reads 10, below the floor 11 that A had
+/// proved. Returns B's response, the journal's records, how many import
+/// requests B's simulator saw, A's batch id, and B's approval lapse note.
+async fn post_after_a_restore(
+    fail_the_record: bool,
+) -> (Value, Vec<Value>, usize, String, Option<Value>) {
+    // A: the whole native post, read back.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let first = saved_captured_batch(&server);
+    let first_batch = first["batch_id"].as_str().unwrap().to_string();
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", first),
+        )
+        .await;
+    let _ = sent(simulator);
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
+    // B, at the same address: the journal's origin moves to the new simulator,
+    // as a verification on another simulator does.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    plans.extend(probe());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let later = server_at(simulator.address(), directory.path());
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let later_origin =
+        super::super::super::canonical_loopback_origin(&later.settings.endpoint).unwrap();
+    let text = String::from_utf8(journal(directory.path())).unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        text.replace(&origin, &later_origin),
+    )
+    .unwrap();
+    let records_before = text.lines().count();
+    let second = saved_line_as(
+        &later,
+        &crate::agent::agent_import::tests::sentinel_batch_id(0x1060),
+        "BRIDGE_MCP_LIVE_20260906_B1",
+    );
+    let args = json!({"company_guid":GUID,"batch_id":second.batch_id});
+    let call = SCRIPTED_APPROVAL.scope(
+        ScriptedApproval::approving(),
+        later.call_tool("post_import", args),
+    );
+    let response = if fail_the_record {
+        crate::agent::agent_import::TEST_ROLLBACK_AT_POST_APPEND_FAILS
+            .scope((), call)
+            .await
+    } else {
+        call.await
+    };
+    let observed = sent(simulator);
+    // An import request, in whichever encoding it was sent.
+    let is_import = |bytes: &[u8]| {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf8_lossy(bytes).contains("Import Data")
+            || String::from_utf16_lossy(&units).contains("Import Data")
+    };
+    let posts = observed
+        .iter()
+        .filter(|request| is_import(&request.request_body))
+        .count();
+    let records = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert!(records.len() > records_before);
+    let lapse = later.post_approvals.lapse_note(&second.batch_id);
+    (response, records, posts, first_batch, lapse)
+}
+
+/// The record is written before B's dispatch intent, on A (the batch it
+/// covers: B has no intent yet), with the mark B's aim read and the journal
+/// count from before that read; B is sent, and its answer names A as covered.
+#[tokio::test]
+async fn a_restore_the_posts_aim_reads_is_recorded_before_its_intent() {
+    let (response, records, posts, first_batch, lapse) = post_after_a_restore(false).await;
+    // The approval was spent on the send: nothing lapsed.
+    assert!(lapse.is_none(), "{lapse:?}");
+    let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
+    assert_eq!(posts, 1, "B was sent once: {response}");
+    let seen = records
+        .iter()
+        .position(|record| record["record_type"] == "rollback_seen")
+        .unwrap_or_else(|| panic!("no rollback record: {response}"));
+    let intent = records
+        .iter()
+        .position(|record| {
+            record["record_type"] == "dispatch_intent" && record["batch_id"] == second_batch
+        })
+        .unwrap();
+    assert!(seen < intent, "recorded before B's intent");
+    assert_eq!(records[seen]["batch_id"], first_batch);
+    assert_eq!(records[seen]["mark_read"], 10);
+    assert!(records[seen]["records_before_read"].as_u64().unwrap() as usize <= seen);
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record["record_type"] == "rollback_seen")
+            .count(),
+        1
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["rollback_recorded_at_post"],
+        json!({"count": 1, "first": [first_batch]}),
+        "{response}"
+    );
+}
+
+/// A record that cannot be written refuses B before its intent, with the typed
+/// refusal: nothing is recorded for B and nothing is sent.
+#[tokio::test]
+async fn a_restore_the_post_cannot_record_refuses_it_with_nothing_sent() {
+    let (response, records, posts, _, lapse) = post_after_a_restore(true).await;
+    // Refused before the approval was spent: it lapsed unspent, so the next
+    // call asks the person again.
+    assert_eq!(
+        lapse.as_ref().map(|note| note["reason"].clone()),
+        Some(json!("post_refused_before_intent")),
+        "{lapse:?}"
+    );
+    let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
+    assert_eq!(posts, 0, "nothing was sent: {response}");
+    assert_eq!(response["isError"], json!(true), "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        crate::tally::approved_import::UnderLockRefusal::RollbackUnrecorded.code(),
+        "{response}"
+    );
+    assert!(!records.iter().any(|record| {
+        record["record_type"] == "dispatch_intent" && record["batch_id"] == second_batch
+    }));
+    assert!(!records
+        .iter()
+        .any(|record| record["record_type"] == "rollback_seen"));
 }

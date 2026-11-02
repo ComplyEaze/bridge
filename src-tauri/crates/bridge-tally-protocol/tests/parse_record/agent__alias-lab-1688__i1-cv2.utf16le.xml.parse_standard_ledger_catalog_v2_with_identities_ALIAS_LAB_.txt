@@ -1,0 +1,99 @@
+# fixture: tests/fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml
+# parser: parse_standard_ledger_catalog_v2_with_identities(ALIAS LAB)
+# source: captured
+Ok(StandardLedgerCatalogV2 {
+    catalog: StandardLedgerCatalog {
+        entries: [
+            StandardLedgerCatalogEntry {
+                name: "Cash",
+                stored_name: None,
+                aliases: [],
+                guid: "021bda0c-b1b1-44c8-8279-5212ce87c9c7-0000001f",
+                parent: Some(
+                    "Cash-in-Hand",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Lab Alias Script",
+                stored_name: None,
+                aliases: [
+                    "ल\u{948}ब खाता",
+                ],
+                guid: "021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000d2",
+                parent: Some(
+                    "Sundry Debtors",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Lab Alias Shape",
+                stored_name: None,
+                aliases: [
+                    "Lab Shape Alias",
+                ],
+                guid: "021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000d1",
+                parent: Some(
+                    "Sundry Debtors",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Lab Other Ledger",
+                stored_name: None,
+                aliases: [
+                    "Lab Other First",
+                    "Lab Other Second",
+                ],
+                guid: "021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000cf",
+                parent: Some(
+                    "Sundry Debtors",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Lab Plain Ledger",
+                stored_name: None,
+                aliases: [
+                    "Lab Plain Alias",
+                ],
+                guid: "021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000ce",
+                parent: Some(
+                    "Sundry Debtors",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Lab Sales",
+                stored_name: None,
+                aliases: [
+                    "Lab Café Sales",
+                ],
+                guid: "021bda0c-b1b1-44c8-8279-5212ce87c9c7-000000d0",
+                parent: Some(
+                    "Sales Accounts",
+                ),
+                parent_unsupported: false,
+            },
+            StandardLedgerCatalogEntry {
+                name: "Profit & Loss A/c",
+                stored_name: None,
+                aliases: [],
+                guid: "021bda0c-b1b1-44c8-8279-5212ce87c9c7-0000001e",
+                parent: Some(
+                    "�#4; Primary",
+                ),
+                parent_unsupported: false,
+            },
+        ],
+    },
+    flags: [
+        Off,
+        On,
+        On,
+        On,
+        On,
+        Off,
+        Off,
+    ],
+})

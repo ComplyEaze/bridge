@@ -54,6 +54,7 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     }
 }
 
@@ -124,6 +125,7 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -192,6 +194,7 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
 
@@ -258,6 +261,7 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -324,6 +328,7 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -655,11 +660,14 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
 /// to each other: the later-dated variant differs from the plain one only by its note.
 /// Both digests were taken again when the five mailing columns and the Covered text
 /// changed the package (#1490); and again when the note's mailing bound went from 3,404 to 3,200
-/// ledgers with the larger per-ledger estimate (the one text change); nothing since then may change them.
+/// ledgers with the larger per-ledger estimate (the one text change); and again when the note also
+/// named the count and the alterations beyond it, in the note and the Covered text (bridge#2074);
+/// nothing since then may
+/// change them.
 const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
-    "3c5831fadce1a40a618f96e897f4dcfa1f50ba4c982a49e56bfb900e2c629d0e";
+    "686df90909e34a085fc63bb7b2b0451b4094ca1ca068a9fc5fe5f20ecb81832e";
 const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
-    "05b08d316cb1a87839fbeccd84736b8acf44b06bc7ce32a8335b8c62a3d1ec1c";
+    "5b6b39d4175fc486623ba912988be6a966b039cafcc2172e8eedd9d94a6f8375";
 
 #[test]
 fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {
@@ -842,6 +850,105 @@ fn a_workbook_that_observed_no_mailing_details_says_so_loudly() {
     );
     assert!(!workbook_text(source.clone()).contains(NOTE));
     assert_eq!(sheet_cell(source, "C4"), None);
+}
+
+/// A workbook read again without the mailing details after their read failed says that read
+/// failed, in place of the note that none were observed (bridge#2214).
+#[test]
+fn a_workbook_read_again_after_its_mailing_read_failed_says_that_read_failed() {
+    use crate::tally::connection::MailingReadFailure;
+    const NOT_OBSERVED: &str = "No ledger's mailing details were observed in this read";
+    let mut source = source_with_precision(2);
+    source.rows = vec![
+        mailing_row("A", "1", MailingDetailsHistory::NotObserved),
+        mailing_row("B", "2", MailingDetailsHistory::NotObserved),
+    ];
+    // Every failure after which the book is read again (bridge#2214), each said as itself.
+    for (cause, said) in [
+        (
+            MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: true,
+            },
+            "Tally's answer to that read passed the 32 MiB limit",
+        ),
+        (
+            MailingReadFailure::Truncated,
+            "Tally's answer to that read broke off before it ended",
+        ),
+        (
+            MailingReadFailure::ReadFailed,
+            "Tally's answer to that read could not be read",
+        ),
+        (
+            MailingReadFailure::NoAnswer,
+            "that read failed before Tally answered it",
+        ),
+        (
+            MailingReadFailure::Undecodable,
+            "Tally's answer to that read could not be decoded as text",
+        ),
+        (
+            MailingReadFailure::HttpStatus,
+            "Tally answered that read with an HTTP error",
+        ),
+        (MailingReadFailure::NotSent, "that read did not reach Tally"),
+        (
+            MailingReadFailure::AnswersDiffered,
+            "Tally's two answers to that read differed",
+        ),
+        (
+            MailingReadFailure::TallyFailed,
+            "Tally answered that read with a failure",
+        ),
+        (
+            MailingReadFailure::StatusAbsent,
+            "Tally's answer to that read carried no status",
+        ),
+        (
+            MailingReadFailure::Malformed,
+            "Tally's answer to that read was not well-formed XML",
+        ),
+        (
+            MailingReadFailure::RowRefused,
+            "Tally's answer to that read held a ledger entry ComplyEaze Bridge could not read",
+        ),
+        (
+            MailingReadFailure::OtherCompany,
+            "Tally's answer to that read was not for this company",
+        ),
+        (
+            MailingReadFailure::BoundPassed,
+            "Tally's answer to that read passed one of ComplyEaze Bridge's count limits",
+        ),
+        (
+            MailingReadFailure::IdentityRepeated,
+            "Tally's answer to that read repeated a ledger",
+        ),
+        (
+            MailingReadFailure::CountDiffers,
+            "Tally's answer to that read held another number of ledgers than were counted",
+        ),
+    ] {
+        source.mailing_details_read_failed = Some(cause);
+        let text = workbook_text(source.clone());
+        assert!(!text.contains(NOT_OBSERVED), "{cause:?}");
+        assert_eq!(sheet_cell(source.clone(), "C4"), None, "{cause:?}");
+        let note = sheet_cell(source.clone(), "C3").expect("the notes cell");
+        assert!(
+            note.starts_with("The mailing details were asked for, and ") && note.contains(said),
+            "{note}"
+        );
+    }
+    // A failure that refuses the export is never read again, so it has no note.
+    for cause in [
+        MailingReadFailure::Deadline,
+        MailingReadFailure::ResponseTooLarge {
+            declared_by_peer: false,
+        },
+    ] {
+        source.mailing_details_read_failed = Some(cause);
+        assert_eq!(source.mailing_details_read_failed_note(), None, "{cause:?}");
+    }
 }
 
 #[test]

@@ -31,7 +31,10 @@ use crate::sync::snapshot::{
     capability_profile_sha256, AdaptiveWindowPolicy, PlannedWindow, SnapshotPlan,
     SqliteSnapshotStateStore,
 };
-use crate::tally::connection::{PairedReadValidationError, PartyLedgerMasterSourceValidationError};
+use crate::tally::connection::{
+    MailingDetailsReadFailed, MailingReadFailure, MailingRetryHeldByDrain,
+    PairedReadValidationError, PartyLedgerMasterSourceValidationError,
+};
 use crate::tally::runtime::{with_operation_wire_budget, TallyRuntimeControlError};
 use crate::tally::validators::{
     normalize_company_guid, validate_company_name, validate_date_range,
@@ -421,13 +424,84 @@ fn party_ledger_master_runtime_command_error(error: anyhow::Error) -> TallyComma
             )
         };
     }
+    let mailing_read_failed = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+        .map(MailingDetailsReadFailed::cause);
+    let held_by_drain = error
+        .chain()
+        .any(|cause| cause.downcast_ref::<MailingRetryHeldByDrain>().is_some());
     let mut mapped = tally_runtime_command_error(error);
     mapped.message = format!(
         "ComplyEaze Bridge withheld the party/ledger master: {}",
         mapped.message
     );
+    // A master read that asked for each party's mailing details too is marked by
+    // its failure's type where the read is sent or its answer is first checked
+    // (bridge#2074). The export goes on without the details after every marked
+    // failure but a deadline or an oversize Tally did not declare (bridge#2214),
+    // so of the marked causes only those two are named as that larger read here,
+    // with the remediation for it; only the size limit says the estimate may have
+    // been too low, since a deadline does not show the answer's size. Every other
+    // cause reaches here only from a read that asked for the details by name, and
+    // is told exactly as a read without the details would be.
+    match mailing_read_failed {
+        Some(MailingReadFailure::Deadline) => {
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
+            mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+        }
+        Some(MailingReadFailure::ResponseTooLarge { .. }) => {
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_READ_FAILED_SENTENCE);
+            mapped
+                .message
+                .push_str(MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE);
+            mapped.remediation = MAILING_DETAILS_READ_FAILED_REMEDIATION;
+        }
+        Some(
+            MailingReadFailure::Truncated
+            | MailingReadFailure::ReadFailed
+            | MailingReadFailure::NoAnswer
+            | MailingReadFailure::Undecodable
+            | MailingReadFailure::HttpStatus
+            | MailingReadFailure::NotSent
+            | MailingReadFailure::AnswersDiffered
+            | MailingReadFailure::TallyFailed
+            | MailingReadFailure::StatusAbsent
+            | MailingReadFailure::Malformed
+            | MailingReadFailure::RowRefused
+            | MailingReadFailure::OtherCompany
+            | MailingReadFailure::BoundPassed
+            | MailingReadFailure::IdentityRepeated
+            | MailingReadFailure::CountDiffers,
+        )
+        | None => {}
+    }
+    // The export waited for Tally to finish a mailing read whose answer may have
+    // left it sending, and Tally had not finished when the wait ended
+    // (bridge#2214): the read's own failure, then why the book was not read again.
+    if held_by_drain {
+        mapped
+            .message
+            .push_str(MAILING_RETRY_HELD_BY_DRAIN_SENTENCE);
+        mapped.remediation = MAILING_RETRY_HELD_BY_DRAIN_REMEDIATION;
+    }
     mapped
 }
+
+/// What a CA is told when a party/ledger master read that asked for the mailing
+/// details ran out of time or past the size limit (bridge#2074).
+const MAILING_DETAILS_READ_FAILED_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses, which makes Tally's answer larger than the read without them.";
+/// Added only where the answer passed the size limit, not after a deadline.
+const MAILING_DETAILS_ESTIMATE_MAY_BE_LOW_SENTENCE: &str = " ComplyEaze Bridge asks for them only where it estimates the answer fits, and for this company the estimate may have been too low.";
+const MAILING_DETAILS_READ_FAILED_REMEDIATION: &str = "Do not retry the unchanged export: it sends the same larger read. Try again only after something has changed, such as Tally being less busy or this company's books being smaller; if it keeps failing, report it to ComplyEaze Bridge, which cannot yet export this company's workbook without the mailing addresses.";
+/// What a CA is also told when Tally was still busy with that read when the
+/// export's wait for it ended, so the book was not read again (bridge#2214).
+const MAILING_RETRY_HELD_BY_DRAIN_SENTENCE: &str = " The read that failed also asked Tally for each party's dated mailing addresses. Tally was still busy with it when ComplyEaze Bridge stopped waiting, so the workbook was not read again without them.";
+const MAILING_RETRY_HELD_BY_DRAIN_REMEDIATION: &str = "Wait a few minutes for Tally to finish, then export again. The export asks for the mailing addresses first again, and reads the workbook without them if that read fails the same way.";
 
 fn party_ledger_master_currency_admission_error(reason: &'static str) -> TallyCommandError {
     // Several Currency-master rows do not identify which row is the company's base
@@ -1945,9 +2019,14 @@ fn verify_observed_company_tuple_from_companies(
 
 /// What the party/ledger master export asks Tally for: it shows each party's dated
 /// mailing details, so its request names them where the whole read fits the mailing
-/// bound and is the standard request otherwise, so a book that exported before is never
-/// refused for the mailing details (bridge#1490); the workbook says when they were not
-/// read. A grouping-decision save uses none of them and sends the standard request.
+/// bound, by the mark or by the ledgers counted to size it and the alterations beyond them
+/// (bridge#2074), and is the
+/// standard request otherwise (bridge#1490); the workbook says when they were not
+/// read. The count's choice is an allowance, so a larger read that runs out of time, or
+/// past the size limit without Tally declaring it, fails; after any other failure of it,
+/// the book is read again without them, once, and the workbook says why (bridge#2214).
+/// A failure of that read again is told as itself. A grouping-decision save uses none of
+/// them and sends the standard request.
 const PARTY_LEDGER_MASTER_EXPORT_READ: crate::tally::connection::ComplianceRead =
     crate::tally::connection::ComplianceRead::WithMailingDetailsWhereWholeReadFits;
 

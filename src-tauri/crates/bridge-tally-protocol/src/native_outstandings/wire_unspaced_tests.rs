@@ -130,8 +130,8 @@ fn a_layout_the_capture_does_not_show_is_still_refused() {
     let lab_bank = "-$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00";
     assert_eq!(capture.matches(lab_bank).count(), 1);
     for changed in [
-        // a rate with decimals
-        "-$100.00 @ \u{20b9} 87.5/$ = -\u{20b9} 8700.00",
+        // a rate that is not a decimal (two points)
+        "-$100.00 @ \u{20b9} 87.5.1/$ = -\u{20b9} 8700.00",
         // the base amount against its symbol
         "-$100.00 @ \u{20b9} 87/$ = -\u{20b9}8700.00",
         // two spaces before `=` with the foreign amount unspaced
@@ -178,4 +178,84 @@ fn the_72_reads_identify_the_rupee_master_as_the_base_among_two() {
             .count(),
         5
     );
+}
+
+/// The same book after dollar purchases and payments, every one keyed at a whole-number rate
+/// (`ledger_snapshot_forex_decimal_rate` and `trial_balance_forex_decimal_rate`, #2071): Tally
+/// wrote the Profit & Loss balance and two Trial Balance movements with a rate that has decimals.
+fn decimal_rate_snapshot() -> String {
+    decode(include_bytes!(
+        "../../tests/fixtures/native/ledger_snapshot_forex_decimal_rate.utf16le.xml"
+    ))
+}
+
+fn decimal_rate_trial_balance() -> String {
+    decode(include_bytes!(
+        "../../tests/fixtures/native/trial_balance_forex_decimal_rate.utf16le.xml"
+    ))
+}
+
+const DECIMAL_RATE_SET_ASIDE: [&str; 6] = [
+    "BRIDGE Export Sales",
+    "BRIDGE Import Purchases",
+    "BRIDGE Lab Bank",
+    "BRIDGE USD Customer",
+    "BRIDGE USD Supplier",
+    "Profit & Loss A/c",
+];
+
+/// The capture holds a balance with a rate with decimals, and the compliance and outstandings
+/// classifications set it aside by name with the other composite ledgers; the two rupee ledgers
+/// are read. Before, the Profit & Loss row refused the whole read.
+#[test]
+fn a_72_balance_with_a_decimal_rate_is_set_aside_by_name() {
+    let capture = decimal_rate_snapshot();
+    assert_eq!(capture.matches(" @ \u{20b9} 86.0058/$ = ").count(), 1);
+    for read in [
+        parse_compliance_ledger_snapshot_for_company(&capture, COMPANY, &rupee())
+            .map(|read| (read.base, read.foreign, read.mixed)),
+        parse_native_ledger_snapshot_classified(&capture, &rupee())
+            .map(|read| (read.base, read.foreign, read.mixed)),
+    ] {
+        let (base, foreign, mixed) = read.expect("the capture is classified");
+        assert!(foreign.is_empty());
+        let base = base
+            .iter()
+            .map(|entry| entry.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(base, ["BRIDGE INR Customer", "Cash"]);
+        let mut mixed = mixed;
+        mixed.sort();
+        assert_eq!(mixed, DECIMAL_RATE_SET_ASIDE);
+    }
+    // The read without a base still refuses, naming the first composite ledger.
+    assert!(matches!(
+        parse_native_ledger_snapshot(&capture),
+        Err(NativeOutstandingsError::ForeignCurrencyLedgerBalance { .. })
+    ));
+}
+
+/// The Trial Balance with currency on the same book sets the same six ledgers aside: a row is set
+/// aside when any of its values is a composite, so its movements with decimal rates changed no
+/// outcome there.
+#[test]
+fn the_decimal_rate_trial_balance_sets_the_same_ledgers_aside() {
+    let capture = decimal_rate_trial_balance();
+    for rate in ["87.50", "87.9999"] {
+        assert_eq!(
+            capture.matches(&format!(" @ \u{20b9} {rate}/$ = ")).count(),
+            1,
+            "{rate}"
+        );
+    }
+    let read = crate::native_trial_balance::parse_native_trial_balance_with_currency(
+        &capture,
+        COMPANY,
+        &rupee(),
+    )
+    .expect("the capture is read");
+    assert!(read.foreign_currency_ledgers.is_empty());
+    let mut mixed = read.mixed_currency_ledgers.clone();
+    mixed.sort();
+    assert_eq!(mixed, DECIMAL_RATE_SET_ASIDE);
 }

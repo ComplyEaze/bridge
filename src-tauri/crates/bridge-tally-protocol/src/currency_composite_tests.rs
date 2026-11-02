@@ -497,7 +497,7 @@ fn the_shapes_admitted_without_a_capture_are_pinned() {
         panic!("a valued composite");
     };
     assert_eq!(valued.foreign_symbol(), "US$");
-    // a rate with one to three decimals (the captured ones have none or four)
+    // a rate with one to three decimals (the captured 7.1 ones have none or four)
     for rate in ["86.5", "86.50", "86.500"] {
         let text = format!("$ 100.00 @ I\u{20b9} {rate}/$  = I\u{20b9} 8650.00");
         let CurrencyComposite::Valued(valued) = parse(&text).unwrap() else {
@@ -581,18 +581,34 @@ fn decode_72(bytes: &[u8]) -> String {
 
 /// Every value in the two 7.2 captures that holds an ` @ `.
 fn composites_of_the_72_captures() -> Vec<String> {
+    composites_of(
+        include_bytes!(
+            "../tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml"
+        ),
+        include_bytes!(
+            "../tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml"
+        ),
+    )
+}
+
+/// Every value in the two 7.2 captures of the later sitting (#2071) that holds an ` @ `.
+fn composites_of_the_72_decimal_rate_captures() -> Vec<String> {
+    composites_of(
+        include_bytes!("../tests/fixtures/native/ledger_snapshot_forex_decimal_rate.utf16le.xml"),
+        include_bytes!("../tests/fixtures/native/trial_balance_forex_decimal_rate.utf16le.xml"),
+    )
+}
+
+/// Every value holding an ` @ ` in a ledger snapshot and a Trial Balance capture.
+fn composites_of(snapshot: &[u8], trial_balance: &[u8]) -> Vec<String> {
     let mut found = Vec::new();
     for (capture, tags) in [
         (
-            decode_72(include_bytes!(
-                "../tests/fixtures/native/ledger_snapshot_forex_unspaced_composite.utf16le.xml"
-            )),
+            decode_72(snapshot),
             &["OPENINGBALANCE", "CLOSINGBALANCE"][..],
         ),
         (
-            decode_72(include_bytes!(
-                "../tests/fixtures/native/trial_balance_forex_unspaced_composite.utf16le.xml"
-            )),
+            decode_72(trial_balance),
             &["TBALOPENING", "DEBITTOTALS", "CREDITTOTALS", "TBALCLOSING"][..],
         ),
     ] {
@@ -631,6 +647,30 @@ fn every_composite_in_the_72_captures_is_the_unspaced_layout_and_only_that() {
     }
 }
 
+/// The later sitting's composites, three of them with a rate that has decimals (two or four), are
+/// the 7.2 layout too, and still not the 7.1 one.
+#[test]
+fn every_composite_in_the_72_decimal_rate_captures_is_the_unspaced_layout() {
+    let found = composites_of_the_72_decimal_rate_captures();
+    assert!(!found.is_empty());
+    let decimal_rates = found
+        .iter()
+        .filter_map(|composite| {
+            let rate = composite.split(" @ ").nth(1)?.split('/').next()?;
+            rate.contains('.').then(|| rate.to_string())
+        })
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(
+        decimal_rates.into_iter().collect::<Vec<_>>(),
+        ["\u{20b9} 86.0058", "\u{20b9} 87.50", "\u{20b9} 87.9999"]
+    );
+    for composite in &found {
+        assert!(is_unspaced_currency_composite(composite), "{composite}");
+        assert!(is_balance_composite(composite), "{composite}");
+        assert!(!is_currency_composite(composite), "{composite}");
+    }
+}
+
 /// The 7.1 captures keep their layout: none of them is the 7.2 one, so nothing that was read
 /// through `is_currency_composite` changes meaning.
 #[test]
@@ -652,9 +692,14 @@ fn a_change_to_the_72_layout_that_no_capture_shows_is_not_a_composite() {
         // the other layout's spaces
         "$ 100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
         "$100.00 @ \u{20b9} 87/$  = \u{20b9} 8700.00",
-        // a rate with decimals, or without a number but with a point
-        "$100.00 @ \u{20b9} 87.5/$ = \u{20b9} 8700.00",
+        // a rate that is not a decimal: a point with no digit on one side, two points, a sign,
+        // a comma, a space
         "$100.00 @ \u{20b9} 87./$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} .5/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87.5.1/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} +87.5/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87,5/$ = \u{20b9} 8700.00",
+        "$100.00 @ \u{20b9} 87 .5/$ = \u{20b9} 8700.00",
         // amounts without two decimals
         "$100 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
         "$100.0 @ \u{20b9} 87/$ = \u{20b9} 8700.00",

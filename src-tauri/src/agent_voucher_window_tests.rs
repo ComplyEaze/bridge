@@ -8892,3 +8892,24 @@ mod ledger_window {
         );
     }
 }
+
+/// #2027: a window held without each entry's GST details does not serve a page that asks for
+/// them. The held window's key carries the choice, so the page names a snapshot not held for it
+/// before any marks read.
+#[tokio::test]
+async fn a_page_asking_for_gst_details_is_not_served_from_a_window_held_without_them() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(identity_plans());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": id, "include_gst_details": true}))
+        .await;
+    let error = refusal_of(&second);
+    assert_eq!(error["code"], "listing_snapshot_changed", "{second}");
+    assert_eq!(error["cause"], "snapshot_not_held", "{second}");
+    // The second page sent the identity read only: no marks read and nothing of the window.
+    assert_eq!(one.requests(), total);
+}

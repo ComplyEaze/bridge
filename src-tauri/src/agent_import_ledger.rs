@@ -1955,48 +1955,59 @@ pub(super) fn rollback_record_extends(
     records_before_read: u64,
 ) -> Result<bool, String> {
     let facts = RollbackFacts::scan(reader)?;
-    let Some(place) = facts.place_of(seen_by) else {
-        return Ok(false);
-    };
-    let prefix = usize::try_from(records_before_read).unwrap_or(usize::MAX);
-    Ok(facts.order.iter().any(|batch_id| {
-        facts.place_of(batch_id) == Some(place)
-            && facts
-                .posts
-                .get(batch_id)
-                .and_then(|post| post.floor_within(prefix))
-                .is_some_and(|floor| floor > mark_read)
-            && facts.cover_of(batch_id).is_none()
-    }))
+    let extends = facts
+        .newly_covered(seen_by, mark_read, records_before_read)
+        .next()
+        .is_some();
+    Ok(extends)
 }
 
-/// The other native batches the rollback-seen records `seen_by` wrote cover,
-/// in journal order, for the answer that records a rollback to name: their
-/// own status is unchanged until each is verified again.
-pub(super) fn covered_by_records_of(
+/// The batch a rollback-seen record written for a post's own reading names
+/// (#1050, seen at the post): the first native batch, in journal order, of
+/// `poster`'s company and address that such a record would cover and no record
+/// on file covers. The post that read the mark has no dispatch intent yet, so
+/// a record may not name it; it names a batch it covers, which admission
+/// accepts. `None` when the record would cover nothing new.
+pub(super) fn first_newly_covered(
     reader: impl BufRead,
-    seen_by: &str,
-) -> Result<Vec<String>, String> {
+    poster: &str,
+    mark_read: u64,
+    records_before_read: u64,
+) -> Result<Option<String>, String> {
     let facts = RollbackFacts::scan(reader)?;
-    let Some(place) = facts.place_of(seen_by) else {
+    let first = facts
+        .newly_covered(poster, mark_read, records_before_read)
+        .next()
+        .cloned();
+    Ok(first)
+}
+
+/// The native batches the journal's last record covers when it is a
+/// rollback-seen record, in journal order, the batch it names included, for
+/// the answer that just wrote it to name: their own status is unchanged until
+/// each is verified again. Empty when the last record is another kind. One
+/// record, not every record its batch names: a record written for a post's
+/// reading names a batch it covers, and that batch may write its own later.
+pub(super) fn covered_by_last_record(reader: impl BufRead) -> Result<Vec<String>, String> {
+    let facts = RollbackFacts::scan(reader)?;
+    let Some(record) = facts
+        .seen
+        .last()
+        .filter(|record| record.at + 1 == facts.records)
+    else {
         return Ok(Vec::new());
     };
-    let records = facts
-        .seen
-        .iter()
-        .filter(|(by, _, _)| by == seen_by)
-        .collect::<Vec<_>>();
+    let Some(place) = facts.place_of(&record.by) else {
+        return Ok(Vec::new());
+    };
     Ok(facts
         .order
         .iter()
-        .filter(|batch_id| batch_id.as_str() != seen_by)
         .filter(|batch_id| facts.place_of(batch_id) == Some(place))
         .filter(|batch_id| {
             facts.posts.get(*batch_id).is_some_and(|post| {
-                records.iter().any(|(_, mark_read, prefix)| {
-                    post.floor_within(*prefix)
-                        .is_some_and(|floor| floor > *mark_read)
-                })
+                post.floor_within(record.prefix)
+                    .is_some_and(|floor| floor > record.mark_read)
             })
         })
         .cloned()
@@ -2006,15 +2017,24 @@ pub(super) fn covered_by_records_of(
 /// The batch's company and Tally address, as its full record names them.
 type Place = (Option<ImportCompanyTuple>, Option<String>);
 
+/// One rollback-seen record: the batch it names, the mark read, how many
+/// records the reading had read before the mark, and its own position.
+struct SeenRecord {
+    by: String,
+    mark_read: u64,
+    prefix: usize,
+    at: usize,
+}
+
 /// What one scan of the journal says about native posts and rollback-seen
-/// records, for [`rollback_cover`] and [`covered_by_records_of`].
+/// records, for [`rollback_cover`] and [`covered_by_last_record`].
 struct RollbackFacts {
     places: BTreeMap<String, Place>,
     posts: BTreeMap<String, NativePost>,
     /// Batch ids in the order their first full record appeared.
     order: Vec<String>,
-    /// Each rollback-seen record: the batch that wrote it, its mark and count.
-    seen: Vec<(String, u64, usize)>,
+    /// Each rollback-seen record, in journal order.
+    seen: Vec<SeenRecord>,
     records: usize,
 }
 
@@ -2078,7 +2098,12 @@ impl RollbackFacts {
                         {
                             // Admission bounds the count by the record's position.
                             let count = usize::try_from(count).unwrap_or(at);
-                            facts.seen.push((update.batch_id.clone(), mark, count));
+                            facts.seen.push(SeenRecord {
+                                by: update.batch_id.clone(),
+                                mark_read: mark,
+                                prefix: count,
+                                at,
+                            });
                         }
                     }
                     StatusKind::VerificationStatus
@@ -2107,17 +2132,40 @@ impl RollbackFacts {
         let post = self.posts.get(batch_id)?;
         self.seen
             .iter()
-            .filter(|(seen_by, mark_read, prefix)| {
-                self.place_of(seen_by) == Some(own_place)
+            .filter(|record| {
+                self.place_of(&record.by) == Some(own_place)
                     && post
-                        .floor_within(*prefix)
-                        .is_some_and(|floor| floor > *mark_read)
+                        .floor_within(record.prefix)
+                        .is_some_and(|floor| floor > record.mark_read)
             })
-            .min_by_key(|(_, mark_read, _)| *mark_read)
-            .map(|(seen_by, mark_read, _)| RollbackCover {
-                mark_read: *mark_read,
-                seen_by: seen_by.clone(),
+            .min_by_key(|record| record.mark_read)
+            .map(|record| RollbackCover {
+                mark_read: record.mark_read,
+                seen_by: record.by.clone(),
             })
+    }
+
+    /// The native batches of `reader`'s company and address, in journal order,
+    /// that a record of `mark_read`, read after `records_before_read` records,
+    /// would cover and that no record on file covers.
+    fn newly_covered<'a>(
+        &'a self,
+        reader: &str,
+        mark_read: u64,
+        records_before_read: u64,
+    ) -> impl Iterator<Item = &'a String> + 'a {
+        let place = self.place_of(reader);
+        let prefix = usize::try_from(records_before_read).unwrap_or(usize::MAX);
+        self.order.iter().filter(move |batch_id| {
+            place.is_some()
+                && self.place_of(batch_id) == place
+                && self
+                    .posts
+                    .get(*batch_id)
+                    .and_then(|post| post.floor_within(prefix))
+                    .is_some_and(|floor| floor > mark_read)
+                && self.cover_of(batch_id).is_none()
+        })
     }
 
     /// The batch's place, when its record names both a company and an address.

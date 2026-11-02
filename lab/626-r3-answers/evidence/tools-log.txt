@@ -1,0 +1,15 @@
+2026-11-02T18:28:49.270Z 000-tools.json list secs 0.02 bytes 235643 isError None
+2026-11-02T18:28:50.414Z 001-companies.json list_companies secs 0.102 bytes 1567 isError False
+2026-11-02T18:28:51.645Z 002-v1.json validate_masters secs 0.724 bytes 1994 isError False
+2026-11-02T18:29:03.905Z 003-b2.json build_import_xml secs 2.392 bytes 2286 isError True
+2026-11-02T18:29:35.124Z 004-b2r.json build_import_xml secs 5.548 bytes 10655 isError False
+2026-11-02T18:29:56.154Z 005-p2.json post_import secs 26.745 bytes 11153 isError False
+2026-11-02T18:30:27.353Z 006-b3.json build_import_xml secs 5.495 bytes 10661 isError False
+2026-11-02T18:30:47.068Z 007-p3.json post_import secs 25.275 bytes 11153 isError False
+2026-11-02T18:31:15.077Z 008-b4.json build_import_xml secs 5.538 bytes 10896 isError False
+2026-11-02T18:31:34.548Z 009-p4.json post_import secs 27.617 bytes 11868 isError False
+2026-11-02T18:32:04.921Z 010-v2.json verify_import secs 3.354 bytes 10659 isError False
+2026-11-02T18:32:09.429Z 011-v3.json verify_import secs 3.742 bytes 10659 isError False
+2026-11-02T18:32:14.624Z 012-v4.json verify_import secs 3.675 bytes 11373 isError False
+2026-11-02T18:32:31.070Z 013-b7.json build_import_xml secs 5.391 bytes 10656 isError False
+2026-11-02T18:32:53.652Z 014-p7.json post_import secs 12.783 bytes 1862 isError True

@@ -1,0 +1,38 @@
+2026-11-02T18:30:46.191Z watch start: tally window 0xa826a4; see within 60 s; answer by 70 s
+2026-11-02T18:30:54.450Z BOX SEEN 0xb11b7c pid 29064 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-11-02T18:30:54.542Z rect 688,143,1252,964 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-02T18:30:54.644Z foreground 0xb11b7c pid 29064 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-02T18:30:54.683Z child Button rect 901,908,1001,941 text: &Yes
+2026-11-02T18:30:54.703Z child Button rect 1011,908,1111,941 text: &No
+2026-11-02T18:30:54.729Z child Button rect 1121,908,1221,941 text: Cancel
+2026-11-02T18:30:54.742Z child Static rect 725,214,765,254 text: 
+2026-11-02T18:30:54.780Z child Static rect 775,214,1203,862 text: Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Payment in "BRIDGE TWIN R3 LAB"
+Company GUID: 54e7d69d-5dcf-452c-b030-bd1ac15fc023
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9001
+Date: 11-Apr-2025  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 102.00  Line break  "Twin Lab B\r\n"
+Cr 102.00  "BRIDGE Twin Bank"
+Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.
+Total debit: 102  Total credit: 102
+Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.
+Batch: bridge-50a3251f-5b1f-4227-bc7f-55c6550a7d95
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+Used: "Twin Lab B", line break at its end, group "Indirect Expenses"
+Not used: "Twin Lab B", no line break at its end, group "Indirect Incomes"
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration: "R3-2"
+2026-11-02T18:30:55.296Z capture s3-open.png 1920x1080 351519 B sha256 d52f853e0360a78eaee7b1b012fa07c93a6b65e47016917d024fc0a793c9436a
+2026-11-02T18:30:55.319Z WAITING for <lab folder>\box\s3.answer
+2026-11-02T18:31:04.729Z before click: foreground 0xb11b7c pid 29064 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-02T18:31:05.043Z CLICKED Yes at 951,924 (physical) 2026-11-02T18:31:04.796Z; seen-to-click 10.4 s
+2026-11-02T18:31:05.945Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

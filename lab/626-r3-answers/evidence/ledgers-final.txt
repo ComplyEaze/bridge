@@ -1,0 +1,10 @@
+'BRIDGE Twin Bank' utf16 42005200490044004700450020005400770069006e002000420061006e006b00 | 00d1 | Bank Accounts | A 213 | close 410.00 410.00 | dr  cr 410.00
+'Cash' utf16 4300610073006800 | 001f | Cash-in-Hand | A 32 | close 1.00 1.00 | dr  cr 1.00
+'Profit & Loss A/c' utf16 500072006f006600690074002000260020004c006f0073007300200041002f006300 | 001e | Primary | A 31 | close 0.00 -411.00 | dr  cr 
+'Seed Expense' utf16 5300650065006400200045007800700065006e0073006500 | 00d3 | Indirect Expenses | A 215 | close -1.00 -1.00 | dr -1.00 cr 
+'Solo Lab' utf16 53006f006c006f0020004c0061006200 | 00d2 | Indirect Expenses | A 214 | close   | dr  cr 
+'Solo Lab\r\n' utf16 53006f006c006f0020004c00610062000d000a00 | 00d4 | Indirect Incomes | A 216 | close   | dr  cr 
+'Twin Lab' utf16 5400770069006e0020004c0061006200 | 00cd | Indirect Expenses | A 209 | close -101.00 -101.00 | dr -101.00 cr 
+'Twin Lab\r\n' utf16 5400770069006e0020004c00610062000d000a00 | 00ce | Indirect Incomes | A 210 | close -103.00 -103.00 | dr -103.00 cr 
+'Twin Lab B' utf16 5400770069006e0020004c006100620020004200 | 00d0 | Indirect Incomes | A 212 | close -104.00 -104.00 | dr -104.00 cr 
+'Twin Lab B\r\n' utf16 5400770069006e0020004c0061006200200042000d000a00 | 00cf | Indirect Expenses | A 211 | close -102.00 -102.00 | dr -102.00 cr 

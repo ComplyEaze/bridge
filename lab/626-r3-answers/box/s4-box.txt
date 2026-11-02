@@ -1,0 +1,44 @@
+2026-11-02T18:31:33.678Z watch start: tally window 0xa826a4; see within 60 s; answer by 70 s
+2026-11-02T18:31:42.620Z BOX SEEN 0x13c2cba pid 25428 title 'ComplyEaze Bridge — post 2 vouchers?' class #32770
+2026-11-02T18:31:42.742Z rect 686,86,1252,1021 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-02T18:31:42.801Z foreground 0x13c2cba pid 25428 bridge_mcp title 'ComplyEaze Bridge — post 2 vouchers?'
+2026-11-02T18:31:42.825Z child Button rect 901,965,1001,998 text: &Yes
+2026-11-02T18:31:42.847Z child Button rect 1011,965,1111,998 text: &No
+2026-11-02T18:31:42.864Z child Button rect 1121,965,1221,998 text: Cancel
+2026-11-02T18:31:42.882Z child Static rect 723,157,763,197 text: 
+2026-11-02T18:31:42.901Z child Static rect 773,157,1203,919 text: Press Y (or click Yes) to post these 2 vouchers into Tally. Press N (or click No) to cancel. Nothing
+is posted until you answer.
+
+Create 2 vouchers in "BRIDGE TWIN R3 LAB"
+Company number: <company number>  Books from: 1-Apr-2025
+Types: 2 Payment
+Dates: 12-Apr-2025 to 13-Apr-2025  Voucher numbers: Tally assigns them
+Total debit: 207  Total credit: 207
+Money out by Payment vouchers: 207
+Company GUID: 54e7d69d-5dcf-452c-b030-bd1ac15fc023
+Tally: http://127.0.0.1:9001
+Each voucher: type, date, amount, ledger, narration (references not shown):
+Each line ends with its narration, quoted; a cut one is marked … (+N characters).
+Payment 12-Apr-2025  103  Line break  "Twin Lab\r\n"  "R3-3"
+Payment 13-Apr-2025  104  "Twin Lab B"  "R3-4"
+
+Dr 0  Cr 207  2 entries  "BRIDGE Twin Bank"
+Dr 103  Cr 0  1 entry  Line break  "Twin Lab\r\n"
+Dr 104  Cr 0  1 entry  "Twin Lab B"
+Line break: a name that ends in a line break in Tally (shown as \r\n). No other name here has one.
+Batch: bridge-67b5129b-ac4b-4c8f-874a-c5b6e36ea4a2
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+Used: "Twin Lab", line break at its end, group "Indirect Incomes"
+Not used: "Twin Lab", no line break at its end, group "Indirect Expenses"
+Used: "Twin Lab B", no line break at its end, group "Indirect Incomes"
+Not used: "Twin Lab B", line break at its end, group "Indirect Expenses"
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+2026-11-02T18:31:43.523Z capture s4-open.png 1920x1080 369207 B sha256 b9750528ac847782097fb931eccba361ee38af1ffea78f7d8f3b8a9c07cb4b53
+2026-11-02T18:31:43.583Z WAITING for <lab folder>\box\s4.answer
+2026-11-02T18:31:54.867Z before click: foreground 0x13c2cba pid 25428 bridge_mcp title 'ComplyEaze Bridge — post 2 vouchers?'
+2026-11-02T18:31:55.141Z CLICKED Yes at 951,982 (physical) 2026-11-02T18:31:54.949Z; seen-to-click 12.3 s
+2026-11-02T18:31:56.044Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

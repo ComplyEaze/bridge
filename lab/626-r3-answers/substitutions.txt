@@ -1,0 +1,4 @@
+Replaced in the tool answers and text files here, with counts. company_number values go first, by a JSON parser. reads/ and reqs/ are byte for byte.
+<company number>: 22
+<desktop client>: 8
+<lab folder>: 13

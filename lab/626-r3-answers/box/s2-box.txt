@@ -1,0 +1,38 @@
+2026-11-02T18:29:54.311Z watch start: tally window 0xa826a4; see within 60 s; answer by 70 s
+2026-11-02T18:30:03.777Z BOX SEEN 0x1bd292c pid 28112 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-11-02T18:30:03.853Z rect 688,162,1252,945 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-02T18:30:03.904Z foreground 0x1bd292c pid 28112 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-02T18:30:03.937Z child Button rect 901,889,1001,922 text: &Yes
+2026-11-02T18:30:03.974Z child Button rect 1011,889,1111,922 text: &No
+2026-11-02T18:30:03.987Z child Button rect 1121,889,1221,922 text: Cancel
+2026-11-02T18:30:04.024Z child Static rect 725,233,765,273 text: 
+2026-11-02T18:30:04.060Z child Static rect 775,233,1203,843 text: Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Payment in "BRIDGE TWIN R3 LAB"
+Company GUID: 54e7d69d-5dcf-452c-b030-bd1ac15fc023
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9001
+Date: 10-Apr-2025  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 101.00  "Twin Lab"
+Cr 101.00  "BRIDGE Twin Bank"
+
+Total debit: 101  Total credit: 101
+Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.
+Batch: bridge-3ddf6046-358c-499a-ac1b-05051915f1ff
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+Used: "Twin Lab", no line break at its end, group "Indirect Expenses"
+Not used: "Twin Lab", line break at its end, group "Indirect Incomes"
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration: "R3-1"
+2026-11-02T18:30:04.740Z capture s2-open.png 1920x1080 373263 B sha256 3aa502031e3e6a9ded5f34e5e2df86d42072981d535bb0794fc93825fe7ea5a4
+2026-11-02T18:30:04.769Z WAITING for <lab folder>\box\s2.answer
+2026-11-02T18:30:16.138Z before click: foreground 0x1bd292c pid 28112 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-02T18:30:16.296Z CLICKED Yes at 951,906 (physical) 2026-11-02T18:30:16.188Z; seen-to-click 12.4 s
+2026-11-02T18:30:17.392Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

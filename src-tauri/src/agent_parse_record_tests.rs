@@ -710,6 +710,26 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, SHAPE_LAB)
     ));
     rows.push(row!(
+        "stock_movement_credit_note_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_delivery_note_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_receipt_note_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
         "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
         "parse_agent_rows(BANKREF_LAB)",
         |_, t| agent_rows(t, BANKREF_LAB)

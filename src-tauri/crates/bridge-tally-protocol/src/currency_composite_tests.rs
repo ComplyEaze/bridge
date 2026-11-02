@@ -773,8 +773,8 @@ fn the_shapes_the_unspaced_check_admits_without_a_capture_are_pinned() {
     }
 }
 
-/// Reading a composite into its parts is unchanged and still the 7.1 layout alone: the 7.2
-/// layout is classified, not read, until a capture shows the arithmetic the parse needs.
+/// Reading a composite into its parts takes the 7.2 layout too, its decimal rate included, as a
+/// captured voucher shows it (`fixtures/agent/vouchers-forex-72-20250401`).
 #[test]
 fn the_composite_parse_reads_the_unspaced_layout_and_its_decimal_rate() {
     let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");

@@ -249,6 +249,10 @@ fn read_composites(row: &Value, book: &IdentifiedBaseCurrency) -> Option<Value> 
             read_composite_amount(allocation, book)?;
         }
         let amount = ExactDecimal::parse(entry["amount"].as_str()?.to_string()).ok()?;
+        // A composite parsed to no amount, so the parser could not compare it.
+        if !tally_entry_polarity_agrees(&amount, entry["is_deemed_positive"] == "Yes") {
+            entry["polarity_disagrees_with_amount"] = Value::Bool(true);
+        }
         net = net.checked_add(&amount).ok()?;
     }
     net.is_zero().then_some(row)

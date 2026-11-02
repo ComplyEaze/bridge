@@ -1433,10 +1433,8 @@ fn every_amount_consuming_parse_still_refuses_the_composite_window() {
     );
 }
 
-/// The 7.2 layout of a composite (the foreign symbol against its digits) is read as a ledger's
-/// balance, not as a voucher's amount: no 7.2 voucher answer is committed, so a voucher entry that
-/// holds one is not withheld and its window refuses, as it did before that layout was known
-/// (#683, #2071). The same entry in the captured 7.1 layout is withheld.
+/// The 7.2 layout of a composite (the foreign symbol against its digits) on a voucher entry is
+/// withheld at the parse as the 7.1 layout is, until the book's base can read it (#683, #2071).
 #[test]
 fn a_72_layout_composite_on_a_voucher_entry_withholds_its_voucher() {
     let captured = captured_forex_composite_vouchers();
@@ -1526,15 +1524,14 @@ fn a_captured_72_window_is_read_as_rupee_amounts_with_the_foreign_amount_apart()
     };
     let decimal_rate = with_rate("86.4125");
     assert_eq!(decimal_rate.len(), 2);
-    for entry in decimal_rate {
-        let sign = entry["amount"]
-            .as_str()
-            .unwrap()
-            .strip_suffix("8641.25")
-            .unwrap();
+    for (entry, (amount, foreign)) in decimal_rate
+        .into_iter()
+        .zip([("-8641.25", "-100.00"), ("8641.25", "100.00")])
+    {
+        assert_eq!(entry["amount"], amount);
         assert_eq!(
             entry["foreign"],
-            json!({"currency": "$", "amount": format!("{sign}100.00"), "rate": "86.4125"})
+            json!({"currency": "$", "amount": foreign, "rate": "86.4125"})
         );
     }
     let allocations = rows
@@ -1587,6 +1584,111 @@ fn a_captured_71_voucher_is_read_under_its_own_base_symbol() {
     assert!(other
         .into_iter()
         .all(|row| row.read_under(&captured_72_book()).is_withheld()));
+}
+
+/// A read composite carries the polarity flag a plain entry does, whichever way it disagrees.
+#[test]
+fn a_read_composite_says_when_its_polarity_disagrees_with_its_amount() {
+    let entries = |xml: &str| {
+        read_under_the_72_book(xml)
+            .into_iter()
+            .flat_map(|row| match row {
+                VoucherRow::Read(row) => row["amounts"].as_array().unwrap().clone(),
+                VoucherRow::Withheld(_) => panic!("every composite here is readable"),
+            })
+            .filter(|entry| entry.get("foreign").is_some())
+            .collect::<Vec<_>>()
+    };
+    let captured = captured_72_vouchers();
+    assert!(entries(&captured)
+        .iter()
+        .all(|entry| entry.get("polarity_disagrees_with_amount").is_none()));
+
+    let flipped = captured
+        .replace(">Yes</ISDEEMEDPOSITIVE>", ">Was</ISDEEMEDPOSITIVE>")
+        .replace(">No</ISDEEMEDPOSITIVE>", ">Yes</ISDEEMEDPOSITIVE>")
+        .replace(">Was</ISDEEMEDPOSITIVE>", ">No</ISDEEMEDPOSITIVE>");
+    let entries = entries(&flipped);
+    for negative in [true, false] {
+        let side = entries
+            .iter()
+            .filter(|entry| entry["amount"].as_str().unwrap().starts_with('-') == negative)
+            .collect::<Vec<_>>();
+        assert!(!side.is_empty());
+        assert!(side
+            .iter()
+            .all(|entry| entry["polarity_disagrees_with_amount"] == true));
+    }
+}
+
+/// Plain and composite entries on one voucher read side by side, and net in rupees.
+#[test]
+fn a_voucher_mixing_plain_and_composite_entries_is_read() {
+    let mixed = captured_72_vouchers().replace(
+        "-$100.00 @ \u{20b9} 86.4125/$ = -\u{20b9} 8641.25",
+        "-8641.25",
+    );
+    let rows = read_under_the_72_book(&mixed);
+    assert!(rows.iter().all(|row| !row.is_withheld()));
+    let voucher = rows
+        .iter()
+        .map(|row| match row {
+            VoucherRow::Read(row) => row,
+            VoucherRow::Withheld(_) => unreachable!("none is withheld"),
+        })
+        .find(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["foreign"]["rate"] == "86.4125")
+        })
+        .unwrap();
+    let amounts = voucher["amounts"].as_array().unwrap();
+    assert_eq!(amounts.len(), 2);
+    let plain = amounts
+        .iter()
+        .find(|entry| entry.get("foreign").is_none())
+        .unwrap();
+    assert_eq!(plain["amount"], "-8641.25");
+    let composite = amounts
+        .iter()
+        .find(|entry| entry.get("foreign").is_some())
+        .unwrap();
+    assert_eq!(composite["amount"], "8641.25");
+}
+
+/// The first bill allocation that holds a composite, its amount changed. Its entry still reads.
+fn with_first_composite_allocation(captured: &str, amount: &str) -> String {
+    let (mut from, open) = (0, "<BILLALLOCATIONS.LIST>");
+    loop {
+        let list = from + captured[from..].find(open).unwrap();
+        let start = list + captured[list..].find("<AMOUNT>").unwrap() + "<AMOUNT>".len();
+        let end = start + captured[start..].find("</AMOUNT>").unwrap();
+        if captured[start..end].contains(" @ ") {
+            return format!("{}{amount}{}", &captured[..start], &captured[end..]);
+        }
+        from = end;
+    }
+}
+
+#[test]
+fn a_bill_allocation_that_will_not_read_withholds_its_voucher() {
+    let captured = captured_72_vouchers();
+    for (name, amount) in [
+        (
+            "unknown",
+            "-\u{20ac}100.00 @ \u{20b9} 86/\u{20ac} = -\u{20b9} 8600.00",
+        ),
+        ("zero", "$0.00 @ \u{20b9} /$ = \u{20b9} 0.00"),
+    ] {
+        let rows = read_under_the_72_book(&with_first_composite_allocation(&captured, amount));
+        assert_eq!(
+            rows.iter().filter(|row| row.is_withheld()).count(),
+            1,
+            "{name}"
+        );
+    }
 }
 
 #[test]

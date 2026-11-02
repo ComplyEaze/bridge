@@ -89,8 +89,9 @@ pub fn is_currency_composite(text: &str) -> bool {
 /// other change in the layout is not this layout, so its caller refuses it. Shapes no capture
 /// shows also pass, as they do the 7.1 check, and the tests pin each: an empty or zero rate with
 /// non-zero amounts, amounts of opposite signs, a zero base with a foreign value, leading zeros,
-/// and a foreign or base symbol other than `$` and the rupee symbol. A row that passes is set
-/// aside by name and its value is never read, so no figure can come from one. The two layouts
+/// and a foreign or base symbol other than `$` and the rupee symbol. A ledger row that passes is
+/// set aside by name and its value is never read, so no figure can come from one; a voucher's is
+/// read only through [`parse_currency_composite`], which refuses these shapes. The two layouts
 /// never both match one string: this one needs the foreign amount unspaced and the other needs
 /// it spaced.
 pub fn is_unspaced_currency_composite(text: &str) -> bool {

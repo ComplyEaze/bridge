@@ -2259,7 +2259,9 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 an
   allocation's `amount`, and `foreign` holds `currency`, `amount` and `rate` as
   Tally wrote them. Sums, summaries and an `amount` search use the rupee amount.
   When a window holds a composite, `vouchers` also reads the book's currencies.
-  Measured on one book of each release, one currency.
+  Measured on one book of each release, one currency. `ledger_movement` still
+  refuses such a window, so a `vouchers` summary holding these amounts cannot be
+  tied to it.
 - **It withholds a voucher it cannot read that way:** the book's base is not
   established as INR, the amount after `=` is not in that base, the foreign
   symbol is not one of the book's Currency masters, a composite has no rate or

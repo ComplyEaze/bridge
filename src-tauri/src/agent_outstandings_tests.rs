@@ -325,6 +325,72 @@ fn forex_receivable_with_only_the_dollar_ledgers_bills() -> Vec<u8> {
     edited.encode_utf16().flat_map(u16::to_le_bytes).collect()
 }
 
+/// A labelled edit of the captured FOREX ledger list: the four rupee debtors'
+/// closing balances cleared, so that on the edited receivable report no ledger
+/// the read keeps carries a balance, as on a plain book whose only party is a
+/// dollar party (bridge#2071).
+fn forex_ledgers_with_the_rupee_debtors_at_zero() -> Vec<u8> {
+    let captured: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+    );
+    let mut text = String::from_utf16(
+        &captured
+            .chunks_exact(2)
+            .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    for (ledger, balance) in [
+        ("BRIDGE INR DEBTOR A", "-3000.00"),
+        ("FX Party 01", "-11500.00"),
+        ("FX Party 02", "-9500.00"),
+        ("FX Party 03", "-10500.00"),
+    ] {
+        let start = text.find(&format!("<LEDGER NAME=\"{ledger}\"")).unwrap();
+        let length = text[start..].find("</LEDGER>").unwrap();
+        let edited = text[start..start + length].replace(
+            &format!(">{balance}</CLOSINGBALANCE>"),
+            ">0.00</CLOSINGBALANCE>",
+        );
+        assert_ne!(edited, text[start..start + length]);
+        text.replace_range(start..start + length, &edited);
+    }
+    text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+}
+
+/// bridge#2071: the plain book. Every bill and every balance is a set-aside
+/// ledger's, so no ledger left carries a balance and the reason is the
+/// effective-date one, and the answer still names what it set aside.
+#[tokio::test]
+async fn mcp_outstandings_name_the_set_aside_ledgers_on_a_book_with_no_other_balance() {
+    let response = forex_outstandings(
+        None,
+        &forex_receivable_with_only_the_dollar_ledgers_bills(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        &forex_ledgers_with_the_rupee_debtors_at_zero(),
+        "20250930",
+        Redaction::None,
+        json!({}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    let unconfirmed =
+        crate::warning_codes::WarningCode::NativeOutstandingsAsOfUnconfirmedWithoutEffectiveDateEvidence
+            .as_str();
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(
+        result["partial_reasons"],
+        json!([unconfirmed, "foreign_currency_ledgers_excluded"])
+    );
+    assert_eq!(result["foreign_currency_ledgers_excluded"]["count"], 3);
+}
+
 /// bridge#2071: when every bill belongs to a ledger the read sets aside, no
 /// row is left to confirm the as-of date by, so every figure is withheld. The
 /// answer gives that reason, and still names the set-aside ledgers as it does

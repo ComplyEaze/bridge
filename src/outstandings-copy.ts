@@ -98,6 +98,21 @@ export type OutstandingsPartialState = {
   tallyReadAttempted: boolean;
 };
 
+// bridge#2071: the two unconfirmed-date reasons once ledgers were set aside.
+// Neither code says Tally left the bills out: they may have gone with their
+// ledgers. Each sentence says only what its code always holds; the
+// effective-date code also comes with bills left, so it never says none was.
+const UNCONFIRMED_WITH_LEDGERS_SET_ASIDE = new Map([
+  [
+    "native_outstandings_as_of_unconfirmed_without_bill_references",
+    "No bill was left for the other ledgers, though they still carry a balance, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals.",
+  ],
+  [
+    "native_outstandings_as_of_unconfirmed_without_effective_date_evidence",
+    "Any bills left gave no overdue-day evidence that identifies the report's effective date, so ComplyEaze Bridge withheld the totals.",
+  ],
+]);
+
 export function outstandingsPartialState(
   reasonCode: string,
   requestedAsOf?: string,
@@ -117,14 +132,12 @@ export function outstandingsPartialState(
     // this other reason; both are said.
     const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
     const setAside = `${named.map(sentence).join(" ")} ComplyEaze Bridge left those ledgers out, with their bills.`;
-    // Tally returned these bills: they went with their ledgers, and another
-    // date reads the same book.
-    if (reasonCode === "native_outstandings_as_of_unconfirmed_without_bill_references") {
+    const unconfirmed = UNCONFIRMED_WITH_LEDGERS_SET_ASIDE.get(reasonCode);
+    if (unconfirmed) {
       return {
         ...state,
         title: "This as-of date could not be confirmed",
-        message: `${setAside} No bill was left, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals.`,
-        retryable: false,
+        message: `${setAside} ${unconfirmed}`,
       };
     }
     return { ...state, message: `${sentence(state.message)} ${setAside}` };

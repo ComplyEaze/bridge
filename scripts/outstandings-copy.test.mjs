@@ -151,8 +151,20 @@ test("a withheld result names the ledgers it also set aside", () => {
   assert.equal(state.title, "This as-of date could not be confirmed");
   assert.doesNotMatch(state.message, /Tally returned no bill references/);
   assert.match(state.message, /1 ledger in a currency other than this company's base currency: Synthetic FX Debtor A \(\$\)\. /);
-  assert.match(state.message, /on 1 base-currency ledger: Synthetic Rupee Party\. ComplyEaze Bridge left those ledgers out, with their bills\. No bill was left, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals\.$/);
-  assert.equal(state.retryable, false);
+  assert.match(state.message, /on 1 base-currency ledger: Synthetic Rupee Party\. ComplyEaze Bridge left those ledgers out, with their bills\. No bill was left for the other ledgers, though they still carry a balance, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals\.$/);
+  assert.equal(state.retryable, true);
+  const plain = outstandingsPartialState(
+    "native_outstandings_as_of_unconfirmed_without_effective_date_evidence",
+    undefined,
+    undefined,
+    undefined,
+    [{ ledger: "Synthetic FX Debtor A", currency: "$" }],
+    [],
+  );
+  assert.equal(plain.title, "This as-of date could not be confirmed");
+  assert.doesNotMatch(plain.message, /Tally returned no|No bill was left/);
+  assert.match(plain.message, /left those ledgers out, with their bills\. Any bills left gave no overdue-day evidence that identifies the report's effective date, so ComplyEaze Bridge withheld the totals\.$/);
+  assert.equal(plain.retryable, true);
   const other = outstandingsPartialState("native_overdue_crosscheck_mismatch", undefined, undefined, undefined, [], ["Synthetic Rupee Party"]);
   assert.match(other.message, /cross-check disagreed .* No totals were calculated\. .*left those ledgers out, with their bills\.$/);
   assert.equal(other.retryable, true);

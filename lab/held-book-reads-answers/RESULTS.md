@@ -29,3 +29,27 @@ Which post passed its deadline is not established from what is here. [partial]
 
 ## Deviations
 1. The second marks read came after a gap, on the run lead's word, because the timeout rule sent nothing more at the stop.
+
+## B3, read smoke of master
+Build: run 41297868762, artifact 13080855097, head 4cdfe448, zip digest equal; 31 tools, none that prepares or posts. Dates: the last completed financial year; the month is its last; every call once, in this order. The run ended at the first read that hit a deadline.
+
+| call | outcome | rows | answer bytes saved | bytes read from Tally | seconds |
+|---|---|---|---|---|---|
+| tally_status | answered, complete | 1 loaded company | 1865 | 4149 | 0.06 |
+| list_companies | answered, complete | 1 | 1611 | 8196 | 0.06 |
+| trial_balance | answered, complete, state `observed`, a first page | 300 | 207358 | 23811162 | 4.28 |
+| profit_and_loss | answered, complete, state `not_established` | 4 unclassified ledgers | 16259 | 29349346 | 5.96 |
+| balance_sheet | answered, complete, state `not_established` | 4 unclassified ledgers | 13275 | 29349346 | 3.24 |
+| stock_summary | refused `stock_summary_too_large`, evidence partial | 0 | 2505 | 22377 | 0.64 |
+| ledger_masters (basic) | answered, complete, a first page | 500 of 9451 | 147445 | 21523206 | 3.00 |
+| masters (groups) | answered, complete, state `observed`, a first page | 500 of 1455 | 112659 | 5533450 | 1.22 |
+| sales_register | refused `party_ledger_master_read_failed`, cause `request_deadline_exceeded`, evidence partial | 0 | 1726 | 44475709 | 24.94 |
+| purchase_register, vouchers, cash_flow | not sent | - | - | - | - |
+
+- **The stop:** sales_register's deadline ended the run. `GET /status` answered 200 within 3 s, Tally stayed on the Gateway with no dialog, one tally.exe. [verified]
+- **Marks:** read raw before and after B3, byte-equal to the first read. [verified]
+- **Not established:** profit_and_loss gives the reason `unclassified_ledger_carries_an_amount`, with 4 ledgers listed unclassified; balance_sheet reads the same. Tally's own statements were not compared here. [verified for the state; whether those 4 ledgers should be classified is not established]
+- **stock_summary:** master has no census admission yet, so this refusal is what #2180 changes (B1 answered on #2180's build). [verified]
+- **Looked at twice:** trial_balance's first page held 300 rows, while its schema names a row limit of 500. The page was marked truncated with a next offset, so nothing was dropped, but why it stopped at 300 was not read. [partial]
+
+**Confidence:** one sitting, one real book, one call each: PARTIAL.

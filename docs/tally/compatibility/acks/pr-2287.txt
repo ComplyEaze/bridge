@@ -1,0 +1,12 @@
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-transport/src/lib.rs
+src-tauri/crates/bridge-tally-transport/tests/http_transport.rs
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_headline.rs
+src-tauri/src/agent_stock_summary.rs
+src-tauri/src/agent_tests.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/runtime.rs
+src-tauri/src/tally/runtime_stock_summary.rs
+reviewer: lamemustafa

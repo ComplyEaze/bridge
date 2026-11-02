@@ -1,0 +1,15 @@
+# Stock Query, Tally's screen, Godown/Batch Details, as read from the captures. Two passes. item | to | godown | batch | quantity
+Hydrochloric Acid 33pc | 2026-03-31 | Main Location | Primary Batch | 150.000
+Hydrochloric Acid 33pc | 2026-03-31 | Main Location | H-2504-A | 300.000
+Hydrochloric Acid 33pc | 2026-03-31 | Factory Floor | H-2504-B | 366.667
+Soda Ash Light | 2026-03-31 | Main Location | Primary Batch | 1350.000
+Soda Ash Light | 2026-03-31 | Factory Floor | Primary Batch | -50.000
+Cleaning Kit A | 2026-03-31 | Main Location | Primary Batch | 25
+Cleaning Kit A | 2026-03-31 | Main Location | K-2504-A | -13
+Zero Stock Item | 2026-03-31 | Main Location | Primary Batch | -50.000
+Hydrochloric Acid 33pc | 2025-08-31 | Main Location | Primary Batch | 150.000
+Hydrochloric Acid 33pc | 2025-08-31 | Main Location | H-2504-A | 300.000
+Hydrochloric Acid 33pc | 2025-08-31 | Factory Floor | H-2504-B | 366.667
+Soda Ash Light | 2025-08-31 | Main Location | Primary Batch | 1350.000
+Soda Ash Light | 2025-08-31 | Factory Floor | Primary Batch | -50.000
+Zero Stock Item | 2025-08-31 | Main Location | Primary Batch | -50.000

@@ -1,0 +1,3 @@
+Replaced in the tool answers and text files here, with counts. company_number values go first, by a JSON parser. The marks in evidence/ are byte for byte.
+<company number>: 5
+<lab folder>: 2

@@ -1,0 +1,20 @@
+2026-11-02T20:02:19Z exe sha256 90000d448c551070c98a8400353cc31330a0da795e0eb290b7882f5a83286f40 ok; launch-env.json sha256 bca337fc6a08535b238a04c6df91268fbeea038247d1ba09a5fd3d059de9313a; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-02T20:02:20Z launched pid 2400; stderr to server-stderr-20261102T200219Z.log
+2026-11-02T20:02:20Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-02T20:02:22Z 000-tools.json tool=list secs=0.024 isError=None error=None saved_sha256=6d321010b952d4c84acf07248a8d929d153fa9fe495ea12fa984db9467ad40ab
+2026-11-02T20:02:23Z 001-companies.json tool=list_companies secs=0.252 isError=False error=None saved_sha256=327106c78a5d30a866c6791a62c7dceab9f259c2c59feab700cd9829125e3025
+2026-11-02T20:06:33Z 002-s2-parse-q.json tool=parse_bank_statement secs=0.078 isError=True error=None saved_sha256=e9ed81da8e245f564f699d18235dcef83a52539fff4ac039bd3c7c1e0dfee6f9
+2026-11-02T20:06:43Z 003-s2-parse-q2.json tool=parse_bank_statement secs=0.096 isError=True error=None saved_sha256=0d12bf974e147e7769416d17712b7d245d18da9dc6d5119f2d134329dbfc8384
+2026-11-02T20:07:05Z 004-s2-parse-q3.json tool=parse_bank_statement secs=0.321 isError=False error=None saved_sha256=2897549c98ed763d3a03329f2af8adb5299ab99b90219616124ea8c13c514712
+2026-11-02T20:07:25Z 005-s2-parse-a.json tool=parse_bank_statement secs=0.221 isError=False error=None saved_sha256=0ff173db48f6541d9762abdc70138ed54dcb1a3419e7385441277097e53f65f9
+2026-11-02T20:07:36Z 006-s2-build.json tool=build_import_xml secs=10.202 isError=False error=None saved_sha256=bb8b681efb0cdecd21d85904099063656ee9f38f26ac407b2cf4a46aaea65da0
+2026-11-02T20:07:54Z 007-s3-parse-q.json tool=parse_bank_statement secs=0.181 isError=False error=None saved_sha256=0de85f69b3d05ee70e3c1ce33e4d8b518c49a922930bea67a2e34ff981d7eae8
+2026-11-02T20:07:56Z 008-s3-parse-a.json tool=parse_bank_statement secs=0.204 isError=False error=None saved_sha256=a89cc4b8be2cc3bd0501a68117526c8b2a2a7187668b676423a1dd9d4c91f4f8
+2026-11-02T20:08:04Z 009-s3-build.json tool=build_import_xml secs=6.964 isError=False error=None saved_sha256=b966ea26df167f0355600221d6595a015503f6f25e18ab981d74c999c7abef5d
+2026-11-02T20:08:07Z 010-s4-parse-q.json tool=parse_bank_statement secs=0.152 isError=False error=None saved_sha256=7333172ed5961ccc53b357131ca9876736206a18d1ef2e4aad0883e247686acb
+2026-11-02T20:08:08Z 011-s4-parse-a.json tool=parse_bank_statement secs=0.179 isError=False error=None saved_sha256=9cad21966bf70c6354379e818195107234c790e709caee6c927382e2fbaf2548
+2026-11-02T20:08:15Z 012-s4-build.json tool=build_import_xml secs=5.551 isError=False error=None saved_sha256=7a0f1ed9ef0ae309b392b2c01835b36b4160daba19b8d5fe09c26dbc61bca39d
+2026-11-02T20:08:50Z 013-s5-post.json tool=post_import secs=7.157 isError=True error=None saved_sha256=56a5ba148b49dfe5e27855dc8cc4055aa66aedc06491ca6369daed624b6c8e04
+2026-11-02T20:10:29Z 014-s6-post.json tool=post_import secs=26.895 isError=False error=None saved_sha256=baeacc2f3b6623bff2b53a52262af062770950343747725876da108a0870ca2f
+2026-11-02T20:10:58Z 015-s6-post2.json tool=post_import secs=16.492 isError=False error=None saved_sha256=141f324d1edf33d5b8ebaceb8995b421b4ef2a598e8bf633d746824a2c3dcabb
+2026-11-02T20:12:36Z session ended; server pid 2400 exit code 0

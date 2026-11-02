@@ -1,0 +1,39 @@
+001-companies.json isError False seconds 0.252 state None reason None ledger None date None balance None cash_projection None voucher_count None
+002-s2-parse-q.json isError True seconds 0.078 state None reason statement_password_file_permissions ledger None date None balance None cash_projection None voucher_count None
+003-s2-parse-q2.json isError True seconds 0.096 state None reason statement_password_file_permissions ledger None date None balance None cash_projection None voucher_count None
+004-s2-parse-q3.json isError False seconds 0.321 state None reason None ledger None date None balance None cash_projection None voucher_count None
+005-s2-parse-a.json isError False seconds 0.221 state None reason None ledger None date None balance None cash_projection None voucher_count None
+006-s2-build.json isError False seconds 10.202 state None reason None ledger None date None balance None cash_projection [{"balance": "200", "date": "20250425", "ledger": "Cash"}] voucher_count 1
+007-s3-parse-q.json isError False seconds 0.181 state None reason None ledger None date None balance None cash_projection None voucher_count None
+008-s3-parse-a.json isError False seconds 0.204 state None reason None ledger None date None balance None cash_projection None voucher_count None
+009-s3-build.json isError False seconds 6.964 state refused reason cash_projection_negative ledger Cash date 20250425 balance -100 cash_projection None voucher_count None
+010-s4-parse-q.json isError False seconds 0.152 state None reason None ledger None date None balance None cash_projection None voucher_count None
+011-s4-parse-a.json isError False seconds 0.179 state None reason None ledger None date None balance None cash_projection None voucher_count None
+012-s4-build.json isError False seconds 5.551 state refused reason cash_book_already_negative ledger Cash date 20250405 balance -300 cash_projection None voucher_count None
+013-s5-post.json isError True seconds 7.157 state None reason cash_projection_stale ledger None date None balance None cash_projection None voucher_count None
+014-s6-post.json isError False seconds 26.895 state None reason None ledger None date None balance None cash_projection None voucher_count None
+015-s6-post2.json isError False seconds 16.492 state None reason None ledger None date None balance None cash_projection None voucher_count None
+relay rows 600 dropped 0
+relay rows in 001-companies.json 4
+relay rows in 006-s2-build.json 98
+relay rows in 009-s3-build.json 72
+relay rows in 012-s4-build.json 72
+relay rows in 013-s5-post.json 76
+relay rows in 014-s6-post.json 104
+relay rows in 015-s6-post2.json 174
+Import as sent req-0569.bin <VOUCHER REMOTEID="68ac4d43-f264-4987-9e81-007065ee0fe6" VCHTYPE="Contra" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>20250412</DATE><EFFECTIVEDATE>20250412</EFFECTIVEDATE><VOUCHERTYPENAME>Contra
+Import requests 1
+TB req-0054.bin BRIDGE Bank A {'TBALOPENING': '-12000.00', 'DEBITTOTALS': '0.00', 'CREDITTOTALS': '0.00', 'TBALCLOSING': '-12000.00'}
+TB req-0054.bin BRIDGE Capital {'TBALOPENING': '11000.00', 'DEBITTOTALS': '', 'CREDITTOTALS': '', 'TBALCLOSING': '11000.00'}
+TB req-0054.bin BRIDGE Customer A {'TBALOPENING': '5000.00', 'DEBITTOTALS': '0.00', 'CREDITTOTALS': '0.00', 'TBALCLOSING': '5000.00'}
+TB req-0054.bin BRIDGE Office Expenses {'TBALOPENING': '0.00', 'DEBITTOTALS': '-900.00', 'CREDITTOTALS': '0.00', 'TBALCLOSING': '-900.00'}
+TB req-0054.bin BRIDGE Petty Cash {'TBALOPENING': '-300.00', 'DEBITTOTALS': '0.00', 'CREDITTOTALS': '0.00', 'TBALCLOSING': '-300.00'}
+TB req-0054.bin Cash {'TBALOPENING': '-1200.00', 'DEBITTOTALS': '0.00', 'CREDITTOTALS': '900.00', 'TBALCLOSING': '-300.00'}
+TB req-0054.bin Profit &amp; Loss A/c {'TBALOPENING': '-2500.00', 'DEBITTOTALS': '', 'CREDITTOTALS': '', 'TBALCLOSING': '-2500.00'}
+saved batch built {"ledgers": ["Cash"], "from": "20250412", "to": "20260331", "book_sha256": "a40cc42c55c8aaef85516d903d6910fd7137354e19c922c8d0d676bf346e47aa"} vouchers 1
+m1 [('ALTVCHID', '11'), ('ALTMSTID', '214')]
+m5-after-payment [('ALTVCHID', '12'), ('ALTMSTID', '214')]
+m5-after-post [('ALTVCHID', '12'), ('ALTMSTID', '214')]
+m6-before-post [('ALTVCHID', '14'), ('ALTMSTID', '214')]
+m7 [('ALTVCHID', '14'), ('ALTMSTID', '214')]
+m7-after-post [('ALTVCHID', '15'), ('ALTMSTID', '214')]

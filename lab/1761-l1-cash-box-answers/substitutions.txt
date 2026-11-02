@@ -1,0 +1,5 @@
+company_number values go first, by a JSON parser, in the answers and the import ledger. The number is X at equal length in the raw reads and relay files, so sizes stand; sha256 in the logs are of the originals. Other replacements in the text files, with counts:
+<company number>: 7
+<desktop client>: 2
+<lab folder>: 31
+<temporary folder>: 1

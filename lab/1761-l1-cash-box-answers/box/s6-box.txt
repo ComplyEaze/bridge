@@ -1,0 +1,36 @@
+﻿2026-11-02T20:10:04.663Z watch start: tally window 0xa826a4; see within 60 s; answer by 70 s
+2026-11-02T20:10:13.199Z BOX SEEN 0x1502848 pid 29444 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-11-02T20:10:13.359Z rect 688,181,1252,926 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-02T20:10:13.456Z foreground 0x1502848 pid 29444 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-02T20:10:13.536Z child Button rect 901,870,1001,903 text: &Yes
+2026-11-02T20:10:13.635Z child Button rect 1011,870,1111,903 text: &No
+2026-11-02T20:10:13.708Z child Button rect 1121,870,1221,903 text: Cancel
+2026-11-02T20:10:13.769Z child Static rect 725,252,765,292 text: 
+2026-11-02T20:10:13.988Z child Static rect 775,252,1203,824 text: Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Contra in "BRIDGE CASHDAY LAB"
+Company GUID: 5342454a-478e-4d59-a663-16ec7b8c84a8
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9002
+Date: 12-Apr-2025  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 100.00  "BRIDGE Bank A"
+Cr 100.00  "Cash"
+
+Total debit: 100  Total credit: 100
+Checked in Tally: every ledger is bank/cash.
+Batch: bridge-a5dcc91b-ddc8-455d-893e-84b98fd4beb7
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration: "CASH A10001761 from Cash | Lab UBI 1761 | 12-Apr-2025"
+2026-11-02T20:10:15.756Z capture s6-open.png 1920x1080 423709 B sha256 dee56cab93f6ab478838f052dc1338447f459df588879d8bcf1607764ced5dca
+2026-11-02T20:10:15.826Z WAITING for <lab folder>\box\s6.answer
+2026-11-02T20:10:28.674Z before click: foreground 0x1502848 pid 29444 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-02T20:10:28.842Z CLICKED Yes at 951,886 (physical) 2026-11-02T20:10:28.719Z; seen-to-click 15.5 s
+2026-11-02T20:10:30.069Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

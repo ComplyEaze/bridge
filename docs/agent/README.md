@@ -2265,9 +2265,21 @@ is not kept in the fixture.
 ### Foreign-currency composites in `vouchers`
 
 A foreign amount entered on a rupee ledger can be stored by Tally as a
-composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
+composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 and
+`-$100.00 @ ₹ 86/$ = -₹ 8600.00` on 7.2 (#674, #683).
 
-- **`vouchers` withholds that voucher.** It passes every date, ledger and
+- **`vouchers` reads it.** The amount after `=` becomes the entry's or the bill
+  allocation's `amount`, and `foreign` holds `currency`, `amount` and `rate` as
+  Tally wrote them. Sums, summaries and an `amount` search use the rupee amount.
+  When a window holds a composite, `vouchers` also reads the book's currencies.
+  Measured on one book of each release, one currency. `ledger_movement` still
+  refuses such a window, so a `vouchers` summary holding these amounts cannot be
+  tied to it.
+- **It withholds a voucher it cannot read that way:** the book's base is not
+  established as INR, the amount after `=` is not in that base, the foreign
+  symbol is not one of the book's Currency masters, a composite has no rate or
+  no foreign amount, or the entries do not net to zero.
+- **A withheld voucher** passes every date, ledger and
   voucher-type check like any other, and is then listed in `withheld_vouchers`
   instead of `items`. The listing gives its GUID, date, type, number and cause,
   up to 100 vouchers, with an exact `withheld_total` that is the same on every
@@ -2275,7 +2287,7 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 - **The result says so.** `state` is `partial` with `reason`
   `vouchers_withheld`, `total` counts `items` only (the buckets, under `summarise_by`), and `coverage` says what
   was left out.
-- **No amount is read from a composite.** Anything that is neither a plain
+- **Nothing else is read as an amount.** Anything that is neither a plain
   decimal nor an exact composite still refuses the whole window. So does a
   composite whose foreign and base amounts carry opposite signs, unless the
   foreign amount is zero: a voucher entry's two amounts share one sign.

@@ -3861,6 +3861,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml",
         APP_FOREX_VOUCHERS,
     ),
+    (
+        "tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml",
+        APP_FOREX_VOUCHERS,
+    ),
     // Voucher exports captured for the removed voucher-scan parser.
     (
         "tests/fixtures/unit_a_optional_voucher_live.xml",

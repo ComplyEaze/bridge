@@ -12,20 +12,12 @@
 use super::*;
 use crate::agent::transfer_pairing::{
     transfer_pairing_view, with_days_read, BatchId, BatchStatus, ContraKey, DayReader,
-    DoubleBookedClass, LedgerGuid, SkipFact, SkipState, TransferView,
+    DoubleBookedClass, LedgerNames, PairingInput, SkipFact, SkipState, TallyDays, TransferView,
+    TRANSFER_K_DAYS,
 };
 use statement_facts::{
     BuildLine, Candidate, FactsError, HeldBy, StatementFacts, TransferFacts, TransferFactsError,
 };
-
-/// How many days apart the two statements may print one transfer and still
-/// pair it by date. Zero until a real statement pair has been measured: k comes
-/// from that pair (the design's C12), not from synthetic rows, so only the same
-/// printed day matches today.
-pub(super) const TRANSFER_K_DAYS: u32 = 0;
-// A whole-day read settles a skip on its own day only (#1392): a k above 0
-// needs the neighbouring days read too.
-const _: () = assert!(TRANSFER_K_DAYS == 0);
 
 /// The argument that names skipped rows a build posts anyway.
 pub(super) const WITHDRAW_SKIPS_KEY: &str = "withdraw_skips";
@@ -97,8 +89,8 @@ impl OpenState {
     pub(super) fn step(self) -> &'static str {
         match self {
             Self::OtherSideUnverified => "The other account's Contra for this row is in the batch named, which is not verified yet. Run verify_import on every batch named for this row; do not post this row. Build the other account's statement for this row's date again only if every batch named for this row was never sent to Tally, verify_import listed every one of their vouchers as not_found, and the person confirms none of their files was ever imported into Tally; then post the new build, verify it, and never import an old batch's file. If verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet. If Tally rejected the send of a batch named for this row, building the other account's statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
-            Self::TallyUnchecked => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date in Tally, or could not find one of the two ledgers in the ledger list it read, or read them all and found a voucher of this date with an entry on each of the two ledgers, which it does not compare with this row, so a Contra entered in Tally directly is not ruled out. Read the vouchers of this date with the vouchers tool and look for a voucher of the Contra voucher class, or of any other type such as a Journal or Payment, that carries this row's amount on the bank ledger the other account's statement was built for, and read its narration where it was not dropped; a voucher dated another day, or booked against another ledger, is not looked for, a transfer may print on different days, and a masked ledger name can read like another, so compare amounts and dates too. Tell the person what you found and keep the skip. Do not book this transfer in Tally another way, and withdraw the skip on one side only: a later post of the other statement would book it twice. Name the row in withdraw_skips only when the person confirms that no entry in Tally carries this transfer.",
-            Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, and ComplyEaze Bridge read every voucher of this date in Tally and found no Contra between the two accounts that could carry it; a Contra dated another day, or booked against another ledger, is not looked for. If no batch of that statement covers this date, build it. If that statement skipped this row too, withdraw the skip on exactly one side, and only when the person confirms. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
+            Self::TallyUnchecked => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date and of the day either side in Tally, or could not find the other account's ledger, or a ledger an entry of those days names, in the ledger list it read, or read them all and found an entry on the other account's ledger within a day of this date, which it does not compare with this row, so a Contra entered in Tally directly is not ruled out. Read the vouchers of this date and of the day either side with the vouchers tool and look for a voucher of the Contra voucher class, or of any other type such as a Journal, Payment or Receipt, that carries this row's amount on the bank ledger the other account's statement was built for, or on a ledger a transfer may pass through, and read its narration where it was not dropped; a voucher dated further away, or booked against another ledger, is not looked for, a transfer may print on different days, and a masked ledger name can read like another, so compare amounts and dates too. Tell the person what you found and keep the skip. Do not book this transfer in Tally another way, and withdraw the skip on one side only: a later post of the other statement would book it twice. Name the row in withdraw_skips only when the person confirms that no entry in Tally carries this transfer.",
+            Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, and ComplyEaze Bridge read every voucher of this date and of the day either side in Tally and found no entry on the other account's ledger, in a voucher of any type; a voucher dated further away, a transfer that passes through another ledger over more days, or one split across vouchers is not looked for. Tell the person what was read and keep the skip; withdraw it on one side only. Name the row in withdraw_skips only when the person confirms that no entry in Tally carries this transfer. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
             Self::Ambiguous => "Each batch named holds a Contra that could carry this row: more than one Contra could, or the one that could is also claimed by another row or booked twice. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified.",
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Where a batch is named, it holds a Contra that could carry this row. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
             Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is.",
@@ -144,6 +136,9 @@ pub(super) enum TransferSummary {
         retired: usize,
         /// Ordered by date, then id.
         open: Vec<OpenRow>,
+        /// What the call's reads of Tally's days yielded, where it read any
+        /// (#1392).
+        day_reads: Option<Value>,
     },
 }
 
@@ -240,6 +235,27 @@ impl TransferSummary {
             skips_open,
             retired: facts.retired_skips,
             open,
+            day_reads: None,
+        }
+    }
+
+    /// The summary, showing what the call's day reads yielded.
+    fn with_day_reads(self, summary: Value) -> Self {
+        match self {
+            Self::Computed {
+                paired,
+                skips_open,
+                retired,
+                open,
+                ..
+            } => Self::Computed {
+                paired,
+                skips_open,
+                retired,
+                open,
+                day_reads: Some(summary),
+            },
+            Self::NotEstablished => Self::NotEstablished,
         }
     }
 
@@ -252,6 +268,7 @@ impl TransferSummary {
             skips_open,
             retired,
             open,
+            day_reads,
         } = self
         else {
             return check_not_run_section(false);
@@ -267,11 +284,14 @@ impl TransferSummary {
         if open.iter().any(|row| row.restored) {
             next_steps.insert("restored".into(), json!(RESTORED_NOTE));
         }
-        let frame = json!({
+        let mut frame = json!({
             "state": "computed", "skips_paired": paired, "skips_open": skips_open,
             "open": [], "open_omitted": open.len(), "retired": retired,
             "next_steps": next_steps.clone(),
         });
+        if let Some(day_reads) = day_reads {
+            frame["day_reads"] = day_reads.clone();
+        }
         // the step for omitted rows is paid for whether or not it is needed
         let frame_len = frame.to_string().len() + OPEN_OMITTED_STEP.len() + 32;
         let mut room = available.saturating_sub(frame_len);
@@ -299,11 +319,10 @@ impl TransferSummary {
         if omitted > 0 {
             next_steps.insert("open_omitted".into(), json!(OPEN_OMITTED_STEP));
         }
-        json!({
-            "state": "computed", "skips_paired": paired, "skips_open": skips_open,
-            "open": rows, "open_omitted": omitted, "retired": retired,
-            "next_steps": next_steps,
-        })
+        frame["open"] = json!(rows);
+        frame["open_omitted"] = json!(omitted);
+        frame["next_steps"] = json!(next_steps);
+        frame
     }
 }
 
@@ -472,48 +491,51 @@ pub(super) enum Admission {
     Refused(TransferRefusal),
 }
 
-/// The facts a build was admitted on, or nothing when the view could not be
-/// established. The view it was admitted on is not kept: the section's is the
-/// one [`Admitted::summary_with_days_read`] computes.
-pub(super) struct Admitted(Option<TransferFacts>);
+/// The facts a build was admitted on, checked for the view once, or nothing
+/// when the view could not be established. The view it was admitted on is not
+/// kept: the section's is the one [`Admitted::summary_with_days_read`]
+/// computes.
+pub(super) struct Admitted(Option<Box<(TransferFacts, PairingInput)>>);
 
 impl Admitted {
-    /// The section's summary, after reading the days of its `tally_unchecked`
-    /// rows from Tally (#1392), with the evidence of the reads that came back.
-    /// It starts from the facts the build was admitted on, and the days change
-    /// only which of those rows read `not_found`, which no admission reads, so
-    /// it is called once nothing is left to refuse. `ledgers` is the
-    /// catalogue this call read: a skip's ledgers are named by their GUIDs,
-    /// spelled as the voucher rows spell them, and a ledger not in it keeps
-    /// its rows `tally_unchecked`.
+    /// The section's summary, after reading the windows of its
+    /// `tally_unchecked` rows from Tally (#1392), folding into `evidence` every
+    /// answer the reads got back. It starts from the facts the build was admitted on, and the
+    /// days change only which of those rows read `not_found`, which no
+    /// admission reads. `ledgers` is the catalogue this call read: a skip's
+    /// ledgers are named by their GUIDs, spelled as Tally sent them, and a day
+    /// naming a ledger not in it rules nothing out. `voucher_mark` is the
+    /// book's voucher mark where this call read it; without it the marks are
+    /// read before the first day.
     pub(super) async fn summary_with_days_read<R: DayReader>(
         self,
         reader: &R,
         identity: &crate::tally::VerifiedCompanyIdentity,
         company: &str,
         ledgers: &bridge_tally_protocol::StandardLedgerCatalog,
-    ) -> (TransferSummary, Option<Evidence>) {
-        let Some(facts) = self.0 else {
-            return (TransferSummary::NotEstablished, None);
+        voucher_mark: Option<u64>,
+        evidence: &mut Evidence,
+    ) -> TransferSummary {
+        let Some(admitted) = self.0 else {
+            return TransferSummary::NotEstablished;
         };
-        let names: BTreeMap<&str, &str> = ledgers
-            .identified_parents()
-            .map(|(name, guid, _)| (guid, name))
-            .collect();
-        match with_days_read(
-            reader,
-            identity,
-            company,
-            &facts.skips,
-            &facts.contras,
-            &facts.coverage,
-            |guid: &LedgerGuid| names.get(guid.as_str()).map(|name| (*name).to_string()),
-        )
-        .await
-        {
-            Ok((view, reads)) => (TransferSummary::of(&facts, &view), reads.evidence),
-            // the facts were admitted, so this is not reached
-            Err(_) => (TransferSummary::NotEstablished, None),
+        let (facts, input) = *admitted;
+        let names = LedgerNames::new(
+            ledgers
+                .identified_parents()
+                .map(|(name, guid, _)| (guid, name)),
+        );
+        let (view, reads) =
+            with_days_read(reader, identity, company, &input, &names, voucher_mark).await;
+        if let Some(read) = &reads.evidence {
+            *evidence = combine_evidence(evidence.clone(), read.clone());
+        }
+        let summary = TransferSummary::of(&facts, &view);
+        // a call that planned no day shows nothing of day reads
+        if reads.whole.is_empty() && reads.kept.is_empty() {
+            summary
+        } else {
+            summary.with_day_reads(reads.summary())
         }
     }
 }
@@ -723,15 +745,15 @@ impl Server {
         }
     }
 
-    /// The facts of one company and the view over them, with a candidate read as
+    /// The facts of one company, checked for the view, with a candidate read as
     /// the newest record when one is given. `subject` is as for
     /// `ledger::transfer_facts`.
-    pub(super) fn transfer_view_while_admitted(
+    fn transfer_input_while_admitted(
         &self,
         company_guid: &str,
         candidate: Option<Candidate>,
         subject: Option<&str>,
-    ) -> Result<(TransferFacts, TransferView), TransferFactsError> {
+    ) -> Result<(TransferFacts, PairingInput), TransferFactsError> {
         let journal: Box<dyn std::io::BufRead> = match self.import_journal_while_admitted() {
             Ok(Some(reader)) => Box::new(reader),
             Ok(None) => Box::new(std::io::empty()),
@@ -741,12 +763,21 @@ impl Server {
             .skip_file_while_admitted()
             .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
         let facts = ledger::transfer_facts(journal, skips, company_guid, candidate, subject)?;
-        let view = transfer_pairing_view(
-            &facts.skips,
-            &facts.contras,
-            &facts.coverage,
-            TRANSFER_K_DAYS,
-        )?;
+        let input = PairingInput::new(&facts.skips, &facts.contras, &facts.coverage)?;
+        Ok((facts, input))
+    }
+
+    /// The facts of one company and the view over them, as
+    /// [`Server::transfer_input_while_admitted`] reads them.
+    pub(super) fn transfer_view_while_admitted(
+        &self,
+        company_guid: &str,
+        candidate: Option<Candidate>,
+        subject: Option<&str>,
+    ) -> Result<(TransferFacts, TransferView), TransferFactsError> {
+        let (facts, input) =
+            self.transfer_input_while_admitted(company_guid, candidate, subject)?;
+        let view = input.view(&TallyDays::none(), TRANSFER_K_DAYS);
         Ok((facts, view))
     }
 
@@ -945,14 +976,15 @@ impl Server {
         // C6: the view with this build in it.
         let candidate_batch = input.candidate_build().map(str::to_string);
         let needs_the_view = input.needs_the_view();
-        let (facts, view) = match self.transfer_view_while_admitted(
+        let (facts, checked) = match self.transfer_input_while_admitted(
             &input.company_guid,
             Some(input.candidate),
             input.subject.as_deref(),
         ) {
-            Ok(view) => view,
+            Ok(facts) => facts,
             Err(error) => return Ok(without_facts(needs_the_view, &error)),
         };
+        let view = checked.view(&TallyDays::none(), TRANSFER_K_DAYS);
         let other_batch = candidate_batch
             .as_deref()
             .and_then(|ours| double_booked_with(&view, ours));
@@ -963,7 +995,9 @@ impl Server {
                 next_step: TRANSFER_DOUBLE_BOOKED_NEXT_STEP.into(),
             }));
         }
-        Ok(Admission::Admitted(Admitted(Some(facts))))
+        Ok(Admission::Admitted(Admitted(Some(Box::new((
+            facts, checked,
+        ))))))
     }
 
     /// A saved batch about to be sent, judged as its build was and against the

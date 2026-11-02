@@ -1494,6 +1494,26 @@ impl Server {
                     });
                 }
             }
+            // The windows of the section's tally_unchecked rows are read here,
+            // under the admission lock and before the catalogue repeat and the
+            // write (#1392): nothing is read between the write and the reply,
+            // and a ledger renamed during these reads is import_catalogue_changed
+            // below. They change only which of those rows read not_found, which
+            // no admission reads, and a day read that fails keeps its rows
+            // unchecked.
+            let voucher_mark = mark
+                .value
+                .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
+            let transfers = transfers
+                .summary_with_days_read(
+                    &super::voucher_window::AgentReader(self),
+                    &identity,
+                    &company.name,
+                    ledger_masters.catalog(),
+                    Some(voucher_mark),
+                    &mut accumulated,
+                )
+                .await;
             let (_, _, _, repeated_catalogue_evidence) = self
                 .read_import_ledger_catalogue(&identity, &company.name)
                 .await?;
@@ -1755,25 +1775,8 @@ impl Server {
             // The file was stored and is read by the logical `path`. Set before the
             // essential length is measured, so the transfers section's room counts it.
             user_visible_path(&path).put_into(&mut payload["result"], "path");
-            // The days of the section's tally_unchecked rows are read last, after
-            // the build is written and with the admission lock released: they
-            // change only which of those rows read not_found, which no
-            // admission reads (#1392).
-            drop(_admission_lock);
-            let (transfers, day_evidence) = transfers
-                .summary_with_days_read(
-                    &super::voucher_window::AgentReader(self),
-                    &identity,
-                    &company.name,
-                    ledger_masters.catalog(),
-                )
-                .await;
-            if let Some(day_evidence) = day_evidence {
-                accumulated = combine_evidence(accumulated.clone(), day_evidence);
-            }
-            // The summary comes from the facts admitted before the append, with
-            // this build in it, so nothing after the append refuses a written
-            // build, and a day read that fails only keeps its rows unchecked. It is drawn
+            // The summary was computed before the append, with this build in it,
+            // so nothing after the append refuses a written build. It is drawn
             // here into the room the essential result leaves. The response
             // cap's fitter can still cut it, down to leaving it out, but only
             // for a result that fits without it (and then the answer is marked
@@ -1880,22 +1883,22 @@ impl Server {
             }
             transfers::Admission::Admitted(summary) => summary,
         };
-        self.append_skip_record_while_admitted(&record)
-            .map_err(fail)?;
-        // As for a build: read last, with the admission lock released (#1392).
-        drop(_admission_lock);
-        let (transfers, day_evidence) = transfers
+        // As for a build: the windows of the tally_unchecked rows are read
+        // under the admission lock, before the record is appended (#1392).
+        let mut accumulated = accumulated;
+        let transfers = transfers
             .summary_with_days_read(
                 &super::voucher_window::AgentReader(self),
                 &identity,
                 &company.name,
                 ledger_masters.catalog(),
+                None,
+                &mut accumulated,
             )
             .await;
-        let accumulated = match day_evidence {
-            Some(day_evidence) => combine_evidence(accumulated, day_evidence),
-            None => accumulated,
-        };
+        let fail = |code: String| ToolFailure::from(code).with_prior_evidence(accumulated.clone());
+        self.append_skip_record_while_admitted(&record)
+            .map_err(fail)?;
         let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
             "state": "skips_recorded",
             "record_id": record.record_id,

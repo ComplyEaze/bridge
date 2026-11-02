@@ -525,7 +525,7 @@ pub(super) fn bank_build_plans() -> Vec<ScenarioPlan> {
 
 /// How many requests a bank build sends up to and including its numbering
 /// read.
-const THROUGH_BANK_NUMBERING: usize = 2 + 10 + 6 + 6 + BUILD_NUMBERING_PLANS;
+pub(super) const THROUGH_BANK_NUMBERING: usize = 2 + 10 + 6 + 6 + BUILD_NUMBERING_PLANS;
 
 /// [`bank_build_plans`], its numbering read answered by `numbering`.
 fn bank_build_plans_numbering(numbering: Vec<ScenarioPlan>) -> Vec<ScenarioPlan> {

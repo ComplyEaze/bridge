@@ -6,7 +6,7 @@ from the head of pull request 1867 at 796e94f1 (posting off). A serial read-only
 gateway and recorded every request and answer; 1,657 requests were relayed and none refused. Every voucher and master was typed on
 Tally's own screen by a person, one at a time; nothing was imported. Each call sent 102 requests in the order
 `agent_gst_by_ledger_server_tests.rs` pins (`RECORDED_ORDER`), with the request fingerprints it pins; every answer other than the
-census (n) and the window (w) was byte-equal across the 14 calls, so those are kept once, from the first call. The bodies are kept
+census (n) and the window (w) was byte-equal across the 14 calls, so those are kept once, from the first call. Since #2265 `gst_by_counter_ledger` sends no balance read on this book, so those pins hold the 94 it sends; the balance answer stays here as captured. The bodies are kept
 exactly as received (UTF-16LE without a BOM; the status probe UTF-8); the company-listing answers held only the lab company's row,
 so nothing was trimmed. The book's month call (step 7, 64 vouchers) passed live but its answers (about 4.1 MB) are not kept here.
 The data is synthetic (SYN and GS1 names, no GSTIN). One instance, 14 vouchers, one release: they back the shapes and refusals

@@ -1828,12 +1828,17 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// leaving margins of 720, 904, 406 and 290. Its review fixes then added 64 bytes to every
 /// list, 30 in its `as_of` text and 34 in its description, counted from the text rather
 /// than measured, which leaves margins of 656, 840, 342 and 226 before any other change.
+/// On 2 Nov 2026 master measured 206,855, 232,849, 235,347 and 240,463 bytes, derived from
+/// measured merges by their known deltas. The outstandings withheld clause and the two
+/// changes waiting behind it add 334 bytes between them, which puts the last two lists
+/// over by 181 and 297. Those two budgets went up by 500, leaving margins of 319
+/// and 203 once all three have landed; the first two lists stay within theirs.
 /// Creating several ledgers in one request added 259 bytes to the master-writes list alone,
-/// measured on the merged tree: the lists are 206,855, 232,849, 235,347 and 240,722 bytes.
-/// The fourth budget went up by 500, leaving margins of 645, 651, 153 and 278.
+/// measured on the merged tree: the lists are 206,980, 232,999, 235,497 and 240,874 bytes,
+/// leaving margins of 520, 501, 503 and 126.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 233_500, 235_500, 241_000];
+const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 233_500, 236_000, 241_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

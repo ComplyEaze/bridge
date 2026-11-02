@@ -1,9 +1,11 @@
 //! One Sales invoice admission, and one read-back, run from the first request
 //! to the last against the scripted transport, on one book's answers only:
 //! BRIDGE PILOT LAB (the `pilot-lab` set; its PROVENANCE table is beside the
-//! fixtures). Every answer is Tally's own bytes, from three days of the book:
-//! the 9 Oct set, the company object (`O`, 12 Oct) and the rates read with the
-//! ledger catalogue it is paired with (21 Oct).
+//! fixtures). Every answer is Tally's own bytes, from three days of the book
+//! (the 9 Oct set, the company object `O` of 12 Oct and the ledger catalogue of
+//! 21 Oct), except the rates read `Q`, which is DERIVED: the lab's 21 Oct answer
+//! to the read restricted to the invoice ledgers' parents, cut to the invoice's
+//! ledgers (below).
 //!
 //! - The admission: the company list, the marks, the book extent, the
 //!   currencies, the ledger compliance listing, the paired listing, the
@@ -16,12 +18,14 @@
 //!   whose request is the same bytes. The company object the HSN/SAC check
 //!   reads is the 12 Oct answer (`O`).
 //! - The rate listing: the compliance listing with each ledger's GST rate and
-//!   rounding, restricted to the parents of the invoice's ledgers, as the lab
-//!   answered it on 21 Oct 2026 (`Q`, with the ledger catalogue read in the same
-//!   minute, which the party's bill-wise flag and the scope come from).
-//!   The derived answers of these tests are built by counted edits: the same
-//!   listing with its ledger rows removed, and with the Sundry Debtors row
-//!   removed (a party under Sales Accounts leaves that parent out of the scope).
+//!   rounding, restricted to the invoice's ledgers by GUID (#1331) (`Q`).
+//!   DERIVED: the code's request for these six ledgers was never sent to the
+//!   lab; the answer served is the lab's 21 Oct 2026 answer to the request
+//!   restricted to their parents, cut to the six (`rates_cut_to`, held equal to
+//!   the lab's GUID answers of 31 Oct 2026 for five other ledgers). The ledger
+//!   catalogue read in the same minute gives the party's bill-wise flag and the
+//!   GUIDs. Other derived answers here are counted edits of the same answer: its
+//!   ledger rows removed, or cut to another invoice's ledgers.
 //! - The read-back: the invoice round's marks after the post (17 and 223) and
 //!   its read-back of the posted invoice, before and after the post.
 use super::*;
@@ -127,7 +131,7 @@ const PILOT: &str = "BRIDGE PILOT LAB";
 /// What one admission sends, in order: e company list, s status probe, m
 /// marks, b book extent, c currencies, L the compliance listing, P the paired
 /// listing, g groups, Q the listing with each ledger's GST rate and rounding,
-/// restricted to the parents of the ledgers the invoice names (#1331),
+/// restricted to the ledgers the invoice names, by GUID (#1331; DERIVED),
 /// T voucher types, N the number read, C the company's tax units, O the company
 /// object (the HSN/SAC check, once the classification admits);
 /// U is the number read for a number the book uses.
@@ -154,11 +158,11 @@ const ADMISSION_ORDER: &str = concat!(
 const LAB_R09_SHA256: &str = "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985";
 const LAB_R10_SHA256: &str = "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6";
 const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
-/// The rates read restricted to the four parents of the lab invoices' ledgers
-/// with the HSN/SAC check's three fields in its field list
-/// (`pilot-lab-ledger-rates-scoped-hsn.request`): the request the code renders,
-/// which the lab answered on 21 Oct 2026.
-const LAB_Q1_SHA256: &str = "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc";
+/// The rates read restricted to the lab invoice's ledgers by GUID (#1331): the
+/// request the code renders, never sent to the lab with these six GUIDs. The
+/// lab answered the same request naming five other ledgers on 31 Oct 2026, and
+/// a test derives this pin from it (`LAB_INVOICE_GUID_RATES_SHA256`).
+const LAB_Q1_SHA256: &str = super::LAB_INVOICE_GUID_RATES_SHA256;
 
 /// The sha256 of each request sent where `order` has `letter`.
 fn sent_as<'a>(
@@ -188,7 +192,8 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
-        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"),
+        // DERIVED: see `lab_invoice_rates_hsn`.
+        'Q' => super::lab_invoice_rates_hsn(),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
@@ -203,9 +208,9 @@ fn pilot_plan(letter: char) -> ScenarioPlan {
 }
 
 /// The ledger catalogue the build reads, as the pilot lab answered it on
-/// 10 Oct 2026 (the set the scoped rates answer belongs to): the party's
-/// bill-wise flag and the parents the rates read is restricted to come from
-/// here.
+/// 21 Oct 2026 (the file is the W18 book's, byte-equal to that answer and to
+/// the one of 31 Oct 2026): the party's bill-wise flag and the GUIDs the rates
+/// read names come from here.
 fn pilot_catalogue() -> bridge_tally_protocol::StandardLedgerCatalogV2 {
     pilot_catalogue_of(&pilot_catalogue_text())
 }
@@ -231,14 +236,34 @@ fn pilot_catalogue_with_parent(
     ledger: &str,
     to: &str,
 ) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    pilot_catalogue_with_element(ledger, "PARENT", to)
+}
+
+/// DERIVED, not Tally's bytes: the lab's catalogue with the row of `ledger`
+/// given the GUID `to`, which stands for the ledger deleted and another created
+/// under its name and group. Its one `GUID` element is replaced and the GUID
+/// must have changed; nothing else differs.
+fn pilot_catalogue_with_guid(
+    ledger: &str,
+    to: &str,
+) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    pilot_catalogue_with_element(ledger, "GUID", to)
+}
+
+/// The catalogue with the first `element` of `ledger`'s row set to `to`.
+fn pilot_catalogue_with_element(
+    ledger: &str,
+    element: &str,
+    to: &str,
+) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
     let text = pilot_catalogue_text();
     let row = format!("<LEDGER NAME=\"{ledger}\"");
     assert_eq!(text.matches(&row).count(), 1, "{ledger}");
     let start = text.find(&row).unwrap();
     let end = start + text[start..].find("</LEDGER>").unwrap();
-    let open = start + text[start..end].find("<PARENT").unwrap();
+    let open = start + text[start..end].find(&format!("<{element}")).unwrap();
     let from = open + text[open..end].find('>').unwrap() + 1;
-    let to_end = from + text[from..end].find("</PARENT>").unwrap();
+    let to_end = from + text[from..end].find(&format!("</{element}>")).unwrap();
     assert_ne!(&text[from..to_end], to);
     let edited = format!("{}{to}{}", &text[..from], &text[to_end..]);
     pilot_catalogue_of(&edited)
@@ -299,11 +324,10 @@ fn pilot_lab_with_units(units: String) -> Lab {
     pilot_lab_replacing('C', units)
 }
 
-/// Tally's answer to the scoped rates read with the HSN/SAC fields, as the lab
-/// sent it on 21 Oct 2026 (13 rows, the catalogue's ledgers under the four
-/// parents).
+/// The answer to the rates read the code sends for the lab invoice: DERIVED
+/// from the lab's own answer (`lab_invoice_rates_hsn`), its six ledgers' rows.
 fn pilot_rate_listing() -> String {
-    utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"))
+    utf16(super::lab_invoice_rates_hsn())
 }
 
 /// DERIVED, not Tally's bytes: the captured rate listing with every ledger row
@@ -319,32 +343,6 @@ fn pilot_rate_listing_without_ledgers() -> String {
     }
     assert!(removed > 0, "the capture lists no ledger");
     assert!(!listing.contains("<LEDGER "), "a ledger row is left");
-    listing
-}
-
-/// DERIVED, not Tally's bytes: the captured scoped rate listing with the rows
-/// under `parent` removed (exactly `rows` of them, counted). The lab's filtered
-/// read returned exactly the unfiltered read's rows under the parents it named
-/// (PROVENANCE), so this stands for the answer to the same read with that parent
-/// left out; the lab was not sent that request.
-fn pilot_rate_listing_without_parent(parent: &str, rows: usize) -> String {
-    let mut listing = pilot_rate_listing();
-    let mut removed = 0;
-    let mut at = 0;
-    while let Some(start) = listing[at..]
-        .find("<LEDGER NAME=\"")
-        .map(|found| found + at)
-    {
-        let end = start + listing[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
-        if listing[start..end].contains(&format!(">{parent}</PARENT>")) {
-            listing.replace_range(start..end, "");
-            removed += 1;
-            at = start;
-        } else {
-            at = end;
-        }
-    }
-    assert_eq!(removed, rows, "rows under {parent}");
     listing
 }
 
@@ -470,12 +468,24 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
             58,
         ),
     ] {
-        // Naming a ledger under Sales Accounts as the party leaves Sundry Debtors
-        // out of the scope: the rates answer is the lab's without that parent's
-        // row (DERIVED, see the helper).
+        // Naming a sales ledger as the party changes the ledgers the rate read
+        // names: the rates answer is the lab's four-parent answer cut to them
+        // (DERIVED, see `rates_cut_to`).
         let (seen, voucher, received) = if party == goods {
+            let legs = [
+                goods,
+                "BRIDGE Svc 998313 5%",
+                "BRIDGE Svc 998314 5%",
+                "BRIDGE CGST 2.5%",
+                "BRIDGE SGST 2.5%",
+                "BRIDGE Round Off",
+            ];
+            let answer = super::rates_cut_to(
+                &utf16(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml")),
+                &legs,
+            );
             admit_on(
-                pilot_lab_replacing('Q', pilot_rate_listing_without_parent("Sundry Debtors", 1)),
+                pilot_lab_replacing('Q', answer),
                 pilot_invoice(party, filed),
             )
             .await
@@ -936,20 +946,15 @@ async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
     assert!(sent_as(&missing, &requests, 'C').is_empty());
 }
 
-// ---- #1331: the rate read is restricted to the parents of the invoice's ledgers ----
+// ---- #1331: the rate read is restricted to the invoice's ledgers ----
 
-/// The rate read of an admission is restricted to the parents of the ledgers
-/// the invoice names (#1331): both sends of it (the read and its repeat) are
-/// the request the lab was sent on 21 Oct 2026
-/// (`pilot-lab-ledger-rates-scoped-hsn.request.utf16le.xml`: the four-parent
-/// request of 10 Oct with the HSN/SAC fields in its field list), byte for byte,
-/// and no other request of the admission is that one.
+/// The rate read of an admission names the invoice's ledgers by GUID (#1331):
+/// both sends of it (the read and its repeat) are that request, and no other
+/// request of the admission is.
 #[tokio::test]
-async fn the_rate_read_is_restricted_to_the_parents_of_the_invoices_ledgers() {
+async fn the_rate_read_is_restricted_to_the_invoices_ledgers() {
     let (seen, _, requests) = admit("BRIDGE Walk-in", "BRIDGE Sales").await;
     assert_eq!(seen, Ok(()));
-    let lab = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.request.utf16le.xml");
-    assert_eq!(crate::agent::sha256_hex(lab), LAB_Q1_SHA256);
     assert_eq!(sent_as(ADMISSION_ORDER, &requests, 'Q'), [LAB_Q1_SHA256; 2]);
     assert_eq!(
         requests
@@ -977,7 +982,7 @@ async fn a_rate_answer_that_is_not_the_scopes_rows_is_refused_and_ends_the_admis
         seen,
         Err(vec![(
             "invoice_ledger_rates_rows_differ",
-            "parent_part_row_count_differs".to_string()
+            "ledger_scope_row_count_differs".to_string()
         )])
     );
     // Through the rate read's second send and its closing bracket: no voucher
@@ -1106,11 +1111,12 @@ fn a_number_control_that_moved_since_the_plan_is_a_change_not_a_fault() {
     }
 }
 
-/// The rates request names the parents of the ledgers the invoice names (#1331),
-/// so it is a function of the catalogue too: a named ledger regrouped, or its
-/// group renamed, between the plan's catalogue and the queue's is a master that
-/// changed, named as such, not a wiring fault. Every other request of the two
-/// plans is equal. The catalogues differ by a counted edit (DERIVED).
+/// The rates request names the invoice's ledgers by GUID (#1331), so a named
+/// ledger regrouped, or its group renamed, between the plan's catalogue and the
+/// queue's leaves the request as it was; the plan's record of each named
+/// ledger's parent changes, and that is a master that changed, named as such,
+/// not a wiring fault. Every other request of the two plans is equal. The
+/// catalogues differ by a counted edit (DERIVED).
 #[test]
 fn a_ledger_regrouped_since_the_plan_is_a_change_not_a_fault() {
     use crate::tally::approved_import::ApprovedImportAdmissionError::InvoiceMastersChanged;
@@ -1118,15 +1124,21 @@ fn a_ledger_regrouped_since_the_plan_is_a_change_not_a_fault() {
     let control = ledger::NumberControl::NoneStanding;
     let planned = plan_of(&voucher, &control);
     for (ledger, to) in [
-        // Moved into a group the scope did not name.
+        // Moved into another group.
         ("BRIDGE Walk-in", "Cash-in-Hand"),
-        // Its group renamed (the only ledger of the party's group the invoice names).
+        // Its group renamed.
         ("BRIDGE Walk-in", "Sundry Debtors (old)"),
         // A sales ledger moved to a group of its own.
         ("BRIDGE Svc 998313 5%", "Services Sold"),
+        // A sales ledger moved to a group another named ledger is under.
+        ("BRIDGE Svc 998313 5%", "Indirect Expenses"),
     ] {
         let later = plan_of_in(&voucher, &control, &pilot_catalogue_with_parent(ledger, to));
-        assert_ne!(planned.rates, later.rates, "{ledger} under {to}");
+        assert_eq!(planned.rates, later.rates, "{ledger} under {to}");
+        assert_ne!(
+            planned.ledger_parents, later.ledger_parents,
+            "{ledger} under {to}"
+        );
         assert_eq!(planned.number, later.number);
         assert_eq!(planned.voucher_types, later.voucher_types);
         assert_eq!(planned.registration, later.registration);
@@ -1141,16 +1153,63 @@ fn a_ledger_regrouped_since_the_plan_is_a_change_not_a_fault() {
             );
         }
     }
-    // A regroup between parents the scope already names changes nothing the
-    // plan sends: the sales ledger moved from Sales Accounts to Indirect
-    // Expenses, both named by the other ledgers of the invoice.
-    let same_parents = plan_of_in(
+    // A ledger the invoice does not name, regrouped, changes nothing the plan
+    // carries.
+    let unnamed = plan_of_in(
         &voucher,
         &control,
-        &pilot_catalogue_with_parent("BRIDGE Svc 998313 5%", "Indirect Expenses"),
+        &pilot_catalogue_with_parent("BRIDGE Svc 998315 5%", "Indirect Expenses"),
     );
-    assert_eq!(planned.rates, same_parents.rates);
-    assert_eq!(invoice::fit_plan(&planned, &same_parents), Ok(()));
+    assert_eq!(planned.rates, unnamed.rates);
+    assert_eq!(planned.ledger_parents, unnamed.ledger_parents);
+    assert_eq!(invoice::fit_plan(&planned, &unnamed), Ok(()));
+}
+
+/// A named ledger replaced under its name between the plan's catalogue and
+/// the queue's (deleted, and another created with the same name and group):
+/// its GUID, and so the rates request and the GUIDs the parents are recorded
+/// under, differ, while every request the invoice alone decides and every
+/// group are equal. That is a master
+/// that changed, named `ledger_scope`, not a wiring fault. The catalogues
+/// differ by a counted edit (DERIVED).
+#[test]
+fn a_ledger_replaced_under_its_name_since_the_plan_is_a_change_not_a_fault() {
+    use crate::tally::approved_import::ApprovedImportAdmissionError::InvoiceMastersChanged;
+    let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    let control = ledger::NumberControl::NoneStanding;
+    let planned = plan_of(&voucher, &control);
+    let replaced = plan_of_in(
+        &voucher,
+        &control,
+        &pilot_catalogue_with_guid(
+            "BRIDGE Walk-in",
+            "6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ff",
+        ),
+    );
+    assert_ne!(planned.rates, replaced.rates);
+    // The parent the plan records is held by GUID, so that record differs too,
+    // though the groups the ledgers sit under did not.
+    assert_ne!(planned.ledger_parents, replaced.ledger_parents);
+    let parents = |plan: &InvoiceReadPlan| {
+        plan.ledger_parents
+            .iter()
+            .map(|(_, parent)| parent.clone())
+            .collect::<std::collections::BTreeSet<_>>()
+    };
+    assert_eq!(parents(&planned), parents(&replaced));
+    assert_eq!(planned.company_name, replaced.company_name);
+    assert_eq!(planned.number, replaced.number);
+    assert_eq!(planned.voucher_types, replaced.voucher_types);
+    assert_eq!(planned.registration, replaced.registration);
+    assert_eq!(planned.ledger_count, replaced.ledger_count);
+    for (wanted, carried) in [(&replaced, &planned), (&planned, &replaced)] {
+        assert_eq!(
+            invoice::fit_plan(wanted, carried),
+            Err(InvoiceMastersChanged {
+                field: "ledger_scope"
+            })
+        );
+    }
 }
 
 /// An invoice and its reads go to the queue together or not at all.

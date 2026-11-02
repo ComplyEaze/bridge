@@ -1849,7 +1849,7 @@ fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
         "When the check before the dialog finds a send of this batch recorded since the call began by another call, and when a held-name refusal finds it in the journal read that follows, the answer is import_already_attempted with error.hold send_of_this_batch_recorded_since",
         "The check under the journal's lock answers the same code without the hold field, as an outcome that may have been sent",
         // A company whose set of loaded companies changed is read and judged.
-        "A book whose set of loaded companies changed is read and judged: the answer is reconciliation_required with company_scope_changed among its reasons, and it says to load the same companies and call again; a read that shows a changed existing master or another company's mark moved keeps the state for that.",
+        "A book whose set of loaded companies changed is read and judged: the answer is reconciliation_required with company_scope_changed among its reasons, and it says to load the same companies and call again; a read that shows a changed existing master or another company's mark moved keeps the state for that, unless the limit above holds the batch open.",
         // What posted_verified checks.
         "bill-wise is not read back",
         "no ledger or group that existed before changed",
@@ -4904,7 +4904,12 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
 /// here, for both absent states, with the reason and a step that says so.
 #[tokio::test]
 async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
-    for target in [7, 8] {
+    for (target, other, next_step) in [
+        (7, 3, verify::NEXT_ABSENT_UNCOVERED),
+        (8, 3, verify::NEXT_ABSENT_UNCOVERED),
+        // Another company's mark moved too: the same hold, with the alert.
+        (7, 4, verify::NEXT_ELSEWHERE_UNCOVERED),
+    ] {
         let plans = through_post(xml(created_one()).with_delivery(
             Delivery::ResetAfterRequestProcessed {
                 delay: Duration::from_millis(0),
@@ -4921,7 +4926,7 @@ async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
         .await;
         sent(simulator);
         let reads =
-            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, 3, None))).unwrap();
+            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, other, None))).unwrap();
         let later = server_at(reads.address(), directory.path());
         // No coverage seam: the read-back reads the release from the answer.
         let response = SCRIPTED_APPROVAL
@@ -4947,9 +4952,13 @@ async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
                 .contains(&json!("absent_not_measured_on_this_release")),
             "{target}: {response}"
         );
+        assert_eq!(result(&response)["next_step"], next_step, "{target}");
         assert_eq!(
-            result(&response)["next_step"],
-            verify::NEXT_ABSENT_UNCOVERED,
+            result(&response)["alert"],
+            json!(
+                settled_alert(MasterVerdictState::MasterWriteLocatedElsewhere)
+                    .filter(|_| other == 4)
+            ),
             "{target}"
         );
         assert_eq!(result(&response)["verification"]["settled"], false);

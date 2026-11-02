@@ -292,15 +292,6 @@ fn tally_runtime_command_error(error: anyhow::Error) -> TallyCommandError {
             true,
             "Keep the result unverified and inspect redacted diagnostics before retrying.",
         )
-    } else if lower.contains("interactive discovery listing limit exceeded") {
-        (
-            "untrusted_discovery_limit_exceeded",
-            "Discovery listing",
-            "The unverified local company listing exceeded ComplyEaze Bridge's display safety limit.",
-            "after_change",
-            true,
-            "Reduce the locally listed companies or use a strict probe for reviewed company evidence.",
-        )
     } else if lower.contains("company") {
         (
             "tally_company_context_failed",

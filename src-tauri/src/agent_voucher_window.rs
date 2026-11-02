@@ -1595,7 +1595,7 @@ pub(super) struct RetainedWindowRead {
 }
 
 /// The audit_read reader: every request is one [`fetch_audit_part`] (single,
-/// unpaired, identity-bracketed, Education-guarded, drain-debted), and every
+/// unpaired, identity-bracketed, Education-guarded), and every
 /// admitted response is retained byte for byte, in order. A failed read keeps
 /// its typed kind for [`audit_window_failure`].
 ///

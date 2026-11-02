@@ -1951,7 +1951,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              it; then call again.",
         ),
         "tally_endpoint_draining" => Some(
-            "Tally was still busy with an earlier request that was stopped for time, so this \
+            "Tally was still busy with an earlier request that did not finish, so this \
              request was not sent. Call again after retry_after_s seconds; the same request is \
              safe to repeat, and a different read would only wait behind the same work. It \
              clears by itself within 10 minutes of the earlier request.",

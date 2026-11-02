@@ -311,8 +311,7 @@ pub(crate) enum AuditPartFailureKind {
     ConnectionDropped,
     /// Tally's response was refused at its head (HTTP status, content type or
     /// content encoding), usually abandoning the body unread, or because a
-    /// complete body could not be decoded. A drain is owed either way; in the
-    /// second case it is merely conservative.
+    /// complete body could not be decoded.
     HeadRejected(&'static str),
     /// The read was cancelled. If it had started, Tally may still be working.
     Cancelled,

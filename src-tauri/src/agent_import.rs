@@ -5543,11 +5543,8 @@ fn write_masters_record(path: &Path, record: &Value) -> Result<(), String> {
     let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
     let bytes =
         serde_json::to_vec_pretty(record).map_err(|_| "proof_serialization_failed".to_string())?;
-    write_private(&staged, &bytes)?;
-    fs::rename(&staged, path).map_err(|_| {
-        let _ = fs::remove_file(&staged);
-        "import_file_write_failed".to_string()
-    })
+    super::local_file::replace_private_file(&staged, path, &bytes)
+        .map_err(|_| "import_file_write_failed".to_string())
 }
 
 impl Server {
@@ -5782,12 +5779,7 @@ fn verified_baselines(imports: &Path, lineage: &amend::Lineage) -> amend::Verifi
 }
 
 fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let mut file = super::local_file::open_local_file(path, true)
-        .map_err(|_| "import_file_write_failed".to_string())?;
-    set_private_file(&file)?;
-    file.set_len(0)
-        .and_then(|_| file.write_all(bytes))
-        .and_then(|_| file.sync_data())
+    super::local_file::write_private_file(path, bytes)
         .map_err(|_| "import_file_write_failed".to_string())
 }
 fn set_private_file(file: &std::fs::File) -> Result<(), String> {

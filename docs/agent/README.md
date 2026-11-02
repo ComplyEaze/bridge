@@ -1344,8 +1344,8 @@ refuses again; a report too large refuses as
 `stock_summary_census_refused`, with the census's own code (for example
 `stock_item_span_census_empty`, or `stock_census_slice_invalid` for a slice answer that
 did not read) in `error.cause`; a book with no stock group counts none. A refusal from the
-count is reported as `stock_summary_extent_changed` instead when the book moved meanwhile. The counted path has not yet
-run against a live book with a mark past 874. After a read, the row count and the
+count is reported as `stock_summary_extent_changed` instead when the book moved meanwhile. The counted path has run
+once against a live book with a mark past 874. After a read, the row count and the
 response size are checked against the mark (and the count) and the admitted size, and a
 breach refuses the whole read as `stock_summary_bound_premise_violated`, unless the
 closing extent shows the book moved (`stock_summary_extent_changed`). The stock-item request does

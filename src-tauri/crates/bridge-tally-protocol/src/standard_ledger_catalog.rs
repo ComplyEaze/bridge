@@ -577,8 +577,8 @@ pub fn parse_ledger_census_slice(
 /// The stock-item GUIDs of one slice of a stock-item census: the response to
 /// [`crate::ledger_census::render_stock_item_census_slice_request`], read by the ledger census's
 /// rules with `STOCKITEM` rows (#1233). Tested on that request's answers as a lab script captured
-/// them (`STOCK_CAPTURE_PROVENANCE.md`); a read past the single-read mark has not yet run through
-/// Bridge.
+/// them (`STOCK_CAPTURE_PROVENANCE.md`); a read past the single-read mark has run through Bridge
+/// once, on one real book.
 pub fn parse_stock_item_census_slice(
     xml: &str,
     expected_company_guid: &str,

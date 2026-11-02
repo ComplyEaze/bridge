@@ -424,7 +424,7 @@ fn the_tool_definition_states_the_date_the_size_and_the_limits() {
         "written at the scale of the values it adds",
         "stock_summary_too_large",
         "counted by AlterID span",
-        "not yet run live past 874",
+        "run live past 874 once",
         "stock_summary_census_refused",
         "stock_summary_report_too_large",
         "stock_summary_item_count_company_higher",

@@ -1081,6 +1081,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 estimated_bytes: *estimated_bytes,
                 limit_bytes: *limit_bytes,
                 limit_master_alter_id: *limit_master_alter_id,
+                counted_items: None,
             });
         }
         match cause

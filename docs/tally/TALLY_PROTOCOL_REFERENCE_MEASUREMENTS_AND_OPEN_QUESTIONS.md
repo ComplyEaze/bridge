@@ -393,9 +393,11 @@ request is predicted over a budget well below the cap.
   `ce849cc6`) gave the same state, reason and items as the previous build on all five windows read. On the book
   counted in one request it sent 28 and 34 requests where the previous build sent 34 and 40, as the doubles predict.
   On the book counted in four requests it sent 76 against 76 where the widened window was empty, and 70 against 88
-  (475 KB of answers against 6.08 MB) where a neighbouring day held vouchers, where the doubles predicted equal
-  counts; which of the previous build's requests are saved there is not established, since the trail keeps only the
-  last 32 sends. The counts that follow are from scripted doubles through the tool call: for a neighbour-empty widened window
+  (475 KB of answers against 6.08 MB) where a neighbouring day held vouchers. The run's sheet had predicted equal
+  counts there, which holds only for an empty widened window. The 18 requests are three data parts of six sends each:
+  the two builds' retained trails (the last 32 sends) match except that the previous build read three parts of the
+  widened window after its census, of about 1.4 MB, 1.4 MB and 3 KB, each sent twice, and this build read none, as the
+  doubles expect. The counts that follow are from scripted doubles through the tool call: for a neighbour-empty widened window
   a census of one request replaces one paired window read and so saves six requests (a census of
   several requests adds a closing marks read, so a small widened window saves none), and with vouchers on the
   neighbouring days it saves every part those days would have taken. The saving is counted in requests;
@@ -1874,3 +1876,4 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-31 | §12a.23: the lines' bullet cut to six fixture items tied to the stock-item fixture, with every lab-only claim given its branch; the year-end closings were Tally's Stock Query screens, not the Stock Summary; three items, not two, answered empty at the year end; the shapes the parser still reads; a later period start and four other gaps added to Not measured. PARTIAL |
 | 2026-10-31 | §12a.23: the parser now refuses a hidden or control character in a name or quantity, a group with no line after it, and lines in more than one unit. |
 | 2026-10-31 | §12a.23: named the closed set of characters the parser refuses in a name or quantity, and added a godown name holding a tab to Not measured. |
+| 2026-11-02 | §11c.4: the one window that sent fewer requests is explained from the run's retained trails: the three data parts of the widened window, which the census-only corroboration does not read (#1240). |

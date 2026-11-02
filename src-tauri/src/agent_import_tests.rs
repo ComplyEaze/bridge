@@ -1547,6 +1547,101 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     assert_eq!(verification_status(&after, 1), "verification_incomplete");
 }
 
+/// The content-only review box for a one-voucher batch whose only match is a
+/// voucher the verifier read with the batch's content after its build, so not
+/// shown to be this post's, with the given cancelled and optional flags. The
+/// box is given what production gives it: the unpaged result, with `vouchers`.
+fn content_only_box(cancelled: bool, optional: bool) -> String {
+    let input = admitted_payload();
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "batch-review-box".to_string(),
+        company_guid: GUID.to_string(),
+        company: None,
+        txn_ids: vec!["txn-001".to_string()],
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
+        sha256: "hash".to_string(),
+        built_at: now(),
+        status: "built".to_string(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".to_string(),
+            value: Some(10),
+            master_value: Some(10),
+        },
+        vouchers: vec![input.vouchers[0].clone()],
+    };
+    let observed = |cancelled, optional| ReadVoucher {
+        remote_id: None,
+        guid: Some("review-box-guid".to_string()),
+        alter_id: Some(11),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
+        voucher_type: Some("Payment".to_string()),
+        narration: None,
+        voucher_number: None,
+        master_id: None,
+        cancelled: Some(cancelled),
+        optional: Some(optional),
+        effective_date: None,
+        entries: vec![
+            ReadEntry {
+                ledger: "Expense".to_string(),
+                amount: "-12.50".to_string(),
+                is_deemed_positive: "Yes".to_string(),
+            },
+            ReadEntry {
+                ledger: "Bank".to_string(),
+                amount: "12.50".to_string(),
+                is_deemed_positive: "No".to_string(),
+            },
+        ],
+    };
+    let result = verify_observed_batch(&line, &[observed(cancelled, optional)])
+        .expect("verification result");
+    // The tally of rows by status still has the match, in the accounts or not.
+    assert_eq!(result["counts"]["matching_content_observed"], 1, "{result}");
+    assert_eq!(
+        result["vouchers"][0]["accounting_effective"],
+        !cancelled && !optional,
+        "{result}"
+    );
+    content_review::review_preview(&line, ledger::ReviewedBinding::Refused, &result)
+        .replace('\n', " ")
+}
+
+/// #2261: the box says a voucher is in the book only for a match that is in
+/// the accounts. A cancelled match is not.
+#[test]
+fn the_content_review_box_does_not_count_a_cancelled_match_as_in_the_book() {
+    let text = content_only_box(true, false);
+    assert!(
+        text.contains("found, for 0 of the 1 voucher sent,"),
+        "{text}"
+    );
+    let live = content_only_box(false, false);
+    assert!(
+        live.contains("found, for 1 of the 1 voucher sent,"),
+        "{live}"
+    );
+}
+
+/// #2261: the same for an optional match.
+#[test]
+fn the_content_review_box_does_not_count_an_optional_match_as_in_the_book() {
+    let text = content_only_box(false, true);
+    assert!(
+        text.contains("found, for 0 of the 1 voucher sent,"),
+        "{text}"
+    );
+}
+
 #[test]
 fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
     let input = admitted_payload();

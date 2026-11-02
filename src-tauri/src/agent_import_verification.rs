@@ -1013,6 +1013,19 @@ fn mark_not_found_with(result: &mut Value, status: &str, next_step: Option<&str>
     counts[status] = json!(already + moved);
 }
 
+/// How many of a verification result's `vouchers` rows are a content-only match that is in the
+/// accounts (`accounting_effective` is `true`); a row without the field, or input that is not an
+/// array, counts none.
+pub(super) fn content_matches_in_the_accounts(vouchers: &Value) -> usize {
+    vouchers.as_array().map_or(0, |rows| {
+        rows.iter()
+            .filter(|row| {
+                row["status"] == "matching_content_observed" && row["accounting_effective"] == true
+            })
+            .count()
+    })
+}
+
 pub(super) fn voucher_is_accounting_effective(voucher: &ReadVoucher) -> Result<bool, String> {
     match (voucher.cancelled, voucher.optional) {
         (Some(false), Some(false)) => Ok(true),

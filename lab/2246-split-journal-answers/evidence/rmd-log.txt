@@ -1,0 +1,9 @@
+10:58:51Z R3 out exists yes; attributes 0x10; entries 0
+10:58:52Z R3 in exists yes; attributes 0x10; entries 0
+10:58:52Z R3 in RemoveDirectoryW returned 1; GetLastError 0
+10:58:52Z R3 in after: exists no (error 2)
+10:58:53Z R3 out exists no (attributes call error 2)
+10:59:04Z R2 out exists yes; attributes 0x10; entries 0
+10:59:04Z R2 out RemoveDirectoryW returned 1; GetLastError 0
+10:59:04Z R2 out after: exists no (error 2)
+10:59:05Z R2 in exists no (attributes call error 2)

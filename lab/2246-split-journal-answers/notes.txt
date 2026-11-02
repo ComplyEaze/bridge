@@ -15,3 +15,8 @@
 10:53 R3a out, fresh folder, the run lead's repeat: built clean, 7.17 s.
 10:54 R3b in: refused the same, 7.05 s, XML and journal line written, empty .build-publication left. One repeat; the second allowed was not needed.
 10:55 Exe hash equal to step 0's. No client running. L3 not run. Nothing posted.
+10:58 R3 empty folder: rmdir from in, returned 1, error 0, gone from both sides.
+10:59 R2 empty folder: rmdir from out, returned 1, error 0, gone from both sides.
+11:00 7.1 copy launched once on port 9011 with a new empty data folder; status 200; Edit Log SILVER; no prompt from Tally; a Windows Firewall dialog at 11:00:55, not answered.
+11:01 7.1 stopped by process id. 7.2 unchanged on 9001. Installed settings file sha256 equal.
+11:03 Close: exe hash equal; BRIDGE CORPUS DENSE shut; Select Company, no company loaded; one tally.exe owns 9001; status 200.

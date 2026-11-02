@@ -34,6 +34,23 @@ The four paths named in #2246's body did not fire on either side. M 328 and V 29
 - **Likely path:** at e9c780f3, `agent_import_persistence.rs`: the journal append succeeded, `remove_dir_all` of the transaction folder failed after emptying it, and `require_settled` then refuses any build while that folder exists. [hypothesis: read from the code and the folder left behind]
 - **Why the folder stayed:** not established. L1c, inside on its own folder, finished clean, and so did R3a, outside on its own. The services on the PC are in the run lead's message, not here.
 
+## Two further checks, on the run lead's word
+**The empty folder, by a plain rmdir.** Each folder was listed empty first; `RemoveDirectoryW` was called once.
+
+| folder | from | return | GetLastError | exists after, from both sides |
+|---|---|---|---|---|
+| R3's `.build-publication` | in | 1 | 0 | no (error 2) |
+| R2's `.build-publication` | out | 1 | 0 | no (error 2) |
+
+The outside rmdir of R3 was not needed. Both XML files and both journals stayed. The folder is not held by permission or by package identity: minutes after the build, a plain rmdir succeeds from inside. So `remove_dir_all` failed only during the build. Why is not established; a short-lived hold on the folder is a hypothesis. No build was run on either folder after the rmdir, so whether a build then works is not measured. [verified for the rmdir]
+
+**TallyPrime 7.1 beside 7.2.** TallyPrime Edit Log 7.1.0 (Build 29327) is installed beside 7.2, and its installed settings name 7.2's data folder, a company to load and a migration port. So the check used a copy of the program on D:, with its own settings: a new empty data folder, nothing loaded, port 9011. The installed settings file's sha256 was equal before and after.
+
+- Launched once: it ran beside 7.2, title band Edit Log, SILVER, no licence prompt, no offer to migrate or repair; `GET /status` on 9011 200; 9001 200 throughout. [verified]
+- Stopped by its own process id. 7.2 kept its process and port and answered 200; the new data folder stayed empty. [verified]
+- A Windows Firewall dialog opened about 12 s after the launch, for the copied program. It was not answered, and stays for the owner.
+- **Not established:** whether 7.1 can open a book, and whether the installed program itself behaves as the copy did. Two scheduler files could not be copied, being held open; the check did not need them.
+
 ## Not run
 L3 (needs the run lead's word). The second allowed repeat.
 

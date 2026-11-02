@@ -1035,6 +1035,27 @@ fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
     }
 }
 
+/// #626: a voucher that landed on the other ledger of a line-break pair does
+/// not match what was sent, in either direction, so it cannot read verified.
+#[test]
+fn a_read_back_on_the_other_ledger_of_a_line_break_pair_does_not_match() {
+    let rows =
+        parse_import_voucher_rows(&captured(LINE_BREAK_READ), LINE_BREAK_COMPANY_GUID).unwrap();
+    let read = |ledger: &str| {
+        let mut row = rows[0].clone();
+        row.entries[0].ledger = ledger.to_string();
+        actual_entry_fingerprint(&row)
+    };
+    assert_eq!(
+        read("Lab Line Break Ledger\r\n"),
+        actual_entry_fingerprint(&rows[0])
+    );
+    assert_ne!(
+        read("Lab Line Break Ledger"),
+        actual_entry_fingerprint(&rows[0])
+    );
+}
+
 /// #1633: only a mark that moved by more than the post created, or a span that
 /// later held another number of vouchers, says another change was made during
 /// the post. The match has no wildcard, so a new refusal must be sorted here.

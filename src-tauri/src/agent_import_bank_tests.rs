@@ -2571,7 +2571,8 @@ fn captured_shape_lab_catalogue() -> String {
 }
 
 /// The captured catalogue with `Chem Supplier 4` renamed `CRLF Supplier`, so
-/// the captured CR LF ledger gains a twin that folds equal to it. This is a
+/// the captured CR LF ledger gains a twin that differs from it only by that
+/// line break. This is a
 /// test-local rewrite of captured bytes: it exercises Bridge's own refusal, and
 /// is no evidence of what Tally does with such a pair.
 fn shape_lab_catalogue_with_folded_twin() -> String {
@@ -2674,12 +2675,34 @@ async fn validate_masters_marks_both_spellings_of_a_folded_twin_unimportable() {
     assert_eq!(simulator.finish().unwrap().len(), plans.len());
 }
 
+/// #626: a request that names one ledger of a line-break pair by its exact
+/// bytes is importable; `validate_masters_marks_both_spellings` is the same
+/// pair named together.
+#[tokio::test]
+async fn validate_masters_admits_one_exact_ledger_of_a_line_break_pair() {
+    for ledger in ["CRLF Supplier\r\n", "CRLF Supplier"] {
+        let plans = shape_lab_catalogue_plans(&shape_lab_catalogue_with_folded_twin());
+        let simulator = SequenceSimulator::spawn(plans).expect("shape lab plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = bank_server(directory.path(), simulator.address().port());
+        let outcome = server
+            .validate_masters(&json!({"company_guid":SHAPE_LAB_GUID,"ledgers":[ledger]}))
+            .await
+            .unwrap();
+        let master = &outcome.payload["result"]["masters"][0];
+        assert_eq!(master["importable"], true, "{master}");
+        assert!(master.get("folded_twins").is_none(), "{master}");
+    }
+}
+
 #[tokio::test]
 async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_file() {
-    for ledger in ["CRLF Supplier\r\n", "CRLF Supplier"] {
+    // Differs by more than the line break, so no pair is admitted.
+    let catalogue = captured_shape_lab_catalogue().replace("Chem Supplier 4", "crlf supplier");
+    for ledger in ["CRLF Supplier\r\n", "crlf supplier"] {
         let plans = [
             mode_tests::licensed_import_probe(),
-            shape_lab_catalogue_plans(&shape_lab_catalogue_with_folded_twin()),
+            shape_lab_catalogue_plans(&catalogue),
         ]
         .concat();
         let simulator = SequenceSimulator::spawn(plans.clone()).expect("shape lab plan");

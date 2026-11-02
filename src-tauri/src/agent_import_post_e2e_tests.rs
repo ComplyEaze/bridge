@@ -1115,7 +1115,7 @@ async fn post_import_refuses_an_amendment_before_any_read_or_approval() {
 /// import lookup could take for it. Refused through the tool, under an
 /// approving script: no approval asked, no request after that catalogue read,
 /// no intent journaled. The twin is a test-local rewrite of the capture (an
-/// unrelated ledger renamed `Cash` plus CR LF), no evidence of Tally behaviour.
+/// unrelated ledger renamed `CASH` plus CR LF), no evidence of Tally behaviour.
 #[tokio::test]
 async fn a_folded_twin_refuses_the_post_before_any_approval() {
     let captured = catalogue();
@@ -1124,7 +1124,7 @@ async fn a_folded_twin_refuses_the_post_before_any_approval() {
         2,
         "name and NAME.LIST"
     );
-    let twinned = captured.replace("Bridge Nested Debtor WR4", "Cash&#13;&#10;");
+    let twinned = captured.replace("Bridge Nested Debtor WR4", "CASH&#13;&#10;");
     let mut plans = Vec::new();
     plans.extend(probe());
     plans.extend(verified_company());
@@ -1155,6 +1155,54 @@ async fn a_folded_twin_refuses_the_post_before_any_approval() {
     assert!(!String::from_utf8(journal(directory.path()))
         .unwrap()
         .contains("\"dispatch_intent\""));
+}
+
+/// #626: a pair that differs only by a line break reaches the person, and the
+/// text they are asked about names both ledgers. Declined here, so nothing is
+/// sent. The twin is the same kind of rewrite, no evidence of Tally behaviour.
+#[tokio::test]
+async fn a_line_break_pair_reaches_the_dialog_with_both_ledgers_named() {
+    let twinned = catalogue().replace("Bridge Nested Debtor WR4", "Cash&#13;&#10;");
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(paired(empty_collection()));
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(twinned));
+    plans.extend(paired(single_currency()));
+    plans.extend(probe());
+    plans.extend(numbering_read(&[]));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::declining();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_approval_declined",
+        "{response}"
+    );
+    assert_eq!(observed.len(), expected);
+    let previews = scripted.previews();
+    assert_eq!(previews.len(), 1, "asked once");
+    let lines = previews[0].lines().collect::<Vec<_>>();
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Used: \"Cash\", no line break"))
+            && lines
+                .iter()
+                .any(|line| line.starts_with("Not used: \"Cash\", line break")),
+        "{}",
+        previews[0]
+    );
 }
 
 /// The same refusal for a twin reached through an alias: an unrelated ledger

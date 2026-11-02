@@ -5044,6 +5044,7 @@ fn a_name_folding_equal_to_two_live_ledgers_is_reported_whichever_it_names() {
                 requested: requested.to_string(),
                 live,
                 through_alias: Default::default(),
+                has_alias: false,
             }],
             "{requested:?}"
         );
@@ -5108,6 +5109,100 @@ fn a_twin_needing_both_folds_is_still_found() {
         );
         assert_eq!(twins.len(), 1, "{requested:?}");
         assert_eq!(twins[0].live.len(), 2, "{requested:?}");
+    }
+}
+
+/// #626: a pair is admitted only when it is two ledgers differing by exactly a
+/// trailing CR LF, the name equals one of them byte for byte, the batch does not
+/// name the other, no alias folds equal, and both groups were read.
+#[test]
+fn only_one_exact_name_with_one_line_break_twin_is_a_line_break_pair() {
+    fn pair(
+        requested: &str,
+        batch: &[&str],
+        catalogue: &[(&str, Option<&str>)],
+        aliases: &[(&str, &str)],
+    ) -> Option<LineBreakTwin> {
+        let batch = batch.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let twins = folded_twins(
+            &[requested.to_string()],
+            catalogue.iter().copied(),
+            aliases.iter().copied(),
+        );
+        let found = twins.first().expect("a family");
+        let admitted = found.line_break_twin(&batch);
+        assert_eq!(
+            refused_twins(twins.clone(), &batch).is_empty(),
+            admitted.is_some()
+        );
+        admitted
+    }
+    let plain = ("Cash", Some("Cash-in-Hand"));
+    let broken = ("Cash\r\n", Some("Bank Accounts"));
+    for catalogue in [[plain, broken], [broken, plain]] {
+        assert_eq!(
+            pair("Cash", &["Cash"], &catalogue, &[]),
+            Some(LineBreakTwin {
+                named: "Cash".into(),
+                named_group: "Cash-in-Hand".into(),
+                other: "Cash\r\n".into(),
+                other_group: "Bank Accounts".into(),
+            })
+        );
+        assert_eq!(
+            pair("Cash\r\n", &["Cash\r\n"], &catalogue, &[]),
+            Some(LineBreakTwin {
+                named: "Cash\r\n".into(),
+                named_group: "Bank Accounts".into(),
+                other: "Cash".into(),
+                other_group: "Cash-in-Hand".into(),
+            })
+        );
+    }
+    type Row<'a> = (
+        &'a str,
+        &'a [&'a str],
+        &'a [(&'a str, Option<&'a str>)],
+        &'a [(&'a str, &'a str)],
+    );
+    let refused: [Row; 8] = [
+        // Equal to neither ledger: only a fold reaches them.
+        ("CASH", &["CASH"], &[plain, broken], &[]),
+        // The batch names both, so no line can say which one it uses.
+        ("Cash", &["Cash", "Cash\r\n"], &[plain, broken], &[]),
+        // A third ledger in the family.
+        ("Cash", &["Cash"], &[plain, broken, ("CASH", None)], &[]),
+        // The two differ by more than the line break.
+        (
+            "Cash",
+            &["Cash"],
+            &[plain, ("cash\r\n", Some("Bank Accounts"))],
+            &[],
+        ),
+        // Neither is a plain name, so "no line break" would be false of both.
+        (
+            "Cash\r\n",
+            &["Cash\r\n"],
+            &[broken, ("Cash\r\n\r\n", Some("Bank Accounts"))],
+            &[],
+        ),
+        // An alias of a member, and a ledger in the family through an alias.
+        ("Cash", &["Cash"], &[plain, broken], &[("Cash", "CASH")]),
+        (
+            "Cash",
+            &["Cash"],
+            &[plain, ("Other", Some("Bank Accounts"))],
+            &[("Other", "Cash\r\n")],
+        ),
+        // A group that was not read cannot be shown.
+        ("Cash", &["Cash"], &[plain, ("Cash\r\n", None)], &[]),
+    ];
+    for (requested, batch, catalogue, aliases) in refused {
+        assert_eq!(
+            pair(requested, batch, catalogue, aliases),
+            None,
+            "{requested:?} {batch:?} {catalogue:?} {aliases:?}"
+        );
     }
 }
 
@@ -6593,6 +6688,7 @@ fn a_folded_twin_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
             ("Profit &amp; Loss A/c".to_string(), None),
         ],
         through_alias: Default::default(),
+        has_alias: false,
     };
     let shown = folded_live_ledgers_json(&twins);
     assert_eq!(shown[0]["parent"], "&#4; Primary");

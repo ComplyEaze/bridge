@@ -1477,7 +1477,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     .unwrap()
     .bind_selected(requested.clone())
     .unwrap();
-    let recheck = |catalogue: &str| {
+    let recheck_bound = |catalogue: &str, binding: &_| {
         recheck_import_admission(
             &line,
             &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
@@ -1486,12 +1486,13 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             catalogue,
             None,
             &single_currency,
-            &ledger_binding,
+            binding,
             InvoiceIdentity::ByNumber,
             None,
             None,
         )
     };
+    let recheck = |catalogue: &str| recheck_bound(catalogue, &ledger_binding);
     // Control: the captured catalogue holds no twin of any named ledger.
     recheck(&catalogue).expect("no twin, so the queued batch is admitted");
     assert_eq!(
@@ -1519,6 +1520,12 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
     ));
+    // A pair the dialog named is in the approved binding, so the queue lets it
+    // on; the same twin outside the binding was refused just above (#626).
+    let shown = twinned_parents
+        .bind_selected(requested.iter().cloned().chain(["Cash\r\n".to_string()]))
+        .unwrap();
+    recheck_bound(&twinned, &shown).expect("the pair the dialog named");
 }
 
 /// #1688: a ledger whose ALIAS folds equal to a named ledger is a twin too, and
@@ -4873,6 +4880,82 @@ fn a_name_that_spells_a_line_break_in_typed_characters_takes_no_mark() {
     assert_eq!(
         beside[entry + 1..entry + 3],
         [r#"Cr 12.50  Line break  "Cash\r\n""#, LINE_BREAK_NOTE]
+    );
+}
+
+fn line_break_twin(named: &str, other: &str) -> LineBreakTwin {
+    LineBreakTwin {
+        named: named.into(),
+        named_group: "Current Assets".into(),
+        other: other.into(),
+        other_group: "Bank Accounts".into(),
+    }
+}
+
+/// #626: every form of the dialog names both ledgers of a pair, each with its
+/// group, and which one the post uses, in either direction; the name is
+/// written bare, so the only marked name is one the voucher lines show.
+#[test]
+fn a_dialog_names_both_ledgers_of_a_line_break_pair_and_which_is_used() {
+    let (mut single, endpoint) = batch();
+    let plain = line_break_twin("Cash", "Cash\r\n");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&plain),
+    )
+    .unwrap()
+    .text;
+    let expected = [
+        r#"Used: "Cash", no line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", line break at its end, group "Bank Accounts""#,
+    ];
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines.windows(2).any(|shown| shown == expected), "{text}");
+    assert!(!text.contains("Line break"), "{text}");
+
+    single.vouchers[0].entries[1].ledger = "Cash\r\n".into();
+    refresh_batch_sha256(&mut single);
+    let broken = line_break_twin("Cash\r\n", "Cash");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&broken),
+    )
+    .unwrap()
+    .text;
+    for shown in [
+        r#"Used: "Cash", line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", no line break at its end, group "Bank Accounts""#,
+    ] {
+        assert!(text.lines().any(|line| line == shown), "{text}");
+    }
+
+    let (several, endpoint) = batch_of_every_type();
+    for form in [PreviewForm::Listed, PreviewForm::TotalsOnly] {
+        let text =
+            review_preview_with_twins(&several, &endpoint, form, std::slice::from_ref(&plain))
+                .unwrap()
+                .text;
+        assert!(text.contains(expected[0]), "{form:?}: {text}");
+        assert!(text.contains(expected[1]), "{form:?}: {text}");
+    }
+}
+
+/// #626: a group is Tally's text, so a dialog refuses one it could not show
+/// whole, as it refuses any other value.
+#[test]
+fn a_dialog_refuses_a_line_break_pair_whose_group_it_cannot_show() {
+    let (single, endpoint) = batch();
+    let mut twin = line_break_twin("Cash", "Cash\r\n");
+    twin.other_group = "Bank\nAccounts".into();
+    assert_eq!(
+        review_preview_with_twins(&single, &endpoint, PreviewForm::Listed, &[twin])
+            .err()
+            .as_deref(),
+        Some("import_review_layout_text")
     );
 }
 

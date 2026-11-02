@@ -3,6 +3,8 @@
 //! test-only seam (`approved_import::test_seam`). No real Tally is involved.
 use super::*;
 use super::{SCRIPTED_REMOTE_ID, SCRIPTED_REMOTE_IDS};
+use crate::agent::agent_import::cash_projection::tests::{cash_book_plans, unmoved_book_record};
+use crate::agent::agent_import::cash_projection::CashProjectionRecord;
 use crate::agent::agent_import::tests::sentinel_batch_id;
 use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
 use bridge_tally_transport::TallyEndpointConfig;
@@ -1480,6 +1482,16 @@ fn saved_bank_vouchers_recording(
     cash_in_hand: Value,
     on_account: Value,
 ) -> (ImportLedgerLine, Value) {
+    saved_bank_line(server, vouchers, cash_in_hand, on_account, None)
+}
+
+fn saved_bank_line(
+    server: &Server,
+    vouchers: Vec<Value>,
+    cash_in_hand: Value,
+    on_account: Value,
+    cash_projection: Option<CashProjectionRecord>,
+) -> (ImportLedgerLine, Value) {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let txn_ids = vouchers
         .iter()
@@ -1501,6 +1513,7 @@ fn saved_bank_vouchers_recording(
     bind_to_captured_catalogue(&mut line);
     line.cash_in_hand_ledgers = serde_json::from_value(cash_in_hand).unwrap();
     line.on_account_approved = serde_json::from_value(on_account).unwrap();
+    line.cash_projection = cash_projection;
     server.append_import_ledger(&line).unwrap();
     fs::write(
         server
@@ -1758,6 +1771,99 @@ fn saved_business_cash_contra(server: &Server) -> Value {
             {"ledger":"WR2 Sales","amount":"5.00","side":"Cr"}]});
     let recorded = json!([{"bridge_txn_id":"contra-815","ledger":"Cash"}]);
     saved_bank_batch_recording(server, contra, recorded).1
+}
+
+/// A deposit from the cash box as its build leaves it: the book it was built on
+/// is recorded with the voucher.
+fn saved_cash_box_deposit(server: &Server, built_on: CashProjectionRecord) -> Value {
+    let deposit = json!({"bridge_txn_id":"deposit-1761","date":"20260901","voucher_type":"Contra",
+        "narration":"Synthetic test only","entries":[
+            {"ledger":"WR2 Sales","amount":"5.00","side":"Dr"},
+            {"ledger":"Cash","amount":"5.00","side":"Cr"}]});
+    let recorded = json!([{"bridge_txn_id":"deposit-1761","ledger":"Cash"}]);
+    saved_bank_line(server, vec![deposit], recorded, json!([]), Some(built_on)).1
+}
+
+/// A deposit whose book reads `balance` now, up to the approval when `reached`.
+fn cash_box_reads(balance: &str, reached: bool) -> Vec<ScenarioPlan> {
+    let mut plans = bank_before_approval(catalogue_with_sales_as_bank(), groups());
+    let rest = plans.split_off(
+        plans.len() - paired(single_currency()).len() - probe().len() - numbering_read(&[]).len(),
+    );
+    plans.extend(cash_book_plans(GUID, "100004", &companies(), balance));
+    if reached {
+        plans.extend(rest);
+    }
+    plans
+}
+
+/// A cash book that reads differently from the one the deposit was built on is
+/// refused with nothing asked of the user.
+#[tokio::test]
+async fn a_cash_book_changed_since_the_build_is_refused_before_approval() {
+    let plans = cash_box_reads("-20.00", false);
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_cash_box_deposit(&server, unmoved_book_record("-30.00"));
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "cash_projection_stale", "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert_eq!(observed.len(), expected, "{response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+}
+
+/// A book that moves while the dialog is open stops the deposit after the answer,
+/// with nothing sent: the read before the dialog is as old as the dialog.
+#[tokio::test]
+async fn a_cash_book_changed_while_the_dialog_is_open_is_refused_after_the_answer() {
+    let mut plans = cash_box_reads("-20.00", true);
+    plans.extend(cash_book_plans(GUID, "100004", &companies(), "-30.00"));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_cash_box_deposit(&server, unmoved_book_record("-20.00"));
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "cash_projection_stale", "{response}");
+    assert_eq!(scripted.previews().len(), 1, "{response}");
+    assert_eq!(observed.len(), expected, "{response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+}
+
+/// The same book as the build's goes on to the approval.
+#[tokio::test]
+async fn a_cash_book_unchanged_since_the_build_reaches_approval() {
+    let plans = cash_box_reads("-20.00", true);
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_cash_box_deposit(&server, unmoved_book_record("-20.00"));
+    let scripted = ScriptedApproval::declining();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let error = &response["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_approval_declined", "{response}");
+    assert_eq!(scripted.previews().len(), 1, "{response}");
+    assert_eq!(observed.len(), expected, "{response}");
 }
 
 /// `Cash` re-parented under Bank Accounts beside `WR2 Sales` as a bank: both

@@ -3165,10 +3165,62 @@ const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRA
      BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
      yet, and the pull request that renders the census as a span replays it and changes this \
      reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
+const CASH_DAY_END: &str = "an answer of the cash day-end lab row on BRIDGE CASHDAY LAB \
+     (2 Nov 2026, #1761), with no row here: the projection's own tests parse each one and hold \
+     its figures; agent/cash-day-end/PROVENANCE.md says what each file is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
+    // The cash day-end row's answers, read by the bank import's cash projection tests.
+    (
+        "tests/fixtures/agent/cash-day-end/window-20250401-20250430.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250402.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250403.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250404.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250405.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250407.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250408.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250409.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250410.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250411.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250425.utf16le.xml",
+        CASH_DAY_END,
+    ),
+    (
+        "tests/fixtures/agent/cash-day-end/trial-balance-to-20250430.utf16le.xml",
+        CASH_DAY_END,
+    ),
     (
         "tests/fixtures/native/bills_receivable_forex_rupee_control.utf16le.xml",
         FOREX_OPEN_BILL,

@@ -480,6 +480,9 @@ base revision.
 <a id="12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost"></a>
 
 [12a.24 The Godown Summary gives godown totals, and the exploded Stock Summary values a root item per godown at that godown's own cost](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost)
+<a id="12a25-a-cash-ledgers-day-end-balance-partial"></a>
+
+[12a.25 A cash ledger's day-end balance (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a25-a-cash-ledgers-day-end-balance-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

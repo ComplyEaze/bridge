@@ -3,6 +3,7 @@
     clippy::disallowed_methods,
     reason = "test doubles: local sockets, servers and processes"
 )]
+use super::super::cash_projection::CashProjectionRecord;
 use super::super::statement_facts::{
     statement_record, ContraRow, RowDirection, SkipRow, StatementFacts, StatementWindow,
 };
@@ -2606,6 +2607,7 @@ fn a_record_without_ledger_identities_reads_as_built_before_binding() {
     assert!(json.get("ledger_identities").is_none(), "{json}");
     assert!(json.get("ledger_identities_2").is_none(), "{json}");
     assert!(json.get("ledger_identities_3").is_none(), "{json}");
+    assert!(json.get("ledger_identities_4").is_none(), "{json}");
     let reread: ImportLedgerLine = serde_json::from_value(json).unwrap();
     assert_eq!(reread.ledger_identities, None);
     // And a current record keeps them across a round trip.
@@ -2640,9 +2642,10 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 }
 
 /// A saved batch holds exactly these records, and its ledger binding is
-/// written as `ledger_identities_3`, never as the `ledger_identities_2` that
-/// the releases after 0.4.2 read or the `ledger_identities` that releases
-/// 0.3.0 to 0.4.2 read. Those releases refuse a batch with no binding they can
+/// written as `ledger_identities_4`, never as the `ledger_identities_3` of the
+/// last release before `cash_projection`, the `ledger_identities_2` that the
+/// releases after 0.4.2 read or the `ledger_identities` that releases 0.3.0 to
+/// 0.4.2 read. Those releases refuse a batch with no binding they can
 /// read and know nothing of the cash-in-hand, bill-wise and statement records,
 /// so this name is what keeps them from posting a batch saved here without
 /// those checks (ADR 0004).
@@ -2653,7 +2656,7 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 /// If this test stops compiling or its list has to change because a field
 /// was added, removed or renamed, the releases before that change will not
 /// read the new record either: give the binding a new written name again
-/// (`ledger_identities_4`, keeping every earlier name as a `serde` alias) in
+/// (`ledger_identities_5`, keeping every earlier name as a `serde` alias) in
 /// the same change, and update the name here. A release that cannot check a
 /// batch must find no binding in it.
 ///
@@ -2693,10 +2696,18 @@ fn a_saved_batch_holds_exactly_these_records() {
             vouchers,
             ledger_identities,
             cash_in_hand_ledgers,
+            cash_projection,
             on_account_approved,
             statement,
             withdrawn_skips: _,
         } = line;
+        if let Some(CashProjectionRecord {
+            ledgers: _,
+            from: _,
+            to: _,
+            book_sha256: _,
+        }) = cash_projection
+        {}
         if let Some(ImportCompanyTuple {
             name: _,
             guid: _,
@@ -2843,6 +2854,12 @@ fn a_saved_batch_holds_exactly_these_records() {
         }],
     }));
     line.withdrawn_skips = Some(vec![format!("st-20260901-{}", padn(2, 16))]);
+    line.cash_projection = Some(CashProjectionRecord {
+        ledgers: vec!["Cash".into()],
+        from: TallyDate::parse("20260901").unwrap(),
+        to: TallyDate::parse("20270331").unwrap(),
+        book_sha256: "0".repeat(64),
+    });
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();
@@ -2856,6 +2873,11 @@ fn a_saved_batch_holds_exactly_these_records() {
             "cash_in_hand_ledgers",
             "cash_in_hand_ledgers[].bridge_txn_id",
             "cash_in_hand_ledgers[].ledger",
+            "cash_projection",
+            "cash_projection.book_sha256",
+            "cash_projection.from",
+            "cash_projection.ledgers",
+            "cash_projection.to",
             "company",
             "company.books_from",
             "company.company_number",
@@ -2866,9 +2888,9 @@ fn a_saved_batch_holds_exactly_these_records() {
             "date_to",
             "endpoint_origin",
             "identity_scheme",
-            "ledger_identities_3",
-            "ledger_identities_3[].guid",
-            "ledger_identities_3[].name",
+            "ledger_identities_4",
+            "ledger_identities_4[].guid",
+            "ledger_identities_4[].name",
             "on_account_approved",
             "on_account_approved[].ledger",
             "on_account_approved[].party_digest",
@@ -2961,8 +2983,12 @@ fn a_batch_an_earlier_release_saved_keeps_its_ledger_binding() {
         rewritten.get("ledger_identities_2").is_none(),
         "{rewritten}"
     );
+    assert!(
+        rewritten.get("ledger_identities_3").is_none(),
+        "{rewritten}"
+    );
     assert_eq!(
-        rewritten["ledger_identities_3"].as_array().map(Vec::len),
+        rewritten["ledger_identities_4"].as_array().map(Vec::len),
         Some(bound)
     );
 }

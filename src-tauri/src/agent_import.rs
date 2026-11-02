@@ -35,6 +35,8 @@ mod bill_wise;
 mod cancel;
 #[path = "agent_import_cash_bank.rs"]
 mod cash_bank;
+#[path = "agent_cash_projection.rs"]
+mod cash_projection;
 use cash_bank::{CashBankState, LegRequirement, ObservedMasters};
 #[path = "agent_import_identity.rs"]
 mod identity;
@@ -470,9 +472,9 @@ pub(super) struct ImportLedgerLine {
     /// resolves to another GUID. Absent on records built before this field
     /// existed: such a batch is refused for posting and must be rebuilt.
     ///
-    /// Written as `ledger_identities_3`. Releases 0.3.0 to 0.4.2 read only
-    /// `ledger_identities`, and the releases after them only
-    /// `ledger_identities_2`; each finds none here and refuses the batch as
+    /// Written as `ledger_identities_4`. Releases 0.3.0 to 0.4.2 read only
+    /// `ledger_identities`, the releases after them only `ledger_identities_2`,
+    /// and the next only `ledger_identities_3`; each finds none here and refuses the batch as
     /// built before this record (`import_batch_predates_ledger_binding`),
     /// which is their one refusal of a record they cannot check. They do not
     /// read `statement` or the records below, so without this they would
@@ -486,7 +488,8 @@ pub(super) struct ImportLedgerLine {
     /// compiling, or fails, until that is looked at.
     #[serde(
         default,
-        rename = "ledger_identities_3",
+        rename = "ledger_identities_4",
+        alias = "ledger_identities_3",
         alias = "ledger_identities_2",
         alias = "ledger_identities",
         skip_serializing_if = "Option::is_none"
@@ -500,6 +503,11 @@ pub(super) struct ImportLedgerLine {
     /// refused for posting and must be rebuilt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cash_in_hand_ledgers: Option<Vec<CashInHandLedger>>,
+    /// The cash book a deposit from the cash box was built on (#1761). A post
+    /// reads that book again before approval and refuses if it has moved.
+    /// Absent on every batch without such a deposit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cash_projection: Option<cash_projection::CashProjectionRecord>,
     /// Each bill-wise ledger (`ISBILLWISEON` Yes) for which the caller supplied
     /// an approval, with the digest that tied it to this batch's exact content
     /// (#1234). Bridge cannot tell whether a person said yes: the digest is a
@@ -1493,6 +1501,38 @@ impl Server {
                     });
                 }
             }
+            // A deposit from the cash box builds only on an established projection
+            // of its cash ledger (#1761).
+            let outflows = cash_projection::outflows_of(&payload.vouchers, &resolved.cash_ledgers)?;
+            let projection = if outflows.is_empty() {
+                None
+            } else {
+                match self.project_cash_book(&identity, &company.name, &outflows).await {
+                    Ok((projection, evidence)) => {
+                        accumulated = combine_evidence(accumulated.clone(), evidence);
+                        Some(projection)
+                    }
+                    Err(cash_projection::CashProjectionFailure::Read(failure)) => {
+                        return Err(failure.with_prior_evidence(accumulated.clone()));
+                    }
+                    Err(cash_projection::CashProjectionFailure::Refused(refusal)) => {
+                        return Ok(ToolOutcome {
+                            payload: json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": refusal.to_json()}),
+                            evidence: accumulated.clone(),
+                            company_guid: Some(payload.company_guid),
+                            truncated: false,
+                        });
+                    }
+                }
+            };
+            if projection.is_some() {
+                let (repeated, evidence) = self.pre_import_mark(&company, &identity).await?;
+                accumulated = combine_evidence(accumulated.clone(), evidence);
+                if repeated.value != mark.value {
+                    return Err(ToolFailure::from(cash_projection::CASH_PROJECTION_STALE.to_string())
+                        .with_prior_evidence(accumulated.clone()));
+                }
+            }
             let (_, _, _, repeated_catalogue_evidence) = self
                 .read_import_ledger_catalogue(&identity, &company.name)
                 .await?;
@@ -1634,6 +1674,7 @@ impl Server {
                         })
                         .collect(),
                 ),
+                cash_projection: projection.as_ref().map(|held| held.record().clone()),
                 on_account_approved: Some(on_account_approved),
                 statement: statement_record,
                 withdrawn_skips,
@@ -1755,6 +1796,7 @@ impl Server {
                     "warnings": warnings,
                     "hsn_warnings": hsn_warnings,
                     "statement_ledger_warnings": statement_warnings,
+                    "cash_projection": projection.as_ref().map(cash_projection::EstablishedCashProjection::to_json),
                     "next_step": next_step
                 }});
             // Where a person finds the file: the real location, which a Microsoft
@@ -4960,6 +5002,7 @@ fn cash_in_hand_refusals(
             bridge_txn_id: need.bridge_txn_id.clone(),
             ledger: need.ledger.clone(),
             cash_in_hand: true,
+            cash_out: false,
         })
         .collect::<Vec<_>>();
     answered_ledger_refusals(&required, observed, max_bytes)

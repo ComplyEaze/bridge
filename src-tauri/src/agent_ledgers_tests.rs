@@ -2407,8 +2407,8 @@ mod through_the_tool {
         let (masters, balances) = (generated_masters(&all), generated_balances(&all));
         let to_masters = marked_compliance_plans(100, Vec::new(), None);
         let to_the_source = |reads: Vec<String>| marked_compliance_plans(100, reads, None);
-        // Identity, the company row and an extent pair go before the currency read; that read, its
-        // closing extent and the profile probe before the source's own opening extent.
+        // The bracket's identity, company row and extent go before the currency read; that read,
+        // the rest of its bracket and the profile probe before the source's own opening extent.
         let before_currency = identity_plans().len() + 5;
         let before_opening_extent = before_currency + 12;
         let cases = [
@@ -2417,6 +2417,10 @@ mod through_the_tool {
             (
                 marked_compliance_plans(6_000, Vec::new(), None),
                 "ledger_catalogue",
+            ),
+            (
+                marked_compliance_plans(102_161, Vec::new(), None),
+                "ledger_count",
             ),
             (to_masters.clone(), "ledger_master"),
             (to_the_source(vec![masters.clone()]), "ledger_balance"),

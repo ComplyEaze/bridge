@@ -195,8 +195,8 @@ byte count, completeness reason, and truncation state. A refused call returns
 puts `error` directly in `structuredContent`, with no `result`). Where a runtime
 refusal has a typed, data-free reason, the error also carries `cause`, which names why
 (for example `company_base_currency_undetermined` beside `party_ledger_master_read_failed`).
-A refusal of the party ledger read, which is several requests, also carries `failed_request`,
-which names the one that failed: `base_currency`, `book_extent`, `ledger_count`, `ledger_catalogue`,
+The party ledger read is several requests, so a refusal where one of them failed also carries
+`failed_request`, which names it: `base_currency`, `book_extent`, `ledger_count`, `ledger_catalogue`,
 `ledger_master`, `ledger_balance` or `groups`.
 A read whose two paired halves differ, because the book changed while Bridge was reading it,
 carries `native_report_pair_changed` or a cause specific to that read (for example

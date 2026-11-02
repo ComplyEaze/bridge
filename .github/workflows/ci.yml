@@ -436,7 +436,25 @@ jobs:
       - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
       - run: node --test scripts/fetch-pdfium.test.mjs
       - run: node --test scripts/check-ai-attribution.test.mjs
-      - run: python3 scripts/merge-gate.test.py
+      # merge-gate.test.py takes about 6.5 of this job's 7.5 minutes and tests the merge gate and what it reads. A
+      # pull request that changes nothing under scripts/, .github/ or docs/tally/compatibility/ (or the Node version
+      # and attributes files) skips it; the merge queue, a push to master, the nightly run and a manual
+      # run always run it, so a break the filter missed is caught before it lands. A diff that cannot be read fails
+      # the step rather than skipping the test.
+      - id: merge-gate-scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          run=true
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            changed="$(git diff --name-only --no-renames -z "$PR_BASE_SHA" "$GITHUB_SHA" | tr '\0' '\n')"
+            if ! grep -Eq '^(scripts/|\.github/|docs/tally/compatibility/|\.gitattributes$|\.node-version$)' <<< "$changed"; then run=false; fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+      - if: steps.merge-gate-scope.outputs.run == 'true'
+        run: python3 scripts/merge-gate.test.py
       - run: python3 scripts/surface_coverage_report.test.py
 
   tally-portable:

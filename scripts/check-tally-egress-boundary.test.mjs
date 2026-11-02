@@ -231,6 +231,37 @@ test("static control: a clean repository passes, and a comment naming clippy is 
   assert.match(result.stdout, /^Tally-path egress boundary is sealed:/);
 });
 
+// Every name the gate's DENIED_TRANSPORT_STACKS lists. The gate runs when it is imported, so the
+// list cannot be imported; the next test reads the gate's source and holds the two lists equal.
+const TRANSPORT_STACKS = [
+  "rustls", "hyper-rustls", "tokio-rustls", "aws-lc-sys", "ring", "native-tls", "hyper-tls", "h2", "h3", "quinn",
+];
+
+test("the TLS, HTTP/2 and QUIC names planted below are exactly the gate's list", () => {
+  const source = readFileSync(gate, "utf8");
+  const declared = source.match(/^const DENIED_TRANSPORT_STACKS = \[([^\]]*)\];$/m);
+  assert.ok(declared, "DENIED_TRANSPORT_STACKS not found in the gate");
+  const names = [...declared[1].matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(names, TRANSPORT_STACKS);
+});
+
+test("a lock file read as nothing is refused", { skip }, () => {
+  assertRefused(sandbox({ "src-tauri/Cargo.lock": "" }).run(), "src-tauri/Cargo.lock lists no packages; it was not read");
+});
+
+test("a network-capable crate, or a TLS, HTTP/2 or QUIC crate, in the lock file is refused", { skip }, () => {
+  const lock = (name) => ({ "src-tauri/Cargo.lock": `[[package]]\nname = "reqwest"\n\n[[package]]\nname = "${name}"\n` });
+  assertRefused(sandbox(lock("ureq")).run(), "src-tauri/Cargo.lock contains ureq, a network-capable crate outside the pinned HTTP client");
+  for (const name of TRANSPORT_STACKS) {
+    assertRefused(
+      sandbox(lock(name)).run(),
+      `src-tauri/Cargo.lock contains ${name}, a TLS, HTTP/2 or QUIC crate the loopback-only transport does not use`,
+    );
+  }
+  // A name that only starts like a listed one is not refused.
+  assert.equal(sandbox(lock("h2o")).run().status, 0);
+});
+
 test("CLIPPY_CONF_DIR or CLIPPY_ARGS in any tracked file is refused", { skip }, () => {
   for (const name of ["CLIPPY_CONF_DIR", "CLIPPY_ARGS"]) {
     const result = sandbox({ ".github/workflows/x.yml": `env:\n  ${name}: elsewhere\n` }).run();

@@ -27,6 +27,10 @@ const EXTENT: &[u8] = include_bytes!(
 const BILLS: &[u8] = include_bytes!(
     "../../crates/bridge-tally-protocol/tests/fixtures/native/bills_receivable_aarav.xml"
 );
+/// The captured nine-ledger catalogue of the test company.
+const CATALOGUE: &[u8] = include_bytes!(
+    "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-ledger-catalogue.utf16le.xml"
+);
 
 fn captured_identity(extent: &str) -> VerifiedCompanyIdentity {
     let companies = bridge_tally_protocol::parse_companies_from_collection(extent).unwrap();
@@ -64,6 +68,28 @@ async fn refusal_with(
     retained: &[&'static [u8]],
     fail_transport: bool,
 ) -> (anyhow::Error, RuntimeReadEvidence) {
+    refusal_ending_with(
+        extent,
+        read,
+        retained,
+        fail_transport.then_some(SERVICE_UNAVAILABLE),
+    )
+    .await
+}
+
+/// The answer to the request after the retained ones that ends the read: a 503, or
+/// an answer cut short of its declared length.
+const SERVICE_UNAVAILABLE: &[u8] =
+    b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+const CUT_SHORT: &[u8] = b"HTTP/1.1 200 OK\r\nContent-Type: text/xml; charset=utf-16\r\nContent-Length: 4096\r\nConnection: close\r\n\r\n\xff\xfe<\0E\0";
+
+async fn refusal_ending_with(
+    extent: &str,
+    read: crate::tally::connection::ComplianceRead,
+    retained: &[&'static [u8]],
+    ending: Option<&'static [u8]>,
+) -> (anyhow::Error, RuntimeReadEvidence) {
+    let fail_transport = ending.is_some();
     let identity = captured_identity(extent);
     let parsed_extent = bridge_tally_protocol::outstandings_shared::parse_company_book_extent_v2(
         extent,
@@ -119,7 +145,7 @@ async fn refusal_with(
                 if fail_transport && index + 1 == bodies.len() {
                     assert_eq!(paired, 0);
                     assert!(headers.starts_with("POST / "));
-                    socket.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await.unwrap();
+                    socket.write_all(ending.unwrap()).await.unwrap();
                     socket.shutdown().await.unwrap();
                     return evidence;
                 }
@@ -262,8 +288,8 @@ fn extent_with_master_mark(mark: u64) -> String {
 }
 
 /// The party/ledger master export (bridge#1490) sends the request a standard read sends for a book
-/// whose master-alteration mark is past the mailing bound, so nothing it read before is sized or
-/// refused by the larger estimate; within the bound it sends the mailing request. Compared by the
+/// whose master-alteration mark is past the mailing bound and whose ledgers are not counted, so
+/// such a book is not sized by the larger estimate; within the bound it sends the mailing request. Compared by the
 /// hash of the first ledger request actually sent, through the client.
 #[tokio::test]
 async fn the_export_sends_the_standard_request_for_a_book_past_the_mailing_bound() {
@@ -286,4 +312,293 @@ async fn the_export_sends_the_standard_request_for_a_book_past_the_mailing_bound
     // Inside the bound the export names the mailing details.
     assert_eq!(sent(219, Export).await, sent(219, WithMailingDetails).await);
     assert_ne!(sent(219, Export).await, sent(219, Standard).await);
+}
+
+/// bridge#2074: a book whose mark is past the standard bound has its ledgers counted by the
+/// catalogue before any ledger request, and the export then decides by that count. Nine ledgers
+/// at a mark of 8,000 are sent the mailing request, as a mailing read sends it; 3,309 ledgers,
+/// inside the standard bound but past the mailing one, are sent the standard request, as before.
+/// Compared by the hashes of the catalogue and the first ledger request, through the client.
+#[tokio::test]
+async fn the_export_decides_by_the_ledgers_a_catalogue_counted_for_a_marked_book() {
+    use crate::tally::connection::ComplianceRead::{
+        Standard, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Export,
+    };
+    let units = CATALOGUE.strip_prefix(&[0xff, 0xfe]).unwrap_or(CATALOGUE);
+    let captured = String::from_utf16(
+        &units
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let catalogue = |extra: u32| -> &'static [u8] {
+        let body = crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
+            &captured,
+            (0..extra).map(|index| {
+                (
+                    format!("Counted Ledger {index:05}"),
+                    format!("{:08x}", 0x3000_0000 + index),
+                )
+            }),
+        );
+        Box::leak(body.into_bytes().into_boxed_slice())
+    };
+    let few = catalogue(0);
+    let many = catalogue(3_300);
+    let sent = |served: Vec<&'static [u8]>, read| async move {
+        let (_, evidence) =
+            refusal_with(&extent_with_master_mark(8_000), read, &served, false).await;
+        evidence.request_sha256
+    };
+    // Nine ledgers: the mailing request, though the mark alone gave the standard one.
+    assert_eq!(
+        sent(vec![few, BILLS], Export).await,
+        sent(vec![few, BILLS], WithMailingDetails).await
+    );
+    assert_ne!(
+        sent(vec![few, BILLS], Export).await,
+        sent(vec![few, BILLS], Standard).await
+    );
+    // 3,309 ledgers: the standard request, byte for byte. The control: a mailing read of them
+    // sends no ledger request at all, since its parts could not hold their one parent group.
+    assert_eq!(
+        sent(vec![many, BILLS], Export).await,
+        sent(vec![many, BILLS], Standard).await
+    );
+    let (refused, _) = refusal_with(
+        &extent_with_master_mark(8_000),
+        WithMailingDetails,
+        &[many],
+        false,
+    )
+    .await;
+    assert!(
+        refused.chain().any(|cause| matches!(
+            cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
+            Some(PartyLedgerMasterSourceValidationError::ParentPartition { .. })
+        )),
+        "{refused:#}"
+    );
+}
+
+/// bridge#2074: a master read sent with the mailing details after the count, whose
+/// answer was cut short, or answered with an HTTP error, is marked as that larger read; the
+/// same failure of the standard read is not. The read's own kind decides, after the count:
+/// the 3,309 ledgers the export asked about are sent the standard request and are not
+/// marked. The export's own mailing read, cut short, answered with an HTTP error, or answered
+/// whole without a STATUS, is not the export's failure (bridge#2214, the maintainers' ruling
+/// on bridge#2074): it goes on with the standard request, here to an endpoint that has
+/// closed, and that read's failure is told unmarked.
+#[tokio::test]
+async fn a_mailing_read_cut_short_is_marked_as_the_mailing_read() {
+    use crate::tally::connection::ComplianceRead::{
+        Standard, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Export,
+    };
+    use crate::tally::connection::MailingDetailsReadFailed;
+    use bridge_tally_transport::TallyTransportError;
+    let transport = |error: &anyhow::Error| {
+        error
+            .chain()
+            .filter_map(|cause| cause.downcast_ref::<TallyTransportError>())
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let units = CATALOGUE.strip_prefix(&[0xff, 0xfe]).unwrap_or(CATALOGUE);
+    let captured = String::from_utf16(
+        &units
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let catalogue = |extra: u32| -> &'static [u8] {
+        let body = crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
+            &captured,
+            (0..extra).map(|index| {
+                (
+                    format!("Counted Ledger {index:05}"),
+                    format!("{:08x}", 0x3000_0000 + index),
+                )
+            }),
+        );
+        Box::leak(body.into_bytes().into_boxed_slice())
+    };
+    let (few, many) = (catalogue(0), catalogue(3_300));
+    let marked = |error: &anyhow::Error| {
+        error
+            .chain()
+            .any(|cause| cause.downcast_ref::<MailingDetailsReadFailed>().is_some())
+    };
+    let cut_short = |served: &'static [u8], read| async move {
+        refusal_ending_with(
+            &extent_with_master_mark(8_000),
+            read,
+            &[served],
+            Some(CUT_SHORT),
+        )
+        .await
+        .0
+    };
+    let mailing = cut_short(few, WithMailingDetails).await;
+    assert!(marked(&mailing), "{mailing:#}");
+    assert!(
+        transport(&mailing).contains(&TallyTransportError::ResponseTruncated),
+        "{mailing:#}"
+    );
+    let continued = cut_short(few, Export).await;
+    assert!(!marked(&continued), "{continued:#}");
+    assert!(
+        matches!(
+            transport(&continued)[..],
+            [TallyTransportError::ConnectionFailed, ..]
+        ),
+        "{continued:#}"
+    );
+    assert!(
+        !transport(&continued).contains(&TallyTransportError::ResponseTruncated),
+        "{continued:#}"
+    );
+    // An HTTP error status in place of the mailing answer: marked where the details were asked
+    // for by name, continued where the export asked for them.
+    let http_error = |read| async move {
+        refusal_ending_with(
+            &extent_with_master_mark(8_000),
+            read,
+            &[few],
+            Some(SERVICE_UNAVAILABLE),
+        )
+        .await
+        .0
+    };
+    let mailing = http_error(WithMailingDetails).await;
+    assert_eq!(
+        mailing
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+            .map(MailingDetailsReadFailed::cause),
+        Some(crate::tally::connection::MailingReadFailure::HttpStatus),
+        "{mailing:#}"
+    );
+    // The standard read's own failure on the closed endpoint, not the mailing answer's status.
+    let continued = http_error(Export).await;
+    assert!(!marked(&continued), "{continued:#}");
+    assert!(!transport(&continued).is_empty(), "{continued:#}");
+    assert!(
+        !transport(&continued)
+            .iter()
+            .any(|error| matches!(error, TallyTransportError::HttpStatus { .. })),
+        "{continued:#}"
+    );
+    let standard = cut_short(few, Standard).await;
+    assert!(!marked(&standard), "{standard:#}");
+    // Resolved to the standard request by the count, its cut is not the mailing read's and
+    // is not read again: its own cut is the only transport error, where a read marked and
+    // continued would end on the closed endpoint.
+    let counted_standard = cut_short(many, Export).await;
+    assert!(!marked(&counted_standard), "{counted_standard:#}");
+    assert_eq!(
+        transport(&counted_standard),
+        [TallyTransportError::ResponseTruncated],
+        "{counted_standard:#}"
+    );
+    // A whole answer to the export's mailing read that the parser refuses (here a missing
+    // STATUS) continues too: the standard read ends on the closed endpoint, unmarked. Asked for
+    // by name, the same answer is marked and told as itself, with no transport error.
+    let (damaged, _) = refusal_with(
+        &extent_with_master_mark(8_000),
+        Export,
+        &[few, BILLS],
+        false,
+    )
+    .await;
+    assert!(!marked(&damaged), "{damaged:#}");
+    assert!(!transport(&damaged).is_empty(), "{damaged:#}");
+    assert!(
+        !damaged.chain().any(|cause| cause
+            .downcast_ref::<bridge_tally_protocol::NativeCollectionError>()
+            .is_some()),
+        "{damaged:#}"
+    );
+    let (named, _) = refusal_with(
+        &extent_with_master_mark(8_000),
+        WithMailingDetails,
+        &[few, BILLS],
+        false,
+    )
+    .await;
+    assert!(marked(&named), "{named:#}");
+    assert!(
+        named.chain().any(|cause| cause
+            .downcast_ref::<bridge_tally_protocol::NativeCollectionError>()
+            == Some(&bridge_tally_protocol::NativeCollectionError::StatusAbsent)),
+        "{named:#}"
+    );
+    assert!(transport(&named).is_empty(), "{named:#}");
+}
+
+/// bridge#2214: the export's mailing answer holding another number of ledgers than its
+/// catalogue counted (ten counted, the captured nine answered) is marked as such and continues
+/// without the details; the standard read that follows keeps its own refusal of the same
+/// difference, unmarked, as on master. Asked for by name, the mailing read's difference is
+/// marked and told as itself.
+#[tokio::test]
+async fn a_mailing_answer_that_differs_from_the_count_continues_to_the_standard_reads_own_check() {
+    use crate::tally::connection::ComplianceRead::{
+        WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Export,
+    };
+    use crate::tally::connection::{MailingDetailsReadFailed, MailingReadFailure};
+    let units = CATALOGUE.strip_prefix(&[0xff, 0xfe]).unwrap_or(CATALOGUE);
+    let captured = String::from_utf16(
+        &units
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let ten: &'static [u8] = Box::leak(
+        crate::tally::standard_ledger_catalog::tests::catalogue_with_extra_ledgers(
+            &captured,
+            std::iter::once(("Counted Ledger 00000".to_owned(), "30000000".to_owned())),
+        )
+        .into_bytes()
+        .into_boxed_slice(),
+    );
+    let differs = |error: &anyhow::Error| {
+        error.chain().any(|cause| {
+            matches!(
+                cause.downcast_ref::<PartyLedgerMasterSourceValidationError>(),
+                Some(PartyLedgerMasterSourceValidationError::LedgerCountDiffers {
+                    expected: 10,
+                    observed: 9,
+                })
+            )
+        })
+    };
+    let cause = |error: &anyhow::Error| {
+        error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+            .map(MailingDetailsReadFailed::cause)
+    };
+    let (continued, served) = refusal_with(
+        &extent_with_master_mark(8_000),
+        Export,
+        &[ten, MASTER, MASTER],
+        false,
+    )
+    .await;
+    assert!(differs(&continued), "{continued:#}");
+    assert_eq!(cause(&continued), None, "{continued:#}");
+    let (named, named_served) = refusal_with(
+        &extent_with_master_mark(8_000),
+        WithMailingDetails,
+        &[ten, MASTER],
+        false,
+    )
+    .await;
+    assert!(differs(&named), "{named:#}");
+    assert_eq!(cause(&named), Some(MailingReadFailure::CountDiffers));
+    // The export's two master pairs, the mailing one first: the server saw one pair more.
+    assert_eq!(served.bytes, named_served.bytes + 2 * MASTER.len());
 }

@@ -38,3 +38,14 @@ The edge books are written by hand in a small generator, as data, then read by b
 | `edge.cp_loans.cash_payments_40a3.json` | 49,254 | `35fdf62af4e7c91942495c1fcb883a4e656f59b6df8d35040509b0fcba99a96c` | `golden/edge.cp_loans.cash_payments_40a3.json` |
 | `cp_loan_blank.json` | 1,290 | `b75ad26a2b52a035cf118704cc3194f8c56fe656e9eadd60e11b730747e01f04` | `edge-books/cp_loan_blank.json` |
 | `edge.cp_loan_blank.cash_payments_40a3.json` | 10,343 | `19e40a0256b5779780879b79351516c708f100a02e17c14c235c247841db6d6b` | `golden/edge.cp_loan_blank.cash_payments_40a3.json` |
+
+## Declared behaviour difference: a s.269ST row under the limit on its own cash line
+
+2 November 2026, #772. `docs/tax-audit/parity-spec-v1.md` section 12 requires every change to an
+existing output to be a declared difference that names the invented book which exercises it.
+
+- **What differs.** A s.269ST row is flagged on the party's side of its vouchers. Where that side is at or over the limit and the cash on those vouchers' own cash line is below it, because bank also moved, the title said the cash was at or over the limit. It now says the party's side is at or over and the cash debited or credited on these vouchers is below it. `Row::over` of `high_value_register` decides this, so the two tests give one row one account. Only the title changes: the row, its figures, its evidence and its limits are as before. The compared field is `title_sha256_16` (parity-spec section 3).
+- **The book.** The invented book is the unit-test book of `src/cash_payments_40a3.rs`. The test `cash_payments_40a3::tests::a_row_under_the_limit_on_its_cash_line_says_so_in_its_title` builds each of the four rows, receipt and payment, named and unnamed, both ways round the limit, and asserts the title whole.
+- **The golden.** The synthetic book has one such row, the payment of 2025-04-01. `golden/synthetic.cash_payments_40a3.json` carries the new title and a `title_sha256_16` recomputed by hand with the hash `canonical.rs` uses (the old hash was reproduced first, to check the method). Nothing else in the golden changed, so it is no longer the reference's own dump for this one finding. The edge goldens hold no such row and did not move. Its byte row in `PROVENANCE.md` is updated in place.
+- **Why it was not regenerated.** `parity/python_golden.py` takes the reference engine's directory, which is not in this repository, and the reference still gives the old title (inferred from this golden, not measured), so a regeneration would bring it back.
+- **What a local parity run shows.** A run of `cash_payments_40a3` on a real book holding such a row reports its `title_sha256_16` as a difference. It is this declared difference, not a regression.

@@ -1117,8 +1117,8 @@
           "label": "Purchase PU/3 on 2025-04-01"
         }
       ],
-      "title_sha256_16": "80dfc7821ab104e4",
-      "title_text": "Cash paid to one party at or over the s.269ST person-per-day threshold on 2025-04-01 -- reportable in clause 31(bc)",
+      "title_sha256_16": "21fede3ab51f19ad",
+      "title_text": "Cash paid to one party on 2025-04-01: the party's side is at or over the s.269ST(a) limit, but the cash credited on these vouchers is below it",
       "limits_sha256_16": "12dc1fc0e70c3fb7",
       "limits_text": [
         "s.269ST(a) is a duty on the receiver of the cash, not the payer: the section reads 'No person shall receive...'. A payment made by the assessee is not itself a books-testable exposure for the assessee under s.269ST; it is a Form 3CD clause 31(bc) reporting item only (limb (a): aggregate per person per day).",

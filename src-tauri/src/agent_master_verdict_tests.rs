@@ -1,5 +1,6 @@
 //! The verdict function over constructed inputs: every state, and one test per
 //! check that flips it. Nothing here reads or sends anything.
+use super::super::verify::{judged_next_step, NEXT_LOAD_SAME_COMPANIES};
 use super::*;
 use crate::tally::ledger_create_item::{AdmittedDutyHead, MasterName, PartySide, VerifiedGstin};
 use bridge_tally_protocol::GstDutyHead;
@@ -2074,6 +2075,52 @@ fn an_uncovered_absent_name_names_the_tally_and_the_cause() {
             judgement.reasons
         );
     }
+}
+
+/// `master_write_located_elsewhere` releases the name, so with Tally's answer
+/// lost, when a create may still be waiting, it needs the measured order too.
+/// With the answer on file no create is waiting, and it stands on any Tally.
+#[test]
+fn another_companys_moved_mark_needs_the_measured_order_when_the_answer_is_lost() {
+    let uncovered = "absent_not_measured_on_gold";
+    let mut absent = World::untouched(suspense());
+    let mut in_the_book = World::lost_answer(suspense());
+    for world in [&mut absent, &mut in_the_book] {
+        world.marks()[1] = mark(other(), 4);
+        world.read.order_coverage = OrderCoverage::NotMeasured(uncovered);
+        let judgement = world.judge();
+        assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+        assert!(!judgement.state.is_terminal());
+        assert_eq!(
+            judgement.reasons,
+            vec!["other_company_mark_moved", uncovered]
+        );
+        assert_eq!(judgement.guid, None);
+        world.answer_held = true;
+        assert_eq!(
+            world.judge().state,
+            MasterVerdictState::MasterWriteLocatedElsewhere
+        );
+    }
+}
+
+/// With the set of loaded companies changed as well, loading them comes first:
+/// the create may have landed in one that is not loaded.
+#[test]
+fn a_held_located_elsewhere_with_a_changed_company_set_asks_to_load_them_first() {
+    let mut world = World::untouched(suspense());
+    world.marks()[1] = mark(other(), 4);
+    world.marks().push(mark(crate::synthetic_guid(0x3333), 1));
+    world.read.order_coverage = OrderCoverage::NotMeasured("absent_not_measured_on_gold");
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    for reason in ["company_scope_changed", "other_company_mark_moved"] {
+        assert!(judgement.reasons.contains(&reason), "{reason}");
+    }
+    assert_eq!(
+        judged_next_step(&judgement, Moment::Reconcile),
+        NEXT_LOAD_SAME_COMPANIES
+    );
 }
 
 /// The captured company lists, read by the parser a shipped build uses: the

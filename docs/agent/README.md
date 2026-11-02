@@ -3122,6 +3122,16 @@ another product such a batch holds its name until the company is read back on
 name kept open also names what else the read showed (`master_new_since_intent`,
 `mark_went_back_since_intent`).
 
+`master_write_located_elsewhere` releases the name too, so the same limit applies
+when no answer from Tally is on file: on any other Tally the state is
+`reconciliation_required`, its reasons include `other_company_mark_moved` and one
+of the reasons above, and an answer that read the book back leads with the alert
+to check every loaded company. With Tally's answer on file no create is waiting,
+and `master_write_located_elsewhere` stands on any Tally. Other verdicts that
+close a batch on a ledger found in the book (`posted_into_existing_master`,
+`posted_unattributed`) are not limited this way: the book itself then refuses a
+new create of that name for as long as that master stands.
+
 Later calls cannot settle these states, and their batches keep holding the name: a
 read that found the name absent while the company's master mark moved back, or
 while a ledger or group appeared that was not there before the send; a ledger

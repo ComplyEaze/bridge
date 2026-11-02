@@ -19,7 +19,9 @@
 //! 2. a pre-image master's `ALTERID` changed, `ALTERED` above zero, or the name
 //!    resolves to a pre-image master: `posted_into_existing_master`;
 //! 3. another loaded company's `ALTMSTID` moved:
-//!    `master_write_located_elsewhere`;
+//!    `master_write_located_elsewhere`, except that with Tally's answer lost
+//!    it too needs [`OrderCoverage`], and elsewhere the batch stays open with
+//!    the reason;
 //! 4. on a reconcile only, the name absent under every key of the index, no pre-image
 //!    master changed or missing, no loaded company's mark moved and no counter
 //!    claiming a create: `confirmed_absent`; the same, but with the target
@@ -679,9 +681,30 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         };
     }
 
-    // 3. Another loaded company's master mark moved.
+    // Either absent state is given only where its basis was measured; on any
+    // other Tally the batch stays open, with the reason naming what is not.
+    let uncovered = match read.order_coverage {
+        OrderCoverage::Measured => None,
+        OrderCoverage::NotMeasured(reason) => Some(reason),
+    };
+
+    // 3. Another loaded company's master mark moved. This verdict releases the
+    // name too, so with Tally's answer lost, when a create may still be
+    // waiting, it needs the same measured order as the absent states; elsewhere
+    // the batch stays open with the reason.
     if others_moved {
         reasons.push("other_company_mark_moved");
+        if let Some(uncovered) = uncovered.filter(|_| !facts.answer_held) {
+            reasons.push(uncovered);
+            return Judgement {
+                state: MasterVerdictState::ReconciliationRequired,
+                guid: None,
+                checks,
+                reasons,
+                name_absent_in_read_book: name_absent,
+                sealed: (),
+            };
+        }
         return Judgement {
             state: MasterVerdictState::MasterWriteLocatedElsewhere,
             guid: None,
@@ -702,12 +725,6 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         && !missing
         && same_companies
         && !counters_claim_a_write;
-    // Either absent state is given only where its basis was measured; on any
-    // other Tally the batch stays open, with the reason naming what is not.
-    let uncovered = match read.order_coverage {
-        OrderCoverage::Measured => None,
-        OrderCoverage::NotMeasured(reason) => Some(reason),
-    };
     if absent_and_unchanged {
         reasons.extend(uncovered);
     }

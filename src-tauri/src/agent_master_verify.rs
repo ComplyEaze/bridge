@@ -37,6 +37,9 @@ use std::collections::BTreeMap;
 pub(super) const NEXT_VERIFIED: &str = "The read-back found exactly one ledger of this name, new, with the parent, tax fields and GSTIN as sent and no opening balance (bill-wise is not read back), no ledger or group that existed before changed, and no other loaded company's master mark moved. Nothing more is needed for this batch; do not post it again.";
 pub(super) const NEXT_INTO_EXISTING: &str = "Open the company in Tally now and check the ledger of this name, its group and the ledgers around it: a ledger that existed before may have been changed. Do not retry and do not post this batch again.";
 pub(super) const NEXT_ELSEWHERE: &str = "Open Tally now and check every loaded company: the change may have landed in a company other than the one approved. Do not retry and do not post this batch again.";
+/// The same alert with the batch kept open: Tally's answer is lost, and the
+/// order that would release the name was not measured on this Tally.
+pub(super) const NEXT_ELSEWHERE_UNCOVERED: &str = "Open Tally now and check every loaded company: a master changed in a company other than the one approved, and that change may be this create. ComplyEaze Bridge has no answer from Tally to the create on file, and it closes such a batch only on TallyPrime 7.2 Silver, licensed, the one Tally where the order it rests on (a read sent after the create was served after it) was measured. The batch stays open, and ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for: a create it sent may still be waiting in Tally. Calling post_ledger_creates with this batch_id again sends nothing and reads the book back, but on this Tally it will not close the batch. Do not retry, and do not create this ledger in Tally by hand. Never post this batch again.";
 pub(super) const NEXT_UNATTRIBUTED: &str = "A later read of the book found the ledger of this name with the parent, tax fields and GSTIN as sent and no opening balance (bill-wise is not read back), and its ALTERID shows it as the first master change in this company after ComplyEaze Bridge's last read of it before sending the create, and not changed since. ComplyEaze Bridge has no answer from Tally to the create on file (it could not be recorded, or Tally never answered), so it cannot show that this change was its own create and not the same ledger made by someone else: check the ledger in Tally. That read also does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for, which would change this ledger again. This batch is closed, and nothing is sent again from it; do not post it again.";
 pub(super) const NEXT_ABSENT: &str = "A later read of the book found no ledger of this name, and the company's master mark had not moved. This batch is closed, and nothing is sent again from it. That read also fits a create that Tally rejected. It was sent after the create's send ended, and Tally has been seen to serve such a read only after the create ran, for requests on new connections and with the create, the read or both on a reused one; it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for. To create the ledger, first make sure Tally is idle and answering, then call prepare_ledger_creates for a new batch: it needs a new approval.";
 /// The read found the name absent after another master change: settled on the
@@ -109,6 +112,8 @@ pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'stati
     }
     if judgement.reasons().contains(&"company_scope_changed") {
         NEXT_LOAD_SAME_COMPANIES
+    } else if judgement.reasons().contains(&"other_company_mark_moved") {
+        NEXT_ELSEWHERE_UNCOVERED
     } else if judgement.reasons().iter().any(|reason| {
         matches!(
             *reason,
@@ -611,7 +616,14 @@ fn verification_result(
     moment: Moment,
     counters: Option<MasterCounters>,
 ) -> Value {
-    let alert = settled_alert(judgement.state());
+    // The one open state that leads with an alert: another company's mark
+    // moved, and the batch stays open.
+    let alert = settled_alert(judgement.state()).or_else(|| {
+        judgement
+            .reasons()
+            .contains(&"other_company_mark_moved")
+            .then_some(NOTE_ALERT_ELSEWHERE)
+    });
     let counters = counters.as_ref();
     let verdict_recorded = recorded.verdict.is_ok();
     let next_step = if verdict_recorded {

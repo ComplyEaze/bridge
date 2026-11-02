@@ -4703,7 +4703,12 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
 /// here, for both absent states, with the reason and a step that says so.
 #[tokio::test]
 async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
-    for target in [7, 8] {
+    for (target, other, next_step) in [
+        (7, 3, verify::NEXT_ABSENT_UNCOVERED),
+        (8, 3, verify::NEXT_ABSENT_UNCOVERED),
+        // Another company's mark moved too: the same hold, with the alert.
+        (7, 4, verify::NEXT_ELSEWHERE_UNCOVERED),
+    ] {
         let plans = through_post(xml(created_one()).with_delivery(
             Delivery::ResetAfterRequestProcessed {
                 delay: Duration::from_millis(0),
@@ -4720,7 +4725,7 @@ async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
         .await;
         sent(simulator);
         let reads =
-            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, 3, None))).unwrap();
+            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, other, None))).unwrap();
         let later = server_at(reads.address(), directory.path());
         // No coverage seam: the read-back reads the release from the answer.
         let response = SCRIPTED_APPROVAL
@@ -4746,9 +4751,13 @@ async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
                 .contains(&json!("absent_not_measured_on_this_release")),
             "{target}: {response}"
         );
+        assert_eq!(result(&response)["next_step"], next_step, "{target}");
         assert_eq!(
-            result(&response)["next_step"],
-            verify::NEXT_ABSENT_UNCOVERED,
+            result(&response)["alert"],
+            json!(
+                settled_alert(MasterVerdictState::MasterWriteLocatedElsewhere)
+                    .filter(|_| other == 4)
+            ),
             "{target}"
         );
         assert_eq!(result(&response)["verification"]["settled"], false);

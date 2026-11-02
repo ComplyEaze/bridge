@@ -76,8 +76,8 @@
       "id": "cash_payments_40a3.s269st_at_or_over_limit_count",
       "value": 4,
       "unit": "count",
-      "definition_sha256_16": "d1cb2ed8cb702b93",
-      "definition_text": "(date, party) pairs where the day's total is at or over the s.269ST(a) limb (i) limit (₹2,00,000 per person per day).",
+      "definition_sha256_16": "643db957532560f3",
+      "definition_text": "(date, party) pairs where the party's side of the day's cash-receipt vouchers is at or over the s.269ST(a) limb (i) limit (₹2,00,000 per person per day), whether or not their cash is.",
       "evidence": []
     },
     {
@@ -151,8 +151,8 @@
       "id": "cash_payments_40a3.s269st_payment_at_or_over_limit_count",
       "value": 5,
       "unit": "count",
-      "definition_sha256_16": "8f8629d398594be3",
-      "definition_text": "(date, party) pairs where the day's cash payment total is at or over the s.269ST(a) limb (a) threshold (₹2,00,000 per person per day) -- reportable in clause 31(bc), not a contravention by the assessee (s.269ST binds the receiver, not the payer).",
+      "definition_sha256_16": "7750bbb2230bcc0f",
+      "definition_text": "(date, party) pairs where the party's side of the day's cash-payment vouchers is at or over the s.269ST(a) limb (a) threshold (₹2,00,000 per person per day) -- reportable in clause 31(bc) where their cash is too, not a contravention by the assessee (s.269ST binds the receiver, not the payer).",
       "evidence": []
     },
     {
@@ -286,8 +286,8 @@
       "id": "cash_payments_40a3.s269st_payment_row_amount_2025-04-01_192cf253",
       "value": 23600000,
       "unit": "paise",
-      "definition_sha256_16": "76010e6f3482105b",
-      "definition_text": "Cash paid to one party ledger (tag 192cf253) on 2025-04-01, summed across every population voucher that day.",
+      "definition_sha256_16": "ec7ebb576fc8facd",
+      "definition_text": "Paid to one party ledger (tag 192cf253) on 2025-04-01, summed across every population voucher that day: the party's side of each voucher, not only its cash.",
       "evidence": [
         {
           "kind": "voucher",

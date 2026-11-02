@@ -8164,8 +8164,8 @@
   "by": "author",
   "what": "the s.269ST receipt row is never unnamed",
   "file": "src/cash_payments_40a3.rs",
-  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        // Over on the party's side but under on the vouchers' own cash line: a true title, as the\n        // high-value register gives the same row (#772). The rest of the finding stays.\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),",
-  "to": "        let unnamed = false;\n        // Over on the party's side but under on the vouchers' own cash line: a true title, as the\n        // high-value register gives the same row (#772). The rest of the finding stays.\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),"
+  "from": "        let unnamed = ledger_name == UNIDENTIFIED_PARTY;\n        // Over on the party's side but under on the vouchers' own cash line: a true title and\n        // amount definition, as the high-value register gives the same row (#772). The rest of the\n        // finding stays.\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),",
+  "to": "        let unnamed = false;\n        // Over on the party's side but under on the vouchers' own cash line: a true title and\n        // amount definition, as the high-value register gives the same row (#772). The rest of the\n        // finding stays.\n        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_row_amount_{rid}\"),"
  },
  {
   "id": "CP-17",
@@ -14294,5 +14294,21 @@
   "file": "src/cash_payments_40a3.rs",
   "from": "        let proven_under = data.over(limit_269st)? == Over::PartySideOnly;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),\n",
   "to": "        let proven_under = false;\n        let f_amt = r.fig(\n            &format!(\"s269st_payment_row_amount_{rid}\"),\n"
+ },
+ {
+  "id": "L772-3",
+  "by": "author",
+  "what": "#772: a s.269ST receipt row under the limit on its cash line keeps the old amount definition",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "} else if proven_under {\n                format!(\n                    \"Received from one party",
+  "to": "} else if false {\n                format!(\n                    \"Received from one party"
+ },
+ {
+  "id": "L772-4",
+  "by": "author",
+  "what": "#772: a s.269ST payment row under the limit on its cash line keeps the old amount definition",
+  "file": "src/cash_payments_40a3.rs",
+  "from": "} else if proven_under {\n                format!(\n                    \"Paid to one party",
+  "to": "} else if false {\n                format!(\n                    \"Paid to one party"
  }
 ]

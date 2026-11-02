@@ -599,8 +599,8 @@ population, non-Contra voucher, party ledger not under 'Sales Accounts', any amo
         Value::Int(rows_269st.len() as i64),
         Unit::Count,
         &format!(
-            "(date, party) pairs where the day's total is at or over the s.269ST(a) limb (i) \
-limit ({} per person per day).",
+            "(date, party) pairs where the party's side of the day's cash-receipt vouchers is at \
+or over the s.269ST(a) limb (i) limit ({} per person per day), whether or not their cash is.",
             rupees(i128::from(limit_269st))
         ),
         Vec::new(),
@@ -610,8 +610,9 @@ limit ({} per person per day).",
         let h = stable_ledger_tag(book, ledger_name)?;
         let rid = format!("{}_{h}", iso(d));
         let unnamed = ledger_name == UNIDENTIFIED_PARTY;
-        // Over on the party's side but under on the vouchers' own cash line: a true title, as the
-        // high-value register gives the same row (#772). The rest of the finding stays.
+        // Over on the party's side but under on the vouchers' own cash line: a true title and
+        // amount definition, as the high-value register gives the same row (#772). The rest of the
+        // finding stays.
         let proven_under = data.over(limit_269st)? == Over::PartySideOnly;
         let f_amt = r.fig(
             &format!("s269st_row_amount_{rid}"),
@@ -621,6 +622,12 @@ limit ({} per person per day).",
                 format!(
                     "Received on {} on cash-receipt vouchers with no party ledger (tag {h}), \
 whatever name they print, summed: the payers' side of each voucher, not only its cash.",
+                    iso(d)
+                )
+            } else if proven_under {
+                format!(
+                    "Received from one party ledger (tag {h}) on {}, summed across every population \
+voucher that day: the party's side of each voucher, not only its cash.",
                     iso(d)
                 )
             } else {
@@ -724,9 +731,10 @@ population, non-Contra voucher, party ledger not under 'Purchase Accounts', any 
         Value::Int(rows_269st_pay.len() as i64),
         Unit::Count,
         &format!(
-            "(date, party) pairs where the day's cash payment total is at or over the \
-s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reportable in clause \
-31(bc), not a contravention by the assessee (s.269ST binds the receiver, not the payer).",
+            "(date, party) pairs where the party's side of the day's cash-payment vouchers is at \
+or over the s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reportable \
+in clause 31(bc) where their cash is too, not a contravention by the assessee (s.269ST binds the \
+receiver, not the payer).",
             limit_269st_text = rupees(i128::from(limit_269st))
         ),
         Vec::new(),
@@ -745,6 +753,12 @@ s.269ST(a) limb (a) threshold ({limit_269st_text} per person per day) -- reporta
                 format!(
                     "Paid on {} on cash-payment vouchers with no party ledger (tag {h}), whatever \
 name they print, summed: the payees' side of each voucher, not only its cash.",
+                    iso(d)
+                )
+            } else if proven_under {
+                format!(
+                    "Paid to one party ledger (tag {h}) on {}, summed across every population \
+voucher that day: the party's side of each voucher, not only its cash.",
                     iso(d)
                 )
             } else {
@@ -1354,8 +1368,9 @@ mod tests {
     }
 
     /// The title of the one s.269ST row of a single voucher: `cash` and `bank` on the cash side
-    /// against `party` for their sum, on the receipt or the payment leg, with its amount.
-    fn s269st_row_of(receipt: bool, party: &str, cash: i64, bank: i64) -> (String, i64) {
+    /// against `party` for their sum, on the receipt or the payment leg, with its amount and the
+    /// amount's definition.
+    fn s269st_row_of(receipt: bool, party: &str, cash: i64, bank: i64) -> (String, i64, String) {
         use crate::book::{LedgerLine, VoucherStatus};
         let sign = if receipt { 1 } else { -1 };
         let line = |ledger: &str, amount_paise: i64| LedgerLine {
@@ -1409,13 +1424,13 @@ mod tests {
         let Value::Int(paise) = amount.value else {
             panic!("{:?}", amount.value);
         };
-        (finding.title.clone(), paise)
+        (finding.title.clone(), paise, amount.definition.clone())
     }
 
     /// #772, declared in `provenance/cp-repin.md`: Rs 1,00,000 in cash and Rs 1,20,000 by bank is
     /// over the s.269ST limit on the party's side and under it on the cash line, so the row keeps
-    /// its amount and its title says so, on either leg and with or without a party ledger. The
-    /// control moves the whole Rs 2,20,000 in cash.
+    /// its amount, and its title and the amount's definition say so, on either leg and with or
+    /// without a party ledger. The control moves the whole Rs 2,20,000 in cash.
     #[test]
     fn a_row_under_the_limit_on_its_cash_line_says_so_in_its_title() {
         let cases = [
@@ -1456,14 +1471,16 @@ mod tests {
             ),
         ];
         for (receipt, party, under, over) in cases {
-            assert_eq!(
-                s269st_row_of(receipt, party, 10_000_000, 12_000_000),
-                (under.to_string(), 22_000_000)
+            let (title, paise, definition) = s269st_row_of(receipt, party, 10_000_000, 12_000_000);
+            assert_eq!((title.as_str(), paise), (under, 22_000_000));
+            assert!(
+                !definition.starts_with("Cash")
+                    && definition.ends_with(" side of each voucher, not only its cash."),
+                "{definition}"
             );
-            assert_eq!(
-                s269st_row_of(receipt, party, 22_000_000, 0),
-                (over.to_string(), 22_000_000)
-            );
+            let (title, paise, definition) = s269st_row_of(receipt, party, 22_000_000, 0);
+            assert_eq!((title.as_str(), paise), (over, 22_000_000));
+            assert_eq!(definition.starts_with("Cash"), party == "Customer A");
         }
     }
 

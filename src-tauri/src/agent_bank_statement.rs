@@ -1,6 +1,7 @@
-//! `parse_bank_statement`: a local capability that turns a password-protected
-//! bank-statement PDF into voucher proposals. It reads the statement and writes
-//! the proposals to a new private file; it never contacts Tally.
+//! `parse_bank_statement` and `parse_bank_statement_csv`: local capabilities that
+//! turn a password-protected bank-statement PDF, or one bank's CSV export, into
+//! voucher proposals. Each reads the statement and writes the proposals to a new
+//! private file; it never contacts Tally.
 //!
 //! **What may leave the machine is decided here.** The statement's rows are
 //! a client's banking record, and a tool result reaches the AI conversation.
@@ -35,12 +36,14 @@ use crate::local_files::local_disk_path::LocalDiskPath;
 use bridge_bank_statement::bank::Bank;
 use bridge_bank_statement::bank::BankReference;
 use bridge_bank_statement::cash::{CashAnswer, CashAnswerRow, CashAnswers, CashMovement};
-use bridge_bank_statement::csv_edge;
+use bridge_bank_statement::csv_edge::{self, CsvLayout};
 use bridge_bank_statement::date::Date;
 use bridge_bank_statement::mapping::{Mapping, MappingRow};
 use bridge_bank_statement::money::Controls;
 use bridge_bank_statement::pdf::{self, MAX_PDF_BYTES};
-use bridge_bank_statement::pipeline::{prepare_text, ParsedStatement, StatementRequest};
+use bridge_bank_statement::pipeline::{
+    prepare_csv, prepare_text, ParsedStatement, StatementRequest,
+};
 use bridge_bank_statement::proposals::StatementRecord;
 use bridge_bank_statement::proposals::{
     format_amount, tie_out_window, Direction, Disposition, VoucherType,
@@ -64,6 +67,8 @@ const PROPOSALS_SCHEMA: &str = "bridge.bank_statement.proposals.v2";
 /// How a proposals file's tie-out edges were worked out: from the statement's
 /// rows, by transaction date.
 pub(super) const TIE_OUT_BASIS: &str = "statement_rows_by_transaction_date";
+/// The same for a CSV statement, whose row and voucher date is the value date.
+pub(super) const TIE_OUT_BASIS_VALUE_DATE: &str = "statement_rows_by_value_date";
 /// Larger than any admissible file: 1000 vouchers at the text limits.
 const MAX_PROPOSALS_FILE_BYTES: u64 = 16 * 1024 * 1024;
 
@@ -128,10 +133,14 @@ impl Server {
         let result = tokio::task::spawn_blocking(move || run(&request, &data_dir, max_bytes))
             .await
             .map_err(|_| "statement_task_failed".to_string())??;
+        Ok(self.parsed_outcome(b"parse_bank_statement", result))
+    }
+
+    fn parsed_outcome(&self, tool: &[u8], result: Value) -> ToolOutcome {
         let (response_sha256, bytes) = returned_evidence(&result, self.settings.redaction);
-        Ok(ToolOutcome {
+        ToolOutcome {
             evidence: Evidence {
-                request_sha256: sha256_hex(b"parse_bank_statement"),
+                request_sha256: sha256_hex(tool),
                 response_sha256,
                 bytes,
                 state: "complete",
@@ -142,7 +151,7 @@ impl Server {
             payload: json!({"result": result}),
             company_guid: None,
             truncated: false,
-        })
+        }
     }
 }
 
@@ -151,14 +160,30 @@ struct OwnedRequest {
     statement_path: LocalDiskPath,
     password_file: LocalDiskPath,
     bank: Bank,
-    account_label: String,
     controls: Controls,
+    choices: StatementChoices,
+}
+
+/// What both statement tools take beside the file and its controls.
+struct StatementChoices {
+    account_label: String,
     bank_ledger: String,
     suspense_ledger: String,
     date_from: Option<Date>,
     date_to: Option<Date>,
     mapping: Mapping,
     cash_answers: CashAnswers,
+}
+
+/// What a parse is written and summarised under.
+struct ParseRecord<'a> {
+    /// The bank or the CSV layout, by name.
+    layout: &'static str,
+    tie_out_basis: &'static str,
+    controls: &'a Controls,
+    /// Given only by the CSV tool, whose figures can be the file's own.
+    controls_source: Option<ControlsSource>,
+    choices: &'a StatementChoices,
 }
 
 fn refused(refusal: &Refusal) -> String {
@@ -193,18 +218,18 @@ fn window_date(args: &Value, key: &str) -> Result<Option<Date>, String> {
 }
 
 impl OwnedRequest {
+    fn record(&self) -> ParseRecord<'_> {
+        ParseRecord {
+            layout: self.bank.name(),
+            tie_out_basis: TIE_OUT_BASIS,
+            controls: &self.controls,
+            controls_source: None,
+            choices: &self.choices,
+        }
+    }
+
     fn from_args(args: &Value) -> Result<Self, String> {
-        let schema = input_schema();
-        if let Some(mapping) = args.get("mapping") {
-            catalog::validate_against_schema(mapping, &schema["properties"]["mapping"], "mapping")?;
-        }
-        if let Some(answers) = args.get("cash_answers") {
-            catalog::validate_against_schema(
-                answers,
-                &schema["properties"]["cash_answers"],
-                "cash_answers",
-            )?;
-        }
+        StatementChoices::validate_lists(args)?;
         let bank = Bank::from_name(required_string(args, "bank")?)
             .ok_or_else(|| "argument_invalid:bank".to_string())?;
         let total_debits = optional_string(args, "total_debits")?;
@@ -219,6 +244,34 @@ impl OwnedRequest {
         if bank.prints_totals() && controls.debits.is_none() {
             return Err("statement_control_totals_required".into());
         }
+        let choices = StatementChoices::from_args(args)?;
+        Ok(Self {
+            statement_path: local_disk_path(args, "statement_path")?,
+            password_file: local_disk_path(args, "password_file")?,
+            bank,
+            controls,
+            choices,
+        })
+    }
+}
+
+impl StatementChoices {
+    fn validate_lists(args: &Value) -> Result<(), String> {
+        let schema = input_schema();
+        if let Some(mapping) = args.get("mapping") {
+            catalog::validate_against_schema(mapping, &schema["properties"]["mapping"], "mapping")?;
+        }
+        if let Some(answers) = args.get("cash_answers") {
+            catalog::validate_against_schema(
+                answers,
+                &schema["properties"]["cash_answers"],
+                "cash_answers",
+            )?;
+        }
+        Ok(())
+    }
+
+    fn from_args(args: &Value) -> Result<Self, String> {
         let date_from = window_date(args, "from")?;
         let date_to = window_date(args, "to")?;
         if let (Some(from), Some(to)) = (date_from, date_to) {
@@ -258,11 +311,7 @@ impl OwnedRequest {
             });
         let cash_answers = CashAnswers::from_rows(answers).map_err(|refusal| refused(&refusal))?;
         Ok(Self {
-            statement_path: local_disk_path(args, "statement_path")?,
-            password_file: local_disk_path(args, "password_file")?,
-            bank,
             account_label: required_string(args, "account_label")?.to_string(),
-            controls,
             bank_ledger: required_string(args, "bank_ledger")?.to_string(),
             suspense_ledger: required_string(args, "suspense_ledger")?.to_string(),
             date_from,
@@ -270,6 +319,20 @@ impl OwnedRequest {
             mapping,
             cash_answers,
         })
+    }
+
+    fn request<'a, G>(&'a self, bank: G, controls: &'a Controls) -> StatementRequest<'a, G> {
+        StatementRequest {
+            bank,
+            account_label: &self.account_label,
+            controls,
+            bank_ledger: &self.bank_ledger,
+            suspense_ledger: &self.suspense_ledger,
+            mapping: &self.mapping,
+            cash_answers: &self.cash_answers,
+            date_from: self.date_from,
+            date_to: self.date_to,
+        }
     }
 }
 
@@ -368,24 +431,25 @@ fn run(request: &OwnedRequest, data_dir: &Path, max_bytes: usize) -> Result<Valu
     };
     let parsed = prepare_text(
         &text,
-        &StatementRequest {
-            bank: request.bank,
-            account_label: &request.account_label,
-            controls: &request.controls,
-            bank_ledger: &request.bank_ledger,
-            suspense_ledger: &request.suspense_ledger,
-            mapping: &request.mapping,
-            cash_answers: &request.cash_answers,
-            date_from: request.date_from,
-            date_to: request.date_to,
-        },
+        &request.choices.request(request.bank, &request.controls),
     )
     .map_err(|refusal| refused(&refusal))?;
-    let statement_sha256 = sha256_hex(&bytes);
-    let (proposals_id, file_sha256) = persist(data_dir, request, &parsed, &statement_sha256)?;
+    written_and_summarised(data_dir, &request.record(), &parsed, &bytes, max_bytes)
+}
+
+/// A prepared statement, written to its private file, as the result the caller receives.
+fn written_and_summarised(
+    data_dir: &Path,
+    record: &ParseRecord<'_>,
+    parsed: &ParsedStatement,
+    statement: &[u8],
+    max_bytes: usize,
+) -> Result<Value, String> {
+    let statement_sha256 = sha256_hex(statement);
+    let (proposals_id, file_sha256) = persist(data_dir, record, parsed, &statement_sha256)?;
     Ok(summary(
-        request,
-        &parsed,
+        record,
+        parsed,
         &proposals_id,
         &file_sha256,
         max_bytes,
@@ -415,7 +479,7 @@ fn account_last4(account_number: &str) -> String {
 
 fn persist(
     data_dir: &Path,
-    request: &OwnedRequest,
+    request: &ParseRecord<'_>,
     parsed: &ParsedStatement,
     statement_sha256: &str,
 ) -> Result<(String, String), String> {
@@ -427,11 +491,11 @@ fn persist(
         "schema": PROPOSALS_SCHEMA,
         "proposals_id": proposals_id,
         "created_at": Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-        "bank": request.bank.name(),
+        "bank": request.layout,
         "account_last4": account_last4(&parsed.account_number),
         "statement_sha256": statement_sha256,
-        "bank_ledger": request.bank_ledger,
-        "suspense_ledger": request.suspense_ledger,
+        "bank_ledger": request.choices.bank_ledger,
+        "suspense_ledger": request.choices.suspense_ledger,
         "controls": {
             "opening_balance": request.controls.opening.as_str(),
             "closing_balance": request.controls.closing.as_str(),
@@ -442,6 +506,9 @@ fn persist(
         "vouchers": parsed.build.proposals,
         "records": parsed.build.records,
     });
+    if let Some(source) = request.controls_source {
+        document["controls_source"] = json!(source.as_str());
+    }
     // Optional, and not part of the schema's required shape: the loader reads
     // fields by name, so a reader of this schema version still reads a file that
     // carries it. An older binary refuses the version itself, so going back to it
@@ -454,8 +521,8 @@ fn persist(
             &parsed.build,
             &request.controls.opening,
             &request.controls.closing,
-            request.date_from,
-            request.date_to,
+            request.choices.date_from,
+            request.choices.date_to,
         ) {
             Some(Ok(Ok(edges))) => json!({
                 "state": "established",
@@ -463,7 +530,7 @@ fn persist(
                 "last_date": edges.last().iso(),
                 "opening_balance": format_amount(edges.opening()),
                 "closing_balance": format_amount(edges.closing()),
-                "basis": TIE_OUT_BASIS,
+                "basis": request.tie_out_basis,
             }),
             Some(Ok(Err(reason))) => json!({"state": "not_established", "reason": reason.code()}),
             Some(Err(refusal)) => return Err(refused(&refusal)),
@@ -504,7 +571,7 @@ fn persist(
 }
 
 fn summary(
-    request: &OwnedRequest,
+    request: &ParseRecord<'_>,
     parsed: &ParsedStatement,
     proposals_id: &str,
     file_sha256: &str,
@@ -552,7 +619,7 @@ fn summary(
         })
         .collect();
     let mut ledgers: Vec<&str> =
-        std::iter::once(request.bank_ledger.as_str())
+        std::iter::once(request.choices.bank_ledger.as_str())
             .chain(
                 parsed.build.proposals.iter().flat_map(|proposal| {
                     proposal.entries.iter().map(|entry| entry.ledger.as_str())
@@ -597,10 +664,10 @@ fn summary(
     } else {
         "Ask the person about the open cash_questions entries in their own words (once for all of them is fine, listing each line's date and amount), ask again about any line they do not confirm, and re-run with their answers in cash_answers (one per line, by bridge_txn_id, with the ledger the answer asks for). Never answer for them: dont_know is an answer they give, and it posts the line to suspense_ledger for the CA to move. build_import_xml refuses these proposals (cash_questions_open) while any question is open."
     };
-    json!({
+    let mut result = json!({
         "proposals_id": proposals_id,
         "sha256": file_sha256,
-        "bank": request.bank.name(),
+        "bank": request.layout,
         "account_last4": account_last4(&parsed.account_number),
         "statement_rows": parsed.statement_rows,
         "rows_in_window": records.len(),
@@ -625,7 +692,19 @@ fn summary(
         "ledgers_to_validate": ledgers_to_validate,
         "ledgers_to_validate_omitted": ledgers_to_validate_omitted,
         "next_step": next_step,
-    })
+    });
+    if let Some(source) = request.controls_source {
+        result["controls_source"] = json!(source.as_str());
+        result["controls_independent"] = json!(source != ControlsSource::ThisFile);
+        if source == ControlsSource::ThisFile {
+            // The file's own last balance, not the caller's figure.
+            result["reconciled"]
+                .as_object_mut()
+                .expect("written above as an object")
+                .remove("closing_balance");
+        }
+    }
+    result
 }
 
 /// Every open cash line, with its question and every answer it may take, so
@@ -1086,12 +1165,31 @@ impl ControlsSource {
         }
     }
 
-    /// Only the file's own first and last balance is not an independent
-    /// control: a chain that starts and ends on them always agrees with itself,
-    /// so a truncated export would pass. The cause is a code, like every
-    /// `ToolFailure` cause, and is data-free.
-    fn independence_cause(self) -> Option<&'static str> {
-        (self == Self::ThisFile).then_some(THIS_FILE_CAUSE)
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::PriorStatement => "prior_statement",
+            Self::BankLedgerInTally => "bank_ledger_in_tally",
+            Self::ThisFile => "this_file",
+        }
+    }
+
+    /// The caller's figures. `this_file` means the file's own first and last balance, taken once
+    /// the file is read, so it takes no figures; every other source must give both. Only the
+    /// file's own are not an independent control: a chain that starts and ends on them always
+    /// agrees with itself, so a truncated export would pass.
+    fn figures(self, args: &Value) -> Result<Option<Controls>, String> {
+        let opening = optional_string(args, "opening_balance")?;
+        let closing = optional_string(args, "closing_balance")?;
+        match (self, opening.as_deref(), closing.as_deref()) {
+            (Self::ThisFile, None, None) => Ok(None),
+            (Self::ThisFile, _, _) => Err("statement_control_figures_with_this_file".into()),
+            (_, Some(opening), Some(closing)) => {
+                Controls::parse_optional(opening, closing, None, None)
+                    .map(Some)
+                    .map_err(|refusal| refused(&refusal))
+            }
+            _ => Err("statement_control_figures_required".into()),
+        }
     }
 }
 
@@ -1128,6 +1226,7 @@ csv_refusals! {
     SerialBroken = "serial_broken",
     UnparseableDate = "unparseable_date",
     DateOrderBroken = "date_order_broken",
+    ValueDateOutsidePeriod = "value_date_outside_period",
     MalformedAmount = "malformed_amount",
     MalformedBalance = "malformed_balance",
     DirectionUnknown = "direction_unknown",
@@ -1136,45 +1235,58 @@ csv_refusals! {
     TrailerMissing = "trailer_missing",
     TrailerUnexpected = "trailer_unexpected",
     EmptyStatement = "empty_statement",
+    NoAccountNumberLine = "no_account_number_line",
+    AmbiguousAccountMatch = "ambiguous_account_match",
 }
 
-/// A file that reads is still refused: whether the real export prints an
-/// account number is not established, so nothing can bind the file to an
-/// account and nothing is proposed (#1320). This is the CSV shell's own code,
-/// not the PDF tool's `statement_no_account_number_line`: that one says a
-/// statement prints no account line, this one says the line was never looked
-/// for.
-pub(super) const CSV_ACCOUNT_LINE_UNMEASURED: &str = "statement_csv_account_line_unmeasured";
 const CSV_REFUSAL_UNMAPPED: &str = "statement_csv_refusal_unmapped";
-/// The cause of a refusal under `controls_source` `this_file`: the figures to
-/// check against are the file's own, derived, not independent.
-const THIS_FILE_CAUSE: &str = "controls_this_file_derived_not_independent";
 
 pub(super) fn input_schema_csv() -> Value {
-    json!({
-        "type":"object", "additionalProperties":false,
-        "required":["statement_path","controls_source"],
-        "properties":{
-            "statement_path":{"type":"string","minLength":1,"maxLength":MAX_PATH_CHARS,"pattern":r"\S","description":"The path of the CSV bank statement on this computer."},
-            "controls_source":{"type":"string","enum":["prior_statement","bank_ledger_in_tally","this_file"],"description":"Where the opening and closing figures to check the file against come from: the previous statement, the bank ledger in Tally, or this file itself. A Tally ledger built from these same statements counts as this_file. Not verified here."}
-        }
-    })
+    let mut schema = input_schema();
+    let properties = schema["properties"]
+        .as_object_mut()
+        .expect("the statement schema has properties");
+    for pdf_only in ["password_file", "bank", "total_debits", "total_credits"] {
+        properties.remove(pdf_only);
+    }
+    properties.insert(
+        "statement_path".to_string(),
+        json!({"type":"string","minLength":1,"maxLength":MAX_PATH_CHARS,"pattern":r"\S","description":"The path of the CSV bank statement on this computer."}),
+    );
+    properties.insert(
+        "controls_source".to_string(),
+        json!({"type":"string","enum":["prior_statement","bank_ledger_in_tally","this_file"],"description":"Where the opening and closing figures to check the file against come from: the previous statement, the bank ledger in Tally, or this file itself. A Tally ledger built from these same statements counts as this_file. Not verified here."}),
+    );
+    schema["required"] = json!([
+        "statement_path",
+        "controls_source",
+        "account_label",
+        "bank_ledger",
+        "suspense_ledger"
+    ]);
+    schema
 }
 
-pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export (UTF-8, LF line ends, every field double-quoted), and check its shape: the header line, the Sl. No. run, the dates, the amounts, the direction cells, and that the Closing Balance line equals the last row's balance. Any other file is refused, never guessed: the error code is statement_<category>, with :row_N where a row is at fault (one of fifteen shape categories, such as layout_unknown or closing_balance_differs). controls_source (prior_statement, bank_ledger_in_tally or this_file) says where the opening and closing figures to check against come from. this_file means the file's own first and last balance, which cannot show that rows are missing: it is not an independent control, and the refusal's cause says so (controls_this_file_derived_not_independent). This tool proposes nothing yet: whether the export prints an account number is not established, so a file that reads is refused as statement_csv_account_line_unmeasured. No row value is returned.";
+pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export, and write voucher proposals as parse_bank_statement does: same checks (the account number printed in the file must end with account_label's digits, the running balance replayed on every row), same result, same next step to build_import_xml. Any other file is refused, never guessed: statement_<category>, with :row_N where a row is at fault. The party of a row is its whole description, or unnamed when that holds a digit, and no rule reads a name or a reference out of it: a row reaches a ledger only when mapping names its exact text, and any other row goes to suspense_ledger. Only a description of ATM CASH WITHDRAWAL or CASH DEPOSIT asks a cash question. controls_source says where opening_balance and closing_balance come from, and both are required unless it is this_file. this_file takes no figures and uses the file's own first and last balance, which cannot show that rows are missing: the result says controls_independent false and returns neither. A Tally ledger built from these same statements counts as this_file. Nothing here verifies the claim. It never contacts Tally.";
 
 /// The admitted arguments of `parse_bank_statement_csv`.
 struct CsvRequest {
     statement_path: LocalDiskPath,
     controls_source: ControlsSource,
+    /// `None` under `this_file`, whose figures are the file's own.
+    figures: Option<Controls>,
+    choices: StatementChoices,
 }
 
 impl CsvRequest {
     fn from_args(args: &Value) -> Result<Self, String> {
+        StatementChoices::validate_lists(args)?;
         let controls_source = ControlsSource::parse(required_string(args, "controls_source")?)
             .ok_or_else(|| "argument_invalid:controls_source".to_string())?;
         Ok(Self {
             statement_path: local_disk_path(args, "statement_path")?,
+            figures: controls_source.figures(args)?,
+            choices: StatementChoices::from_args(args)?,
             controls_source,
         })
     }
@@ -1196,20 +1308,41 @@ fn read_csv_file(path: &LocalDiskPath) -> Result<Vec<u8>, String> {
     read_statement(path, csv_edge::MAX_FILE_BYTES)
 }
 
-/// Every run ends in a refusal until the account line exists, so the result is
-/// the failure itself, not a `Result` with a success nothing can build.
-fn run_csv(request: &CsvRequest) -> ToolFailure {
-    let bytes = match read_csv_file(&request.statement_path) {
-        Ok(bytes) => bytes,
-        Err(code) => return code.into(),
+fn run_csv(request: &CsvRequest, data_dir: &Path, max_bytes: usize) -> Result<Value, ToolFailure> {
+    let bytes = read_csv_file(&request.statement_path)?;
+    let statement = csv_edge::read_statement(&bytes).map_err(|refusal| csv_failure(&refusal))?;
+    let derived;
+    let controls = match &request.figures {
+        Some(figures) => figures,
+        None => {
+            derived = Controls::parse_optional(
+                statement.opening.as_str(),
+                statement.closing.as_str(),
+                None,
+                None,
+            )
+            .map_err(|refusal| refused(&refusal))?;
+            &derived
+        }
     };
-    match csv_edge::read_statement(&bytes) {
-        Err(refusal) => csv_failure(&refusal),
-        Ok(_) => ToolFailure {
-            cause: request.controls_source.independence_cause(),
-            ..CSV_ACCOUNT_LINE_UNMEASURED.to_string().into()
+    let parsed = prepare_csv(
+        &statement,
+        &request.choices.request(CsvLayout::BankA, controls),
+    )
+    .map_err(|refusal| refused(&refusal))?;
+    Ok(written_and_summarised(
+        data_dir,
+        &ParseRecord {
+            layout: CsvLayout::BankA.name(),
+            tie_out_basis: TIE_OUT_BASIS_VALUE_DATE,
+            controls,
+            controls_source: Some(request.controls_source),
+            choices: &request.choices,
         },
-    }
+        &parsed,
+        &bytes,
+        max_bytes,
+    )?)
 }
 
 impl Server {
@@ -1218,9 +1351,12 @@ impl Server {
         args: &Value,
     ) -> Result<ToolOutcome, ToolFailure> {
         let request = CsvRequest::from_args(args)?;
-        Err(tokio::task::spawn_blocking(move || run_csv(&request))
+        let data_dir = self.settings.data_dir.clone();
+        let max_bytes = self.settings.max_bytes;
+        let result = tokio::task::spawn_blocking(move || run_csv(&request, &data_dir, max_bytes))
             .await
-            .unwrap_or_else(|_| "statement_task_failed".to_string().into()))
+            .map_err(|_| ToolFailure::from("statement_task_failed".to_string()))??;
+        Ok(self.parsed_outcome(b"parse_bank_statement_csv", result))
     }
 }
 

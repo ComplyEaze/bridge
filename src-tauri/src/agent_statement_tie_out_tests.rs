@@ -516,6 +516,23 @@ fn a_window_of_whole_months_is_read_with_the_balances_the_parse_worked_out() {
 }
 
 #[test]
+fn a_window_tied_by_value_date_is_read_as_one_tied_by_transaction_date_is() {
+    let mut window = august("1000.00", "1179.50");
+    window["tie_out"]["basis"] = json!("statement_rows_by_value_date");
+    let file = StatementFile::read(&with_window(carried(), window)).unwrap();
+    assert_eq!(
+        file.window,
+        Ok(edges(
+            (2026, 8, 1),
+            (2026, 8, 31),
+            "1000.00",
+            "1179.50",
+            true
+        ))
+    );
+}
+
+#[test]
 fn a_window_the_parse_could_not_tie_is_not_established_with_its_reason() {
     for (reason, expected) in [
         (

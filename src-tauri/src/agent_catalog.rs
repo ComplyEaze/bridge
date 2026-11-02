@@ -351,6 +351,7 @@ fn lab_tools_env_enabled() -> bool {
 /// not free of a local write, and the description says so.
 pub(super) const READ_RECEIPT_SENTENCE: &str = "Each call appends metadata-only receipt lines (tool, company, counts, request and response fingerprints; no book content) to ComplyEaze Bridge's local log on this computer; it writes nothing to Tally.";
 const BUILD_IMPORT_SENTENCE: &str = "Reads Tally to check the vouchers, then writes the prepared import file and a ledger record to ComplyEaze Bridge's local folder on this computer (for a statement of only skipped rows, no import file: one record of those rows); writes nothing to Tally.";
+const PARSE_STATEMENT_CSV_SENTENCE: &str = "Reads the CSV bank statement you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally.";
 const PARSE_STATEMENT_SENTENCE: &str = "Reads the bank statement PDF (and password file) you name and writes the parsed proposals to a new private file in ComplyEaze Bridge's local folder on this computer; never contacts Tally.";
 const VERIFY_IMPORT_SENTENCE: &str = "Reads the batch's date window from Tally, then adds new proof files for the batch beside every earlier one and a status record naming them current, and may also add a verified baseline, a masters-check record and, for a native post, the binding of its vouchers to the Tally vouchers its post created, in ComplyEaze Bridge's local folder on this computer, replacing and deleting nothing there (paging an existing proof only reads it); writes nothing to Tally.";
 const PREPARE_LEDGER_SENTENCE: &str = "Reads the company's ledger and group names from Tally once, then writes one record of the prepared ledger to ComplyEaze Bridge's local folder on this computer; writes nothing to Tally.";
@@ -402,7 +403,7 @@ impl ToolEffect {
             "negative_stock" => Self::Read,
             "outstandings" => Self::Read,
             "parse_bank_statement" => Self::LocalWrite(PARSE_STATEMENT_SENTENCE),
-            "parse_bank_statement_csv" => Self::Read,
+            "parse_bank_statement_csv" => Self::LocalWrite(PARSE_STATEMENT_CSV_SENTENCE),
             "post_import" => Self::TallyPost,
             "post_ledger_creates" => Self::TallyPost,
             "prepare_ledger_creates" => Self::LocalWrite(PREPARE_LEDGER_SENTENCE),
@@ -504,8 +505,8 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         ("post_ledger_creates", "batch_id") => "The batch_id prepare_ledger_creates returned for the prepared ledger.",
         ("prepare_ledger_creates", "ledger") => "The one ledger to create. name: ASCII only, no leading, trailing or repeated spaces. kind: party, suspense or gst_duty. For a party: side (sundry_debtors or sundry_creditors, required), gstin (optional, its check character is verified) and bill_wise (optional, default false). For gst_duty: duty_head in Tally's spelling (only SGST/UTGST is admitted today). The parent group follows from the kind, and no opening balance can be given.",
         (_, "batch_id") => "The batch_id build_import_xml returned for the saved batch.",
-        ("parse_bank_statement", "from") => "Optional: only statement rows dated on or after this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no start.",
-        ("parse_bank_statement", "to") => "Optional: only statement rows dated on or before this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no end.",
+        ("parse_bank_statement" | "parse_bank_statement_csv", "from") => "Optional: only statement rows dated on or after this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no start.",
+        ("parse_bank_statement" | "parse_bank_statement_csv", "to") => "Optional: only statement rows dated on or before this day (YYYYMMDD or YYYY-MM-DD) are proposed. Left out, the window has no end.",
         ("audit_test_run", "test") => "The test to run: one of this parameter's enum values, the tests this tool admits.",
         ("audit_test_run", "cash_groups") => "The groups holding cash ledgers, spelt as in the book (masters kind=groups). Ask the user; a group left out is not counted.",
         ("audit_test_run", "bank_groups") => "The groups holding bank ledgers, spelt as in the book. Ask the user whether an overdraft group is one; not a cash group.",
@@ -542,13 +543,13 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         ("outstandings", "party") => "Optional, for detail: a party ledger's name, spelled as in the book or differing only in ASCII case and spaces. A ledger whose own name differs in case or symbols from the spelling its vouchers carry is reached by either; `ledger_match` shows its own name and, when different, `ledger_row_spelling`, the spelling its vouchers carry. The bills are matched on the voucher spelling; what Tally's outstandings reports call such a ledger is not measured, so a detail that finds no bill for a party that has some is not proof it has none.",
         ("outstandings", "reference") => "Optional, with detail=bill_trail: one bill reference as open_bills lists it; the read then starts at the earliest date the reports list for that bill.",
         ("outstandings", "top") => "How many parties to rank by gross exposure (default 25). It ranks parties only; page the bills with offset and limit.",
-        ("parse_bank_statement", "bank_ledger") => "The Tally ledger of this bank account, spelled as in the book; check it with validate_masters.",
-        ("parse_bank_statement", "closing_balance") => "The closing balance the statement prints: at most two decimal places, thousands separators allowed (1,00,000.00).",
-        ("parse_bank_statement", "mapping") => "Optional: one row per counterparty, spelled as counterparties lists it (case and spaces ignored), with the ledger to post it under and a treatment: auto (the default: a Payment when money leaves the bank, a Receipt when it arrives), contra (both legs are bank or cash ledgers; needs a ledger) or skip (a transfer another imported statement already carries; the ledger is the other bank account's ledger, never this statement's own bank_ledger). Cash lines are answered in cash_answers, not mapped.",
-        ("parse_bank_statement", "opening_balance") => "The opening balance the statement prints: at most two decimal places, thousands separators allowed (1,00,000.00).",
+        ("parse_bank_statement" | "parse_bank_statement_csv", "bank_ledger") => "The Tally ledger of this bank account, spelled as in the book; check it with validate_masters.",
+        ("parse_bank_statement" | "parse_bank_statement_csv", "closing_balance") => "The closing balance the statement prints: at most two decimal places, thousands separators allowed (1,00,000.00).",
+        ("parse_bank_statement" | "parse_bank_statement_csv", "mapping") => "Optional: one row per counterparty, spelled as counterparties lists it (case and spaces ignored), with the ledger to post it under and a treatment: auto (the default: a Payment when money leaves the bank, a Receipt when it arrives), contra (both legs are bank or cash ledgers; needs a ledger) or skip (a transfer another imported statement already carries; the ledger is the other bank account's ledger, never this statement's own bank_ledger). Cash lines are answered in cash_answers, not mapped.",
+        ("parse_bank_statement" | "parse_bank_statement_csv", "opening_balance") => "The opening balance the statement prints: at most two decimal places, thousands separators allowed (1,00,000.00).",
         ("parse_bank_statement", "password_file") => "The path of a local file holding the statement's password; on a Mac it must be yours with group and other permissions off, and on Windows it must be owned by you or Administrators, with no one but you, SYSTEM and Administrators able to read or change it. The password is never returned.",
         ("parse_bank_statement", "statement_path") => "The path of the bank-statement PDF on this computer.",
-        ("parse_bank_statement", "suspense_ledger") => "The Tally ledger a line is posted to when no mapping or answer names one, tagged for the CA, spelled as in the book.",
+        ("parse_bank_statement" | "parse_bank_statement_csv", "suspense_ledger") => "The Tally ledger a line is posted to when no mapping or answer names one, tagged for the CA, spelled as in the book.",
         ("statement_tie_out", "proposals_id") => "The proposals_id parse_bank_statement returned for the statement.",
         ("statement_tie_out", "proposals_sha256") => "The sha256 parse_bank_statement returned for that proposals file; the call is refused (proposals_changed) if the file no longer has it.",
         ("statement_tie_out", "stage") => "before_build: the closing gap counts this file's vouchers as if they were already in the book. after_post: the book as it stands now, for after any of the file's vouchers has been imported, by anyone.",

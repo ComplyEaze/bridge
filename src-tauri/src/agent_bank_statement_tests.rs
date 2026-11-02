@@ -754,15 +754,15 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
         "suspense_ledger": "Suspense"
     });
     let request = OwnedRequest::from_args(&args).unwrap();
-    let open = parsed_with(&request.cash_answers);
-    let summary_open = summary(&request, &open, "statement-x", "0", 200_000);
+    let open = parsed_with(&request.choices.cash_answers);
+    let summary_open = summary(&request.record(), &open, "statement-x", "0", 200_000);
     assert_eq!(summary_open["cash_questions"].as_array().unwrap().len(), 1);
     let id = summary_open["cash_questions"][0]["bridge_txn_id"]
         .as_str()
         .unwrap()
         .to_string();
     let (proposals_id, digest) =
-        persist(directory.path(), &request, &open, &"0".repeat(64)).unwrap();
+        persist(directory.path(), &request.record(), &open, &"0".repeat(64)).unwrap();
     let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
     assert_eq!(
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).err(),
@@ -772,9 +772,14 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     args["cash_answers"] =
         json!([{"bridge_txn_id": id, "answer": "owner_use", "ledger": "Drawings"}]);
     let request = OwnedRequest::from_args(&args).unwrap();
-    let answered = parsed_with(&request.cash_answers);
-    let (proposals_id, digest) =
-        persist(directory.path(), &request, &answered, &"0".repeat(64)).unwrap();
+    let answered = parsed_with(&request.choices.cash_answers);
+    let (proposals_id, digest) = persist(
+        directory.path(),
+        &request.record(),
+        &answered,
+        &"0".repeat(64),
+    )
+    .unwrap();
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
     // Drawings is carried to build for the Suspense-group check, not as cash
@@ -800,7 +805,7 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     assert_eq!(drawn["voucher_type"], "Payment");
     assert_eq!(drawn["entries"][0]["ledger"], "Drawings");
     assert_eq!(drawn["entries"][0]["side"], "Dr");
-    let summary = summary(&request, &answered, "statement-x", "0", 200_000);
+    let summary = summary(&request.record(), &answered, "statement-x", "0", 200_000);
     assert_eq!(summary["cash_questions"], json!([]));
     // Only the unidentified transfer went to suspense; the answered cash line
     // did not.
@@ -814,9 +819,9 @@ fn an_open_cash_line_written_by_the_parse_is_refused_where_the_build_reads_it() 
     args["cash_answers"] =
         json!([{"bridge_txn_id": id, "answer": "business_cash", "ledger": "Cash"}]);
     let request = OwnedRequest::from_args(&args).unwrap();
-    let kept = parsed_with(&request.cash_answers);
+    let kept = parsed_with(&request.choices.cash_answers);
     let (proposals_id, digest) =
-        persist(directory.path(), &request, &kept, &"0".repeat(64)).unwrap();
+        persist(directory.path(), &request.record(), &kept, &"0".repeat(64)).unwrap();
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
     let named = resolved
@@ -911,7 +916,7 @@ fn every_list_in_the_summary_is_bounded_and_counts_what_it_left_out() {
     }))
     .unwrap();
     let max_bytes = 40_000;
-    let summary = summary(&request, &parsed, "statement-x", "0", max_bytes);
+    let summary = summary(&request.record(), &parsed, "statement-x", "0", max_bytes);
     let listed = |key: &str| summary[key].as_array().unwrap().len();
     let omitted = |key: &str| usize::try_from(summary[key].as_u64().unwrap()).unwrap();
     assert_eq!(summary["cash_questions_open"], 300);
@@ -1075,8 +1080,13 @@ fn a_parsed_statement_is_published_as_version_two_and_resolved_with_its_facts() 
         "suspense_ledger": "Suspense"
     }))
     .unwrap();
-    let (proposals_id, digest) =
-        persist(directory.path(), &request, &parsed, &"0".repeat(64)).unwrap();
+    let (proposals_id, digest) = persist(
+        directory.path(),
+        &request.record(),
+        &parsed,
+        &"0".repeat(64),
+    )
+    .unwrap();
     let document: Value = serde_json::from_slice(
         &fs::read(
             directory
@@ -1320,7 +1330,7 @@ fn the_ledgers_to_validate_are_bounded_and_counted() {
     }))
     .unwrap();
     let max_bytes = 40_000;
-    let summary = summary(&request, &parsed, "statement-x", "0", max_bytes);
+    let summary = summary(&request.record(), &parsed, "statement-x", "0", max_bytes);
     let listed = summary["ledgers_to_validate"].as_array().unwrap().len();
     let omitted =
         usize::try_from(summary["ledgers_to_validate_omitted"].as_u64().unwrap()).unwrap();
@@ -1435,7 +1445,7 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
                 account_number: "00000000001234",
                 date_from: None,
                 date_to: None,
-                cash_answers: &request.cash_answers,
+                cash_answers: &request.choices.cash_answers,
             },
         )
         .unwrap();
@@ -1467,7 +1477,7 @@ fn only_an_open_cash_lines_id_date_amount_and_party_leave() {
     assert!(records[4..]
         .iter()
         .all(|record| record.cash_answer.is_some()));
-    let mut summary = summary(&request, &parsed, "statement-x", "0", 200_000);
+    let mut summary = summary(&request.record(), &parsed, "statement-x", "0", 200_000);
 
     // Every key the summary carries, so a new one cannot slip past the scan.
     let mut top: Vec<&str> = summary
@@ -1733,7 +1743,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
                 account_number: "00000000001234",
                 date_from: None,
                 date_to: None,
-                cash_answers: &request.cash_answers,
+                cash_answers: &request.choices.cash_answers,
             },
         )
         .unwrap();
@@ -1756,7 +1766,7 @@ fn the_parse_result_carries_no_amount_but_the_callers_own() {
     }]);
     let request = OwnedRequest::from_args(&args).unwrap();
     let parsed = parsed_with(&request);
-    let summary = summary(&request, &parsed, "statement-x", "0", 200_000);
+    let summary = summary(&request.record(), &parsed, "statement-x", "0", 200_000);
     assert_eq!(summary["cash_questions"].as_array().unwrap().len(), 1);
 
     // Every leaf of the result, by path (array positions as *), so no field
@@ -2030,8 +2040,8 @@ fn parse_of(
         "suspense_ledger": "Suspense"
     });
     let mut request = OwnedRequest::from_args(&args).unwrap();
-    request.date_from = date_from;
-    request.date_to = date_to;
+    request.choices.date_from = date_from;
+    request.choices.date_to = date_to;
     let build = build(
         rows,
         Bank::Hdfc,
@@ -2043,7 +2053,7 @@ fn parse_of(
             account_number: "00000000004321",
             date_from,
             date_to,
-            cash_answers: &request.cash_answers,
+            cash_answers: &request.choices.cash_answers,
         },
     )
     .unwrap();
@@ -2109,7 +2119,7 @@ pub(in crate::agent) fn persisted_august_of_a_longer_statement(
     bank_ledger: &str,
 ) -> (String, String) {
     let (request, parsed) = august_parse(bank_ledger);
-    persist(data_dir, &request, &parsed, &"0".repeat(64)).unwrap()
+    persist(data_dir, &request.record(), &parsed, &"0".repeat(64)).unwrap()
 }
 
 /// The id and digest of a proposals file written by `persist`, the code
@@ -2120,12 +2130,13 @@ pub(in crate::agent) fn persisted_synthetic_statement(
     bank_ledger: &str,
 ) -> (String, String) {
     let (request, parsed) = windowed_parse(bank_ledger, None, None);
-    persist(data_dir, &request, &parsed, &"0".repeat(64)).unwrap()
+    persist(data_dir, &request.record(), &parsed, &"0".repeat(64)).unwrap()
 }
 
 fn persisted_document(request: &OwnedRequest, parsed: &ParsedStatement) -> Value {
     let directory = tempfile::tempdir().unwrap();
-    let (proposals_id, _) = persist(directory.path(), request, parsed, &"0".repeat(64)).unwrap();
+    let (proposals_id, _) =
+        persist(directory.path(), &request.record(), parsed, &"0".repeat(64)).unwrap();
     let path = directory
         .path()
         .join(PROPOSALS_DIRECTORY)
@@ -2208,7 +2219,7 @@ fn a_build_with_no_span_writes_no_window_field() {
 #[test]
 fn the_window_never_reaches_the_summary() {
     let (request, parsed) = windowed_parse("Synthetic Bank Ledger", None, None);
-    let summary = summary(&request, &parsed, "statement-x", "0", 200_000).to_string();
+    let summary = summary(&request.record(), &parsed, "statement-x", "0", 200_000).to_string();
     for needle in [
         "\"window\"",
         "first_row_date",
@@ -2258,7 +2269,7 @@ fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
             account_number: "00000000004321",
             date_from: None,
             date_to: None,
-            cash_answers: &request.cash_answers,
+            cash_answers: &request.choices.cash_answers,
         },
     )
     .unwrap();
@@ -2272,8 +2283,13 @@ fn the_build_is_told_which_bank_and_suspense_ledgers_the_file_was_parsed_for() {
         coverage: None,
         build,
     };
-    let (proposals_id, digest) =
-        persist(directory.path(), &request, &parsed, &"0".repeat(64)).unwrap();
+    let (proposals_id, digest) = persist(
+        directory.path(),
+        &request.record(),
+        &parsed,
+        &"0".repeat(64),
+    )
+    .unwrap();
     let build_args = |proposals_id: &str, digest: &str| json!({"company_guid": "00000000-0000-4000-8000-000000000002", "proposals_id": proposals_id, "proposals_sha256": digest});
     let resolved =
         resolve_import_arguments(directory.path(), &build_args(&proposals_id, &digest)).unwrap();
@@ -2431,7 +2447,7 @@ fn a_skipped_rows_ledger_is_listed_to_validate() {
         "suspense_ledger": "Suspense"
     }))
     .unwrap();
-    let summary = summary(&request, &parsed, "statement-x", "0", 40_000);
+    let summary = summary(&request.record(), &parsed, "statement-x", "0", 40_000);
     // Each name is listed as the summary lists every ledger: a marked party name.
     let expected: Vec<Value> = [
         "Synthetic Bank Ledger",

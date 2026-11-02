@@ -23,6 +23,10 @@
 //! return, a byte-order mark, a UTF-16 file), so a file a spreadsheet has
 //! re-saved is refused, not guessed at.
 //!
+//! - The account number is the value beside the preamble's `Account No.` key, in the key/value
+//!   columns: one such row, all ASCII digits, or the file is refused. Its label was read from
+//!   the real export; whether its value is ever masked was not, and a masked one is refused as
+//!   no account number. It is compared and hashed into row labels, never written into a message.
 //! - The header is found by its exact nine cells, once, wherever it sits (the
 //!   address block's length varies); a file without it is `layout_unknown`.
 //! - `Sl. No.` runs 1, 2, 3 and so on; the transactions end at the
@@ -39,8 +43,10 @@
 //!   two balances this returns. Because the opening is derived from row 1,
 //!   the replay cannot fault row 1: its amount and direction are proven by
 //!   nothing here, and a file of one row proves only itself.
-//! - Value dates are checked for shape and validity, not for order or
-//!   against the transaction date; the preamble's `Period` is not read, and
+//! - A value date is checked for shape and validity, not for order, and must
+//!   sit in its transaction's calendar month or be the day before it, the
+//!   note's case. Any other moves a row into another period on no measured
+//!   ground, and refuses. The preamble's `Period` is not read, and
 //!   the closing line's date is checked for validity only. A nine-cell
 //!   line above the header is preamble (the header is found by content).
 //!
@@ -50,8 +56,8 @@
 //! plain positive form; a statement of another year's layout, an amount
 //! printed in another grouping, and every other bank's CSV.
 
-use crate::bank::{BALANCE, CREDIT, DATE, DEBIT, NARRATION};
-use crate::date::{parse_day_month_year_hyphenated, parse_day_month_year_slashed};
+use crate::bank::{BankReference, RowGrammar, BALANCE, CREDIT, DATE, DEBIT, NARRATION};
+use crate::date::{parse_day_month_year_hyphenated, parse_day_month_year_slashed, Date};
 use crate::parse::Row;
 use crate::refusal::Refusal;
 use crate::text::strip;
@@ -76,6 +82,10 @@ pub const HEADER_CELLS: [&str; 9] = [
 ];
 
 const CLOSING_BALANCE: &str = "Closing Balance";
+/// The preamble's key for the account number, and the two columns it and its value sit in.
+const ACCOUNT_KEY: &str = "Account No.";
+const KEY_COLUMN: usize = 4;
+const VALUE_COLUMN: usize = 5;
 /// The longest amount cell read, in bytes.
 const MAX_AMOUNT_CELL: usize = 32;
 /// The largest file read, in bytes: the one export measured was 38,804 bytes
@@ -85,6 +95,8 @@ pub const MAX_FILE_BYTES: usize = 4 * 1024 * 1024;
 /// What the file holds once it has been read whole.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CsvStatement {
+    /// The account number the preamble prints, all ASCII digits.
+    pub account_number: String,
     /// In file order, which is the bank's posting order.
     pub rows: Vec<Row>,
     /// The first row's balance before its own amount: derived from row 1, so
@@ -93,6 +105,82 @@ pub struct CsvStatement {
     pub opening: ExactDecimal,
     /// The `Closing Balance` line, equal to the last row's balance.
     pub closing: ExactDecimal,
+}
+
+/// The layout's rows as a build reads them.
+///
+/// The party is the row's whole description, and the reference its `Chq /Ref No.` cell: no rule
+/// reads a name, a mode or a cash line out of the description, because none has been derived
+/// from a real export's descriptions. So a row reaches a ledger only when a mapping names its
+/// exact text, every other row goes to suspense, and a cash withdrawal is one more suspense line
+/// and not a cash question. A transfer reference needs a mode, so none is given.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CsvLayout {
+    BankA,
+}
+
+impl CsvLayout {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::BankA => "csv_bank_a",
+        }
+    }
+}
+
+impl RowGrammar for CsvLayout {
+    /// The reader has already turned the value date into this form.
+    fn parse_date(self, text: &str) -> Option<Date> {
+        Date::parse_iso(text)
+    }
+    fn date_format(self) -> &'static str {
+        "%Y-%m-%d"
+    }
+    /// The description, or unnamed when it holds a digit. No rule for this export's narrations
+    /// is measured, so nothing can be cut out of one, and a party is shown to the AI conversation,
+    /// where a narration may not go: a reference or an account number must not pass as a name. A number that changes per row could not be mapped twice anyway.
+    fn party(self, row: &Row) -> String {
+        match strip(row.get(NARRATION)) {
+            text if text.is_empty() || text.chars().any(char::is_numeric) => {
+                crate::bank::UNNAMED.to_string()
+            }
+            text => text.to_string(),
+        }
+    }
+    fn reference(self, row: &Row) -> (String, String) {
+        (String::new(), strip(row.get(CHQ_REF)).to_string())
+    }
+    fn transfer_reference(self, _row: &Row) -> Option<BankReference> {
+        None
+    }
+    /// The cell as printed, recorded only. `None` when it is empty or all zeros.
+    fn instrument(self, row: &Row) -> Option<String> {
+        let value = strip(row.get(CHQ_REF));
+        (!value.chars().all(|character| character == '0')).then(|| value.to_string())
+    }
+}
+
+/// The one account number the preamble prints.
+fn account_number(preamble: &[Option<Vec<String>>]) -> Result<String, Refusal> {
+    let mut values = preamble
+        .iter()
+        .flatten()
+        .filter(|cells| cells.get(KEY_COLUMN).is_some_and(|key| key == ACCOUNT_KEY))
+        .map(|cells| cells.get(VALUE_COLUMN).map_or("", String::as_str));
+    match (values.next(), values.next()) {
+        (Some(value), None)
+            if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) =>
+        {
+            Ok(value.to_string())
+        }
+        (Some(_), Some(_)) => Err(Refusal::new(
+            "ambiguous_account_match",
+            "the file's preamble prints the account number key more than once",
+        )),
+        _ => Err(Refusal::new(
+            "no_account_number_line",
+            "the file's preamble prints no account number in digits beside its account number key",
+        )),
+    }
 }
 
 fn refuse(category: &'static str, row: usize, what: &str) -> Refusal {
@@ -165,6 +253,17 @@ fn posting_time(text: &str) -> Option<String> {
     );
     (hour < 24 && minute < 60 && second < 60)
         .then(|| format!("{} {hour:02}:{minute:02}:{second:02}", date.iso()))
+}
+
+/// Whether `value` sits in the month of the transaction date `posted` opens
+/// with, or is the day before it (interest posted after midnight).
+fn value_date_in_period(value: Date, posted: &str) -> bool {
+    posted
+        .get(..10)
+        .and_then(parse_day_month_year_hyphenated)
+        .is_some_and(|day| {
+            (value.year, value.month) == (day.year, day.month) || day.previous_day() == Some(value)
+        })
 }
 
 fn decimal(text: &str) -> ExactDecimal {
@@ -240,6 +339,7 @@ pub fn read_statement(bytes: &[u8]) -> Result<CsvStatement, Refusal> {
             "a line before the header is not quoted comma-separated fields",
         ));
     }
+    let account_number = account_number(&parsed[..header])?;
     let mut rows = Vec::new();
     let mut before: Option<String> = None;
     let mut balances: Vec<ExactDecimal> = Vec::new();
@@ -298,6 +398,13 @@ pub fn read_statement(bytes: &[u8]) -> Result<CsvStatement, Refusal> {
                 "the value date is not DD-MM-YYYY",
             ));
         };
+        if !value_date_in_period(value_date, &cells[1]) {
+            return Err(refuse(
+                "value_date_outside_period",
+                number,
+                "the value date is outside the transaction date's month and not the day before it",
+            ));
+        }
         let Some(moved) = amount(&cells[5]) else {
             return Err(refuse(
                 "malformed_amount",
@@ -400,6 +507,7 @@ pub fn read_statement(bytes: &[u8]) -> Result<CsvStatement, Refusal> {
         ));
     }
     Ok(CsvStatement {
+        account_number,
         rows,
         opening,
         closing,

@@ -1760,8 +1760,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              against the ledgers the master read returned. A ledger added or deleted during the \
              read can cause it; retry once while the book is quiet. A repeat means Tally answers \
              one of the reads wrongly or, for a census, that a ledger's AlterID lies above the \
-             book's master-alteration mark: call ledger_masters with fields=basic instead. ComplyEaze Bridge \
-             released nothing.",
+             book's master-alteration mark: call ledger_masters with fields=basic instead. An \
+             invoice's read names its ledgers, so there the count is of the ledgers asked for: \
+             nothing was written, so build once more, and report a repeat rather than retrying. \
+             ComplyEaze Bridge released nothing.",
         ),
         "ledger_count_company_differs" => Some(
             "ComplyEaze Bridge counts this book's ledgers by AlterID span, and Tally's own count \
@@ -2239,10 +2241,10 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              company is that size. Tell the user this invoice has to be entered in Tally itself.",
         ),
         "invoice_book_size_unknown" => Some(
-            "Tally did not report the company's voucher mark or master mark, so ComplyEaze Bridge \
-             could not tell whether the company is within the limit for an invoice, and nothing \
-             was written. Build once more; if the \
-             refusal repeats, tell the user this invoice has to be entered in Tally itself.",
+            "Tally did not report the company's voucher mark, so ComplyEaze Bridge could not \
+             tell whether the company is within the limit for an invoice, and nothing was \
+             written. Build once more; if the refusal repeats, tell the user this invoice has to \
+             be entered in Tally itself.",
         ),
         "import_invoice_figures_unreadable" => Some(
             "An invoice of this batch has an amount or a date ComplyEaze Bridge cannot read, so \

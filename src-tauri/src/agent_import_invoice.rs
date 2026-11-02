@@ -1126,8 +1126,8 @@ pub(super) fn queued_invoice_for<'a>(
 
 /// Whether the plan the queue sent is the one this invoice calls for. Every
 /// part of it is a function of the invoice and the clock alone (the company,
-/// the date the listing is read as of, and each request, the ledger count's
-/// among them) apart from the number's control, which is the journal's, and the
+/// the date the listing is read as of, and each request) apart from the
+/// number's control, which is the journal's, and the
 /// rates request and its ledgers' parents, which are also functions of the
 /// catalogue: the request names the invoice's ledgers by GUID, and the plan
 /// records the parent the catalogue gave each (#1331). A plan that differs in the
@@ -1196,7 +1196,7 @@ pub(super) fn fit_plan(
 /// calls for (a wiring fault); a plan made on another day than `today`, named
 /// by its date; a number control, or a ledger scope (a named ledger regrouped
 /// since the plan's catalogue was read), that moved since the plan; the judge's
-/// own refusal; and an observation that differs from the recorded one, naming the first field that does. The size limits and the
+/// own refusal; and an observation that differs from the recorded one, naming the first field that does. The size limit and the
 /// currency were judged before the plan's reads were sent.
 pub(super) fn admit_queued_invoice(
     voucher: &ImportVoucher,
@@ -1972,7 +1972,8 @@ fn admitted(
 /// refusal. The build's judge and the queue's precheck both call it, so the
 /// limit has one copy and is decided before the listing is read (#1337). The
 /// masters' mark limits nothing: the listing names the invoice's ledgers
-/// (#1331). A mark Tally did not give never admits.
+/// (#1331), and the listing's own read refuses a book that gives no master
+/// mark. A voucher mark Tally did not give never admits.
 fn size_gate(marks: &str, company_guid: &str) -> Result<super::PreImportMark, Verdict> {
     let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
     // The duplicate-number read and the read-back each walk the book's
@@ -1984,14 +1985,11 @@ fn size_gate(marks: &str, company_guid: &str) -> Result<super::PreImportMark, Ve
     if let Some(refusal) = voucher_mark_refusal(mark.value) {
         return Err(refusing(refusal));
     }
-    if mark.master_value.is_none() {
-        return Err(refusing(refuse("invoice_book_size_unknown")));
-    }
     Ok(mark)
 }
 
 /// What the endpoint queue asks before it sends any read of an invoice's
-/// masters (#1337): the company's currency, then the size limits, judged on the
+/// masters (#1337): the company's currency, then the size limit, judged on the
 /// marks and currencies it has already read. A book the limits or the currency
 /// refuse is refused with none of the listing, rates, voucher types, number or
 /// registration reads sent, as the build refuses it.
@@ -2118,9 +2116,7 @@ impl InvoiceJudge<'_> {
         .map(Some)
     }
 
-    /// The plan of an admission: every request fixed from the invoice, the
-    /// ledger count's included, which the queue sends only when its precheck
-    /// asks for it.
+    /// The plan of an admission: every request fixed from the invoice.
     pub(super) fn plan(
         &self,
         listing_as_of: bridge_tally_core::TallyDate,
@@ -2409,9 +2405,9 @@ impl InvoiceJudge<'_> {
 impl super::super::Server {
     /// Read what the masters say about one Sales invoice, classify every leg,
     /// and record what was observed on the voucher. The reads: the company's
-    /// marks (and its ledger count when the master mark is high), the ledger
-    /// compliance listing (reserved group ancestry, duty head, the GSTIN in
-    /// force on the invoice date), the same listing with each ledger's GST
+    /// marks, the ledger compliance listing of the invoice's ledgers (reserved
+    /// group ancestry, duty head, the GSTIN in force on the invoice date), the
+    /// same listing with each ledger's GST
     /// rate and rounding (the tax is worked out from it), the voucher types (the named type, its
     /// class and its series-level numbering), the vouchers carrying the number
     /// and the company's GST registration in force on the invoice date. The

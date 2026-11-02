@@ -1811,11 +1811,9 @@ pub(crate) fn observed_opening_boundary(
 
 /// An invoice plan's reads on `client` (#1337). First the plan's precheck is
 /// asked, on the marks the queue read as its binding reads began and the
-/// currencies it read: the currency and the size limits are judged, as the
-/// build judges them, before any read of the plan is sent. When the book is
-/// over the master mark the precheck asks for the ledger count, which is read
-/// and the precheck asked again. Then the reads, in the order the admission
-/// makes them: the compliance listing, the rates, the voucher types, the
+/// currencies it read: the currency and the size limit are judged, as the
+/// build judges them, before any read of the plan is sent. Then the reads, in
+/// the order the admission makes them: the compliance listing, the rates, the voucher types, the
 /// number, the number's control, the company's registration, the company
 /// object's HSN/SAC fields and the groups' (always read here, though the build
 /// reads the groups only when a ledger's own row defers to them). Each goes

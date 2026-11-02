@@ -1,11 +1,10 @@
 use bridge_tally_protocol::{
-    decode_xml_bytes, decode_xml_bytes_limited, export_status, parse_companies,
-    parse_companies_for_interactive_discovery, parse_companies_from_collection,
+    decode_xml_bytes, decode_xml_bytes_limited, export_status, parse_companies_from_collection,
     parse_companies_with_evidence, parse_import_result,
     parse_native_ledger_source_records_with_evidence, parse_standard_ledger_catalog,
     parse_standard_ledger_catalog_with_identities, parse_standard_ledger_identity_observation,
     verify_company_context, PartyLedgerMasterFieldObservation, StandardLedgerCatalogError,
-    TallyExportStatus, MAX_INTERACTIVE_DISCOVERY_COMPANIES,
+    TallyExportStatus,
 };
 use quick_xml::{events::Event, Reader};
 use tally_protocol_simulator::{encode, Fixture, ScenarioPlan, WireEncoding};
@@ -272,8 +271,8 @@ fn production_byte_limit_is_checked_before_decoding() {
 
 #[test]
 fn malformed_and_truncated_corpus_never_returns_partial_records() {
-    assert!(parse_companies(&Fixture::MalformedXml.body()).is_err());
-    assert!(parse_companies(&Fixture::TruncatedXml.body()).is_err());
+    assert!(parse_companies_with_evidence(&Fixture::MalformedXml.body()).is_err());
+    assert!(parse_companies_with_evidence(&Fixture::TruncatedXml.body()).is_err());
 }
 
 #[test]
@@ -494,7 +493,7 @@ fn production_import_parser_preserves_every_exact_counter() {
 
 #[test]
 fn application_failure_errors_do_not_echo_line_error_payloads() {
-    let error = parse_companies(&Fixture::ExportStatusZero.body()).unwrap_err();
+    let error = parse_companies_with_evidence(&Fixture::ExportStatusZero.body()).unwrap_err();
     assert_eq!(
         error.to_string(),
         "Tally reported that the export request failed"
@@ -504,46 +503,13 @@ fn application_failure_errors_do_not_echo_line_error_payloads() {
 
 #[test]
 fn legacy_company_api_shape_is_preserved() {
-    let companies = parse_companies(
+    let companies = parse_companies_with_evidence(
         r#"<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000001</COMPANYGUIDFIELD></COMPANYINFO></BODY></ENVELOPE>"#,
     )
-    .unwrap();
+    .unwrap()
+    .records;
     assert_eq!(companies.len(), 1);
     assert_eq!(companies[0].name, "BRIDGE SYNTHETIC BOOK");
-}
-
-#[test]
-fn direct_company_report_response_is_narrowly_admitted_without_status_header() {
-    let direct = r#"<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE DIRECT SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>"#;
-    let companies = parse_companies_for_interactive_discovery(direct).unwrap();
-    assert_eq!(companies.len(), 1);
-    assert_eq!(companies[0].name, "BRIDGE DIRECT SYNTHETIC BOOK");
-    assert!(parse_companies(direct).is_err());
-    assert!(parse_companies_with_evidence(direct).is_err());
-
-    for xml in [
-        "<ENVELOPE/>",
-        "<ENVELOPE><BODY><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE DIRECT SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></BODY></ENVELOPE>",
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE DIRECT SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYNAMEFIELD>duplicate</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE DIRECT SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD><UNEXPECTED>value</UNEXPECTED></COMPANYINFO></ENVELOPE>",
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD><UNEXPECTED/>BRIDGE DIRECT SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD><![CDATA[BRIDGE DIRECT SYNTHETIC BOOK]]></COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE DIRECT SYNTHETIC BOOK<!-- comment --></COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>BRIDGE DIRECT SYNTHETIC BOOK</COMPANYNAMEFIELD><COMPANYGUIDFIELD>&#x20;</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-        "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>&#x20;</COMPANYNAMEFIELD><COMPANYGUIDFIELD>00000000-0000-4000-8000-000000000099</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-    ] {
-        assert!(parse_companies_for_interactive_discovery(xml).is_err(), "must reject {xml}");
-    }
-}
-
-#[test]
-fn interactive_company_discovery_stops_before_materializing_an_oversized_listing() {
-    let rows = (0..=MAX_INTERACTIVE_DISCOVERY_COMPANIES)
-        .map(|index| format!("<COMPANYINFO><COMPANYNAMEFIELD>Synthetic {index}</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-{index}</COMPANYGUIDFIELD></COMPANYINFO>"))
-        .collect::<String>();
-    let error = parse_companies_for_interactive_discovery(&format!("<ENVELOPE>{rows}</ENVELOPE>"))
-        .expect_err("untrusted discovery must stop at the display ceiling");
-    assert!(error.to_string().contains("listing limit exceeded"));
 }
 
 /// Measured live 2026-08-07: the `Company` collection response

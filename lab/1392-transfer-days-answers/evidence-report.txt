@@ -1,0 +1,54 @@
+cat2 ledger rows as received: ['Cash', 'Profit & Loss A/c', 'TLab Bank A', 'TLab Bank B', 'TLab Clearing']
+m1: bytes 3398 sha256 bb303e14451a5e9ce94045d4280d61510c7fea71ac9deba8c9b330589a6ad2d5 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+cat1: bytes 7840 sha256 fdc7c83e372956ea9ee7b49a496e24e397de006c9efd6a83b2c351165291f644 VOUCHER nodes 1 (voucher objects 0, header count nodes 1) (control text removed for parsing only)
+m2: bytes 3404 sha256 63ff95d5235692fabd9e21844acf5c0a0fd10355bbf0b419aec74b8836a75136 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d12-c: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d12-v: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d13-c: bytes 5436 sha256 7d01c9c9c0fb897776d61271d7599e8d620f64009ed186fb6c45036ae38fb2e4 VOUCHER nodes 2 (voucher objects 1, header count nodes 1)
+   {'GUID': 'bc9-00000006', 'ALTERID': '8', 'DATE': '20260413', 'VOUCHERTYPENAME': 'Contra', 'VOUCHERNUMBER': '6'}
+d13-v: bytes 38972 sha256 77e8ab25a9e64f4e8a30e9b0bfd6c5841fd1c1cc9d059761076c6e33e0ecf509 VOUCHER nodes 2 (voucher objects 1, header count nodes 1) (control text removed for parsing only)
+   {'GUID': 'bc9-00000006', 'ALTERID': '8', 'DATE': '20260413', 'VOUCHERTYPENAME': 'Contra', 'VOUCHERNUMBER': '6'}
+      'TLab Bank A' amount 7000.00 deemed No
+      'Cash' amount -7000.00 deemed Yes
+d14-c: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d14-v: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d19-c: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d19-v: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d20-c: bytes 5436 sha256 22d8ce8b2719925b760b15b2f4a6c99d37d330cec87e48a03b4e6672f8f77b0f VOUCHER nodes 2 (voucher objects 1, header count nodes 1)
+   {'GUID': 'bc9-00000007', 'ALTERID': '9', 'DATE': '20260420', 'VOUCHERTYPENAME': 'Contra', 'VOUCHERNUMBER': '7'}
+d20-v: bytes 38972 sha256 c09457d783e24ecc2350760c6b0c3cc3216451a4740deaf44d8b5be324dbc896 VOUCHER nodes 2 (voucher objects 1, header count nodes 1) (control text removed for parsing only)
+   {'GUID': 'bc9-00000007', 'ALTERID': '9', 'DATE': '20260420', 'VOUCHERTYPENAME': 'Contra', 'VOUCHERNUMBER': '7'}
+      'TLab Bank A' amount 4000.00 deemed No
+      'Cash' amount -4000.00 deemed Yes
+d21-c: bytes 5438 sha256 54f6975fc0b4bb68d68164b11c78f0e06368b6020c90714d298687cb74c9fcf5 VOUCHER nodes 2 (voucher objects 1, header count nodes 1)
+   {'GUID': 'bc9-00000008', 'ALTERID': '10', 'DATE': '20260421', 'VOUCHERTYPENAME': 'Contra', 'VOUCHERNUMBER': '8'}
+d21-v: bytes 44674 sha256 61c9eed7bb078ff1c50a388af4a6715164898c6bf620557d7bee4a3b6325fd59 VOUCHER nodes 2 (voucher objects 1, header count nodes 1) (control text removed for parsing only)
+   {'GUID': 'bc9-00000008', 'ALTERID': '10', 'DATE': '20260421', 'VOUCHERTYPENAME': 'Contra', 'VOUCHERNUMBER': '8'}
+      'TLab Bank A' amount 25000.00 deemed No
+      'TLab Bank B' amount -25000.00 deemed Yes
+d22-c: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d22-v: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d26-c: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d26-v: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d27-c: bytes 5440 sha256 bd0fbe460173d5c450247326804c5a73098cf47fb771dce46a6324027c50829f VOUCHER nodes 2 (voucher objects 1, header count nodes 1)
+   {'GUID': 'bc9-00000009', 'ALTERID': '11', 'DATE': '20260427', 'VOUCHERTYPENAME': 'Payment', 'VOUCHERNUMBER': '1'}
+d27-v: bytes 39048 sha256 c0e2f79688ce370e8bfdd3c1d4630e8a945ddefcfb66c927ff686aaafe615fb5 VOUCHER nodes 2 (voucher objects 1, header count nodes 1) (control text removed for parsing only)
+   {'GUID': 'bc9-00000009', 'ALTERID': '11', 'DATE': '20260427', 'VOUCHERTYPENAME': 'Payment', 'VOUCHERNUMBER': '1'}
+      'TLab Clearing' amount -30000.00 deemed Yes
+      'TLab Bank A' amount 30000.00 deemed No
+d28-c: bytes 5442 sha256 1a58d520cf93c91f1da9e4288736104029d0f50188738e64a58153d34193b4e2 VOUCHER nodes 2 (voucher objects 1, header count nodes 1)
+   {'GUID': 'bc9-0000000a', 'ALTERID': '12', 'DATE': '20260428', 'VOUCHERTYPENAME': 'Receipt', 'VOUCHERNUMBER': '1'}
+d28-v: bytes 39058 sha256 26754f6310ecdd13fcde3c45775e0d61859d3bfc334c0cc3aabecac56109d02e VOUCHER nodes 2 (voucher objects 1, header count nodes 1) (control text removed for parsing only)
+   {'GUID': 'bc9-0000000a', 'ALTERID': '12', 'DATE': '20260428', 'VOUCHERTYPENAME': 'Receipt', 'VOUCHERNUMBER': '1'}
+      'TLab Clearing' amount 30000.00 deemed No
+      'TLab Bank B' amount -30000.00 deemed Yes
+d29-c: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+d29-v: bytes 3026 sha256 b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+m3: bytes 3404 sha256 63ff95d5235692fabd9e21844acf5c0a0fd10355bbf0b419aec74b8836a75136 VOUCHER nodes 1 (voucher objects 0, header count nodes 1)
+cat2: bytes 9048 sha256 a64e215c34c3524bb7f002b208692e5325f1bf97df5baddf9e8e1757e15e25b6 VOUCHER nodes 1 (voucher objects 0, header count nodes 1) (control text removed for parsing only)
+step 8: LEDGERNAME values seen: ['Cash', 'TLab Bank A', 'TLab Bank B', 'TLab Clearing']
+  'Cash': exact match in cat2 True; code points 0043 0061 0073 0068
+  'TLab Bank A': exact match in cat2 True; code points 0054 004C 0061 0062 0020 0042 0061 006E 006B 0020 0041
+  'TLab Bank B': exact match in cat2 True; code points 0054 004C 0061 0062 0020 0042 0061 006E 006B 0020 0042
+  'TLab Clearing': exact match in cat2 True; code points 0054 004C 0061 0062 0020 0043 006C 0065 0061 0072 0069 006E 0067
+unmatched: []

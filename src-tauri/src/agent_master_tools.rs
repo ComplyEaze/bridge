@@ -1464,7 +1464,7 @@ fn master_next_step(code: &str) -> Option<&'static str> {
             "Nothing was sent: the approval box closed unanswered when its time ran out. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         ),
         "master_review_too_large" => Some(
-            "Nothing was sent: the approval box's text was over its limit, or on Windows the box did not fit the screen whole. A larger or less scaled screen helps with the second; then call post_ledger_creates with this batch_id again. If it is refused the same way, call prepare_ledger_creates for a new batch with a shorter ledger name.",
+            "Nothing was sent: the approval box's text was over its limit, or the box would not fit the screen whole. A larger or less scaled screen helps with the second, and on a Mac so does moving the Dock to the side or hiding it; then call post_ledger_creates with this batch_id again. If it is refused the same way, call prepare_ledger_creates for a new batch with a shorter ledger name.",
         ),
         "master_approval_declined" => Some(
             "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",

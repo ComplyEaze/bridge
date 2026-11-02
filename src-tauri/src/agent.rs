@@ -1985,18 +1985,21 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              for Claude Desktop installed from the Microsoft Store, and that copy holds an \
              import journal other than this process's. The journal checks of one copy do not \
              see the batches of the other, so a row posted from one could be posted again \
-             from the other. The cause says what was found: other_journal_holds_batches, or \
-             other_journal_not_read, package_copies_not_listed, journal_not_located or \
-             package_copy_journal_not_located when ComplyEaze Bridge could not tell and \
-             refuses the same way. Tell the user to post from the copy that already keeps \
-             that journal (the extension inside Claude Desktop, when the package is Claude \
-             Desktop's), not from this one, and not to move, merge or delete either folder. \
-             Batches this copy already built or posted are not seen by that copy, so a row \
-             posted from here could be posted again from there; check such a row in Tally \
-             before posting it there. Uninstalling, resetting or repairing that Microsoft \
+             from the other. The cause says what was found. With other_journal_holds_batches \
+             or other_journal_not_read, tell the user to post from the copy that already \
+             keeps that journal (the extension inside Claude Desktop, when the package is \
+             Claude Desktop's), not from this one. Batches this copy already built or posted \
+             are not seen by that copy, so a row posted from here could be posted again from \
+             there; check such a row in Tally before posting it there. With \
+             package_copies_not_listed, journal_not_located or \
+             package_copy_journal_not_located, ComplyEaze Bridge could not tell whether there \
+             is a second journal, so no other copy is known to post from: tell the user to \
+             restart the computer and try once more, and if it is refused again to stop \
+             posting on this computer. Either way, tell the user not to move, merge or delete \
+             either folder. Uninstalling, resetting or repairing that Microsoft \
              Store app removes its copy and the journal in it. Running bridge_mcp \
              --local-data-report --show-paths outside Claude Desktop lists the package copies \
-             (package_copies). Do not retry here.",
+             (package_copies). Apart from that one try, do not retry here.",
         ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \

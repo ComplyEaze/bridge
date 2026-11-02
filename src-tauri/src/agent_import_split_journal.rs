@@ -64,6 +64,31 @@ pub(super) const REFUSED_MESSAGE: &str = "Nothing was posted. On this computer a
     saved Journal or anything posted from here, so check its rows in Tally before posting them \
     there. Do not move or delete either folder.";
 
+/// The same post refused where no second journal was found, only no way to tell:
+/// there is no other copy known to post from.
+const NOT_TOLD_MESSAGE: &str = "Nothing was posted. ComplyEaze Bridge could not tell whether a \
+    Microsoft Store app's package on this computer, such as Claude Desktop installed from the \
+    Microsoft Store, keeps an import journal of its own, because Windows did not answer for the \
+    folders it checks. Neither copy's checks would see the other's batches, so it refuses rather \
+    than risk posting a row twice. Restart this computer and post again. If it is refused again, \
+    stop posting on this computer and keep the batch. Do not move or delete either folder.";
+
+/// The causes that found no second journal, only no way to tell.
+const NOT_TOLD_CAUSES: [&str; 3] = [
+    "package_copies_not_listed",
+    "journal_not_located",
+    "package_copy_journal_not_located",
+];
+
+/// The message of a post refused with `cause`, by what the check found.
+pub(super) fn refused_message(cause: Option<&str>) -> &'static str {
+    if cause.is_some_and(|cause| NOT_TOLD_CAUSES.contains(&cause)) {
+        NOT_TOLD_MESSAGE
+    } else {
+        REFUSED_MESSAGE
+    }
+}
+
 impl SplitJournal {
     pub(super) fn cause(self) -> &'static str {
         match self {

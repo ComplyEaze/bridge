@@ -381,14 +381,40 @@ async fn a_saved_journal_refused_for_its_text_says_to_build_it_again() {
 /// own: what was found, where to post from, and to move or delete neither folder.
 #[tokio::test]
 async fn a_journal_beside_a_second_journal_says_where_to_post_from() {
-    use super::split_journal::{
-        tests::layout, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA, REFUSED_MESSAGE,
-    };
+    use super::split_journal::{tests::layout, REFUSED_MESSAGE};
     let at = layout();
+    std::fs::write(
+        at.copy.join(super::local_data::JOURNAL_FILE),
+        super::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let result = post_with_journals_at(&at).await;
+    assert_eq!(result["error"]["message"], REFUSED_MESSAGE, "{result}");
+}
+
+/// A post refused because no second journal could be told apart says so, not where to post
+/// from: there is no other copy known to post from (#2233). This service's response budget
+/// drops the cause from the answer, and the message still follows it.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_journal_with_no_second_journal_known_names_no_copy_to_post_from() {
+    use super::split_journal::{tests::layout, REFUSED_MESSAGE};
+    let at = layout();
+    std::fs::remove_dir_all(at.local.join("Packages")).unwrap();
+    std::fs::write(at.local.join("Packages"), b"not a folder").unwrap();
+    let result = post_with_journals_at(&at).await;
+    let message = result["error"]["message"].as_str().unwrap();
+    assert_ne!(message, REFUSED_MESSAGE, "{result}");
+    assert!(message.contains("Restart this computer"), "{result}");
+}
+
+/// A saved batch posted from `at`'s data folder and refused for its journals, before approval.
+async fn post_with_journals_at(at: &super::split_journal::tests::Layout) -> Value {
+    use super::split_journal::{IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA};
     // Made again, private, by the service.
     std::fs::remove_dir(&at.data).unwrap();
     let (service, mut line) = service(at.data.clone());
-    line.batch_id = "bridge-00000000-0000-4000-8000-000000000004".into();
+    line.batch_id = "bridge-00000000-0000-4000-8000-000000000002".into();
     line.ledger_identities = Some(Vec::new());
     line.cash_in_hand_ledgers = Some(Vec::new());
     let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
@@ -406,21 +432,16 @@ async fn a_journal_beside_a_second_journal_says_where_to_post_from() {
         &xml,
     )
     .unwrap();
-    std::fs::write(
-        at.copy.join(super::local_data::JOURNAL_FILE),
-        super::local_data::tests::journal(true),
-    )
-    .unwrap();
     let operation = LOCAL_APP_DATA
         .scope(
             at.local.clone(),
             service.post(&line.batch_id, &line.sha256, &line.company_guid),
         )
         .await;
-    let result = &operation.result["result"];
+    let result = operation.result["result"].clone();
     assert_eq!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{result}");
     assert_eq!(result["attempt_recorded"], false, "{result}");
-    assert_eq!(result["error"]["message"], REFUSED_MESSAGE, "{result}");
+    result
 }
 
 /// A Journal whose approval window is too large to show whole is refused with a

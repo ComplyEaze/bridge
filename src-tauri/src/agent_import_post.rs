@@ -1614,6 +1614,17 @@ impl Server {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
                 }
+                // A second journal (#2233) refuses every post from this copy, so the
+                // message says what to do next, by what the check found, rather than
+                // to review the error. The cause is the failure's: the payload's own
+                // is dropped under the budget rule above.
+                if outcome.payload["result"]["error"]["code"]
+                    == super::split_journal::IMPORT_JOURNAL_SPLIT
+                    && attempted == Some(false)
+                {
+                    outcome.payload["result"]["error"]["message"] =
+                        json!(super::split_journal::refused_message(cause));
+                }
                 // The code's next step, under the same rule, and only when the
                 // journal shows nothing was sent (#1573).
                 // A numbering refusal's step, and its message, need more
@@ -2145,11 +2156,6 @@ fn reconciliation_failure_payload(
     }
     if code == DESKTOP_LEDGER_LINE_BREAK {
         payload["result"]["error"]["message"] = json!(DESKTOP_LEDGER_LINE_BREAK_ACTION);
-    }
-    // A second journal (#2233) refuses every post from this copy, so the
-    // message says where to post from rather than to review the error.
-    if code == super::split_journal::IMPORT_JOURNAL_SPLIT && attempted == Some(false) {
-        payload["result"]["error"]["message"] = json!(super::split_journal::REFUSED_MESSAGE);
     }
     // A draining endpoint (#2142) is held back like a busy one: nothing was
     // sent by the refused send, and the same next steps hold.

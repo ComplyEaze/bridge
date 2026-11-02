@@ -108,8 +108,10 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
             } else {
                 result
             };
-            if let Some(rows) = figures["open_bills"]
-                .as_array_mut()
+            // `get_mut` for the same reason: a withheld answer has neither list.
+            if let Some(rows) = figures
+                .get_mut("open_bills")
+                .and_then(Value::as_array_mut)
                 .filter(|rows| rows.len() > width)
             {
                 rows.truncate(width);
@@ -118,8 +120,10 @@ fn retain_page_width(response: &mut Value, shape: PageShape, width: usize) -> Re
                     *shown = json!(width);
                 }
             }
-            if let Some(rows) = figures["unallocated"]["parties"]
-                .as_array_mut()
+            if let Some(rows) = figures
+                .get_mut("unallocated")
+                .and_then(|unallocated| unallocated.get_mut("parties"))
+                .and_then(Value::as_array_mut)
                 .filter(|rows| rows.len() > width)
             {
                 rows.truncate(width);

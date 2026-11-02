@@ -415,15 +415,26 @@ async fn a_trimmed_later_page_of_the_set_aside_ledgers_resumes_after_its_rows() 
     let result = response["structuredContent"]["result"].clone();
     assert_eq!(result["offset"], 1, "{result}");
     let excluded = &result["foreign_currency_ledgers_excluded"];
-    assert_eq!(excluded["ledgers"].as_array().unwrap().len(), 2, "{excluded}");
+    assert_eq!(
+        excluded["ledgers"].as_array().unwrap().len(),
+        2,
+        "{excluded}"
+    );
     assert!(!result.to_string().contains("FX USD Debtor"), "{result}");
     let whole = json!({"result": result});
     let size = whole.to_string().len();
     let (trimmed, truncated, _) = enforce_response_byte_cap(whole, size - 1).unwrap();
     assert!(truncated);
     let excluded = &trimmed["result"]["foreign_currency_ledgers_excluded"];
-    assert_eq!(excluded["ledgers"].as_array().unwrap().len(), 1, "{excluded}");
+    assert_eq!(
+        excluded["ledgers"].as_array().unwrap().len(),
+        1,
+        "{excluded}"
+    );
     assert_eq!(excluded["next_offset"], 2, "{excluded}");
+    for absent in ["open_bills", "unallocated"] {
+        assert!(trimmed["result"].get(absent).is_none(), "{trimmed}");
+    }
 
     let refused = read(json!({"party": "BRIDGE FX DEBTOR A"})).await;
     assert_eq!(refused["isError"], true, "{refused}");

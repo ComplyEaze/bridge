@@ -509,6 +509,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_no_response: 2,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
             no_dispatch_never_verified: 1
         }
@@ -522,6 +523,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_no_response: 0,
             unsettled_binding_refused: 0,
             unsettled_reviewed: 0,
+            unsettled_restored: 0,
             settled_by_person: 0,
             no_dispatch_never_verified: 0
         }
@@ -1475,14 +1477,171 @@ fn a_rollback_seen_on_one_batch_covers_an_earlier_batch_of_the_company() {
         );
         assert_eq!(scan.records, journal.len() as u64);
     }
-    // The answer that recorded it names P1 as the batch to verify again.
+    // The answer that recorded it names what its record covers: P1, to verify
+    // again, and P2 itself.
     assert_eq!(
-        covered_by_records_of(Cursor::new(journal.concat()), "p2").unwrap(),
-        vec!["p1".to_string()]
+        covered_by_last_record(Cursor::new(journal.concat())).unwrap(),
+        vec!["p1".to_string(), "p2".to_string()]
     );
-    assert!(covered_by_records_of(Cursor::new(journal.concat()), "p1")
+    // A last record of another kind covers nothing.
+    journal.push(record(&placed(
+        "p3",
+        "BRIDGE ROLLBACK LAB",
+        Some(PLACE_ENDPOINT),
+    )));
+    assert!(covered_by_last_record(Cursor::new(journal.concat()))
         .unwrap()
         .is_empty());
+}
+
+/// #1050, a restore seen at the post: the post that read the mark has no
+/// dispatch intent yet, so its record names the first batch of its company it
+/// newly covers. That record is admitted, covers that batch, and does not
+/// cover the post, whose intent comes after the count the reading carries.
+#[test]
+fn a_posts_reading_is_recorded_on_the_first_batch_it_covers() {
+    let created = captured_outcome().counters().created;
+    assert!(created > 0);
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let poster = placed("poster", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let elsewhere = placed(
+        "elsewhere",
+        "BRIDGE ROLLBACK LAB COPY",
+        Some(PLACE_ENDPOINT),
+    );
+    let mut journal = vec![
+        record(&elsewhere),
+        intent(&elsewhere, Some(1)),
+        answered(&elsewhere),
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        record(&p2),
+        intent(&p2, Some(1 + created)),
+        answered(&p2),
+        record(&poster),
+    ];
+    let read = journal.len() as u64;
+    let named = first_newly_covered(Cursor::new(journal.concat()), "poster", 1, read).unwrap();
+    assert_eq!(
+        named.as_deref(),
+        Some("p1"),
+        "the first, not another company's"
+    );
+    // Nothing new to cover at a mark no post's floor is above.
+    assert_eq!(
+        first_newly_covered(
+            Cursor::new(journal.concat()),
+            "poster",
+            1 + 2 * created,
+            read
+        )
+        .unwrap(),
+        None
+    );
+    journal.push(seen(&p1, 1, read));
+    journal.push(intent(&poster, Some(1)));
+    for id in ["p1", "p2"] {
+        assert_eq!(
+            cover(&journal, id).covered_by,
+            Some(RollbackCover {
+                mark_read: 1,
+                seen_by: "p1".into()
+            }),
+            "{id}"
+        );
+    }
+    assert_eq!(cover(&journal, "poster").covered_by, None);
+    assert_eq!(cover(&journal, "elsewhere").covered_by, None);
+    // Once recorded, the same reading covers nothing new.
+    assert_eq!(
+        first_newly_covered(Cursor::new(journal.concat()), "poster", 1, read).unwrap(),
+        None
+    );
+}
+
+/// #1050: in the local data report's count, a native post a recorded restore
+/// covers is not settled whatever its latest status reads, and counts in its
+/// own bucket and in no other part of `unsettled`.
+#[test]
+fn a_restored_post_is_not_settled_whatever_its_status_reads() {
+    let created = captured_outcome().counters().created;
+    assert!(created > 0);
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let verified = |line: &ImportLedgerLine| {
+        let mut read = line.clone();
+        read.status = "posted_verified".into();
+        record(&StatusRecord::from(&read))
+    };
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        verified(&p1),
+        record(&p2),
+        intent(&p2, Some(1 + created)),
+        answered(&p2),
+    ];
+    let before = settlement(Cursor::new(journal.concat())).unwrap();
+    // P1 verified and settled; P2 answered, not yet verified.
+    assert_eq!((before.unsettled, before.unsettled_restored), (1, 0));
+    let read = journal.len() as u64;
+    journal.push(seen(&p2, 1, read));
+    let after = settlement(Cursor::new(journal.concat())).unwrap();
+    assert_eq!(after.unsettled, 2, "{after:?}");
+    assert_eq!(after.unsettled_restored, 2, "{after:?}");
+    assert_eq!(
+        after.unsettled_no_response + after.unsettled_binding_refused + after.unsettled_reviewed,
+        0,
+        "{after:?}"
+    );
+    assert_eq!(after.settled_by_person, 0);
+    assert_eq!(after.sent_or_found, 2, "the rows stay held");
+}
+
+/// #1050: a cover reaches only native posts dispatched before its reading. A
+/// hand-imported batch beside it, with no dispatch intent, and a post sent
+/// after the record are counted as before, and the parts still sum to
+/// `unsettled`.
+#[test]
+fn a_restore_leaves_a_hand_import_and_a_later_post_where_they_were() {
+    let created = captured_outcome().counters().created;
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let hand = placed("hand", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let later = placed("later", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let mut hand_found = hand.clone();
+    hand_found.status = "posted_verified".into();
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        record(&hand_found),
+    ];
+    let read = journal.len() as u64;
+    journal.push(seen(&p1, 1, read));
+    journal.push(record(&later));
+    // Its floor is above the record's mark, so only its place after the
+    // record keeps it uncovered.
+    journal.push(intent(&later, Some(1 + created)));
+    let counted = settlement(Cursor::new(journal.concat())).unwrap();
+    assert!(created > 0);
+    // P1 restored; `later` sent after the record, no answer: no response;
+    // the hand import was never dispatched and was found posted.
+    assert_eq!(counted.unsettled_restored, 1, "{counted:?}");
+    assert_eq!(counted.unsettled_no_response, 1, "{counted:?}");
+    assert_eq!(counted.unsettled, 2, "{counted:?}");
+    assert_eq!(counted.sent_or_found, 3, "{counted:?}");
+    assert_eq!(counted.no_dispatch_never_verified, 0, "{counted:?}");
+    assert_eq!(
+        counted.unsettled,
+        counted.unsettled_no_response
+            + counted.unsettled_binding_refused
+            + counted.unsettled_reviewed
+            + counted.unsettled_restored,
+        "{counted:?}"
+    );
 }
 
 /// A record judges a batch only on what the journal held when its mark was
@@ -1565,7 +1724,7 @@ fn an_answer_reporting_status_zero_raises_no_floor() {
     assert!(!rollback_record_extends(Cursor::new(journal.concat()), "seer", 1, read).unwrap());
     journal.push(seen(&seer, 1, read));
     assert_eq!(cover(&journal, "refused").covered_by, None);
-    assert!(covered_by_records_of(Cursor::new(journal.concat()), "seer")
+    assert!(covered_by_last_record(Cursor::new(journal.concat()))
         .unwrap()
         .is_empty());
 }
@@ -1958,10 +2117,17 @@ fn a_reviewed_batch_is_counted_in_its_own_bucket_until_voided() {
     assert_eq!(counts(&both), (2, 0, 1, 1));
     both.push(reviewed(&p2, ResponseNotRecorded));
     assert_eq!(counts(&both), (2, 0, 0, 2));
-    // A restore below both posts' floors voids both reviews.
+    // A restore below both posts' floors voids both reviews, and both posts
+    // then count as restored and in no other part (#1050).
     let read = both.len() as u64;
     both.push(seen(&p2, 1, read));
-    assert_eq!(counts(&both), (2, 1, 1, 0));
+    assert_eq!(counts(&both), (2, 0, 0, 0));
+    assert_eq!(
+        settlement(Cursor::new(both.concat()))
+            .unwrap()
+            .unsettled_restored,
+        2
+    );
 }
 
 /// The writer's check: the review a record would stand as if appended, or the
@@ -2224,10 +2390,17 @@ fn a_settled_batch_leaves_every_not_settled_count_until_voided() {
     assert_eq!(counts(&reviewed_too), (2, 0, 1, 1, 0, 2));
     reviewed_too.push(settled(&p1));
     assert_eq!(counts(&reviewed_too), (1, 0, 1, 0, 1, 2));
-    // A restore below the post's floor voids the settlement.
+    // A restore below the post's floor voids the settlement, and both posts
+    // then count as restored and in no other part (#1050).
     let read = settled_journal.len() as u64;
     settled_journal.push(seen(&p2, 1, read));
-    assert_eq!(counts(&settled_journal), (2, 1, 1, 0, 0, 2));
+    assert_eq!(counts(&settled_journal), (2, 0, 0, 0, 0, 2));
+    assert_eq!(
+        settlement(Cursor::new(settled_journal.concat()))
+            .unwrap()
+            .unsettled_restored,
+        2
+    );
 }
 
 /// The writer's check: whether a record would stand if appended, or the

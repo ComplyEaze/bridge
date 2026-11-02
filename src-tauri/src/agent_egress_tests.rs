@@ -31,7 +31,7 @@ fn failed_partial_write_and_sync_restore_the_original_receipts() {
 }
 
 #[test]
-fn failed_rollback_is_distinct_and_incomplete_log_refuses_future_appends() {
+fn failed_rollback_is_distinct_and_the_next_append_repairs_the_torn_tail() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("agent-egress.jsonl");
     fs::write(&path, b"{}\n").unwrap();
@@ -46,14 +46,23 @@ fn failed_rollback_is_distinct_and_incomplete_log_refuses_future_appends() {
     });
     assert_eq!(result, Err("egress_record_rollback_failed".into()));
     let damaged = fs::read(&path).unwrap();
+    let before = read_egress_tail(&path, 20).unwrap();
+    assert_eq!(before.records, ["{}"]);
+    assert_eq!(before.unrepaired_tail_bytes, Some(9));
+    assert_eq!(fs::read(&path).unwrap(), damaged, "reads never repair");
+    append_egress_line(&path, r#"{"next":1}"#).unwrap();
+    let repaired = fs::read(&path).unwrap();
+    assert!(repaired.starts_with(&damaged), "nothing is removed");
+    let after = read_egress_tail(&path, 20).unwrap();
+    assert_eq!(after.records, [r#"{"next":1}"#, "{}"]);
+    assert_eq!(after.unrepaired_tail_bytes, None);
     assert_eq!(
-        append_egress_line(&path, "{}"),
-        Err("egress_log_incomplete".into())
-    );
-    assert_eq!(fs::read(&path).unwrap(), damaged);
-    assert_eq!(
-        read_egress_tail(&path, 20).unwrap_err(),
-        "egress_log_incomplete"
+        after.torn,
+        [TornRecord {
+            offset: 3,
+            bytes: 11,
+            sha256: super::super::sha256_hex(b"{\"partial#\n"),
+        }]
     );
 }
 
@@ -68,7 +77,7 @@ fn receipt_size_limit_preserves_the_file_and_admitted_tail_is_readable() {
         Err("egress_record_too_large".into())
     );
     assert_eq!(fs::read(&path).unwrap(), b"{}\n");
-    let admitted = format!("\"{}\"", "x".repeat(MAX_EGRESS_TAIL_BYTES - 4));
+    let admitted = format!("{{\"x\":\"{}\"}}", "x".repeat(MAX_EGRESS_TAIL_BYTES - 10));
     append_egress_line(&path, &admitted).unwrap();
     assert_eq!(read_egress_tail(&path, 1).unwrap().records, [admitted]);
 }
@@ -217,7 +226,7 @@ async fn egress_log_reports_byte_bounded_tail_even_below_requested_record_count(
 }
 
 #[tokio::test]
-async fn egress_log_rejects_unterminated_and_malformed_receipts_in_band() {
+async fn egress_log_reports_a_torn_tail_and_rejects_malformed_receipts_in_band() {
     use super::super::{Redaction, Server, Settings, TallyEndpointConfig};
     use serde_json::{json, Value};
     let directory = tempfile::tempdir().unwrap();
@@ -247,11 +256,25 @@ async fn egress_log_rejects_unterminated_and_malformed_receipts_in_band() {
     let complete = read_egress_tail(&path, 20).unwrap();
     assert_eq!(complete.records.len(), 1);
     assert!(!complete.truncated);
+    // A torn tail is never read as a receipt, and is reported by its size until the next receipt
+    // repairs it; the read itself repairs nothing.
+    for torn in [
+        valid[..valid.len() - 1].to_vec(),
+        valid[..valid.len() / 2].to_vec(),
+    ] {
+        fs::write(&path, &torn).unwrap();
+        let tail = read_egress_tail(&path, 20).unwrap();
+        assert!(tail.records.is_empty());
+        assert_eq!(tail.unrepaired_tail_bytes, Some(torn.len() as u64));
+        let response = server.call_tool("egress_log", json!({"limit":20})).await;
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(result["records"], json!([]), "{response}");
+        assert_eq!(result["unrepaired_tail_bytes"], torn.len(), "{response}");
+        assert_eq!(fs::read(&path).unwrap(), torn, "reads never repair");
+    }
     let mut prefix_with_newline = valid[..valid.len() / 2].to_vec();
     prefix_with_newline.push(b'\n');
     for damaged in [
-        valid[..valid.len() - 1].to_vec(),
-        valid[..valid.len() / 2].to_vec(),
         prefix_with_newline,
         [b"{\"tool\":\n".as_slice(), valid.as_slice()].concat(),
     ] {
@@ -569,4 +592,203 @@ async fn egress_log_digest_covers_every_line_read_even_when_the_answer_is_trimme
     // And not of the eleven returned.
     let returned_lines = read.records[..returned].to_vec();
     assert_ne!(digest, super::super::sha256_json(&returned_lines));
+}
+
+/// The log as written, then read back newest first.
+fn records_of(path: &Path) -> Vec<String> {
+    read_egress_tail(path, 256).unwrap().records
+}
+
+/// A record cut just before its newline is whole JSON, yet it is never read as a record: not
+/// before the repair, and not after it.
+#[test]
+fn a_whole_record_cut_before_its_newline_is_never_read_as_one() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    fs::write(&path, b"{\"a\":1}\n{\"cut\":true}").unwrap();
+    assert_eq!(records_of(&path), [r#"{"a":1}"#]);
+    append_egress_line(&path, r#"{"b":2}"#).unwrap();
+    let tail = read_egress_tail(&path, 256).unwrap();
+    assert_eq!(tail.records, [r#"{"b":2}"#, r#"{"a":1}"#]);
+    assert_eq!(tail.torn.len(), 1);
+    let bytes = fs::read(&path).unwrap();
+    assert!(bytes.starts_with(b"{\"a\":1}\n{\"cut\":true}#\n{\"record_type\":\"torn_record\""));
+}
+
+/// A complete line that is not a record is never hidden: it is refused whether or not a torn tail
+/// follows it, and the repair leaves such a file as it was.
+#[test]
+fn a_complete_malformed_line_is_refused_and_never_vouched_for() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    let damaged = b"{\"a\":1}\n\0\0\0\n{\"cut".to_vec();
+    fs::write(&path, &damaged).unwrap();
+    assert_eq!(
+        read_egress_tail(&path, 20).unwrap_err(),
+        "egress_log_incomplete"
+    );
+    assert_eq!(
+        append_egress_line(&path, r#"{"b":2}"#),
+        Err("egress_log_incomplete".into())
+    );
+    assert_eq!(fs::read(&path).unwrap(), damaged);
+    let middle = b"{\"a\":1}\nnot json\n{\"b\":2}\n".to_vec();
+    fs::write(&path, &middle).unwrap();
+    assert_eq!(
+        read_egress_tail(&path, 20).unwrap_err(),
+        "egress_log_incomplete"
+    );
+}
+
+/// A marker is honoured only when it matches the bytes before it exactly.
+#[test]
+fn a_marker_that_does_not_match_its_bytes_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    fs::write(&path, b"{\"a\":1}\n{\"cut").unwrap();
+    append_egress_line(&path, r#"{"b":2}"#).unwrap();
+    let good = fs::read(&path).unwrap();
+    let text = String::from_utf8(good.clone()).unwrap();
+    let sha = read_egress_tail(&path, 20).unwrap().torn[0].sha256.clone();
+    for forged in [
+        text.replace(&sha, &"0".repeat(64)),
+        text.replace("\"torn_bytes\":7", "\"torn_bytes\":6"),
+        text.replace("\"torn_offset\":8", "\"torn_offset\":9"),
+        text.replace("{\"cut#", "{\"cux#"),
+    ] {
+        assert_ne!(forged, text);
+        fs::write(&path, &forged).unwrap();
+        assert_eq!(
+            read_egress_tail(&path, 20).unwrap_err(),
+            "egress_log_incomplete",
+            "{forged}"
+        );
+    }
+}
+
+/// A repair that is itself cut short is repaired by the next append, whose marker vouches for the
+/// whole run; the cut repair's bytes are never a record.
+#[test]
+fn a_cut_repair_is_vouched_for_by_the_next_one() {
+    for debris in [
+        b"#".as_slice(),
+        b"#\n".as_slice(),
+        b"#\n{\"record_type\":\"torn_re".as_slice(),
+        b"#\n{\"record_type\":\"torn_record\",\"torn_bytes\":3}".as_slice(),
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("agent-egress.jsonl");
+        let damaged = [b"{\"a\":1}\n{\"cut\":true}".as_slice(), debris].concat();
+        fs::write(&path, &damaged).unwrap();
+        assert_eq!(records_of(&path), [r#"{"a":1}"#]);
+        append_egress_line(&path, r#"{"b":2}"#).unwrap();
+        let tail = read_egress_tail(&path, 256).unwrap();
+        assert_eq!(tail.records, [r#"{"b":2}"#, r#"{"a":1}"#]);
+        assert_eq!(tail.torn.len(), 1);
+        assert_eq!(tail.torn[0].offset, 8);
+        assert!(fs::read(&path).unwrap().starts_with(&damaged));
+    }
+}
+
+/// Wherever the scan's window starts, a marker is checked against its bytes, read from the file
+/// when the window does not hold them, and the torn bytes are never a record.
+#[test]
+fn a_marker_is_checked_at_every_window_cut() {
+    for padding in [0_usize, 1, 7, 100, 1_000, 30_000, 60_000] {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("agent-egress.jsonl");
+        let filler = format!("{{\"pad\":\"{}\"}}\n", "x".repeat(padding));
+        let mut bytes = filler.repeat(3).into_bytes();
+        bytes.extend_from_slice(format!("{{\"cut\":\"{}", "y".repeat(padding)).as_bytes());
+        fs::write(&path, &bytes).unwrap();
+        append_egress_line(&path, r#"{"after":0}"#).unwrap();
+        for index in 1..=5 {
+            append_egress_line(&path, &format!("{{\"after\":{index}}}")).unwrap();
+        }
+        for take in [1, 2, 5, 6, 7, 8, 10, 256] {
+            let tail = read_egress_tail(&path, take).unwrap();
+            assert!(
+                tail.records
+                    .iter()
+                    .all(|record| !record.contains("\"cut\"")),
+                "padding {padding}, take {take}"
+            );
+            assert!(tail.records.len() + tail.torn.len() <= take);
+        }
+    }
+}
+
+/// Every line written is one JSON object, so every record ends `}` and a torn tail is found.
+#[test]
+fn only_a_single_line_json_object_is_appended() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    for line in ["[1]", "1", "{\"a\":1}\n{\"b\":2}", "\"text\""] {
+        assert_eq!(
+            append_egress_line(&path, line),
+            Err("egress_record_write_failed".into()),
+            "{line}"
+        );
+    }
+    assert!(!path.exists() || fs::read(&path).unwrap().is_empty());
+}
+
+/// A torn tail longer than any record leaves the file as it was.
+#[test]
+fn a_torn_tail_longer_than_a_record_is_refused_not_repaired() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    let mut bytes = b"{\"a\":1}\n".to_vec();
+    bytes.extend(std::iter::repeat_n(b'z', MAX_TORN_BYTES + 1));
+    fs::write(&path, &bytes).unwrap();
+    assert_eq!(
+        append_egress_line(&path, r#"{"b":2}"#),
+        Err("egress_log_incomplete".into())
+    );
+    assert_eq!(fs::read(&path).unwrap(), bytes);
+}
+
+/// The bound counts the sentinel the repair adds: a run at the bound gets a marker the reader then
+/// honours, and a run one byte longer is refused and left as it was, never given a marker the
+/// reader would refuse for good.
+#[test]
+fn a_run_at_the_bound_is_repaired_and_one_byte_more_is_refused() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    let at_bound = MAX_TORN_BYTES - TORN_SENTINEL.len();
+    for (run, repaired) in [(at_bound, true), (at_bound + 1, false)] {
+        let mut bytes = b"{\"a\":1}\n".to_vec();
+        bytes.extend(std::iter::repeat_n(b'z', run));
+        fs::write(&path, &bytes).unwrap();
+        let appended = append_egress_line(&path, r#"{"b":2}"#);
+        if repaired {
+            appended.unwrap();
+            // The record before the run lies past the scan's 256 KiB window: the marker's range,
+            // which starts before the window, is read back and checked from the file.
+            let tail = read_egress_tail(&path, 256).unwrap();
+            assert_eq!(tail.records, [r#"{"b":2}"#]);
+            assert!(tail.truncated);
+            assert_eq!(tail.torn.len(), 1);
+            assert_eq!(tail.torn[0].offset, 8);
+            assert_eq!(tail.torn[0].bytes, MAX_TORN_BYTES as u64);
+        } else {
+            assert_eq!(appended, Err("egress_log_incomplete".into()));
+            assert_eq!(fs::read(&path).unwrap(), bytes);
+        }
+    }
+}
+
+/// A line that is JSON but not an object is not a record, wherever it sits.
+#[test]
+fn a_json_line_that_is_not_an_object_is_refused_mid_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-egress.jsonl");
+    for line in ["[null]", "[\"x\"]", "1", "\"text\""] {
+        fs::write(&path, format!("{{\"a\":1}}\n{line}\n{{\"b\":2}}\n")).unwrap();
+        assert_eq!(
+            read_egress_tail(&path, 20).unwrap_err(),
+            "egress_log_incomplete",
+            "{line}"
+        );
+    }
 }

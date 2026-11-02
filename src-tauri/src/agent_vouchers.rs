@@ -25,6 +25,10 @@ pub(super) struct VoucherPageKey {
     /// A summary (#1230) is its own question: a listing and a summary never replace each other's
     /// held window, so pages of one cannot be served from a read that belongs to the other.
     summary: Option<SummaryGroup>,
+    /// Whether the window was read with each entry's GST details (#2027): a window read without
+    /// them cannot serve a page that asks for them, and one read with them is not held for a call
+    /// that does not, so the bytes held without the argument are unchanged.
+    gst_details: GstDetailsShown,
 }
 
 impl VoucherPageKey {
@@ -44,7 +48,14 @@ impl VoucherPageKey {
             selector: selector.cloned(),
             search: search.cloned(),
             summary: None,
+            gst_details: GstDetailsShown::Withheld,
         }
+    }
+
+    /// The same question asked with or without each entry's GST details.
+    pub(super) fn with_gst_details(mut self, gst: GstDetailsShown) -> Self {
+        self.gst_details = gst;
+        self
     }
 
     /// The same question asked as a summary by `group`.
@@ -228,21 +239,25 @@ enum PageServe {
 }
 
 /// The rows of one page, redacted and party-marked as `vouchers` always did, with each
-/// entry's bank allocations (#1231) and goods lines (#2015) only when the call asked for them.
+/// entry's bank allocations (#1231), goods lines (#2015) and GST details (#2027) only when the
+/// call asked for them.
 pub(super) fn page_items(
     server: &Server,
     rows: &[Value],
     (offset, limit): (usize, usize),
-    (bank, goods): (BankAllocationsShown, GoodsLinesShown),
+    (bank, goods, gst): (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
 ) -> Vec<Value> {
     rows.iter()
         .skip(offset)
         .take(limit)
         .map(|row| {
             redact_value(
-                mark_voucher_party_names(present_voucher_goods_lines(
-                    present_voucher_bank_allocations(row.clone(), bank),
-                    goods,
+                mark_voucher_party_names(present_voucher_gst_details(
+                    present_voucher_goods_lines(
+                        present_voucher_bank_allocations(row.clone(), bank),
+                        goods,
+                    ),
+                    gst,
                 )),
                 server.settings.redaction,
             )
@@ -327,7 +342,7 @@ pub(super) fn render_page_body(
     rows: &[Value],
     summary: Option<&SummaryRequest>,
     (offset, limit): (usize, usize),
-    shown: (BankAllocationsShown, GoodsLinesShown),
+    shown: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
 ) -> Result<PageBody, ToolFailure> {
     let Some(request) = summary else {
         let items = page_items(server, rows, (offset, limit), shown);
@@ -531,6 +546,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let shown = (
             BankAllocationsShown::from_args(args)?,
             GoodsLinesShown::from_args(args)?,
+            GstDetailsShown::from_args(args)?,
         );
         // A type GUID that is not this company's cannot name any of its
         // types: refused rather than answered with an empty selection.
@@ -559,6 +575,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
                 search.as_ref(),
             )
             .with_summary(summary_group)
+            .with_gst_details(shown.2)
         });
         let mut earlier_snapshot = None;
         if let Some(key) = &page_key {
@@ -653,7 +670,15 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             VoucherReadShape::EntryWildcard
         };
         let read = server
-            .read_entry_window_rows(&identity, &company.name, &from, &to, shape, composites)
+            .read_entry_window_rows(
+                &identity,
+                &company.name,
+                &from,
+                &to,
+                shape,
+                composites,
+                shown.2,
+            )
             .await?;
         accumulate_evidence(&mut accumulated, read.all_evidence());
         // What each request of the window read cost (#595); the empty-window
@@ -941,7 +966,7 @@ impl Server {
         accumulated: &mut Option<Evidence>,
         guid: &str,
         summary_group: Option<SummaryGroup>,
-        shown: (BankAllocationsShown, GoodsLinesShown),
+        shown: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
     ) -> Result<PageServe, ToolFailure> {
         let held = self
             .voucher_pages
@@ -1224,7 +1249,8 @@ impl Server {
     }
 
     /// The `vouchers` window in either entry-wildcard shape, parsed under
-    /// `composites` (#674).
+    /// `composites` (#674), with each entry's GST details when `gst` shows them (#2027).
+    #[allow(clippy::too_many_arguments)]
     pub(super) async fn read_entry_window_rows(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -1233,8 +1259,9 @@ impl Server {
         to: &TallyDate,
         shape: VoucherReadShape,
         composites: VoucherComposites,
+        gst: GstDetailsShown,
     ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
-        read_entry_window_rows_with(
+        read_entry_window_rows_reading_gst(
             &AgentReader(self),
             identity,
             company,
@@ -1242,6 +1269,7 @@ impl Server {
             to,
             shape,
             composites,
+            gst,
         )
         .await
     }
@@ -1289,6 +1317,32 @@ pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
     shape: VoucherReadShape,
     composites: VoucherComposites,
 ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
+    read_entry_window_rows_reading_gst(
+        reader,
+        identity,
+        company,
+        from,
+        to,
+        shape,
+        composites,
+        GstDetailsShown::Withheld,
+    )
+    .await
+}
+
+/// [`read_entry_window_rows_with`], reading each entry's GST details only when `gst` shows them
+/// (#2027): only `vouchers` called with `include_gst_details` asks.
+#[allow(clippy::too_many_arguments)]
+async fn read_entry_window_rows_reading_gst<R: WindowReader>(
+    reader: &R,
+    identity: &VerifiedCompanyIdentity,
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    shape: VoucherReadShape,
+    composites: VoucherComposites,
+    gst: GstDetailsShown,
+) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
     read_voucher_window_with(
         reader,
         identity,
@@ -1300,10 +1354,12 @@ pub(super) async fn read_entry_window_rows_with<R: WindowReader>(
         WindowReadLimits::for_shape(shape).counting_small_books(),
         |xml| match composites {
             VoucherComposites::Withhold => {
-                parse_agent_rows_withholding(xml, identity.company_guid())
+                parse_agent_rows_withholding_reading_gst(xml, identity.company_guid(), gst)
             }
-            VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
-                .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
+            VoucherComposites::Refuse => {
+                parse_agent_rows_reading_gst(xml, identity.company_guid(), gst)
+                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect())
+            }
         },
     )
     .await

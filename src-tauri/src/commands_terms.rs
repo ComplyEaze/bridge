@@ -29,7 +29,7 @@ fn record_unavailable() -> TallyCommandError {
         "ComplyEaze Bridge could not read or write its record of the Terms of Use, so it reads nothing from Tally and posts nothing.",
         "after_change",
         false,
-        "Check that the Bridge data folder (com.complyeaze.bridge, in your Application Support or AppData folder) can be written, or remove its terms-acceptance.jsonl if its last line is cut short, then accept the Terms again.",
+        "Check that the Bridge data folder (com.complyeaze.bridge, in your Application Support or AppData folder) can be written, then accept the Terms again. If that fails too, its terms-acceptance.jsonl holds a line Bridge did not write: move that file aside and accept the Terms again.",
     )
 }
 

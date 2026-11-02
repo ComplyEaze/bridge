@@ -248,19 +248,20 @@ fn party_master_opening_balance_comparison_rejects_an_unparseable_master_value()
 
 /// A `/status` read that fails is reported by the transport's own safe code (#1299): an HTTP
 /// 500 is `http_status_failure`, not the generic `endpoint_unreachable`. The probe reports it
-/// while its XML reads find no company list (a list found replaces the code with
+/// while its one company read finds no company list (a list found replaces the code with
 /// `status_heuristic_unavailable`).
 #[tokio::test]
 async fn a_failed_status_read_is_reported_by_the_transport_safe_code() {
     let failed_status =
         b"HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             .to_vec();
-    // Not a company list in either discovery shape.
+    // Not a company list. Nothing further is queued, so a second company
+    // request would hang and fail this test.
     let no_list = utf16_xml_response("<ENVELOPE></ENVELOPE>");
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
-        for response in [failed_status, no_list.clone(), no_list] {
+        for response in [failed_status, no_list] {
             let (mut socket, _) = listener.accept().await.unwrap();
             let request = read_complete_http_request(&mut socket).await;
             assert!(!request.is_empty());
@@ -915,9 +916,6 @@ async fn capability_probe_records_unavailable_product_mode_evidence_without_refu
             utf16_xml_response(
                 "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Capability collection unavailable</LINEERROR></DATA></BODY></ENVELOPE>",
             ),
-            utf16_xml_response(
-                "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
-            ),
         ];
         for response in responses {
             let (mut socket, _) = listener.accept().await.expect("accept Tally request");
@@ -959,9 +957,8 @@ async fn capability_probe_records_unavailable_product_mode_evidence_without_refu
     );
 }
 
-/// `fetch_companies` now requests the native `Company` collection
-/// (`ReadOnlyProfile::CompanyListV2`) instead of the legacy `CompanyListV1`
-/// custom TDL report. This asserts the request itself carries that shape --
+/// `fetch_companies` requests the native `Company` collection
+/// (`ReadOnlyProfile::CompanyListV2`). This asserts the request itself carries that shape --
 /// `TYPE=Collection`, no `REPORT`/`FORM`/`PART`/`LINE`/`FIELD` stack, and no
 /// `SVCURRENTCOMPANY` scoping a discovery read to one company -- and that a
 /// company row's `NAME` attribute and nested `GUID` are trimmed and returned.
@@ -1057,10 +1054,9 @@ async fn direct_company_bootstrap_uses_only_the_shaped_collection_identity() {
         .await
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
-    // `fetch_companies` (the first of the two reads below) now requests the
+    // `fetch_companies` (the first of the two reads below) requests the
     // native `Company` collection (`ReadOnlyProfile::CompanyListV2`), so its
-    // response carries that shape rather than the legacy `CompanyListV1`
-    // direct report. Its GUID must still not escape into the returned
+    // response carries that shape. Its GUID must still not escape into the returned
     // identity -- only the second, scoped `standard` read may do that.
     let discovered = r#"<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME="Synthetic Company"><GUID TYPE="String">scoped-guid</GUID><COMPANYNUMBER TYPE="Number">100001</COMPANYNUMBER><BOOKSFROM TYPE="Date">20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>"#;
     let standard = "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO /></DESC><DATA><COLLECTION MSTDEPTYPE=\"Ledger\" ISMSTDEPTYPE=\"Yes\"><SyntheticLedger NAME=\"synthetic-ledger\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">ledger-guid</GUID><PARENT TYPE=\"String\">Primary</PARENT><BRIDGECOMPANYGUID TYPE=\"String\">scoped-guid</BRIDGECOMPANYGUID><BRIDGECOMPANYNAME TYPE=\"String\">Synthetic Company</BRIDGECOMPANYNAME><LANGUAGENAME.LIST><LANGUAGEID>1033</LANGUAGEID></LANGUAGENAME.LIST></SyntheticLedger></COLLECTION></DATA></BODY></ENVELOPE>";
@@ -1099,14 +1095,12 @@ async fn capability_probe_does_not_promote_a_direct_company_report() {
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
     let server = tokio::spawn(async move {
-        // This responder gives the same untrusted bare direct company
-        // report regardless of what is requested: once for the `V2`
-        // collection attempt (which the collection parser rejects, since
-        // it never satisfies `HEADER/STATUS`), and once more for the
-        // `V1` fallback that follows.
+        // This responder answers the `V2` collection with an untrusted bare
+        // direct company report, which the collection parser rejects since
+        // it never satisfies `HEADER/STATUS`. Nothing further is queued, so
+        // a second company request would hang and fail this test.
         for (index, body) in [
             "<RESPONSE>LOCAL STATUS HEURISTIC UNRECOGNIZED</RESPONSE>",
-            "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
             "<ENVELOPE><COMPANYINFO><COMPANYNAMEFIELD>Synthetic Company</COMPANYNAMEFIELD><COMPANYGUIDFIELD>guid-1</COMPANYGUIDFIELD></COMPANYINFO></ENVELOPE>",
         ]
         .into_iter()
@@ -1147,7 +1141,7 @@ async fn capability_probe_does_not_promote_a_direct_company_report() {
         probe.profile.transports[&TransportId::XmlHttp]
             .safe_reason_code
             .as_deref(),
-        Some("direct_company_report_untrusted")
+        Some("xml_export_shape_unrecognized")
     );
     assert_eq!(
         probe.profile.features[&CapabilityFeatureId::CompanyRead].state,
@@ -1162,11 +1156,11 @@ async fn capability_probe_does_not_promote_a_shaped_company_failure_to_xml_suppo
         .expect("bind synthetic Tally server");
     let address = listener.local_addr().expect("synthetic Tally address");
     let server = tokio::spawn(async move {
-        // Same shaped `STATUS=0` failure for both the `V2` collection
-        // attempt and the `V1` fallback that follows it.
+        // A shaped `STATUS=0` failure for the `V2` collection, reported
+        // from that one answer: nothing further is queued, so a second
+        // company request would hang and fail this test.
         for (index, body) in [
             "<RESPONSE>TallyPrime Server is Running</RESPONSE>",
-            "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Could not find Company ''</LINEERROR></DATA></BODY></ENVELOPE>",
             "<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><BODY><DATA><LINEERROR>Could not find Company ''</LINEERROR></DATA></BODY></ENVELOPE>",
         ]
         .into_iter()
@@ -1215,9 +1209,9 @@ async fn capability_probe_does_not_promote_a_shaped_company_failure_to_xml_suppo
 /// A gateway-shaped `Company` collection response with two loaded
 /// synthetic companies and the `CMPINFO` counter trap included. Proves
 /// `probe` requests `CompanyListV2` on the happy path
-/// and trusts its success without ever falling back to the legacy
-/// `CompanyListV1` report: the mock server has exactly one POST response
-/// queued, so a fallback request would hang and fail this test.
+/// and trusts its success with no second company request: the mock server
+/// has exactly one POST response queued, so another request would hang and
+/// fail this test.
 #[tokio::test]
 async fn capability_probe_marks_presentation_equivalent_guid_siblings_ambiguous() {
     let listener = TcpListener::bind("127.0.0.1:0")
@@ -1854,11 +1848,232 @@ fn a_mailing_details_read_is_admitted_by_its_own_per_ledger_estimate() {
     );
 }
 
-/// The party/ledger master export asks for the mailing details only where the whole read
-/// fits their bound, so a book the standard request read before is never refused for the
-/// larger per-ledger estimate: a mark inside 3,200 is sent the mailing request, any larger
+/// Every transport error a post of the mailing pair can end with is marked with its cause,
+/// decided by the post's own error (bridge#2214 and the maintainers' ruling on bridge#2074):
+/// a deadline and an oversize Tally did not declare refuse, a declared oversize is read again,
+/// an answer that broke off, could not be read, did not decode or never came continues once the
+/// drain clears, and every other error, an HTTP error status and a post that never reached
+/// Tally among them, continues at once. A `/status` check of the pair that failed is not the
+/// post's failure, though it sits in the same chain.
+#[test]
+fn every_failure_of_a_mailing_post_is_decided_by_its_transport_error() {
+    use super::{
+        mailing_details_read_error, MailingDetailsReadFailed, MailingReadDecision as D,
+        MailingReadFailure as F, PairedNativeReportResponseFailure,
+    };
+    use bridge_tally_transport::{TallyTransportError as T, WireRefusal};
+    let limit = bridge_tally_transport::XML_RESPONSE_MAX_BYTES;
+    for (error, cause, decision) in [
+        (T::RequestTimedOut, F::Deadline, D::Refuse),
+        (
+            T::ResponseTooLarge {
+                limit,
+                declared_by_peer: false,
+            },
+            F::ResponseTooLarge {
+                declared_by_peer: false,
+            },
+            D::Refuse,
+        ),
+        (
+            T::ResponseTooLarge {
+                limit,
+                declared_by_peer: true,
+            },
+            F::ResponseTooLarge {
+                declared_by_peer: true,
+            },
+            D::Retry,
+        ),
+        (T::ResponseTruncated, F::Truncated, D::ContinueOnceDrained),
+        (T::ResponseReadFailed, F::ReadFailed, D::ContinueOnceDrained),
+        (T::RequestFailed, F::NoAnswer, D::ContinueOnceDrained),
+        (
+            T::InvalidEncoding {
+                code: "invalid_utf16le",
+            },
+            F::Undecodable,
+            D::ContinueOnceDrained,
+        ),
+        (
+            T::UnsupportedContentEncoding,
+            F::Undecodable,
+            D::ContinueOnceDrained,
+        ),
+        (T::HttpStatus { status: 503 }, F::HttpStatus, D::Continue),
+        (
+            T::EndpointInvalid {
+                code: "endpoint_host_not_loopback",
+            },
+            F::NotSent,
+            D::Continue,
+        ),
+        (
+            T::PolicyInvalid {
+                code: "request_timeout_zero",
+            },
+            F::NotSent,
+            D::Continue,
+        ),
+        (T::ClientInitializationFailed, F::NotSent, D::Continue),
+        (T::RequestTooLarge { limit }, F::NotSent, D::Continue),
+        (T::ConnectionFailed, F::NotSent, D::Continue),
+        (
+            T::WireRefused {
+                refusal: WireRefusal::Draining { retry_after_ms: 1 },
+            },
+            F::NotSent,
+            D::Continue,
+        ),
+        (T::SendWithdrawn, F::NotSent, D::Continue),
+    ] {
+        let found = |error: anyhow::Error| {
+            mailing_details_read_error(error)
+                .chain()
+                .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+                .map(MailingDetailsReadFailed::cause)
+        };
+        let posted = found(anyhow::Error::new(PairedNativeReportResponseFailure::new(
+            anyhow::Error::new(error.clone()),
+        )));
+        assert_eq!(posted, Some(cause), "{error:?}");
+        assert_eq!(cause.decision(), decision, "{error:?}");
+        // The same transport error from the pair's health check, not from its post.
+        let checked = anyhow::Error::new(error.clone())
+            .context("Tally health check between paired native report reads failed");
+        assert_eq!(found(checked), None, "{error:?}");
+    }
+}
+
+/// The maintainers' ruling on bridge#2074: every refusal of a whole mailing master answer that
+/// the collection parser types is marked with its cause, and each continues without the
+/// details: a wrong company, Tally's own failure answer, a missing STATUS, XML that does not
+/// parse, a row the grammar refuses and a passed bound. The refusal is still the master
+/// answer's, whatever the mark.
+#[test]
+fn every_refusal_of_a_mailing_answer_is_marked_to_continue() {
+    use super::{
+        mailing_details_answer_error, party_ledger_master_master_snapshot_error,
+        MailingDetailsReadFailed, MailingReadDecision as D, MailingReadFailure as F,
+    };
+    use bridge_tally_protocol::NativeCollectionError as N;
+    for (error, cause) in [
+        (N::MalformedResponse, F::Malformed),
+        (N::NotSuccess, F::TallyFailed),
+        (N::StatusAbsent, F::StatusAbsent),
+        (N::RowUnusable, F::RowRefused),
+        (N::CompanyIdentityMismatch, F::OtherCompany),
+        (N::BoundsViolation, F::BoundPassed),
+    ] {
+        let marked = mailing_details_answer_error(party_ledger_master_master_snapshot_error(
+            anyhow::Error::new(error),
+        ));
+        let found = marked
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+            .map(MailingDetailsReadFailed::cause);
+        assert_eq!(found, Some(cause), "{error:?}");
+        assert_eq!(cause.decision(), D::Continue, "{error:?}");
+        assert!(marked.chain().any(|cause| matches!(
+            cause.downcast_ref::<super::PartyLedgerMasterSourceValidationError>(),
+            Some(super::PartyLedgerMasterSourceValidationError::MasterResponseInvalid { .. })
+        )));
+    }
+}
+
+/// The export's decision for every way its mailing read can fail (bridge#2214, and the
+/// maintainers' ruling on bridge#2074): it refuses only where Tally may still be working on the
+/// read, a deadline or an oversize Tally did not declare; it reads again at once after an
+/// oversize Tally declared; it waits for the drain after an answer that broke off, could not be
+/// read, did not decode or never came; and it continues at once after every other failure.
+#[test]
+fn the_export_refuses_only_where_tally_may_still_be_working_on_its_mailing_read() {
+    use super::{MailingReadDecision as D, MailingReadFailure as F};
+    for (cause, decision) in [
+        (F::Deadline, D::Refuse),
+        (
+            F::ResponseTooLarge {
+                declared_by_peer: false,
+            },
+            D::Refuse,
+        ),
+        (
+            F::ResponseTooLarge {
+                declared_by_peer: true,
+            },
+            D::Retry,
+        ),
+        (F::Truncated, D::ContinueOnceDrained),
+        (F::ReadFailed, D::ContinueOnceDrained),
+        (F::NoAnswer, D::ContinueOnceDrained),
+        (F::Undecodable, D::ContinueOnceDrained),
+        (F::HttpStatus, D::Continue),
+        (F::NotSent, D::Continue),
+        (F::AnswersDiffered, D::Continue),
+        (F::TallyFailed, D::Continue),
+        (F::StatusAbsent, D::Continue),
+        (F::Malformed, D::Continue),
+        (F::RowRefused, D::Continue),
+        (F::OtherCompany, D::Continue),
+        (F::BoundPassed, D::Continue),
+        (F::IdentityRepeated, D::Continue),
+        (F::CountDiffers, D::Continue),
+    ] {
+        assert_eq!(cause.decision(), decision, "{cause:?}");
+    }
+}
+
+/// Markup inside a mailing field fails the whole master answer as a row the grammar refuses
+/// (the captured mailing answer, one PIN code given a child element), and that refusal of the
+/// export's mailing read continues without the details. The unchanged capture parses.
+#[test]
+fn markup_inside_a_mailing_field_is_a_refused_row_that_continues() {
+    use super::{
+        mailing_details_answer_error, party_ledger_master_master_snapshot_error,
+        MailingDetailsReadFailed, MailingReadDecision as D, MailingReadFailure as F,
+    };
+    let bytes: &[u8] = include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/agent/native-party-masters-mailing-details.utf16le.xml"
+    );
+    let units = bytes.strip_prefix(&[0xff, 0xfe]).unwrap_or(bytes);
+    let captured = String::from_utf16(
+        &units
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    // The company the capture's rows are bound to, read from the capture itself.
+    let bound = "<BRIDGECOMPANYGUID TYPE=\"String\">";
+    let start = captured.find(bound).expect("a bound company") + bound.len();
+    let guid = captured[start..start + captured[start..].find('<').unwrap()].trim();
+    bridge_tally_protocol::parse_native_party_ledger_master_structure(&captured, guid)
+        .expect("the unchanged capture parses");
+    let field = "<PINCODE TYPE=\"String\">";
+    assert!(captured.contains(field));
+    let with_markup = captured.replacen(field, &format!("{field}<B>0</B>"), 1);
+    let refused =
+        bridge_tally_protocol::parse_native_party_ledger_master_structure(&with_markup, guid)
+            .expect_err("markup inside a mailing field is refused");
+    assert_eq!(
+        refused
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<bridge_tally_protocol::NativeCollectionError>()),
+        Some(&bridge_tally_protocol::NativeCollectionError::RowUnusable),
+        "{refused:#}"
+    );
+    let cause = mailing_details_answer_error(party_ledger_master_master_snapshot_error(refused))
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<MailingDetailsReadFailed>())
+        .map(MailingDetailsReadFailed::cause);
+    assert_eq!(cause, Some(F::RowRefused));
+    assert_eq!(F::RowRefused.decision(), D::Continue);
+}
+
+/// By the mark alone, the party/ledger master export asks for the mailing details only where
+/// the whole read fits their bound: a mark inside 3,200 is sent the mailing request, any larger
 /// mark (a group of 3,201 to 4,266 ledgers included) the standard one, and no other kind of
-/// read is changed (#1490).
+/// read is changed (#1490). A count taken past 4,266 can choose again (bridge#2074, below).
 #[test]
 fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
     use super::ComplianceRead::{
@@ -1883,6 +2098,77 @@ fn the_export_gives_up_the_mailing_details_for_a_book_past_their_bound() {
     }
     for other in [Standard, WithMailingDetails, WithGstDetails] {
         assert_eq!(other.resolved_for_mark(bound + 1), other);
+    }
+}
+
+/// Once a book's ledgers were counted to size a whole read, the export decides by the count
+/// and the alterations beyond it: the counted ledgers at the mailing estimate, each with the
+/// further entries one save can add unseen by the mark (2074-L A4b), and one further mailing
+/// entry for every alteration past them, must fit the budget. A book of few ledgers and many
+/// alterations is then sent the mailing request; one whose alterations could hold more entries
+/// than the budget, or with more ledgers than the allowance admits, keeps the standard
+/// request. Such a read is still admitted whole. No other kind of read is changed
+/// (bridge#2074).
+#[test]
+fn the_export_takes_the_mailing_details_where_the_counted_ledgers_fit_their_bound() {
+    use super::ComplianceRead::{
+        Standard, WithGstDetails, WithMailingDetails, WithMailingDetailsWhereWholeReadFits as Ask,
+    };
+    let budget = super::COMPLIANCE_MASTER_RESPONSE_BUDGET_BYTES_UNVERIFIED;
+    let per_ledger = super::COMPLIANCE_MASTER_BYTES_PER_LEDGER_WITH_MAILING_DETAILS_UNVERIFIED;
+    let per_entry = super::MAILING_DETAILS_BYTES_PER_FURTHER_ENTRY_UNVERIFIED;
+    let unseen = super::MAILING_DETAILS_UNSEEN_ENTRIES_PER_LEDGER_UNVERIFIED;
+    let per_counted = per_ledger + unseen * per_entry;
+    assert_eq!(per_counted, 9_800);
+    let bound = super::compliance_master_ledgers_per_read(WithMailingDetails);
+    assert_eq!(bound, 3_200);
+    // The count is taken only past the standard bound, a mark of 4,267 at least. There a
+    // counted ledger also carries the entries the mark may not show, so the count admits at
+    // most 1,265 ledgers, far fewer than the mark's bound.
+    let first_counted_mark = super::compliance_master_ledgers_per_read(Standard) + 1;
+    assert_eq!(first_counted_mark, 4_267);
+    let counted_bound = (budget - first_counted_mark * per_entry) / (per_counted - per_entry);
+    assert_eq!(counted_bound, 1_265);
+    assert_eq!(
+        Ask.resolved_for_count(counted_bound, first_counted_mark),
+        WithMailingDetails
+    );
+    assert_eq!(
+        Ask.resolved_for_count(counted_bound + 1, first_counted_mark),
+        Standard
+    );
+    assert_eq!(Ask.resolved_for_count(bound, bound), Standard);
+    // The issue's book: about 300 ledgers at a mark near 8,000.
+    assert_eq!(Ask.resolved_for_count(300, 8_000), WithMailingDetails);
+    // The largest mark nine ledgers are given the details for, exactly.
+    let nine = 9 + (budget - 9 * per_counted) / per_entry;
+    assert_eq!(Ask.resolved_for_count(9, nine), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_count(9, nine + 1), Standard);
+    // A book whose estimate is the budget exactly is given the details; one entry more is not.
+    assert_eq!(2 * per_counted + (13_319 - 2) * per_entry, budget);
+    assert_eq!(Ask.resolved_for_count(2, 13_319), WithMailingDetails);
+    assert_eq!(Ask.resolved_for_count(2, 13_320), Standard);
+    // 3,000 ledgers in a book near the catalogue's limit could hold more entries than fit.
+    assert_eq!(Ask.resolved_for_count(3_000, 22_857), Standard);
+    // A count is taken only for a mark past the standard bound; a read the mailing request is
+    // given is admitted whole, as the standard read was.
+    let mark = super::compliance_master_ledgers_per_read(Standard) + 1;
+    for counted in [1, 300] {
+        assert_eq!(Ask.resolved_for_count(counted, mark), WithMailingDetails);
+        assert_eq!(
+            super::admit_compliance_master_read(mark, Some(counted), WithMailingDetails).ok(),
+            Some(super::ComplianceAdmission::Admitted),
+            "count {counted}"
+        );
+        assert_eq!(
+            super::admit_compliance_master_read(mark, Some(counted), Standard).ok(),
+            Some(super::ComplianceAdmission::Admitted),
+            "count {counted}"
+        );
+    }
+    for other in [Standard, WithMailingDetails, WithGstDetails] {
+        assert_eq!(other.resolved_for_count(1, 8_000), other);
+        assert_eq!(other.resolved_for_count(bound + 1, 8_000), other);
     }
 }
 
@@ -1946,4 +2232,24 @@ fn a_details_read_is_partitioned_by_its_own_ledger_bound() {
     for part in parts.parts() {
         assert!(part.ledger_count() <= with.max_ledgers_per_part);
     }
+}
+
+/// #2142: every gated client posts under its wire config's drain policy, and
+/// none when the config has none.
+#[test]
+fn a_gated_client_drains_by_its_wire_configs_policy() {
+    use crate::endpoint_wire::WireGateConfig;
+    use bridge_tally_transport::DrainPolicy;
+    let config = super::TallyConfig {
+        host: "127.0.0.1".into(),
+        port: 9,
+    };
+    let plain = super::TallyClient::with_wire(config.clone(), &WireGateConfig::default()).unwrap();
+    assert_eq!(plain.http.drain_policy(), None);
+    let draining = super::TallyClient::with_wire(
+        config,
+        &WireGateConfig::default().with_drain(DrainPolicy::MEASURED),
+    )
+    .unwrap();
+    assert_eq!(draining.http.drain_policy(), Some(DrainPolicy::MEASURED));
 }

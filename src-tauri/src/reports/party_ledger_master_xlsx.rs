@@ -87,7 +87,8 @@ pub(crate) fn render_party_ledger_master_xlsx(
     if let Some(note) = source.notes_text() {
         worksheet.write_string(2, 2, note)?;
     }
-    if no_mailing_details_were_observed(source) {
+    // A failed mailing read says so among the notes instead (bridge#2214).
+    if no_mailing_details_were_observed(source) && source.mailing_details_read_failed.is_none() {
         worksheet.write_string(3, 2, NO_MAILING_DETAILS_OBSERVED_NOTE)?;
     }
     worksheet.write_string_with_format(7, 0, "Repeated read agreement", &bold)?;
@@ -100,7 +101,7 @@ pub(crate) fn render_party_ledger_master_xlsx(
     worksheet.write_string(
         8,
         1,
-        "Ledger identity, parent, Party GSTIN and requested party/master fields when returned, the dated mailing details (address, PIN code, state) in force on the Balances-as-of date (requested only for a book whose master-alteration mark is at most 3,200; a note beside the header says when none were observed), plus opening/closing balances over the named period. The \"as returned\" address, PIN code and state columns are Tally's older flat fields, which can be empty for a party that holds a mailing address: read the Mailing columns at the right when they were observed.",
+        "Ledger identity, parent, Party GSTIN and requested party/master fields when returned, the dated mailing details (address, PIN code, state) in force on the Balances-as-of date (requested only where the read is estimated to fit their bound: a master-alteration mark of at most 3,200, or, for a book whose ledgers were counted to size the read, the count and the alterations beyond it; a note beside the header says when none were observed), plus opening/closing balances over the named period. The \"as returned\" address, PIN code and state columns are Tally's older flat fields, which can be empty for a party that holds a mailing address: read the Mailing columns at the right when they were observed.",
     )?;
     worksheet.write_string_with_format(9, 0, "Not observed fields", &bold)?;
     worksheet.write_string(
@@ -247,9 +248,10 @@ pub(crate) fn render_party_ledger_master_xlsx(
 }
 
 /// Said in the workbook when no ledger's answer carried a mailing-details list. The export asks
-/// for the lists only where the whole read fits their bound, so a book past it is read as it was
-/// before they existed (bridge#1490); a blank mailing column is then not "no address".
-const NO_MAILING_DETAILS_OBSERVED_NOTE: &str = "No ledger's mailing details were observed in this read: the request for them is made only for a book whose master-alteration mark is at most 3,200, or Tally returned none. The Mailing columns are empty and their status says not observed; that is not the same as a party having no mailing address. Read the address in Tally.";
+/// for the lists only where the whole read fits their bound, by the mark or by a count taken to
+/// size the read (bridge#2074), so a book past it is read as it was before they existed
+/// (bridge#1490); a blank mailing column is then not "no address".
+const NO_MAILING_DETAILS_OBSERVED_NOTE: &str = "No ledger's mailing details were observed in this read: the request for them is made only where the read is estimated to fit their bound (a master-alteration mark of at most 3,200, or, for a book whose ledgers were counted to size the read, the count and the alterations beyond it), or Tally returned none. The Mailing columns are empty and their status says not observed; that is not the same as a party having no mailing address. Read the address in Tally.";
 
 fn no_mailing_details_were_observed(source: &PartyLedgerMasterSource) -> bool {
     !source.rows.is_empty()

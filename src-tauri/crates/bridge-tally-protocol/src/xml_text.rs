@@ -6,6 +6,8 @@
 //! path also escaped CR and LF, and nothing else did. [`escape_text`] is the
 //! superset of both sets, so every call site gets the stronger guarantee.
 //!
+//! [`escape_text`]: crate::xml_text::escape_text
+//!
 //! Escaping CR and LF matters even though the XML 1.0 grammar would pass a
 //! literal CR or LF through unescaped: the spec's end-of-line handling rule
 //! requires a conforming parser to fold a literal CR LF pair (and a lone CR)

@@ -936,6 +936,13 @@ pub(crate) enum UnderLockRefusal {
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,
+    /// The aim read the company's voucher mark below a floor an earlier native
+    /// post of the company had proved (a restore), and the record of it could
+    /// not be written (#1050). No dispatch intent is recorded and nothing is
+    /// sent: once this post's vouchers raise the mark, no later reading could
+    /// see the restore.
+    #[error("post_rollback_unrecorded")]
+    RollbackUnrecorded,
     /// The approval could not be spent: it was revoked after this call took
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
@@ -988,6 +995,7 @@ impl UnderLockRefusal {
             Self::BatchChanged => "import_batch_changed",
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
+            Self::RollbackUnrecorded => "post_rollback_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
             Self::PreImageUnrecorded => "master_pre_image_unrecorded",
             Self::PreImageWriteFailed => "master_pre_image_write_failed",
@@ -1150,6 +1158,15 @@ pub(crate) mod test_seam {
             Self {
                 held: Some(Arc::new(tokio::sync::watch::channel(None).0)),
                 ..Self::new(false)
+            }
+        }
+
+        /// A held post dialog that runs `while_pending` as it opens, on the
+        /// dialog's own task, before it waits for [`ScriptedApproval::answer`].
+        pub(crate) fn held_after(while_pending: impl Fn() + Send + Sync + 'static) -> Self {
+            Self {
+                while_pending: Some(Arc::new(while_pending)),
+                ..Self::held()
             }
         }
 
@@ -2171,7 +2188,9 @@ pub(crate) mod test_seam {
     /// AppKit lays the alert's text out as Part A saw the panel do: 16 points a
     /// line, two lines for a 100-character prose line, 28 lines for the smallest
     /// one-voucher post text, and one of ten 46-capital lines broken (row 1964-M,
-    /// cells A1, A5, A7 and A4e). Measured without a window (#1780).
+    /// cells A1, A5, A7 and A4e). Measured without a window (#1780). The voucher
+    /// text is Part A's `a7-smallest-voucher.txt` with its GUID and batch lines
+    /// replaced by synthetic text of the same length.
     #[cfg(target_os = "macos")]
     #[test]
     fn the_mac_alert_text_is_measured_as_the_panel_lays_it_out() {
@@ -2486,8 +2505,8 @@ fn answer_reserve() -> (usize, usize) {
 /// at that width, or the Mac alert's one line, which the alert wraps itself).
 /// The parent measures what is shown, so a text that does not fit
 /// is refused before a window opens, never cut. A stop release has no caps
-/// beyond the byte limit. A Mac's dialog child also counts the alert's own
-/// lines before it shows it, [`exit_unless_the_alert_fits`].
+/// beyond the byte limit. A Mac's dialog child also measures the alert's text as
+/// the window lays it out before it shows it, [`exit_unless_the_alert_fits`].
 fn fits_the_box(shown: Shown, count: VoucherCount, displayed: &str) -> bool {
     if shown == Shown::StopRelease {
         return true;
@@ -2842,9 +2861,10 @@ fn review_title(count: VoucherCount) -> String {
 
 // The macOS alert as row 1964-M Part A measured it (`lab/1964-mac-alert-caps-answers`,
 // macOS 26.6.2, one display, one run of each cell, so every figure here is
-// partial). A real approval text takes its wide layout: 13-point text in a
-// column about 402 points wide (46 capitals overflow it once in ten lines, cell
-// A4e), under 150 points of title, icon and buttons. The
+// partial). The texts measured took the wide layout; whether a real text can
+// ever take the compact one, whose chrome is 68 points taller, was not measured.
+// Wide is 13-point text in a column about 402 points wide (46 capitals overflow
+// it once in ten lines, cell A4e), under 150 points of title, icon and buttons. The
 // alert opens with its top at a fixed place and is never moved up, so a tall one
 // runs off the bottom of the screen. Its top was 168 points from the top of a
 // 982-point screen whose visible frame starts 33 points down; whether that is a
@@ -2899,6 +2919,8 @@ fn alert_fits(text_height: f64, screen: ScreenSpan) -> bool {
 
 /// Whether an alert whose text is `text_height` points tall fits on every one
 /// of `screens` (#1780). No screen fits nothing, so an empty list is refused.
+/// Production cannot reach that with an empty list, as `alert_screens` gives
+/// `None` for one and the dialog ends as unavailable; it stays as a defence.
 #[cfg(not(windows))]
 fn alert_fits_every_screen(text_height: f64, screens: &[ScreenSpan]) -> bool {
     !screens.is_empty()
@@ -3074,12 +3096,13 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the post's box (`show_review`): topmost with
@@ -3115,12 +3138,13 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the review's box: topmost with MB_SYSTEMMODAL, taking
@@ -3155,12 +3179,13 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the review's box: topmost with MB_SYSTEMMODAL, taking
@@ -3235,13 +3260,14 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // The box cannot scroll: `guarded` measures it when it opens and, if it is
     // not wholly on the screen, never returns (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: Both buffers are NUL-terminated and live for the synchronous
-        // dialog; no parent HWND is borrowed. No application state is exposed
+        // dialog; the owner is `guarded`'s hidden window, alive until the box
+        // returns. No application state is exposed
         // to callbacks.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
@@ -3253,7 +3279,9 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // click and a key while the box was open (#1780). That run did
                 // not test what else a system-modal box changes: the taskbar
                 // showed no task buttons while it was open, cause not tested
-                // (#2161). When Windows lets it,
+                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // window, the other way a stand-in box was seen to stay on top
+                // (#1780); an owned box has no taskbar button. When Windows lets it,
                 // MB_SETFOREGROUND also gives the box the foreground, so a key
                 // typed for Tally can answer it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
@@ -3310,12 +3338,13 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     // line tells the person to press Y or N, and in one lab run on Windows 10
     // MB_SETFOREGROUND alone did not give it the keyboard when it opened
     // seconds after the last input went to Tally (#1780).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the post's box (`show_review`): topmost with

@@ -139,7 +139,7 @@ impl IdentifiedBaseCurrency {
     }
 
     /// The INR rule, by the base master's mailing name alone
-    /// ([`CurrencyMaster::is_inr`]).
+    /// (`CurrencyMaster::is_inr`).
     pub fn is_inr(&self) -> bool {
         self.is_inr
     }

@@ -3137,7 +3137,8 @@ Both absent states rest on the order Tally serves requests in: the read that fin
 the name absent is sent after the create's send ended, and Tally has been seen to
 serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection and with the
-create, the read or both on a reused connection (#2176). Their answers carry
+create, the read or both on a reused connection, behind a long read, and with every
+request on a new connection behind a long import (#2176). Their answers carry
 `verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
 absent state only when the read-back's Tally reports TallyPrime 7.2, licensed,
 Silver or Gold: Gold is the same product with multi-user access, so the edition

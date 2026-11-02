@@ -84,6 +84,7 @@ fn book(to: &str, rows: Vec<PartyLedgerMasterRow>) -> PartyLedgerMasterWorkbook 
         balance_date_basis: BalanceDateBasis::HostToday(TallyDate::parse(to).unwrap()),
         last_voucher_date: TallyDate::parse(to).unwrap(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
         rows,
         request_sha256: "0".repeat(64),
         master_response_sha256: "a".repeat(64),

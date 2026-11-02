@@ -1828,9 +1828,14 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// leaving margins of 720, 904, 406 and 290. Its review fixes then added 64 bytes to every
 /// list, 30 in its `as_of` text and 34 in its description, counted from the text rather
 /// than measured, which leaves margins of 656, 840, 342 and 226 before any other change.
+/// On 2 Nov 2026 master measured 206,855, 232,849, 235,347 and 240,463 bytes, derived from
+/// measured merges by their known deltas. The outstandings withheld clause and the two
+/// changes waiting behind it add 334 bytes between them, which puts the last two lists
+/// over by 181 and 297. Those two budgets went up by 500, leaving margins of 319
+/// and 203 once all three have landed; the first two lists stay within theirs.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 233_500, 235_500, 240_500];
+const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 233_500, 236_000, 241_000];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

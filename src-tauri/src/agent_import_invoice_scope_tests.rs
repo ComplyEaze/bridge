@@ -1,9 +1,9 @@
-//! The invoice's ledger scope (#1331): which ledgers and parents a Sales
-//! invoice's rate read is restricted to, and the proof that an answer to it
-//! holds exactly those ledgers.
+//! The invoice's ledger scope (#1331): which ledgers a Sales invoice's rate read
+//! is restricted to, by GUID, and the proof that an answer to it holds exactly
+//! those ledgers.
 //!
-//! The real-bytes cases use the pilot lab's own answers of 10 Oct 2026
-//! (fixtures/agent/pilot-lab/PROVENANCE.md, "The parent-filter round"); the
+//! The real-bytes cases use the pilot lab's own answers of 31 Oct 2026
+//! (fixtures/agent/pilot-lab/PROVENANCE.md, "The ledger-filter round"); the
 //! rule cases use small synthetic catalogues and say so.
 use super::*;
 use crate::agent::agent_import::invoice::wire;
@@ -12,24 +12,22 @@ use bridge_tally_protocol::StandardLedgerCatalogV2;
 const PILOT: &str = "BRIDGE PILOT LAB";
 const PILOT_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 
-/// The ledgers of the lab invoice `BP/26-27/0010`: the customer, two sales
-/// ledgers, the two tax ledgers and the round off.
-const LEGS: [&str; 6] = [
+/// The five ledgers of the lab's Goods 18% invoice: the customer, the sales
+/// ledger, the two tax ledgers and the round off.
+const FIVE: [&str; 5] = [
     "BRIDGE Walk-in",
-    "BRIDGE Svc 998313 5%",
-    "BRIDGE Svc 998314 5%",
-    "BRIDGE CGST 2.5%",
-    "BRIDGE SGST 2.5%",
+    "BRIDGE Goods 18%",
+    "BRIDGE CGST 9%",
+    "BRIDGE SGST 9%",
     "BRIDGE Round Off",
 ];
 
-const CATALOGUE: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml");
-const SCOPED_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.request.utf16le.xml");
-const SCOPED_HSN_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.request.utf16le.xml");
-const SCOPED_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped.utf16le.xml");
-const WHOLE_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-whole-10oct.utf16le.xml");
-const CASE_CHANGED_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.request.utf16le.xml");
-const CASE_CHANGED_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-case-changed.utf16le.xml");
+const CATALOGUE: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml");
+const GUID_REQUEST: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.request.utf16le.xml");
+const GUID_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.utf16le.xml");
+const ONE_ABSENT_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-one-absent.utf16le.xml");
+const NONE_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-none.utf16le.xml");
+const PARENTS_ANSWER: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml");
 
 /// The window the lab's rate requests carried: the financial year's start and
 /// the invoice date.
@@ -63,7 +61,7 @@ fn pilot_catalogue() -> StandardLedgerCatalogV2 {
 }
 
 fn listed(answer: &[u8]) -> Vec<ListedLedger> {
-    wire::parse_ledger_rates_and_rows(&captured(answer), PILOT_GUID, &LEGS)
+    wire::parse_ledger_rates_and_rows(&captured(answer), PILOT_GUID, &FIVE)
         .unwrap()
         .1
 }
@@ -73,14 +71,23 @@ fn synthetic(rows: &[(&str, &str)]) -> StandardLedgerCatalogV2 {
     let rows = rows
         .iter()
         .enumerate()
-        .map(|(index, (name, parent))| {
+        .map(|(index, (name, parent))| (*name, *parent, guid(index)))
+        .collect::<Vec<_>>();
+    synthetic_with_guids(&rows)
+}
+
+/// SYNTHETIC: a catalogue of `(name, parent, GUID)` rows.
+fn synthetic_with_guids(rows: &[(&str, &str, String)]) -> StandardLedgerCatalogV2 {
+    let rows = rows
+        .iter()
+        .map(|(name, parent, guid)| {
             format!(
                 "<LEDGER NAME=\"{}\" RESERVEDNAME=\"\"><GUID TYPE=\"String\">{}</GUID>\
                  <PARENT TYPE=\"String\">{}</PARENT><ISBILLWISEON TYPE=\"Logical\">No</ISBILLWISEON>\
                  <BRIDGECOMPANYGUID TYPE=\"String\">{PILOT_GUID}</BRIDGECOMPANYGUID>\
                  <BRIDGECOMPANYNAME TYPE=\"String\">{PILOT}</BRIDGECOMPANYNAME></LEDGER>",
                 name.replace('&', "&amp;").replace('"', "&quot;"),
-                guid(index),
+                guid,
                 parent.replace('&', "&amp;").replace('"', "&quot;"),
             )
         })
@@ -112,197 +119,176 @@ fn scope_of(
     InvoiceLedgerScope::from_catalogue(catalogue.catalog(), named)
 }
 
-fn parents_of(scope: &InvoiceLedgerScope) -> Vec<String> {
-    scope
-        .part()
-        .parents()
-        .iter()
-        .map(|parent| parent.as_catalogue_text().to_string())
-        .collect()
+fn rendered(scope: &InvoiceLedgerScope) -> String {
+    wire::render_ledger_rates_request_for_ledgers(PILOT, (&window().0, &window().1), scope.part())
 }
 
 // ---- The pilot lab's own bytes ----
 
-/// The lab's request with the HSN/SAC check's three fields added to its field
-/// list (#691, W16): the edit that turns the lab's unrestricted rates request
-/// into the one it answered on 12 Oct 2026 (the code renders the restricted one
-/// with the same three fields, which the lab answered on 21 Oct 2026). The edit
-/// must apply exactly once.
-fn with_the_hsn_fields(request: String) -> String {
-    const FROM: &str = "ROUNDINGLIMIT</FETCH>";
-    assert_eq!(request.matches(FROM).count(), 1);
-    request.replace(
-        FROM,
-        "ROUNDINGLIMIT, HSNDETAILS.LIST, GSTTYPEOFSUPPLY, GSTAPPLICABLE</FETCH>",
-    )
-}
-
-/// The scope the lab invoice's legs make is the four parents, and the request
-/// it renders is, byte for byte, the one the lab answered on 21 Oct 2026 (the
-/// file starts with a byte order mark): the four-parent request of 10 Oct with
-/// the HSN/SAC fields added to its field list.
+/// The five ledgers make, byte for byte, the request the lab answered on 31 Oct
+/// 2026 (its file starts with a byte order mark). Naming a ledger twice, or in
+/// another order, is the same request.
 #[test]
-fn the_lab_invoices_legs_make_the_request_the_lab_answered() {
-    let scope = scope_of(&pilot_catalogue(), &LEGS).unwrap();
-    assert_eq!(
-        parents_of(&scope),
-        [
-            "Duties & Taxes",
-            "Indirect Expenses",
-            "Sales Accounts",
-            "Sundry Debtors"
-        ]
-    );
-    let rendered = wire::render_ledger_rates_request_for_parents(
-        PILOT,
-        (&window().0, &window().1),
-        scope.part(),
-    );
-    assert_eq!(captured(SCOPED_HSN_REQUEST), rendered);
-    // The same request without the fields is the one the lab answered on 10 Oct.
-    assert_eq!(with_the_hsn_fields(captured(SCOPED_REQUEST)), rendered);
-    // Naming a ledger twice, or in another order, is the same scope.
-    let mut shuffled = LEGS.to_vec();
+fn the_lab_invoices_ledgers_make_the_request_the_lab_answered() {
+    let scope = scope_of(&pilot_catalogue(), &FIVE).unwrap();
+    assert_eq!(captured(GUID_REQUEST), rendered(&scope));
+    let mut shuffled = FIVE.to_vec();
     shuffled.reverse();
     shuffled.push("BRIDGE Walk-in");
-    let again = scope_of(&pilot_catalogue(), &shuffled).unwrap();
     assert_eq!(
-        wire::render_ledger_rates_request_for_parents(
-            PILOT,
-            (&window().0, &window().1),
-            again.part()
-        ),
-        rendered
+        rendered(&scope_of(&pilot_catalogue(), &shuffled).unwrap()),
+        rendered(&scope)
     );
 }
 
-/// Tally's answer to that request holds exactly the catalogue's 11 ledgers
-/// under the four parents, and the scope accepts it.
+/// Tally's answer to that request holds exactly the five ledgers, and the scope
+/// accepts it, with every named ledger's rate row.
 #[test]
 fn the_answer_the_lab_gave_is_exactly_the_scopes_ledgers() {
-    let scope = scope_of(&pilot_catalogue(), &LEGS).unwrap();
-    let rows = listed(SCOPED_ANSWER);
-    assert_eq!(rows.len(), 11);
-    assert_eq!(scope.part().ledger_count(), 11);
+    let scope = scope_of(&pilot_catalogue(), &FIVE).unwrap();
+    let rows = listed(GUID_ANSWER);
+    assert_eq!(rows.len(), 5);
     assert_eq!(scope.prove(&rows), Ok(()));
     let (rates, _) =
-        wire::parse_ledger_rates_and_rows(&captured(SCOPED_ANSWER), PILOT_GUID, &LEGS).unwrap();
+        wire::parse_ledger_rates_and_rows(&captured(GUID_ANSWER), PILOT_GUID, &FIVE).unwrap();
     assert_eq!(
         rates.len(),
-        LEGS.len(),
+        FIVE.len(),
         "every named ledger has its rate row"
     );
 }
 
-/// The whole book's answer (15 rows) to a scoped request is a filter that was
-/// not applied: refused on the count, as is the answer to the case-changed
-/// filter (4 rows). The scope never accepts an answer for a request it did not
-/// make.
+/// An answer that is not the scope's rows is refused on its count: the lab's
+/// answer that lacks the round off (the request named four of the five and a
+/// GUID the book does not hold), and its answer to the four-parent read, which
+/// holds every ledger under those parents. The scope that names exactly those
+/// four accepts the first.
 #[test]
 fn an_answer_that_is_not_the_scopes_is_refused_on_its_rows() {
-    let scope = scope_of(&pilot_catalogue(), &LEGS).unwrap();
+    let scope = scope_of(&pilot_catalogue(), &FIVE).unwrap();
     for (answer, label) in [
-        (WHOLE_ANSWER, "whole book"),
-        (CASE_CHANGED_ANSWER, "one parent"),
+        (ONE_ABSENT_ANSWER, "one lacking"),
+        (PARENTS_ANSWER, "parents"),
     ] {
         assert_eq!(
             scope.prove(&listed(answer)),
             Err(refuse_value(
                 "invoice_ledger_rates_rows_differ",
-                "parent_part_row_count_differs"
+                "ledger_scope_row_count_differs"
             )),
             "{label}"
         );
     }
+    let four = scope_of(&pilot_catalogue(), &FIVE[..4]).unwrap();
+    assert_eq!(four.prove(&listed(ONE_ABSENT_ANSWER)), Ok(()));
 }
 
-/// The case-changed request is, byte for byte, the one the lab answered: the
-/// scoped request with only its formula's parent spelled `SALES ACCOUNTS`. A
-/// part naming that spelling is planned from a catalogue that holds it
-/// (SYNTHETIC catalogue; the request bytes are the lab's).
+/// The lab's answer to a filter that names no ledger of the book is a complete
+/// envelope with no row. The rate read never takes that for "no ledger has a
+/// rate": it is a read that failed.
 #[test]
-fn the_case_changed_filter_is_the_request_the_lab_answered() {
-    let scope = scope_of(&synthetic(&[("Sales", "SALES ACCOUNTS")]), &["Sales"]).unwrap();
-    let rendered = wire::render_ledger_rates_request_for_parents(
-        PILOT,
-        (&window().0, &window().1),
-        scope.part(),
-    );
+fn an_answer_with_no_ledger_is_a_failed_read() {
     assert_eq!(
-        with_the_hsn_fields(captured(CASE_CHANGED_REQUEST)),
-        rendered
+        wire::parse_ledger_rates_and_rows(&captured(NONE_ANSWER), PILOT_GUID, &FIVE).err(),
+        Some("invoice_ledger_rates_listing_empty")
     );
-}
-
-/// `$Parent` folds case on this book (reference 11e): the filter spelled
-/// `SALES ACCOUNTS` returned the four `Sales Accounts` ledgers, each row
-/// carrying the book's own spelling. The proof compares each row's parent
-/// exactly, so that answer is exactly the rows of a scope whose parent is the
-/// book's `Sales Accounts`, and not the rows of the lab invoice's four-parent
-/// scope. That is also why a scope refuses a book with a case-twin parent: the
-/// filter cannot tell the twins apart.
-#[test]
-fn a_filter_in_another_case_returned_rows_the_books_spelling_proves() {
-    let scope = scope_of(&pilot_catalogue(), &["BRIDGE Svc 998313 5%"]).unwrap();
-    assert_eq!(parents_of(&scope), ["Sales Accounts"]);
-    assert_eq!(scope.part().ledger_count(), 4);
-    let rows = listed(CASE_CHANGED_ANSWER);
-    assert!(rows
-        .iter()
-        .all(|row| row.parent.as_deref() == Some("Sales Accounts")));
-    assert_eq!(scope.prove(&rows), Ok(()));
-    let invoice = scope_of(&pilot_catalogue(), &LEGS).unwrap();
-    assert!(invoice.prove(&rows).is_err());
 }
 
 /// One row changed in the lab's real answer is refused under the way it
 /// differs: a row lost, a row that is another ledger's, a row under another
-/// parent, a row twice, a row with no GUID.
+/// parent, a renamed row, a row twice, a row with no GUID.
 #[test]
 fn one_row_of_the_real_answer_changed_is_refused() {
-    let scope = scope_of(&pilot_catalogue(), &LEGS).unwrap();
+    let scope = scope_of(&pilot_catalogue(), &FIVE).unwrap();
     let differs = |cause: &str| Err(refuse_value("invoice_ledger_rates_rows_differ", cause));
-    let rows = listed(SCOPED_ANSWER);
+    let rows = listed(GUID_ANSWER);
 
     let mut lost = rows.clone();
     lost.pop();
-    assert_eq!(scope.prove(&lost), differs("parent_part_row_count_differs"));
+    assert_eq!(
+        scope.prove(&lost),
+        differs("ledger_scope_row_count_differs")
+    );
 
     let mut foreign = rows.clone();
     foreign[0].guid = Some(guid(999));
-    assert_eq!(
-        scope.prove(&foreign),
-        differs("parent_part_row_not_in_catalogue")
-    );
+    assert_eq!(scope.prove(&foreign), differs("ledger_scope_row_not_named"));
 
     let mut moved = rows.clone();
     moved[0].parent = Some("Sales Accounts".to_string());
     assert_eq!(
         scope.prove(&moved),
-        differs("parent_part_row_differs_from_catalogue")
+        differs("ledger_scope_row_differs_from_catalogue")
     );
 
     let mut padded = rows.clone();
     padded[0].parent = padded[0].parent.as_ref().map(|parent| format!("{parent} "));
     assert_eq!(
         scope.prove(&padded),
-        differs("parent_part_row_differs_from_catalogue")
+        differs("ledger_scope_row_differs_from_catalogue")
     );
 
     let mut renamed = rows.clone();
     renamed[0].name = "Renamed".to_string();
     assert_eq!(
         scope.prove(&renamed),
-        differs("parent_part_row_differs_from_catalogue")
+        differs("ledger_scope_row_differs_from_catalogue")
     );
 
     let mut doubled = rows.clone();
     doubled[1] = doubled[0].clone();
-    assert_eq!(scope.prove(&doubled), differs("parent_part_row_repeated"));
+    assert_eq!(scope.prove(&doubled), differs("ledger_scope_row_repeated"));
+
+    let walk_in = rows
+        .iter()
+        .position(|row| row.name == "BRIDGE Walk-in")
+        .unwrap();
+    let mut recased = rows.clone();
+    recased[walk_in].name = recased[walk_in].name.to_uppercase();
+    assert_ne!(recased[walk_in].name, rows[walk_in].name);
+    assert_eq!(
+        scope.prove(&recased),
+        differs("ledger_scope_row_differs_from_catalogue")
+    );
+
+    let mut parent_recased = rows.clone();
+    parent_recased[0].parent = parent_recased[0]
+        .parent
+        .as_ref()
+        .map(|parent| parent.to_uppercase());
+    assert_ne!(parent_recased[0].parent, rows[0].parent);
+    assert_eq!(
+        scope.prove(&parent_recased),
+        differs("ledger_scope_row_differs_from_catalogue")
+    );
+
+    // A GUID is compared in lower case on both sides: the same GUID in capitals
+    // is the same ledger.
+    let mut guid_recased = rows.clone();
+    guid_recased[0].guid = guid_recased[0]
+        .guid
+        .as_ref()
+        .map(|guid| guid.to_uppercase());
+    assert_eq!(scope.prove(&guid_recased), Ok(()));
 
     let mut unnamed = rows;
     unnamed[0].guid = None;
-    assert_eq!(scope.prove(&unnamed), differs("row_without_guid"));
+    assert_eq!(
+        scope.prove(&unnamed),
+        differs("ledger_scope_row_without_guid")
+    );
+}
+
+/// An invoice that names no ledger plans no read.
+#[test]
+fn a_scope_of_no_ledger_is_unplannable() {
+    assert_eq!(
+        scope_of(&book(), &[]).err(),
+        Some(refuse_value(
+            "invoice_ledger_scope_unplannable",
+            "ledger_guid_part_empty"
+        ))
+    );
 }
 
 // ---- The rules, on small synthetic catalogues ----
@@ -317,17 +303,29 @@ fn book() -> StandardLedgerCatalogV2 {
     ])
 }
 
-/// Only the parents of the named ledgers are read, and the ledgers under them
-/// are the count the proof expects: `Other Customer` is read because it shares
-/// the customer's parent; `Cash` is not.
+/// Only the named ledgers are read: `Other Customer` shares the customer's
+/// parent and is not, and the proof expects exactly the three named.
 #[test]
-fn only_the_named_ledgers_parents_are_read() {
+fn only_the_named_ledgers_are_read() {
     let scope = scope_of(&book(), &["Customer", "Sales", "Output CGST"]).unwrap();
+    let request = rendered(&scope);
+    for index in [0, 2, 3] {
+        assert!(
+            request.contains(&format!("$GUID = \"{}\"", guid(index))),
+            "{index}"
+        );
+    }
+    for index in [1, 4] {
+        assert!(!request.contains(&guid(index)), "{index}");
+    }
     assert_eq!(
-        parents_of(&scope),
-        ["Duties & Taxes", "Sales Accounts", "Sundry Debtors"]
+        scope.prove(&[
+            row(0, "Customer", "Sundry Debtors"),
+            row(2, "Sales", "Sales Accounts"),
+            row(3, "Output CGST", "Duties & Taxes"),
+        ]),
+        Ok(())
     );
-    assert_eq!(scope.part().ledger_count(), 4);
     assert_eq!(
         scope.prove(&[
             row(0, "Customer", "Sundry Debtors"),
@@ -335,56 +333,56 @@ fn only_the_named_ledgers_parents_are_read() {
             row(2, "Sales", "Sales Accounts"),
             row(3, "Output CGST", "Duties & Taxes"),
         ]),
-        Ok(())
-    );
-    // A ledger outside the scope in the answer is not part of it.
-    assert_eq!(
-        scope.prove(&[
-            row(0, "Customer", "Sundry Debtors"),
-            row(1, "Other Customer", "Sundry Debtors"),
-            row(2, "Sales", "Sales Accounts"),
-            row(4, "Cash", "Cash-in-Hand"),
-        ]),
         Err(refuse_value(
             "invoice_ledger_rates_rows_differ",
-            "parent_part_row_not_in_catalogue"
+            "ledger_scope_row_count_differs"
         ))
     );
 }
 
-/// The row parser keeps a `PARENT` as the answer wrote it, a trailing space
-/// included, because the catalogue keeps it the same way: trimmed, a padded
-/// row would prove against an unpadded catalogue. A scope never plans such a
-/// parent in the first place. (SYNTHETIC answer: the lab book holds no such
-/// group.)
+/// The plan records each scoped ledger's catalogue parent by GUID, so a ledger
+/// regrouped under the same GUID changes what the plan carries though its
+/// request does not.
+#[test]
+fn a_regrouped_ledger_changes_the_parents_but_not_the_request() {
+    let before = scope_of(&book(), &["Customer", "Sales"]).unwrap();
+    let after = scope_of(
+        &synthetic(&[
+            ("Customer", "BRIDGE Debtors Sub"),
+            ("Other Customer", "Sundry Debtors"),
+            ("Sales", "Sales Accounts"),
+            ("Output CGST", "Duties & Taxes"),
+            ("Cash", "Cash-in-Hand"),
+        ]),
+        &["Customer", "Sales"],
+    )
+    .unwrap();
+    assert_eq!(rendered(&before), rendered(&after));
+    assert_eq!(
+        before.parents(),
+        [
+            (guid(0), "Sundry Debtors".to_string()),
+            (guid(2), "Sales Accounts".to_string())
+        ]
+    );
+    assert_ne!(before.parents(), after.parents());
+}
+
+/// A parent with a space at its end is compared verbatim: the catalogue's
+/// spelling is the one the row must carry.
 #[test]
 fn a_row_parent_with_a_trailing_space_is_read_verbatim() {
-    let answer = format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION>\
-         <LEDGER NAME=\"Sales\"><GUID>{}</GUID><PARENT>Sales Accounts </PARENT>\
-         <BRIDGECOMPANYGUID>{PILOT_GUID}</BRIDGECOMPANYGUID></LEDGER></COLLECTION></DATA></BODY></ENVELOPE>",
-        guid(0)
-    );
-    let (_, rows) = wire::parse_ledger_rates_and_rows(&answer, PILOT_GUID, &["Sales"]).unwrap();
-    assert_eq!(rows, [row(0, "Sales", "Sales Accounts ")]);
-    // A catalogue holding the same padded parent is refused before any request.
+    let scope = scope_of(&synthetic(&[("Sales", "Sales Accounts ")]), &["Sales"]).unwrap();
+    assert_eq!(scope.prove(&[row(0, "Sales", "Sales Accounts ")]), Ok(()));
     assert_eq!(
-        scope_of(&synthetic(&[("Sales", "Sales Accounts ")]), &["Sales"]).err(),
-        Some(refuse_ledger("invoice_ledger_parent_unnameable", "Sales"))
-    );
-    // Against the unpadded catalogue the verbatim row does not prove.
-    let plain = scope_of(&synthetic(&[("Sales", "Sales Accounts")]), &["Sales"]).unwrap();
-    assert_eq!(
-        plain.prove(&rows),
+        scope.prove(&[row(0, "Sales", "Sales Accounts")]),
         Err(refuse_value(
             "invoice_ledger_rates_rows_differ",
-            "parent_part_row_differs_from_catalogue"
+            "ledger_scope_row_differs_from_catalogue"
         ))
     );
 }
 
-/// A name is resolved exactly on the catalogue's row spelling: another case, a
-/// stray space or a ledger the book does not hold is not a ledger of the book.
 #[test]
 fn a_name_is_resolved_exactly() {
     for name in ["customer", "Customer ", "Nobody"] {
@@ -396,103 +394,62 @@ fn a_name_is_resolved_exactly() {
     }
 }
 
-/// A parent that cannot be written inside a filter (a quote ends the literal)
-/// names no read.
+/// A parent a filter literal could not hold (a quote, a space at either end)
+/// was refused while the read named parents. The read now names ledgers by
+/// GUID, so such a parent is only compared, verbatim, against the row.
+/// (SYNTHETIC: the lab book holds no such group.)
 #[test]
-fn a_parent_that_cannot_be_written_in_a_filter_is_refused() {
-    let quoted = synthetic(&[("Sales", "Bad\"Group"), ("Customer", "Sundry Debtors")]);
-    assert_eq!(
-        scope_of(&quoted, &["Sales"]).err(),
-        Some(refuse_ledger("invoice_ledger_parent_unnameable", "Sales"))
-    );
-    // A parent no named ledger is under does not matter.
-    assert!(scope_of(&quoted, &["Customer"]).is_ok());
-}
-
-/// A parent with whitespace at either end is not named: the catalogue keeps it
-/// verbatim, and whether Tally's filter matches such a name was never
-/// measured. Refused with the ledger, not read with a name that may match
-/// nothing. (SYNTHETIC: the lab book holds no such group.)
-#[test]
-fn a_parent_with_whitespace_at_either_end_is_refused() {
-    for parent in [" Sundry Debtors", "Sundry Debtors ", "\u{a0}Sundry Debtors"] {
-        let padded = synthetic(&[("Customer", parent), ("Sales", "Sales Accounts")]);
+fn a_parent_no_filter_could_hold_is_read_and_compared_verbatim() {
+    for parent in ["Bad\"Group", " Sundry Debtors", "\u{a0}Sundry Debtors"] {
+        let scope = scope_of(&synthetic(&[("Customer", parent)]), &["Customer"]).unwrap();
         assert_eq!(
-            scope_of(&padded, &["Customer"]).err(),
-            Some(refuse_ledger(
-                "invoice_ledger_parent_unnameable",
-                "Customer"
-            )),
+            scope.prove(&[row(0, "Customer", parent)]),
+            Ok(()),
             "{parent:?}"
         );
-        assert!(scope_of(&padded, &["Sales"]).is_ok(), "{parent:?}");
+        assert!(!rendered(&scope).contains(parent), "{parent:?}");
     }
 }
 
-/// `$Parent` folds case, so a filter for `Sales Accounts` would also return
-/// the ledgers of a parent spelled `SALES ACCOUNTS`: refused before the read.
-/// Naming both spellings is a scope that expects both.
+/// A ledger whose parent the catalogue cannot carry (here blank) has no
+/// parent the proof could compare its row with, so it names no read.
 #[test]
-fn a_parent_that_differs_only_in_case_from_a_scoped_one_is_refused() {
-    let twins = synthetic(&[
-        ("Sales", "Sales Accounts"),
-        ("Sales Twin", "SALES ACCOUNTS"),
-        ("Customer", "Sundry Debtors"),
-    ]);
+fn a_ledger_whose_parent_the_catalogue_cannot_carry_is_refused() {
+    let catalogue = synthetic(&[("Customer", "   "), ("Sales", "Sales Accounts")]);
     assert_eq!(
-        scope_of(&twins, &["Sales", "Customer"]).err(),
-        Some(refuse_value("invoice_scope_parent_folds", "Sales Accounts"))
-    );
-    assert_eq!(
-        scope_of(&twins, &["Sales Twin", "Customer"]).err(),
-        Some(refuse_value("invoice_scope_parent_folds", "SALES ACCOUNTS"))
-    );
-    let both = scope_of(&twins, &["Sales", "Sales Twin"]).unwrap();
-    assert_eq!(both.part().ledger_count(), 2);
-}
-
-/// More ledgers under the named parents than one read may hold is refused
-/// before any request, under the plan's own cause.
-#[test]
-fn a_scope_too_large_for_one_read_is_refused() {
-    // The rates request asks for GST details, so the bound is the one for a read with them, which
-    // is smaller than the Standard one; a scope sized on the Standard bound would pass here.
-    let limit = crate::tally::connection::parent_partition_limits(
-        crate::tally::connection::ComplianceRead::WithGstDetails,
-    )
-    .max_ledgers_per_part;
-    assert!(
-        limit
-            < crate::tally::connection::parent_partition_limits(
-                crate::tally::connection::ComplianceRead::Standard
-            )
-            .max_ledgers_per_part
-    );
-    let names = (0..=limit)
-        .map(|index| format!("Ledger {index}"))
-        .collect::<Vec<_>>();
-    let rows = names
-        .iter()
-        .map(|name| (name.as_str(), "Sundry Debtors"))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        scope_of(&synthetic(&rows), &["Ledger 0"]).err(),
-        Some(refuse_value(
-            "invoice_ledger_scope_too_large",
-            "parent_over_budget"
+        scope_of(&catalogue, &["Customer", "Sales"]).err(),
+        Some(refuse_ledger(
+            "invoice_ledger_parent_unnameable",
+            "Customer"
         ))
     );
-    // One fewer fits.
-    assert!(scope_of(&synthetic(&rows[1..]), &["Ledger 1"]).is_ok());
+    assert!(scope_of(&catalogue, &["Sales"]).is_ok());
 }
 
-/// Every refusal the scope can make has a next step for the caller.
+/// A GUID with a character outside the closed alphabet never reaches a
+/// request: the ledger is refused before any is made.
+#[test]
+fn a_ledger_whose_guid_is_of_another_form_is_refused() {
+    let catalogue = synthetic_with_guids(&[
+        (
+            "Customer",
+            "Sundry Debtors",
+            format!("{PILOT_GUID}-0000000z"),
+        ),
+        ("Sales", "Sales Accounts", guid(1)),
+    ]);
+    assert_eq!(
+        scope_of(&catalogue, &["Customer", "Sales"]).err(),
+        Some(refuse_ledger("invoice_ledger_guid_unnameable", "Customer"))
+    );
+    assert!(scope_of(&catalogue, &["Sales"]).is_ok());
+}
+
 #[test]
 fn every_refusal_of_a_scope_has_a_next_step() {
     for code in [
         "invoice_ledger_parent_unnameable",
-        "invoice_scope_parent_folds",
-        "invoice_ledger_scope_too_large",
+        "invoice_ledger_guid_unnameable",
         "invoice_ledger_scope_unplannable",
         "invoice_ledger_rates_rows_differ",
     ] {

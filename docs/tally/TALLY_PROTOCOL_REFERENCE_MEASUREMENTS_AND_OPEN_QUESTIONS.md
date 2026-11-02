@@ -1816,6 +1816,17 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **What Bridge does with it.** `stock_by_godown` reads the plain Godown Summary for godown totals and returns them only when they tie to the plain Stock Summary; it reads a value per item per godown only from the exploded Stock Summary's `SSGODOWN` lines, only for an item whose godown values and quantities add up to its own line, and only where the plain report shows that line with the same value. The exploded Godown Summary is never read.
 - **Not measured:** a batch-wise item under the root (every `SSBATCH` was empty), a value per godown for an item inside a stock group over the gateway, a costing method other than the average cost these items used, a compound unit, a godown two levels down, a godown with no stock, an item whose godown values do not add up, another book or release, TallyPrime 7.1 for the Godown Summary, and whether Tally ever writes `SSBATCHNAME` lines after a stock group's line: Bridge's check against the plain report matches a line by name and value only, so such a group would pass as an item under the root.
 
+### 12a.25 A cash ledger's day-end balance (PARTIAL)
+
+**Measured:** one synthetic book of ten vouchers on two cash ledgers and one bank ledger, TallyPrime 7.2 Silver, one sitting. `crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/` holds the voucher window and the Trial Balance to each of eleven dates in April.
+
+- **The Trial Balance gives the day-end (verified).** `TBALCLOSING` at each date equals opening plus the vouchers to that date, and it signs a debit negative, so a credit balance at a day's end reads positive (300.00 for 300.00 Cr).
+- **An optional voucher and a cancelled one leave the balance alone (verified).** The window still lists both, flagged. A cancelled voucher's one entry list holds no ledger or amount.
+- **A post-dated voucher counts at a later date whatever the current date (verified, one voucher).** With the current date at 12 April, a Payment post-dated 25 April is in the closing at 25 and at 30 April, and the window lists it on its own date. Whether the date during keying affects the flag was not tested.
+- **The book's last entry date leaves that voucher out (verified, one voucher).** It read 11 April, so it cannot end a read meant to reach every dated voucher.
+- **Not measured:** a Trial Balance whose `from` is not the first day of the books, the Movement read on this book, and any of this on a book of real size.
+- **What Bridge does with it.** A deposit from the cash box builds only if the ledger's opening and vouchers reach Tally's own closing, so the vouchers read must be the ones Tally counts. The window runs from the first deposit to the 31 March on or after the later of the last deposit and the last entry.
+
 ## 13. Open questions
 
 | Question | Why it matters |

@@ -472,9 +472,11 @@ go, and what an uninstall or reset really removes.
   bill-wise ledgers you approved to receive entries On Account (with the
   64-character fingerprint your approval matched when the batch was built, a
   short code made from that party's rows, the batch and the company; it is kept as a record
-  and is not checked again when the batch is posted). These records hold ledger
-  names and fingerprints, and no new amounts, PAN, bank account numbers or
-  contact details. It also holds the proof-of-post files that hold what Tally
+  and is not checked again when the batch is posted). A batch with a deposit
+  from the cash box also holds the cash ledgers' names, the dates read and a
+  64-character fingerprint of their day-end balances, which the post compares
+  with a fresh read. These records hold ledger names and fingerprints, and no
+  new amounts, PAN, bank account numbers or contact details. It also holds the proof-of-post files that hold what Tally
   read back, and a short note when an approval you gave was dropped without
   being used.
 - **Bank-statement proposals** (`bank-statements/`): every row of a statement

@@ -2433,10 +2433,11 @@ fn the_checks_against_the_batch_line() {
 // ---- the journal record ------------------------------------------------------------
 
 #[test]
-fn the_binding_is_written_as_ledger_identities_3_only() {
+fn the_binding_is_written_as_ledger_identities_4_only() {
     let line = build(1).voucher(payment(&st(1), "1.00")).line();
     let written = serde_json::to_value(&line).unwrap();
-    assert!(written.get("ledger_identities_3").is_some(), "{written}");
+    assert!(written.get("ledger_identities_4").is_some(), "{written}");
+    assert!(written.get("ledger_identities_3").is_none(), "{written}");
     assert!(written.get("ledger_identities_2").is_none(), "{written}");
     assert!(written.get("ledger_identities").is_none(), "{written}");
     assert!(written.get("statement").is_none(), "{written}");
@@ -2447,12 +2448,16 @@ fn the_binding_is_written_as_ledger_identities_3_only() {
 #[test]
 fn a_binding_written_under_an_earlier_name_is_still_read() {
     let line = build(1).voucher(payment(&st(1), "1.00")).line();
-    for earlier in ["ledger_identities_2", "ledger_identities"] {
+    for earlier in [
+        "ledger_identities_3",
+        "ledger_identities_2",
+        "ledger_identities",
+    ] {
         let mut value = serde_json::to_value(&line).unwrap();
         let binding = value
             .as_object_mut()
             .unwrap()
-            .remove("ledger_identities_3")
+            .remove("ledger_identities_4")
             .unwrap();
         value[earlier] = binding;
         let reread: ImportLedgerLine = serde_json::from_value(value).unwrap();

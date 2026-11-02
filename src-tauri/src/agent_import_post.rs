@@ -1062,6 +1062,17 @@ impl Server {
                     cash_in_hand_refused = Some(refused);
                     return Err("cash_ledger_not_cash_in_hand".to_string().into());
                 }
+                // The book the deposit was projected on must still be the book
+                // (#1761); the queue's aim holds it from here to the send.
+                if let Some(record) = &line.cash_projection {
+                    let evidence =
+                        Box::pin(self.cash_book_unmoved(&identity, &company.name, record))
+                            .await
+                            .map_err(|failure| {
+                                ToolFailure::from(failure).with_prior_evidence(accumulated.clone())
+                            })?;
+                    accumulated = combine_evidence(accumulated.clone(), evidence);
+                }
                 Some(
                     crate::tally::agent_read_request::AgentReadRequest::parse(
                         native_group_snapshot_read(&company.name).into_xml(),

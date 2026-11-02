@@ -260,7 +260,7 @@ pub(super) struct DigestContext<'a> {
     pub(super) batch_content: [u8; 32],
 }
 
-fn hex(bytes: &[u8]) -> String {
+pub(super) fn hex(bytes: &[u8]) -> String {
     use std::fmt::Write as _;
     bytes.iter().fold(String::new(), |mut text, byte| {
         let _ = write!(text, "{byte:02x}");

@@ -483,6 +483,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
     let initial = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -609,6 +610,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -747,6 +749,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -853,6 +856,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -945,6 +949,7 @@ fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1123,6 +1128,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1161,6 +1167,7 @@ fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1386,6 +1393,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1482,6 +1490,7 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1556,6 +1565,7 @@ fn content_only_box(cancelled: bool, optional: bool) -> String {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1650,6 +1660,7 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1717,6 +1728,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
     let mut line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1791,6 +1803,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1861,6 +1874,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -1925,6 +1939,7 @@ fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -3954,6 +3969,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,
@@ -5474,6 +5490,7 @@ fn divergent_verification() -> Value {
     let line = ImportLedgerLine {
         ledger_identities: None,
         cash_in_hand_ledgers: Some(Vec::new()),
+        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,

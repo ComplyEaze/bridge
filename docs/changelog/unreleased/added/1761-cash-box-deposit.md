@@ -1,0 +1,1 @@
+- A cash deposit answered `own_cash_box` now builds a Contra out of the named cash ledger. The build reads that ledger's day-end balances to the end of the year and refuses the deposit if any later day would go below zero, says separately when the book is already below zero, and a post refuses if the cash book has changed since the build (#1761).

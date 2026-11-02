@@ -682,6 +682,9 @@ pub(super) struct AnsweredCashLedger {
     pub(super) bridge_txn_id: String,
     pub(super) ledger: String,
     pub(super) cash_in_hand: bool,
+    /// The voucher takes this cash out of the ledger, a deposit from the cash
+    /// box: it builds only on a cash-book projection (#1761).
+    pub(super) cash_out: bool,
 }
 
 /// `build_import_xml`'s arguments, and what the proposals file requires of the
@@ -841,12 +844,11 @@ pub(super) struct StatementLedgers {
 fn answered_entry(answer: CashAnswer) -> Option<(&'static str, &'static str)> {
     match answer {
         CashAnswer::BusinessCash => Some(("Contra", "Dr")),
+        // A deposit: the cash leaves the named ledger, so its leg is the credit.
+        CashAnswer::OwnCashBox => Some(("Contra", "Cr")),
         CashAnswer::OwnerUse => Some(("Payment", "Dr")),
         CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => Some(("Receipt", "Cr")),
-        CashAnswer::PaidToSomeone
-        | CashAnswer::OwnCashBox
-        | CashAnswer::UnbookedCashSales
-        | CashAnswer::DontKnow => None,
+        CashAnswer::PaidToSomeone | CashAnswer::UnbookedCashSales | CashAnswer::DontKnow => None,
     }
 }
 
@@ -1024,6 +1026,7 @@ pub(super) fn resolve_import_arguments(
                 .to_string(),
             ledger: record["ledger"].as_str().unwrap_or_default().to_string(),
             cash_in_hand: answer.names_cash_in_hand(),
+            cash_out: answer == CashAnswer::OwnCashBox,
         };
         let built = vouchers.as_array().is_some_and(|vouchers| {
             vouchers.iter().any(|voucher| {

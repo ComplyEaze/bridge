@@ -438,6 +438,52 @@ impl Server {
     /// what the two snapshot reads compare — and the pre-flight comes back
     /// beside it, with the ranges read so the closing read can replay them and
     /// be comparable part for part.
+    /// Each day's net movement on `ledger` over a window, a debit positive, read
+    /// once. The caller ties the sum to Tally's own closing, which a read that left
+    /// a voucher out cannot pass (#1761).
+    pub(super) async fn read_ledger_day_moves(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        company: &str,
+        ledger: &str,
+        window: (bridge_tally_core::TallyDate, bridge_tally_core::TallyDate),
+    ) -> Result<(BTreeMap<String, bridge_tally_core::ExactDecimal>, Evidence), ToolFailure> {
+        let plan = || WindowPlanSource::Estimate { known_marks: None };
+        let scope_name = scope_name_of(ledger).ok();
+        let scope = scope_name
+            .as_ref()
+            .map_or(WindowScope::Book, WindowScope::Ledger);
+        let mut attempt = None;
+        let read = match self
+            .read_movement_vouchers(identity, company, scope, window.clone(), plan(), None)
+            .await
+        {
+            Err(failure)
+                if matches!(scope, WindowScope::Ledger(_))
+                    && WholeBookReason::of_failure(&failure).is_some() =>
+            {
+                attempt = failure.evidence.map(|evidence| *evidence);
+                self.read_movement_vouchers(
+                    identity,
+                    company,
+                    WindowScope::Book,
+                    window,
+                    plan(),
+                    None,
+                )
+                .await?
+            }
+            read => read?,
+        };
+        let moves = day_moves_of(&read.page.rows, ledger)?;
+        let evidence = [attempt, read.preflight, Some(read.evidence), read.closing]
+            .into_iter()
+            .flatten()
+            .reduce(combine_evidence)
+            .expect("the data evidence is present");
+        Ok((moves, evidence))
+    }
+
     async fn read_movement_vouchers(
         &self,
         identity: &VerifiedCompanyIdentity,
@@ -630,6 +676,37 @@ fn parse_movement_polarity<'de, D: serde::Deserializer<'de>>(
 ) -> Result<bool, D::Error> {
     let value = <String as serde::Deserialize>::deserialize(deserializer)?;
     required_tally_bool(Some(&value)).map_err(serde::de::Error::custom)
+}
+
+/// Each day's net movement on `ledger` in `vouchers`, a debit positive.
+pub(super) fn day_moves_of(
+    vouchers: &[MovementVoucher],
+    ledger: &str,
+) -> Result<BTreeMap<String, bridge_tally_core::ExactDecimal>, String> {
+    let invalid = |_| "voucher_amount_invalid".to_string();
+    let mut moves = BTreeMap::<String, bridge_tally_core::ExactDecimal>::new();
+    for voucher in vouchers {
+        for entry in voucher
+            .ledger_entries
+            .iter()
+            .filter(|entry| entry.ledger_name == ledger)
+        {
+            let amount =
+                bridge_tally_core::ExactDecimal::parse(entry.amount.clone()).map_err(invalid)?;
+            let (is_debit, magnitude) = movement_entry_effect(&amount, entry.is_deemed_positive);
+            let magnitude = bridge_tally_core::ExactDecimal::parse(magnitude).map_err(invalid)?;
+            let day = moves
+                .entry(voucher.date.clone())
+                .or_insert_with(bridge_tally_core::ExactDecimal::zero);
+            *day = if is_debit {
+                day.checked_add(&magnitude)
+            } else {
+                day.checked_subtract(&magnitude)
+            }
+            .map_err(invalid)?;
+        }
+    }
+    Ok(moves)
 }
 
 #[cfg(test)]

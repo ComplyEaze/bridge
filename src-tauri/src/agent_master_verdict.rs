@@ -120,9 +120,10 @@ pub(super) struct ReadBack {
 }
 
 /// Whether the order Tally serves requests in, which both absent states rest
-/// on, was measured on the Tally a read-back went to. It was measured only on
-/// TallyPrime 7.2 Silver, licensed (the abandoned-create rows and the order
-/// rows of #1713): the product must be exactly `TallyPrime`, since another
+/// on, was measured on the Tally a read-back went to. It was measured on
+/// TallyPrime 7.2, licensed (the abandoned-create rows and the order rows of
+/// #1713, on Silver; Gold is the same product with multi-user access, so the
+/// edition is no bound): the product must be exactly `TallyPrime`, since another
 /// product of the same release and tier can open the same data folder. Built
 /// only from what the read's identity brackets saw, so no caller can claim a
 /// measured Tally it did not read.
@@ -135,7 +136,6 @@ pub(super) enum OrderCoverage {
 
 impl OrderCoverage {
     pub(super) fn of(tally: &crate::tally::ObservedTally) -> Self {
-        use bridge_tally_core::LicenseTier;
         if tally.education {
             return Self::NotMeasured("absent_not_measured_in_education");
         }
@@ -144,11 +144,8 @@ impl OrderCoverage {
             return Self::NotMeasured("absent_not_measured_on_this_product");
         }
         match (product, tally.release.as_deref(), tally.license_tier) {
-            (Some("TallyPrime"), Some("7.2"), Some(LicenseTier::Silver)) => Self::Measured,
-            (_, _, Some(LicenseTier::Gold)) => Self::NotMeasured("absent_not_measured_on_gold"),
-            (Some(_), Some(_), Some(LicenseTier::Silver)) => {
-                Self::NotMeasured("absent_not_measured_on_this_release")
-            }
+            (Some("TallyPrime"), Some("7.2"), Some(_)) => Self::Measured,
+            (Some(_), Some(_), Some(_)) => Self::NotMeasured("absent_not_measured_on_this_release"),
             _ => Self::NotMeasured("absent_tally_release_not_known"),
         }
     }
@@ -689,12 +686,13 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     };
 
     // 3. Another loaded company's master mark moved. This verdict releases the
-    // name too, so with Tally's answer lost, when a create may still be
-    // waiting, it needs the same measured order as the absent states; elsewhere
-    // the batch stays open with the reason.
+    // name too, so with the name absent and Tally's answer lost, when a create
+    // may still be waiting, it needs the same measured order as the absent
+    // states; elsewhere the batch stays open with the reason. With the name in
+    // the book the book itself refuses a new create, as at steps 2 and 6.
     if others_moved {
         reasons.push("other_company_mark_moved");
-        if let Some(uncovered) = uncovered.filter(|_| !facts.answer_held) {
+        if let Some(uncovered) = uncovered.filter(|_| name_absent && !facts.answer_held) {
             reasons.push(uncovered);
             return Judgement {
                 state: MasterVerdictState::ReconciliationRequired,

@@ -1697,7 +1697,7 @@ fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
         "When the check before the dialog finds a send of this batch recorded since the call began by another call, and when a held-name refusal finds it in the journal read that follows, the answer is import_already_attempted with error.hold send_of_this_batch_recorded_since",
         "The check under the journal's lock answers the same code without the hold field, as an outcome that may have been sent",
         // A company whose set of loaded companies changed is read and judged.
-        "A book whose set of loaded companies changed is read and judged: the answer is reconciliation_required with company_scope_changed among its reasons, and it says to load the same companies and call again; a read that shows a changed existing master or another company's mark moved keeps the state for that.",
+        "A book whose set of loaded companies changed is read and judged: the answer is reconciliation_required with company_scope_changed among its reasons, and it says to load the same companies and call again; a read that shows a changed existing master or another company's mark moved keeps the state for that, unless the limit above holds the batch open.",
         // What posted_verified checks.
         "bill-wise is not read back",
         "no ledger or group that existed before changed",

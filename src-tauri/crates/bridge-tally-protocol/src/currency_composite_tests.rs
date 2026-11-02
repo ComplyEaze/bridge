@@ -778,7 +778,8 @@ fn the_shapes_the_unspaced_check_admits_without_a_capture_are_pinned() {
 #[test]
 fn the_composite_parse_reads_the_unspaced_layout_and_its_decimal_rate() {
     let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");
-    let parsed = parse_currency_composite("-$100.00 @ \u{20b9} 86.4125/$ = -\u{20b9} 8641.25", &base);
+    let parsed =
+        parse_currency_composite("-$100.00 @ \u{20b9} 86.4125/$ = -\u{20b9} 8641.25", &base);
     let Ok(CurrencyComposite::Valued(composite)) = parsed else {
         panic!("{parsed:?}");
     };
@@ -793,13 +794,35 @@ fn the_composite_parse_reads_the_unspaced_layout_and_its_decimal_rate() {
 fn the_composite_parse_applies_its_refusals_to_the_unspaced_layout() {
     let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");
     for (text, refusal) in [
-        ("$100.00 @ I\u{20b9} 87/$ = I\u{20b9} 8700.00", CompositeRefusal::BaseNotBookBase),
-        ("$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00", CompositeRefusal::SignsDisagree),
-        ("$100.00 @ \u{20b9} 87.12345/$ = \u{20b9} 8712.34", CompositeRefusal::RatePrecision),
-        ("$0100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00", CompositeRefusal::LeadingZero),
-        ("$100.00 @ \u{20b9} /$ = \u{20b9} 8700.00", CompositeRefusal::EmptyRateWithValue),
-        ("$100.00 @ \u{20b9} 87/$  = \u{20b9} 8700.00", CompositeRefusal::NotComposite),
+        (
+            "$100.00 @ I\u{20b9} 87/$ = I\u{20b9} 8700.00",
+            CompositeRefusal::BaseNotBookBase,
+        ),
+        (
+            "$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+            CompositeRefusal::SignsDisagree,
+        ),
+        (
+            "$100.00 @ \u{20b9} 87.12345/$ = \u{20b9} 8712.34",
+            CompositeRefusal::RatePrecision,
+        ),
+        (
+            "$0100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00",
+            CompositeRefusal::LeadingZero,
+        ),
+        (
+            "$100.00 @ \u{20b9} /$ = \u{20b9} 8700.00",
+            CompositeRefusal::EmptyRateWithValue,
+        ),
+        (
+            "$100.00 @ \u{20b9} 87/$  = \u{20b9} 8700.00",
+            CompositeRefusal::NotComposite,
+        ),
     ] {
-        assert_eq!(parse_currency_composite(text, &base), Err(refusal), "{text}");
+        assert_eq!(
+            parse_currency_composite(text, &base),
+            Err(refusal),
+            "{text}"
+        );
     }
 }

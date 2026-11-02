@@ -1,3 +1,10 @@
 docs/tally/TALLY_PROTOCOL_REFERENCE.md
 docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_read_profiles.rs
+src-tauri/src/agent_voucher_parse.rs
+src-tauri/src/agent_voucher_parse_tests.rs
+src-tauri/src/agent_voucher_scalars.rs
+src-tauri/src/agent_voucher_window.rs
+src-tauri/src/agent_vouchers.rs
 reviewer: lamemustafa

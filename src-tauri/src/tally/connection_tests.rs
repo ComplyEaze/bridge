@@ -1883,7 +1883,7 @@ fn every_failure_of_a_mailing_post_is_decided_by_its_transport_error() {
             F::ResponseTooLarge {
                 declared_by_peer: true,
             },
-            D::Retry,
+            D::ContinueOnceDrained,
         ),
         (T::ResponseTruncated, F::Truncated, D::ContinueOnceDrained),
         (T::ResponseReadFailed, F::ReadFailed, D::ContinueOnceDrained),
@@ -1900,7 +1900,11 @@ fn every_failure_of_a_mailing_post_is_decided_by_its_transport_error() {
             F::Undecodable,
             D::ContinueOnceDrained,
         ),
-        (T::HttpStatus { status: 503 }, F::HttpStatus, D::Continue),
+        (
+            T::HttpStatus { status: 503 },
+            F::HttpStatus,
+            D::ContinueOnceDrained,
+        ),
         (
             T::EndpointInvalid {
                 code: "endpoint_host_not_loopback",
@@ -2001,13 +2005,13 @@ fn the_export_refuses_only_where_tally_may_still_be_working_on_its_mailing_read(
             F::ResponseTooLarge {
                 declared_by_peer: true,
             },
-            D::Retry,
+            D::ContinueOnceDrained,
         ),
         (F::Truncated, D::ContinueOnceDrained),
         (F::ReadFailed, D::ContinueOnceDrained),
         (F::NoAnswer, D::ContinueOnceDrained),
         (F::Undecodable, D::ContinueOnceDrained),
-        (F::HttpStatus, D::Continue),
+        (F::HttpStatus, D::ContinueOnceDrained),
         (F::NotSent, D::Continue),
         (F::AnswersDiffered, D::Continue),
         (F::TallyFailed, D::Continue),

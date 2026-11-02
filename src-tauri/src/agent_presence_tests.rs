@@ -803,9 +803,10 @@ fn presence_plans() -> Vec<ScenarioPlan> {
 /// The voucher high-water mark the pre-flight volume bound reads before the
 /// window (protocol reference §11c). Small enough that the window is read
 /// whole after its census, in the synthetic shape the import tests already
-/// replay.
+/// replay, and no lower than the window's AlterIDs (12 and 13): the census is
+/// spanned to the mark (#2145).
 fn high_water_xml() -> String {
-    format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
+    format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>13</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
 }
 
 /// `presence_plans` on a book whose voucher mark needs a census (#985): the
@@ -816,7 +817,7 @@ fn counted_presence_plans() -> Vec<ScenarioPlan> {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(
-        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>100</ALTVCHID>"),
+        &high_water_xml().replace("<ALTVCHID>13</ALTVCHID>", "<ALTVCHID>100</ALTVCHID>"),
     ));
     steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&window_xml()));
@@ -918,7 +919,7 @@ async fn an_uncounted_nonempty_window_issues_no_absent() {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(
-        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>0</ALTVCHID>"),
+        &high_water_xml().replace("<ALTVCHID>13</ALTVCHID>", "<ALTVCHID>0</ALTVCHID>"),
     ));
     steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&catalogue));
@@ -2605,7 +2606,7 @@ async fn a_company_that_never_held_a_voucher_still_has_its_numbering_checked() {
     // No ALTVCHID: the book has never held a voucher. The numbering check needs
     // only the master axis, so it runs and refuses on the book's own reading,
     // not on the empty book (the build path refuses that book on purpose).
-    let no_voucher_axis = high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "");
+    let no_voucher_axis = high_water_xml().replace("<ALTVCHID>13</ALTVCHID>", "");
     let plans = splice_numbering(
         presence_plans(),
         agent_import::numbering_fixtures::numbering_answers(CAPTURED_GUID, &[]),

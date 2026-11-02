@@ -1889,6 +1889,140 @@ async fn a_batch_recorded_before_its_cash_in_hand_ledgers_is_refused_before_any_
     assert!(observed.is_empty(), "{response}");
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, a post is refused before any dialog or Tally request, and nothing
+/// is recorded.
+#[tokio::test]
+async fn a_post_beside_a_second_journal_is_refused_before_any_request() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (_, args) = saved_bank_batch(&server, contra());
+    std::fs::write(
+        at.copy.join("agent-import-ledger.jsonl"),
+        crate::agent::agent_import::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let before = journal(&at.data);
+    let scripted = ScriptedApproval::approving();
+    let response = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{response}");
+    assert_eq!(
+        result["error"]["cause"],
+        SplitJournal::OtherHoldsBatches.cause(),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert!(observed.is_empty(), "{response}");
+    assert_eq!(journal(&at.data), before);
+}
+
+/// #2233: a second journal made in a Store package's copy of the data folder
+/// while the dialog stands open is found again under the admission lock: the
+/// post is refused by its own under-lock variant before its intent, and the
+/// POST is never sent.
+#[tokio::test]
+async fn a_second_journal_made_while_the_dialog_is_open_is_refused_under_the_lock() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (line, args) = saved_batch(&server);
+    let other = at.copy.join("agent-import-ledger.jsonl");
+    let scripted = ScriptedApproval::approving_after(move || {
+        std::fs::write(
+            &other,
+            crate::agent::agent_import::local_data::tests::journal(true),
+        )
+        .unwrap();
+    });
+    let response = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        )
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    let refusal = UnderLockRefusal::JournalSplit(SplitJournal::OtherHoldsBatches.cause());
+    assert_eq!(
+        scripted.previews().len(),
+        1,
+        "the dialog was shown: {response}"
+    );
+    assert_eq!(result["error"]["code"], refusal.code(), "{response}");
+    assert_eq!(refusal.code(), IMPORT_JOURNAL_SPLIT);
+    assert_eq!(
+        result["error"]["cause"],
+        SplitJournal::OtherHoldsBatches.cause(),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert_eq!(observed, post_at, "the POST is never sent: {response}");
+    let intents = String::from_utf8(journal(&at.data))
+        .unwrap()
+        .lines()
+        .map(|record| serde_json::from_str::<Value>(record).unwrap())
+        .filter(|record| {
+            record["record_type"] == "dispatch_intent"
+                && record["batch_id"] == line.batch_id.as_str()
+        })
+        .count();
+    assert_eq!(intents, 0, "no intent from this post: {response}");
+}
+
+/// #2233: a batch already dispatched still reconciles beside a second journal:
+/// `post_import` on it goes to the readback before the split-journal check,
+/// since a sent batch is reconciled, never refused into a rebuild.
+#[tokio::test]
+async fn a_dispatched_batch_beside_a_second_journal_still_reconciles() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (line, args) = saved_batch(&server);
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
+                &line, &native, None,
+            ))
+            .unwrap();
+    }
+    std::fs::write(
+        at.copy.join("agent-import-ledger.jsonl"),
+        crate::agent::agent_import::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let response = LOCAL_APP_DATA
+        .scope(at.local.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_ne!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{response}");
+    assert_ne!(result["attempt_recorded"], json!(false), "{response}");
+    assert!(observed > 0, "the readback reads Tally: {response}");
+}
+
 /// #1234: a batch saved before the build recorded its bill-wise approvals is
 /// refused before any Tally request and must be rebuilt, as above.
 #[tokio::test]

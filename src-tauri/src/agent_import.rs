@@ -64,6 +64,8 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
+#[path = "agent_import_split_journal.rs"]
+mod split_journal;
 // The master write journal. The read-back piece, which follows the tools,
 // reads the parts of it the tools do not yet (the sidecar read, the verdict).
 #[cfg_attr(not(test), allow(dead_code))]
@@ -1270,6 +1272,11 @@ impl Server {
             // Admit the journal before publication; labels in older batches do not
             // collide with this build's independently generated wire identities.
             self.import_snapshot_while_admitted(None)?;
+            // No batch is written to a journal that cannot see a second one a
+            // Store package's copy of the data folder keeps (#2233).
+            split_journal::admit(&self.settings.data_dir).map_err(|split| {
+                ToolFailure::from(split).with_prior_evidence(accumulated.clone())
+            })?;
             // The admission above read the stop before this lock; a post may
             // have gone out since. No file is written for a stopped company.
             if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())

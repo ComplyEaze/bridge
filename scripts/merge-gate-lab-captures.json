@@ -3392,6 +3392,446 @@
       "size": 848
     },
     {
+      "blob": "e6543ce16676f7eb004f2b61c8b3175b542d7341",
+      "capture_id": "cat.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/cat.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "119f80c0314cb876eb81f7dbed081b3df3ed68767e9af45fa259102437b118fc",
+      "size": 2112
+    },
+    {
+      "blob": "712186b1b18c3d92fbbb0cbd00799dbaa7bee51a",
+      "capture_id": "cat1.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/cat1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "fdc7c83e372956ea9ee7b49a496e24e397de006c9efd6a83b2c351165291f644",
+      "size": 7840
+    },
+    {
+      "blob": "b4a8ac1f1ee62c4afdc9c928c4f7a082314cac8b",
+      "capture_id": "cat2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/cat2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a64e215c34c3524bb7f002b208692e5325f1bf97df5baddf9e8e1757e15e25b6",
+      "size": 9048
+    },
+    {
+      "blob": "60962460268c135642aec33bf27b5d7f27fc480d",
+      "capture_id": "d12-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "997f0bf0eab2e6419ee82d18c755dda61a6af7be2f3f6ef39f6968941073ab66",
+      "size": 1442
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d12-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "9db668b73d7989fa0b33cecb30602a837457be68",
+      "capture_id": "d12-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d18374387f9beba58c1f152f2bf0b5544c1c672f8193b646f1f1554ffb37529c",
+      "size": 1746
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d12-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "3874e738669b7cc628145a3683689c65d4e214de",
+      "capture_id": "d13-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d15d482a0adeaf351867814b6998fef12d6c952afb79d3506784a9d7a7acd599",
+      "size": 1442
+    },
+    {
+      "blob": "24dc42d6654da8429300ac8a27af338f2f01ee0f",
+      "capture_id": "d13-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7d01c9c9c0fb897776d61271d7599e8d620f64009ed186fb6c45036ae38fb2e4",
+      "size": 5436
+    },
+    {
+      "blob": "1a67e3c7b6422c17aff8a21efd72a9351f3fdd9b",
+      "capture_id": "d13-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a35da16465294dac62a3e660137c2645ab5bd926f3540cf21ec6d003a9a1257c",
+      "size": 1746
+    },
+    {
+      "blob": "7f5512aecac3e80b52e35c26a61e00e113f3dc8c",
+      "capture_id": "d13-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "77e8ab25a9e64f4e8a30e9b0bfd6c5841fd1c1cc9d059761076c6e33e0ecf509",
+      "size": 38972
+    },
+    {
+      "blob": "6489733f8c1dbb301cbb73ba9aa14e51b1102e79",
+      "capture_id": "d14-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "687cc6d94436d411b34d7e16a113324f2fa6bc33910fa9382ef89215ef862d47",
+      "size": 1442
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d14-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "a0208952b1373d1708fef31a981780e8b228c283",
+      "capture_id": "d14-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ad95846de1c44862d7f56085253a8b2f43127ba9652b252d563886a1018c7aa0",
+      "size": 1746
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d14-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "6ca0fdcdf53eb36ef94599de6e6284170bc68fd7",
+      "capture_id": "d19-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2fe068771b7452976367b80638b9f30fa7caf6adc1465bcccbe8487b58119226",
+      "size": 1442
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d19-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "feaeef4ff3fc3a5ac147722edc39b2d9a9eec6e1",
+      "capture_id": "d19-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "105459be08e733bbcb56f44625d51d33772f734d2be72ddd35bef85941804798",
+      "size": 1746
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d19-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "025a3ebef90b9f6f2e0b694cafc32406c8b9cc6f",
+      "capture_id": "d20-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4804c672cc04e27b237539d814622a27d025049be3fd73ed925c62b1260b9ed4",
+      "size": 1442
+    },
+    {
+      "blob": "8d9ac68b8e1d73ad774eb1823f1fea86803d0414",
+      "capture_id": "d20-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "22d8ce8b2719925b760b15b2f4a6c99d37d330cec87e48a03b4e6672f8f77b0f",
+      "size": 5436
+    },
+    {
+      "blob": "96321e035d448407754277374133702f9ff652ea",
+      "capture_id": "d20-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "002a99ade98e8a2828945a1c3521c0b51b26cdd65c6ea10d8f9866f441acf7e8",
+      "size": 1746
+    },
+    {
+      "blob": "cba810c5db6e2f354060ff777981cbc0d2693207",
+      "capture_id": "d20-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c09457d783e24ecc2350760c6b0c3cc3216451a4740deaf44d8b5be324dbc896",
+      "size": 38972
+    },
+    {
+      "blob": "6eb44ce4d2666567311259cd2c71d96453c31de9",
+      "capture_id": "d21-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "e4703c9b7398caef90cb546058d3bb345229f8e331fea606115d02352a6a224b",
+      "size": 1442
+    },
+    {
+      "blob": "99124b18a87121288c6c56d0477a2e7f0de4ec44",
+      "capture_id": "d21-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "54f6975fc0b4bb68d68164b11c78f0e06368b6020c90714d298687cb74c9fcf5",
+      "size": 5438
+    },
+    {
+      "blob": "d709d9736451742429a49252fa0396493fe98b6e",
+      "capture_id": "d21-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "84a7fe5933e9fa2c085d50e3c46329a770fe33851bd49e2942fdb64ba3785fc4",
+      "size": 1746
+    },
+    {
+      "blob": "cffe7116dbeaf53500132ac686f22124d96453fb",
+      "capture_id": "d21-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "61c9eed7bb078ff1c50a388af4a6715164898c6bf620557d7bee4a3b6325fd59",
+      "size": 44674
+    },
+    {
+      "blob": "f3a7253b34a8d34c03dcd645ae12a06394764fed",
+      "capture_id": "d26-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "78baa7f645f48dbf6a8cf8b22cc22b2ef129f1592f88865b0ab1a4e089ff5041",
+      "size": 1442
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d26-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "9732657c123094a7f81719584e236e53c15846b1",
+      "capture_id": "d26-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "eb53fcf7a537dc8c3e45cc1f7913c7d9b54909912e4ce4e35c1e575983089ef5",
+      "size": 1746
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d26-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "827fbfe65df45e36656b39b8bd4ee4f88a6729f6",
+      "capture_id": "d27-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "fa27e79ec16606ace41ef68c7870ac96c3c55a602f47790fb8a6efa80f0c7837",
+      "size": 1442
+    },
+    {
+      "blob": "461a2e5a9ad2816ebe06b300706c8e02140af268",
+      "capture_id": "d27-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "bd0fbe460173d5c450247326804c5a73098cf47fb771dce46a6324027c50829f",
+      "size": 5440
+    },
+    {
+      "blob": "c1996b3d756671f5a47ba06441941ccc5b9e4cf8",
+      "capture_id": "d27-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4dc933c0eb9290d2bd4509f0ac5727db53260369f6b0de453543d6f3c79fe498",
+      "size": 1746
+    },
+    {
+      "blob": "d9778e074174b1fd0931c94100669d9251eb0ef3",
+      "capture_id": "d27-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c0e2f79688ce370e8bfdd3c1d4630e8a945ddefcfb66c927ff686aaafe615fb5",
+      "size": 39048
+    },
+    {
+      "blob": "23bc51a00a7db2fa9116485017c863d7f7bc7bec",
+      "capture_id": "d28-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c372707bf6086a27df95905e03b74fef7edcbf2fcb250f2f71eb2a5a846bd8e8",
+      "size": 1442
+    },
+    {
+      "blob": "f852dedec1315b575d0ca2b185a14fdf34b960b4",
+      "capture_id": "d28-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1a58d520cf93c91f1da9e4288736104029d0f50188738e64a58153d34193b4e2",
+      "size": 5442
+    },
+    {
+      "blob": "8e22c61397de887be3e9f9217d16a32fac173e24",
+      "capture_id": "d28-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "9c9f23809f0a0df708efbb859b719faad3914ad1093c00245ab9b91b97a930b9",
+      "size": 1746
+    },
+    {
+      "blob": "07dd75d5cb45abe8cd9801b11df34e15a80512e7",
+      "capture_id": "d28-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "26754f6310ecdd13fcde3c45775e0d61859d3bfc334c0cc3aabecac56109d02e",
+      "size": 39058
+    },
+    {
+      "blob": "7db785d72b7839067741de5ac90d415f9f2208c4",
+      "capture_id": "d29-c.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-c.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ecd9d4e859f9e7f671ffbc5d91396178639fc36152d005b9c8c3d94b3946b22b",
+      "size": 1442
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d29-c.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-c.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "3d8a55cf8e640bb1c8334bc0a3e23b3138f63f0b",
+      "capture_id": "d29-v.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-v.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8c3d52138d07dfa7d8a7f54852e89bd4ea5eb8e4d0b434cdde83cd3411ff07a0",
+      "size": 1746
+    },
+    {
+      "blob": "d87bc237bcba87299739f1722bf6a9b49a82a689",
+      "capture_id": "d29-v.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-v.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "b072f28fa0b711663cb0e24fe02a44043fa7dc31678d43a1efd38551bf64f351",
+      "size": 3026
+    },
+    {
+      "blob": "2aed614121dff4ccc3b247b6ad175ca7e7729727",
+      "capture_id": "m2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-transfer-days-answers at 5fb43569",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/m2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "63ff95d5235692fabd9e21844acf5c0a0fd10355bbf0b419aec74b8836a75136",
+      "size": 3404
+    },
+    {
       "blob": "fae78f1e34d25f3f1bd6a7c44affaa2063eeaa64",
       "capture_id": "alt-a-05-stock-query-alt-unit-probe-b.answer.utf16le.xml",
       "company": "BRIDGE SHAPE LAB",

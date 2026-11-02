@@ -1653,10 +1653,12 @@ impl Server {
             }
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
-            if let Some(error) = persistence::persist_build(&imports, &line, xml.as_bytes(), || {
+            let folder_left = match persistence::persist_build(&imports, &line, xml.as_bytes(), || {
                 self.append_import_ledger_while_admitted(&line)
             })? {
-                return Ok(ToolOutcome {
+                persistence::Persisted::Built { folder_left } => folder_left,
+                persistence::Persisted::Incomplete(error) => {
+                    return Ok(ToolOutcome {
                     payload: json!({"result":{"batch_id":batch_id,"error":{"code":error,
                         "message":"Local batch publication is incomplete; reconcile its recovery journal before continuing."}}}),
                     evidence: Evidence {
@@ -1667,7 +1669,8 @@ impl Server {
                     company_guid: Some(line.company_guid.clone()),
                     truncated: false,
                 });
-            }
+                }
+            };
             // Reuse the posting admission path to describe only a route that
             // this exact saved batch can take. A manual-only batch is still a
             // successful build.
@@ -1717,6 +1720,11 @@ impl Server {
             // Appended last, so neither rewrite of the first warning above
             // can replace it.
             let hsn_warnings = hsn_warnings_of(&line.vouchers, &mut warnings);
+            if let (Some(cause), Some(list)) = (folder_left, warnings.as_array_mut()) {
+                list.push(json!(format!(
+                    "This batch is built and on record, but its temporary folder could not be removed ({cause}). The next build or post clears the folder if it is empty; if anything is left in it, they are refused until a person checks it."
+                )));
+            }
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                     "batch_id": batch_id, "sha256": sha256,
                     "amendment": amendment,

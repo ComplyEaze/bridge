@@ -4396,11 +4396,11 @@ the status record in its `update.json` with the journal's last line, as JSON
 - an earlier, whole record: the append never began, and the earlier proof is
   current;
 - a torn last line: the append stopped part-way. Keep a copy of the journal,
-  then remove only that partial line;
-- no `update.json`: the stop came before the record was written, and the
-  journal is as it was.
+  then remove only that partial line.
 
-Then remove the folder. Proof files that no journal record names are left
+Then remove the folder. A build or verification folder with nothing in it needs
+none of this: the next admission removes it, since it means either that nothing
+was published or that the publication finished (#2269). Proof files that no journal record names are left
 over from the stopped verification; nothing reads them. Preserve the journal
 and generated XML; do not delete it merely to retry. This is explicit
 recovery after a partial file transaction, not a power-loss atomicity guarantee.

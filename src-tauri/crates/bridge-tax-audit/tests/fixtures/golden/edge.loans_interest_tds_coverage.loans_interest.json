@@ -726,10 +726,10 @@
     },
     {
       "id": "loans_interest.s194a_tds_coverage_a0ffd58e",
-      "value": "covered",
+      "value": "not checked",
       "unit": "text",
-      "definition_sha256_16": "f5677077cb6ef632",
-      "definition_text": "Whether the TDS on loan ledger (tag a0ffd58e) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS deducted is seen on the loan (a TDS debit alone is not). The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
+      "definition_sha256_16": "1da46588bc810e39",
+      "definition_text": "Whether the TDS on loan ledger (tag a0ffd58e) covers the s.194A rate on its interest: covered, partly covered, covered by amount but not by date (the TDS seen reaches the rate, while the date-aware count, reversals included, credits less), none, not judged where the rules carry no s.194A rate, not checked where a TDS debit sits beside TDS deducted on the loan (the debit can reverse a deduction, and the books do not say which), or not computed where a voucher listed as both crediting and debiting the loan carries interest or TDS and TDS is seen on the loan. The rate assumes the lender furnished a PAN: s.206AA's higher rate is not applied, and the books do not show a PAN.",
       "evidence": []
     },
     {
@@ -946,7 +946,7 @@
     },
     {
       "id": "loans_interest.s194a_tds_over_threshold_lender_count",
-      "value": 2,
+      "value": 3,
       "unit": "count",
       "definition_sha256_16": "460e4c4fc8e61e8a",
       "definition_text": "Loan ledgers with a non-exempt lender whose interest this year exceeds the s.194A threshold, where the assessee is a deductor or its deductor status is not known, and the TDS seen does not cover the s.194A rate on it (each listed in clause 21(b)); a loan whose s.194A verdict is not computed is not counted.",
@@ -1322,11 +1322,14 @@
       ]
     },
     {
-      "id": "loans_interest/s194a_tds_seen/a0ffd58e",
+      "id": "loans_interest/s194a/a0ffd58e",
       "clauses": [
-        "s.194A"
+        "s.194A",
+        "3CD-21(b)",
+        "3CD-34(a)",
+        "3CD-34(c)"
       ],
-      "confidence": "judgement_required",
+      "confidence": "needs_document",
       "facts": [
         {
           "name": "interest",
@@ -1349,28 +1352,22 @@
         },
         {
           "kind": "voucher",
-          "id": "r02",
-          "label": "Journal r02 on 2025-06-30"
-        },
-        {
-          "kind": "voucher",
-          "id": "r03",
-          "label": "Journal r03 on 2025-07-15"
+          "id": "r01",
+          "label": "Journal r01 on 2025-06-30"
         }
       ],
-      "title_sha256_16": "1ab998e85e7b33d0",
-      "title_text": "TDS seen on the loan covers the s.194A rate on its interest; not listed in clause 21(b)",
-      "limits_sha256_16": "62114d78d98a8482",
+      "title_sha256_16": "3fd95b27e8346147",
+      "title_text": "Interest to a non-exempt lender over the s.194A threshold, TDS on the loan not checked against the s.194A rate",
+      "limits_sha256_16": "c94fd344dbfbbfde",
       "limits_text": [
-        "Not checked: that the TDS was deposited by the due date (clause 21(b) also covers tax deducted but not paid by the s.139(1) due date).",
-        "Not checked: the period each deduction relates to, beyond its date (a deduction counts only against interest credited on or before it).",
-        "Not checked: the lender's PAN. The s.194A(1) rate is used; s.206AA's higher rate is not applied.",
-        "Not counted: a deduction, or its reversal, on a voucher that also posts to another loan (the books do not split it between them).",
-        "Not checked: that each deduction is s.194A TDS on this interest; TDS-payable lines on any voucher posting to this ledger count, including TDS under another section on another credit to it (rent, commission)."
+        "Books only: lender type ('nbfc') comes from the client's setup, not from a notification lookup; confirm the lender is not itself a body notified as exempt under s.194A(3)(iii) beyond the lender types the rules already exempt.",
+        "s.40(a)(ia) disallows 30% of the interest on TDS default; the second proviso removes this if the lender's Form 26A (Rule 31ACB) shows the interest was returned as income -- s.201(1A) interest still runs either way.",
+        "Not checked: whether the TDS debit on Journal r03 on 2025-07-15 (tds_debited_on_loan_a0ffd58e) reverses TDS deducted on this loan, and so whether what is left covers this interest."
       ],
-      "ask_client_sha256_16": "565f4ad14bb95150",
+      "ask_client_sha256_16": "290cc8e579b4eb9f",
       "ask_client_text": [
-        "Confirm the TDS deducted on interest to Invented Round Finance, the period it covers, and the challans showing it was deposited by the due date."
+        "Confirm the TDS deducted under s.194A on interest to Invented Round Finance and the interest it covers.",
+        "If not deducted, confirm whether Form 26A is available for this lender."
       ]
     },
     {

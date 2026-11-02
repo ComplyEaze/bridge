@@ -3452,7 +3452,7 @@
   "by": "author",
   "what": "coverage is open with no TDS seen on the loan (a certain default lost)",
   "file": "src/loans_interest.rs",
-  "from": "        let coverage_open = !listed_194a.is_empty() && tds_on_loan != 0;",
+  "from": "        let coverage_open = !listed_194a.is_empty() && !tds_by_voucher.is_empty();",
   "to": "        let coverage_open = !listed_194a.is_empty();"
  },
  {
@@ -11718,6 +11718,54 @@
   "file": "src/loans_interest.rs",
   "from": "            let definition = if principal_tds.iter().any(|&(_, x)| x < 0) {",
   "to": "            let definition = if false {"
+ },
+ {
+  "id": "L1875-TDS-14",
+  "by": "author",
+  "what": "loans_interest: a deduction beside a TDS debit can read as covering the interest (#1875 rule 4)",
+  "file": "src/loans_interest.rs",
+  "from": "                if !split_deducted.is_empty() || debit_beside_deduction {",
+  "to": "                if !split_deducted.is_empty() {"
+ },
+ {
+  "id": "L1875-TDS-15",
+  "by": "author",
+  "what": "loans_interest: a TDS debit alone reads not checked, with nothing deducted",
+  "file": "src/loans_interest.rs",
+  "from": "        let debit_beside_deduction = tds_on_loan > 0 && !debited.is_empty();",
+  "to": "        let debit_beside_deduction = !debited.is_empty();"
+ },
+ {
+  "id": "L1875-TDS-16",
+  "by": "author",
+  "what": "loans_interest: the coverage is open on the TDS deducted alone, so a TDS debit alone leaves it closed",
+  "file": "src/loans_interest.rs",
+  "from": "        let coverage_open = !listed_194a.is_empty() && !tds_by_voucher.is_empty();",
+  "to": "        let coverage_open = !listed_194a.is_empty() && tds_on_loan != 0;"
+ },
+ {
+  "id": "L1875-TDS-17",
+  "by": "author",
+  "what": "loans_interest: the not-checked finding does not name the TDS debit",
+  "file": "src/loans_interest.rs",
+  "from": "                if debit_beside_deduction {\n                    limits.push(format!(",
+  "to": "                if false {\n                    limits.push(format!("
+ },
+ {
+  "id": "L1875-TDS-18",
+  "by": "author",
+  "what": "loans_interest: the not-checked finding does not name the split voucher",
+  "file": "src/loans_interest.rs",
+  "from": "                if !split_deducted.is_empty() {\n                    limits.push(format!(",
+  "to": "                if false {\n                    limits.push(format!("
+ },
+ {
+  "id": "L1875-TDS-19",
+  "by": "author",
+  "what": "loans_interest: the coverage text does not list not checked beside a TDS debit",
+  "file": "src/loans_interest.rs",
+  "from": "        let unchecked_debit = if debit_beside_deduction {",
+  "to": "        let unchecked_debit = if false {"
  },
  {
   "id": "P1243-DEP-01",

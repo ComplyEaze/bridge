@@ -469,9 +469,10 @@ async fn a_recorded_review_goes_stale_when_anything_it_bound_changes() {
     // The cases share no file, lock or port: each has its own simulator,
     // directory and server. A case spends its time waiting on its simulator
     // (about 70 requests), so they run side by side on this thread and the
-    // waits overlap, four at a time: with all eight running, a slow Windows
-    // runner once left a probe unanswered past its deadline. Every case is
-    // joined, and a panic in any of them is passed on under the case's name.
+    // waits overlap, four at a time: with all eight running, a Windows run
+    // once left a probe unanswered past its deadline, cause not established.
+    // Every case is joined, and a panic in any of them is passed on under the
+    // case's name.
     let slots = std::rc::Rc::new(tokio::sync::Semaphore::new(4));
     let local = tokio::task::LocalSet::new();
     local

@@ -1,0 +1,37 @@
+{
+ "host": "127.0.0.1",
+ "port": 9001,
+ "conns": {},
+ "steps": [
+  {
+   "name": "A",
+   "at": 1.0,
+   "conn": "new",
+   "file": "<lab folder>/seed/N1a-2.xml",
+   "sha256": "469309620f04e8cc09c4d02a9b027a2b7785b75ba93ebcf528a70593b1f37145",
+   "limit": null,
+   "write": true,
+   "max_bytes": 2000000
+  },
+  {
+   "name": "B",
+   "at": 5.0,
+   "conn": "new",
+   "file": "<lab folder>/plans/N1a-2-create.xml",
+   "sha256": "11732d0462f67eec6607d62cf14cede069036e8e5908cf3da205887de0ce44bb",
+   "limit": 20,
+   "write": true,
+   "max_bytes": 2000000
+  },
+  {
+   "name": "C",
+   "at": 26.0,
+   "conn": "new",
+   "file": "<earlier lab folder>/earlier/lab/1713-abandoned-ledger-create/requests/ledgers.xml",
+   "sha256": "3eb31c35d3b911421742005af98e5e87453fbfc7dbc0d812ac1856761a3f280b",
+   "limit": null,
+   "write": false,
+   "max_bytes": 2000000
+  }
+ ]
+}

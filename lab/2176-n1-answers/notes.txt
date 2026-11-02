@@ -1,0 +1,9 @@
+2026-11-02 #2176 N1, UTC. The sheet at 869bca9e; order.py equal to its SHA256.txt.
+11:09 Step 0: BRIDGE ABANDON LAB loaded alone; one tally.exe owns 9001; status 200.
+11:10 First backup by Tally's screen. Marks V 48000 M 226. Probe names absent.
+11:11 N1a: 1,200 Journals. D 29.73 s; the watcher's false stop at about T0+19; C not sent. VOID. Observations to 11:41; B present, M 227.
+11:44 Held for the run lead's word. Row #1392 ran between, on another book.
+12:00 Second backup by Tally's screen, on the run lead's word. Marks V 49200 M 227. Probe names absent by orderread.py. Watcher copy changed; seeds of 2,700.
+12:01 N1a-2. D 56.13 s; C written 26.00; PASS-present. Observations to 12:32.
+12:33 N1b. D 56.39 s; C written 26.02; PASS-present. Observations to 13:04.
+13:05 Company shut; Select Company, none loaded; one tally.exe; status 200. No restore.

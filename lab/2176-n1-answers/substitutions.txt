@@ -1,0 +1,5 @@
+Replaced in text files here, with counts. Answers and request XML are byte for byte.
+<earlier lab folder>: 35
+<lab folder>: 18
+stop: 22
+stop-all: 5

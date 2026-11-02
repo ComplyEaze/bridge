@@ -2340,6 +2340,15 @@ Committed captures of a synthetic book's Payments carry the bank on some rows an
 counterparty of a Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import`
 does not compare the field for a Receipt, Payment or Contra.
 
+### E-invoice details in `vouchers` (#1378)
+
+With `include_e_invoice: true`, a row of `vouchers` for an invoice, or for any voucher that carries a detail, holds
+`e_invoice`: `irn`, `ack_no` and `ack_date`, each `{"state":"present","value":...}`, `{"state":"absent"}` (asked for and empty) or
+`{"state":"not_reported"}` (this book or release did not send it). `ack_date` is `YYYYMMDD`; one that is not a date
+refuses the read (`voucher_irn_ack_date_invalid`). Every other read sends the request it did before. ComplyEaze Bridge never asks Tally
+to generate, cancel or upload an e-invoice. Measured on one synthetic book with details keyed by hand; a voucher
+the portal issued was not read (protocol reference 8.2j).
+
 ### Cost-centre allocations in voucher reads
 
 Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of

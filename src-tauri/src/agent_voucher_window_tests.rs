@@ -8915,6 +8915,57 @@ mod ledger_window {
     }
 }
 
+/// #1378: the shapes that name the e-invoice details are the window request and nothing else
+/// changed, and neither the plain nor the class request names them.
+#[test]
+fn only_a_read_that_asks_names_the_e_invoice_details() {
+    let day = TallyDate::parse("20250401").unwrap();
+    let render = |shape: VoucherReadShape| shape.render("Lab", &day, &day, None).unwrap();
+    for (plain, asking) in [
+        (
+            VoucherReadShape::EntryWildcard,
+            VoucherReadShape::EInvoiceEntryWildcard,
+        ),
+        (
+            VoucherReadShape::ClassEntryWildcard,
+            VoucherReadShape::EInvoiceClassEntryWildcard,
+        ),
+    ] {
+        assert_eq!(plain.asking(EInvoiceFields::NotAsked), plain);
+        assert_eq!(plain.asking(EInvoiceFields::Asked), asking);
+        assert_eq!(plain.e_invoice(), EInvoiceFields::NotAsked);
+        assert_eq!(asking.e_invoice(), EInvoiceFields::Asked);
+        assert!(!render(plain).contains("IRN"));
+        assert_eq!(
+            render(asking).replace(",IRN,IRNACKNO,IRNACKDATE", ""),
+            render(plain)
+        );
+    }
+    // A shape outside the `vouchers` tool is never asked.
+    assert_eq!(
+        VoucherReadShape::Movement.asking(EInvoiceFields::Asked),
+        VoucherReadShape::Movement
+    );
+}
+
+/// #1378: a window held without the e-invoice details does not serve a page that asks for them,
+/// as for each entry's GST details below.
+#[tokio::test]
+async fn a_page_asking_for_e_invoice_details_is_not_served_from_a_window_held_without_them() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(identity_plans());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": id, "include_e_invoice": true}))
+        .await;
+    let error = refusal_of(&second);
+    assert_eq!(error["code"], "listing_snapshot_changed", "{second}");
+    assert_eq!(one.requests(), total);
+}
+
 /// #2027: a window held without each entry's GST details does not serve a page that asks for
 /// them. The held window's key carries the choice, so the page names a snapshot not held for it
 /// before any marks read.

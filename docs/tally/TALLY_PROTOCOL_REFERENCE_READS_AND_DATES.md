@@ -816,6 +816,15 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
 - **What the tool returns.** Only when `vouchers` is called with `goods_lines: true`: an entry with goods lines gains `goods_lines`, each with `stock_item` and with `actual_quantity`, `billed_quantity`, `rate` and `amount` as `absent`, `empty` or a trimmed `value`, and `batches` (`godown`, `batch`, both quantities, `amount`) when the line has batch rows. A line whose batch amounts do not add up to its amount, whose amount or a batch amount is not a decimal, or that names no item, a field sent twice, an element inside a field that is read, a line or batch list at another depth, more than 1,000 lines or 100 batch rows: the entry carries `goods_lines_unreadable` with a reason and no partial list, and the rest of the response is unchanged. Without the argument, and in the registers, neither key is returned.
 - **Not shown.** A Credit or Debit Note with items; discounts; additional cost; a bill of materials; a foreign-currency line; a voucher typed on Tally's screen; a compound unit; Gold, Education and releases other than 7.1 and (one book) 7.2.
 
+### 8.2j `IRN`, `IRNACKNO`, `IRNACKDATE` on the voucher `FETCH` — **PARTIAL 2026-11-02; TallyPrime 7.2, one synthetic book**
+
+**Scope: TallyPrime 7.2 Silver, licensed; synthetic company `BRIDGE EINVOICE LAB`, e-invoicing on in its GST registration; two Sales invoices keyed by hand, with invented details. Nothing reached the e-invoice portal.**
+
+- **Where they sit.** `IRN` and `IRNACKNO` (`TYPE="String"`) and `IRNACKDATE` (`TYPE="Date"`, `YYYYMMDD`) are direct children of `VOUCHER`. A window read returns them only when its `FETCH` names them, so Bridge names them only for a `vouchers` call with `include_e_invoice`. That list, the full window list with these three added, has not been observed: the lab's named read carried a short list.
+- **Empty is the answer for no details.** An invoice without details has all three elements, empty, so presence says nothing and the value does. Bridge reports `present`, `absent` for an element sent empty, and `not_reported` for an element not sent.
+- **Keyed by hand, with no portal.** The three take typed values on the voucher's `Statutory Details` sub-screen. Tally then lists the invoice under `IRN Generated` in its e-Invoice report and does not offer to generate one on save; the invoice without details drew that offer. Whether Tally checks their form was not tried.
+- **Not measured.** An import that sets them, which is why Bridge never sends them; a voucher the portal issued, which may set `IRNQRCODE` and others that stayed empty here; another release.
+
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**
 
 **Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters (2026-09-12) and 36 (2026-09-30).** Captured from

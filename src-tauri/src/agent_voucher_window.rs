@@ -69,9 +69,30 @@ pub(super) enum VoucherReadShape {
     /// `render_agent_class_vouchers_in_span`: the entry wildcard plus each
     /// row's voucher type resolved by Tally (bridge#625).
     ClassEntryWildcard,
+    /// [`Self::EntryWildcard`] naming the e-invoice details (#1378).
+    EInvoiceEntryWildcard,
+    /// [`Self::ClassEntryWildcard`] naming the e-invoice details (#1378).
+    EInvoiceClassEntryWildcard,
 }
 
 impl VoucherReadShape {
+    /// This shape as a read that `e_invoice` says asked for the details.
+    pub(super) const fn asking(self, e_invoice: EInvoiceFields) -> Self {
+        match (self, e_invoice) {
+            (Self::EntryWildcard, EInvoiceFields::Asked) => Self::EInvoiceEntryWildcard,
+            (Self::ClassEntryWildcard, EInvoiceFields::Asked) => Self::EInvoiceClassEntryWildcard,
+            (shape, _) => shape,
+        }
+    }
+
+    /// Whether this shape's request named the e-invoice details.
+    pub(super) const fn e_invoice(self) -> EInvoiceFields {
+        match self {
+            Self::EInvoiceEntryWildcard | Self::EInvoiceClassEntryWildcard => EInvoiceFields::Asked,
+            _ => EInvoiceFields::NotAsked,
+        }
+    }
+
     /// Encoded bytes per voucher to assume before anything has been measured.
     ///
     /// Set above the heaviest figure measured for each shape (§11c): named entry
@@ -87,7 +108,10 @@ impl VoucherReadShape {
             // The class COMPUTEs add about 1.2 KB of UTF-16 per voucher
             // (ten elements at ~120 bytes, measured one at a time on 7.1),
             // well inside the margin above the 256 KB measured.
-            Self::EntryWildcard | Self::ClassEntryWildcard => 384 * 1024,
+            Self::EntryWildcard
+            | Self::ClassEntryWildcard
+            | Self::EInvoiceEntryWildcard
+            | Self::EInvoiceClassEntryWildcard => 384 * 1024,
         }
     }
 
@@ -104,9 +128,11 @@ impl VoucherReadShape {
     const fn day_not_readable_code(self) -> &'static str {
         match self {
             Self::ImportVerification => "verification_window_day_not_readable",
-            Self::Movement | Self::EntryWildcard | Self::ClassEntryWildcard => {
-                "voucher_window_day_not_readable"
-            }
+            Self::Movement
+            | Self::EntryWildcard
+            | Self::ClassEntryWildcard
+            | Self::EInvoiceEntryWildcard
+            | Self::EInvoiceClassEntryWildcard => "voucher_window_day_not_readable",
         }
     }
 
@@ -137,6 +163,12 @@ impl VoucherReadShape {
             }
             (Self::ClassEntryWildcard, _) => {
                 render_agent_class_vouchers_in_span(company, from, to, span)
+            }
+            (Self::EInvoiceEntryWildcard, _) => {
+                render_agent_e_invoice_vouchers_in_span(company, from, to, span, false)
+            }
+            (Self::EInvoiceClassEntryWildcard, _) => {
+                render_agent_e_invoice_vouchers_in_span(company, from, to, span, true)
             }
         }
     }

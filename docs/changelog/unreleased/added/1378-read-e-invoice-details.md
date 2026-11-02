@@ -1,0 +1,1 @@
+- `vouchers` with `include_e_invoice` says, for each invoice, whether it carries an IRN, an acknowledgement number and an acknowledgement date: each present with its value, absent, or not reported by this book or release.

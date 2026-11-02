@@ -2313,3 +2313,91 @@ fn a_whitespace_only_or_self_closing_bill_date_is_not_observed() {
         .iter()
         .any(|allocation| allocation["bill_date"] == "20250627"));
 }
+
+/// The first captured voucher with `elements` added as a labelled edit and made an invoice. Tally's
+/// answers for these three are the lab's (protocol reference §8.2j).
+fn invoice_with(elements: &str) -> String {
+    with_injected_voucher_element(elements).replacen(
+        "<ISINVOICE>No</ISINVOICE>",
+        "<ISINVOICE>Yes</ISINVOICE>",
+        1,
+    )
+}
+
+fn e_invoice_of(xml: &str) -> Value {
+    let rows = parse_agent_rows_reading_gst(
+        xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        EInvoiceFields::Asked,
+    )
+    .unwrap();
+    rows[0]["e_invoice"].clone()
+}
+
+const CARRIED: &str = "<IRN TYPE=\"String\">a1b2</IRN>\
+<IRNACKNO TYPE=\"String\">112233</IRNACKNO><IRNACKDATE TYPE=\"Date\">20250403</IRNACKDATE>";
+
+#[test]
+fn an_invoice_says_each_e_invoice_detail_present_absent_or_not_reported() {
+    assert_eq!(
+        e_invoice_of(&invoice_with(CARRIED)),
+        json!({"irn": {"state": "present", "value": "a1b2"},
+            "ack_no": {"state": "present", "value": "112233"},
+            "ack_date": {"state": "present", "value": "20250403"}})
+    );
+    // Tally's answer for the invoice with none: each element there, empty.
+    let none = "<IRN TYPE=\"String\"></IRN><IRNACKNO TYPE=\"String\"/>\
+<IRNACKDATE TYPE=\"Date\"></IRNACKDATE>";
+    let absent = json!({"state": "absent"});
+    assert_eq!(
+        e_invoice_of(&invoice_with(none)),
+        json!({"irn": absent, "ack_no": absent, "ack_date": absent})
+    );
+    // An element not sent is not said to be empty.
+    let said = e_invoice_of(&invoice_with("<IRN>a1b2</IRN>"));
+    assert_eq!(said["irn"]["state"], "present");
+    assert_eq!(said["ack_no"]["state"], "not_reported");
+    assert_eq!(said["ack_date"]["state"], "not_reported");
+}
+
+#[test]
+fn a_voucher_that_is_no_invoice_says_nothing_unless_it_carries_a_detail() {
+    assert!(e_invoice_of(&with_injected_voucher_element("<IRN></IRN>")).is_null());
+    assert!(e_invoice_of(&captured_native_vouchers()).is_null());
+    let said = e_invoice_of(&with_injected_voucher_element("<IRN>a1b2</IRN>"));
+    assert_eq!(said["irn"]["value"], "a1b2");
+    assert_eq!(said["ack_no"]["state"], "not_reported");
+}
+
+#[test]
+fn an_acknowledgement_date_that_is_no_date_refuses_the_read() {
+    let xml = with_injected_voucher_element("<IRNACKDATE>3-Apr-25</IRNACKDATE>");
+    assert_eq!(
+        parse_agent_rows_reading_gst(
+            &xml,
+            CAPTURED_VOUCHER_COMPANY_GUID,
+            GstDetailsShown::Withheld,
+            EInvoiceFields::Asked,
+        ),
+        Err("voucher_irn_ack_date_invalid".to_string())
+    );
+}
+
+/// A read that did not name the three says nothing about them, whatever the voucher holds.
+#[test]
+fn a_read_that_did_not_ask_returns_no_e_invoice_key() {
+    let xml = invoice_with(CARRIED);
+    let rows = parse_agent_rows(&xml, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+    let rows = parse_agent_changed_rows(&xml, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+    let rows = parse_agent_rows_reading_gst(
+        &xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        EInvoiceFields::NotAsked,
+    )
+    .unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+}

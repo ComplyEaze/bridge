@@ -86,6 +86,8 @@ mod post;
 pub(super) use post::numbering::POST_NEXT_STEP as POST_NUMBERING_NEXT_STEP;
 #[path = "agent_import_content_review.rs"]
 mod content_review;
+#[path = "agent_import_settle.rs"]
+mod settle;
 #[path = "agent_import_span_identity.rs"]
 mod span_identity;
 #[path = "agent_import_statement_facts.rs"]
@@ -396,6 +398,14 @@ tokio::task_local! {
     /// live list. It lets a test run a type that is not live yet through the
     /// build, the post and the verification; no tool call can set it.
     pub(super) static TEST_QUALIFIED_VOUCHER_TYPES: &'static [VoucherType];
+}
+
+#[cfg(test)]
+tokio::task_local! {
+    /// Test-only: the rollback-seen record a post would write for its own
+    /// reading (#1050) fails to append, as a full disk would make it; no tool
+    /// call can set it.
+    pub(super) static TEST_ROLLBACK_AT_POST_APPEND_FAILS: ();
 }
 
 /// The voucher types the build, the post and the verification accept. Always
@@ -809,6 +819,17 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
         "ComplyEaze Bridge could not confirm which Tally vouchers this post created, so the batch stays open. For some vouchers it sent, the book holds a voucher with the same date, voucher type and ledger entries, but ComplyEaze Bridge cannot tell whether that one is this post's: check each voucher in Tally before posting any of them again. ComplyEaze Bridge cannot close this batch or amend it."
     };
     let mut summary = summary.to_string();
+    summary.push_str(&post_span_summary_tails(&report));
+    report["summary"] = json!(summary);
+    report
+}
+
+/// What follows the first line of a binding's summary: the examples that name
+/// what can make the check refuse (#1633), and the restore that reached other
+/// posts of the company (#1050). Each starts with a space, so a first line of
+/// any kind takes them as they are, and a settlement's line keeps them.
+fn post_span_summary_tails(report: &Value) -> String {
+    let mut summary = String::new();
     // A refusal by the mark's step or the span's count says what was observed
     // and what can do that, as examples, after the line that says what to
     // check (#1633).
@@ -837,8 +858,13 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
             " This check also found the company's books restored from a backup after other posts of it, and recorded that: verify {posts} again, and check their vouchers in Tally."
         ));
     }
-    report["summary"] = json!(summary);
-    report
+    summary
+}
+
+/// The summary of a binding whose batch a person settled (#1709): the settled
+/// line, then what follows any first line (see [`post_span_summary_tails`]).
+fn settled_post_span_summary(binding: &Value) -> String {
+    format!("{}{}", settle::SUMMARY, post_span_summary_tails(binding))
 }
 
 /// How one verification attributes a native post by its own span, and what it
@@ -2447,6 +2473,19 @@ impl Server {
                     proof["content_review"] = content_review::report(reviewed);
                 }
             }
+            // A person's standing settlement of this batch after Tally answered
+            // that its post created none of its vouchers (#1709), on the same
+            // rule. It changes no verdict, only the binding's summary line.
+            if dispatched && self.import_person_settlement(&line.batch_id) == Ok(true) {
+                proof["person_settlement"] = settle::report();
+                if proof["post_span_binding"].is_object() {
+                    // The settled line replaces the first line only: what can
+                    // make the check refuse and the restore that reached other
+                    // posts of the company still follow it (#1633, #1050).
+                    proof["post_span_binding"]["summary"] =
+                        json!(settled_post_span_summary(&proof["post_span_binding"]));
+                }
+            }
             *observed_rows = Some(observed.rows.clone());
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": proof});
             if dispatched {
@@ -2466,6 +2505,9 @@ impl Server {
                     );
                 }
             }
+            // Each voucher's own line no longer asks for a settlement it has
+            // (#1709). Set after the finalisers above, which write the lines.
+            settle::settle_voucher_next_steps(&mut payload["result"]);
             let status = final_verification_status(
                 dispatched.then(|| &payload["result"]["dispatch"]),
                 &result,
@@ -2958,7 +3000,10 @@ impl Server {
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| "import_batch_not_found".to_string())?;
         let others = match self.import_journal_while_admitted()? {
-            Some(reader) => ledger::covered_by_records_of(reader, &line.batch_id)?,
+            Some(reader) => ledger::covered_by_last_record(reader)?
+                .into_iter()
+                .filter(|batch_id| *batch_id != line.batch_id)
+                .collect(),
             None => Vec::new(),
         };
         Ok(Some((recorded.generation, others)))
@@ -2980,6 +3025,49 @@ impl Server {
             }
             None => Ok(false),
         }
+    }
+
+    /// A post's own reading of the voucher mark (#1050): when `mark`, which its
+    /// aim read after `records_before_read` journal records, is below a floor an
+    /// earlier native post of the company had proved, and no record on file
+    /// covers that post, it is recorded here, before the post's dispatch intent.
+    /// The post has no intent yet, so the record names the first batch it
+    /// covers, which admission accepts. Under the exclusive admission lock.
+    /// Returns the batches the record covers, or `None` when it would cover
+    /// nothing new. A record that cannot be written is an error, and the caller
+    /// sends nothing: a restore seen and not recorded is the false verified
+    /// this guards, and once this post's vouchers raise the mark no later
+    /// reading can see it.
+    pub(super) fn record_rollback_seen_at_post_while_admitted(
+        &self,
+        poster: &str,
+        mark: u64,
+        records_before_read: u64,
+    ) -> Result<Option<Vec<String>>, String> {
+        let Some(reader) = self.import_journal_while_admitted()? else {
+            return Ok(None);
+        };
+        let Some(named) = ledger::first_newly_covered(reader, poster, mark, records_before_read)?
+        else {
+            return Ok(None);
+        };
+        let snapshot = self
+            .import_snapshot_while_admitted(Some(&named))?
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        #[cfg(test)]
+        if TEST_ROLLBACK_AT_POST_APPEND_FAILS.try_with(|()| ()).is_ok() {
+            return Err("import_ledger_write_failed".into());
+        }
+        self.append_import_record_while_admitted(&ledger::StatusRecord::rollback_seen(
+            &snapshot.batch,
+            mark,
+            records_before_read,
+        ))?;
+        let covered = match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::covered_by_last_record(reader)?,
+            None => Vec::new(),
+        };
+        Ok(Some(covered))
     }
 
     /// Every GUID another batch's post-span verdict bound.

@@ -40,6 +40,7 @@ DEFAULT_TOOLS = {
     "read_evidence",
     "sales_register",
     "statement_tie_out",
+    "stock_by_godown",
     "stock_summary",
     "tally_status",
     "trial_balance",
@@ -57,6 +58,7 @@ DEFAULT_TOOLS = {
 IMPORT_TOOLS = {
     "build_import_xml",
     "parse_bank_statement",
+    "parse_bank_statement_csv",
 }
 POSTING_TOOLS = {
     "acknowledge_post_review",

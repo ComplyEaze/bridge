@@ -20,6 +20,11 @@
 //! never after it. So no cycle can form: whoever holds the wire lock is only
 //! waiting on Tally, and Tally answers or the request deadline ends the send.
 //!
+//! A transport given a [`crate::DrainPolicy`] holds the lock across a drain
+//! probe and the post it clears (#2142): one `GET /status` with its own short
+//! deadline, then the post, so the lock can be held for both. Between probes it
+//! releases the lock and pauses, as between refused attempts.
+//!
 //! The one caller-visible exception is [`TallyHttpTransport::acquire_wire_lock`]
 //! (one try, never a wait): a caller takes the lock, does local work (a durable record on the local
 //! disk, which does not wait on another process), and spends the lock on
@@ -53,15 +58,19 @@ pub const WIRE_WAIT_MAX: Duration = Duration::from_secs(10);
 /// The retry hint returned with a [`WireRefusal::Busy`] refusal.
 pub const WIRE_BUSY_RETRY_AFTER: Duration = Duration::from_secs(5);
 
-/// Why the gate refused a send. Nothing was sent in either case.
+/// Why the gate refused a send. Nothing was sent in any case.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WireRefusal {
     /// Another send to this endpoint held the wire lock for the whole bounded
     /// wait. Retryable after [`WIRE_BUSY_RETRY_AFTER`].
     Busy,
-    /// The lock could not be opened. The gate fails closed: an unverifiable
-    /// lock is not a held one.
+    /// The lock could not be opened, or its drain record could not be read or
+    /// written. The gate fails closed: an unverifiable lock is not a held one.
     Unavailable,
+    /// An earlier send to this endpoint was cut while Tally may still have been
+    /// working on it, and `GET /status` has not yet answered three times in a
+    /// row since (#2142). Retryable after `retry_after_ms`.
+    Draining { retry_after_ms: u64 },
 }
 
 impl WireRefusal {
@@ -69,13 +78,53 @@ impl WireRefusal {
         match self {
             Self::Busy => "tally_endpoint_busy",
             Self::Unavailable => "tally_endpoint_lock_unavailable",
+            Self::Draining { .. } => "tally_endpoint_draining",
+        }
+    }
+
+    /// When the same call may be tried again, for a refusal that passes.
+    pub const fn retry_after(self) -> Option<Duration> {
+        match self {
+            Self::Busy => Some(WIRE_BUSY_RETRY_AFTER),
+            Self::Unavailable => None,
+            Self::Draining { retry_after_ms } => Some(Duration::from_millis(retry_after_ms)),
         }
     }
 }
 
+/// What an endpoint's drain record says (#2142), read and written only by the
+/// holder of its wire lock, so every process sees one record.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DrainDebt {
+    /// Nothing owed.
+    Clear,
+    /// A post began at `since_ms` and its sender has not settled it. A later
+    /// holder finds its sender gone (the lock is released only after a send
+    /// ends), so it is owed.
+    InFlight { since_ms: u64 },
+    /// A post was cut at `since_ms`; `answered` probes in a row have
+    /// answered since, the last sent at `last_probe_ms`.
+    Owed {
+        since_ms: u64,
+        answered: u8,
+        last_probe_ms: Option<u64>,
+    },
+}
+
 /// One held wire lock, owned by the gate's implementation. Dropping it
-/// releases the lock.
-pub trait WireLockHeld: Send + Sync {}
+/// releases the lock. A gate that keeps no drain record (lab tools, this
+/// crate's tests) is always clear and records nothing.
+pub trait WireLockHeld: Send + Sync {
+    /// The endpoint's drain record, read under this lock.
+    fn debt(&self) -> Result<DrainDebt, WireRefusal> {
+        Ok(DrainDebt::Clear)
+    }
+
+    /// Replace the endpoint's drain record with `debt`, under this lock.
+    fn record(&self, _debt: DrainDebt) -> Result<(), WireRefusal> {
+        Ok(())
+    }
+}
 
 /// A pause between two refused attempts, with no wire lock held.
 pub type WirePause = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
@@ -92,6 +141,16 @@ pub trait TallyWireGate: Send + Sync {
     /// Wait `delay` before the next attempt. This crate has no timer of its
     /// own, and a test can make the pause instant.
     fn pause(&self, delay: Duration) -> WirePause;
+
+    /// The wall clock in milliseconds since the Unix epoch, for the drain
+    /// record shared across processes. A test can set it.
+    fn now_ms(&self) -> u64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| {
+                u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+            })
+    }
 }
 
 /// How far apart a busy wire lock is tried again, and how much waiting one

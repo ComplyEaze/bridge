@@ -1,0 +1,581 @@
+{
+  "file": "src-tauri/src/agent_import_post_on_account.rs",
+  "base_commit": "026ba163dfcbf75d515a24d0dbbf14c5245534ec",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Left out as equivalent, and not run: a batch saved without the On Account record read as recording none, since marks() is the record's only reader and gives false for both.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 1873,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_post_on_account.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/import|numbering|post|approv/)'",
+      "time": "2026-10-30T00:10:52.450105Z"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 1873,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/import|numbering|post|approv/)'"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 1875,
+      "command": "as the hand run, for the tool's two missed mutants and the eight hand-written ones that survived"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 43,
+      "unviable": 3
+    },
+    "hand": {
+      "caught": 23
+    },
+    "survived_at_base": {
+      "tool": 2,
+      "hand": 8
+    }
+  },
+  "tool_results": {
+    "52:9 replace ReviewText::into_string -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_three_entry_receipt_posts_the_request_its_intent_recorded",
+      "killer_at": "base"
+    },
+    "52:9 replace ReviewText::into_string -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_three_entry_receipt_posts_the_request_its_intent_recorded",
+      "killer_at": "base"
+    },
+    "58:9 replace ReviewText::listing_vouchers -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ReviewText: std::default::Default` is not satisfied"
+    },
+    "64:9 replace ReviewText::lists_vouchers -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::only_a_text_that_lists_the_vouchers_says_it_lists_them",
+      "killer_at": "base"
+    },
+    "64:9 replace ReviewText::lists_vouchers -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::approval_tests::a_batch_too_tall_for_the_screen_is_asked_again_as_totals_and_posted_by_a_later_call",
+      "killer_at": "base"
+    },
+    "70:9 replace OnAccountMarks<'a>::of -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `OnAccountMarks<'_>: std::default::Default` is not satisfied"
+    },
+    "80:9 replace OnAccountMarks<'a>::marks -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "80:9 replace OnAccountMarks<'a>::marks -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "88:9 replace OnAccountMarks<'a>::named -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_three_entry_receipt_posts_the_request_its_intent_recorded",
+      "killer_at": "base"
+    },
+    "88:9 replace OnAccountMarks<'a>::named -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_three_entry_receipt_posts_the_request_its_intent_recorded",
+      "killer_at": "base"
+    },
+    "102:9 replace OnAccountMarks<'a>::legend -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "102:9 replace OnAccountMarks<'a>::legend -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "121:9 replace OnAccountMarks<'a>::seal -> Result<ReviewText, String> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ReviewText: std::default::Default` is not satisfied"
+    },
+    "128:36 replace && with || in OnAccountMarks<'a>::seal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_saved_journal_without_bill_wise_approvals_is_refused_in_plain_words",
+      "killer_at": "base"
+    },
+    "128:39 delete ! in OnAccountMarks<'a>::seal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "128:74 replace == with != in OnAccountMarks<'a>::seal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_dialog_text_without_a_recorded_ledgers_mark_is_refused",
+      "killer_at": "base"
+    },
+    "135:17 delete ! in OnAccountMarks<'a>::seal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "145:12 delete ! in OnAccountMarks<'a>::seal": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_saved_journal_without_bill_wise_approvals_is_refused_in_plain_words",
+      "killer_at": "base"
+    },
+    "160:5 replace reads_like_the_legend -> bool with true": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "160:5 replace reads_like_the_legend -> bool with false": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "168:38 replace + with - in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "168:38 replace + with * in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "170:34 replace && with || in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "170:30 replace > with == in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "170:30 replace > with < in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "170:30 replace > with >= in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "170:70 replace || with && in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "170:47 replace - with + in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "170:47 replace - with / in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "170:87 replace == with != in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "170:82 replace - with + in reads_like_the_legend": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "170:82 replace - with / in reads_like_the_legend": {
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "171:24 replace || with && in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "171:27 delete ! in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "174:38 replace + with - in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "174:38 replace + with * in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "177:13 replace && with || in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "176:13 replace && with || in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "175:17 replace > with == in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "175:17 replace > with < in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "175:17 replace > with >= in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "175:22 replace + with - in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "175:22 replace + with * in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "177:52 replace == with != in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "177:46 replace + with - in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "177:46 replace + with * in reads_like_the_legend": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "A01": {
+      "what": "ON_ACCOUNT_MARK: the mark ends in one space, not two",
+      "edits": [
+        {
+          "from": "pub(super) const ON_ACCOUNT_MARK: &str = \"On Account  \";",
+          "to": "pub(super) const ON_ACCOUNT_MARK: &str = \"On Account \";"
+        }
+      ],
+      "mutation": "2f5395eb23175208413875e6d9750be2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_bank_voucher_with_the_note_and_the_on_account_sentence_fits_one_entry_fewer",
+      "killer_at": "base"
+    },
+    "A02": {
+      "what": "ON_ACCOUNT_LEGEND: the legend loses its second sentence",
+      "edits": [
+        {
+          "from": "\"On Account: a bill-wise ledger when this batch was built. Its entries carry no bill allocation.\";",
+          "to": "\"On Account: a bill-wise ledger when this batch was built.\";"
+        }
+      ],
+      "mutation": "c2aec0bca70cd68b9df33d13d5f43bbf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "A03": {
+      "what": "ON_ACCOUNT_UNMARKED: the refusal takes the layout code (codes swapped)",
+      "edits": [
+        {
+          "from": "pub(super) const ON_ACCOUNT_UNMARKED: &str = \"import_review_on_account_unmarked\";",
+          "to": "pub(super) const ON_ACCOUNT_UNMARKED: &str = \"import_review_layout_text\";"
+        }
+      ],
+      "mutation": "b16dc32a3b4b9e17d75c01ecb2922fe4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_dialog_text_without_a_recorded_ledgers_mark_is_refused",
+      "killer_at": "base"
+    },
+    "A04": {
+      "what": "of: only the first approved ledger is recorded",
+      "edits": [
+        {
+          "from": ".map(|approved| approved.iter().map(|item| item.ledger.as_str()).collect()),",
+          "to": ".map(|approved| approved.iter().take(1).map(|item| item.ledger.as_str()).collect()),"
+        }
+      ],
+      "mutation": "f3c1ddfb96ce7a2f32c656c6b8a359a5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_marks_the_totals_line_of_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "A06": {
+      "what": "marks: a ledger matches by ASCII case fold, not exactly",
+      "edits": [
+        {
+          "from": ".is_some_and(|recorded| recorded.contains(ledger))",
+          "to": ".is_some_and(|recorded| recorded.iter().any(|known| known.eq_ignore_ascii_case(ledger)))"
+        }
+      ],
+      "mutation": "dff2a686091d597c608c34d8f1f59d3c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::one_voucher_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "A07": {
+      "what": "named: the mark follows the name instead of preceding it (arms swapped)",
+      "edits": [
+        {
+          "from": "format!(\"{ON_ACCOUNT_MARK}{shown}\")",
+          "to": "format!(\"{shown}{ON_ACCOUNT_MARK}\")"
+        }
+      ],
+      "mutation": "04bb16ef2701034fd5c9c687c8125a62",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_bank_voucher_with_the_note_and_the_on_account_sentence_fits_one_entry_fewer",
+      "killer_at": "base"
+    },
+    "A08": {
+      "what": "legend: shown only when every ledger is marked (any to all)",
+      "edits": [
+        {
+          "from": ".any(|ledger| self.marks(ledger))",
+          "to": ".all(|ledger| self.marks(ledger))"
+        }
+      ],
+      "mutation": "7ab075f0a9e32cba7a0bfcb9eef766f8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::review_marks_each_entry_on_a_ledger_approved_on_account",
+      "killer_at": "base"
+    },
+    "A09": {
+      "what": "seal: the legend may stand anywhere in a line, not as a line of its own",
+      "edits": [
+        {
+          "from": "!preview.lines().any(|shown| shown == ON_ACCOUNT_LEGEND)",
+          "to": "!preview.contains(ON_ACCOUNT_LEGEND)"
+        }
+      ],
+      "mutation": "0c4873ebbbb21c009845d44967c6882f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_dialog_text_without_a_recorded_ledgers_mark_is_refused",
+      "killer_at": "base"
+    },
+    "A10": {
+      "what": "seal: the legend check is skipped (guard dropped)",
+      "edits": [
+        {
+          "from": "if marked.peek().is_some() && !preview.lines().any(|shown| shown == ON_ACCOUNT_LEGEND) {",
+          "to": "if marked.peek().is_some() && false {"
+        }
+      ],
+      "mutation": "9f2d6906caa7d3273b3a730966d7ed24",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_dialog_text_without_a_recorded_ledgers_mark_is_refused",
+      "killer_at": "base"
+    },
+    "A11": {
+      "what": "seal: the marked-name check is skipped (guard dropped)",
+      "edits": [
+        {
+          "from": "        if marked.any(|ledger| {",
+          "to": "        if false && marked.any(|ledger| {"
+        }
+      ],
+      "mutation": "89fcaec114807daf3288c49d3a8422fa",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_dialog_text_without_a_recorded_ledgers_mark_is_refused",
+      "killer_at": "base"
+    },
+    "A12": {
+      "what": "seal: an unreadable recorded ledger name passes (verdict swapped)",
+      "edits": [
+        {
+          "from": "ReviewLedgerName::parse(ledger).map_or(true, |ledger| {",
+          "to": "ReviewLedgerName::parse(ledger).map_or(false, |ledger| {"
+        }
+      ],
+      "mutation": "7099dbe1038c0bc56afe81aac7b5643f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_recorded_ledger_whose_name_cannot_be_shown_refuses_the_text",
+      "killer_at": "this_commit"
+    },
+    "A13": {
+      "what": "seal: a marked name may stand anywhere in a line, not at its end",
+      "edits": [
+        {
+          "from": "!preview.lines().any(|shown| shown.ends_with(&named))",
+          "to": "!preview.lines().any(|shown| shown.contains(&named))"
+        }
+      ],
+      "mutation": "29832e5e783cf9750dce0818ce498b77",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_dialog_text_without_a_recorded_ledgers_mark_is_refused",
+      "killer_at": "base"
+    },
+    "A14": {
+      "what": "seal: the marked name needs one space before it, not two",
+      "edits": [
+        {
+          "from": "let named = format!(\"  {}\", self.named(ledger));",
+          "to": "let named = format!(\" {}\", self.named(ledger));"
+        }
+      ],
+      "mutation": "2aa958b166c93eae016d788149c63ae2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::another_ledgers_line_does_not_stand_in_for_a_marked_name",
+      "killer_at": "base"
+    },
+    "A15": {
+      "what": "seal: only the first voucher's marked ledgers are checked",
+      "edits": [
+        {
+          "from": "        let mut marked = line\n            .vouchers\n            .iter()\n",
+          "to": "        let mut marked = line\n            .vouchers\n            .iter()\n            .take(1)\n"
+        }
+      ],
+      "mutation": "670bc361d7f3f95317e870dff113eb55",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_batch_text_is_refused_when_a_later_vouchers_recorded_ledger_is_unmarked",
+      "killer_at": "this_commit"
+    },
+    "A16": {
+      "what": "seal: the line-break check sees no ledger names (guard emptied)",
+      "edits": [
+        {
+          "from": "if !line_break_names_are_marked(&preview, named) {",
+          "to": "if !line_break_names_are_marked(&preview, named.take(0)) {"
+        }
+      ],
+      "mutation": "de95bc3eb59c4b64343131c49d990087",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_bank_voucher_with_the_note_and_the_on_account_sentence_fits_one_entry_fewer",
+      "killer_at": "base"
+    },
+    "A17": {
+      "what": "seal: the line-break refusal takes the unmarked code (verdict swapped)",
+      "edits": [
+        {
+          "from": "            return Err(LINE_BREAK_UNMARKED.into());",
+          "to": "            return Err(ON_ACCOUNT_UNMARKED.into());"
+        }
+      ],
+      "mutation": "e08842a782ce68797238e64fcca23287",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_text_that_shows_a_line_break_name_once_without_its_mark_is_refused",
+      "killer_at": "base"
+    },
+    "A18": {
+      "what": "reads_like_the_legend: case is not folded",
+      "edits": [
+        {
+          "from": "text.chars().map(|c| c.to_ascii_lowercase()).collect();",
+          "to": "text.chars().collect();"
+        }
+      ],
+      "mutation": "9138632a2c322055b5a3fae52b433450",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "A19": {
+      "what": "reads_like_the_legend: an underscore before is not a word character (arm dropped)",
+      "edits": [
+        {
+          "from": "(chars[at - 1].is_alphanumeric() || chars[at - 1] == '_')",
+          "to": "chars[at - 1].is_alphanumeric()"
+        }
+      ],
+      "mutation": "0399218c566cfcaad9cd12ed6e1dcc8c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "A20": {
+      "what": "reads_like_the_legend: only an ASCII letter or digit before is a word character",
+      "edits": [
+        {
+          "from": "chars[at - 1].is_alphanumeric()",
+          "to": "chars[at - 1].is_ascii_alphanumeric()"
+        }
+      ],
+      "mutation": "1fe19086ed9a1299966f511e03571968",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "A21": {
+      "what": "reads_like_the_legend: only a space counts as whitespace",
+      "edits": [
+        {
+          "from": "take_while(|c| c.is_whitespace())",
+          "to": "take_while(|c| **c == ' ')"
+        }
+      ],
+      "mutation": "c9bc2dfc4cd707265e2febb5a1609e19",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "A22": {
+      "what": "reads_like_the_legend: no whitespace may stand before the colon",
+      "edits": [
+        {
+          "from": "chars.get(past_spaces(account + 7)) == Some(&':')",
+          "to": "chars.get(account + 7) == Some(&':')"
+        }
+      ],
+      "mutation": "94922ea0cfb475def5a0d413de53038c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "A23": {
+      "what": "reads_like_the_legend: no whitespace is needed between on and account (guard dropped)",
+      "edits": [
+        {
+          "from": "        account > at + 2\n            && starts(",
+          "to": "        starts("
+        }
+      ],
+      "mutation": "4fe7ba6feae235dc07ba2814869dfc35",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    },
+    "A24": {
+      "what": "reads_like_the_legend: the colon is not required (guard dropped)",
+      "edits": [
+        {
+          "from": "            && starts(account, \"account\")\n            && chars.get(past_spaces(account + 7)) == Some(&':')",
+          "to": "            && starts(account, \"account\")"
+        }
+      ],
+      "mutation": "959a2f616431fe0e9d79103748b29c06",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {}
+}

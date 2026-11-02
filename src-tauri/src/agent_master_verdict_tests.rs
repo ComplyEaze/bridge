@@ -137,6 +137,7 @@ impl World {
                     master(MasterKind::Ledger, new_ledger(), 8, &[NAME]),
                 ]),
                 party: PartyRead::Rows(vec![row]),
+                order_coverage: OrderCoverage::Measured,
             },
         }
     }
@@ -261,6 +262,7 @@ fn a_clean_create_of_each_kind_is_posted_verified_with_every_check_passed() {
             checks.opening_balance,
             checks.counters,
             checks.target_mark_moved,
+            checks.target_mark_step_one,
             checks.other_marks_unmoved,
             checks.pre_image_unchanged,
         ] {
@@ -626,7 +628,7 @@ fn each_counter_outside_one_created_none_altered_no_errors_no_exceptions_fails()
 }
 
 #[test]
-fn the_target_mark_must_have_moved_forward() {
+fn straight_after_the_post_the_target_mark_must_step_by_exactly_one() {
     for after in [7, 6] {
         let mut world = World::clean(suspense());
         world.marks()[0] = mark(TARGET, after);
@@ -636,7 +638,78 @@ fn the_target_mark_must_have_moved_forward() {
             |checks| checks.target_mark_moved,
             "target_mark_not_moved",
         );
+        // One reason for the one fact.
+        assert!(!world.judge().reasons.contains(&"target_mark_step_not_one"));
     }
+    // A step of two: another master change in the company between the aim
+    // read and this read-back. The ledger is as sent, but the doubt stands.
+    for after in [9, 40] {
+        let mut world = World::clean(suspense());
+        world.marks()[0] = mark(TARGET, after);
+        assert_doubt(
+            &world,
+            &format!("{after}"),
+            |checks| checks.target_mark_step_one,
+            "target_mark_step_not_one",
+        );
+        let judgement = world.judge();
+        assert_eq!(judgement.checks.target_mark_moved, Check::Passed);
+        assert_eq!(judgement.reasons, vec!["target_mark_step_not_one"]);
+        assert!(!judgement.state.is_terminal());
+        assert_eq!(judgement.guid.as_deref(), Some(new_ledger()));
+    }
+}
+
+/// A later read cannot use the step: the book may have moved on since. The
+/// ledger's own `ALTERID` decides it, so changes to other masters after the
+/// create do not stop a verdict, and a change that came before the create is
+/// not forgotten by waiting.
+#[test]
+fn a_later_read_decides_the_step_by_the_ledgers_alter_id() {
+    let mut world = World::clean(suspense());
+    world.moment = Moment::Reconcile;
+    world.marks()[0] = mark(TARGET, 40);
+    assert_verified(&world, "changes to other masters after the create");
+    assert_eq!(world.judge().checks.target_mark_step_one, Check::Passed);
+    // The step-two case above, read again later: the other change came
+    // first, so the ledger is the second change after the intent. Its reason
+    // is the ledger's own, not a step that may have been one.
+    world.new_ledger_alter_id(9);
+    assert_doubt(
+        &world,
+        "a change before the create",
+        |checks| checks.target_mark_step_one,
+        "ledger_altered_since_create",
+    );
+    assert_eq!(world.judge().reasons, vec!["ledger_altered_since_create"]);
+    // An ALTERID at or below the intent's mark is not after it at all.
+    world.new_ledger_alter_id(7);
+    assert_eq!(
+        world.judge().reasons,
+        vec!["ledger_alter_id_not_after_intent"]
+    );
+}
+
+/// A clean create that the person then edits in Tally reads, on a later call
+/// with Tally's answer on file, as a ledger changed since its create: open,
+/// and saying so. Its step straight after the POST was one.
+#[test]
+fn a_ledger_edited_after_a_clean_create_stays_open_as_altered_since_create() {
+    let mut world = World::clean(suspense());
+    assert_verified(&world, "straight after the post");
+    world.moment = Moment::Reconcile;
+    world.marks()[0] = mark(TARGET, 9);
+    world.new_ledger_alter_id(9);
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert_eq!(judgement.checks.counters, Check::Passed);
+    assert_eq!(
+        judgement.checks.first_change_after_intent,
+        Check::NotChecked
+    );
+    assert_eq!(judgement.checks.target_mark_step_one, Check::Failed);
+    assert_eq!(judgement.reasons, vec!["ledger_altered_since_create"]);
+    assert_eq!(judgement.guid.as_deref(), Some(new_ledger()));
 }
 
 #[test]
@@ -747,6 +820,7 @@ fn all_passed_needs_every_check_counters_included() {
         opening_balance: Check::Passed,
         counters: Check::Passed,
         target_mark_moved: Check::Passed,
+        target_mark_step_one: Check::Passed,
         other_marks_unmoved: Check::Passed,
         pre_image_unchanged: Check::Passed,
         first_change_after_intent: Check::NotChecked,
@@ -804,6 +878,11 @@ fn all_passed_needs_every_check_counters_included() {
         .all_passed());
         assert!(!Checks {
             target_mark_moved: flipped,
+            ..all
+        }
+        .all_passed());
+        assert!(!Checks {
+            target_mark_step_one: flipped,
             ..all
         }
         .all_passed());
@@ -1238,16 +1317,113 @@ fn right_after_a_post_a_missing_ledger_is_never_confirmed_absent() {
 }
 
 #[test]
-fn a_moved_target_mark_forbids_confirmed_absent() {
-    for after in [8, 6] {
+fn a_mark_moved_forward_with_no_master_new_settles_as_absent_after_change() {
+    // The stuck case of #1713: the create ran and its ledger was deleted, or
+    // another master changed. The name is absent and no master is new.
+    for after in [8, 9] {
         let mut world = World::untouched(suspense());
         world.marks()[0] = mark(TARGET, after);
         let judgement = world.judge();
         assert_eq!(
             judgement.state,
-            MasterVerdictState::ReconciliationRequired,
+            MasterVerdictState::ConfirmedAbsentAfterChange,
             "{after}"
         );
+        assert_eq!(
+            judgement.reasons,
+            vec!["not_in_book", "mark_moved_since_intent"],
+            "{after}"
+        );
+        assert!(judgement.guid.is_none());
+        assert!(judgement.state.is_terminal());
+    }
+    // A mark that went back (a restore, replaced data) is not settled.
+    let mut world = World::untouched(suspense());
+    world.marks()[0] = mark(TARGET, 6);
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert_eq!(
+        judgement.reasons,
+        vec![
+            "mark_went_back_since_intent",
+            "name_not_one_ledger_in_book",
+            "target_mark_not_moved",
+            "counters_unavailable",
+        ]
+    );
+}
+
+/// A ledger or group the pre-image did not hold may be this create's ledger
+/// under another name: the batch stays open, whatever else holds.
+#[test]
+fn a_master_new_since_the_intent_keeps_an_absent_name_open() {
+    for kind in [MasterKind::Ledger, MasterKind::Group] {
+        let mut world = World::untouched(suspense());
+        world.marks()[0] = mark(TARGET, 9);
+        world.masters().push(master(
+            kind,
+            crate::synthetic_guid(0x5152),
+            8,
+            &["Renamed Since"],
+        ));
+        let judgement = world.judge();
+        assert_eq!(
+            judgement.state,
+            MasterVerdictState::ReconciliationRequired,
+            "{kind:?}"
+        );
+        assert!(judgement.name_absent_in_read_book, "{kind:?}");
+        assert!(
+            judgement.reasons.contains(&"master_new_since_intent"),
+            "{kind:?}: {:?}",
+            judgement.reasons
+        );
+    }
+}
+
+/// The other conditions of `confirmed_absent` hold for the new state too: a
+/// read straight after the post, counters that claim a write, a pre-image
+/// master changed or missing, or another company's mark moved never settle it.
+#[test]
+fn an_absent_name_after_a_change_needs_every_other_absent_condition() {
+    type Change = fn(&mut World);
+    let changes: [(&str, Change, MasterVerdictState); 5] = [
+        (
+            "straight after the post",
+            |world| world.moment = Moment::JustPosted,
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "counters claim a create",
+            |world| {
+                world.counters = Some(counters(1, 0, 0, 0));
+                world.answer_held = true;
+            },
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "a pre-image master changed",
+            |world| world.masters()[0].alter_id = 10,
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "a pre-image master missing",
+            |world| {
+                world.masters().remove(0);
+            },
+            MasterVerdictState::ReconciliationRequired,
+        ),
+        (
+            "another company's mark moved",
+            |world| world.marks()[1] = mark(other(), 4),
+            MasterVerdictState::MasterWriteLocatedElsewhere,
+        ),
+    ];
+    for (label, change, state) in changes {
+        let mut world = World::untouched(suspense());
+        world.marks()[0] = mark(TARGET, 9);
+        change(&mut world);
+        assert_eq!(world.judge().state, state, "{label}");
     }
 }
 
@@ -1405,8 +1581,9 @@ fn an_unavailable_read_back_is_not_absence() {
 fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact() {
     type Change = fn(&mut World);
     use MasterVerdictState::{
-        ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
-        PostedIntoExistingMaster, PostedUnattributed, PostedVerified, ReconciliationRequired,
+        ConfirmedAbsent, ConfirmedAbsentAfterChange, MasterWriteLocatedElsewhere,
+        MastersAfterPostUnconfirmed, PostedIntoExistingMaster, PostedUnattributed, PostedVerified,
+        ReconciliationRequired,
     };
     type Case = (
         &'static str,
@@ -1450,8 +1627,8 @@ fn every_verdict_state_and_reason_is_unchanged_and_the_fact_beside_them_is_exact
             "absent, target mark moved",
             World::untouched(suspense()),
             |world| world.marks()[0] = mark(TARGET, 8),
-            ReconciliationRequired,
-            vec!["name_not_one_ledger_in_book", "counters_unavailable"],
+            ConfirmedAbsentAfterChange,
+            vec!["not_in_book", "mark_moved_since_intent"],
             true,
         ),
         (
@@ -1766,5 +1943,201 @@ fn an_open_judgement_is_never_terminal() {
         assert!(!judgement.state.is_terminal(), "{verdict:?}");
         assert_eq!(judgement.guid, None);
         assert_eq!(judgement.reasons, vec!["a_reason"]);
+    }
+}
+
+/// The order an absent state rests on was measured on TallyPrime 7.2 Silver,
+/// licensed, only: every other Tally, an unknown one included, is not covered.
+#[test]
+fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
+    use crate::tally::ObservedTally;
+    use bridge_tally_core::LicenseTier;
+    let tally = |release: Option<&str>, tier: Option<LicenseTier>, education: bool| ObservedTally {
+        product: Some("TallyPrime".to_string()),
+        release: release.map(str::to_string),
+        license_tier: tier,
+        education,
+    };
+    for (seen, expected) in [
+        (
+            tally(Some("7.2"), Some(LicenseTier::Silver), false),
+            OrderCoverage::Measured,
+        ),
+        (
+            tally(Some("7.2"), Some(LicenseTier::Gold), false),
+            OrderCoverage::NotMeasured("absent_not_measured_on_gold"),
+        ),
+        (
+            tally(Some("7.1"), Some(LicenseTier::Silver), false),
+            OrderCoverage::NotMeasured("absent_not_measured_on_this_release"),
+        ),
+        (
+            tally(None, Some(LicenseTier::Silver), false),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
+        (
+            tally(Some("7.2"), None, false),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
+        (
+            tally(Some("7.2"), None, true),
+            OrderCoverage::NotMeasured("absent_not_measured_in_education"),
+        ),
+        (
+            ObservedTally::default(),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
+        (
+            ObservedTally {
+                product: Some("TallyPrime Edit Log".to_string()),
+                ..tally(Some("7.2"), Some(LicenseTier::Silver), false)
+            },
+            OrderCoverage::NotMeasured("absent_not_measured_on_this_product"),
+        ),
+        (
+            ObservedTally {
+                product: Some("tallyprime".to_string()),
+                ..tally(Some("7.2"), Some(LicenseTier::Silver), false)
+            },
+            OrderCoverage::NotMeasured("absent_not_measured_on_this_product"),
+        ),
+        (
+            ObservedTally {
+                product: None,
+                ..tally(Some("7.2"), Some(LicenseTier::Silver), false)
+            },
+            OrderCoverage::NotMeasured("absent_tally_release_not_known"),
+        ),
+    ] {
+        assert_eq!(OrderCoverage::of(&seen), expected, "{seen:?}");
+    }
+}
+
+/// On a Tally not covered, neither absent state is given: the batch stays open
+/// with the reason that names the Tally, and the rest of the read is judged.
+#[test]
+fn neither_absent_state_is_given_on_a_tally_not_covered() {
+    for reason in [
+        "absent_not_measured_on_this_product",
+        "absent_not_measured_on_gold",
+        "absent_not_measured_on_this_release",
+        "absent_tally_release_not_known",
+        "absent_not_measured_in_education",
+    ] {
+        for after in [7, 8] {
+            let mut world = World::untouched(suspense());
+            world.marks()[0] = mark(TARGET, after);
+            world.read.order_coverage = OrderCoverage::NotMeasured(reason);
+            let judgement = world.judge();
+            assert_eq!(
+                judgement.state,
+                MasterVerdictState::ReconciliationRequired,
+                "{reason} {after}"
+            );
+            assert!(judgement.reasons.contains(&reason), "{reason} {after}");
+            assert!(!judgement.state.is_terminal());
+        }
+    }
+}
+
+/// On a Tally not covered, an absent name kept open names both the Tally and
+/// what else the read showed: a master new since the send, or a mark that went
+/// back.
+#[test]
+fn an_uncovered_absent_name_names_the_tally_and_the_cause() {
+    let uncovered = "absent_not_measured_on_this_release";
+    let mut new_master = World::untouched(suspense());
+    new_master.marks()[0] = mark(TARGET, 9);
+    new_master.masters().push(master(
+        MasterKind::Ledger,
+        crate::synthetic_guid(0x5153),
+        8,
+        &["Renamed Since"],
+    ));
+    let mut went_back = World::untouched(suspense());
+    went_back.marks()[0] = mark(TARGET, 6);
+    for (mut world, cause) in [
+        (new_master, "master_new_since_intent"),
+        (went_back, "mark_went_back_since_intent"),
+    ] {
+        world.read.order_coverage = OrderCoverage::NotMeasured(uncovered);
+        let judgement = world.judge();
+        assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+        assert!(
+            judgement.reasons.contains(&uncovered),
+            "{cause}: {:?}",
+            judgement.reasons
+        );
+        assert!(
+            judgement.reasons.contains(&cause),
+            "{cause}: {:?}",
+            judgement.reasons
+        );
+    }
+}
+
+/// The captured company lists, read by the parser a shipped build uses: the
+/// TallyPrime 7.2 Silver one is measured and the 7.1 Silver one is not.
+/// Brackets that disagree, or an answer that does not parse, say nothing of
+/// the Tally, so neither is measured.
+#[test]
+fn the_captured_company_lists_give_the_coverage_through_the_real_parser() {
+    use crate::tally::ObservedTally;
+    let decoded = |bytes: &[u8]| {
+        let units: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect();
+        String::from_utf16(&units)
+            .unwrap()
+            .trim_start_matches('\u{feff}')
+            .to_string()
+    };
+    let seven_two_list = decoded(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-ledger-l1/s6-03nov-e-1.utf16le.xml"
+    ));
+    let seven_two = ObservedTally::of_company_list(&seven_two_list);
+    let seven_one = ObservedTally::of_company_list(&decoded(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-release-companies.utf16le.xml"
+    )));
+    assert_eq!(seven_two.release.as_deref(), Some("7.2"));
+    assert_eq!(seven_one.release.as_deref(), Some("7.1"));
+    assert_eq!(seven_two.product.as_deref(), Some("TallyPrime"));
+    assert_eq!(OrderCoverage::of(&seven_two), OrderCoverage::Measured);
+    // NOT a capture: the 7.2 capture with one element changed, its product
+    // name, since no company list from another product is captured. Release
+    // and tier alone do not pin the product: another product of the same
+    // release and tier can open the same data folder.
+    let product = r#"<PRODUCTNAME TYPE="String">TallyPrime</PRODUCTNAME>"#;
+    assert_eq!(seven_two_list.matches(product).count(), 1);
+    let other_product = ObservedTally::of_company_list(&seven_two_list.replace(
+        product,
+        r#"<PRODUCTNAME TYPE="String">TallyPrime Edit Log</PRODUCTNAME>"#,
+    ));
+    assert_eq!(other_product.release.as_deref(), Some("7.2"));
+    assert_eq!(
+        OrderCoverage::of(&other_product),
+        OrderCoverage::NotMeasured("absent_not_measured_on_this_product")
+    );
+    assert_eq!(
+        OrderCoverage::of(&ObservedTally::agreed(seven_two.clone(), seven_two.clone())),
+        OrderCoverage::Measured
+    );
+    assert_eq!(
+        OrderCoverage::of(&seven_one),
+        OrderCoverage::NotMeasured("absent_not_measured_on_this_release")
+    );
+    for (opening, closing) in [
+        (seven_two.clone(), seven_one.clone()),
+        (seven_one, seven_two.clone()),
+        (
+            seven_two,
+            ObservedTally::of_company_list("<ENVELOPE></ENVELOPE>"),
+        ),
+    ] {
+        assert_eq!(
+            OrderCoverage::of(&ObservedTally::agreed(opening, closing)),
+            OrderCoverage::NotMeasured("absent_tally_release_not_known")
+        );
     }
 }

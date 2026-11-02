@@ -1,5 +1,6 @@
-//! The ledger census: how many ledgers a book holds, counted from the ledgers'
-//! GUIDs by AlterID span instead of read as ledgers (#679).
+//! The AlterID census: how many rows a book's collection holds, counted from
+//! their GUIDs by AlterID span instead of read whole. First the ledger census
+//! (#679), described below.
 //!
 //! A book's ledger count decides how its compliance master is read (whole, in
 //! parent parts, or refused). Until now the count came from reading the whole
@@ -18,14 +19,21 @@
 //! change while they were read (the caller brackets the census with the
 //! opening and closing company extent; nothing here proves that).
 //!
+//! The plan and the census are generic over the collection counted
+//! ([`CensusCollection`]): [`Ledgers`], which the compliance read sends, and
+//! [`StockItems`] (#1233), whose request no read sends yet. The ledger names
+//! (`LedgerCensus` and the rest) are that collection's instances, and the
+//! ledger census's codes, texts and request bytes are as they were.
+//!
 //! The rules are types rather than reminders (AGENTS.md P2):
-//! - a [`LedgerCensusSlice`] can only come from a [`LedgerCensusPlan`], so a
-//!   slice with `after >= through`, or one past the width the caller bounded,
-//!   is not constructible;
-//! - a [`LedgerCensus`] hands out its slices in order, one at a time, and
-//!   [`LedgerCensus::finish`] is the only way to obtain a [`LedgerCount`]: it
+//! - a [`CensusSlice`] can only come from a [`CensusPlan`], so a slice with
+//!   `after >= through`, or one past the width the caller bounded, is not
+//!   constructible, and a slice of one collection's plan is not accepted by
+//!   another collection's request;
+//! - a [`Census`] hands out its slices in order, one at a time, and
+//!   [`Census::finish`] is the only way to obtain a [`CensusCount`]: it
 //!   refuses a census that stopped early, that saw a GUID twice, or that saw
-//!   no ledger at all.
+//!   no row at all.
 //!
 //! What is measured (docs/tally/TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md,
 //! section 11e, PARTIAL): the `$AlterID > a AND $AlterID <= b` formula, on three
@@ -36,26 +44,87 @@
 //! argument chosen by the caller.
 
 use std::collections::HashSet;
+use std::fmt;
+use std::marker::PhantomData;
 
 use crate::xml_text::escape_text as xml_escape;
 
 /// The name of the `SYSTEM` formula a census slice request adds.
 pub const CENSUS_FORMULA_NAME: &str = "BridgeSpan";
 
+/// What a census counts: the rows its slices ask for. Each collection names its rows in its
+/// refusals and has its own codes, so a refusal says which census refused. A slice of one
+/// collection's plan cannot be passed to another collection's request.
+pub trait CensusCollection {
+    /// The row's name in a refusal's text, singular.
+    const NOUN: &'static str;
+    /// The refusal codes.
+    const CODES: CensusCodes;
+}
+
+/// One code per [`CensusError`] variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CensusCodes {
+    pub plan_invalid: &'static str,
+    pub too_many_slices: &'static str,
+    pub slice_over_bound: &'static str,
+    pub duplicate_identity: &'static str,
+    pub census_empty: &'static str,
+    pub incomplete: &'static str,
+}
+
+/// The ledgers of `List of Ledgers` (#679).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ledgers {}
+
+impl CensusCollection for Ledgers {
+    const NOUN: &'static str = "ledger";
+    const CODES: CensusCodes = CensusCodes {
+        plan_invalid: "ledger_span_plan_invalid",
+        too_many_slices: "ledger_span_too_many_slices",
+        slice_over_bound: "ledger_span_slice_over_bound",
+        duplicate_identity: "ledger_span_duplicate_identity",
+        census_empty: "ledger_span_census_empty",
+        incomplete: "ledger_span_incomplete",
+    };
+}
+
+/// A company's stock items (#1233). Its request is a candidate: no read sends it yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StockItems {}
+
+impl CensusCollection for StockItems {
+    const NOUN: &'static str = "stock item";
+    const CODES: CensusCodes = CensusCodes {
+        plan_invalid: "stock_item_span_plan_invalid",
+        too_many_slices: "stock_item_span_too_many_slices",
+        slice_over_bound: "stock_item_span_slice_over_bound",
+        duplicate_identity: "stock_item_span_duplicate_identity",
+        census_empty: "stock_item_span_census_empty",
+        incomplete: "stock_item_span_incomplete",
+    };
+}
+
+pub type LedgerCensusError = CensusError<Ledgers>;
+pub type LedgerCensusSlice = CensusSlice<Ledgers>;
+pub type LedgerCensusPlan = CensusPlan<Ledgers>;
+pub type LedgerCensus = Census<Ledgers>;
+pub type LedgerCount = CensusCount<Ledgers>;
+
 /// The bounds a census plan must fit. The caller chooses them from what it has
 /// measured; nothing in this module knows a response size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CensusLimits {
-    /// The most AlterIDs one slice spans, hence the most ledgers it may return.
+    /// The most AlterIDs one slice spans, hence the most rows it may return.
     pub slice_width: u64,
     /// The most slices one census may make.
     pub max_slices: usize,
 }
 
 /// Why a census could not be planned, or why its slices did not add up to a
-/// ledger count. Every variant is data-free.
+/// count. No variant carries book data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LedgerCensusError {
+pub enum CensusError<C> {
     /// The plan was asked for a mark of zero or a slice width of zero.
     PlanInvalid,
     /// The mark needs more slices than the limit allows.
@@ -65,52 +134,69 @@ pub enum LedgerCensusError {
     SliceOverBound { rows: u64 },
     /// A GUID came back twice, in one slice or in two.
     DuplicateIdentity,
-    /// Every slice answered with no ledger. A book of no ledgers is not
+    /// Every slice answered with no row. A collection with no rows is not
     /// distinguishable here from a company that is closed or absent (both
     /// answer an empty slice with the same body), so it is refused.
     CensusEmpty,
     /// `finish` was called before every slice was accepted.
     Incomplete,
+    /// Never built: it carries the collection's type.
+    #[doc(hidden)]
+    Collection(std::convert::Infallible, PhantomData<C>),
 }
 
-impl LedgerCensusError {
+impl<C: CensusCollection> CensusError<C> {
     /// A stable, data-free name for the failure, for a refusal's `cause`.
-    pub const fn safe_code(self) -> &'static str {
+    pub fn safe_code(self) -> &'static str {
+        let codes = C::CODES;
         match self {
-            Self::PlanInvalid => "ledger_span_plan_invalid",
-            Self::TooManySlices { .. } => "ledger_span_too_many_slices",
-            Self::SliceOverBound { .. } => "ledger_span_slice_over_bound",
-            Self::DuplicateIdentity => "ledger_span_duplicate_identity",
-            Self::CensusEmpty => "ledger_span_census_empty",
-            Self::Incomplete => "ledger_span_incomplete",
+            Self::PlanInvalid => codes.plan_invalid,
+            Self::TooManySlices { .. } => codes.too_many_slices,
+            Self::SliceOverBound { .. } => codes.slice_over_bound,
+            Self::DuplicateIdentity => codes.duplicate_identity,
+            Self::CensusEmpty => codes.census_empty,
+            Self::Incomplete => codes.incomplete,
+            Self::Collection(never, _) => match never {},
         }
     }
 }
 
-impl std::fmt::Display for LedgerCensusError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(match self {
-            Self::PlanInvalid => "the ledger census plan was invalid",
-            Self::TooManySlices { .. } => "the ledger census needs more slices than allowed",
-            Self::SliceOverBound { .. } => "a ledger census slice returned more rows than it spans",
-            Self::DuplicateIdentity => "the ledger census saw one ledger twice",
-            Self::CensusEmpty => "the ledger census found no ledger",
-            Self::Incomplete => "the ledger census stopped before its last slice",
-        })
+impl<C: CensusCollection> fmt::Display for CensusError<C> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let noun = C::NOUN;
+        match self {
+            Self::PlanInvalid => write!(formatter, "the {noun} census plan was invalid"),
+            Self::TooManySlices { .. } => {
+                write!(
+                    formatter,
+                    "the {noun} census needs more slices than allowed"
+                )
+            }
+            Self::SliceOverBound { .. } => write!(
+                formatter,
+                "a {noun} census slice returned more rows than it spans"
+            ),
+            Self::DuplicateIdentity => write!(formatter, "the {noun} census saw one {noun} twice"),
+            Self::CensusEmpty => write!(formatter, "the {noun} census found no {noun}"),
+            Self::Incomplete => {
+                write!(formatter, "the {noun} census stopped before its last slice")
+            }
+            Self::Collection(never, _) => match *never {},
+        }
     }
 }
 
-impl std::error::Error for LedgerCensusError {}
+impl<C: CensusCollection + fmt::Debug> std::error::Error for CensusError<C> {}
 
-/// One slice `(after, through]` of AlterID. Only a [`LedgerCensusPlan`] builds
-/// one.
+/// One slice `(after, through]` of AlterID. Only a [`CensusPlan`] builds one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LedgerCensusSlice {
+pub struct CensusSlice<C> {
     after: u64,
     through: u64,
+    collection: PhantomData<C>,
 }
 
-impl LedgerCensusSlice {
+impl<C> CensusSlice<C> {
     /// The AlterID the slice starts after (exclusive).
     pub fn after(&self) -> u64 {
         self.after
@@ -121,7 +207,7 @@ impl LedgerCensusSlice {
         self.through
     }
 
-    /// The most ledgers the slice can return: AlterIDs are distinct.
+    /// The most rows the slice can return: AlterIDs are distinct.
     pub fn width(&self) -> u64 {
         self.through - self.after
     }
@@ -129,43 +215,46 @@ impl LedgerCensusSlice {
 
 /// The slices that cover `(0, mark]`, each at most the limit's width.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LedgerCensusPlan {
-    slices: Vec<LedgerCensusSlice>,
+pub struct CensusPlan<C> {
+    slices: Vec<CensusSlice<C>>,
 }
 
-impl LedgerCensusPlan {
-    pub fn new(mark: u64, limits: CensusLimits) -> Result<Self, LedgerCensusError> {
+impl<C: Copy> CensusPlan<C> {
+    pub fn new(mark: u64, limits: CensusLimits) -> Result<Self, CensusError<C>> {
         if mark == 0 || limits.slice_width == 0 || limits.max_slices == 0 {
-            return Err(LedgerCensusError::PlanInvalid);
+            return Err(CensusError::PlanInvalid);
         }
         // Whole slices plus a remainder, without the `mark + width - 1` that
         // could overflow.
         let slices =
             mark / limits.slice_width + u64::from(!mark.is_multiple_of(limits.slice_width));
         if slices > limits.max_slices as u64 {
-            return Err(LedgerCensusError::TooManySlices { slices });
+            return Err(CensusError::TooManySlices { slices });
         }
         let mut planned = Vec::with_capacity(slices as usize);
         let mut after = 0_u64;
         while after < mark {
             let through = after.saturating_add(limits.slice_width).min(mark);
-            planned.push(LedgerCensusSlice { after, through });
+            planned.push(CensusSlice {
+                after,
+                through,
+                collection: PhantomData,
+            });
             after = through;
         }
         Ok(Self { slices: planned })
     }
 
-    pub fn slices(&self) -> &[LedgerCensusSlice] {
+    pub fn slices(&self) -> &[CensusSlice<C>] {
         &self.slices
     }
 }
 
-/// A ledger count that only a complete, duplicate-free, non-empty census
-/// produces.
+/// A count that only a complete census, with no GUID seen twice and at least one row, produces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LedgerCount(u64);
+pub struct CensusCount<C>(u64, PhantomData<C>);
 
-impl LedgerCount {
+impl<C> CensusCount<C> {
     pub fn get(self) -> u64 {
         self.0
     }
@@ -174,14 +263,14 @@ impl LedgerCount {
 /// A census in progress: its slices are taken in order and each slice's GUIDs
 /// are accepted before the next is offered.
 #[derive(Debug)]
-pub struct LedgerCensus {
-    plan: LedgerCensusPlan,
+pub struct Census<C> {
+    plan: CensusPlan<C>,
     accepted: usize,
     seen: HashSet<String>,
 }
 
-impl LedgerCensus {
-    pub fn new(plan: LedgerCensusPlan) -> Self {
+impl<C: Copy> Census<C> {
+    pub fn new(plan: CensusPlan<C>) -> Self {
         Self {
             plan,
             accepted: 0,
@@ -190,24 +279,24 @@ impl LedgerCensus {
     }
 
     /// The slice to ask for next, or `None` once every slice was accepted.
-    pub fn next_slice(&self) -> Option<LedgerCensusSlice> {
+    pub fn next_slice(&self) -> Option<CensusSlice<C>> {
         self.plan.slices.get(self.accepted).copied()
     }
 
     /// Takes the GUIDs one slice returned. A slice holding more rows than its
     /// span, or a GUID already seen, refuses the census; nothing is kept from a
     /// refused slice.
-    pub fn accept(&mut self, guids: Vec<String>) -> Result<(), LedgerCensusError> {
-        let slice = self.next_slice().ok_or(LedgerCensusError::Incomplete)?;
+    pub fn accept(&mut self, guids: Vec<String>) -> Result<(), CensusError<C>> {
+        let slice = self.next_slice().ok_or(CensusError::Incomplete)?;
         let rows = guids.len() as u64;
         if rows > slice.width() {
-            return Err(LedgerCensusError::SliceOverBound { rows });
+            return Err(CensusError::SliceOverBound { rows });
         }
         let mut fresh = HashSet::with_capacity(guids.len());
         for guid in guids {
             let guid = guid.to_ascii_lowercase();
             if self.seen.contains(&guid) || !fresh.insert(guid) {
-                return Err(LedgerCensusError::DuplicateIdentity);
+                return Err(CensusError::DuplicateIdentity);
             }
         }
         self.seen.extend(fresh);
@@ -215,16 +304,15 @@ impl LedgerCensus {
         Ok(())
     }
 
-    /// The ledger count, once every slice was accepted and at least one ledger
-    /// was seen.
-    pub fn finish(self) -> Result<LedgerCount, LedgerCensusError> {
+    /// The count, once every slice was accepted and at least one row was seen.
+    pub fn finish(self) -> Result<CensusCount<C>, CensusError<C>> {
         if self.accepted != self.plan.slices.len() {
-            return Err(LedgerCensusError::Incomplete);
+            return Err(CensusError::Incomplete);
         }
         if self.seen.is_empty() {
-            return Err(LedgerCensusError::CensusEmpty);
+            return Err(CensusError::CensusEmpty);
         }
-        Ok(LedgerCount(self.seen.len() as u64))
+        Ok(CensusCount(self.seen.len() as u64, PhantomData))
     }
 }
 
@@ -266,6 +354,26 @@ pub fn render_ledger_census_slice_request(company: &str, slice: &LedgerCensusSli
         </DESC>
     </BODY>
 </ENVELOPE>"#,
+        company = xml_escape(company),
+        formula = CENSUS_FORMULA_NAME,
+        after = slice.after,
+        through = slice.through,
+    )
+}
+
+/// The census request for one slice of stock items: a `StockItem` collection
+/// fetching each item's GUID, with the company's GUID computed on every row,
+/// restricted to the slice's AlterID span by the ledger census's formula. A
+/// CANDIDATE (#1233): a request of this kind (GUID only, the same formula and
+/// compute) was measured on two books by a lab script, not as these bytes, so
+/// no read sends it until it is observed through Bridge on a lab book. Like the
+/// ledger census, it has no period variables: AlterID is not period-scoped.
+pub fn render_stock_item_census_slice_request(
+    company: &str,
+    slice: &CensusSlice<StockItems>,
+) -> String {
+    format!(
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>BridgeStockItemCensus</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="{formula}">$AlterID &gt; {after} AND $AlterID &lt;= {through}</SYSTEM><COLLECTION NAME="BridgeStockItemCensus" ISMODIFY="No"><TYPE>StockItem</TYPE><FETCH>GUID</FETCH><COMPUTE>BRIDGECOMPANYGUID:$GUID:Company:##SVCurrentCompany</COMPUTE><FILTERS>{formula}</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
         formula = CENSUS_FORMULA_NAME,
         after = slice.after,

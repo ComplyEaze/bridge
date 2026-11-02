@@ -169,7 +169,11 @@ fn listed_tools(settings: &[(&str, &str)]) -> Vec<String> {
 #[test]
 fn the_started_program_lists_tools_by_its_posting_and_import_settings() {
     let posting = ["post_import", "acknowledge_post_review"];
-    let preparing = ["build_import_xml", "parse_bank_statement"];
+    let preparing = [
+        "build_import_xml",
+        "parse_bank_statement",
+        "parse_bank_statement_csv",
+    ];
     let on = listed_tools(&[("BRIDGE_AGENT_ENABLE_WRITES", "true")]);
     for name in posting.iter().chain(&preparing) {
         assert!(on.iter().any(|tool| tool == name), "{name}: {on:?}");

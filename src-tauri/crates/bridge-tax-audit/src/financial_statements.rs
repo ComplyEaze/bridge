@@ -680,9 +680,9 @@ closing value shows a closing stock of zero; a Summary that lists no item at all
 ends. A ratio on Tally's item-level Stock Summary values is not shown here; if one is wanted, both \
 opening and closing stock must be taken on that same basis."
             .to_string(),
-        "Closing stock is the client's own manually-entered Stock-in-Hand ledger value (accounts \
-not integrated with inventory), not an independently counted or valued physical stock figure; the \
-books cannot show whether it was actually verified."
+        "Closing stock is the Stock-in-Hand ledger balance the client recorded in the books \
+(accounts not integrated with inventory), not an independently counted or valued physical stock \
+figure; the books cannot show whether it was actually verified."
             .to_string(),
         ]
     };
@@ -1468,6 +1468,36 @@ P&L/Balance Sheet report"
         );
         assert_eq!(fig(&r, "closing_stock"), Value::Int(550_000));
         assert_eq!(fig(&r, "gross_profit"), Value::Int(630_000));
+    }
+
+    /// On the ledger basis the two limits are the balance-sheet basis and the closing-stock
+    /// sentence, whole and in that order, with or without a report part to tie to. This is the test
+    /// book of the closing-stock wording difference declared in `tests/fixtures/PROVENANCE.md`.
+    #[test]
+    fn a_ledger_stock_book_says_its_closing_stock_is_what_the_client_recorded() {
+        let ledger_limits = [
+            "The gross profit ratio uses the stock values in the books (balance-sheet basis) at both \
+ends. A ratio on Tally's item-level Stock Summary values is not shown here; if one is wanted, both \
+opening and closing stock must be taken on that same basis.",
+            "Closing stock is the Stock-in-Hand ledger balance the client recorded in the books \
+(accounts not integrated with inventory), not an independently counted or valued physical stock \
+figure; the books cannot show whether it was actually verified.",
+        ];
+        let b = book();
+        assert_eq!(stock_basis(&b, false), StockBasis::Ledgers);
+
+        let without = run(&b, &rules(), &BTreeSet::new(), None).unwrap();
+        assert_eq!(without.findings[0].limits.len(), 3);
+        assert_eq!(without.findings[0].limits[..2], ledger_limits);
+
+        let with = run(
+            &b,
+            &rules(),
+            &BTreeSet::new(),
+            Some(&report(480_000, Some(550_000))),
+        )
+        .unwrap();
+        assert_eq!(with.findings[0].limits, ledger_limits);
     }
 
     /// A term that is not known is reported and never read as zero: no gross or net profit, no

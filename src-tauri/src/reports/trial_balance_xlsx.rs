@@ -129,9 +129,7 @@ pub fn render_trial_balance_xlsx(
     if let Some(limitation) = &movements_differ {
         sheet.write_string_with_format(row, 0, "Ledgers that do not add up", &bold)?;
         sheet.write_string_with_format(row, 1, limitation, &wrapped)?;
-        // About 660 characters: at the 270-character, six-line calibration of the limitation row
-        // above, about fifteen lines.
-        sheet.set_row_height(row, 225)?;
+        sheet.set_row_height(row, wrapped_row_height(limitation.chars().count()))?;
         row += 1;
     }
     row += 1;
@@ -285,6 +283,15 @@ pub fn render_trial_balance_xlsx(
     workbook
         .save_to_buffer()
         .map_err(TrialBalanceXlsxError::from)
+}
+
+/// The height, in points, of a row whose column-B text of `chars` characters wraps at the
+/// committed width. The limitation row's calibration (271 characters in six lines of 90 points)
+/// gives 45 characters and 15 points a line; one line more is slack for word breaks, and Excel's
+/// largest row height (409 points) caps it.
+fn wrapped_row_height(chars: usize) -> u32 {
+    let lines = u32::try_from(chars.div_ceil(45).saturating_add(1)).unwrap_or(u32::MAX);
+    lines.saturating_mul(15).min(409)
 }
 
 fn write_amount(

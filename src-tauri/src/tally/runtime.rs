@@ -13,16 +13,16 @@ use crate::warning_codes::WarningCode;
 use bridge_tally_core::{DateSpan, ExactDecimal, TallyDate};
 use bridge_tally_protocol::native_outstandings::{
     compute_native_outstandings_with_exclusions, parse_company_currency,
-    parse_company_currency_name, parse_currency_master_list, parse_native_bill_rows,
+    parse_company_currency_name, parse_currency_master_list, parse_native_bill_rows_unadmitted,
     parse_native_group_snapshot, parse_native_ledger_snapshot_classified,
     render_company_base_currency_request, render_company_currency_request,
     render_company_currency_request_with_originalname, render_native_bills_request,
     render_native_group_snapshot_request, render_native_ledger_export_request,
     render_native_ledger_snapshot_request, AgeingAnchor as NativeAgeingAnchor, BaseCurrencyName,
     ClassifiedLedgerSnapshot, CompanyCurrency, ForeignCurrencyLedger, IdentifiedBaseCurrency,
-    LedgerCurrencyRefusal, NativeBillRow, NativeBillsReportKind, NativeGroupSnapshot,
-    NativeLedgerExportPeriod, NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod,
-    NativeMasterSnapshot, NativeOutstandingsError, NativeOverdueCrosscheck,
+    LedgerCurrencyRefusal, NativeBillsReportKind, NativeGroupSnapshot, NativeLedgerExportPeriod,
+    NativeLedgerExportPeriodError, NativeLedgerSnapshotPeriod, NativeMasterSnapshot,
+    NativeOutstandingsError, NativeOverdueCrosscheck,
 };
 use bridge_tally_protocol::outstandings_shared::{
     CompanyBookExtent, DateBoundaryProfile, OutstandingsReport,
@@ -79,6 +79,10 @@ mod stock_summary_tests;
 mod negative_stock;
 pub(crate) use negative_stock::{NegativeStockAnswer, NegativeStockReadError};
 
+#[path = "runtime_stock_by_godown.rs"]
+mod stock_by_godown;
+pub(crate) use stock_by_godown::{StockByGodownRead, StockByGodownReadError};
+
 #[path = "runtime_trial_balance.rs"]
 mod trial_balance;
 pub(crate) use trial_balance::SingleCurrencyTrialBalance;
@@ -112,6 +116,60 @@ pub struct AgentRead {
     /// The stricter of the date-boundary profiles the read's opening and
     /// closing identity brackets observed: Education if either reported it.
     pub boundary_profile: DateBoundaryProfile,
+    /// The Tally both brackets saw: its release and licence tier, or nothing
+    /// known when they differ.
+    pub observed_tally: ObservedTally,
+}
+
+/// What an identity bracket's company list said of the Tally that answered:
+/// its product, its release and its licence tier (Silver or Gold, none in
+/// Education). A field is `None` when the capability answer did not give it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ObservedTally {
+    pub product: Option<String>,
+    pub release: Option<String>,
+    pub license_tier: Option<bridge_tally_core::LicenseTier>,
+    pub education: bool,
+}
+
+impl ObservedTally {
+    /// What a `CompanyListV2` answer says of the Tally that answered: by the
+    /// full capability observation, and Education also by any `EDUMODE` field
+    /// saying anything but `No` when that observation does not parse.
+    pub(crate) fn of_company_list(xml: &str) -> Self {
+        let observation =
+            bridge_tally_protocol::parse_company_gateway_capability_observation(xml).ok();
+        let education = observation
+            .as_ref()
+            .is_some_and(|observation| observation.educational_mode)
+            || bridge_tally_protocol::company_list_may_be_in_educational_mode(xml);
+        observation.map_or(
+            Self {
+                education,
+                ..Self::default()
+            },
+            |observation| Self {
+                product: Some(observation.product),
+                release: observation.release,
+                license_tier: match (education, observation.silver, observation.gold) {
+                    (false, true, false) => Some(bridge_tally_core::LicenseTier::Silver),
+                    (false, false, true) => Some(bridge_tally_core::LicenseTier::Gold),
+                    _ => None,
+                },
+                education,
+            },
+        )
+    }
+
+    /// The Tally a paired read was served by: what both of its identity
+    /// brackets said, or nothing known when they differ.
+    pub(crate) fn agreed(opening: Self, closing: Self) -> Self {
+        if opening == closing {
+            opening
+        } else {
+            Self::default()
+        }
+    }
 }
 
 /// What the endpoint queue read to admit a post, before the aim: the reads of
@@ -137,7 +195,8 @@ async fn fetch_admitted_agent_read(
     identity: &VerifiedCompanyIdentity,
     request: super::agent_read_request::AgentReadRequest,
 ) -> anyhow::Result<(AgentRead, RuntimeReadEvidence)> {
-    let opening = bracket_verified_company_identity_observing_mode(client, identity).await?;
+    let (opening, opening_tally) =
+        bracket_verified_company_identity_observing_mode(client, identity).await?;
     if !request.window_accepted_by(opening) {
         return Err(EducationBoundaryRefusal.into());
     }
@@ -146,9 +205,10 @@ async fn fetch_admitted_agent_read(
         .fetch_native_report_paired_with_evidence(request_xml.clone())
         .await?;
     let evidence = RuntimeReadEvidence::paired(&request_xml, encoded_sha256.clone(), encoded_bytes);
-    let closing = bracket_verified_company_identity_observing_mode(client, identity)
-        .await
-        .map_err(|error| with_read_evidence(error, evidence.clone()))?;
+    let (closing, closing_tally) =
+        bracket_verified_company_identity_observing_mode(client, identity)
+            .await
+            .map_err(|error| with_read_evidence(error, evidence.clone()))?;
     // Education reported only after the read may have served it: which mode
     // answered is unknown, so the read is refused as if it had been sent in
     // Education (a licence server dropping out mid-read does this).
@@ -169,6 +229,7 @@ async fn fetch_admitted_agent_read(
             encoded_bytes,
             encoded_sha256,
             boundary_profile: profile,
+            observed_tally: ObservedTally::agreed(opening_tally, closing_tally),
         },
         evidence,
     ))
@@ -653,7 +714,7 @@ async fn fetch_admitted_audit_part(
     // As for every admitted agent read (bridge#581): the mode comes from the
     // bracket's own company list, and a window Education would serve empty is
     // refused before it is sent.
-    let opening = bracket_verified_company_identity_observing_mode(client, identity).await?;
+    let (opening, _) = bracket_verified_company_identity_observing_mode(client, identity).await?;
     if !request.window_accepted_by(opening) {
         return Err(EducationBoundaryRefusal.into());
     }
@@ -696,7 +757,7 @@ async fn fetch_admitted_audit_part(
             evidence.clone(),
         ));
     }
-    let closing = bracket_verified_company_identity_observing_mode(client, identity)
+    let (closing, _) = bracket_verified_company_identity_observing_mode(client, identity)
         .await
         .map_err(|error| with_read_evidence(error, evidence.clone()))?;
     // Education reported only after the part may have been served by it: which
@@ -1150,14 +1211,16 @@ async fn bracket_verified_company_identity(
 async fn bracket_verified_company_identity_observing_mode(
     client: &TallyClient,
     identity: &VerifiedCompanyIdentity,
-) -> anyhow::Result<DateBoundaryProfile> {
-    let (companies, _, education) = client.fetch_companies_observing_education_mode().await?;
+) -> anyhow::Result<(DateBoundaryProfile, ObservedTally)> {
+    let (companies, _, education, tally) =
+        client.fetch_companies_observing_education_mode().await?;
     admit_company_identity(&companies, identity)?;
-    Ok(if education {
+    let profile = if education {
         DateBoundaryProfile::EducationRestricted
     } else {
         DateBoundaryProfile::ModeAgnostic
-    })
+    };
+    Ok((profile, tally))
 }
 
 /// A read refused because Education mode would not honour its
@@ -2264,20 +2327,6 @@ pub(crate) fn inr_witness_for_tests(
             )
             .unwrap(),
     }
-}
-
-/// Every bill row whose party is a foreign-currency ledger left out
-/// (bridge#551).
-fn without_excluded_parties(
-    rows: Vec<NativeBillRow>,
-    foreign: &[ForeignCurrencyLedger],
-    mixed: &[String],
-) -> Vec<NativeBillRow> {
-    rows.into_iter()
-        .filter(|row| {
-            !foreign.iter().any(|ledger| ledger.ledger == row.party) && !mixed.contains(&row.party)
-        })
-        .collect()
 }
 
 /// What a native outstandings read compares each ledger's own currency with
@@ -4516,11 +4565,14 @@ impl TallyRuntime {
 
                     let closing_evidence = confirm_read_boundary(&client, boundary_profile).await?;
                     read_evidence = read_evidence.clone().combine(closing_evidence);
+                    // A bill's closing amount is admitted only once its
+                    // party is known not to be set aside below (bridge#2071).
                     let receivable_rows =
-                        parse_native_bill_rows(&receivable_body, &books_from, &as_of)
+                        parse_native_bill_rows_unadmitted(&receivable_body, &books_from, &as_of)
                             .map_err(|error| error.in_report("receivable"))?;
-                    let payable_rows = parse_native_bill_rows(&payable_body, &books_from, &as_of)
-                        .map_err(|error| error.in_report("payable"))?;
+                    let payable_rows =
+                        parse_native_bill_rows_unadmitted(&payable_body, &books_from, &as_of)
+                            .map_err(|error| error.in_report("payable"))?;
                     let snapshot = match classify_against {
                         LedgerClassification::Against(base) => {
                             parse_native_ledger_snapshot_classified(&ledger_body, &base)
@@ -4571,9 +4623,12 @@ impl TallyRuntime {
                     // figure, the statement rows included.
                     let foreign = snapshot.foreign;
                     let mixed = snapshot.mixed;
-                    let receivable_rows =
-                        without_excluded_parties(receivable_rows, &foreign, &mixed);
-                    let payable_rows = without_excluded_parties(payable_rows, &foreign, &mixed);
+                    let receivable_rows = receivable_rows
+                        .admit_except(&foreign, &mixed)
+                        .map_err(|error| error.in_report("receivable"))?;
+                    let payable_rows = payable_rows
+                        .admit_except(&foreign, &mixed)
+                        .map_err(|error| error.in_report("payable"))?;
                     let ledger_rows = snapshot.base;
                     let group_rows =
                         parse_native_group_snapshot(&group_body, expected_company_guid)?;

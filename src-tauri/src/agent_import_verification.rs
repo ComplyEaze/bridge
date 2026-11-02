@@ -805,7 +805,7 @@ pub(super) fn unmatched_cause(
 /// Whether a post's answer has the captured shape of a post Tally rejected
 /// whole: every counter reported, `CREATED 0`, `EXCEPTIONS` equal to the
 /// `sent` vouchers and every other counter zero (§9.2; bridge#1108).
-fn answer_reported_none_created(
+pub(super) fn answer_reported_none_created(
     counters: &bridge_tally_protocol::TallyImportResult,
     sent: u64,
 ) -> bool {
@@ -873,7 +873,7 @@ pub(super) fn plain_next_step(status: &str) -> Option<&'static str> {
         "bound_not_in_window" => Some("This voucher was posted, but it is not in the book for these dates now: it may have been deleted or re-dated in Tally, or the company restored from a backup. Check in Tally before posting it again."),
         "book_rolled_back" => Some("This voucher was posted, but the company's books are now older than that post: they were probably restored from a backup or replaced by another copy. Check in Tally before posting it again."),
         "sent_not_attributed" => Some("This voucher was sent to Tally, but ComplyEaze Bridge cannot match it in the book now, for example because it was edited in Tally. Check in Tally before posting it again."),
-        "tally_reported_not_created" => Some("Tally reported this voucher as not created. ComplyEaze Bridge will not send this saved voucher again, and nothing in ComplyEaze Bridge puts it in the book yet; do not import it again through Tally's Import menu. Verify this batch again later to see whether a voucher with these same details is in the book."),
+        "tally_reported_not_created" => Some("Tally reported this voucher as not created. ComplyEaze Bridge will not send this saved voucher again; do not import it again through Tally's Import menu. Ask the user to check in Tally whether it is in the book. Once they say each voucher of the batch is in the book or will not be posted, call acknowledge_post_review with doubt not_created: it asks them in a dialog you cannot answer, and closes the batch."),
         _ => None,
     }
 }
@@ -957,7 +957,7 @@ pub(super) fn invoice_readback_due<'a>(
 /// The next step of a voucher a later verification cannot find when the saved
 /// answer of its post reported it as not created
 /// (`UnmatchedCause::ReportedNotCreatedWhenSent`).
-pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered in Tally with a different date, voucher type, ledger or amount: look for it there. ComplyEaze Bridge will not send this saved voucher again, and nothing in ComplyEaze Bridge puts it in the book yet; do not import its file through Tally's Import menu.";
+pub(super) const REPORTED_NOT_CREATED_WHEN_SENT_NEXT_STEP: &str = "When ComplyEaze Bridge sent this voucher, Tally reported it as not created, and ComplyEaze Bridge does not find it in the book for these dates now. It may since have been entered in Tally with a different date, voucher type, ledger or amount: look for it there. ComplyEaze Bridge will not send this saved voucher again; do not import its file through Tally's Import menu. Once the user says each voucher of the batch is in the book or will not be posted, call acknowledge_post_review with doubt not_created: it asks them in a dialog you cannot answer, and closes the batch.";
 
 /// The next step of an unbound post's voucher that its content cannot find when
 /// the post's own answer from Tally is on record and was not clean (it did not

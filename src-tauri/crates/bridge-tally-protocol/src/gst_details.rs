@@ -271,7 +271,7 @@ fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetai
             rates.push(GstRateDetails {
                 duty_head: rate.duty_head,
                 valuation_type: rate.valuation_type,
-                rate: classify_rate(rate.rate)?,
+                rate: classify_gst_rate(rate.rate)?,
             });
         }
         states.push(GstStateDetails {
@@ -290,7 +290,10 @@ fn validate_entry(entry: RawGstDetailsEntry) -> Result<GstDetailsEntry, GstDetai
     })
 }
 
-fn classify_rate(raw: Option<String>) -> Result<GstRate, GstDetailsDefect> {
+/// One `GSTRATE` as sent, `None` when the element is missing: absent, empty, zero or a value, or
+/// [`GstDetailsDefect::RateNotDecimal`]. Shared with the voucher entry read of the same element
+/// (#2027), so a rate means the same on a ledger and on an entry.
+pub fn classify_gst_rate(raw: Option<String>) -> Result<GstRate, GstDetailsDefect> {
     let Some(raw) = raw else {
         return Ok(GstRate::Absent);
     };

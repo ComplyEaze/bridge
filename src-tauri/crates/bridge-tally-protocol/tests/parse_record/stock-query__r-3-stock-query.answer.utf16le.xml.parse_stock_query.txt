@@ -1,0 +1,4 @@
+# fixture: tests/fixtures/stock-query/r-3-stock-query.answer.utf16le.xml
+# parser: parse_stock_query
+# source: captured
+Ok(NoLines)

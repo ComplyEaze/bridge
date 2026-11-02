@@ -94,6 +94,30 @@ client had disconnected.
 Throughout that window every other request failed — including `/status`. Because the gateway
 serialises (§1), one abandoned expensive read blocks the entire instance.
 
+**Measured since, for a shorter cut** (30 Oct 2026, `lab/2142-status-while-busy-answers` and
+`lab/2142-drain-repeat-answers`: one synthetic book, one long report read cut by the client at
+20 s, five times over two sittings; **partial**):
+- `GET /status` sent while Tally builds a long read waits until the read ends (twice).
+- After the cut, Tally's work ran on 8.9 s to 25.4 s. A `/status` sent about 1 s after the cut
+  waited 9.3 s and 10.8 s.
+- Once `/status` had answered quickly three times in a row, 2 s apart, a data read answered at
+  its at-rest speed (four times).
+
+Bridge's drain after a cut post rests on these readings (`DrainPolicy::MEASURED` in the
+transport crate).
+
+**Measured through Bridge's own transport** (30 Oct 2026, `lab/2142-drain-live-answers` at
+35d4f151: one synthetic book, one sitting, two runs that agree; **partial**):
+- A report read cut at the 20 s limit was refused in about 21.5 s, and the drain was then owed.
+- A ledger read sent at once was refused as `tally_endpoint_draining`, `retry_after_s` 10: its
+  one `/status` probe was cut at 5 s and its post was not sent.
+- The next call, 10 s and 15 s later, went ahead on its first try after three answered probes
+  and answered whole, and the drain cleared. The probes' two 2 s pauses made that call about
+  4 s longer than at rest (5.3 s and 5.5 s, against 1.0 s to 1.8 s); its read did not wait.
+
+Not measured: a dropped connection, a size limit or an abandoned send in place of the cut; a
+second process sending meanwhile; other reads, books and editions.
+
 **Consequences:**
 
 1. **Abandoning a request frees your socket, not Tally.** There is no observed way to cancel
@@ -237,6 +261,21 @@ request is predicted over a budget well below the cap.
      AlterID spans stops as soon as it has counted more vouchers than the allowance can hold at the
      default figure (the allowed requests times the vouchers one request holds at it, which every
      first plan uses), so that certain refusal costs no further census span (#945).
+     The tax audit's read is the exception, because its period cannot be narrowed (#2173). It is
+     refused on the count before any data part only when even the plan it would make after a first
+     part measured at the floor (half the default figure, the lightest it can use) needs more than
+     128 requests: 42 vouchers in the first request and 85 in each after it, at most 10,837
+     entry-wildcard vouchers in the period, and fewer when its days are dense, since a request
+     packs whole days. The audit's parts must tile its period by whole days, so a day no request
+     can carry whole is refused before any data part as `audit_window_divided_by_alterid`: the first
+     day that holds vouchers, over 42, or any later day over 85. A first day of 40 and then 127 days
+     of 85 fit (10,835 vouchers in 128 requests); a book with 82 vouchers on its first day does not.
+     Otherwise it reads the first part and is refused, if at all, when a measured part's re-plan
+     needs too many, or divides a day. Before a part is measured it sends no more than the parts its
+     admission counted. Every request keeps the same size bound; only the moment of the refusal
+     moves. Its census stops at that floor bound, not the default's. Under Education the boundary
+     check still covers every part of the plan made at the default figure before the first part is
+     read, so such a period can be refused for an unsupported boundary instead.
    - `voucher_window_book_too_large` — the book's mark needs more than 256 census spans (a mark above
      about 2.1 million). A **product limit**: narrowing the window does not help, because the census
      walks the book's AlterIDs whatever the window.
@@ -599,7 +638,8 @@ Reading ledgers and vouchers in Education waits for the Collection-based profile
 - whether Education accepts `$$` functions whose arguments contain no space;
 - whether Education accepts a `COMPUTE` of `$GUID:Company:##SVCurrentCompany`;
 - whether Education accepts `CompanyListV1`, a custom report with no `$$` function that the
-  live-read tool sent before its removal (#1745).
+  live-read tool sent before its removal (#1745). (2026-10-31: no longer asked; Bridge builds no
+  such report since #1872.)
 
 ## 11e. Ledger master read sizes and part reads on two books — **PARTIAL**
 
@@ -715,7 +755,7 @@ itself was sent, so this cannot keep the complement's own `NOT`-filtered master 
 part is checked against the catalogue by GUID before a row is released, and a part whose answer
 passes the response limit ends the read under its own cause.
 
-**The parent filter also works on the rates request, and `$Parent` folds letter case (PARTIAL, one synthetic licensed 7.1 Silver book of 15 ledgers under 8 parents, read only, 10 Oct 2026, #1331).** The `List of Ledgers` request that fetches the compliance fields plus `GSTDETAILS.LIST`, `RATEOFTAXCALCULATION`, `ROUNDINGMETHOD` and `ROUNDINGLIMIT` was sent unfiltered (15 rows) and with `$Parent = "Duties &amp; Taxes" OR $Parent = "Indirect Expenses" OR $Parent = "Sales Accounts" OR $Parent = "Sundry Debtors"` (11 rows). The 11 were exactly the unfiltered read's rows under those four parents, by GUID, and every filtered row had the same element paths and values as its unfiltered row, the four rate fields included (`ROUNDINGMETHOD` is absent from the same rows in both). The same filter spelled `SALES ACCOUNTS` returned the four `Sales Accounts` ledgers, each row still carrying the book's own spelling: **`$Parent` matched across letter case**, for this one parent and this one spelling. Each request answered in 0.008 to 0.012 s. The answers are in the pilot-lab fixtures (`pilot-lab-ledger-rates-scoped*`, PROVENANCE.md). Not measured: any other characters or spellings, whether the compliance master and balance collections fold the same way (the mechanism is the same), two parents of one book that differ only in case, and any book larger than 15 ledgers. Bridge therefore refuses an invoice whose ledgers' parents have a case-twin among the book's parents, before the request, and proves a scoped answer against the catalogue by GUID, name and exact parent text.
+**The parent filter also works on the rates request, and `$Parent` folds letter case (PARTIAL, one synthetic licensed 7.1 Silver book of 15 ledgers under 8 parents, read only, 10 Oct 2026, #1331).** The `List of Ledgers` request that fetches the compliance fields plus `GSTDETAILS.LIST`, `RATEOFTAXCALCULATION`, `ROUNDINGMETHOD` and `ROUNDINGLIMIT` was sent unfiltered (15 rows) and with `$Parent = "Duties &amp; Taxes" OR $Parent = "Indirect Expenses" OR $Parent = "Sales Accounts" OR $Parent = "Sundry Debtors"` (11 rows). The 11 were exactly the unfiltered read's rows under those four parents, by GUID, and every filtered row had the same element paths and values as its unfiltered row, the four rate fields included (`ROUNDINGMETHOD` is absent from the same rows in both). The same filter spelled `SALES ACCOUNTS` returned the four `Sales Accounts` ledgers, each row still carrying the book's own spelling: **`$Parent` matched across letter case**, for this one parent and this one spelling. Each request answered in 0.008 to 0.012 s. The answers are in the pilot-lab fixtures (`pilot-lab-ledger-rates-scoped*`, PROVENANCE.md). Not measured: any other characters or spellings, whether the compliance master and balance collections fold the same way (the mechanism is the same), two parents of one book that differ only in case, and any book larger than 15 ledgers. Bridge then refused an invoice whose ledgers' parents had a case-twin among the book's parents, before the request. Since #1331 the invoice's rate read names its ledgers by GUID instead, so no parent is in its filter and that refusal is gone; the answer is proved against the catalogue by GUID, name and exact parent text (the `$GUID` filter's measurement: the voucher-writes part, section 9.16).
 
 **Not established:** a book above about 9,500 ledgers, any size at which Tally stops answering,
 or the cause of the empty range, prefix and span filters on the second book. The largest single latency was 1.00 s on the synthetic
@@ -725,7 +765,7 @@ row cost seen here.
 
 **Bridge's parent partition (#679) is CODE, live unproven.** A counted book that does not fit one read
 is split by the parent groups the catalogue names: packed first-fit-decreasing by ledger count into
-parts of at most 4,266 ledgers (3,200 when the request names the mailing details, as `ledger_masters` with `include_mailing_details` does, and the workbook does only for a book whose master-alteration mark is at most 3,200, otherwise sending the standard request; 2,000 with the GST details) and at most 200 parents, at most 12 parts (so at most 2,400 parents, refused as `parent_partition_too_many_parts` above that), and read through the
+parts of at most 4,266 ledgers (3,200 when the request names the mailing details, as `ledger_masters` with `include_mailing_details` does; 2,000 with the GST details; the workbook names them only for a whole read, never in parts) and at most 200 parents, at most 12 parts (so at most 2,400 parents, refused as `parent_partition_too_many_parts` above that), and read through the
 `$Parent = "a" OR $Parent = "b"` filter measured above, with the reserved root written as
 `&#4; Primary`. Each part is read as its master pair then its balance pair inside one extent bracket,
 and every catalogue ledger must come back exactly once, from its own part, with the catalogue's name
@@ -1725,6 +1765,43 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 - **What Bridge does with it.** The `stock_items` kind of `masters` returns each item's two lists as observations (entries sorted by date, `unreadable` with a defect, or `not_observed`), choosing no code and no rate for a date. A Tally `ERROR` or `LINEERROR` at any depth of a list, markup inside a value and a cut-off list refuse the read; an undated or invalid-dated entry, a repeated field, two different entries on one date, a rate that is not a plain decimal, a credit flag other than Yes or No and a repeated state or duty-head row fail that item's list only.
 - **Not measured:** a state row other than `Any`, slab rates, a GST rate keyed on a stock group or on the company, an HSN code keyed on the company, an item that defers to a coded group (whether it inherits the code), a nested group, another release, a larger book, a zero-row stock-item answer, a client book.
 
+### 12a.23 Stock Query by item name gives an item's closing quantity per godown and batch
+
+**PARTIAL: VERIFIED 2026-10-28 on one synthetic book, TallyPrime 7.2**, one request at a time, reads only, the marks unchanged before and after. Fixtures and their sizes and hashes: `crates/bridge-tally-protocol/tests/fixtures/stock-query/PROVENANCE.md`. Counts were taken by parsing the XML, not by searching the text.
+
+- **The request (verified).** The built-in report envelope the Stock Summary is sent in (§12a.1), with `ID` `Stock Query` and one more static variable after the period's, `STOCKITEMNAME`, the item's name escaped once as XML text. Without it, or with a name Tally does not know, the answer is the 46-byte empty envelope (`<ENVELOPE></ENVELOPE>`); both are fixtures. With `SVSTOCKITEM` in its place, or with an unknown variable, the answer was the same envelope at the first sitting (`lab/2018-stock-query-with-item-answers` at `263cc72c`); those captures are not among the fixtures.
+- **The answer (verified).** A flat `ENVELOPE`. First, zero or more last-purchase groups of six elements in this order: `STQPURCDATE`, `STQPURCPARTY`, `STQPURCVCHQTY`, `STQPURCVCHRATE`, `STQPURCVCHDISC`, `STQPURCVCHAMOUNT`, or last-sale groups: `STQSALESDATE`, `STQSALESVCHNO` (which holds the party), `STQSALESVCHQTY`, `STQSALESVCHRATE`, `STQSALESVCHDISC`, `STQSALESVCHAMOUNT`. No capture holds both kinds, so their order relative to each other is not measured, and Bridge reads them in either order. Then one `STQGODOWNNAME`, `STQBATCHNAME`, `STQGODOWNQTY` triple per godown and batch holding stock at the period end.
+  - One item carried five purchase groups (`r-09`, five purchases of 100 Kgs). They do not account for its movement in the year, from 300 Kgs opening to 1300 Kgs closing in the stock-item fixture below, so whether Tally caps their number, or the rest came from other vouchers, is not measured.
+- **The lines (PARTIAL: six items' answers are fixtures; the others are lab captures named here).**
+  - They follow the period end: at the opening day only the opening quantities came, and no group. Fixtures: `r-12` against `r-4` (Hydrochloric Acid 33pc) and `r-14` against `r-03` (Cleaning Kit A).
+  - At the year end, the lines of the six fixture answers that hold lines (`r-01`, `r-02`, `r-03`, `r-4`, `r-09`, `r-11`) sum to the same items' `CLOSINGBALANCE` in `stock_items_shape_lab_fy_live` (§12a.13): 100 Box, 400 Kgs, 12 Nos, 816.667 Kgs, 1300 Kgs and -50 Kgs. That fixture was taken on 7.1 at another sitting of the same book; the collection read again on 7.2 at the year end equalled it in every leaf value (`lab/2018-stock-query-names-units-dates-answers` at `86ea5211`).
+  - At the sitting (`lab/2018-stock-query-items-periods-answers` at `a5b369bf`), eight of the book's eleven items answered lines, and each one's lines equalled the godown and batch details on Tally's own Stock Query screen for that item and summed to the closing that screen showed. Two of the eight answers (HDPE Drum 50L, Sulphuric Acid 98pc) are not fixtures. The other three items answered the empty envelope (below).
+  - At 1 April and 1 May 2025, five items' lines equalled the stock-item collection's `CLOSINGBALANCE` (§12a.13) at the same date, except that at 1 April Zero Stock Item answered the empty envelope beside a closing of `0.000 Kgs` (`86ea5211`). None of those answers is among the fixtures.
+  - Stock not kept in a named batch is the batch `Primary Batch`.
+  - A quantity is `<number> <unit>` in the item's base unit, with the item's own decimals (`150.000 Kgs`, `25 Nos`, `100 Box`), signed as stock is (`-50.000 Kgs`, `-13 Nos`).
+  - An item with no stock at the period end answered the same empty envelope as an unknown name (`a5b369bf`): Zero Stock Item at the opening day, and three items at the year end (Cleaning Kit B, Descaler Concentrate, Label Roll). Tally's Stock Query screen showed 0 for the first three; Label Roll's screen was not opened. The stock-item collection's closing for the three year-end items is empty, not zero, in the fixture above and at all three dates of `86ea5211`. None of these empty answers is among the fixtures, whose empty answers are the unknown name and the bare request. So the empty answer is not yet tied to zero stock by any fixture.
+- **No value.** No line carries a value, rate, expiry or manufacturing date; the only amounts are the groups' voucher amounts.
+- **Names (verified, a later sitting on the same book; fixtures).** Names with `&`, `(`, `)`, `'`, `"`, `%`, `/`, `,` and `-` were selected when escaped once, and the raw and entity forms of `'` and `"` answered byte for byte alike (`lab/2018-stock-query-names-units-dates-answers` at `86ea5211`). Bridge's builder admits exactly those characters besides letters, digits and single spaces, each only between other characters, as every captured name has them (none at either end, none touching another); a test fails if the admitted set and the set in the captured names ever differ. In that sitting each of those items' one line equalled the stock-item collection's `CLOSINGBALANCE` (§12a.13) read beside it.
+- **Alternate units (verified, a later sitting on the same book; fixtures).** An item with an alternate unit is written in its base unit only (`30 Nos`), while the stock-item collection writes its closing as base `=` alternate (` 30 Nos =  3 Box`), which the stock read's strict quantity grammar does not read (`lab/2018-alternate-unit-row-answers` at `88616807`). So the line and the collection's closing are not compared for such an item.
+- **What Bridge does with it.** `native_stock_query` renders the request for one item and reads the answer into its lines, skipping the groups. Among the shapes no capture holds, it refuses an element in another case or with an attribute, a comment or declaration, a kind of group coming back after the other, a godown and batch read twice, a name or quantity holding the sanitiser's marker (§1.1(d)), a character in the closed set `unsafe_display_character` refuses (every control character, `U+0000` to `U+001F` and `U+007F` to `U+009F`, and `U+061C`, `U+200B`, `U+200E`, `U+200F`, `U+202A` to `U+202E`, `U+2060`, `U+2066` to `U+206F` and `U+FEFF`; it admits `U+200C` and `U+200D`, which Indic spelling needs), or padded at either end, a group with no line after it, and lines in more than one unit. A padded quantity is refused rather than trimmed as the stock read's grammar trims it, because no captured Stock Query answer pads one. It reads others that no capture holds, without refusing them: an empty group element, both kinds of group once each, and a zero quantity. No read sends it yet.
+- **Not measured:** another release; a book that is not batch-wise; a period starting after the books' first day (every request sent `SVFROMDATE` 1 April 2025, the books' first day, and `render_stock_query_request` accepts any period, so whether the lines are then the closing at the period end or the movement within the period is open); among the fixtures, a period end other than the year end and the opening day (1 May 2025 is lab only); more than five purchase groups; a full stop or leading, trailing or doubled spaces in a name; measured punctuation in any other position, such as no surrounding space or an unpaired bracket or quote; a value for a batch; a godown under another godown (both captured godowns sit directly under the root), so whether a parent's line includes its children's; Tally's failure answer to a Stock Query, none captured (a failure element below the envelope's first level is read as malformed, not as Tally's failure); a godown name holding a tab (the parser refuses it as a control character, and no capture holds one, so whether Tally ever writes one is open); and which company or item an answer is for, since it echoes neither.
+
+### 12a.24 The Godown Summary gives godown totals, and the exploded Stock Summary values a root item per godown at that godown's own cost
+
+**PARTIAL: VERIFIED 2026-10-28 and 2026-10-30 on one synthetic book, licensed TallyPrime 7.2 Silver on Windows** (`education_mode=false`), attended, one request at a time, two sittings. Every request was the committed Stock Summary request (§12a.13) with only the report ID, the period end or the one variable `<EXPLODEFLAG>Yes</EXPLODEFLAG>` changed. Fixtures and exact requests: `tests/fixtures/BUILTIN_REPORTS_CAPTURE_PROVENANCE.md` (`builtin_godown_summary_*`, `builtin_godown_closing_*`).
+
+- **The Godown Summary by name (verified).** `<ID>Godown Summary</ID>`, the title of Tally's own godown-wise screen, answered in band with the Stock Summary's grammar: one `DSPACCNAME` / `DSPSTKINFO` pair per godown directly under the root, and no line for a stock group or an item.
+  - A godown's `DSPCLQTY` is the net of every item in it that shares a unit, never one item's closing: `316.667 Kgs` was one item's `366.667 Kgs` and another's `-50.000 Kgs`. It was empty for a godown holding items in several units; the cause of an empty quantity is not measured, because the Stock Summary's line for a group whose items were all in `Kgs` was empty too.
+  - The godown amounts summed exactly to the plain Stock Summary's total for the same period at every date read: `3000.01` on the unchanged book, and `2300.01` and `2292.01` at 31 August 2025 and 31 March 2026 after the keying below. The screen showed the same lines with the sign reversed, as the Stock Summary's does.
+  - A godown keyed under `Main Location` had **no line of its own**: `Main Location`'s amount held the child's. Tally's Godown Summary screen in its Detailed format, its drill-down into `Main Location`, and the report with the explode flag each showed the child as its own line under its parent; the plain (Condensed) screen did not.
+  - With the explode flag, the answer stayed flat and each godown was followed by its stock groups, its items directly under the root and its child godowns, one level, all in the same pair grammar. Nothing but a name tells a group, an item and a child godown apart there, so this shape is not read. These answers (`answers/b-04` and `b-10`, and `a-03` before the keying) are kept on the lab branch only, not committed.
+  - Drilling into a godown or a group on the screen kept the title `Godown Summary`.
+- **The Stock Summary with the explode flag on 7.2 (verified).** It answered as on 7.1 (§12a.13): flat, one level expanded. After two items were keyed directly under the root, each was followed by one `SSBATCHNAME` (`SSBATCH` empty, `SSGODOWN` the godown) and a `DSPSTKINFO` per godown holding stock, the child godown by its own name. An item inside a stock group had no such line in the answer, although Tally's Stock Summary screen, Detailed with every level expanded, showed such an item's godown and batch lines with their values. Before the keying, with every item in a group, no `SSBATCHNAME` appeared at all (`answers/a-02` and `a-07`, kept on the lab branch only).
+- **Each godown is valued at its own cost (verified, one item).** The split item was keyed with 30 Nos at 10.00 in `Main Location` and 20 Nos at 12.50 in the child godown, then 8 Nos were moved to `Factory Floor` by a Stock Journal dated 15 September 2025 at 11.00. At 31 March 2026 the exploded report gave `Main Location` 22 Nos at 10.00, `-220.00`: not the 245.52 that the item's 31 March rate of 11.16 would give, nor the 242.00 at its 11.00 before the transfer; `Factory Floor` 8 Nos at 11.00, `-88.00`; and the child godown 20 Nos at 12.50, `-250.00`. These add up to the item's own line, 50 Nos at 11.16, `-558.00`, which equalled the item's value in Tally's Stock Summary screen and in `stock_summary`. On the voucher screen Tally offered the source godown's own cost, 10.00, as the transfer's outward rate.
+- **Stock Query (§12a.23) on the same items** gave the same quantities per godown, with no value.
+- **What Bridge does with it.** `stock_by_godown` reads the plain Godown Summary for godown totals and returns them only when they tie to the plain Stock Summary; it reads a value per item per godown only from the exploded Stock Summary's `SSGODOWN` lines, only for an item whose godown values and quantities add up to its own line, and only where the plain report shows that line with the same value. The exploded Godown Summary is never read.
+- **Not measured:** a batch-wise item under the root (every `SSBATCH` was empty), a value per godown for an item inside a stock group over the gateway, a costing method other than the average cost these items used, a compound unit, a godown two levels down, a godown with no stock, an item whose godown values do not add up, another book or release, TallyPrime 7.1 for the Godown Summary, and whether Tally ever writes `SSBATCHNAME` lines after a stock group's line: Bridge's check against the plain report matches a line by name and value only, so such a group would pass as an item under the root.
+
 ## 13. Open questions
 
 | Question | Why it matters |
@@ -1790,4 +1867,10 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-21 | §12a.21: the Profit and Loss of an integrated inventory book with `Less: Closing Stock` as a `PLSUBAMT` leaf, the Balance Sheet without a stock leaf, no Gross Profit leaf, on four committed captures of one synthetic licensed 7.1 Silver book; a second book with opening stock reported by the lab, not committed. |
 | 2026-10-26 | §11c.4: the empty-window corroboration by census marked PARTIAL after one live run on TallyPrime 7.2 Silver (`lab/1240-empty-window-live-answers`, `ce849cc6`): the same answers, the request counts as predicted except one window that sent fewer. |
 | 2026-10-27 | §12a.13: items inside stock groups nested three deep on one synthetic TallyPrime 7.2 Silver book: the item collection lists every depth, `NUMSTOCKITEMS` counts them, the plain report has a line only for what sits under the root, and each nested row's quantity equals Tally's Stock Summary screen with every level expanded. VERIFIED on that book |
+| 2026-10-28 | §12a.23: Stock Query by item name on one synthetic TallyPrime 7.2 Silver book: the request, the answer's groups and godown, batch and quantity lines, which summed to each item's closing; the empty answer for an unknown name. PARTIAL |
 | 2026-10-29 | §12a.13: period ends inside the year on two synthetic TallyPrime 7.2 Silver books (30 September and 31 May; 31 August and 30 September, nested groups included), and a voucher dated on the end date counted by both sources. PARTIAL |
+| 2026-10-30 | §12a.23: separated the claims its fixtures carry from those resting on lab captures that are not fixtures (`SVSTOCKITEM`, an unknown variable, an item with no stock), and listed the shapes the parser refuses. |
+| 2026-10-30 | §12a.23: the special-character names and the alternate unit are fixtures now; the builder's alphabet is exactly the captured one, and each such line met the collection's closing beside it. |
+| 2026-10-31 | §12a.23: the lines' bullet cut to six fixture items tied to the stock-item fixture, with every lab-only claim given its branch; the year-end closings were Tally's Stock Query screens, not the Stock Summary; three items, not two, answered empty at the year end; the shapes the parser still reads; a later period start and four other gaps added to Not measured. PARTIAL |
+| 2026-10-31 | §12a.23: the parser now refuses a hidden or control character in a name or quantity, a group with no line after it, and lines in more than one unit. |
+| 2026-10-31 | §12a.23: named the closed set of characters the parser refuses in a name or quantity, and added a godown name holding a tab to Not measured. |

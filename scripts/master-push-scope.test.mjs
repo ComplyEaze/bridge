@@ -33,7 +33,7 @@ const stand = {
   silent: ["", 0],
 };
 
-function runScope(event, { script = "silent", changed = [], draft = "", env = {}, versions = null } = {}) {
+function runScope(event, { script = "silent", changed = [], draft = "", env = {}, versions = null, tools = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "scope-step-"));
   try {
     const sh = (command) => {
@@ -64,6 +64,11 @@ function runScope(event, { script = "silent", changed = [], draft = "", env = {}
     // A stand-in `gh api repos/<repo>/pulls/<n> --jq .draft`: prints the live draft state, or fails.
     writeFileSync(join(dir, "bin", "gh"), `#!/bin/bash\nprintf '%s' "$*" > "$STUB_GH_ARGS"\n[ "$STUB_GH_EXIT" = 0 ] || exit "$STUB_GH_EXIT"\nprintf '%s\\n' "$STUB_LIVE_DRAFT"\n`);
     chmodSync(join(dir, "bin", "gh"), 0o755);
+    // Further stand-ins for system tools, ahead of the real ones on PATH.
+    for (const [name, text] of Object.entries(tools)) {
+      writeFileSync(join(dir, "bin", name), text);
+      chmodSync(join(dir, "bin", name), 0o755);
+    }
     writeFileSync(join(dir, "scope.sh"), scopeScript());
     const outputFile = join(dir, "out");
     const summaryFile = join(dir, "summary");
@@ -113,6 +118,21 @@ test("a push runs everything on Windows when the script says no, says nothing, c
     assert.deepEqual(heavy(outputs), ALL, script);
     assert.deepEqual(systems(outputs), { native: BOTH, bundle: WIN }, script);
   }
+});
+
+// A `head` that writes each line as it reads it, as a pipe may deliver them, with a pause after each. A reader of its
+// output that stops at a match on the first line ends it while it writes the second, so it is killed by SIGPIPE.
+const lineByLineHead = `#!/bin/bash
+count=2
+[ "$1" = -n ] && count=$2
+while [ "$count" -gt 0 ] && IFS= read -r line; do printf '%s\\n' "$line"; sleep 0.3; count=$((count - 1)); done
+`;
+
+test("a push honours a reuse line on the first line however its lines reach the step", () => {
+  // The step once piped the decision through `head -n 2 | grep -q` under pipefail: grep stopped at a first-line
+  // match, head died writing the second line, and a reuse of the native family was read as none.
+  const { outputs } = runScope("push", { script: "both", tools: { head: lineByLineHead } });
+  assert.deepEqual(systems(outputs), { native: MAC, bundle: null });
 });
 
 test("a push runs the macOS bundle and seam jobs when it changes a packaging path, or when its before commit cannot be compared", () => {
@@ -283,4 +303,61 @@ test("pull requests supersede by branch; master pushes share one group and never
     assert.notEqual(first.group, concurrencyOf(event, { ref: "refs/heads/gh-readonly-queue/master/x", runId: "2" }).group, `${event} runs are never in one group`);
     assert.notEqual(first.group, push.group);
   }
+});
+
+// The `merge-gate-scope` step of the Workflow consistency job decides whether a pull request runs the merge gate's
+// 6.5-minute test. It runs under bash against a real two-commit repository, like the scope step above.
+function gateStep() {
+  const start = workflow.indexOf("      - id: merge-gate-scope");
+  const run = workflow.indexOf("        run: |", start);
+  const end = workflow.findIndex((line, index) => index > run && /^ {6}- /.test(line));
+  assert.ok(start !== -1 && run !== -1 && end !== -1, "the merge-gate-scope step is where this test expects it");
+  return workflow.slice(run + 1, end).map((line) => line.slice(10)).join("\n");
+}
+function runGateStep(event, changed, { base } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "gate-scope-"));
+  try {
+    const sh = (command) => {
+      const result = spawnSync("bash", ["-c", command], { cwd: dir, encoding: "utf8" });
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    const commit = (message) => sh(`git -c user.name=t -c user.email=t@example.invalid -c commit.gpgsign=false commit -q --allow-empty -m ${message} && git rev-parse HEAD`);
+    sh("git init -q -b main");
+    const first = commit("base");
+    for (const file of changed) {
+      mkdirSync(join(dir, file, ".."), { recursive: true });
+      writeFileSync(join(dir, file), "x");
+    }
+    sh("git add -A");
+    const head = commit("change");
+    writeFileSync(join(dir, "step.sh"), gateStep());
+    const outputFile = join(dir, "out");
+    writeFileSync(outputFile, "");
+    const result = spawnSync("bash", ["step.sh"], {
+      cwd: dir, encoding: "utf8",
+      env: { PATH: process.env.PATH, HOME: dir, GITHUB_OUTPUT: outputFile, GITHUB_SHA: head, EVENT_NAME: event, PR_BASE_SHA: base ?? first },
+    });
+    return { status: result.status, output: readFileSync(outputFile, "utf8").trim() };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("a pull request runs the merge gate's test only when it changes the gate or what it reads; every other event always runs it", () => {
+  for (const changed of [["scripts/merge-gate.sh"], ["scripts/anything.mjs"], [".github/workflows/ci.yml"], ["docs/tally/compatibility/acks/pr-1.txt"], [".gitattributes"], [".node-version"], ["src-tauri/src/x.rs", "scripts/a.mjs"]]) {
+    assert.deepEqual(runGateStep("pull_request", changed), { status: 0, output: "run=true" }, changed.join());
+  }
+  for (const changed of [["src-tauri/src/x.rs"], ["src/App.tsx"], ["docs/a.md"], ["CHANGELOG.md"], ["docs/tally/TALLY_PROTOCOL_REFERENCE.md"], ["src-tauri/crates/bridge-tax-audit/parity/mutations.mjs"]]) {
+    assert.deepEqual(runGateStep("pull_request", changed), { status: 0, output: "run=false" }, changed.join());
+  }
+  for (const event of ["merge_group", "push", "schedule", "workflow_dispatch"]) {
+    assert.deepEqual(runGateStep(event, ["src-tauri/src/x.rs"]), { status: 0, output: "run=true" }, event);
+  }
+});
+
+test("a pull request whose diff cannot be read fails the step instead of skipping the test", () => {
+  const result = runGateStep("pull_request", ["src-tauri/src/x.rs"], { base: "f".repeat(40) });
+  assert.notEqual(result.status, 0);
+  assert.equal(result.output, "", "no run= line is written, so the test step does not skip");
 });

@@ -50,7 +50,7 @@ identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
 names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
-and stock-group parents; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+and stock-group parents, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
 GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
@@ -110,6 +110,7 @@ The ordinary default tools, in name order:
 - `read_evidence`
 - `sales_register`
 - `statement_tie_out`
+- `stock_by_godown`
 - `stock_summary`
 - `tally_status`
 - `trial_balance`
@@ -124,7 +125,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
-not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` is in the source after release 0.6.1 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_godown` is in the source after release 0.7.0 and is not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -132,16 +133,25 @@ statements, the egress log, lab files, lock files, other) the file count, bytes
 and the age in days of the oldest file, symlinks it did not follow, sockets
 and other special files it did not count, folders it could not list (named, not
 read as empty), and the import journal's state: batches, batches sent or found
-posted, how many of those are not settled (with no recorded response, or with a
-response but a latest status that is not `posted_verified`: a post Tally
+posted, how many of those are not settled (with no recorded response, with a
+response but a latest status that is not `posted_verified`, or covered by a
+recorded restore whatever their status: a post Tally
 rejected stays not settled; `not_settled_binding_refused` counts the native
 posts whose binding to their own vouchers was refused, all of which stay not
 settled for good, a post Tally rejected in part or whole among them;
 `not_settled_reviewed_not_attributed` counts the native posts matched by content
 only, their binding refused or no answer from Tally recorded, that a person
 recorded checking in Tally (`acknowledge_post_review` with `doubt` set to
-`content_only`), still not settled and never verified; none of these overlaps
-`not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`),
+`content_only`), still not settled and never verified; `not_settled_restored`
+counts the native posts a recorded restore covers (bridge#1050), not settled
+whatever their latest status reads; they never read `posted_verified` again,
+and nothing in ComplyEaze Bridge clears that count yet, so they stay there, in
+no other count, with their rows held: check them in Tally;
+none of these overlaps
+`not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`;
+`settled_by_person` counts the native posts Tally answered as creating none of their vouchers that a person
+settled (`acknowledge_post_review` with `doubt` set to `not_created`), which are in none of the `not_settled`
+counts),
 batches with no recorded dispatch that were never found posted
 (`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
@@ -149,7 +159,8 @@ before it builds or reads. A journal it could not read is reported as
 `journal_unreadable` (could not be opened), `journal_read_failed` or
 `journal_invalid` (refused twice, 100 ms apart), never as absent. It reads the
 journal without the admission lock, names no file path (the command line adds the
-folder paths only with `--show-paths`), and does not cover files outside this
+folder paths, where their files are, the journal's location and any package
+copy of the folder only with `--show-paths`), and does not cover files outside this
 folder (the desktop app's other settings, its mirror database and logs); it also
 lists the per-user folder of dispatch lease locks (names, sizes and times only).
 Its own call is logged in the egress log like any tool call. On the command
@@ -164,7 +175,8 @@ already sent to Tally: archive the whole folder by moving it, never delete
 them piecemeal. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
-bank-statement voucher proposals. `BRIDGE_AGENT_ENABLE_WRITES=true` enables
+bank-statement voucher proposals, and `parse_bank_statement_csv`, which checks the shape of one bank's CSV
+statement export and proposes nothing yet (#1320; below). `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
 sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
 voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
@@ -267,12 +279,28 @@ measured (4,902 bytes: a party with two short dated entries; UNVERIFIED for a po
 or longer address lines is larger), so a read holds at most 3,200 ledgers
 (the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
 refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
-repeat `include_mailing_details` on later pages. Measured on one synthetic book (TallyPrime 7.1, and 7.2 for a second dated entry on one party, oldest first); three or more entries,
-an entry with no date and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
-local file, names the mailing details only where the book's master-alteration mark is at most 3,200 (the
-whole read fits their bound) and otherwise sends the standard request, as before #1490, so a book that exported
-before is never refused for the larger estimate; its header then says that no ledger's mailing details were
-observed and the status column reads not observed. Where it reads them it shows only the entry in force on its
+repeat `include_mailing_details` on later pages. Measured on synthetic books (TallyPrime 7.1, and 7.2 for a second dated entry
+on one party, oldest first, and in lab row 2074-L for ten dated entries on one party, at about 924 bytes each beyond the
+first); an entry with no date, a book of many populated parties and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
+local file, names the mailing details only where the whole read is estimated to fit their bound: a
+master-alteration mark of at most 3,200, or, where its ledgers are counted to size the read (a mark past 4,266),
+the counted ledgers, each allowed four further mailing entries the mark may not show (one save can add several),
+with one more entry allowed for each alteration beyond them (#2074). These are allowances from one lab row, not
+bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490; its header
+then says that no ledger's mailing details were observed and the status column reads not observed. A counted book that
+the standard request exported before can now be sent the larger mailing request. The export fails where that read
+runs out of time, or passes the 32 MiB response limit without Tally declaring it, since Tally may still be working on
+it; its error says the mailing addresses were part of the failed read. After any other failure of that read, the
+workbook reads the book once more with the standard request, and its header says how the larger read failed (#2214):
+an oversize Tally declared, an answer that broke off, could not be read, did not decode or never came, an HTTP error
+status, a post that did not reach Tally, the pair's two answers differing, or any refusal of a whole answer (Tally's
+own failure answer, a missing STATUS, XML that does not parse, a row the grammar refuses, as markup inside a mailing
+field does, a wrong company, a passed bound, a repeated ledger or a ledger count that differs). After an answer that
+broke off, could not be read, did not decode or never came, Tally may still be sending it, so while the standard
+post is refused as draining before anything of it was sent, the export waits and tries again, for at most 60 s, a
+bound not measured, and fails past it. The standard read keeps every refusal it has without the mailing details.
+Only the declared oversize, and a separate read after it, have been seen live. `ledger_masters` with
+`include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,
@@ -309,7 +337,9 @@ When Bridge got no response it could read, the `cause` names why and the error a
   before any body was read.
 - An `endpoint_…` runtime code: Bridge held the request back and sent nothing. So do
   `tally_endpoint_busy` (with `retry_after_s`) and `tally_endpoint_lock_unavailable`, which
-  come back as the `code` itself.
+  come back as the `code` itself, and `tally_endpoint_draining` (with `retry_after_s`), when an
+  earlier post was cut for time and Tally has not yet answered `/status` three times in a row
+  since (#2142); a draining refusal may have sent `/status` checks, but not the request.
 
 A wrong or reset port therefore reads as an endpoint problem, not as a Tally data problem. A
 failed read without `endpoint` either received a response whose body then failed to read, decode,
@@ -976,7 +1006,8 @@ and Tally may still be building its answer: nothing was sent. ComplyEaze Bridge 
 clear that, so the refusal stays until ComplyEaze Bridge is restarted; look at Tally first), `C6-moved`
 and `voucher_window_changed_during_read` (someone changed the book during the read: it may be tried
 again), `audit_window_divided_by_alterid` (a day too heavy for one request: the read is refused, because
-the engine's windows must tile the period by date), `BIND-GROUP-UNKNOWN` (a group named in `cash_groups`
+the engine's windows must tile the period by date; refused before any voucher is read when the count
+shows it, over 42 vouchers on the first day that holds any or over 85 on a later day), `BIND-GROUP-UNKNOWN` (a group named in `cash_groups`
 or `bank_groups` is not in the book: check the spelling against `masters` with `kind=groups`), the
 engine's other rule codes for a read it does not admit (`C1-...` to `C11-...`, `CFG-...`), and the
 tool's own: `audit_test_refused` (the test refused the book without a rule code), `audit_book_refused`,
@@ -1092,6 +1123,43 @@ book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, whic
 unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
 Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
 Gold and other releases.
+
+### Stock by godown (`stock_by_godown`)
+
+Use `stock_by_godown` with `company_guid` and `as_of` (a month's last day, as for `stock_summary`)
+for closing stock by godown. It reads Tally's own Godown Summary, the plain Stock Summary and the Stock
+Summary with the explode flag over the same period, each twice, inside `stock_summary`'s bracket.
+
+`state` is `tied` when every godown carries a value and the godown values add up to the plain Stock
+Summary's total. It then returns `godowns`: each godown directly under Tally's root with its value and
+`quantity`, which is Tally's net of the godown's items that share a unit (`net_across_items`), never one
+item's closing, and is `empty` for a godown holding items in several units. A godown under another
+godown has no line of its own: its stock is in its parent's figures. Otherwise `state` is
+`not_established`, with `reason` `godown_totals_differ` or `godown_totals_not_comparable` (a total
+missing, or a value empty on either report: `tie_out` then also counts `godown_empty_amounts` and
+`stock_summary_empty_amounts`), `tie_out` holding both totals, and no godown or item.
+
+`root_items` gives, for each item directly under the root, its value and quantity in each godown, as
+Tally's exploded Stock Summary writes them: each godown at that godown's own cost, not the item's average
+rate times the quantity. They are returned (`state` `tied`) only where the godown values add up to the
+item's own value, and the quantities too where all are in the item's unit (`quantities`
+`added_to_the_item_quantity`, or `not_compared`), and where the plain Stock Summary shows the item's line
+with that value. Otherwise `state` says why and no godown line is returned: `values_differ` and
+`quantities_differ` (with both sides), `value_empty`, `batch_named` (a batch line, not measured),
+`godown_repeated` and `plain_report_differs`. `root_items` lists only the items Tally wrote godown lines
+for. Tally's export answer gives no value per godown for an item inside a stock group (its Stock Summary
+screen, Detailed with every level expanded, does show one), so none is returned for it
+(`checks.items_inside_stock_groups` is `not_available`). An empty exploded answer returns the godowns with
+`root_items` null and `root_items_reason` `exploded_stock_summary_empty_is_not_a_finding`; so does an
+answer that is the plain report line for line, which does not show the explode flag was honoured
+(`explode_flag_not_observed_is_not_a_finding`). Only average cost and simple units were measured.
+
+Refusals: `stock_by_godown_as_of_not_measured` (before any request), `stock_by_godown_as_of_before_books`,
+`stock_by_godown_as_of_in_future`, `stock_by_godown_period_not_honoured`, `stock_by_godown_education_unqualified`, `stock_by_godown_too_large`
+(with `size`), `stock_by_godown_bound_premise_violated` and `stock_by_godown_extent_changed`. Signs are
+kept as sent: a negative value is stock held. Godown and item names are masked under `mask_parties`.
+Measured on TallyPrime 7.2 on one synthetic book at two month ends (protocol reference §12a.24); the tool
+itself has not yet been run against a live Tally.
 
 ### Stock Summary
 
@@ -2723,6 +2791,19 @@ Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 not live-Tally qualification or a claim that every Tally configuration or
 licence mode has been qualified.
 
+### CSV statement shell (`parse_bank_statement_csv`)
+
+Takes `statement_path` (a local file, under the path rules of `parse_bank_statement`) and `controls_source`
+(`prior_statement`, `bank_ledger_in_tally` or `this_file`), and reads the file with the CSV edge reader of the
+`bridge-bank-statement` crate, which accepts one private bank's export layout and nothing else. A file the reader
+refuses is refused with its category as the error code, `statement_<category>` and `:row_N` where a row is at fault; there
+are fifteen categories, each its own code. A file that reads is still refused, as `statement_csv_account_line_unmeasured` (not the PDF tool's `statement_no_account_number_line`, which says a statement prints no account line):
+whether that export prints an account number is not established, so nothing binds a file to an account and nothing is
+proposed. With `controls_source` `this_file` the refusal's `cause` is `controls_this_file_derived_not_independent` and its next step says "derived, not independent": the
+file's own first and last balance cannot show that rows are missing, so they are not an independent control. `controls_source` is
+checked before the file is opened and ComplyEaze Bridge cannot verify the claim. The tool writes nothing to Tally or beside the statement
+(like every read tool it adds receipt lines to the local log) and returns no row value. Part of #1320; the account line and the proposals follow once the export's account line is measured.
+
 ### Statement tie-out (`statement_tie_out`)
 
 A read-only check of the bank ledger against a statement `parse_bank_statement`
@@ -2802,18 +2883,47 @@ deadlocks.
 - **No cause is given.** Uncleared cheques, deposits in transit, a missing entry,
   a repeated entry and the wrong bank ledger look alike; the reading says so,
   prescribes no remedy and checks the bank ledger only.
-- **Not yet proved against a live book.** The tool-level tests replay captured
-  responses with one value changed in memory, and the dated ledger read the tool
-  relies on is the one described in protocol reference section 5.5. Their
-  proposals files are written by hand, except in the round-trip test, whose file
-  is written by the code the parse uses. One run by an outside contributor on two
-  synthetic companies (TallyPrime 7.1 Silver, 10 October 2026) is only partly
-  recorded, in the pull request: the import summary was not captured and no raw
-  answers are kept. A statement whose last day is the end of a financial year is
-  still to be run, and so is a window of whole calendar months: the book's
-  position read at a month's first day and the day after its last has been
-  measured on some ledgers and dates (protocol reference section 5.5), not on a
-  bank ledger in the middle of its year or after its last voucher.
+- **Run against a live book.** Every checked row of one run passed on 30 October
+  2026 (UTC; 31 October on the lab computer), and one row was recorded as a note
+  (licensed TallyPrime 7.2 Silver, one synthetic company, the published 0.7.0
+  Windows package):
+  - A window ending in the middle of a month answered `not_established`
+    (`window_not_whole_calendar_months`) with no amount, after the company check
+    alone: four requests and no ledger read.
+  - Two windows of one whole calendar month each, on a bank ledger in the middle
+    of its year, tied while the book also held a second bank ledger.
+    `trial_balance` at each month end, and Tally's own Ledger display over the
+    two months, agreed with the statement. An entry keyed by hand that is not on
+    the statement showed as a closing gap and a change of its own amount, with
+    the opening still tied.
+  - A statement whose first and last rows fall in the middle of a month was read
+    at its first row's date and the day after its last: a voucher dated the day
+    before the first row counted in the opening, and one dated the day after the
+    last row stayed out of the closing.
+  - ComplyEaze Bridge's own post of that statement's vouchers (`post_import`,
+    `posted_verified`) then tied at `after_post`, and `before_build` run again
+    answered `file_already_partly_posted` for the closing and the change rather
+    than counting the batch twice. A twin of one row keyed after the post showed
+    at `after_post` as a closing gap and a change of its amount.
+
+  Two earlier runs were on TallyPrime 7.1 Silver: one by an outside contributor
+  on two synthetic companies (10 October 2026), only partly recorded in the pull
+  request, and one on 14 October 2026 on the same synthetic company. That run had
+  already measured whole-month windows on the bank ledger in the middle of its
+  year before and after a hand import, reads after the ledger's last voucher, a
+  window refused as `window_not_whole_calendar_months` with no ledger read, and
+  `file_already_partly_posted`. New in this run are the second bank ledger,
+  Tally's Ledger display as the reference, the statement edges in the middle of a
+  month, ComplyEaze Bridge's own post, and TallyPrime 7.2. The tool-level tests
+  replay captured responses with one value changed in memory, and the dated
+  ledger read the tool relies on is the one described in protocol reference
+  section 5.5. Their proposals files are written by hand, except in the
+  round-trip test, whose file is written by the code the parse uses. Not
+  measured: a statement whose last day is the end of a financial year, a book of
+  1,000 or more vouchers, Education mode, a voucher posted inside the window
+  during the reads, another bank's statement layout, and Gold. Evidence:
+  `RESULTS.md` on the lab branch `lab/1211-tie-out-evidence-answers` at
+  `7760d367`.
 
 ## Approved voucher posting
 
@@ -2857,8 +2967,7 @@ releases the stop a sent Sales invoice that is not verified posted puts on its
 company (`invoice_company_stopped`), after the person has checked Tally, in the
 same dialog the model cannot answer.
 
-`prepare_ledger_creates` and `post_ledger_creates` are in the source and are not in
-a published build yet. The create path and the rule that refuses a near name were
+`prepare_ledger_creates` and `post_ledger_creates` were added in release 0.7.0. The create path and the rule that refuses a near name were
 measured on TallyPrime 7.1 Silver, on one synthetic book; other releases and
 editions are not measured.
 
@@ -2891,13 +3000,22 @@ the paired ledger and group names, and the new ledger's parent, tax fields, GSTI
 and opening balance) and answers with one state: `posted_verified` (exactly one
 ledger of the name, new, with the parent, tax fields, GSTIN and opening balance
 as sent; bill-wise is not read back; no ledger or group that existed before
-changed; no other loaded company's master mark moved),
+changed; the company's own master mark moved by exactly one, or, on a later call,
+the ledger's `ALTERID` shows it as the first master change in the company after
+the last read before the send, which `verification.checks.target_mark_step_one`
+shows; no other loaded company's master mark moved),
 `posted_into_existing_master` or `master_write_located_elsewhere` (loud: check
 Tally, do not retry), `confirmed_absent` (only from a later call: its read found
 the name absent and the company's master mark unmoved; a create that Tally
 rejected reaches it too, and it does not show that Tally will not still run a
 create that ComplyEaze Bridge stopped waiting for, so make sure Tally is idle and
 answering before a new batch is prepared, which needs a new approval),
+`confirmed_absent_after_change` (only from a later call: its read found the name
+absent, no ledger or group that existed before changed or went missing, no ledger
+or group that was not there before the send, and the company's master mark moved
+forward since the send; whether the create ran, its ledger later deleted, or never
+ran is not known; the batch is settled and its name released, and a new batch
+needs a new approval),
 `posted_unattributed` (only from a later call, when no answer from Tally to the
 create is on file (it could not be recorded, or Tally never answered): the ledger
 was found as sent, and its `ALTERID` shows it as the first master change in the
@@ -2940,7 +3058,10 @@ cannot be indexed. `master_approval_declined`, `master_approval_unavailable` and
 `master_approval_timed_out` say the person declined the dialog, the dialog could
 not be shown, or the person did not answer in time; each says nothing was sent,
 and a declined or timed-out answer's `next_step` says that the next call with the
-same `batch_id` opens a new dialog. In an answer,
+same `batch_id` opens a new dialog. `master_review_too_large` from
+`post_ledger_creates` says the dialog's text was over its limit or, on Windows,
+where the dialog is measured against the screen as the post's is, that it did not
+fit the screen whole; nothing was sent. In an answer,
 `verification.verdict_written` is true when this call appended the verdict (an
 open verdict already on file in the same words is not appended again);
 `verification.verdict_record_error` is the code of why the verdict was not
@@ -2999,10 +3120,32 @@ Post this batch again when they are settled, and create nothing in Tally by hand
 meanwhile, because the earlier create may still be waiting in Tally and would
 overwrite it.
 
+Both absent states rest on the order Tally serves requests in: the read that finds
+the name absent is sent after the create's send ended, and Tally has been seen to
+serve such a read only after the create had run. That was seen on TallyPrime 7.2
+Silver, for ledger creates, with every request on a new connection and with the
+create, the read or both on a reused connection (#2176). Their answers carry
+`verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
+absent state only when the read-back's Tally reports TallyPrime 7.2 Silver,
+licensed. On any other the batch stays open, its name held, with a reason that
+names what is not covered: `absent_not_measured_on_this_product` (the product is
+not exactly TallyPrime), `absent_not_measured_on_gold`,
+`absent_not_measured_on_this_release`, `absent_not_measured_in_education` or
+`absent_tally_release_not_known`, and a next step that says so: calling again
+on the same Tally will not close it, so on TallyPrime 7.1, Gold, Education or
+another product such a batch holds its name until the company is read back on
+7.2 Silver. Before this, `confirmed_absent` was given on any Tally. An absent
+name kept open also names what else the read showed (`master_new_since_intent`,
+`mark_went_back_since_intent`).
+
 Later calls cannot settle these states, and their batches keep holding the name: a
-read that found the name absent while the company's master mark moved; a ledger
-present with no counters, or with a field that differs; a create Tally rejected,
-once the mark moves; and the reasons `pre_image_master_missing`,
+read that found the name absent while the company's master mark moved back, or
+while a ledger or group appeared that was not there before the send; a ledger
+present with no counters, or with a field that differs; a ledger changed in Tally
+after its create, or created after another master change, which reads
+`ledger_altered_since_create` (its `ALTERID` is past the first change after the
+last read before the send); a create Tally rejected, once the mark moves; and the
+reasons `pre_image_master_missing`,
 `pre_image_unreadable` and `master_index_not_usable`. A later call judges the book
 as it then is, so a state stays unsettled only while the book stays as it was read.
 A company that is not loaded or was renamed is not read back until the same
@@ -3229,7 +3372,7 @@ been observed live on a synthetic Silver 7.1 company, each reading back
    **Post N vouchers**) on macOS or **Yes** on Windows to permit this attempt. **Cancel** or Escape
    declines on macOS; Return may leave the dialog open. Windows defaults to
    **No**, and its window also takes the keyboard (Windows 10, a full-screen Tally,
-   one screen, each tried once, #1780: on the 0.6.0 release candidate a Down arrow
+   one screen, each tried once, [#1780](https://github.com/ComplyEaze/bridge/issues/1780): on the 0.6.0 release candidate a Down arrow
    moved its buttons; on the published 0.6.0 a typed **n** declined it and a typed
    **y** approved it; macOS not measured). When you ask for a post, stop typing in Tally until you have
    answered the window with the mouse. Long or directionally ambiguous previews are refused; use the
@@ -3314,14 +3457,25 @@ import journal keeps a record of it whenever it covers a post no earlier record
 covers, so a second restore is recorded too (`post_span_binding.rollback_recorded`,
 with `other_batches_covered`: how many of the company's other native posts it
 covers, and the first ten, to verify again). A record that cannot be written
-fails the check, to be run again.
+fails the check, to be run again. A post sees a restore too: when the voucher
+mark its last read before the send gives is below such a floor, the record is
+written before the post's own dispatch intent and before its approval is spent,
+and the post's answer gives `rollback_recorded_at_post` (the count and the first
+ten of the native posts it covers, to verify again). That record names one of
+the posts it covers, not the post that read the mark, which has no intent yet;
+the journal does not say which post saw it. A record a post cannot write
+refuses the post as `post_rollback_unrecorded`, with nothing recorded for it
+and nothing sent, and the approval withdrawn, so the next call asks again:
+once that post's vouchers raised the mark, no later check could see the
+restore.
 From then on no native post of the same company (name, GUID, company number
 and books-from date) at the same Tally address reads `posted_verified` if it
 was sent before that check read the journal and the vouchers it had proved by
 then (its binding, else Tally's answer unless it reported `STATUS` 0, else
 its mark before the post) put it above the mark read:
 `post_span_binding` is then `book_rolled_back` with `mark_read` and `seen_by`
-(the batch whose check saw it), its vouchers read as matching content, not as
+(the batch whose check saw it, or, for a restore a post saw, one of the posts
+the record covers, possibly this one), its vouchers read as matching content, not as
 its own, and the plain line says to check them in Tally. The check still sees a
 rollback only while the mark reads below some post's: a book restored and then
 keyed or edited past the mark before any check is not seen, and a native voucher
@@ -3364,7 +3518,8 @@ changes (a changed book alters the vouchers' statuses, never the refusal), `ackn
 doubt only beside vouchers that read back verified, and an amendment of it is unavailable
 (`import_amend_natively_posted`, as for any natively posted batch). The summary of such a post says that it cannot
 be closed or amended; its vouchers are checked in Tally. Its rows stay refused in any other batch
-(`import_txn_already_posted`), and `local_data_report` counts it as `not_settled_binding_refused`.
+(`import_txn_already_posted`), and `local_data_report` counts it as `not_settled_binding_refused` (or as
+`not_settled_restored` once a recorded restore covers it).
 After the person has checked its vouchers in Tally, `acknowledge_post_review` with `doubt` set to `content_only`
 records that they did (bridge#1039), in the same review dialog. The same holds for a native post with no answer
 from Tally recorded (`post_span_binding` state `not_bound`, code `binding_response_not_recorded`), which never
@@ -3372,7 +3527,8 @@ binds either. It is admitted only while the journal holds that state and a fresh
 binding refused as `span_identity_reused`, a book read as rolled back, a binding not yet settled or a batch that
 reads `posted_verified`. The record, in the import journal, changes nothing in Tally and no status or verdict; it
 binds no voucher, lifts no invoice stop and releases no row. `verify_import` reports it as `content_review`, with
-its own `next_step`, and `local_data_report` counts the batch as `not_settled_reviewed_not_attributed` instead.
+its own `next_step`, and `local_data_report` counts the batch as `not_settled_reviewed_not_attributed` instead (a
+recorded restore voids the review, and the batch then counts as `not_settled_restored`).
 A later `posted_verified` of the batch, a later answer from Tally with an outcome, or a recorded rollback of the
 book voids it. A build older than this record refuses the whole import journal once one is written, as for a
 stop release: do not downgrade after recording one. Any other batch is refused before any read
@@ -3381,6 +3537,25 @@ one stands (`ack_already_recorded`), and a readback that no longer shows the sta
 batch's records change, or a rollback is recorded, while the dialog is open (`ack_changed_while_reviewing`).
 A multi-voucher batch whose voucher mark step was not confirmed is a different case: the review of
 `acknowledge_post_review` is kept on this computer and does not change its status.
+
+A native post whose saved answer from Tally reported none of its vouchers created (every counter reported, none
+created, one exception for each voucher sent, nothing else counted; for a batch, the post also recorded its
+voucher step as matching) stays `reconciliation_required` for good, and ComplyEaze Bridge never sends it again:
+Tally can still finish work its client gave up on, so a second send could book a voucher twice (bridge#1709).
+Once the person says each voucher is in the book or will not be posted, `acknowledge_post_review` with `doubt`
+set to `not_created` settles the batch, in its own dialog (`--confirm-settle`, titled to close the batch), which
+the model cannot answer. It is admitted only while the journal holds that answer and a fresh readback shows the
+batch neither `posted_verified`, bound, still binding nor rolled back (`ack_not_created_not_established`
+otherwise; `ack_batch_not_posted` for a batch never sent; `ack_already_recorded` while one stands). The record,
+in the import journal, changes nothing in Tally and no status or verdict, binds no voucher and sends nothing. Its
+rows stay held, so a rebuild of them is still refused (`import_txn_already_posted`), and a Sales invoice keeps
+its stop until the separate release (`doubt` set to `invoice_stop`). `verify_import` reports it as
+`person_settlement`, with its own `next_step` and a binding summary that says a person settled the batch, and
+`local_data_report` counts the batch as `settled_by_person` instead of `not_settled`. A later `posted_verified`,
+a later answer from Tally with an outcome, a binding or a recorded rollback of the book voids it. Nothing is
+written when the batch's records change while the dialog is open (`ack_changed_while_reviewing`). A build older
+than this record refuses the whole import journal once one is written, as for a stop release: do not downgrade
+after recording one.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
@@ -3412,7 +3587,8 @@ only beside vouchers that read back verified; with `doubt` set to `content_only`
 it records that the person checked them, which settles nothing (bridge#1039). Its `post_span_binding.summary` says when the book holds,
 for each voucher it sent or for some, a voucher with the same date, voucher type
 and ledger entries that is neither cancelled nor optional, and that ComplyEaze
-Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`,
+Bridge cannot tell whether that voucher is this post's; `local_data_report` counts it under `not_settled_binding_refused`
+(under `not_settled_restored` once a recorded restore covers it),
 or under `not_settled_reviewed_not_attributed` once a person has recorded checking it.
 `voucher_presence` cannot identify a native post's
 vouchers, because they carry no marker: one edited or re-dated in Tally can read
@@ -4277,8 +4453,15 @@ cap as the response is really encoded, sets `truncated`, and counts the receipts
 size in `result.omitted_for_size`. This tool has no offset, so the receipts cut for size
 cannot be reached by it; a single receipt that is alone over the cap is refused
 (`agent_response_too_large`). Receipts left out by the bounded tail scan are not counted in
-`omitted_for_size`. Missing terminal newlines, invalid
-UTF-8, or invalid JSON in retained complete rows return `egress_log_incomplete`.
+`omitted_for_size`. A receipt a stopped process left cut short (a torn tail) is never read as a
+receipt (#2172). Until the next receipt is written it is reported only by its size, in
+`result.unrepaired_tail_bytes`. Writing the next receipt repairs it, by appending, never by
+removing bytes: a `#` line, then a `torn_record` marker giving the torn bytes' offset, length and
+sha256. `result.torn_records` lists the markers among the receipts read. A line that is neither a
+whole receipt nor exactly vouched for by the marker after it, or invalid UTF-8 or JSON in a
+receipt, returns `egress_log_incomplete`. The marker is a repair note, not proof against
+tampering. The same repair keeps the Terms of Use record (`terms-acceptance.jsonl`) usable: a torn
+last line there is never an acceptance, and accepting again repairs it.
 
 Verification captures the batch journal generation before readback and checks it
 under the exclusive publication lock. If another process published the same batch

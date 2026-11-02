@@ -152,11 +152,12 @@ pub(crate) enum BuiltInReport {
     NegativeLedgers,
     NegativeStock,
     StockSummary,
+    GodownSummary,
 }
 
 impl BuiltInReport {
     #[cfg(test)]
-    pub(crate) const ALL: [Self; 9] = [
+    pub(crate) const ALL: [Self; 10] = [
         Self::BalanceSheet,
         Self::ProfitAndLoss,
         Self::SalesRegister,
@@ -166,6 +167,7 @@ impl BuiltInReport {
         Self::NegativeLedgers,
         Self::NegativeStock,
         Self::StockSummary,
+        Self::GodownSummary,
     ];
 
     /// The report name Tally's gateway accepts. Plain ASCII words, so the
@@ -185,6 +187,8 @@ impl BuiltInReport {
             // Accepted by Tally in a live capture, 6 Oct 2026.
             Self::NegativeStock => "Negative Stock",
             Self::StockSummary => "Stock Summary",
+            // The title of Tally's own godown-wise report, accepted in a live capture, 28 Oct 2026.
+            Self::GodownSummary => "Godown Summary",
         }
     }
 }
@@ -206,9 +210,35 @@ pub(crate) fn render_built_in_report_request(
     company: &str,
     period: &NativeLedgerSnapshotPeriod,
 ) -> String {
+    render_report_envelope(report.id(), company, period, "")
+}
+
+/// The same envelope with Tally's explode flag after the dates, the one
+/// variable measured on a built-in report (§12a.13, §12a.24). Only the Stock
+/// Summary is sent this way.
+pub(crate) fn render_exploded_stock_summary_request(
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+) -> String {
+    render_report_envelope(
+        BuiltInReport::StockSummary.id(),
+        company,
+        period,
+        "<EXPLODEFLAG>Yes</EXPLODEFLAG>",
+    )
+}
+
+/// The built-in report envelope for the report `id`, with `extra` (already-rendered static
+/// variables, or nothing) after the period's. `id` and `extra` come only from this crate's own
+/// builders, never from data; the company is escaped here, once.
+pub(crate) fn render_report_envelope(
+    id: &str,
+    company: &str,
+    period: &NativeLedgerSnapshotPeriod,
+    extra: &str,
+) -> String {
     format!(
-        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE></STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
-        id = report.id(),
+        r#"<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Data</TYPE><ID>{id}</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>{extra}</STATICVARIABLES></DESC></BODY></ENVELOPE>"#,
         company = xml_escape(company),
         from = period.from().as_str(),
         to = period.to().as_str(),

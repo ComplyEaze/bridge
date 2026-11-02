@@ -37,6 +37,10 @@ pub(crate) const REVIEW_BUTTON: &str = "Yes";
 /// same Yes/No/Cancel box as the review.
 #[cfg(not(windows))]
 const RELEASE_BUTTON: &str = "Release the stop";
+/// The settle dialog's positive button on a Mac (#1709). Windows shows the
+/// same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const SETTLE_BUTTON: &str = "Close the batch";
 /// What the review dialog's subprocess prints, followed by the nonce it was
 /// given, when and only when the person chose the positive button.
 const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
@@ -55,6 +59,8 @@ const MASTERS_BUTTON: &str = "Create ledger";
 const ONE_ITEM: VoucherCount = VoucherCount(NonZeroUsize::MIN);
 /// The same for the invoice-stop release dialog, distinct from both.
 const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
+/// The same for the settle dialog (#1709), distinct from every other.
+const SETTLE_TOKEN_PREFIX: &str = "bridge-batch-settle-acknowledged:";
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -154,6 +160,10 @@ pub(crate) struct InvoiceReadPlan {
     /// for a book over the master mark.
     pub(crate) ledger_count: AgentReadRequest,
     pub(crate) rates: AgentReadRequest,
+    /// Each ledger the rates request names, by lower-case GUID, with the parent
+    /// the plan's catalogue gave it (#1331). The request names ledgers by GUID,
+    /// so it is unchanged when one is regrouped; this is how the queue tells.
+    pub(crate) ledger_parents: Vec<(String, String)>,
     pub(crate) voucher_types: AgentReadRequest,
     pub(crate) number: AgentReadRequest,
     /// The same read for the invoice the journal held as the number's control.
@@ -615,7 +625,9 @@ impl PendingPostApproval {
     }
 
     /// The same for the one-ledger dialog: [`ApprovedImport::confirm_masters`]
-    /// with exactly these arguments, on its own task. It has no box to fit.
+    /// with exactly these arguments, on its own task. Its box is measured as
+    /// the post's is, but a box that does not fit is refused with nothing to
+    /// note: the one-ledger text has no shorter form.
     pub(crate) fn ask_masters(
         item: LedgerCreateItem,
         company: VerifiedCompanyIdentity,
@@ -928,6 +940,13 @@ pub(crate) enum UnderLockRefusal {
     /// nothing is sent.
     #[error("post_mark_unrecorded")]
     MarkUnrecorded,
+    /// The aim read the company's voucher mark below a floor an earlier native
+    /// post of the company had proved (a restore), and the record of it could
+    /// not be written (#1050). No dispatch intent is recorded and nothing is
+    /// sent: once this post's vouchers raise the mark, no later reading could
+    /// see the restore.
+    #[error("post_rollback_unrecorded")]
+    RollbackUnrecorded,
     /// The approval could not be spent: it was revoked after this call took
     /// it, or a voucher post reached the lock without one (#791).
     #[error("import_approval_revoked")]
@@ -980,6 +999,7 @@ impl UnderLockRefusal {
             Self::BatchChanged => "import_batch_changed",
             Self::TxnAlreadyPosted => "import_txn_already_posted",
             Self::MarkUnrecorded => "post_mark_unrecorded",
+            Self::RollbackUnrecorded => "post_rollback_unrecorded",
             Self::ApprovalRevoked => "import_approval_revoked",
             Self::PreImageUnrecorded => "master_pre_image_unrecorded",
             Self::PreImageWriteFailed => "master_pre_image_write_failed",
@@ -1142,6 +1162,15 @@ pub(crate) mod test_seam {
             Self {
                 held: Some(Arc::new(tokio::sync::watch::channel(None).0)),
                 ..Self::new(false)
+            }
+        }
+
+        /// A held post dialog that runs `while_pending` as it opens, on the
+        /// dialog's own task, before it waits for [`ScriptedApproval::answer`].
+        pub(crate) fn held_after(while_pending: impl Fn() + Send + Sync + 'static) -> Self {
+            Self {
+                while_pending: Some(Arc::new(while_pending)),
+                ..Self::held()
             }
         }
 
@@ -1687,9 +1716,10 @@ pub(crate) mod test_seam {
 
     /// A dialog whose box did not fit the screen exits with its own status
     /// (#1832). That is a refusal that says the text is too large, for the
-    /// post and for the review, with or without a token: no answer, a
-    /// printed approval included, passes for a box the person could not see
-    /// whole. It is not a decline, not unavailable and never approved.
+    /// post, the review and the one-ledger box (#1780), with or without a
+    /// token: no answer, a printed approval included, passes for a box the
+    /// person could not see whole. It is not a decline, not unavailable and
+    /// never approved.
     #[tokio::test]
     async fn a_box_that_did_not_fit_the_screen_is_refused_whatever_it_printed() {
         let directory = standin_directory();
@@ -1703,6 +1733,10 @@ pub(crate) mod test_seam {
             (
                 "the review token for this nonce",
                 "bridge-review-acknowledged:{NONCE}\n",
+            ),
+            (
+                "the one-ledger token for this nonce",
+                "bridge-create-ledger:{NONCE}\n",
             ),
         ] {
             let path = standin(directory.path(), status, answer);
@@ -1719,6 +1753,13 @@ pub(crate) mod test_seam {
                 "review: {name}"
             );
             assert_ran_to_its_end(&path, "Review", name);
+            let path = standin(directory.path(), status, answer);
+            assert_eq!(
+                super::confirm_masters_with(&path, "Create").await,
+                Err("master_review_too_large".to_string()),
+                "one ledger: {name}"
+            );
+            assert_ran_to_its_end(&path, "Create", name);
         }
         // The statuses next to it keep their meaning: a decline is exit 1, a
         // clean exit with no token is unavailable.
@@ -2188,17 +2229,22 @@ enum Shown {
     Post,
     Review,
     StopRelease,
+    Settle,
     /// The one-ledger dialog, always about one ledger.
     Masters,
 }
 
-/// The two kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
-/// and each has its own subprocess mode, so the invoice-stop release is never
-/// shown with the review's title or button (#1828).
+/// The kinds of acknowledgement. [`ReviewAcknowledged::confirm`] takes one,
+/// and each has its own subprocess mode, so the invoice-stop release or a
+/// batch's settlement is never shown with the review's title or button
+/// (#1828, #1709).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReviewKind {
     Review,
     StopRelease,
+    /// A person's settlement of a batch Tally answered as creating none of
+    /// its vouchers (#1709).
+    Settle,
 }
 
 impl ReviewKind {
@@ -2206,6 +2252,7 @@ impl ReviewKind {
         match self {
             Self::Review => Shown::Review,
             Self::StopRelease => Shown::StopRelease,
+            Self::Settle => Shown::Settle,
         }
     }
 
@@ -2215,6 +2262,7 @@ impl ReviewKind {
         match self {
             Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
             Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
+            Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
         }
     }
 }
@@ -2245,6 +2293,13 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
                 .into(),
             "Nothing is released until you answer.",
         ),
+        Shown::Settle => (
+            format!(
+                "close this batch in ComplyEaze Bridge for good, so that it never sends {} again",
+                these_vouchers(count)
+            ),
+            "Nothing is closed until you answer.",
+        ),
         Shown::Masters => (
             "create this ledger in Tally".into(),
             "Nothing is created until you answer.",
@@ -2270,6 +2325,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Post => post_words(count).1,
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
+        Shown::Settle => SETTLE_BUTTON.to_string(),
         Shown::Masters => MASTERS_BUTTON.to_string(),
     };
     wrapped(
@@ -2492,6 +2548,9 @@ async fn confirm_masters_with(executable: &std::path::Path, preview: &str) -> Re
     )
     .await
     {
+        // A box that did not fit the screen is a refusal whatever else the
+        // child printed, as for the post's box (#1832).
+        Ok(answer) if answer.box_did_not_fit => Err("master_review_too_large".into()),
         Ok(answer) if answer.token_matched && answer.exited_cleanly => Ok(()),
         // A person's decline is no token and exit 1. A clean exit without the
         // token is an executable that is not this dialog.
@@ -2619,6 +2678,18 @@ pub fn run_release_confirmation() -> bool {
     )
 }
 
+/// Entry point for the settle dialog's subprocess (#1709), under the same
+/// rules: its own window title and token, so a settlement is never titled a
+/// review.
+pub fn run_settle_confirmation() -> bool {
+    answer_with_token(
+        SETTLE_TOKEN_PREFIX,
+        show_settle_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
 /// Read the parent's nonce line, count line and preview from `input`, show
 /// `dialog` with that count and preview, and
 /// write the token for that nonce to `output` only when it returns true. The
@@ -2716,6 +2787,29 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
         == rfd::MessageDialogResult::Custom(RELEASE_BUTTON.into())
 }
 
+/// The settle window's title: it closes a batch and reviews no voucher, so it
+/// names neither a review nor a post (#1709).
+#[cfg(not(windows))]
+fn settle_title() -> String {
+    "ComplyEaze Bridge — close this batch".into()
+}
+
+/// The settle dialog: the acknowledgement dialog with its own title and
+/// button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    rfd::MessageDialog::new()
+        .set_title(settle_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            SETTLE_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(SETTLE_BUTTON.into())
+}
+
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
 /// custom labels, so the title asks the question, with the count for a batch
 /// (#746).
@@ -2732,8 +2826,8 @@ fn review_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = review_question(count)
@@ -2742,22 +2836,24 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
-                // Topmost: a window the connector opens while Tally fills the
-                // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). With
-                // MB_SETFOREGROUND the box also takes the foreground, so a key
-                // typed for Tally answers it; the parent puts a first line on
-                // its text that says what Y and N do (#1780). No stays the
-                // default button.
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2775,24 +2871,72 @@ fn release_question() -> String {
 #[cfg(windows)]
 fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
-                // As for the review's box: topmost, taking the foreground, with
-                // No as the default button (#1589, #1780).
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows settle box's title, a question as the review's is (#1709).
+#[cfg(windows)]
+fn settle_question() -> String {
+    "ComplyEaze Bridge — close this batch for good?".into()
+}
+
+/// The Windows settle box: the review's box with its own title.
+#[cfg(windows)]
+fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2846,8 +2990,8 @@ fn post_question(count: VoucherCount) -> String {
 #[cfg(windows)]
 fn show_review(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     // rfd without common-controls-v6 discards custom labels. Use the existing
     // Win32 dependency so No is the default and Escape/close remain Cancel.
@@ -2855,23 +2999,38 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // The box cannot scroll: `guarded` measures it when it opens and, if it is
     // not wholly on the screen, never returns (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: Both buffers are NUL-terminated and live for the synchronous
-        // dialog; no parent HWND is borrowed. No application state is exposed
+        // dialog; the owner is `guarded`'s hidden window, alive until the box
+        // returns. No application state is exposed
         // to callbacks.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
                 // screen is otherwise drawn behind it, since a background
-                // process may not take the foreground (#1589). With
-                // MB_SETFOREGROUND the box also takes the foreground, so a key
-                // typed for Tally answers it; the parent puts a first line on
+                // process may not take the foreground (#1589). MB_TOPMOST alone
+                // was seen not to hold when the box opened seconds after the
+                // last input went to Tally. With MB_SYSTEMMODAL added the box
+                // held it in one lab run on Windows 10, where Tally still took a
+                // click and a key while the box was open (#1780). That run did
+                // not test what else a system-modal box changes: the taskbar
+                // showed no task buttons while it was open, cause not tested
+                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // window, the other way a stand-in box was seen to stay on top
+                // (#1780); an owned box has no taskbar button. When Windows lets it,
+                // MB_SETFOREGROUND also gives the box the foreground, so a key
+                // typed for Tally can answer it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
                 // default button.
-                MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
             )
         }
     });
@@ -2902,8 +3061,8 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
 #[cfg(windows)]
 fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_TOPMOST,
-        MB_YESNOCANCEL,
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
     };
     // As for the post dialog: No is the default, Escape and close are Cancel.
     if count != ONE_ITEM {
@@ -2911,20 +3070,34 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     }
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = MASTERS_TITLE.encode_utf16().chain(Some(0)).collect();
-    // SAFETY: Both buffers are NUL-terminated and live for the synchronous dialog;
-    // no parent HWND is borrowed. No application state is exposed to callbacks.
-    unsafe {
-        MessageBoxW(
-            std::ptr::null_mut(),
-            text.as_ptr(),
-            title.as_ptr(),
-            // Topmost: a window the connector opens while Tally fills the
-            // screen is otherwise drawn behind it, since a background
-            // process may not take the foreground (#1589). It changes only
-            // the drawing order; No stays the default button.
-            MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | MB_SETFOREGROUND | MB_TOPMOST,
-        ) == IDYES
-    }
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832). Through `guarded` it is also
+    // brought to the front once it appears, as the post's box is: its first
+    // line tells the person to press Y or N, and in one lab run on Windows 10
+    // MB_SETFOREGROUND alone did not give it the keyboard when it opened
+    // seconds after the last input went to Tally (#1780).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the post's box (`show_review`): topmost with
+                // MB_SYSTEMMODAL, taking the foreground when Windows lets it,
+                // with No as the default button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

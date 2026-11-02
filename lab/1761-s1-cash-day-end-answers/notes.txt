@@ -1,0 +1,17 @@
+#1761 s1 before the sitting, 2 Nov 2026 UTC. Sheet at bef604bb, 16 of 16 files equal. Master 9fcb102c. No company of this name in the data folder (filters CASH, BRIDGE CA: none). Nothing keyed, nothing sent. compare.py: R1, R2, R4 to R14 equal to master; R3 differs.
+Company created by Tally's screen: BRIDGE CASHDAY LAB, books 1-4-25, inventory No, GST No. Current date on the Gateway before any change: 1-Apr-2025.
+Masters by hand. BRIDGE Customer A: bill-by-bill set to No (the sheet names no bill-wise sub-screen). BRIDGE Bank A: name mistyped without spaces before accept, corrected on the same screen before accept. Opening balances 11,000.00 each way.
+BK1 taken 22:31 local, TDBK1800_<company number>.001, 24252 B, sha256 2efb965e895d8c8b5fa9091f2f93bf1a7229b2c66c3b66fbd413d04eac4d27e4. Marks after: GUID 5342454a-478e-4d59-a663-16ec7b8c84a8, ALTVCHID empty, ALTMSTID 214.
+Current date set to 12-4-2025 (Gateway showed 1-Apr-2025 before). Vouchers 1 and 2 accepted.
+Voucher 3: Bank Allocations sub-screen, unnamed in the sheet: held, no key, asked for a word.
+Voucher 3: Bank Allocations accepted as offered with Ctrl+A as agreed during the row; voucher accepted.
+Voucher 4: Warning "Negative Cash!" with Rs (-)300.00, "Press any key to continue": held, no key, asked for a word.
+Voucher 4: Negative Cash warning dismissed once as agreed during the row, by the click on the title band, not a key; voucher accepted unchanged. No later voucher raised it.
+Voucher 5: Bank Allocations offered Transaction Type Cheque (voucher 3's offered Cash); accepted as offered with Ctrl+A.
+Voucher 6: marked Optional with Ctrl+L; Status line read Optional. Voucher 7: accepted, reopened with PageUp, Alt+X, prompt "Cancel ?", answered Y. Voucher 10: marked Post-Dated with Ctrl+T; Status line read Post-Dated.
+Voucher F2 moves Tally's current date with it: Gateway read 25-Apr-2025 after voucher 10; set back to 12-Apr-2025 at the Gateway before BK2 and the reads. So the current date was not held at 12 April during voucher keying.
+Date of last entry on the Gateway: 11-Apr-25.
+BK2 taken 22:42 local, TDBK1800_<company number>.001, 29838 B, sha256 eaff50fbba41eaebe841a68a283a2355abf3d41cd4da5532fb39e54a77f9e364. Marks after: ALTVCHID 11, ALTMSTID 214.
+Step 0: first tasklist line failed on the shell's quoting (kept); rerun from a .cmd file. netstat: 9001 listening, PID 28316. GET /status 200.
+R1, R2 sent. R3 answered 303430 B, above the 200000 bound: stop under C3, file kept, not parsed, word asked for. R3b and R4 to R15 not sent.
+R3 parsed from the saved file with no resend, with the bound agreed during the row, 1,000,000 B for R3 and R3b. R3b sent after R3: 290296 B. No dialog on screen after either. R4 to R14 sent one at a time. R15 equal to R1 byte for byte, V 11, M 214. GET /status 200 after the last read.

@@ -1098,3 +1098,30 @@ fn only_the_step_and_count_refusals_name_a_concurrent_change() {
     }
     assert_eq!(concurrent_change_line_for("span_unknown_code"), None);
 }
+
+/// Sign-rule site 4 (#1872): the span identity compares what was sent with the row in canonical
+/// form, so the sixth captured voucher (3450.50) written `03450.50` still binds, and one paisa
+/// more does not. The batch-side text is a lexeme; the comparison is not.
+#[test]
+fn a_padded_amount_binds_against_the_row_tally_holds() {
+    let span = span();
+    let read = span_read();
+    let mut padded = sent();
+    for entry in &mut padded[5].entries {
+        assert_eq!(entry.amount, "3450.50");
+        entry.amount = "03450.50".into();
+    }
+    let bound = bind(&span, COMPANY_GUID, &padded, &read, &BTreeSet::new()).unwrap();
+    assert_eq!(bound.len(), 10);
+    let mut paisa = sent();
+    for entry in &mut paisa[5].entries {
+        entry.amount = "03450.51".into();
+    }
+    assert_eq!(
+        refusal(bind(&span, COMPANY_GUID, &paisa, &read, &BTreeSet::new())),
+        SpanRefusal::Content {
+            position: 5,
+            fields: vec!["entries"]
+        }
+    );
+}

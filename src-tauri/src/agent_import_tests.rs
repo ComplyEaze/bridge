@@ -3769,6 +3769,9 @@ mod mode_tests;
 #[path = "agent_import_invoice_admission_tests.rs"]
 mod invoice_admission_tests;
 
+#[path = "agent_import_amount_pin_tests.rs"]
+mod amount_pin_tests;
+
 #[test]
 fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_periods() {
     // The recorded Education refusal affected ##SVFromDate/##SVToDate predicates.

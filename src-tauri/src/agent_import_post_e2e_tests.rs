@@ -7272,7 +7272,13 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'M' => "81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c", // r02-marks.xml
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
-        'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
+        // The listing by GUID (#1331): the code's requests for this invoice's
+        // six ledgers, never sent to the lab with these GUIDs. The lab answered
+        // the same two requests naming five other ledgers
+        // (`lab/1331-scoped-masters-answers`), and the answers here are cut from
+        // its whole-book ones (`lab_invoice_listing`).
+        'L' => "5b55872145f7f3fa5504a79780cb3c94dcbb2a556e57e1087d6b94aa7025f671",
+        'P' => "6d2afdcba9e33f84a7aa80f90250974a8c0dcc1c416e945ed9ad3137169508d8",
         // The rates read restricted to the invoice's ledgers by GUID (#1331):
         // the code's request, never sent to the lab with these six GUIDs; the
         // lab answered the same request naming five other ledgers on 31 Oct
@@ -7281,7 +7287,6 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'Q' => super::super::tests::LAB_INVOICE_GUID_RATES_SHA256,
         'O' => "72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648", // w14-company-object.xml
         'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml
-        'P' => "71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f", // r06-ledgers-paired.xml
         'g' => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f", // r07-groups.xml
         'T' => "c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00", // r08-voucher-types.xml
         'N' => "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985", // r09-number-new-invoice.xml
@@ -7395,12 +7400,13 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
-        'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
+        // DERIVED: see `lab_invoice_listing`.
+        'L' => super::super::tests::lab_invoice_listing(),
         // DERIVED: see `lab_invoice_rates_hsn`.
         'Q' => super::super::tests::lab_invoice_rates_hsn(),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'G' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml"),
-        'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
+        'P' => super::super::tests::lab_invoice_balances(),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
@@ -7961,55 +7967,30 @@ async fn a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_i
     pilot_refused_in_the_queue(&run, "invoice_book_too_many_vouchers", pilot_queue_start());
 }
 
-/// A book over the master mark has its ledger count asked for, and that read is
-/// the only one of the invoice's sent; the post is refused before the listing,
-/// the rates, the voucher types, the number or the registration is read.
-///
-/// SYNTHETIC answer: there is no capture of the ledger count of the pilot lab,
-/// only of another company's (the size book's, Tally's own bytes in
-/// `company-ledger-count`). The answer here is that capture with the size
-/// book's name and GUID replaced by the pilot lab's, so that the row is the
-/// company's. It shows that the queue asks the count only when the master mark
-/// is over, reads nothing else of the invoice first, and judges the count with
-/// the build's limit. It does not show that Tally answers the count request for
-/// the pilot lab with 4,339, or at all: the unedited capture is judged under
-/// its own company's name in the precheck's unit test.
-///
-/// The binding marks are SYNTHETIC too: the captured marks with the master mark
-/// edited to 5,001, standing for a book whose masters grew past the gate's mark.
+/// A book past the marks the whole-book listing was held to is read and posted
+/// like any other (#1331): the listing names the invoice's ledgers, so the
+/// masters' mark decides nothing. SYNTHETIC answers: every captured answer that
+/// carries the master mark, edited to 900,000. It stands for a large book; it
+/// is not Tally's answer for one, and a post on one has not been run.
 #[tokio::test]
-async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal() {
-    let at = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap();
-    let marks = pilot_text('m');
-    let count = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/company-ledger-count.utf16le.xml"
-    ));
-    // The company's name occurs twice in the captured answer and its GUID once; an edit that matched fewer
-    // would leave the answer naming another company.
-    assert_eq!(count.matches("BRIDGE SIZE 2K").count(), 2);
-    let count = replaced_once(
-        &count.replace("BRIDGE SIZE 2K", "BRIDGE PILOT LAB"),
-        "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
-        PILOT_GUID,
-    );
-    // The queue's currency read, then the ledger count's paired read (K).
-    let start = pilot_queue_start();
-    let order = format!("{}eKsKse{}", &PILOT_ORDER[..start], &PILOT_ORDER[start..]);
-    let run = pilot_post_changed_in(
-        &order,
-        &[
-            Changed {
-                positions: vec![at],
-                body: replaced_once(&marks, " 223</ALTMSTID>", " 5001</ALTMSTID>"),
-            },
-            Changed {
-                positions: vec![start + 1, start + 3],
-                body: count,
-            },
-        ],
-    )
+async fn a_book_past_the_old_master_mark_is_posted_on_its_ledgers_alone() {
+    let run = pilot_post_changed(&['m', 'M', 'b'].map(|letter| {
+        Changed {
+            positions: PILOT_ORDER
+                .char_indices()
+                .filter_map(|(position, kind)| (kind == letter).then_some(position))
+                .collect(),
+            body: replaced_once(&pilot_text(letter), " 223</ALTMSTID>", " 900000</ALTMSTID>"),
+        }
+    }))
     .await;
-    pilot_refused_in_the_queue(&run, "invoice_book_too_large", start + 6);
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(
+        result["verification_status"], "posted_verified",
+        "{}",
+        run.response
+    );
+    assert_eq!(run.observed.len(), PILOT_ORDER.len());
 }
 
 /// A currency master added while the approval waited is refused under its own

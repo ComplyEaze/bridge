@@ -156,9 +156,9 @@ pub(crate) struct InvoiceReadPlan {
     /// limits and the currency are judged by the rule the build judges them by,
     /// ahead of the reads they spare.
     pub(crate) precheck: InvoicePrechecker,
-    /// The company's own ledger count: sent only when the precheck asks for it,
-    /// for a book over the master mark.
-    pub(crate) ledger_count: AgentReadRequest,
+    /// The ledgers the compliance listing is read for: the ones the invoice
+    /// names (#1331).
+    pub(crate) listing_ledgers: bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
     pub(crate) rates: AgentReadRequest,
     /// Each ledger the rates request names, by lower-case GUID, with the parent
     /// the plan's catalogue gave it (#1331). The request names ledgers by GUID,
@@ -185,25 +185,13 @@ pub(crate) struct InvoicePrecheckInput<'a> {
     pub(crate) marks: &'a str,
     /// The company's Currency masters, as the queue read them.
     pub(crate) currencies: &'a str,
-    /// The company's ledger count, once the precheck has asked for it.
-    pub(crate) ledger_count: Option<&'a str>,
-    pub(crate) company_name: &'a str,
     pub(crate) company_guid: &'a str,
-}
-
-/// The precheck's answer when it refuses nothing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum InvoicePrecheck {
-    /// The limits and the currency admit the book: send the rest of the plan.
-    Admitted,
-    /// The master mark is over the size gate's mark: the ledger count decides.
-    NeedsLedgerCount,
 }
 
 /// A function of the invoice module that the queue runs before the plan's
 /// reads, so that this layer does not call that one.
 pub(crate) type InvoicePrechecker =
-    fn(&InvoicePrecheckInput<'_>) -> Result<InvoicePrecheck, ApprovedImportAdmissionError>;
+    fn(&InvoicePrecheckInput<'_>) -> Result<(), ApprovedImportAdmissionError>;
 
 /// What the queue read for an [`InvoiceReadPlan`], or what the build has read
 /// of one so far: each answer is `None` until it is read. The admission's judge
@@ -212,7 +200,6 @@ pub(crate) type InvoicePrechecker =
 pub(crate) struct InvoiceAnswers {
     /// The all-company marks, as the binding reads began.
     pub(crate) marks: Option<String>,
-    pub(crate) ledger_count: Option<String>,
     pub(crate) listing: Option<super::runtime::PartyLedgerMasterListing>,
     pub(crate) rates: Option<String>,
     pub(crate) voucher_types: Option<String>,

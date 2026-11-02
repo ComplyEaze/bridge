@@ -41,8 +41,8 @@ const W18_GUID: &str = PILOT_GUID;
 /// The SHA-256 of the request the build sends for each kind of read. Each is
 /// a request the lab answered, as in the 9 Oct replay, except: the number
 /// read, which is `w18-number-0040.xml` (`../r09-number-new-invoice.xml` with
-/// the number changed only); the two listings named below; `Q`, the rates
-/// request by GUID, which is the code's and was never sent with these GUIDs (a
+/// the number changed only); `L` and `P`, the listing by GUID, and `Q`, the
+/// rates request by GUID, which are the code's and were never sent with these GUIDs (a
 /// test derives its pin from the lab's 31 Oct 2026 request naming five other
 /// ledgers; see `w18_scoped_rates_hsn`); and `X` and `Y`, which are the code's requests the
 /// lab answered on 16 Oct 2026 on a later state of the book (see
@@ -50,14 +50,12 @@ const W18_GUID: &str = PILOT_GUID;
 fn w18_request_sha256(letter: char) -> &'static str {
     match letter {
         'N' => "84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8",
-        // Not `r05` and `r06` as W18 sent them (SVTODATE 20260801): on W18's
-        // book the last voucher date is 20260915, so the build asks the
-        // compliance listing with SVTODATE 20260915 and the paired listing
-        // with 20261001. W18c sent those two requests to Tally and these are
-        // its answers (the paired one differs from W18's: see
-        // fixtures/agent/pilot-lab-w18/PROVENANCE.md).
-        'L' => "b0c02fc724502e10dc23a9d6b430c9cbb20c191df948082f06fab9d7e4c8f9bc",
-        'P' => "41b2de3ed4488e5943d25fe36b2c2727f397ca01bae4082d7af36f787bb4b4b5",
+        // The listing by GUID (#1331): the code's requests for this invoice's
+        // six ledgers, never sent with these GUIDs. Their answers are cut from
+        // W18c's whole-book ones, sent with the dates these carry (SVTODATE
+        // 20260915 and 20261001, see fixtures/agent/pilot-lab-w18/PROVENANCE.md).
+        'L' => "67a79e291d33efb283caf5f41b268b9a1ebe2f400d1800d8ef153b94ce79b34d",
+        'P' => "6877e09d1ce9bb9c3ef14a52950193ea6159df20968e0120800b472415efc0b8",
         // The rates read names the invoice's ledgers by GUID (#1331), and this
         // invoice names `BRIDGE Svc 4D 5%` where `BP/26-27/0010` names
         // `BRIDGE Svc 998313 5%`: the request the lab answered on 31 Oct 2026
@@ -121,8 +119,9 @@ fn w18_plan(letter: char) -> ScenarioPlan {
         'Q' => return pilot_answer(super::super::super::tests::w18_scoped_rates_hsn()),
         'm' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-marks.utf16le.xml"),
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-book-extent.utf16le.xml"),
-        'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml"),
-        'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-paired.utf16le.xml"),
+        // DERIVED: see `w18_invoice_listing`.
+        'L' => super::super::super::tests::w18_invoice_listing(),
+        'P' => super::super::super::tests::w18_invoice_balances(),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-number-0040.utf16le.xml"),

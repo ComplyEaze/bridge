@@ -1,7 +1,8 @@
 //! Proof publication under the import admission lock, additive (#911), and
 //! the build's recoverable publication. An interrupted build, or a journal
 //! append whose outcome is unknown, keeps its transaction folder and blocks
-//! admission until its state is reconciled.
+//! admission until its state is reconciled. An empty folder records no unknown
+//! outcome: admission clears it (`require_settled`, #2269).
 use super::*;
 
 const TRANSACTION: &str = ".proof-publication";
@@ -18,17 +19,78 @@ fn create_transaction(path: &Path) -> std::io::Result<()> {
     builder.create(path)
 }
 
+/// Refuse while a transaction's marker stands. The caller holds the admission
+/// lock, shared or exclusive; every writer holds it exclusively from creating
+/// the folder to removing it, so no publication is running here. A folder with
+/// nothing in it is removed and refuses nothing: `update.json` goes only after
+/// the journal is synced whole or the append is rolled back and the XML removed,
+/// and before it exists nothing is published. `remove_dir` removes only an empty
+/// folder, so a marker still holding anything keeps refusing (#2269).
 pub(super) fn require_settled(imports: &Path) -> Result<(), String> {
     for (name, error_code) in [
         (TRANSACTION, "proof_publication_recovery_required"),
         (BUILD_TRANSACTION, "import_publication_recovery_required"),
     ] {
-        match fs::symlink_metadata(imports.join(name)) {
+        let path = imports.join(name);
+        match fs::symlink_metadata(&path) {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Ok(metadata) if metadata.is_dir() => match fs::remove_dir(&path) {
+                Ok(()) => {}
+                // Another shared holder removed it first.
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    if error.kind() != std::io::ErrorKind::DirectoryNotEmpty {
+                        eprintln!("{name} not cleared: {}", os_cause(&error));
+                    }
+                    return Err(error_code.into());
+                }
+            },
             _ => return Err(error_code.into()),
         }
     }
     Ok(())
+}
+
+/// An OS error by its number alone: the text of one can carry a path.
+fn os_cause(error: &std::io::Error) -> String {
+    match error.raw_os_error() {
+        Some(code) => format!("os error {code}"),
+        None => format!("{:?}", error.kind()),
+    }
+}
+
+/// Remove a transaction folder once its outcome is known, trying a plain rmdir
+/// if `remove` fails, with no wait: the caller holds the admission lock, and a
+/// folder left empty is cleared at the next admission. Stderr keeps the first
+/// OS error whatever follows; `Err` carries it when the folder stayed (#2269).
+fn clear_transaction(
+    path: &Path,
+    remove: impl FnOnce(&Path) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let Err(error) = remove(path) else {
+        return Ok(());
+    };
+    let cause = os_cause(&error);
+    eprintln!("import transaction folder not removed: {cause}");
+    match fs::remove_dir(path) {
+        Ok(()) => Ok(()),
+        Err(retry) if retry.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(_) => Err(cause),
+    }
+}
+
+fn clear_transaction_folder(path: &Path) -> Result<(), String> {
+    clear_transaction(path, |path| fs::remove_dir_all(path))
+}
+
+/// What a build's publication came to.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum Persisted {
+    /// The journal holds the batch. `folder_left` is why its transaction
+    /// folder is still there, which does not undo the build.
+    Built { folder_left: Option<String> },
+    /// Not known published: the caller returns the batch's recovery ID.
+    Incomplete(String),
 }
 
 pub(super) fn persist_build(
@@ -36,8 +98,15 @@ pub(super) fn persist_build(
     line: &ImportLedgerLine,
     xml: &[u8],
     append_status: impl FnOnce() -> Result<(), String>,
-) -> Result<Option<String>, String> {
-    persist_build_with_stage(imports, line, xml, append_status, write_private)
+) -> Result<Persisted, String> {
+    persist_build_with_stage(
+        imports,
+        line,
+        xml,
+        append_status,
+        write_private,
+        clear_transaction_folder,
+    )
 }
 
 fn persist_build_with_stage(
@@ -46,7 +115,8 @@ fn persist_build_with_stage(
     xml: &[u8],
     append_status: impl FnOnce() -> Result<(), String>,
     stage_xml: impl FnOnce(&Path, &[u8]) -> Result<(), String>,
-) -> Result<Option<String>, String> {
+    clear: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<Persisted, String> {
     let path = imports.join(format!("{}.xml", line.batch_id));
     let transaction = imports.join(BUILD_TRANSACTION);
     create_transaction(&transaction)
@@ -66,23 +136,23 @@ fn persist_build_with_stage(
     if let Err(error) = publication {
         // Once our marker exists, the caller must return this batch's recovery
         // ID even if no complete XML or journal record could be published.
-        return Ok(Some(error));
+        return Ok(Persisted::Incomplete(error));
     }
+    let recovery = || Persisted::Incomplete("import_publication_recovery_required".into());
     match append_status() {
-        Err(error) if error == "import_ledger_rollback_failed" => Ok(Some(error)),
+        Err(error) if error == "import_ledger_rollback_failed" => Ok(Persisted::Incomplete(error)),
         Err(error) => {
             if fs::remove_file(&path).is_err() {
-                return Ok(Some("import_publication_recovery_required".into()));
+                return Ok(recovery());
             }
-            match fs::remove_dir_all(&transaction) {
+            match clear(&transaction) {
                 Ok(()) => Err(error),
-                Err(_) => Ok(Some("import_publication_recovery_required".into())),
+                Err(_) => Ok(recovery()),
             }
         }
-        Ok(()) => match fs::remove_dir_all(&transaction) {
-            Ok(()) => Ok(None),
-            Err(_) => Ok(Some("import_publication_recovery_required".into())),
-        },
+        Ok(()) => Ok(Persisted::Built {
+            folder_left: clear(&transaction).err(),
+        }),
     }
 }
 
@@ -118,11 +188,12 @@ pub(super) fn publish_proofs(
         markdown,
         append_status,
         before,
-        sync_directory,
+        (sync_directory, clear_transaction_folder),
     )
 }
 
-/// [`publish_proofs`] with the directory sync given, so a test can fail it.
+/// [`publish_proofs`] with the directory sync and the folder's removal given,
+/// so a test can fail either.
 fn publish_proofs_syncing(
     imports: &Path,
     update: &ImportLedgerLine,
@@ -130,7 +201,10 @@ fn publish_proofs_syncing(
     markdown: &[u8],
     append_status: impl FnOnce(&ledger::StatusRecord) -> Result<(), String>,
     mut before: impl FnMut(PublicationStep) -> Result<(), String>,
-    sync: impl FnOnce(&Path) -> std::io::Result<()>,
+    (sync, clear): (
+        impl FnOnce(&Path) -> std::io::Result<()>,
+        impl FnOnce(&Path) -> Result<(), String>,
+    ),
 ) -> Result<ledger::ProofName, String> {
     let name = ledger::ProofName::of(json, Utc::now());
     before(PublicationStep::WriteJson)?;
@@ -165,13 +239,15 @@ fn publish_proofs_syncing(
             Err("proof_publication_rollback_failed".into())
         }
         Err(error) => {
-            fs::remove_dir_all(&transaction)
-                .map_err(|_| "proof_publication_recovery_required".to_string())?;
+            clear(&transaction).map_err(|_| "proof_publication_recovery_required".to_string())?;
             Err(error)
         }
-        Ok(()) => fs::remove_dir_all(&transaction)
-            .map(|()| name)
-            .map_err(|_| "proof_publication_recovery_required".to_string()),
+        // The record is whole and names this pair: a folder that stays does
+        // not undo that, and `clear` has kept why (#2269).
+        Ok(()) => {
+            let _ = clear(&transaction);
+            Ok(name)
+        }
     }
 }
 

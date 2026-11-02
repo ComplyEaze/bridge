@@ -2166,6 +2166,11 @@ pub(crate) mod whole_day {
     const T29_V: &[u8] = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-v.utf16le.xml"
     );
+    // A captured marks answer that holds no row of the lab company: BRIDGE
+    // OUTSTANDINGS LAB's, read on 26 October 2026 with only that book loaded.
+    const O_M1: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml"
+    );
     pub(crate) type Exchange = (&'static [u8], &'static [u8]);
     /// An exchange whose answer may be a scripted refusal (`None`).
     type Scripted = (&'static [u8], Option<&'static [u8]>);
@@ -2467,6 +2472,48 @@ pub(crate) mod whole_day {
             reads.summary(),
             serde_json::json!({"whole": 0, "empty": 0, "kept": [
                 {"date": "20260406", "cause": "scripted_refusal"},
+                {"date": "20260405", "cause": "day_read_not_attempted"},
+            ]})
+        );
+    }
+
+    /// A marks answer that does not hold the company fails the day's read under
+    /// the parser's own cause: the day is kept, no census or vouchers request
+    /// follows for it, and no later date is tried.
+    #[tokio::test]
+    async fn a_marks_answer_without_the_company_keeps_its_day_and_reads_no_further() {
+        let answer = utf16(O_M1);
+        assert!(answer.contains("<COMPANY "), "a marks answer with a row");
+        assert!(!answer.to_ascii_lowercase().contains(LAB_GUID));
+        let mut exchanges = day_d06();
+        exchanges[0] = (M_REQ, O_M1);
+        exchanges.extend(day_d05());
+        let planned = exchanges.len();
+        let reader = Captured::of(exchanges);
+        let plan = plan_of(&["20260405", "20260406"]);
+        let reads = read_days(&reader, &identity(), LAB, &plan).await;
+        assert!(reads.whole.is_empty());
+        assert_eq!(
+            reads.kept,
+            [
+                (
+                    date("20260406"),
+                    DayKept::ReadFailed("company_high_water_identity_absent".to_string())
+                ),
+                (date("20260405"), DayKept::NotAttempted),
+            ]
+        );
+        assert_eq!(
+            planned - reader.left(),
+            1,
+            "only the marks request of 6 April was sent"
+        );
+        // the marks answer came back, and stays in the evidence
+        assert!(reads.evidence.is_some());
+        assert_eq!(
+            reads.summary(),
+            serde_json::json!({"whole": 0, "empty": 0, "kept": [
+                {"date": "20260406", "cause": "company_high_water_identity_absent"},
                 {"date": "20260405", "cause": "day_read_not_attempted"},
             ]})
         );

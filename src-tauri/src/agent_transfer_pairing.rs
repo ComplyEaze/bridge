@@ -452,7 +452,10 @@ impl TallyDays {
 /// that is partial confidence (#1392): no capture shows Tally answering an
 /// empty census for a day that holds vouchers, and none rules it out. Without
 /// it no row could read `NotFound`, as the days beside a transfer are often
-/// empty. Whether to keep it is the maintainers' decision.
+/// empty. The maintainers accepted it for day reads with one risk named: a
+/// company closed between a day's marks read and its census could read as an
+/// empty day. `NotFound` stays report-only, and a person confirms any
+/// withdrawal.
 fn corroborated(window: &[&WholeDay]) -> bool {
     let holds = |at: usize| window.get(at).is_some_and(|day| !day.vouchers.is_empty());
     (0..window.len()).all(|at| holds(at) || at.checked_sub(1).is_some_and(holds) || holds(at + 1))

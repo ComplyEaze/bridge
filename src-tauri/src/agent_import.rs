@@ -1501,16 +1501,13 @@ impl Server {
             // below. They change only which of those rows read not_found, which
             // no admission reads, and a day read that fails keeps its rows
             // unchecked.
-            let voucher_mark = mark
-                .value
-                .ok_or_else(|| "pre_import_mark_unobserved".to_string())?;
             let transfers = transfers
                 .summary_with_days_read(
                     &super::voucher_window::AgentReader(self),
                     &identity,
                     &company.name,
                     ledger_masters.catalog(),
-                    Some(voucher_mark),
+                    mark.value,
                     &mut accumulated,
                 )
                 .await;

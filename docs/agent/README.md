@@ -2607,8 +2607,10 @@ refused as `proposals_legacy` (parse the statement again).
   one-day filter. It is taken as read on its own two answers agreeing, beside a
   date read whole in the same call; no capture shows Tally answering an empty
   census for a date that holds vouchers, and none rules it out, so this is
-  partial confidence and the maintainers' decision (#1392). Without it no row
-  could read `not_found`. Ledger names are compared exactly as Tally
+  partial confidence; the maintainers accepted it for day reads (#1392), and
+  without it no row could read `not_found`. One risk remains: a company closed
+  between one date's marks read and its census could read as an empty date. The
+  result stays report-only, and a person confirms any withdrawal. Ledger names are compared exactly as Tally
   sent them, and a date whose entries name a ledger the call's ledger list does
   not hold rules nothing out. No date is read for a book whose voucher mark needs
   more than one census request a day. Each read is one window of one date: the
@@ -2634,8 +2636,9 @@ refused as `proposals_legacy` (parse the statement again).
   is withdrawn, on one side only, solely on the person's confirmation that no
   entry in Tally carries the transfer (`withdraw_skips`, as for any open row),
   and the step says not to book the transfer in Tally another way, because a
-  later post of the other statement would book it twice. Reading the days sends
-  their vouchers to the AI provider: `mask_parties` shortens party and ledger
+  later post of the other statement would book it twice. The assistant's read
+  of those days sends their vouchers to the AI provider (ComplyEaze Bridge's own
+  day reads send only `day_reads`): `mask_parties` shortens party and ledger
   names, `drop_narration` drops narrations, and neither hides amounts.
 - **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
   covers (see `verify_import`, `book_rolled_back`) is never found posted or
@@ -2730,8 +2733,8 @@ refused as `proposals_legacy` (parse the statement again).
   whatever the batch's status. A skip naming one of those ledgers that a single
   verified Contra matches by date on such a day is `matched_unconfirmed`, never
   paired. A skip with no candidate is `tally_unchecked` (or `not_found` after a
-  whole-day read of Tally) only where the other account's windows still hold its
-  day, and otherwise `not_established`;
+  read of its date and the day either side in Tally) only where the other
+  account's windows still hold its day, and otherwise `not_established`;
   `reference_differs` and `reversed_same_day` are decided before either. A
   Contra with no statement record inside a statement's own builds blocks the
   same way; another voucher there does not.

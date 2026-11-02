@@ -3076,6 +3076,11 @@ const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRA
      BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
      yet, and the pull request that renders the census as a span replays it and changes this \
      reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
+const SPANNED_CENSUS_OTHER_BOOK_MARKS: &str = "BRIDGE OUTSTANDINGS LAB's marks answer from the \
+     span read's lab run (26 Oct 2026, #899), read with only that book loaded, with no row here: \
+     the whole_day tests in src/agent_transfer_pairing_tests.rs serve it to the lab request for \
+     BRIDGE TRANSFER LAB's marks, as an answer that holds no row of that company, and pin that the \
+     day's read fails on it (#1392); agent/spanned-census-two-books/PROVENANCE.md says what it is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
@@ -4048,7 +4053,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
-        SPANNED_CENSUS,
+        SPANNED_CENSUS_OTHER_BOOK_MARKS,
     ),
     (
         "tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",

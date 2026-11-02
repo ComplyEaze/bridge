@@ -149,7 +149,7 @@ fn wire_refusal_command_error(refusal: bridge_tally_transport::WireRefusal) -> T
         WireRefusal::Draining { .. } => tally_command_error(
             "tally_endpoint_draining",
             "Operation",
-            "Tally was still busy with an earlier request that was stopped for time.",
+            "Tally was still busy with an earlier request that did not finish.",
             "safe",
             false,
             "Try again in a few seconds; this clears by itself within 10 minutes. This request was not sent to Tally.",

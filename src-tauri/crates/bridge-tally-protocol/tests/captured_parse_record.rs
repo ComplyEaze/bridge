@@ -3807,7 +3807,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_FOREX_VOUCHERS,
     ),
     (
-        "tests/fixtures/agent/vouchers-forex-72-20250401.utf16le.xml",
+        "tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml",
         APP_FOREX_VOUCHERS,
     ),
     // Voucher exports captured for the removed voucher-scan parser.

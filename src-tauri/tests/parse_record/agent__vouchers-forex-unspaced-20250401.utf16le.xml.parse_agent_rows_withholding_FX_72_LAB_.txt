@@ -1,5 +1,5 @@
-# fixture: agent/vouchers-forex-72-20250401.utf16le.xml
-# parser: parse_agent_rows_withholding(FOREX_72_LAB)
+# fixture: agent/vouchers-forex-unspaced-20250401.utf16le.xml
+# parser: parse_agent_rows_withholding(FX_72_LAB)
 # source: captured
 Ok([
     Withheld(

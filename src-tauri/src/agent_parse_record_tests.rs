@@ -61,7 +61,7 @@ const IMPORT_LAB: &str = "17a10910-773c-42c6-bd66-7bba9a392536";
 /// `LINE_BREAK_COMPANY_GUID`).
 const LINE_BREAK_LAB: &str = "224e7f8c-a0aa-45ce-889a-ad4b7fdbe852";
 const FOREX_LAB: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
-const FOREX_72_LAB: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+const FX_72_LAB: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
 const AARAV: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const BILL_ALLOCATION_LAB: &str = "74d7e825-396a-4667-90b2-83f593f06a36";
 const GST_CREDIT_PERIODS_LAB: &str = "46faa869-1208-4119-8961-f28db4df3b8e";
@@ -742,9 +742,9 @@ fn rows() -> Vec<Row> {
         |_, t| withholding(t, FOREX_LAB)
     ));
     rows.push(row!(
-        "agent/vouchers-forex-72-20250401.utf16le.xml",
-        "parse_agent_rows_withholding(FOREX_72_LAB)",
-        |_, t| withholding(t, FOREX_72_LAB)
+        "agent/vouchers-forex-unspaced-20250401.utf16le.xml",
+        "parse_agent_rows_withholding(FX_72_LAB)",
+        |_, t| withholding(t, FX_72_LAB)
     ));
     // A synthetic voucher-import file, read as bytes (`source_draft_xml_tests.rs`).
     rows.push(Row {

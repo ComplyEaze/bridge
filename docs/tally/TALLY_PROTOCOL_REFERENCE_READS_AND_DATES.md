@@ -615,7 +615,7 @@ digits) is otherwise unchanged. Bridge sets such a balance aside by name and nev
 (`currency_composite::is_unspaced_currency_composite`, bridge#2228).
 
 **A voucher on TallyPrime 7.2 writes the same layout (PARTIAL: one synthetic book, one read of one
-day, `lab/683-v72-voucher-answers`, the fixture `vouchers-forex-72-20250401`).** Eleven vouchers
+day, `lab/683-v72-voucher-answers`, the fixture `vouchers-forex-unspaced-20250401`).** Eleven vouchers
 of 1 April 2025, eight with composites: each entry's and bill allocation's `AMOUNT` is
 `-$100.00 @ ₹ 86/$ = -₹ 8600.00`, and `VATEXPAMOUNT` repeats it. A keyed rate of 86.4125 is written
 as `86.4125`. Each voucher's entries net to zero on the amounts after `=`, and on every composite

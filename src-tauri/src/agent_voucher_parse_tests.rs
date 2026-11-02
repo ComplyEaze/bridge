@@ -1471,10 +1471,10 @@ fn decoded_utf16le(bytes: &[u8]) -> String {
 }
 
 /// The 7.2 lab book's answer of one day: eleven vouchers, eight with composites
-/// (fixtures/agent/vouchers-forex-72-20250401.PROVENANCE.md).
+/// (fixtures/agent/vouchers-forex-unspaced-20250401.PROVENANCE.md).
 fn captured_72_vouchers() -> String {
     decoded_utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-72-20250401.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml"
     ))
 }
 

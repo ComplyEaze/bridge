@@ -1,4 +1,4 @@
-# `vouchers-forex-72-20250401`: provenance
+# `vouchers-forex-unspaced-20250401`: provenance
 
 A raw `vouchers` window read of the synthetic several-currency lab book on TallyPrime 7.2, the first voucher answer in that release's composite layout (#683).
 
@@ -8,13 +8,13 @@ A raw `vouchers` window read of the synthetic several-currency lab book on Tally
 - **Date:** 2026-11-02. Sent once; the answer kept byte for byte. Source: `raw/vouchers.response` on branch `lab/683-v72-voucher-answers` at `03940570`.
 - **Company:** `BRIDGE FOREXGROUP LAB`, a synthetic lab book, GUID `1bb48be5-baba-45b2-90d8-7593244915a9`. Base currency master NAME `₹`, plus a `$` master. Its marks were equal before and after the read.
 - **Window:** 2025-04-01 to 2025-04-01, one request, one part.
-- **Request:** `vouchers-forex-72-20250401.request.xml`, the bytes of `vouchers-forex-composite-20260915.request.xml` with this company and date; the fetch list is unchanged. It was sent as UTF-16LE with a byte-order mark.
+- **Request:** `vouchers-forex-unspaced-20250401.request.xml`, the bytes of `vouchers-forex-composite-20260915.request.xml` with this company and date; the fetch list is unchanged. It was sent as UTF-16LE with a byte-order mark.
 - **Response:** BOM-less UTF-16LE, exactly as received.
 
 | file | bytes | sha256 |
 |---|---|---|
-| `vouchers-forex-72-20250401.utf16le.xml` | 387856 | `92e0e0548596cb6103f974c7d8b44afdea09c39ee8fcaf425ddceb3ae67c9369` |
-| `vouchers-forex-72-20250401.request.xml` | 860 | `a105626a9f3ab64988c1c0041715f4a593086d07e87efba599ff8fa9407c4f1a` |
+| `vouchers-forex-unspaced-20250401.utf16le.xml` | 387856 | `92e0e0548596cb6103f974c7d8b44afdea09c39ee8fcaf425ddceb3ae67c9369` |
+| `vouchers-forex-unspaced-20250401.request.xml` | 860 | `a105626a9f3ab64988c1c0041715f4a593086d07e87efba599ff8fa9407c4f1a` |
 
 ## What it establishes
 

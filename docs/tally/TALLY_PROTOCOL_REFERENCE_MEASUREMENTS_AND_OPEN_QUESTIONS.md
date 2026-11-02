@@ -509,6 +509,8 @@ Bridge's own reads, and nothing else was changed in between.
 | Regroup a ledger; change its opening balance; create a ledger; delete it | 0 | +1 each | VERIFIED |
 | Rename the base currency, then restore it (a company with no vouchers) | absent throughout | +2, then +1 | PARTIAL |
 
+Deleting a ledger with no vouchers moves only its own step: on Tally's screen the master mark rose by one and the other ledgers kept their `ALTERID`s (`lab/1713-row-s-answers`, TallyPrime 7.2 Silver, one delete; group `ALTERID`s not read). PARTIAL.
+
 Further observations from the same runs:
 
 - **Invisible fields.** Bridge's import-verification read returns a bill allocation's amount only,

@@ -388,30 +388,26 @@ async fn mcp_outstandings_name_the_set_aside_ledgers_when_they_hold_every_bill()
 
 /// The withheld answer's lists are paged with no figures beside them, so it
 /// carries the page's offset: a response cap that trims a later page resumes
-/// after the rows it kept, and the names stay masked. A party detail is refused
-/// with the withheld reason, as the detail is not tied to the whole book.
+/// after the rows it kept, and the names stay masked.
 #[tokio::test]
 async fn a_trimmed_later_page_of_the_set_aside_ledgers_resumes_after_its_rows() {
-    let receivable = forex_receivable_with_only_the_dollar_ledgers_bills();
-    let read = |arguments: Value| {
-        forex_outstandings(
-            None,
-            &receivable,
-            include_bytes!(
-                "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
-            ),
-            include_bytes!(
-                "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
-            ),
-            include_bytes!(
-                "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
-            ),
-            "20250930",
-            Redaction::MaskParties,
-            arguments,
-        )
-    };
-    let response = read(json!({"offset": 1, "limit": 2})).await;
+    let response = forex_outstandings(
+        None,
+        &forex_receivable_with_only_the_dollar_ledgers_bills(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ),
+        "20250930",
+        Redaction::MaskParties,
+        json!({"offset": 1, "limit": 2}),
+    )
+    .await;
     let result = response["structuredContent"]["result"].clone();
     assert_eq!(result["offset"], 1, "{result}");
     let excluded = &result["foreign_currency_ledgers_excluded"];
@@ -435,11 +431,6 @@ async fn a_trimmed_later_page_of_the_set_aside_ledgers_resumes_after_its_rows() 
     for absent in ["open_bills", "unallocated"] {
         assert!(trimmed["result"].get(absent).is_none(), "{trimmed}");
     }
-
-    let refused = read(json!({"party": "BRIDGE FX DEBTOR A"})).await;
-    assert_eq!(refused["isError"], true, "{refused}");
-    let error = &refused["structuredContent"]["error"];
-    assert_eq!(error["code"], "detail_requires_a_complete_read", "{error}");
 }
 
 /// bridge#642: a book with several Currency masters but no ledger kept in

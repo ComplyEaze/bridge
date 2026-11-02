@@ -175,8 +175,8 @@ already sent to Tally: archive the whole folder by moving it, never delete
 them piecemeal. For a command-line
 installation, `BRIDGE_AGENT_ENABLE_IMPORT=true` also exposes
 `build_import_xml` and `parse_bank_statement`, which prepares local
-bank-statement voucher proposals, and `parse_bank_statement_csv`, which checks the shape of one bank's CSV
-statement export and proposes nothing yet (#1320; below). `BRIDGE_AGENT_ENABLE_WRITES=true` enables
+bank-statement voucher proposals, and `parse_bank_statement_csv`, which does the same from one bank's CSV
+statement export (#1320; below). `BRIDGE_AGENT_ENABLE_WRITES=true` enables
 that import workflow and exposes `post_import` and `acknowledge_post_review`. The MCPB extension always
 sets `BRIDGE_AGENT_ENABLE_IMPORT=true` and maps its **Allow voucher posting, one
 voucher or a batch of up to 50** setting (`enable_posting_2026_10`), off by
@@ -2775,18 +2775,29 @@ Tally Cloud Access, every non-loopback Tally host, and change enumeration. A
 not live-Tally qualification or a claim that every Tally configuration or
 licence mode has been qualified.
 
-### CSV statement shell (`parse_bank_statement_csv`)
+### CSV statements (`parse_bank_statement_csv`)
 
-Takes `statement_path` (a local file, under the path rules of `parse_bank_statement`) and `controls_source`
-(`prior_statement`, `bank_ledger_in_tally` or `this_file`), and reads the file with the CSV edge reader of the
-`bridge-bank-statement` crate, which accepts one private bank's export layout and nothing else. A file the reader
-refuses is refused with its category as the error code, `statement_<category>` and `:row_N` where a row is at fault; there
-are fifteen categories, each its own code. A file that reads is still refused, as `statement_csv_account_line_unmeasured` (not the PDF tool's `statement_no_account_number_line`, which says a statement prints no account line):
-whether that export prints an account number is not established, so nothing binds a file to an account and nothing is
-proposed. With `controls_source` `this_file` the refusal's `cause` is `controls_this_file_derived_not_independent` and its next step says "derived, not independent": the
-file's own first and last balance cannot show that rows are missing, so they are not an independent control. `controls_source` is
-checked before the file is opened and ComplyEaze Bridge cannot verify the claim. The tool writes nothing to Tally or beside the statement
-(like every read tool it adds receipt lines to the local log) and returns no row value. Part of #1320; the account line and the proposals follow once the export's account line is measured.
+Takes `statement_path` (a local file, under the path rules of `parse_bank_statement`), `controls_source`
+(`prior_statement`, `bank_ledger_in_tally` or `this_file`) and `parse_bank_statement`'s `account_label`, `bank_ledger`,
+`suspense_ledger`, `from`, `to`, `mapping` and `cash_answers`, and writes proposals as that tool does: same checks, same
+result, same next step to `build_import_xml`. The CSV edge reader of the `bridge-bank-statement` crate accepts one private
+bank's export layout and nothing else. A file the reader refuses is refused with its category as the error code,
+`statement_<category>` and `:row_N` where a row is at fault; there are seventeen categories, each its own code. The file must
+print exactly one account number, all digits, ending in `account_label`'s digits: a masked number is
+`statement_no_account_number_line`, because it can tell two accounts apart only by chance.
+
+`opening_balance` and `closing_balance` are required unless `controls_source` is `this_file`
+(`statement_control_figures_required`). `this_file` takes neither (`statement_control_figures_with_this_file`) and uses the
+file's own first and last balance, which cannot show that rows are missing, so the result carries `controls_source` and
+`controls_independent` `false`, and so does the proposals file. A Tally ledger built from these same statements counts as
+`this_file`. `controls_source` is ComplyEaze Bridge's record of the caller's claim; it cannot verify it.
+
+A row's party is its whole description, or unnamed when the description holds a digit, so a reference or an account number
+never reaches the result; such a row is known by its date, amount and chq/ref cell. No rule reads a name or a reference out of a
+description, because the export's narrations have not been measured: a row reaches a ledger only when `mapping` names its exact
+text and any other row goes to `suspense_ledger`. Only a description of exactly `ATM CASH WITHDRAWAL` or `CASH DEPOSIT` asks a
+cash question. The chq/ref cell is recorded as printed and matches nothing. Part of #1320; the narration rules follow once the
+export's narrations are measured.
 
 ### Statement tie-out (`statement_tie_out`)
 

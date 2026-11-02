@@ -852,6 +852,14 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             }),
         ),
         (
+            "parse_bank_statement_csv",
+            json!({
+                "cash_questions":[{"printed_as":party_name("Customer One")}],
+                "counterparties":[{"party":party_name("Customer One"),"also_printed_as":[party_name("Supplier Two")]}],
+                "ledgers_to_validate":[party_name("Entry Ledger")],
+            }),
+        ),
+        (
             "post_import",
             json!({"error":{"ledgers_changed":[party_name("Customer One"),party_name("Supplier Two")]}}),
         ),
@@ -936,8 +944,6 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
         "gst_status",
         "local_data_report",
         "month_register",
-        // Refuses every file with a code and returns no value of a row.
-        "parse_bank_statement_csv",
         "post_ledger_creates",
         "prepare_ledger_creates",
         "statement_tie_out",

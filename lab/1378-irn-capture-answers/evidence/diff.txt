@@ -1,0 +1,39 @@
+A attributes {'REMOTEID': 'eb2f5190-292e-4ed8-bfd3-eace839fe699-00000001', 'VCHKEY': 'eb2f5190-292e-4ed8-bfd3-eace839fe699-0000b2b5:00000008', 'VCHTYPE': 'Sales', 'OBJVIEW': 'Invoice Voucher View'}
+B attributes {'REMOTEID': 'eb2f5190-292e-4ed8-bfd3-eace839fe699-00000002', 'VCHKEY': 'eb2f5190-292e-4ed8-bfd3-eace839fe699-0000b2b5:00000010', 'VCHTYPE': 'Sales', 'OBJVIEW': 'Invoice Voucher View'}
+elements: A 732 B 732
+only in A: 0
+only in B: 0
+in both, value or attribute differs: 9
+   VOUCHER/IRNACKDATE[0] A '20250403' {} | B '' {}
+   VOUCHER/GUID[0] A 'eb2f5190-292e-4ed8-bfd3-eace839fe699-00000001' {} | B 'eb2f5190-292e-4ed8-bfd3-eace839fe699-00000002' {}
+   VOUCHER/VOUCHERNUMBER[0] A '1' {} | B '2' {}
+   VOUCHER/IRN[0] A 'a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8' {} | B '' {}
+   VOUCHER/IRNACKNO[0] A '112233' {} | B '' {}
+   VOUCHER/ALTERID[0] A '1' {} | B '2' {}
+   VOUCHER/MASTERID[0] A '1' {} | B '2' {}
+   VOUCHER/VOUCHERKEY[0] A '196490458824712' {} | B '196490458824720' {}
+   VOUCHER/VOUCHERRETAINKEY[0] A '1' {} | B '5' {}
+e-invoice elements on both:
+   VOUCHER/IRNCANCELDATE[0] A '' {} | B '' {}
+   VOUCHER/IRNACKDATE[0] A '20250403' {} | B '' {}
+   VOUCHER/IRN[0] A 'a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8' {} | B '' {}
+   VOUCHER/IRNCANCELREASON[0] A '' {} | B '' {}
+   VOUCHER/IRNCANCELCODE[0] A '' {} | B '' {}
+   VOUCHER/IRNQRCODE[0] A '' {} | B '' {}
+   VOUCHER/IRNACKNO[0] A '112233' {} | B '' {}
+   VOUCHER/IRNIRPSOURCE[0] A '' {} | B '' {}
+   VOUCHER/IGNOREEINVVALIDATION[0] A 'No' {} | B 'No' {}
+   VOUCHER/IRNJSONEXPORTED[0] A 'No' {} | B 'No' {}
+   VOUCHER/IRNCANCELLED[0] A 'No' {} | B 'No' {}
+   VOUCHER/ISEINVOVERRIDDEN[0] A 'No' {} | B 'No' {}
+   VOUCHER/RESETIRNQRCODE[0] A 'No' {} | B 'No' {}
+   VOUCHER/QRCODECRC[0] A '0' {} | B '0' {}
+   VOUCHER/IGNEINVVALIDCRC[0] A '0' {} | B '0' {}
+   VOUCHER/IRNACKUPDATEDATETIME[0] A '000000000' {} | B '000000000' {}
+   VOUCHER/IRNERRORLIST.LIST[0] A '' {} | B '' {}
+children of the voucher in A 729
+BILLTOPLACE A '' B ''
+SHIPTOPLACE A '' B ''
+ISEINVOICE A None B None
+EINVOICEPROVIDED A None B None
+PLACEOFSUPPLY A 'Karnataka' B 'Karnataka'

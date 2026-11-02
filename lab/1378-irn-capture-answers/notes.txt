@@ -1,0 +1,9 @@
+#1378 discovery, 2 Nov 2026 UTC. Master 559eff14c on the day. Tally 7.2 Silver, PID 1200.
+Company BRIDGE EINVOICE LAB created new; features: inventory No, GST Yes. GST details via Alter > Statutory Masters > Maharashtra Registration: GSTIN invented, e-Invoicing applicable Yes, applicable from 1-Apr-25.
+Seed import of three ledgers: CREATED 3, no errors; the customer's state, country, registration type and GSTIN did not show on the ledger screen and were keyed by hand. Sales ledger HSN/SAC and rate keyed by hand.
+BK1 by Tally's screen before any voucher.
+Invoice A: voucher screen; field "Provide e-Invoice details" Yes; sub-screen e-Invoice Details (title Statutory Details). Ack No., Ack Date and IRN take a mouse click and typing; the cursor does not stop on them by itself. Saved: no prompt.
+Invoice B: same path, the three left blank. Saved: prompt "Do you want to generate e-Invoice?" Yes or No, answered No with n. Voucher saved. Nothing sent.
+New screens named: Dispatch Details, Party Details, e-Invoice Details, the generate prompt. Fetch Details Using GSTIN/UIN not touched.
+Report: Go To > GST Reports > e-Invoice. A under IRN Generated, IRN updated without QR Code. B under Uncertain Transactions, Applicable Tax Ledger is not selected. F10 Cancel IRN, Manually Update IRN Info, Get IRN Info, Open e-Invoice Portal, Set GST Status, Enter Alter: all untouched.
+Restore: company shut; Data > Backup & Restore > Restore; Restore Data Path Tally's data folder; Specify Path the BK1 folder; one row, 2-Nov-26 11:07 pm; Accept Y; "Company data folder already exists", Replace. Loaded alone: No Vouchers Entered; marks V empty, M 215. Company shut.

@@ -1,0 +1,1 @@
+Replaced in the text files here, with counts. reads/ and reqs/ are byte for byte, except the two invented GSTINs, each masked as 15 X in both encodings, so sizes stand; the sha256 in evidence/log.txt are of the originals, listed in kept-local.txt.

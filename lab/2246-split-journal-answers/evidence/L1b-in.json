@@ -1,0 +1,126 @@
+{
+  "app_files_outside_this_folder_covered": false,
+  "classes": {
+    "approval_notes": {
+      "bytes": 212,
+      "files": 1,
+      "oldest_days": 16
+    },
+    "bank_statements": {
+      "bytes": 31750,
+      "files": 4,
+      "oldest_days": 21
+    },
+    "egress_log": {
+      "bytes": 1768722,
+      "files": 1,
+      "oldest_days": 2
+    },
+    "import_files": {
+      "bytes": 130285,
+      "files": 39,
+      "oldest_days": 21
+    },
+    "journal": {
+      "bytes": 174198,
+      "files": 1,
+      "oldest_days": 2
+    },
+    "lab": {
+      "bytes": 0,
+      "files": 0,
+      "oldest_days": null
+    },
+    "locks": {
+      "bytes": 17,
+      "files": 5606,
+      "oldest_days": 21
+    },
+    "other": {
+      "bytes": 90,
+      "files": 1,
+      "oldest_days": 21
+    },
+    "proofs": {
+      "bytes": 652835,
+      "files": 244,
+      "oldest_days": 21
+    },
+    "review_records": {
+      "bytes": 8991,
+      "files": 95,
+      "oldest_days": 21
+    }
+  },
+  "entries_that_could_not_be_read": 0,
+  "entry_cap_reached": false,
+  "folder": "present",
+  "folder_file_locations": {
+    "files": 4,
+    "files_read": 4,
+    "folders": [
+      {
+        "path": "<home>\\AppData\\Local\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent",
+        "state": "resolved"
+      }
+    ],
+    "listing_capped": false
+  },
+  "folder_path": "<home>\\AppData\\Local\\Bridge\\agent",
+  "folders_that_could_not_be_listed": [],
+  "incomplete_reason": null,
+  "interrupted_write_folders": 0,
+  "journal": {
+    "batches": 38,
+    "no_dispatch_never_verified": 6,
+    "not_settled": 2,
+    "not_settled_binding_refused": 1,
+    "not_settled_no_response": 0,
+    "not_settled_not_verified": 1,
+    "not_settled_restored": 0,
+    "not_settled_reviewed_not_attributed": 0,
+    "sent_or_found_posted": 32,
+    "settled_by_person": 0,
+    "state": "read"
+  },
+  "journal_path": "<home>\\AppData\\Local\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+  "journal_path_state": "resolved",
+  "lock_folder_file_locations": [
+    {
+      "files": 2899,
+      "files_read": 64,
+      "folders": [
+        {
+          "path": "<home>\\AppData\\Local\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases",
+          "state": "resolved"
+        }
+      ],
+      "listing_capped": false
+    },
+    {
+      "files": 2706,
+      "files_read": 64,
+      "folders": [
+        {
+          "path": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases",
+          "state": "resolved"
+        }
+      ],
+      "listing_capped": false
+    }
+  ],
+  "lock_folder_path": "<home>\\AppData\\Local\\Bridge\\agent",
+  "lock_folder_paths": [
+    "<home>\\AppData\\Local\\Bridge\\agent",
+    "<home>\\.complyeaze-bridge\\coordination"
+  ],
+  "master_journal": {
+    "state": "absent"
+  },
+  "other_directories_not_entered": 0,
+  "package_copies": [
+    "<home>\\AppData\\Local\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent"
+  ],
+  "special_files_not_counted": 0,
+  "symlinks_not_followed": 0
+}

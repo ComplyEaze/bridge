@@ -1,0 +1,16 @@
+side in utc 2026-11-02T10:51:44Z
+== R2 exists True
+top entries 5
+D imports entries=3 mtime=10:49:27.703
+F agent-egress.jsonl bytes=15008 mtime=10:49:31.191
+F agent-import-admission.lock bytes=0 mtime=10:48:24.769
+F agent-import-ledger.jsonl bytes=2152 mtime=10:49:27.703
+F terms-acceptance.jsonl bytes=90 mtime=10:48:20.241
+-- imports tree
+D .build-publication entries=0 empty=True mtime=10:49:27.738
+F bridge-8f407bcd-1b0d-48c5-8585-e4a7f9bef70d.xml bytes=926 mtime=10:49:27.659 attrs=Archive
+F bridge-91327a2d-ebae-4564-b136-75fb526d1601.xml bytes=926 mtime=10:48:30.891 attrs=Archive
+-- journal lines 2
+line 1 keys=16 [batch_id,identity_scheme,company_guid,endpoint_origin,company,txn_ids,date_from,date_to,sha256,built_at,status,pre_import_mark,vouchers,ledger_identities_3,cash_in_hand_ledgers,on_account_approved] kinds: status=built
+line 2 keys=16 [batch_id,identity_scheme,company_guid,endpoint_origin,company,txn_ids,date_from,date_to,sha256,built_at,status,pre_import_mark,vouchers,ledger_identities_3,cash_in_hand_ledgers,on_account_approved] kinds: status=built
+== Q2 exists False

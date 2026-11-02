@@ -1,0 +1,7 @@
+2026-11-02T10:48:20Z side out; client pid 26832; exe sha256 fa2f88e0fe54157835f13c59106b9b39409feca4bba5cfc77b94604592b38736 ok; launch-env.json sha256 809ce343220b0a1e7ebe16accde62172f5c30f05e2fa15e0178f65c02c7c3a1c; LOCALAPPDATA='<home>\\AppData\\Local' APPDATA='<home>\\AppData\\Roaming' USERPROFILE='<home>'
+2026-11-02T10:48:20Z launched pid 16276; stderr to server-stderr-20261102T104820Z.log
+2026-11-02T10:48:20Z package family: client none; server none
+2026-11-02T10:48:20Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-02T10:48:22Z 000-companies.json tool=list_companies secs=0.179 isError=False error=None saved_sha256=b602db28295f2afb7799ad527b2ef16572f89747c51b94dbcd83802c5b961522
+2026-11-02T10:48:31Z 001-build.json tool=build_import_xml secs=7.451 isError=False error=None saved_sha256=04144627c8f49d1cd60506260d9e7e7f22233ab7884bc1164e0244d1d523b798
+2026-11-02T10:48:32Z session ended; server pid 16276 exit code 0

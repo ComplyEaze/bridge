@@ -1,0 +1,13 @@
+2026-11-02T10:44:57Z side out; client pid 23720; exe sha256 fa2f88e0fe54157835f13c59106b9b39409feca4bba5cfc77b94604592b38736 ok; launch-env.json sha256 c6cb45ceb90d8faf9ca6b2aa8757113cb048e47191bdb1060deecece5c9c3d2d; LOCALAPPDATA='<home>\\AppData\\Local' APPDATA='<home>\\AppData\\Roaming' USERPROFILE='<home>'
+2026-11-02T10:44:57Z launched pid 28396; stderr to server-stderr-20261102T104457Z.log
+2026-11-02T10:44:57Z package family: client none; server none
+2026-11-02T10:44:57Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-02T10:45:20Z 000-tools.json tool=list secs=0.013 isError=None error=None saved_sha256=fed131f64a3ed0d4941a46e2a0d851920df6b5c28bc309ebe9b3e15dea95e783
+2026-11-02T10:45:21Z 001-companies.json tool=list_companies secs=0.242 isError=False error=None saved_sha256=61af569c6449f14ca859cdf75e5421bafd191ac74eaa91add5a81c274561b027
+2026-11-02T10:45:24Z 002-marks1.json tool=ledger_masters secs=0.907 isError=False error=None saved_sha256=15497ff881fb127d6f8edce759a8200a52c74c929f2c00346f9f27b0fdaf2fc2
+2026-11-02T10:45:25Z 003-egress1.json tool=egress_log secs=0.191 isError=False error=None saved_sha256=e005c33009361e9952c08b9737b9f253b39797861b0f382303c407e333108bf3
+2026-11-02T10:45:28Z 004-build.json tool=build_import_xml secs=1.319 isError=True error=None saved_sha256=9bcb9bea7b1cba0e2559c8ad069c96665c446c4b1d8075fc71de1ab24f1d736b
+2026-11-02T10:45:36Z 005-post.json tool=post_import secs=0.149 isError=True error=None saved_sha256=ba2049ad35b9a5f01df905af39a624bb8f8bf195f65ea9c098f04e3f30a7461b
+2026-11-02T10:45:50Z 006-marks2.json tool=ledger_masters secs=0.937 isError=False error=None saved_sha256=edf7c72b91c0de393fa76d241a20eca98b8b1a771f2c13d4fab8c9f4fadb8326
+2026-11-02T10:45:51Z 007-egress2.json tool=egress_log secs=0.066 isError=False error=None saved_sha256=80fcee0c9ce2ef9201be0a0fb531b84b362ab1459a6b5deeffcf06498dfedc1f
+2026-11-02T10:45:52Z session ended; server pid 28396 exit code 0

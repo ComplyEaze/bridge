@@ -1,0 +1,17 @@
+2026-11-02 #2246 rows, UTC. Sheet lab/2246-split-journal at f0533b80, SHA256 5 of 5 equal; LAB-COMMON sha256 equal. Build: run 41184397066, artifact 13036317536, zip digest equal, head e9c780f3.
+10:40 Step 0: BRIDGE CORPUS DENSE loaded alone; one tally.exe owns 9001; status 200. Standard user, Medium Mandatory Level.
+10:40 Step 1: one package; version 4.4212.0.0; signature kind Developer. Python is under the local app data folder; the first line of python.txt opened from out.
+10:41 Step 2: K1a, K1b (WMI), K1c. Out's package family none; its new file in the real folder; in's new file seen from out only under the package; ka.txt same vol and id from both sides.
+10:41 Step 3: R journal 1074 B, Q journal 174198 B, different files.
+10:42 L1a out, L1b in: exit 0; package_copies lists Q on both.
+10:44 L1c in: batch built, path under Q, path_state resolved, 10.63 s. Q journal grew to 175278 B.
+10:45 L1d out: build and post refused import_journal_split, other_journal_holds_batches; post 0.149 s, no box. Marks M 328, V 29900 before and after. R journal 1074 B, R imports equal.
+10:47 L2z out: both new journals absent.
+10:48 L2a out: batch built; one file from both sides; Q2 journal absent.
+10:49 L2b in: EXPECT mismatch. import_publication_recovery_required, cause null, batch_id, no path, 7.49 s. Journal grew in place to 2152 B; the row stopped and the run lead was asked.
+10:51 Read-only listing from both sides, identical: imports holds an empty .build-publication and both XML files; Q2 absent.
+10:52 L2c out, on the run lead's word: refused the same, 1.27 s.
+10:53 L2d in: refused the same, 1.25 s. R2 journal 2152 B; folder still empty.
+10:53 R3a out, fresh folder, the run lead's repeat: built clean, 7.17 s.
+10:54 R3b in: refused the same, 7.05 s, XML and journal line written, empty .build-publication left. One repeat; the second allowed was not needed.
+10:55 Exe hash equal to step 0's. No client running. L3 not run. Nothing posted.

@@ -1,0 +1,10 @@
+
+
+Name              : <desktop client>
+PackageFamilyName : <family>
+Version           : 4.4212.0.0
+SignatureKind     : Developer
+
+
+
+

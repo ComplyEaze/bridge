@@ -2624,6 +2624,66 @@ pub(super) fn lab_invoice_rates_hsn() -> &'static [u8] {
     })
 }
 
+/// DERIVED, not Tally's bytes: a compliance answer of the whole book cut to an
+/// invoice's ledgers by [`rates_cut_to`], the answer to the listing the code reads
+/// for them by GUID (#1331). On 31 Oct 2026 the lab's answers to those two
+/// requests, for five ledgers of this company at 18, 10,018 and 20,018 ledgers,
+/// held exactly those rows, each equal to its row of the whole read at 18
+/// (`lab/1331-scoped-masters-answers`, g4 and g5). Those answers are not in this
+/// tree, so no test holds the cut to them.
+fn listing_cut_to(
+    cell: &'static std::sync::OnceLock<Vec<u8>>,
+    answer: &[u8],
+    legs: &[&str],
+) -> &'static [u8] {
+    cell.get_or_init(|| {
+        rates_cut_to(&utf16le(answer), legs)
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect()
+    })
+}
+
+/// The compliance master answer for `BP/26-27/0010` ([`listing_cut_to`]).
+pub(super) fn lab_invoice_listing() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
+        &LAB_INVOICE_LEGS,
+    )
+}
+
+/// The compliance balance answer for `BP/26-27/0010` ([`listing_cut_to`]).
+pub(super) fn lab_invoice_balances() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
+        &LAB_INVOICE_LEGS,
+    )
+}
+
+/// The compliance master answer for the W18 invoice ([`listing_cut_to`]).
+pub(super) fn w18_invoice_listing() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml"),
+        &W18_INVOICE_LEGS,
+    )
+}
+
+/// The compliance balance answer for the W18 invoice ([`listing_cut_to`]).
+pub(super) fn w18_invoice_balances() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-paired.utf16le.xml"),
+        &W18_INVOICE_LEGS,
+    )
+}
+
 /// The sha256 of the rates read the code sends for `BP/26-27/0010`: the request
 /// the lab answered on 31 Oct 2026 (`pilot-lab-ledger-rates-guid.request`) with
 /// only its GUIDs changed to the six ledgers' (DERIVED: the shape is the lab's;
@@ -3874,6 +3934,9 @@ mod mode_tests;
 
 #[path = "agent_import_invoice_admission_tests.rs"]
 mod invoice_admission_tests;
+
+#[path = "agent_import_amount_pin_tests.rs"]
+mod amount_pin_tests;
 
 #[test]
 fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_periods() {

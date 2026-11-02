@@ -3,5 +3,4 @@
   among thousands under Sundry Debtors no longer makes that read the whole book. A ledger
   moved to another group between the approval and the post still refuses the post. The
   refusals `invoice_scope_parent_folds` and `invoice_ledger_scope_too_large` are gone, and
-  `invoice_ledger_guid_unnameable` is new. The ledger listing beside it and its book-size
-  limits are unchanged for now (#1331).
+  `invoice_ledger_guid_unnameable` is new (#1331).

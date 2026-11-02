@@ -22,7 +22,7 @@ use super::master_ledger::MasterMark;
 use super::post::admit_queued_aim;
 use crate::agent::change_parse::parse_all_company_marks;
 use crate::tally::approved_import::{ApprovedImportAdmissionError, QueuedAdmission};
-use crate::tally::ledger_create_item::{LedgerCreateItem, RenderedLedgerCreate};
+use crate::tally::ledger_create_item::{LedgerCreateBatch, LedgerCreateItem, RenderedLedgerCreate};
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_core::master_name_index::{
     IndexedMaster, MasterKind, MasterNameIndex, MasterNameIndexError,
@@ -34,26 +34,30 @@ use bridge_tally_protocol::{parse_ledger_name_index, StandardLedgerCatalogError}
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
-/// The request a master approval is held with: the item and the request
+/// The request a master approval is held with: the batch and the request
 /// rendered from it, once. It is the masters twin of `NativePostRequest` in the
 /// approval slot, and carries no company: the rendered bytes name it, and the
 /// approval binding holds the verified tuple.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct MasterPostRequest {
-    item: LedgerCreateItem,
+    batch: LedgerCreateBatch,
     rendered: RenderedLedgerCreate,
 }
 
 impl MasterPostRequest {
-    /// Renders `item` for `company`, once.
-    pub(super) fn render(item: LedgerCreateItem, company: &VerifiedCompanyIdentity) -> Self {
-        let rendered = item.render_import(company);
-        Self { item, rendered }
+    /// Renders `batch` for `company`, once.
+    pub(super) fn render(
+        batch: impl Into<LedgerCreateBatch>,
+        company: &VerifiedCompanyIdentity,
+    ) -> Self {
+        let batch = batch.into();
+        let rendered = batch.render_import(company);
+        Self { batch, rendered }
     }
 
     #[cfg(test)]
-    pub(super) fn item(&self) -> &LedgerCreateItem {
-        &self.item
+    pub(super) fn batch(&self) -> &LedgerCreateBatch {
+        &self.batch
     }
 
     /// The rendered request, as the POST will send it.
@@ -149,7 +153,7 @@ pub(super) fn recheck_master_admission(
     queued: QueuedAdmission<'_>,
 ) -> anyhow::Result<BTreeMap<String, u64>> {
     let QueuedAdmission::Masters {
-        item,
+        batch,
         company,
         ledgers_first,
         ledgers_second,
@@ -172,7 +176,7 @@ pub(super) fn recheck_master_admission(
     admit_master_create(
         ledgers,
         groups,
-        item,
+        batch,
         company_marks_at_binding,
         company_marks,
         company,
@@ -219,18 +223,18 @@ pub(super) fn parse_readback_indexes(
     parse_indexes(ledgers_xml, groups_xml, company_guid)
 }
 
-/// The check a master tool makes before it saves or asks anything: the proposed
-/// name resolves to no ledger or group in the index answers just read. It is
-/// the queue's name decision without the aim, which only the queue can make.
-/// Typed refusals as [`recheck_master_admission`] gives them.
+/// The check a master tool makes before it saves or asks anything: every
+/// proposed name resolves to no ledger or group in the index answers just
+/// read. It is the queue's name decision without the aim, which only the queue
+/// can make. Typed refusals as [`recheck_master_admission`] gives them.
 pub(super) fn check_name_free(
     ledgers_xml: &str,
     groups_xml: &str,
-    item: &LedgerCreateItem,
+    batch: &LedgerCreateBatch,
     company_guid: &str,
 ) -> anyhow::Result<()> {
     let (ledgers, groups) = parse_indexes(ledgers_xml, groups_xml, company_guid)?;
-    admit_free_name(ledgers, groups, item).map(|_| ())
+    admit_free_names(ledgers, groups, batch).map(|_| ())
 }
 
 /// What the queue's recheck leaves for `before_dispatch` to record: the books
@@ -280,19 +284,19 @@ pub(super) fn aim_master_marks(company_marks: &str) -> anyhow::Result<Vec<Master
         .collect())
 }
 
-/// The decision, over parsed indexes: no ledger or group holds the name,
-/// then the company's master mark did not move
+/// The decision, over parsed indexes: no ledger or group holds any item's
+/// name, then the company's master mark did not move
 /// between the binding snapshot and the aim snapshot (`admit_queued_aim`).
 /// The first collision, in ledger-then-group order, names the refusal.
 pub(super) fn admit_master_create(
     ledgers: Vec<IndexedMaster>,
     groups: Vec<IndexedMaster>,
-    item: &LedgerCreateItem,
+    batch: &LedgerCreateBatch,
     company_marks_at_binding: &str,
     company_marks: &str,
     company: &VerifiedCompanyIdentity,
 ) -> anyhow::Result<BTreeMap<String, u64>> {
-    let index = admit_free_name(ledgers, groups, item)?;
+    let index = admit_free_names(ledgers, groups, batch)?;
     admit_queued_aim(
         company_marks_at_binding,
         company_marks,
@@ -306,12 +310,13 @@ pub(super) fn admit_master_create(
 }
 
 /// The name decision over parsed indexes: no ledger or group holds a spelling
-/// the item's name could resolve to. Returns the index,
-/// whose pre-image the dispatch records.
-fn admit_free_name(
+/// any item's name could resolve to. The first collision, in batch order and
+/// then ledger-then-group order, names the refusal. Returns the index, whose
+/// pre-image the dispatch records.
+fn admit_free_names(
     ledgers: Vec<IndexedMaster>,
     groups: Vec<IndexedMaster>,
-    item: &LedgerCreateItem,
+    batch: &LedgerCreateBatch,
 ) -> anyhow::Result<MasterNameIndex> {
     let mut masters = ledgers;
     masters.extend(groups);
@@ -323,6 +328,14 @@ fn admit_free_name(
             _ => StandardLedgerCatalogError::MalformedResponse,
         })
     })?;
+    for item in batch.items() {
+        admit_free_name(&index, item)?;
+    }
+    Ok(index)
+}
+
+/// One item's name against the index.
+fn admit_free_name(index: &MasterNameIndex, item: &LedgerCreateItem) -> anyhow::Result<()> {
     // The name checked is the item's own typed name, the one the POST carries.
     // A blank candidate is the only error, and a `MasterName` is never blank:
     // reaching it is a wiring fault.
@@ -336,7 +349,7 @@ fn admit_free_name(
         }
         .into());
     }
-    Ok(index)
+    Ok(())
 }
 
 #[cfg(test)]

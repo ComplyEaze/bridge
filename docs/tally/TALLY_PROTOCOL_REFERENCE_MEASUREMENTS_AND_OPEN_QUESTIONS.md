@@ -232,8 +232,13 @@ request is predicted over a budget well below the cap.
      data part; a census span's row count is fixed by construction, so its only uncertainty is the
      per-row figure, measured live at 2.42–2.72 KB on earlier books (§11c.5) and at about
      3.27 KB on the wire (about 1.64 KB decoded) on a book with a mark of about 1.03M (PARTIAL,
-     30-Sep-2026, bridge#899). A full census is about 22 to 27 MB of the 33.5 MB cap: about 1.25x
-     headroom on the heaviest row seen. Whether a heavier row exists is UNVERIFIED.
+     30-Sep-2026, bridge#899), and at 3.24 to 3.38 KB on three spanned reads of 1,986 to 5,029
+     rows of one real book, the widest span read so far (PARTIAL, one sitting, 2-Nov-2026,
+     bridge#899). A full census is about 22 to 27 MB of the 33.5 MB cap: about 1.25x
+     headroom on the heaviest row seen. Whether a heavier row exists is UNVERIFIED. Bytes bound a
+     span; time does not follow them: that sitting's financial year took 21.35 s for 2,022 rows
+     against 5.55 s for a month's 1,986, and a repeated day 0.035 s against 2.62 s, so no time per
+     span is read from it.
    - The cost is a census count proportional to the **book**, not the window: a mark of 250,000 is
      31 census requests however short the window. It is a cost in elapsed time, not in gateway
      safety: every request stays bounded, so a caller that abandons the read leaves at most one
@@ -1886,3 +1891,4 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-31 | §12a.23: the lines' bullet cut to six fixture items tied to the stock-item fixture, with every lab-only claim given its branch; the year-end closings were Tally's Stock Query screens, not the Stock Summary; three items, not two, answered empty at the year end; the shapes the parser still reads; a later period start and four other gaps added to Not measured. PARTIAL |
 | 2026-10-31 | §12a.23: the parser now refuses a hidden or control character in a name or quantity, a group with no line after it, and lines in more than one unit. |
 | 2026-10-31 | §12a.23: named the closed set of characters the parser refuses in a name or quantity, and added a godown name holding a tab to Not measured. |
+| 2026-11-02 | §11c.3: census bytes per row on three spanned reads of 1,986 to 5,029 rows of one real book, and that the time of one sitting did not follow the rows. PARTIAL (bridge#899) |

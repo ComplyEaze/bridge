@@ -40,9 +40,9 @@ pub(super) const WINDOW_READ_BUDGET_BYTES: u64 =
 /// 1.2 KB per row in UTF-8 — Tally emits a fixed envelope whatever narrow fields
 /// are named — which is about 2.4 KB on Bridge's UTF-16 wire. This leaves room
 /// above that rather than assuming it. Measured live since: 2.42 to 2.72 KB per
-/// row on earlier books (§11c.5) and about 3.27 KB on a book with a mark of
-/// about 1.03M (#899); `WindowReadLimits::census_capacity` gives the headroom
-/// that leaves.
+/// row on earlier books (§11c.5), about 3.27 KB on a book with a mark of about
+/// 1.03M and 3.24 to 3.38 KB on spans of up to 5,029 rows of a real book (#899);
+/// `WindowReadLimits::census_capacity` gives the headroom that leaves.
 const CENSUS_WIRE_BYTES_PER_VOUCHER: u64 = 4 * 1024;
 
 /// The most census requests one window read may spend. A book whose voucher

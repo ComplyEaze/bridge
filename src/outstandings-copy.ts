@@ -112,12 +112,22 @@ export function outstandingsPartialState(
   ].filter((sentence): sentence is string => sentence !== null);
   if (reasonCode !== "currency_ledgers_excluded") {
     const state = withheldState(reasonCode, requestedAsOf, tallyAsOf, foreignCurrencyLedgerName);
+    if (!named.length) return state;
     // bridge#2071: ledgers were set aside, then every figure was withheld for
     // this other reason; both are said.
     const sentence = (text: string) => (text.endsWith(".") ? text : `${text}.`);
-    return named.length
-      ? { ...state, message: `${sentence(state.message)} ${named.map(sentence).join(" ")} ComplyEaze Bridge left those ledgers out, with their bills.` }
-      : state;
+    const setAside = `${named.map(sentence).join(" ")} ComplyEaze Bridge left those ledgers out, with their bills.`;
+    // Tally returned these bills: they went with their ledgers, and another
+    // date reads the same book.
+    if (reasonCode === "native_outstandings_as_of_unconfirmed_without_bill_references") {
+      return {
+        ...state,
+        title: "This as-of date could not be confirmed",
+        message: `${setAside} No bill was left, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals.`,
+        retryable: false,
+      };
+    }
+    return { ...state, message: `${sentence(state.message)} ${setAside}` };
   }
   return {
     title: "Outstandings totals withheld on the desktop",
@@ -179,9 +189,6 @@ function withheldState(
   };
 }
 
-export function isNonRetryableOutstandingsBoundary(value: string) {
-  return !outstandingsPartialState(value).retryable;
-}
 
 export type WorkingPaperUnavailableState = {
   title: string;

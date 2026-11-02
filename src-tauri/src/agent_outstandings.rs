@@ -194,6 +194,9 @@ impl Server {
                     let mut partial_reasons = vec![reason.reason_code.as_str()];
                     partial_reasons.extend(exclusions.partial_reasons());
                     payload["partial_reasons"] = json!(partial_reasons);
+                    // The lists are paged with no figures beside them, so the
+                    // page's offset sits here: a trim resumes from it.
+                    payload["offset"] = json!(bill_offset);
                     let (foreign, mixed, truncated) = set_aside_ledgers(
                         exclusions,
                         bill_offset,

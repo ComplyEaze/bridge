@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { isNonRetryableOutstandingsBoundary, outstandingsAgeingAnchorLabel, outstandingsAgeingDisclosure, outstandingsPartialReason, outstandingsPartialState, workingPaperUnavailableState } from "../src/outstandings-copy.ts";
+import { outstandingsAgeingAnchorLabel, outstandingsAgeingDisclosure, outstandingsPartialReason, outstandingsPartialState, workingPaperUnavailableState } from "../src/outstandings-copy.ts";
 
 test("the backend ageing anchor is disclosed in the bucket label", () => {
   assert.equal(outstandingsAgeingAnchorLabel("due_date"), "aged from due date");
@@ -94,7 +94,7 @@ test("currency ledgers left out withhold desktop totals and name the ledgers", (
   assert.doesNotMatch(long.message, /Synthetic FX 5/);
   const unnamed = outstandingsPartialState("currency_ledgers_excluded");
   assert.match(unnamed.message, /keeps some of this company's ledgers in another currency/);
-  assert.equal(isNonRetryableOutstandingsBoundary("currency_ledgers_excluded"), true);
+  assert.equal(unnamed.retryable, false);
 });
 
 // bridge#642: base-currency ledgers with a value in another currency are
@@ -148,13 +148,17 @@ test("a withheld result names the ledgers it also set aside", () => {
     [{ ledger: "Synthetic FX Debtor A", currency: "$" }],
     ["Synthetic Rupee Party"],
   );
-  assert.equal(state.title, "Tally did not confirm this as-of date");
-  assert.match(state.message, /^Tally returned no bill references .* withheld the totals\. /);
+  assert.equal(state.title, "This as-of date could not be confirmed");
+  assert.doesNotMatch(state.message, /Tally returned no bill references/);
   assert.match(state.message, /1 ledger in a currency other than this company's base currency: Synthetic FX Debtor A \(\$\)\. /);
-  assert.match(state.message, /on 1 base-currency ledger: Synthetic Rupee Party\. ComplyEaze Bridge left those ledgers out, with their bills\.$/);
-  assert.equal(state.retryable, true);
+  assert.match(state.message, /on 1 base-currency ledger: Synthetic Rupee Party\. ComplyEaze Bridge left those ledgers out, with their bills\. No bill was left, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals\.$/);
+  assert.equal(state.retryable, false);
+  const other = outstandingsPartialState("native_overdue_crosscheck_mismatch", undefined, undefined, undefined, [], ["Synthetic Rupee Party"]);
+  assert.match(other.message, /^Tally's overdue-day cross-check disagreed .* withheld the totals\. .*left those ledgers out, with their bills\.$/);
+  assert.equal(other.retryable, true);
   const unnamed = outstandingsPartialState("native_outstandings_as_of_unconfirmed_without_bill_references", undefined, undefined, undefined, [], []);
   assert.doesNotMatch(unnamed.message, /left those ledgers out/);
+  assert.equal(unnamed.retryable, true);
 });
 
 test("a refused period is distinct from a row-level disagreement", () => {

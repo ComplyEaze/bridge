@@ -1359,9 +1359,10 @@ impl PartyLedgerMasterCurrencyAssertion {
 pub(crate) struct ClassifiedCurrencyWitness(PartyLedgerMasterCurrencyAssertion, ClassifiedBase);
 
 /// Proof that a result was read under a [`ClassifiedCurrencyWitness`], which
-/// [`OutstandingsLoadResult::BaseCurrencyLedgersOnly`] must carry: only
+/// [`OutstandingsLoadResult::BaseCurrencyLedgersOnly`] and
+/// [`OutstandingsLoadResult::WithheldWithLedgersSetAside`] must carry: only
 /// `admit_inr_classified` mints one, so a single-master witness cannot
-/// produce that result by construction.
+/// produce either result by construction.
 /// A classified witness on a book with one master cannot either: its base
 /// refuses a ledger in another currency in `classify_ledger_currencies`. Its
 /// field is private to this module and its test and child modules.

@@ -765,7 +765,7 @@ row cost seen here.
 
 **Bridge's parent partition (#679) is CODE, live unproven.** A counted book that does not fit one read
 is split by the parent groups the catalogue names: packed first-fit-decreasing by ledger count into
-parts of at most 4,266 ledgers (3,200 when the request names the mailing details, as `ledger_masters` with `include_mailing_details` does, and the workbook does only for a book whose master-alteration mark is at most 3,200, otherwise sending the standard request; 2,000 with the GST details) and at most 200 parents, at most 12 parts (so at most 2,400 parents, refused as `parent_partition_too_many_parts` above that), and read through the
+parts of at most 4,266 ledgers (3,200 when the request names the mailing details, as `ledger_masters` with `include_mailing_details` does; 2,000 with the GST details; the workbook names them only for a whole read, never in parts) and at most 200 parents, at most 12 parts (so at most 2,400 parents, refused as `parent_partition_too_many_parts` above that), and read through the
 `$Parent = "a" OR $Parent = "b"` filter measured above, with the reserved root written as
 `&#4; Primary`. Each part is read as its master pair then its balance pair inside one extent bracket,
 and every catalogue ledger must come back exactly once, from its own part, with the catalogue's name

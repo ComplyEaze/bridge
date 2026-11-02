@@ -5,7 +5,7 @@ These ten files are the responses Tally sent, in order, to one live `purchase_re
 compiled) on the disposable BRIDGE GST RECON LAB book, TallyPrime 7.1 Silver, on 2026-10-01,
 for the single day 2025-09-03. A serial read-only relay sat between the binary and the gateway
 and recorded the bytes; 102 requests were relayed, none refused. The order in which they were sent and each request's
-SHA-256 are in `agent_register_server_tests.rs` (`RECORDED_ORDER`, `recorded_request_sha256`).
+SHA-256 are in `agent_register_server_tests.rs` (`RECORDED_ORDER`, `recorded_request_sha256`). Since #2265 a register sends no balance read on this book, so those pins hold the 94 it sends; the balance answer stays here as captured.
 The body of each response is kept exactly as received (UTF-16LE without a BOM, the status probe
 UTF-8), except the three company-listing responses, where every `COMPANY` row but the target
 book's was removed: the untrimmed responses name every company loaded in that Tally. The

@@ -219,7 +219,8 @@ pub(crate) struct PartyLedgerMasterRow {
     pub(crate) master_id: String,
     pub(crate) alter_id: String,
     pub(crate) opening_balance: ExactDecimal,
-    /// `None` is an empty Tally `CLOSINGBALANCE`, not a zero balance.
+    /// `None` is an empty Tally `CLOSINGBALANCE`, not a zero balance, or a read
+    /// that left balances out, which no workbook is made from.
     pub(crate) closing_balance: Option<ExactDecimal>,
 }
 

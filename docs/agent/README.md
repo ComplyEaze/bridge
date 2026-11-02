@@ -1739,9 +1739,9 @@ rate or return section, and matches nothing against any portal.
   1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
   `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
   row has the sales and tax entries positive and the party entry negative.
-- **The cost varies by book.** A call sends 102 requests on a book with 8
-  ledgers and one currency (96 were recorded before a small book was counted, plus
-  the six the count adds; not measured since) and 118 on one with 44 ledgers and two
+- **The cost varies by book.** A call sends 94 requests on a book with 8
+  ledgers and one currency (96 recorded, six more to count a small book, eight fewer
+  with no balance reads; not measured since) and 118 on one with 44 ledgers and two
   currencies (base-currency reads are added). The result does not report the cost.
 - **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
   on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
@@ -4005,7 +4005,8 @@ Per tool:
 - `purchase_register` and `sales_register`, which send the same requests
   (`register` in `src-tauri/src/agent_register.rs`):
   1. the company read;
-  2. a masters read, as `ledger_masters` with `fields=compliance`;
+  2. a masters read, as `ledger_masters` with `fields=compliance`, without its
+     balance read on a book of one Currency master;
   3. the window read, with the marks already known from that masters read;
   4. a scoped read of the closing marks;
   5. the masters read again;

@@ -2204,17 +2204,22 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              been created, renamed or moved in Tally while this ran: build once more; if the \
              refusal repeats, report it rather than retrying.",
         ),
-        "invoice_book_too_large" | "invoice_book_too_many_vouchers" => Some(
-            "ComplyEaze Bridge builds an invoice only on a company within its size limits: a \
-             voucher mark of 25,000 or less, and a master mark of 5,000 or less or else 2,000 \
-             ledgers or fewer. `detail` gives the count that is over. Building again gives the \
-             same refusal while the company is that size. Tell the user this invoice has to be \
-             entered in Tally itself.",
+        "invoice_ledger_listing_rows_differ" => Some(
+            "Tally's answer about this invoice's ledgers did not hold what ComplyEaze Bridge \
+             asked for: `detail` names how it differs (a ledger it did not ask for, or one whose \
+             name or group has changed). Nothing was written. A ledger may have been created, \
+             renamed or moved in Tally while this ran: build once more; if the refusal repeats, \
+             report it rather than retrying.",
         ),
-        "invoice_book_size_unknown" | "invoice_book_size_unreadable" => Some(
-            "Tally did not report the company's size (its voucher mark, its master mark or its \
-             ledger count), so ComplyEaze Bridge could not tell whether the company is within \
-             the limits for an invoice, and nothing was written. Build once more; if the \
+        "invoice_book_too_many_vouchers" => Some(
+            "ComplyEaze Bridge builds an invoice only on a company with a voucher mark of 25,000 \
+             or less. `detail` gives the mark. Building again gives the same refusal while the \
+             company is that size. Tell the user this invoice has to be entered in Tally itself.",
+        ),
+        "invoice_book_size_unknown" => Some(
+            "Tally did not report the company's voucher mark or master mark, so ComplyEaze Bridge \
+             could not tell whether the company is within the limit for an invoice, and nothing \
+             was written. Build once more; if the \
              refusal repeats, tell the user this invoice has to be entered in Tally itself.",
         ),
         "import_invoice_figures_unreadable" => Some(

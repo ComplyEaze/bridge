@@ -601,14 +601,6 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_voucher_types_request(company))
 }
 
-/// The company's own count of its ledgers, to size an invoice build on a book
-/// whose master mark is high.
-pub(super) fn invoice_ledger_count_read(company: &str) -> ReadRequest {
-    ReadRequest(
-        bridge_tally_protocol::outstandings_shared::render_company_ledger_count_request(company),
-    )
-}
-
 /// The vouchers carrying one invoice number in one financial year, with the
 /// measured per-row Sales-class compute, for the duplicate-number check.
 pub(super) fn invoice_number_read(

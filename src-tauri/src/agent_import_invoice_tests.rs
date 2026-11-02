@@ -1463,21 +1463,6 @@ fn the_book_size_guard_admits_at_each_bound_and_refuses_one_past_it() {
         voucher_mark_refusal(None),
         Some(refuse("invoice_book_size_unknown"))
     );
-    assert!(mark_admits(5_000));
-    assert!(!mark_admits(5_001));
-    assert_eq!(ledger_count_refusal(Some(2_000), 9_000), None);
-    assert_eq!(
-        ledger_count_refusal(Some(2_001), 9_000),
-        Some(refuse_value("invoice_book_too_large", "2001 ledgers"))
-    );
-    // A count Tally did not give never admits, and is unknown, not large.
-    assert_eq!(
-        ledger_count_refusal(None, 9_000),
-        Some(refuse_value(
-            "invoice_book_size_unknown",
-            "master mark 9000"
-        ))
-    );
 }
 
 #[test]

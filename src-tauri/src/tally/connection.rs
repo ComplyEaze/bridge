@@ -35,8 +35,10 @@ use bridge_tally_protocol::{
     native_outstandings::{
         parse_compliance_ledger_snapshot_for_company, parse_native_group_snapshot_with_evidence,
         parse_native_ledger_snapshot_for_company, render_native_group_snapshot_request,
-        render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
-        render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
+        render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_ledgers,
+        render_native_ledger_snapshot_request_for_parents, render_party_ledger_master_request,
+        render_party_ledger_master_request_for_ledgers,
+        render_party_ledger_master_request_for_parents,
         render_party_ledger_master_request_for_parents_with_gst_details,
         render_party_ledger_master_request_for_parents_with_mailing_details,
         render_party_ledger_master_request_with_gst_details,
@@ -975,6 +977,33 @@ impl CountCrossCheck {
 enum PartyLedgerRead<'a> {
     Whole { expected_ledgers: Option<u64> },
     Part(&'a ParentPart),
+}
+
+/// How much of the book one compliance read covers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ComplianceScope {
+    /// Every ledger, with the fields `ComplianceRead` asks for: sized first.
+    Book(ComplianceRead),
+    /// Only these ledgers, with the standard fields (#1331). The part bounds the
+    /// rows whatever the book's size, so nothing sizes the read and a book too
+    /// large for the whole listing is read the same way.
+    Ledgers(bridge_tally_protocol::ledger_guid_part::LedgerGuidPart),
+}
+
+impl ComplianceScope {
+    fn read(&self) -> ComplianceRead {
+        match self {
+            Self::Book(read) => *read,
+            Self::Ledgers(_) => ComplianceRead::Standard,
+        }
+    }
+
+    fn ledgers(&self) -> Option<&bridge_tally_protocol::ledger_guid_part::LedgerGuidPart> {
+        match self {
+            Self::Book(_) => None,
+            Self::Ledgers(part) => Some(part),
+        }
+    }
 }
 
 /// What sizing a compliance master read decided before any ledger request.
@@ -2082,10 +2111,12 @@ impl TallyClient {
         boundary_profile: DateBoundaryProfile,
         currency_assertion: PartyLedgerMasterCurrencyAssertion,
         basis: &BalanceDateBasis,
-        read: ComplianceRead,
+        scope: &ComplianceScope,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let mut evidence = RuntimeReadEvidence::empty();
         let mut count_evidence = RuntimeReadEvidence::empty();
+        let read = scope.read();
+        let ledgers = scope.ledgers();
         let result = async {
             let opening_extent = self.fetch_company_book_extent(identity).await?;
             if let BalanceDateBasis::Requested(requested) = basis {
@@ -2110,7 +2141,10 @@ impl TallyClient {
             // Sized before any ledger request is sent (#637): by the mark when
             // it fits, otherwise by the count of a balance-free catalogue read
             // once the local checks below have passed (#668).
-            let admission = admit_compliance_master_read(master_mark, None, read)?;
+            let admission = match ledgers {
+                Some(_) => ComplianceAdmission::Admitted,
+                None => admit_compliance_master_read(master_mark, None, read)?,
+            };
             let currency = currency_assertion.require_opening_extent(&opening_extent)?;
             let master_period = NativeLedgerExportPeriod::new(
                 boundary_profile,
@@ -2137,8 +2171,9 @@ impl TallyClient {
                 anyhow::Error::new(PartyLedgerMasterSourceValidationError::BalancePeriod)
             })?;
             let mut partition = None;
-            // How many ledgers the whole read must return, once a count says.
-            let mut expected_ledgers = None;
+            // How many ledgers the whole read must return, once a count says, or
+            // the ledgers the read names: a row short means a filter not applied.
+            let mut expected_ledgers = ledgers.map(|part| part.guids().len() as u64);
             // A census counts a book whose mark is past what its catalogue can
             // be read for (#679); its count admits the read like a catalogue's.
             let mut census_count = None;
@@ -2242,8 +2277,20 @@ impl TallyClient {
                 None => read,
             };
             let group_request = render_native_group_snapshot_request(identity.display_name());
-            let part_requests = |read: ComplianceRead| match &partition {
-                None => vec![(
+            let part_requests = |read: ComplianceRead| match (&partition, ledgers) {
+                (_, Some(part)) => vec![(
+                    render_party_ledger_master_request_for_ledgers(
+                        identity.display_name(),
+                        &master_period,
+                        part,
+                    ),
+                    render_native_ledger_snapshot_request_for_ledgers(
+                        identity.display_name(),
+                        &balance_period,
+                        part,
+                    ),
+                )],
+                (None, None) => vec![(
                     match read {
                         ComplianceRead::Standard | ComplianceRead::WithoutBalances => {
                             render_party_ledger_master_request(
@@ -2267,7 +2314,7 @@ impl TallyClient {
                     },
                     render_native_ledger_snapshot_request(identity.display_name(), &balance_period),
                 )],
-                Some(partition) => partition
+                (Some(partition), None) => partition
                     .parts()
                     .iter()
                     .map(|part| {

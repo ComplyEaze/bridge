@@ -14,8 +14,7 @@
 
 use super::{xml_escape, EntrySide, ImportEntry, ImportVoucher};
 use crate::tally::approved_import::{
-    ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheck, InvoicePrecheckInput,
-    InvoiceReadPlan,
+    ApprovedImportAdmissionError, InvoiceAnswers, InvoicePrecheckInput, InvoiceReadPlan,
 };
 use bridge_tally_core::TallyDate;
 use serde::{Deserialize, Serialize};
@@ -334,15 +333,6 @@ fn paise(amount: &str) -> Option<i128> {
     whole.checked_mul(100)?.checked_add(fraction)
 }
 
-/// The largest company master mark (an upper bound on its ledgers) a v0
-/// invoice is built or posted on. Each invoice reads the whole compliance
-/// listing at least four times (the build, before the dialog, after it, and in
-/// the endpoint queue, #1337; a redeemed approval enters again from the top and
-/// repeats the two re-reads); above this the read is refused rather than risk a
-/// large book's gateway. The bound is provisional: no read of a book near it
-/// has been measured.
-const INVOICE_MAX_MASTER_MARK: u64 = 5_000;
-
 /// The largest voucher mark (an upper bound on the book's vouchers) a v0
 /// invoice is built or posted on. PROVISIONAL: formula-filtered voucher reads
 /// have been timed in seconds on books of a few thousand vouchers, and this
@@ -359,38 +349,6 @@ fn voucher_mark_refusal(mark: Option<u64>) -> Option<InvoiceRefusal> {
             format!("voucher mark {vouchers}"),
         )),
         None => Some(refuse("invoice_book_size_unknown")),
-    }
-}
-
-/// Whether the master mark alone admits a book.
-fn mark_admits(mark: u64) -> bool {
-    mark <= INVOICE_MAX_MASTER_MARK
-}
-
-/// What a book above that mark may hold, by the company's own ledger count,
-/// and still be built on: the whole compliance listing is a few kilobytes a
-/// ledger, so this keeps one read of it to a few megabytes. The listing's own
-/// size gate stays in front of it. The rate read is already narrowed to the named
-/// ledgers themselves, by GUID (#1331); reading this listing for the same
-/// ledgers, so that large books can be admitted, is the next change.
-const INVOICE_MAX_LEDGERS: u64 = 2_000;
-
-/// Why a book over the mark is refused on the company's own ledger count, or
-/// `None` when the count admits it. A count Tally did not give never admits,
-/// and is refused as unknown, not as large.
-fn ledger_count_refusal(ledgers: Option<u64>, mark: u64) -> Option<InvoiceRefusal> {
-    match ledgers {
-        Some(ledgers) if ledgers <= INVOICE_MAX_LEDGERS => None,
-        Some(ledgers) => Some(refuse_value(
-            "invoice_book_too_large",
-            format!("{ledgers} ledgers"),
-        )),
-        // Not known to be large: the count did not come back, and the mark alone
-        // does not admit the book.
-        None => Some(refuse_value(
-            "invoice_book_size_unknown",
-            format!("master mark {mark}"),
-        )),
     }
 }
 
@@ -1044,6 +1002,15 @@ fn failed(code: &'static str) -> InvoiceAdmission {
     failed_with(code.to_string())
 }
 
+/// What a verdict is when the answers it needed are already in hand.
+fn admission_of(verdict: Verdict) -> InvoiceAdmission {
+    match verdict {
+        Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
+        Verdict::Failed(code) => failed_with(code),
+        Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
+    }
+}
+
 fn failed_with(code: String) -> InvoiceAdmission {
     InvoiceAdmission::Failed(super::super::ToolFailure::from(code))
 }
@@ -1182,7 +1149,7 @@ pub(super) fn fit_plan(
         company_name,
         listing_as_of,
         precheck: _,
-        ledger_count,
+        listing_ledgers,
         rates,
         ledger_parents,
         voucher_types,
@@ -1193,7 +1160,6 @@ pub(super) fn fit_plan(
         group_hsn,
     } = wanted;
     if *company_name != carried.company_name
-        || *ledger_count != carried.ledger_count
         || *voucher_types != carried.voucher_types
         || *number != carried.number
         || *registration != carried.registration
@@ -1212,7 +1178,10 @@ pub(super) fn fit_plan(
             field: "number_control",
         });
     }
-    if *rates != carried.rates || *ledger_parents != carried.ledger_parents {
+    if *rates != carried.rates
+        || *listing_ledgers != carried.listing_ledgers
+        || *ledger_parents != carried.ledger_parents
+    {
         return Err(ApprovedImportAdmissionError::InvoiceMastersChanged {
             field: "ledger_scope",
         });
@@ -1950,7 +1919,6 @@ fn duty_head_of(observation: &bridge_tally_protocol::GstDutyHeadObservation) -> 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Need {
     Marks,
-    LedgerCount,
     Listing,
     Rates,
     VoucherTypes,
@@ -2000,17 +1968,12 @@ fn admitted(
         .map_err(|error| Verdict::Failed(error.to_string()))
 }
 
-/// The size limits on a book, judged on its marks (and its ledger count when
-/// the master mark is over the gate's mark): the marks it admits, a refusal,
-/// or `Need::LedgerCount`. The build's judge and the queue's precheck both call
-/// it, so the limits have one copy and are decided before the listing is read
-/// (#1337).
-fn size_gate(
-    marks: &str,
-    ledger_count: Option<&str>,
-    company_name: &str,
-    company_guid: &str,
-) -> Result<super::PreImportMark, Verdict> {
+/// The size limit on a book, judged on its marks: the marks it admits or a
+/// refusal. The build's judge and the queue's precheck both call it, so the
+/// limit has one copy and is decided before the listing is read (#1337). The
+/// masters' mark limits nothing: the listing names the invoice's ledgers
+/// (#1331). A mark Tally did not give never admits.
+fn size_gate(marks: &str, company_guid: &str) -> Result<super::PreImportMark, Verdict> {
     let mark = super::pre_import_mark_of(marks, company_guid).map_err(Verdict::Failed)?;
     // The duplicate-number read and the read-back each walk the book's
     // vouchers (a formula decides the rows, so Tally evaluates every
@@ -2021,26 +1984,8 @@ fn size_gate(
     if let Some(refusal) = voucher_mark_refusal(mark.value) {
         return Err(refusing(refusal));
     }
-    match mark.master_value {
-        Some(value) if mark_admits(value) => {}
-        // The mark counts every master alteration, so a long-lived or
-        // stock-heavy book is over it whatever its ledger count: the
-        // company's own count of its ledgers can admit such a book.
-        Some(value) => {
-            let Some(body) = ledger_count else {
-                return Err(Verdict::Need(Need::LedgerCount));
-            };
-            let count = bridge_tally_protocol::outstandings_shared::parse_company_ledger_count(
-                body,
-                company_name,
-                company_guid,
-            )
-            .map_err(|_| unusable("invoice_book_size_unreadable"))?;
-            if let Some(refusal) = ledger_count_refusal(count.map(|count| count.get()), value) {
-                return Err(refusing(refusal));
-            }
-        }
-        None => return Err(refusing(refuse("invoice_book_size_unknown"))),
+    if mark.master_value.is_none() {
+        return Err(refusing(refuse("invoice_book_size_unknown")));
     }
     Ok(mark)
 }
@@ -2052,18 +1997,11 @@ fn size_gate(
 /// registration reads sent, as the build refuses it.
 pub(super) fn queued_precheck(
     input: &InvoicePrecheckInput<'_>,
-) -> Result<InvoicePrecheck, ApprovedImportAdmissionError> {
+) -> Result<(), ApprovedImportAdmissionError> {
     super::post::admit_post_currency(input.currencies)?;
-    match size_gate(
-        input.marks,
-        input.ledger_count,
-        input.company_name,
-        input.company_guid,
-    ) {
-        Ok(_) => Ok(InvoicePrecheck::Admitted),
-        Err(Verdict::Need(Need::LedgerCount)) => Ok(InvoicePrecheck::NeedsLedgerCount),
-        Err(verdict) => Err(queued_refusal(verdict)),
-    }
+    size_gate(input.marks, input.company_guid)
+        .map(|_| ())
+        .map_err(queued_refusal)
 }
 
 /// What a judge's verdict is as a refusal in the queue: the admission's own
@@ -2120,7 +2058,6 @@ impl InvoiceJudge<'_> {
     ) -> Result<crate::tally::agent_read_request::AgentReadRequest, Verdict> {
         let company = self.identity.display_name();
         match need {
-            Need::LedgerCount => admitted(super::super::invoice_ledger_count_read(company)),
             Need::VoucherTypes => admitted(super::super::invoice_voucher_types_read(company)),
             Need::Registration => {
                 admitted(super::super::invoice_company_registration_read(company))
@@ -2192,7 +2129,7 @@ impl InvoiceJudge<'_> {
             company_name: self.identity.display_name().to_string(),
             listing_as_of,
             precheck: queued_precheck,
-            ledger_count: self.request(Need::LedgerCount)?,
+            listing_ledgers: self.scope()?.part().clone(),
             rates: self.request(Need::Rates)?,
             ledger_parents: self.scope()?.parents(),
             voucher_types: self.request(Need::VoucherTypes)?,
@@ -2221,24 +2158,17 @@ impl InvoiceJudge<'_> {
             .ok_or_else(|| refusing(refuse("invoice_party_missing")))?;
         let scope = self.scope()?;
 
-        // 0. Refuse large books: the whole ledger compliance listing is read
-        // at least four times for one invoice (build, before the dialog, after
-        // it, and in the endpoint queue; a redeemed approval repeats the two
-        // re-reads).
+        // 0. Refuse a book whose vouchers are too many for the number read.
         let Some(marks) = answers.marks.as_deref() else {
             return Err(Verdict::Need(Need::Marks));
         };
-        let mark = size_gate(
-            marks,
-            answers.ledger_count.as_deref(),
-            self.identity.display_name(),
-            self.identity.company_guid(),
-        )?;
+        let mark = size_gate(marks, self.identity.company_guid())?;
 
         // 1. The compliance listing.
         let Some(listing) = answers.listing.as_ref() else {
             return Err(Verdict::Need(Need::Listing));
         };
+        scope.prove_listing(listing).map_err(refusing)?;
         let index =
             bridge_tally_protocol::group_ancestry::GroupIndex::build(listing.groups.clone());
         // 1b. Each ledger's GST rate and rounding, from the same listing with
@@ -2571,12 +2501,13 @@ impl super::super::Server {
                         note(&mut evidence, read);
                     }
                     Need::Listing => {
+                        let ledgers = judge.scope().map_err(admission_of)?.part().clone();
                         let listing =
-                            Box::pin(self.runtime.fetch_agent_party_ledger_masters_with_evidence(
+                            Box::pin(self.runtime.fetch_named_ledger_masters_with_evidence(
                                 self.tally_config(),
                                 identity,
                                 today.clone(),
-                                crate::tally::connection::ComplianceRead::Standard,
+                                ledgers,
                             ))
                             .await
                             .map_err(|error| {
@@ -2591,22 +2522,16 @@ impl super::super::Server {
                         );
                         answers.listing = Some(listing);
                     }
-                    Need::LedgerCount
-                    | Need::CompanyHsn
+                    Need::CompanyHsn
                     | Need::Rates
                     | Need::VoucherTypes
                     | Need::Number
                     | Need::NumberControl
                     | Need::GroupHsn
                     | Need::Registration => {
-                        let request = judge.request(need).map_err(|verdict| match verdict {
-                            Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
-                            Verdict::Failed(code) => failed_with(code),
-                            Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
-                        })?;
+                        let request = judge.request(need).map_err(admission_of)?;
                         let (xml, read, _) = self.post_admitted_read(identity, request).await?;
                         let slot = match need {
-                            Need::LedgerCount => &mut answers.ledger_count,
                             Need::Rates => &mut answers.rates,
                             Need::VoucherTypes => &mut answers.voucher_types,
                             Need::Number => &mut answers.number,
@@ -2621,11 +2546,7 @@ impl super::super::Server {
                 },
             }
         };
-        let plan = judge.plan(today).map_err(|verdict| match verdict {
-            Verdict::Refused(refusals) => InvoiceAdmission::Refused(refusals),
-            Verdict::Failed(code) => failed_with(code),
-            Verdict::Need(_) => failed("invoice_read_plan_inconsistent"),
-        })?;
+        let plan = judge.plan(today).map_err(admission_of)?;
         if let Some(detail) = voucher.invoice.as_mut() {
             detail.observed = Some(observed);
         }

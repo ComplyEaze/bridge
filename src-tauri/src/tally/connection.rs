@@ -567,6 +567,42 @@ impl PartyLedgerMasterSourceValidationError {
     }
 }
 
+/// Which request of the party ledger read failed (#2265): one code and one cause cover the whole
+/// chain, so a deadline alone cannot say which request it cut. `LedgerCount` is every request of
+/// the census by span. A closed set of codes, carried as context so the chain's typed causes and
+/// its read evidence stay where they are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+pub(crate) enum LedgerReadRequest {
+    #[error("Tally currency read beside a ledger read failed")]
+    BaseCurrency,
+    #[error("Tally book extent read beside a ledger read failed")]
+    BookExtent,
+    #[error("Tally ledger count read failed")]
+    LedgerCount,
+    #[error("Tally ledger catalogue read failed")]
+    LedgerCatalogue,
+    #[error("Tally ledger master read failed")]
+    LedgerMaster,
+    #[error("Tally ledger balance read failed")]
+    LedgerBalance,
+    #[error("Tally group read beside a ledger read failed")]
+    Groups,
+}
+
+impl LedgerReadRequest {
+    pub(crate) const fn code(self) -> &'static str {
+        match self {
+            Self::BaseCurrency => "base_currency",
+            Self::BookExtent => "book_extent",
+            Self::LedgerCount => "ledger_count",
+            Self::LedgerCatalogue => "ledger_catalogue",
+            Self::LedgerMaster => "ledger_master",
+            Self::LedgerBalance => "ledger_balance",
+            Self::Groups => "groups",
+        }
+    }
+}
+
 /// Names a parent part's read that ran past the response cap as such, so the
 /// caller learns the part's filter was probably ignored; a whole-book read has
 /// no filter to blame and any other failure is left as it came.
@@ -2118,7 +2154,10 @@ impl TallyClient {
         let read = scope.read();
         let ledgers = scope.ledgers();
         let result = async {
-            let opening_extent = self.fetch_company_book_extent(identity).await?;
+            let opening_extent = self
+                .fetch_company_book_extent(identity)
+                .await
+                .context(LedgerReadRequest::BookExtent)?;
             if let BalanceDateBasis::Requested(requested) = basis {
                 if requested < opening_extent.books_from() {
                     return Err(anyhow::Error::new(
@@ -2188,7 +2227,8 @@ impl TallyClient {
                         &mut evidence,
                         &mut count_evidence,
                     )
-                    .await?;
+                    .await
+                    .context(LedgerReadRequest::LedgerCount)?;
                 let counted = census.get();
                 count_cross_check = Some(cross_check);
                 census_count = Some(counted);
@@ -2209,7 +2249,8 @@ impl TallyClient {
                     render_standard_ledger_catalog_request(identity.display_name())?;
                 let catalogue_pair = self
                     .fetch_native_report_paired(catalogue_request.clone())
-                    .await?;
+                    .await
+                    .context(LedgerReadRequest::LedgerCatalogue)?;
                 let (catalogue_body, catalogue_bytes, catalogue_sha256) = catalogue_pair
                     .require_stable(PairedReadValidationError::PartyLedgerCatalogue)?;
                 let catalogue_read = RuntimeReadEvidence::paired(
@@ -2437,7 +2478,8 @@ impl TallyClient {
             let request_sha256 = party_ledger_request_commitment(&committed_requests);
             let group_pair = self
                 .fetch_native_report_paired(group_request.clone())
-                .await?;
+                .await
+                .context(LedgerReadRequest::Groups)?;
             let (group_body, group_response_bytes, group_response_sha256) =
                 group_pair.require_stable(PairedReadValidationError::PartyLedgerGroup)?;
             evidence = evidence.clone().combine(RuntimeReadEvidence::paired(
@@ -2451,7 +2493,10 @@ impl TallyClient {
                     .into_iter()
                     .map(|entry| entry.record)
                     .collect();
-            let closing_extent = self.fetch_company_book_extent(identity).await?;
+            let closing_extent = self
+                .fetch_company_book_extent(identity)
+                .await
+                .context(LedgerReadRequest::BookExtent)?;
             if closing_extent != opening_extent {
                 return Err(anyhow::Error::new(
                     PairedReadValidationError::PartyLedgerExtent,
@@ -2800,7 +2845,8 @@ impl TallyClient {
                 } else {
                     error
                 }
-            })?;
+            })
+            .context(LedgerReadRequest::LedgerMaster)?;
         let (master_body, master_response_bytes, master_response_sha256) = master_pair
             .require_stable(PairedReadValidationError::PartyLedgerMaster)
             .map_err(|error| marked(error, MailingReadFailure::AnswersDiffered))?;
@@ -2933,7 +2979,8 @@ impl TallyClient {
         let balance_pair = self
             .fetch_native_report_paired(balance_request.to_owned())
             .await
-            .map_err(|error| parent_part_response_error(part, error))?;
+            .map_err(|error| parent_part_response_error(part, error))
+            .context(LedgerReadRequest::LedgerBalance)?;
         let (balance_body, response_bytes, response_sha256) =
             balance_pair.require_stable(PairedReadValidationError::PartyLedgerBalance)?;
         *evidence = evidence.clone().combine(RuntimeReadEvidence::paired(

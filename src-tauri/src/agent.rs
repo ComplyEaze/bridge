@@ -856,6 +856,8 @@ struct ReadDetail {
     /// The first Trial Balance row that does not add up, for a statement refusal (#692). Its
     /// ledger is shown as a party name, so `mask_parties` masks it.
     inconsistent_row: Option<crate::reports::statements::RowGap>,
+    /// Which request of the party ledger read failed (#2265). A code from a closed set.
+    failed_request: Option<&'static str>,
 }
 
 /// See [`ReadDetail::window_scope`]: whether the refusal is that of the read by the party's ledger
@@ -2661,6 +2663,8 @@ impl ToolFailure {
                 .and_then(|error| error.bill_row())
                 .map(|(report, row)| BillRowRef { report, row })
         });
+        let failed_request =
+            crate::tally::runtime::failed_ledger_request(&error).map(|request| request.code());
         Self {
             code: code.to_string(),
             evidence,
@@ -2671,9 +2675,10 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
-            read_detail: bill_row.map(|bill_row| {
+            read_detail: (bill_row.is_some() || failed_request.is_some()).then(|| {
                 Box::new(ReadDetail {
-                    bill_row: Some(bill_row),
+                    bill_row,
+                    failed_request,
                     ..ReadDetail::default()
                 })
             }),
@@ -3062,6 +3067,7 @@ impl Server {
                     unplaced_ledger,
                     window_scope,
                     inconsistent_row,
+                    failed_request,
                 ) = read_detail
                     .map(|detail| {
                         (
@@ -3071,9 +3077,15 @@ impl Server {
                             detail.unplaced_ledger,
                             detail.window_scope,
                             detail.inconsistent_row,
+                            detail.failed_request,
                         )
                     })
                     .unwrap_or_default();
+                if let Some(request) = failed_request {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["failed_request"] = json!(request);
+                    }
+                }
                 if let Some(row) = inconsistent_row {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["ledger"] = party_name_value(row.ledger);

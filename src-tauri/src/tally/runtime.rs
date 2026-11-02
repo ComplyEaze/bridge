@@ -4,7 +4,7 @@ use crate::endpoint_wire::WireGateConfig;
 use crate::reports::party_ledger_master::{BalanceDateBasis, PartyLedgerMasterSource};
 use crate::tally::connection::canonical_loopback_origin;
 use crate::tally::connection::{
-    ComplianceRead, ComplianceScope, NativePairedRead, PairedReadValidationError,
+    ComplianceRead, ComplianceScope, LedgerReadRequest, NativePairedRead, PairedReadValidationError,
 };
 use crate::tally::connector::SealedReadRequest;
 use crate::tally::runtime_control::{
@@ -811,6 +811,18 @@ pub(crate) struct RuntimeReadFailure {
     pub(crate) evidence: RuntimeReadEvidence,
     #[source]
     source: anyhow::Error,
+}
+
+/// The request of the party ledger read that failed (#2265). Context is found by downcast from
+/// the error it wraps, and not from a concrete error around it, so each `RuntimeReadFailure` in
+/// the chain is opened.
+pub(crate) fn failed_ledger_request(error: &anyhow::Error) -> Option<LedgerReadRequest> {
+    error.downcast_ref().copied().or_else(|| {
+        error
+            .chain()
+            .filter_map(|cause| cause.downcast_ref::<RuntimeReadFailure>())
+            .find_map(|failure| failure.source.downcast_ref().copied())
+    })
 }
 
 pub(crate) fn with_read_evidence(
@@ -3313,7 +3325,8 @@ impl TallyRuntime {
         // leaves foreign ledgers out by name.
         let currency_read = self
             .detect_classified_base_currency_with_extent(config.clone(), identity)
-            .await?;
+            .await
+            .map_err(|error| error.context(LedgerReadRequest::BaseCurrency))?;
         let assertion = admitted_listing_assertion(&currency_read)?;
         let (source, source_evidence) = self
             .fetch_scoped_party_ledger_master_source(

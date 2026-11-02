@@ -5611,6 +5611,10 @@ fn each_master_refusal_reaches_the_caller_under_its_own_code() {
             UnderLockRefusal::MasterJournalUnavailable,
             "master_ledger_unavailable",
         ),
+        (
+            UnderLockRefusal::JournalSplit("other_journal_holds_batches"),
+            "import_journal_split",
+        ),
     ] {
         assert_eq!(refusal_code(&anyhow::Error::from(refusal)), code);
     }

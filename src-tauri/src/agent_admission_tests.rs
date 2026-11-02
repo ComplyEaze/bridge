@@ -1835,8 +1835,8 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// and 203 once all three have landed; the first two lists stay within theirs.
 /// Also on 2 Nov 2026, provenance detail came out of the `vouchers`, `masters`, `ledger_masters`
 /// and `post_import` texts, 1,298 bytes off the first list and 1,424 off the other three. On the
-/// merged tree the lists measure 205,667, 231,560, 234,069 and 239,187 bytes, leaving margins of
-/// 1,833, 1,940, 1,931 and 1,813. The budgets stay: that room is for the changes behind it.
+/// merged tree the lists measure 205,920, 231,813, 234,322 and 239,440 bytes, leaving margins of
+/// 1,580, 1,687, 1,678 and 1,560. The budgets stay: that room is for the changes behind it.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 233_500, 236_000, 241_000];

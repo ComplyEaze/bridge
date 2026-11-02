@@ -158,3 +158,38 @@ fn the_ledger_texts_name_alias_of_and_the_alias_twin() {
     assert!(ledger.contains("or to one of its aliases"));
     assert!(ledger.contains("through_alias"));
 }
+
+/// #2152: a batch that could be imported or posted says what checks which
+/// order. A post after an import is refused by the post's own read of the book
+/// (`import_preexisting_identity`); an import after a post is checked by
+/// nothing. The posting-off warning and next step say it in the same words.
+#[test]
+fn the_one_route_sentence_names_the_check_that_exists_and_the_one_that_does_not() {
+    const ONE_ROUTE: &str = "Use one route only. Once this batch is posted, do not import this file: nothing checks an import against an earlier post. If this file is imported first, post_import, which Allow voucher posting adds, reads the book before asking for approval and refuses the batch (import_preexisting_identity) if any of its vouchers is already there, matched by its narration tag, by date, voucher type and entries, or for an invoice by its number.";
+    let (warnings, next_step) = build_import_guidance(false, None, false, false, false, false);
+    assert!(
+        warnings[0].as_str().unwrap().ends_with(ONE_ROUTE),
+        "{warnings}"
+    );
+    assert!(next_step.ends_with(ONE_ROUTE), "{next_step}");
+    // The stale claim is gone from every text this guidance can return.
+    for (writes_enabled, refusal) in [
+        (true, None),
+        (true, Some("import_post_batch_too_large")),
+        (false, None),
+        (false, Some("import_post_batch_too_large")),
+    ] {
+        let (warnings, next_step) =
+            build_import_guidance(writes_enabled, refusal, false, false, false, false);
+        assert!(
+            !warnings
+                .to_string()
+                .contains("nothing checks an import against a post."),
+            "{warnings}"
+        );
+        assert!(
+            !next_step.contains("nothing checks an import against a post."),
+            "{next_step}"
+        );
+    }
+}

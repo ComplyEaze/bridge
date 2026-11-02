@@ -64,6 +64,8 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
+#[path = "agent_import_split_journal.rs"]
+mod split_journal;
 // The master write journal. The read-back piece, which follows the tools,
 // reads the parts of it the tools do not yet (the sidecar read, the verdict).
 #[cfg_attr(not(test), allow(dead_code))]
@@ -1270,6 +1272,11 @@ impl Server {
             // Admit the journal before publication; labels in older batches do not
             // collide with this build's independently generated wire identities.
             self.import_snapshot_while_admitted(None)?;
+            // No batch is written to a journal that cannot see a second one a
+            // Store package's copy of the data folder keeps (#2233).
+            split_journal::admit(&self.settings.data_dir).map_err(|split| {
+                ToolFailure::from(split).with_prior_evidence(accumulated.clone())
+            })?;
             // The admission above read the stop before this lock; a post may
             // have gone out since. No file is written for a stopped company.
             if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())
@@ -2483,6 +2490,10 @@ impl Server {
                 line.vouchers.len(),
             );
             payload["result"]["verification_status"] = json!(status.as_str());
+            // Said before it is saved, so every page of the proof carries it.
+            if !dispatched && status == VerificationStatus::PostedVerified {
+                verification::mark_found_not_sent(&mut payload["result"]);
+            }
             // Marked before it is saved, so the proof holds the marks too.
             mark_verification_names(&mut payload["result"]);
             self.persist_import_verification(&payload["result"], &line, status, generation)?;
@@ -3899,7 +3910,7 @@ fn build_import_guidance(
     };
     let manual_import_next_step = "Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment";
     // A batch that two routes could put in the book: either direction books it twice.
-    let one_route = "Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.";
+    let one_route = "Use one route only. Once this batch is posted, do not import this file: nothing checks an import against an earlier post. If this file is imported first, post_import, which Allow voucher posting adds, reads the book before asking for approval and refuses the batch (import_preexisting_identity) if any of its vouchers is already there, matched by its narration tag, by date, voucher type and entries, or for an invoice by its number.";
     // A file import after a native post is not checked against it (the post
     // binds a fresh REMOTEID); a post after a file import is refused by the
     // post's own book read (import_preexisting_identity).
@@ -3925,7 +3936,7 @@ fn build_import_guidance(
             warnings(
                 &format!("No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), the post_import tool, which that setting adds, would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import. {one_route}"),
             ),
-            "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment. Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.",
+            "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment. Use one route only. Once this batch is posted, do not import this file: nothing checks an import against an earlier post. If this file is imported first, post_import, which Allow voucher posting adds, reads the book before asking for approval and refuses the batch (import_preexisting_identity) if any of its vouchers is already there, matched by its narration tag, by date, voucher type and entries, or for an invoice by its number.",
         ),
         (false, Some(code)) => (
             warnings(&format!(

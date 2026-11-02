@@ -842,7 +842,7 @@ fn the_settle_dialog_counts_each_type_spans_the_dates_and_breaks_a_long_name() {
     assert_eq!(
         lines[5..7],
         [
-            "Batch: bridge-6c79872c-aab6-4be5-a181-18182c8148be",
+            format!("Batch: {}", line.batch_id).as_str(),
             "Sent to Tally: 3 vouchers (2 Journal, 1 Payment), dated 20260905 to 20260909.",
         ],
         "{preview}"

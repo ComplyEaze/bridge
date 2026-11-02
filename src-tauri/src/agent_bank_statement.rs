@@ -65,9 +65,10 @@ const PROPOSALS_SCHEMA_V1: &str = "bridge.bank_statement.proposals.v1";
 /// `direction` and `reversed_same_day`.
 const PROPOSALS_SCHEMA: &str = "bridge.bank_statement.proposals.v2";
 /// How a proposals file's tie-out edges were worked out: from the statement's
-/// rows, by transaction date (a CSV row's date is its value date, the date its
-/// voucher takes).
+/// rows, by transaction date.
 pub(super) const TIE_OUT_BASIS: &str = "statement_rows_by_transaction_date";
+/// The same for a CSV statement, whose row and voucher date is the value date.
+pub(super) const TIE_OUT_BASIS_VALUE_DATE: &str = "statement_rows_by_value_date";
 /// Larger than any admissible file: 1000 vouchers at the text limits.
 const MAX_PROPOSALS_FILE_BYTES: u64 = 16 * 1024 * 1024;
 
@@ -178,6 +179,7 @@ struct StatementChoices {
 struct ParseRecord<'a> {
     /// The bank or the CSV layout, by name.
     layout: &'static str,
+    tie_out_basis: &'static str,
     controls: &'a Controls,
     /// Given only by the CSV tool, whose figures can be the file's own.
     controls_source: Option<ControlsSource>,
@@ -219,6 +221,7 @@ impl OwnedRequest {
     fn record(&self) -> ParseRecord<'_> {
         ParseRecord {
             layout: self.bank.name(),
+            tie_out_basis: TIE_OUT_BASIS,
             controls: &self.controls,
             controls_source: None,
             choices: &self.choices,
@@ -527,7 +530,7 @@ fn persist(
                 "last_date": edges.last().iso(),
                 "opening_balance": format_amount(edges.opening()),
                 "closing_balance": format_amount(edges.closing()),
-                "basis": TIE_OUT_BASIS,
+                "basis": request.tie_out_basis,
             }),
             Some(Ok(Err(reason))) => json!({"state": "not_established", "reason": reason.code()}),
             Some(Err(refusal)) => return Err(refused(&refusal)),
@@ -693,6 +696,13 @@ fn summary(
     if let Some(source) = request.controls_source {
         result["controls_source"] = json!(source.as_str());
         result["controls_independent"] = json!(source != ControlsSource::ThisFile);
+        if source == ControlsSource::ThisFile {
+            // The file's own last balance, not the caller's figure.
+            result["reconciled"]
+                .as_object_mut()
+                .expect("written above as an object")
+                .remove("closing_balance");
+        }
     }
     result
 }
@@ -1216,6 +1226,7 @@ csv_refusals! {
     SerialBroken = "serial_broken",
     UnparseableDate = "unparseable_date",
     DateOrderBroken = "date_order_broken",
+    ValueDateOutsidePeriod = "value_date_outside_period",
     MalformedAmount = "malformed_amount",
     MalformedBalance = "malformed_balance",
     DirectionUnknown = "direction_unknown",
@@ -1256,7 +1267,7 @@ pub(super) fn input_schema_csv() -> Value {
     schema
 }
 
-pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export, and write voucher proposals as parse_bank_statement does: same checks (the account number printed in the file must end with account_label's digits, the running balance replayed on every row), same result, same next step to build_import_xml. Any other file is refused, never guessed: statement_<category>, with :row_N where a row is at fault. The party of a row is its whole description, or unnamed when that holds a digit, and no rule reads a name or a reference out of it: a row reaches a ledger only when mapping names its exact text, and any other row goes to suspense_ledger. Only a description of exactly ATM CASH WITHDRAWAL or CASH DEPOSIT asks a cash question. controls_source says where opening_balance and closing_balance come from, and both are required unless it is this_file. this_file takes no figures and uses the file's own first and last balance, which cannot show that rows are missing: the result says controls_independent false. A Tally ledger built from these same statements counts as this_file. Nothing here verifies the claim. It never contacts Tally.";
+pub(super) const DESCRIPTION_CSV: &str = "Read a local CSV bank statement in the one layout measured, a private bank's net-banking export, and write voucher proposals as parse_bank_statement does: same checks (the account number printed in the file must end with account_label's digits, the running balance replayed on every row), same result, same next step to build_import_xml. Any other file is refused, never guessed: statement_<category>, with :row_N where a row is at fault. The party of a row is its whole description, or unnamed when that holds a digit, and no rule reads a name or a reference out of it: a row reaches a ledger only when mapping names its exact text, and any other row goes to suspense_ledger. Only a description of ATM CASH WITHDRAWAL or CASH DEPOSIT asks a cash question. controls_source says where opening_balance and closing_balance come from, and both are required unless it is this_file. this_file takes no figures and uses the file's own first and last balance, which cannot show that rows are missing: the result says controls_independent false and returns neither. A Tally ledger built from these same statements counts as this_file. Nothing here verifies the claim. It never contacts Tally.";
 
 /// The admitted arguments of `parse_bank_statement_csv`.
 struct CsvRequest {
@@ -1323,6 +1334,7 @@ fn run_csv(request: &CsvRequest, data_dir: &Path, max_bytes: usize) -> Result<Va
         data_dir,
         &ParseRecord {
             layout: CsvLayout::BankA.name(),
+            tie_out_basis: TIE_OUT_BASIS_VALUE_DATE,
             controls,
             controls_source: Some(request.controls_source),
             choices: &request.choices,

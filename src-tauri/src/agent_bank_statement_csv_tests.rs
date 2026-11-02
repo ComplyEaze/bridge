@@ -99,6 +99,11 @@ fn broken() -> Vec<(&'static str, Vec<u8>, &'static str)> {
             "statement_date_order_broken:row_2",
         ),
         (
+            "value_date_outside_period",
+            with_row_two(&ROW_TWO.replacen("\"03-04-2025\"", "\"31-03-2025\"", 1)),
+            "statement_value_date_outside_period:row_2",
+        ),
+        (
             "malformed_amount",
             with_row_two(&ROW_TWO.replacen("\"250.50\"", "\"250.5\"", 1)),
             "statement_malformed_amount:row_2",
@@ -256,7 +261,7 @@ fn the_categories_the_edge_reader_gives_are_exactly_the_variants_the_tool_maps()
     let mut mapped: Vec<&str> = CsvRefusal::ALL.iter().map(|kind| kind.category()).collect();
     mapped.sort_unstable();
     assert_eq!(reached, mapped);
-    assert_eq!(mapped.len(), 17);
+    assert_eq!(mapped.len(), 18);
     for kind in CsvRefusal::ALL {
         assert_eq!(CsvRefusal::from_category(kind.category()), Some(*kind));
     }
@@ -425,6 +430,12 @@ async fn a_file_that_reads_writes_its_proposals_and_says_where_its_figures_came_
         assert_eq!(result["controls_independent"], independent, "{source}");
         assert_eq!(result["reconciled"]["running_balance_every_row"], true);
         assert_eq!(result["reconciled"]["totals_match_statement"], false);
+        // Under `this_file` the closing balance is the file's, not the caller's.
+        assert_eq!(
+            result["reconciled"].get("closing_balance").is_some(),
+            independent,
+            "{source}"
+        );
         // `build_import_xml` reads the same file through this loader.
         let document = load_proposals(
             &directory.path().join("agent"),
@@ -434,6 +445,10 @@ async fn a_file_that_reads_writes_its_proposals_and_says_where_its_figures_came_
         .unwrap();
         assert_eq!(document["controls_source"], source);
         assert_eq!(document["vouchers"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            document["window"]["tie_out"]["basis"],
+            "statement_rows_by_value_date"
+        );
     }
 }
 

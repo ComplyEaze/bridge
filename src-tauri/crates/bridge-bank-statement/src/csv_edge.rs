@@ -43,8 +43,10 @@
 //!   two balances this returns. Because the opening is derived from row 1,
 //!   the replay cannot fault row 1: its amount and direction are proven by
 //!   nothing here, and a file of one row proves only itself.
-//! - Value dates are checked for shape and validity, not for order or
-//!   against the transaction date; the preamble's `Period` is not read, and
+//! - A value date is checked for shape and validity, not for order, and must
+//!   sit in its transaction's calendar month or be the day before it, the
+//!   note's case. Any other moves a row into another period on no measured
+//!   ground, and refuses. The preamble's `Period` is not read, and
 //!   the closing line's date is checked for validity only. A nine-cell
 //!   line above the header is preamble (the header is found by content).
 //!
@@ -253,6 +255,17 @@ fn posting_time(text: &str) -> Option<String> {
         .then(|| format!("{} {hour:02}:{minute:02}:{second:02}", date.iso()))
 }
 
+/// Whether `value` sits in the month of the transaction date `posted` opens
+/// with, or is the day before it (interest posted after midnight).
+fn value_date_in_period(value: Date, posted: &str) -> bool {
+    posted
+        .get(..10)
+        .and_then(parse_day_month_year_hyphenated)
+        .is_some_and(|day| {
+            (value.year, value.month) == (day.year, day.month) || day.previous_day() == Some(value)
+        })
+}
+
 fn decimal(text: &str) -> ExactDecimal {
     ExactDecimal::parse(text.to_string()).expect("a validated plain decimal")
 }
@@ -385,6 +398,13 @@ pub fn read_statement(bytes: &[u8]) -> Result<CsvStatement, Refusal> {
                 "the value date is not DD-MM-YYYY",
             ));
         };
+        if !value_date_in_period(value_date, &cells[1]) {
+            return Err(refuse(
+                "value_date_outside_period",
+                number,
+                "the value date is outside the transaction date's month and not the day before it",
+            ));
+        }
         let Some(moved) = amount(&cells[5]) else {
             return Err(refuse(
                 "malformed_amount",

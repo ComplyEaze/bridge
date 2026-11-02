@@ -405,6 +405,17 @@ fn dates_are_checked_for_shape_validity_and_order() {
         refuses(read_statement(value.as_bytes()), "unparseable_date").row,
         Some(2)
     );
+    // A value date in another month is refused unless it is the day before.
+    let moved = text.replace("\"03-04-2025\"", "\"31-03-2025\"");
+    assert_eq!(
+        refuses(read_statement(moved.as_bytes()), "value_date_outside_period").row,
+        Some(2)
+    );
+    let ahead = text.replace("\"03-04-2025\"", "\"01-05-2025\"");
+    assert_eq!(
+        refuses(read_statement(ahead.as_bytes()), "value_date_outside_period").row,
+        Some(2)
+    );
     // Posting order broken by one second.
     let order = text.replace("03-04-2025 09:00:01", "02-04-2025 10:14:59");
     assert_eq!(

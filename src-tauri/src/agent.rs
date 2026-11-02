@@ -1830,7 +1830,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              (Unicode Default_Ignorable_Code_Point or Format, except ZWJ, ZWNJ and the \
              prepended concatenation marks). Remove that sequence or character from the \
              voucher number or narration and build the batch again with build_import_xml (for \
-             proposals from an earlier parse_bank_statement, run parse_bank_statement again \
+             proposals from an earlier bank statement parse, run that parse again \
              first): a saved batch cannot be changed, and post_import refuses one saved with \
              such a narration. The reference may carry either freely.",
         ),

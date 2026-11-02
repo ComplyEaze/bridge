@@ -2789,7 +2789,7 @@ print exactly one account number, all digits, ending in `account_label`'s digits
 `opening_balance` and `closing_balance` are required unless `controls_source` is `this_file`
 (`statement_control_figures_required`). `this_file` takes neither (`statement_control_figures_with_this_file`) and uses the
 file's own first and last balance, which cannot show that rows are missing, so the result carries `controls_source` and
-`controls_independent` `false`, and so does the proposals file. A Tally ledger built from these same statements counts as
+`controls_independent` `false` and no `closing_balance`, and the proposals file records both. A Tally ledger built from these same statements counts as
 `this_file`. `controls_source` is ComplyEaze Bridge's record of the caller's claim; it cannot verify it.
 
 A row's party is its whole description, or unnamed when the description holds a digit, so a reference or an account number
@@ -2815,7 +2815,8 @@ deadlocks.
   `window.tie_out` where the file can be compared with the book: either
   `established`, with the dates and the statement's balance at the start of the
   first and the end of the last (`first_date`, `last_date`, `opening_balance`,
-  `closing_balance`, basis `statement_rows_by_transaction_date`), or
+  `closing_balance`, basis `statement_rows_by_transaction_date`, or
+  `statement_rows_by_value_date` for a CSV statement), or
   `not_established` with a reason. The schema string is unchanged, and an older
   build still reads such a file. For the whole statement the dates are its first
   and last row dates and the balances are the ones the caller supplied. For a
@@ -2824,7 +2825,7 @@ deadlocks.
   `window_not_whole_calendar_months`) within the statement's rows
   (`window_beyond_statement_rows`); the opening is the supplied opening plus the
   net of the rows dated before the window, and the closing the supplied closing
-  less the net of the rows dated after it. These are sums by transaction date,
+  less the net of the rows dated after it. These are sums by the row's date,
   so the order the bank printed the rows in cannot move them, and every row's
   amount is proved by the running-balance check before they are taken. The
   tie-out checks the month rule again when it reads the file. For a file that

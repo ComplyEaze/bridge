@@ -1,0 +1,30 @@
+WRITE imp-b-plain {'CREATED': '1', 'ALTERED': '0', 'DELETED': '0', 'COMBINED': '0', 'IGNORED': '0', 'ERRORS': '0', 'CANCELLED': '0', 'LASTVCHID': '4', 'LASTMID': '0'} LINEERROR []
+MARKS rows 1 {'GUID': 'd984f70a-2b9a-4eac-b46c-144a38623cb3', 'ALTVCHID': '4', 'ALTMSTID': '211'}
+LEDGERS
+  (other) 'Cash'
+  (other) 'Profit & Loss A/c'
+  attr 'Twin A' len 6 utf16 5400770069006e0020004100 utf8 5477696e2041
+     elements ["'Twin A' len 6 utf16 5400770069006e0020004100 utf8 5477696e2041"]
+     GUID d984f70a-2b9a-4eac-b46c-144a38623cb3-000000ce PARENT Indirect Incomes ALTERID 208
+  attr 'Twin A\r\n' len 8 utf16 5400770069006e00200041000d000a00 utf8 5477696e20410d0a
+     elements ["'Twin A\\r\\n' len 8 utf16 5400770069006e00200041000d000a00 utf8 5477696e20410d0a"]
+     GUID d984f70a-2b9a-4eac-b46c-144a38623cb3-000000cf PARENT Indirect Incomes ALTERID 209
+  attr 'Twin B' len 6 utf16 5400770069006e0020004200 utf8 5477696e2042
+     elements ["'Twin B' len 6 utf16 5400770069006e0020004200 utf8 5477696e2042"]
+     GUID d984f70a-2b9a-4eac-b46c-144a38623cb3-000000d1 PARENT Indirect Incomes ALTERID 211
+  attr 'Twin B\r\n' len 8 utf16 5400770069006e00200042000d000a00 utf8 5477696e20420d0a
+     elements ["'Twin B\\r\\n' len 8 utf16 5400770069006e00200042000d000a00 utf8 5477696e20420d0a"]
+     GUID d984f70a-2b9a-4eac-b46c-144a38623cb3-000000d0 PARENT Indirect Incomes ALTERID 210
+VOUCHERS
+   {'DATE': '20260804', 'VOUCHERTYPENAME': 'Payment', 'VOUCHERNUMBER': '1', 'NARRATION': '626 R2 imp-a-plain', 'ALTERID': '1'} party 'Cash' len 4 utf16 4300610073006800 utf8 43617368
+     entry 'Twin A' len 6 utf16 5400770069006e0020004100 utf8 5477696e2041 amount -711.00 deemed Yes
+     entry 'Cash' len 4 utf16 4300610073006800 utf8 43617368 amount 711.00 deemed No
+   {'DATE': '20260805', 'VOUCHERTYPENAME': 'Payment', 'VOUCHERNUMBER': '2', 'NARRATION': '626 R2 imp-a-break', 'ALTERID': '2'} party 'Cash' len 4 utf16 4300610073006800 utf8 43617368
+     entry 'Twin A\r\n' len 8 utf16 5400770069006e00200041000d000a00 utf8 5477696e20410d0a amount -712.00 deemed Yes
+     entry 'Cash' len 4 utf16 4300610073006800 utf8 43617368 amount 712.00 deemed No
+   {'DATE': '20260806', 'VOUCHERTYPENAME': 'Payment', 'VOUCHERNUMBER': '3', 'NARRATION': '626 R2 imp-b-break', 'ALTERID': '3'} party 'Cash' len 4 utf16 4300610073006800 utf8 43617368
+     entry 'Twin B\r\n' len 8 utf16 5400770069006e00200042000d000a00 utf8 5477696e20420d0a amount -713.00 deemed Yes
+     entry 'Cash' len 4 utf16 4300610073006800 utf8 43617368 amount 713.00 deemed No
+   {'DATE': '20260807', 'VOUCHERTYPENAME': 'Payment', 'VOUCHERNUMBER': '4', 'NARRATION': '626 R2 imp-b-plain', 'ALTERID': '4'} party 'Cash' len 4 utf16 4300610073006800 utf8 43617368
+     entry 'Twin B' len 6 utf16 5400770069006e0020004200 utf8 5477696e2042 amount -714.00 deemed Yes
+     entry 'Cash' len 4 utf16 4300610073006800 utf8 43617368 amount 714.00 deemed No

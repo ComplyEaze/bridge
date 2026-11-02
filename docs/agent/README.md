@@ -37,7 +37,7 @@ Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
 (default `500`), `BRIDGE_AGENT_MAX_BYTES` (default `200000`), and
 `BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`).
-`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer. Control replies (to
+`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer, so a page can end before `limit`, marked truncated with its `next_offset`. Control replies (to
 `initialize`, `ping` and `tools/list`), which the build fixes and which carry no
 book data, are held to 1,000,000 bytes, or to it if it is larger. The host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
 The resolved data path must be valid Unicode so saved artifact paths can be
@@ -338,8 +338,9 @@ When Bridge got no response it could read, the `cause` names why and the error a
 - An `endpoint_…` runtime code: Bridge held the request back and sent nothing. So do
   `tally_endpoint_busy` (with `retry_after_s`) and `tally_endpoint_lock_unavailable`, which
   come back as the `code` itself, and `tally_endpoint_draining` (with `retry_after_s`), when an
-  earlier post was cut for time and Tally has not yet answered `/status` three times in a row
-  since (#2142); a draining refusal may have sent `/status` checks, but not the request.
+  earlier request was cut, abandoned or refused at its head and Tally has not yet answered
+  `/status` three times in a row since (#2142); a draining refusal may have sent `/status`
+  checks, but not the request.
 
 A wrong or reset port therefore reads as an endpoint problem, not as a Tally data problem. A
 failed read without `endpoint` either received a response whose body then failed to read, decode,
@@ -1001,9 +1002,8 @@ redaction setting hides it, so the tool is refused as `audit_redaction_unsupport
 
 Refusals: `audit_part_deadline_exceeded` (a part ran past the 20 seconds a request is given; the same
 request would be sent again and Tally may still be building the abandoned answer, so do not retry as it
-stands), `audit_part_drain_required` (a previous request was abandoned, in this call or an earlier one,
-and Tally may still be building its answer: nothing was sent. ComplyEaze Bridge does not yet probe Tally to
-clear that, so the refusal stays until ComplyEaze Bridge is restarted; look at Tally first), `C6-moved`
+stands), `tally_endpoint_draining` (an earlier request was cut, and Tally has not yet answered that it has finished:
+the request was not sent. Call again after `retry_after_s` seconds), `C6-moved`
 and `voucher_window_changed_during_read` (someone changed the book during the read: it may be tried
 again), `audit_window_divided_by_alterid` (a day too heavy for one request: the read is refused, because
 the engine's windows must tile the period by date; refused before any voucher is read when the count
@@ -2265,9 +2265,21 @@ is not kept in the fixture.
 ### Foreign-currency composites in `vouchers`
 
 A foreign amount entered on a rupee ledger can be stored by Tally as a
-composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
+composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 and
+`-$100.00 @ ₹ 86/$ = -₹ 8600.00` on 7.2 (#674, #683).
 
-- **`vouchers` withholds that voucher.** It passes every date, ledger and
+- **`vouchers` reads it.** The amount after `=` becomes the entry's or the bill
+  allocation's `amount`, and `foreign` holds `currency`, `amount` and `rate` as
+  Tally wrote them. Sums, summaries and an `amount` search use the rupee amount.
+  When a window holds a composite, `vouchers` also reads the book's currencies.
+  Measured on one book of each release, one currency. `ledger_movement` still
+  refuses such a window, so a `vouchers` summary holding these amounts cannot be
+  tied to it.
+- **It withholds a voucher it cannot read that way:** the book's base is not
+  established as INR, the amount after `=` is not in that base, the foreign
+  symbol is not one of the book's Currency masters, a composite has no rate or
+  no foreign amount, or the entries do not net to zero.
+- **A withheld voucher** passes every date, ledger and
   voucher-type check like any other, and is then listed in `withheld_vouchers`
   instead of `items`. The listing gives its GUID, date, type, number and cause,
   up to 100 vouchers, with an exact `withheld_total` that is the same on every
@@ -2275,7 +2287,7 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 - **The result says so.** `state` is `partial` with `reason`
   `vouchers_withheld`, `total` counts `items` only (the buckets, under `summarise_by`), and `coverage` says what
   was left out.
-- **No amount is read from a composite.** Anything that is neither a plain
+- **Nothing else is read as an amount.** Anything that is neither a plain
   decimal nor an exact composite still refuses the whole window. So does a
   composite whose foreign and base amounts carry opposite signs, unless the
   foreign amount is zero: a voucher entry's two amounts share one sign.
@@ -3169,7 +3181,8 @@ Both absent states rest on the order Tally serves requests in: the read that fin
 the name absent is sent after the create's send ended, and Tally has been seen to
 serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection and with the
-create, the read or both on a reused connection (#2176). Their answers carry
+create, the read or both on a reused connection, behind a long read, and with every
+request on a new connection behind a long import (#2176). Their answers carry
 `verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
 absent state only when the read-back's Tally reports TallyPrime 7.2, licensed,
 Silver or Gold: Gold is the same product with multi-user access, so the edition

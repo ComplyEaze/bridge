@@ -51,6 +51,7 @@ const CORPUS_DENSE: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
 const BILLTRAIL_LAB: &str = "9ab5002c-e910-4242-83e4-a27cc490600b";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+const PILOT_LAB: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 /// The empty book of the marks capture in `COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md`.
 const HANDIMPORT_LAB: &str = "9b5b6d54-4cdb-4b90-9600-cab45ee70c3a";
 const READS_LAB: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
@@ -61,6 +62,7 @@ const IMPORT_LAB: &str = "17a10910-773c-42c6-bd66-7bba9a392536";
 /// `LINE_BREAK_COMPANY_GUID`).
 const LINE_BREAK_LAB: &str = "224e7f8c-a0aa-45ce-889a-ad4b7fdbe852";
 const FOREX_LAB: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+const FX_72_LAB: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
 const AARAV: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const BILL_ALLOCATION_LAB: &str = "74d7e825-396a-4667-90b2-83f593f06a36";
 const GST_CREDIT_PERIODS_LAB: &str = "46faa869-1208-4119-8961-f28db4df3b8e";
@@ -154,7 +156,7 @@ fn census(text: &str, on: &str) -> String {
     coded(parse_voucher_census(text, (day(on), day(on)), None))
 }
 
-/// A census over a window and one AlterID span, as a ledger-scoped census read asks for it.
+/// A census over a window and one AlterID span, as every census read asks for it (#2145).
 fn census_span(text: &str, (from, to): (&str, &str), (after, through): (u64, u64)) -> String {
     coded(parse_voucher_census(
         text,
@@ -231,6 +233,10 @@ fn rows() -> Vec<Row> {
     ));
     rows.extend(high_water_rows!(
         "agent/wa1-payment-company-high-water.utf16le.xml",
+        IMPORT_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/amend-now-company-high-water.utf16le.xml",
         IMPORT_LAB
     ));
     rows.extend(high_water_rows!(
@@ -391,6 +397,21 @@ fn rows() -> Vec<Row> {
         |_, t| census(t, "20260403")
     ));
     rows.push(row!(
+        "agent/amend-now-d3-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260401, (0, 1829])",
+        |_, t| census_span(t, ("20260401", "20260401"), (0, 1829))
+    ));
+    rows.push(row!(
+        "agent/amend-now-wa1-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260403, (0, 1829])",
+        |_, t| census_span(t, ("20260403", "20260403"), (0, 1829))
+    ));
+    rows.push(row!(
+        "agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
+        "parse_voucher_census(20260804 to 20260805, (0, 68])",
+        |_, t| census_span(t, ("20260804", "20260805"), (0, 68))
+    ));
+    rows.push(row!(
         "agent/register-e2e/native-register-e2e-census.utf16le.xml",
         "parse_voucher_census(20250903)",
         |_, t| census(t, "20250903")
@@ -480,6 +501,11 @@ fn rows() -> Vec<Row> {
         "parse_voucher_census(20250428)",
         |_, t| census(t, "20250428")
     ));
+    rows.push(row!(
+        "stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml",
+        "parse_voucher_census(20250421, span 0 to 3)",
+        |_, t| census_span(t, ("20250421", "20250421"), (0, 3))
+    ));
     // Import verification and span reads (`agent_import_ack_tests.rs`,
     // `agent_import_index_tests.rs`, `agent_import_span_identity_tests.rs`).
     rows.push(row!(
@@ -499,6 +525,16 @@ fn rows() -> Vec<Row> {
     ));
     rows.push(row!(
         "agent/wa1-payment-import-verification.utf16le.xml",
+        "parse_import_verification_rows(IMPORT_LAB)",
+        |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/amend-now-d3-import-verification.utf16le.xml",
+        "parse_import_verification_rows(IMPORT_LAB)",
+        |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/amend-now-wa1-import-verification.utf16le.xml",
         "parse_import_verification_rows(IMPORT_LAB)",
         |_, t| verification(t, IMPORT_LAB)
     ));
@@ -583,6 +619,11 @@ fn rows() -> Vec<Row> {
         "agent/register-e2e/native-register-e2e-window.utf16le.xml",
         "parse_agent_rows(REGISTER_LAB)",
         |_, t| agent_rows(t, REGISTER_LAB)
+    ));
+    rows.push(row!(
+        "agent/pilot-lab-register/pilot-lab-register-window.utf16le.xml",
+        "parse_agent_rows(PILOT_LAB)",
+        |_, t| agent_rows(t, PILOT_LAB)
     ));
     rows.push(row!(
         "agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml",
@@ -710,6 +751,26 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, SHAPE_LAB)
     ));
     rows.push(row!(
+        "stock_movement_credit_note_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_delivery_note_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_receipt_note_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml",
+        "parse_agent_rows(SHAPE_LAB)",
+        |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
         "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
         "parse_agent_rows(BANKREF_LAB)",
         |_, t| agent_rows(t, BANKREF_LAB)
@@ -739,6 +800,11 @@ fn rows() -> Vec<Row> {
         "agent/vouchers-forex-composite-20260915.utf16le.xml",
         "parse_agent_rows_withholding(FOREX_LAB)",
         |_, t| withholding(t, FOREX_LAB)
+    ));
+    rows.push(row!(
+        "agent/vouchers-forex-unspaced-20250401.utf16le.xml",
+        "parse_agent_rows_withholding(FX_72_LAB)",
+        |_, t| withholding(t, FX_72_LAB)
     ));
     // A synthetic voucher-import file, read as bytes (`source_draft_xml_tests.rs`).
     rows.push(Row {

@@ -946,7 +946,13 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 - **From that branch's notes, not from an answer:** the ledger creation screen refused a name differing by case alone from an existing ledger ("Name already exists."), and a name pasted into it with a trailing CR LF was stored without the line break.
 - **Not established:** both creation orders of each pair; an alias that only folds equal to another ledger's name; a balance read of either ledger (which ledger a voucher landed on is read from the voucher entry's name); Gold and Education; other releases.
 
-bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`). The 2026-10-13 run does not change that.
+**For a trailing CR LF, exact bytes decided in both creation orders. VERIFIED 2026-11-02, licensed TallyPrime 7.2 Silver, one synthetic company, two pairs, one sitting. Confidence: PARTIAL.** Branch `lab/626-r2-twin-answers`, `c42884e7`, bridge#626. Every name was read from the answers with an XML parser, with CR protected so the parser could not normalise it.
+- **The pairs.** One pair was created plain name first, the other CR LF name first, by request. Each create answered `CREATED` 1, `ALTERED` 0. Each ledger kept its own GUID, the first of each pair was unchanged by the second, and each ledger's `NAME` attribute and `NAME` element held the same bytes.
+- **The vouchers.** Four Payments, one naming each ledger with `&#13;&#10;` for the break, each answered `CREATED` 1. Each debit entry read back with the bytes sent, and those matched exactly one ledger row.
+- **`PARTYLEDGERNAME`.** Tally read it back as `Cash`, the credit ledger, on all four, though each file named the twin. The ledger entries are what this run used.
+- **Not established:** a name equal to neither twin (the 2026-10-13 run above, on 7.1); case twins; alias twins; twins made on Tally's screens; Gold, other releases, any other book; a post through Bridge's own path; a balance or report read of either ledger (which ledger a voucher landed on is read from the entry's name).
+
+bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`). Neither the 2026-10-13 run nor this one changes that.
 
 **Encoding a CR LF in a master name: `&#13;&#10;`. VERIFIED on one run (licensed TallyPrime 7.1
 Gold, one client book, 2026-09-28).**

@@ -475,21 +475,14 @@ fn a_build_drains_by_the_measured_policy() {
 /// cut for time, and the other then finds the drain owed. Its probe is cut by
 /// its own deadline while the simulator, serving one request at a time as Tally
 /// does, is still on the cut post, so it is refused as draining with no post
-/// sent: the probe never reached the head of the queue.
+/// sent: the probe never reached the head of the queue. The simulator holds
+/// that post until it is cancelled, so no slow runner can let the probe through.
 #[tokio::test]
 async fn a_post_cut_by_one_client_holds_the_next_post_of_another() {
     let root = tempfile::tempdir().unwrap();
-    let simulator = SequenceSimulator::spawn(vec![
-        xml().with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(
-            Duration::from_millis(900),
-        )),
-        ScenarioPlan::new(Fixture::ProductStatus(
-            tally_protocol_simulator::ProductStatus::TallyPrime,
-        ))
-        .with_delivery(tally_protocol_simulator::Delivery::SlowHeaders(
-            Duration::from_millis(600),
-        )),
-    ])
+    let simulator = SequenceSimulator::spawn(vec![xml().with_delivery(
+        tally_protocol_simulator::Delivery::SlowHeaders(Duration::from_secs(60)),
+    )])
     .unwrap();
     let endpoint = endpoint(
         &simulator.address().ip().to_string(),
@@ -504,7 +497,7 @@ async fn a_post_cut_by_one_client_holds_the_next_post_of_another() {
         TallyHttpTransport::with_policy(
             endpoint.clone(),
             bridge_tally_transport::TransportPolicy {
-                request_timeout: Duration::from_millis(300),
+                request_timeout: Duration::from_secs(1),
                 ..bridge_tally_transport::TransportPolicy::default()
             },
         )

@@ -612,10 +612,10 @@ async fn a_debt_older_than_ten_minutes_clears_without_a_probe() {
     assert_eq!(sent(simulator), ["/", "/"]);
 }
 
-/// A post Tally answered with an error status owes nothing: a whole head came
-/// back, so Tally had finished it.
+/// A post refused at its head owes the drain: the body is abandoned unread, and
+/// the head says nothing about whether Tally has finished.
 #[tokio::test]
-async fn a_post_answered_with_an_error_status_owes_nothing() {
+async fn a_post_refused_at_its_head_owes_the_drain() {
     let simulator = SequenceSimulator::spawn(vec![xml().with_http_status(500)]).unwrap();
     let (transport, shared) = transport(&simulator, DrainDebt::Clear, Some(POLICY));
     assert_eq!(
@@ -627,7 +627,14 @@ async fn a_post_answered_with_an_error_status_owes_nothing() {
     );
     assert_eq!(
         history(&shared),
-        [DrainDebt::InFlight { since_ms: T0 }, DrainDebt::Clear]
+        [
+            DrainDebt::InFlight { since_ms: T0 },
+            DrainDebt::Owed {
+                since_ms: T0,
+                answered: 0,
+                last_probe_ms: None,
+            },
+        ]
     );
     let _ = sent(simulator);
 }

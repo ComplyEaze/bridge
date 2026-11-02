@@ -11,7 +11,7 @@ fn write(path: &Path, bytes: &[u8]) {
 }
 
 /// A minimal journal: one built batch, optionally sent.
-fn journal(sent: bool) -> Vec<u8> {
+pub(in crate::agent::agent_import) fn journal(sent: bool) -> Vec<u8> {
     let line: super::super::ImportLedgerLine = serde_json::from_value(serde_json::json!({
         "batch_id":"b1","company_guid":"synthetic-guid","company":null,
         "txn_ids":["txn"],"date_from":"20260901","date_to":"20260901",

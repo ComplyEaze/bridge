@@ -689,7 +689,8 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let counted = read.counted();
         // A withheld voucher goes through every date, ledger and type check as
         // a row with no amounts, and is set aside only after them (#674).
-        let rows = read.rows.into_iter().map(VoucherRow::into_filter_row).collect();
+        let voucher_rows = server.read_withheld_composites(&identity, read.rows, &mut accumulated).await;
+        let rows = voucher_rows.into_iter().map(VoucherRow::into_filter_row).collect();
         let mut rows = validate_then_filter_voucher_rows(rows, from.as_str(), to.as_str(), None)?;
         let empty_window = if rows.is_empty() {
             let (read_evidence, partial, reason) = server
@@ -1129,7 +1130,11 @@ impl Server {
             )
             .await?
         {
-            WindowCount::Counted { census, evidence } => {
+            WindowCount::Counted {
+                census,
+                evidence,
+                voucher_mark,
+            } => {
                 let found = census
                     .holds_a_voucher_between(from, to)
                     .map(|in_window| (in_window, !census.is_empty()))
@@ -1140,8 +1145,8 @@ impl Server {
                         identity,
                         company,
                         evidence,
-                        any_in_window,
-                        any_in_widened,
+                        (any_in_window, any_in_widened),
+                        voucher_mark,
                     )
                     .await;
             }
@@ -1185,24 +1190,34 @@ impl Server {
         })
         .map_err(|code| ToolFailure::from(code).with_prior_evidence(evidence.clone()));
         let (any_in_window, any_in_widened) = found?;
-        self.corroborate_empty_by_days(identity, company, evidence, any_in_window, any_in_widened)
-            .await
+        self.corroborate_empty_by_days(
+            identity,
+            company,
+            evidence,
+            (any_in_window, any_in_widened),
+            None,
+        )
+        .await
     }
 
     /// The corroboration's verdict from what the widened read found; when it
     /// found nothing at all, the company's voucher high-water mark decides
     /// between a book with no vouchers and an uncorroborated empty window.
+    /// `voucher_mark` is that mark when the count has just read it (the mark it
+    /// read after its census); otherwise it is read here.
     async fn corroborate_empty_by_days(
         &self,
         identity: &VerifiedCompanyIdentity,
         company: &str,
         mut evidence: Evidence,
-        any_in_window: bool,
-        any_in_widened: bool,
+        (any_in_window, any_in_widened): (bool, bool),
+        voucher_mark: Option<u64>,
     ) -> Result<(Evidence, bool, Option<&'static str>), ToolFailure> {
         let outcome = async {
             let high_water = if any_in_window || any_in_widened {
                 None
+            } else if let Some(mark) = voucher_mark {
+                Some(mark)
             } else {
                 let (high_water_xml, high_water_evidence) = self
                     .post_read(identity, company_high_water_read(company))
@@ -1273,6 +1288,32 @@ impl Server {
             gst,
         )
         .await
+    }
+
+    /// The window's rows, each voucher withheld for a composite read under the book's classified
+    /// base where that can be done (#683). The base is read only for a window that holds one, and
+    /// a book whose base is not established leaves them withheld.
+    async fn read_withheld_composites(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        rows: Vec<VoucherRow>,
+        accumulated: &mut Option<Evidence>,
+    ) -> Vec<VoucherRow> {
+        if !rows.iter().any(VoucherRow::is_withheld) {
+            return rows;
+        }
+        let Ok(currency) = self
+            .runtime
+            .detect_classified_base_currency_with_extent(self.tally_config(), identity)
+            .await
+        else {
+            return rows;
+        };
+        accumulate_evidence(accumulated, evidence_from_runtime_read(currency.evidence()));
+        let Some(book) = currency.inr_base() else {
+            return rows;
+        };
+        rows.into_iter().map(|row| row.read_under(&book)).collect()
     }
 
     /// [`Self::read_entry_wildcard_window`] in either entry-wildcard shape:

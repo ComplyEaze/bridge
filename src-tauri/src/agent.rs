@@ -1919,7 +1919,9 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // A cause, reached through `voucher_window_part_not_admitted`. Since
         // #985 a window read whole is admitted against the census that sized
         // it, so this is reachable on an ordinary day's read, not only on a
-        // divided one.
+        // divided one. Since #2145 that census is spanned to the marks read
+        // before it, so a voucher saved between those marks and the census
+        // also reaches it.
         "part_census_mismatch" => Some(
             "ComplyEaze Bridge counted this window's vouchers before reading them, and the read returned \
              different vouchers from the ones it counted (`counts` gives returned against \
@@ -2001,7 +2003,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              it; then call again.",
         ),
         "tally_endpoint_draining" => Some(
-            "Tally was still busy with an earlier request that was stopped for time, so this \
+            "Tally was still busy with an earlier request that did not finish, so this \
              request was not sent. Call again after retry_after_s seconds; the same request is \
              safe to repeat, and a different read would only wait behind the same work. It \
              clears by itself within 10 minutes of the earlier request.",
@@ -2062,6 +2064,28 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              user to check that invoice in Tally, then call acknowledge_post_review with that \
              batch_id and doubt invoice_stop (available when posting is enabled): a native \
              dialog asks the user, and nothing but their answer releases the stop.",
+        ),
+        "import_journal_split" => Some(
+            "Nothing was written or posted. On this computer Windows keeps a second copy of \
+             ComplyEaze Bridge's data folder inside a Microsoft Store app's package, as it does \
+             for Claude Desktop installed from the Microsoft Store, and that copy holds an \
+             import journal other than this process's. The journal checks of one copy do not \
+             see the batches of the other, so a row posted from one could be posted again \
+             from the other. The cause says what was found. With other_journal_holds_batches \
+             or other_journal_not_read, tell the user to post from the copy that already \
+             keeps that journal (the extension inside Claude Desktop, when the package is \
+             Claude Desktop's), not from this one. Batches this copy already built or posted \
+             are not seen by that copy, so a row posted from here could be posted again from \
+             there; check such a row in Tally before posting it there. With \
+             package_copies_not_listed, journal_not_located or \
+             package_copy_journal_not_located, ComplyEaze Bridge could not tell whether there \
+             is a second journal, so no other copy is known to post from: tell the user to \
+             restart the computer and try once more, and if it is refused again to stop \
+             posting on this computer. Either way, tell the user not to move, merge or delete \
+             either folder. Uninstalling, resetting or repairing that Microsoft \
+             Store app removes its copy and the journal in it. Running bridge_mcp \
+             --local-data-report --show-paths outside Claude Desktop lists the package copies \
+             (package_copies). Apart from that one try, do not retry here.",
         ),
         "invoice_stop_unreadable" => Some(
             "ComplyEaze Bridge could not read its own import journal to see whether an earlier \

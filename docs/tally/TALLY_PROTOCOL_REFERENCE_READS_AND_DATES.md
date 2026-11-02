@@ -614,6 +614,15 @@ Every other composite kept a whole or empty rate. The 7.2 layout (the foreign sy
 digits) is otherwise unchanged. Bridge sets such a balance aside by name and never reads its rate
 (`currency_composite::is_unspaced_currency_composite`, bridge#2228).
 
+**A voucher on TallyPrime 7.2 writes the same layout (PARTIAL: one synthetic book, one read of one
+day, `lab/683-v72-voucher-answers`, the fixture `vouchers-forex-unspaced-20250401`).** Eleven vouchers
+of 1 April 2025, eight with composites: each entry's and bill allocation's `AMOUNT` is
+`-$100.00 @ ₹ 86/$ = -₹ 8600.00`, and `VATEXPAMOUNT` repeats it. A keyed rate of 86.4125 is written
+as `86.4125`. Each voucher's entries net to zero on the amounts after `=`, and on every composite
+there that amount is the foreign amount times the rate exactly, so no rounding case is shown.
+`vouchers` reads the amount after `=`, and leaves a voucher withheld when they do not net to zero
+(bridge#683).
+
 **Adding the field changes nothing else.** On FOREX the response was otherwise byte-identical to
 the same request without it. The same holds for the native Trial Balance request
 (`TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING` plus `CURRENCYNAME`): measured on FOREX and
@@ -914,29 +923,29 @@ fields and `LEDGSTREGDETAILS.LIST`) with `LEDMAILINGDETAILS.LIST` added at the e
   4,400), and every entry read back exactly as keyed, oldest first. At a mark of 4,400 with 13 ledgers the count path
   read the book whole, in one part (A6). The party/ledger master export's count allowance (1,200 bytes a further entry
   and four entries a ledger the mark does not show) rests on these; the workbook itself was not read in this row.
-- **An answer past the response cap is refused at its head and owes no drain, and a standard read sent after it
-  answers whole. PARTIAL: TallyPrime 7.2 Silver, 2026-10-30, one synthetic book, one sitting
+- **An answer past the response cap is refused at its head, and a standard read sent after it answers whole.
+  PARTIAL: TallyPrime 7.2 Silver, 2026-10-30, one synthetic book, one sitting
   (`lab/2214-mailing-cut-drain-answers`).** 201 parties with about 200 dated entries each were created by import,
   one create a party, and each create moved the master mark by one: about fifty times the four entries a ledger the
   allowance above gives the mark's undercount. The mailing master answer grew by about 940 bytes an entry and answered
   whole at every step up to about 32,000 entries (about 30 MB), never reaching the 20 s limit; at this cost a 20 s
   cut would need more than three times the entries that passed the cap. At about 40,000 entries (an answer of about 37.6 MB) the read
   was refused as past Bridge's 32 MiB cap, 3.4 s to 5.4 s into the post, with no drain owed. Tally declared the
-  length in the head (measured on a capped `curl` of the same request), which is why nothing was owed. A separate
+  length in the head (measured on a capped `curl` of the same request), which is why nothing was owed at that date. A separate
   standard `ledger_masters` call sent about half a second later answered whole, every row equal to the standard read
   at the same state and the marks unchanged, in three of three tries. A mailing read cut at the 20 s limit, and the
-  drain after one, were not reached on this book. After an oversize Tally declares, the party/ledger master export
-  reads the book once more with the standard request inside the same operation (#2214); that read again has not been
-  run against Tally. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
+  drain after one, were not reached on this book. Since #2142 an oversize Tally declares owes the drain, because its
+  body is left unread (§11c.2). After one, the party/ledger master export reads the book once more with the standard
+  request inside the same operation (#2214), once the drain clears; neither that read nor those probes have been run
+  against Tally. The export refuses only after a deadline or an oversize Tally did not declare, since Tally may
   still be working on that read; such a cut mailing read has not been seen live. After any other failure of that read
   it reads the book once more without the details, and the workbook names the failure (the maintainers' ruling on
   #2074; none reached on this book): an answer that broke off, could not be read, did not decode or never came, an
   HTTP error status, a post that did not reach Tally, the pair's two answers differing, or any refusal of a whole
   answer, such as Tally's own failure answer, a missing STATUS, XML that does not parse, or a row the grammar refuses,
   which markup inside a mailing field alone can cause. An answer that broke off, could not be read, did not decode or
-  never came may leave Tally still sending it. The transport owes a drain after each of these but the decode failure
-  (#2142), though a decode failure partway through a body sent without a declared length may still leave Tally
-  sending. So after any of the four, while the standard post is refused as draining before anything of it was sent,
+  never came may leave Tally still sending it, as may one refused at its head. The transport owes a drain after each
+  of these (#2142). So after any of them, an HTTP error status and a declared oversize among them, while the standard post is refused as draining before anything of it was sent,
   the export waits and tries again, for at most 60 s, a bound not measured on this read, and fails past it. The
   standard read keeps every refusal it has without the mailing details.
 - **Not shown (by the 7.1 capture).** A second mailing entry with a later date (so which entry applies on a date, and in what order Tally

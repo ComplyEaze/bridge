@@ -115,9 +115,9 @@ pub(super) fn review_preview(
             "it has no readable answer from Tally to the post".to_string()
         }
     };
-    let matched = result["counts"]["matching_content_observed"]
-        .as_u64()
-        .unwrap_or(0);
+    // A match that is cancelled or optional is not in the accounts, so the box
+    // never counts it as in the book, as the settle dialog does not.
+    let matched = verification::content_matches_in_the_accounts(&result["vouchers"]);
     let (noun, these) = if count == 1 {
         ("voucher", "this voucher")
     } else {

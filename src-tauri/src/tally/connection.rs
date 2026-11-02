@@ -183,21 +183,16 @@ pub(crate) enum MailingReadDecision {
     /// Tally finished with the read, or it never reached Tally: the standard
     /// read is sent at once.
     Continue,
-    /// The answer broke off, could not be read, did not decode, or never came,
-    /// so Tally may still be sending or working on it. The standard read is
+    /// The answer broke off, could not be read, did not decode, never came, or
+    /// was refused at its head, so Tally may still be sending or working on it,
+    /// and the transport owes a drain for each (#2142). The standard read is
     /// sent once the drain clears: where its first post is refused as draining
     /// before anything of it was sent, the export waits and tries again,
     /// starting no try after [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], a bound
     /// not measured, and past that fails with the mailing read's own failure.
-    /// The transport owes no drain after an answer that did not decode (#2142),
-    /// so that one's standard read is not refused for its own drain, though a
-    /// decode failure partway through a body sent without a declared length may
-    /// still leave Tally sending it.
+    /// An oversize Tally declares is the one such case seen live (protocol
+    /// reference §8.4, lab row 2214).
     ContinueOnceDrained,
-    /// Tally declared the answer past the response cap, the one case seen live
-    /// (protocol reference §8.4, lab row 2214): it had finished the work, so
-    /// nothing is owed and the book is read again at once without the details.
-    Retry,
     /// The read ran out of time, or past the cap without Tally declaring it, so
     /// Tally may still be working on it, and no such cut of a mailing read has
     /// been seen live: the export fails, and nothing is sent again.
@@ -215,12 +210,13 @@ impl MailingReadFailure {
             } => MailingReadDecision::Refuse,
             Self::ResponseTooLarge {
                 declared_by_peer: true,
-            } => MailingReadDecision::Retry,
-            Self::Truncated | Self::ReadFailed | Self::NoAnswer | Self::Undecodable => {
-                MailingReadDecision::ContinueOnceDrained
             }
-            Self::HttpStatus
-            | Self::NotSent
+            | Self::Truncated
+            | Self::ReadFailed
+            | Self::NoAnswer
+            | Self::Undecodable
+            | Self::HttpStatus => MailingReadDecision::ContinueOnceDrained,
+            Self::NotSent
             | Self::AnswersDiffered
             | Self::TallyFailed
             | Self::StatusAbsent
@@ -345,11 +341,12 @@ pub(crate) fn mailing_retry_held_by_drain(mailing: anyhow::Error) -> anyhow::Err
 /// before it reads the book again without the details (bridge#2214). Each wait
 /// sends only `/status` probes. UNVERIFIED, not measured on this read: no
 /// mailing answer that broke off, could not be read, did not decode or never
-/// came has been reached in the lab (2214 lab row: Tally declared every
-/// oversize, which owes no drain). It rests on the outstandings drains, which
-/// ran 8.9 s to 25.4 s past a 20 s cut, so 60 s covers about twice the longest.
-/// No try starts past it, but the last one can spend its own drain probes,
-/// about 11 s more.
+/// came has been reached in the lab, and in the 2214 lab row, where Tally
+/// declared every oversize, the next read was sent with no drain (it ran
+/// before #2142 made such a refusal owe one). It rests on the outstandings
+/// drains, which ran 8.9 s to 25.4 s past a 20 s cut, so 60 s covers about
+/// twice the longest. No try starts past it, but the last one can spend its
+/// own drain probes, about 11 s more.
 const MAILING_RETRY_DRAIN_WAIT_UNVERIFIED: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// The wait a retry keeps to: [`MAILING_RETRY_DRAIN_WAIT_UNVERIFIED`], or 3 s in
@@ -2345,7 +2342,7 @@ impl TallyClient {
                     };
                     let once_drained = match cause.decision() {
                         MailingReadDecision::Refuse => return Err(error),
-                        MailingReadDecision::Continue | MailingReadDecision::Retry => false,
+                        MailingReadDecision::Continue => false,
                         MailingReadDecision::ContinueOnceDrained => true,
                     };
                     if let Some(failure) =
@@ -3132,14 +3129,6 @@ impl TallyClient {
         .await;
         result.map_err(|error| super::runtime::with_read_evidence(error, evidence))?;
         Ok(first)
-    }
-
-    /// The smallest request Tally answers: its status page. Used to learn
-    /// whether a responder that was left building an abandoned response has
-    /// finished; it proves nothing else.
-    pub(crate) async fn status_probe(&self) -> anyhow::Result<()> {
-        self.http.get_status_decoded().await?;
-        Ok(())
     }
 
     fn record_observed_encoding(&self, encoding: TallyTextEncoding) {

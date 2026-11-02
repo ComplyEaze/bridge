@@ -1268,6 +1268,17 @@ fn the_markdown_proof_follows_the_verification_status() {
     );
     assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
     assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
+    // #2152: the saved proof's note that no dispatch is on record is shown, and
+    // it is a line, not a banner.
+    assert!(!clean.contains("Dispatch record"), "{clean}");
+    let mut unsent = proof(Some("posted_verified"), json!([]));
+    verification::mark_found_not_sent(&mut unsent);
+    let unsent = render_proof_markdown(&unsent);
+    assert!(
+        unsent.contains("- Dispatch record: none on this computer — found in the book, not sent by ComplyEaze Bridge\n"),
+        "{unsent}"
+    );
+    assert!(!unsent.contains(banner), "{unsent}");
     // Not verified with no duplicates, or no status at all, is not clean either:
     // the banner follows the status, not the duplicate list. With no dispatch
     // record Bridge did not send the batch, so the banner forbids no resend.
@@ -1545,6 +1556,101 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     );
     assert_eq!(after["counts"]["posted_verified"], 0);
     assert_eq!(verification_status(&after, 1), "verification_incomplete");
+}
+
+/// The content-only review box for a one-voucher batch whose only match is a
+/// voucher the verifier read with the batch's content after its build, so not
+/// shown to be this post's, with the given cancelled and optional flags. The
+/// box is given what production gives it: the unpaged result, with `vouchers`.
+fn content_only_box(cancelled: bool, optional: bool) -> String {
+    let input = admitted_payload();
+    let line = ImportLedgerLine {
+        ledger_identities: None,
+        cash_in_hand_ledgers: Some(Vec::new()),
+        on_account_approved: Some(Vec::new()),
+        statement: None,
+        withdrawn_skips: None,
+        endpoint_origin: None,
+        identity_scheme: None,
+        amends_batch_id: None,
+        batch_id: "batch-review-box".to_string(),
+        company_guid: GUID.to_string(),
+        company: None,
+        txn_ids: vec!["txn-001".to_string()],
+        date_from: stored_date("20260901"),
+        date_to: stored_date("20260901"),
+        sha256: "hash".to_string(),
+        built_at: now(),
+        status: "built".to_string(),
+        pre_import_mark: PreImportMark {
+            kind: "company_high_water".to_string(),
+            value: Some(10),
+            master_value: Some(10),
+        },
+        vouchers: vec![input.vouchers[0].clone()],
+    };
+    let observed = |cancelled, optional| ReadVoucher {
+        remote_id: None,
+        guid: Some("review-box-guid".to_string()),
+        alter_id: Some(11),
+        date: bridge_tally_core::TallyDate::parse("20260901").unwrap(),
+        voucher_type: Some("Payment".to_string()),
+        narration: None,
+        voucher_number: None,
+        master_id: None,
+        cancelled: Some(cancelled),
+        optional: Some(optional),
+        effective_date: None,
+        entries: vec![
+            ReadEntry {
+                ledger: "Expense".to_string(),
+                amount: "-12.50".to_string(),
+                is_deemed_positive: "Yes".to_string(),
+            },
+            ReadEntry {
+                ledger: "Bank".to_string(),
+                amount: "12.50".to_string(),
+                is_deemed_positive: "No".to_string(),
+            },
+        ],
+    };
+    let result = verify_observed_batch(&line, &[observed(cancelled, optional)])
+        .expect("verification result");
+    // The tally of rows by status still has the match, in the accounts or not.
+    assert_eq!(result["counts"]["matching_content_observed"], 1, "{result}");
+    assert_eq!(
+        result["vouchers"][0]["accounting_effective"],
+        !cancelled && !optional,
+        "{result}"
+    );
+    content_review::review_preview(&line, ledger::ReviewedBinding::Refused, &result)
+        .replace('\n', " ")
+}
+
+/// #2261: the box says a voucher is in the book only for a match that is in
+/// the accounts. A cancelled match is not.
+#[test]
+fn the_content_review_box_does_not_count_a_cancelled_match_as_in_the_book() {
+    let text = content_only_box(true, false);
+    assert!(
+        text.contains("found, for 0 of the 1 voucher sent,"),
+        "{text}"
+    );
+    let live = content_only_box(false, false);
+    assert!(
+        live.contains("found, for 1 of the 1 voucher sent,"),
+        "{live}"
+    );
+}
+
+/// #2261: the same for an optional match.
+#[test]
+fn the_content_review_box_does_not_count_an_optional_match_as_in_the_book() {
+    let text = content_only_box(false, true);
+    assert!(
+        text.contains("found, for 0 of the 1 voucher sent,"),
+        "{text}"
+    );
 }
 
 #[test]
@@ -6170,6 +6276,40 @@ async fn numbered_journal_built_against(plans: Vec<ScenarioPlan>) -> (Value, usi
     )
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, a build is refused under the admission lock: it writes no file and
+/// no journal record, and the copy is left as it was.
+#[tokio::test]
+async fn a_build_beside_a_second_journal_is_refused_and_writes_nothing() {
+    use super::split_journal::{tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA};
+    let at = layout();
+    let other = at.copy.join(super::local_data::JOURNAL_FILE);
+    fs::write(&other, super::local_data::tests::journal(true)).unwrap();
+    let simulator =
+        SequenceSimulator::spawn(whole_build(build_numbering_plans(&[]))).expect("build plan");
+    let server = numbering_server(&at.data, simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    input.vouchers[0].voucher_number = Some("TEST-1".into());
+    let failure = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            server.build_import_xml(&serde_json::to_value(input).unwrap()),
+        )
+        .await
+        .err()
+        .expect("refused");
+    simulator.cancel();
+    assert_eq!(failure.code, IMPORT_JOURNAL_SPLIT);
+    assert_eq!(failure.cause, Some(SplitJournal::OtherHoldsBatches.cause()));
+    assert_eq!(written_files(&at.data), 0);
+    assert!(!at.data.join(super::local_data::JOURNAL_FILE).exists());
+    assert_eq!(
+        fs::read(&other).unwrap(),
+        super::local_data::tests::journal(true)
+    );
+}
+
 /// The numbering read with the Journal type numbered Manual and its series'
 /// duplicate setting read as prevented (the capture reads it as not).
 fn manual_journal_preventing_duplicates() -> Vec<ScenarioPlan> {
@@ -6443,11 +6583,11 @@ async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
             assert!(next_step.starts_with("Tell the user that this connection cannot post."));
             for text in [first, next_step] {
                 assert!(
-                    text.contains("once this batch is posted, do not import this file"),
+                    text.contains("Once this batch is posted, do not import this file"),
                     "{text}"
                 );
                 assert!(
-                    text.contains("once this file is imported, do not post this batch"),
+                    text.contains("If this file is imported first, post_import"),
                     "{text}"
                 );
             }

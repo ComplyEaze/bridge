@@ -844,6 +844,9 @@ impl Server {
             if line.on_account_approved.is_none() {
                 return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.to_string().into());
             }
+            // Nor while a Store package's copy of the data folder keeps a
+            // second journal this one cannot see (#2233): before any dialog.
+            super::split_journal::admit(&self.settings.data_dir)?;
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
             let (redeeming, form) = match scope {
@@ -1317,6 +1320,14 @@ impl Server {
                                 UnderLockRefusal::CompanyStopped,
                             ));
                         }
+                        // A second journal in a Store package's copy of the data
+                        // folder (#2233) may have been made while the dialog stood
+                        // open: asked again here, under the lock.
+                        super::split_journal::admit(&self.settings.data_dir).map_err(|split| {
+                            BeforeDispatchError::Refused(UnderLockRefusal::JournalSplit(
+                                split.cause(),
+                            ))
+                        })?;
                         // The transfer records again, between the check before the
                         // dialog and the intent: the approval is withdrawn and the
                         // next call gives the whole reason before asking.
@@ -1451,11 +1462,18 @@ impl Server {
                         .downcast_ref::<crate::tally::runtime::CurrencyAdmissionRefusal>()
                         .map(|refusal| refusal.0)
                 });
+                // What the split-journal check found under the lock (#2233).
+                let split_cause = error.chain().find_map(|cause| {
+                    match cause.downcast_ref::<UnderLockRefusal>() {
+                        Some(UnderLockRefusal::JournalSplit(cause)) => Some(*cause),
+                        _ => None,
+                    }
+                });
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
                     failure.cause = refusal_cause(
                         &failure.code,
-                        group.or(invoice_field).or(currency_cause),
+                        group.or(invoice_field).or(currency_cause).or(split_cause),
                         transport,
                     );
                 }
@@ -1632,6 +1650,17 @@ impl Server {
                     if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
+                }
+                // A second journal (#2233) refuses every post from this copy, so the
+                // message says what to do next, by what the check found, rather than
+                // to review the error. The cause is the failure's: the payload's own
+                // is dropped under the budget rule above.
+                if outcome.payload["result"]["error"]["code"]
+                    == super::split_journal::IMPORT_JOURNAL_SPLIT
+                    && attempted == Some(false)
+                {
+                    outcome.payload["result"]["error"]["message"] =
+                        json!(super::split_journal::refused_message(cause));
                 }
                 // The code's next step, under the same rule, and only when the
                 // journal shows nothing was sent (#1573).
@@ -2085,7 +2114,7 @@ const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port wa
 
 /// The same, when Tally was still busy with an earlier request cut for time
 /// (#2142): nothing was posted, and the approval has lapsed.
-const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that did not finish. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
 /// What a caller does when the port was busy and whether the post was sent
 /// could not be observed.

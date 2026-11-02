@@ -42,6 +42,24 @@ post dialog for the same voucher (#730), on a readback whose debit carries trail
 | `agent/wa1-payment-journal.jsonl` | 2742 | `2f979b1fa4335ab97744d609eb79a57a0de69a68e5795517f04014a3858b3136` |
 | `agent/wa1-payment-import.xml` | 1037 | `0c2ee2981538ea3725583b197e8c2bea007bec264d1e96d61916b08ddf65f1f3` |
 
+## The census spanned to the mark (#2145)
+
+Since #2145 the call sends this census spanned to the voucher mark it read, `(0, 1676]`: the request above with
+` AND $AlterID &gt; 0 AND $AlterID &lt;= 1676` added to its census formula and nothing else changed, sha256
+`1d4b71cc24fe52cebb805ddf6f12442b0ae2717d381da01317e2631b5af9f748` (`requests/a-wa1_c2_spanned_0_1676.request.utf16le.xml`
+on the run sheet `lab/2145-spanned-census-captures` at `6a968f01`). This capture holds no answer to that request, and an
+answer captured for the unspanned census may not stand in for it (#899). The review test of this payment, which pins every request,
+therefore no longer reads this capture: the book was read again on 30 Oct 2026 with the census spanned
+(`AMEND_NOW_CAPTURE_PROVENANCE.md`), and that test now reads it and pins the book as it is now. No test replays this capture's
+answers any more; they are kept for their parse records.
+
+The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026, one after the other
+(`lab/2145-spanned-census-captures-answers` at `993d96bc`), after the book had moved on: its voucher mark read 1829. The
+captured voucher now carries ALTERID 1681, and three more vouchers dated 3 April 2026 carry ALTERIDs above 1676, so the
+unspanned answer differs from the recorded one, and the spanned answer
+(`947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974`, 3,022 bytes) holds no voucher, as the span requires.
+Neither stands for this capture.
+
 ## What it establishes
 
 - Tally returns a single Payment's amounts in the import-verification read as `-1.00` / `1.00`:

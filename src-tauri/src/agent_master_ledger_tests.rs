@@ -110,8 +110,11 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
     )
 }
 
+/// Any open file stands in. One that already exists leaves no new file to create in the
+/// system temp folder, where a Windows runner has refused with access denied.
 fn lock() -> ExclusiveAdmission {
-    ExclusiveAdmission::standing_in(tempfile::tempfile().unwrap())
+    let held = std::fs::File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap();
+    ExclusiveAdmission::standing_in(held)
 }
 
 /// `append` for any record: an intent goes through `append_intent`, as a caller's does.

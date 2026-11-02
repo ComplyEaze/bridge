@@ -9,13 +9,20 @@ use crate::tally::approved_import::{ReviewKind, VoucherCount};
 use ledger::ReviewedBinding::{Refused, ResponseNotRecorded};
 
 /// The `result` of the lab's `verify_import` of its refused batch (#1039 row
-/// R1, `refused-span-binding-lab/PROVENANCE.md`).
+/// R1, `refused-span-binding-lab/PROVENANCE.md`), as the review box is given
+/// it. The capture is the paged response, which holds the rows that are not
+/// `posted_verified` as `unverified_vouchers`; production passes the box the
+/// unpaged result, with all of them as `vouchers`, so that key is built here.
+/// The capture file is not edited.
 fn lab_result() -> Value {
     let exchange: Value = serde_json::from_str(include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/refused-span-binding-lab/013-s8-verify_import-b1.json"
     ))
     .unwrap();
-    exchange["response"]["result"]["structuredContent"]["result"].clone()
+    let mut result = exchange["response"]["result"]["structuredContent"]["result"].clone();
+    assert_eq!(result["verified_total"], 0);
+    result["vouchers"] = result["unverified_vouchers"].clone();
+    result
 }
 
 fn review_args(line: &ImportLedgerLine) -> Value {
@@ -140,6 +147,39 @@ fn the_lab_s_refused_batch_is_the_state_a_review_admits() {
         with(lab["post_span_binding"].clone(), "posted_verified"),
         None
     );
+}
+
+/// The count of content-only matches in the accounts is the one the settle
+/// dialog and a refused binding's summary use, and it fails closed (#2261).
+#[test]
+fn only_a_row_shown_to_be_in_the_accounts_counts_as_a_content_match() {
+    use crate::agent::agent_import::verification::content_matches_in_the_accounts as counted;
+    let content = |effective: Value| json!({"status": "matching_content_observed", "accounting_effective": effective});
+    assert_eq!(
+        counted(&json!([
+            content(json!(true)),
+            content(json!(false)),
+            content(json!(true))
+        ])),
+        2
+    );
+    // No field, a field that is not `true`, another status, and input that is
+    // not an array, count none.
+    assert_eq!(
+        counted(&json!([{"status": "matching_content_observed"}])),
+        0
+    );
+    assert_eq!(
+        counted(&json!([content(json!("true")), content(Value::Null)])),
+        0
+    );
+    assert_eq!(
+        counted(&json!([{"status": "posted_verified", "accounting_effective": true}])),
+        0
+    );
+    for not_rows in [Value::Null, json!({}), json!("vouchers")] {
+        assert_eq!(counted(&not_rows), 0, "{not_rows}");
+    }
 }
 
 /// A batch of `count` Receipts of the lab's company, dated as the lab's.
@@ -628,7 +668,8 @@ async fn a_review_naming_another_company_is_refused_before_any_read() {
 
 /// The dialog shows the batch's company by its GUID when the batch records
 /// no company name, a character of the batch id that could mislead as `?`,
-/// and no matching voucher when the read reports no count of them.
+/// and no matching voucher when the read reports no rows to count them from,
+/// whatever its tally of rows by status says.
 #[test]
 fn the_review_dialog_shows_only_what_the_batch_and_the_read_hold() {
     let lab = lab_result();
@@ -671,8 +712,10 @@ fn the_review_dialog_shows_only_what_the_batch_and_the_read_hold() {
         wide.lines().skip(company).take(2).collect::<Vec<_>>(),
         [format!("Company: {}", "A".repeat(45)), "B".repeat(46)]
     );
+    // The lab's tally still says 50 content-only rows; with no rows, the box
+    // counts none.
     let mut uncounted = lab.clone();
-    uncounted["counts"] = Value::Null;
+    uncounted["vouchers"] = Value::Null;
     let uncounted = preview(&line, &uncounted).replace('\n', " ");
     assert!(
         uncounted.contains("found, for 0 of the 1 voucher sent, a voucher in the book"),

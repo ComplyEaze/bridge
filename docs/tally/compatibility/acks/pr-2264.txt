@@ -1,0 +1,6 @@
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/crates/bridge-tally-protocol/tests/simulator_corpus.rs
+src-tauri/src/commands.rs
+src-tauri/src/source_draft/catalog.rs
+src/main.tsx
+reviewer: lamemustafa

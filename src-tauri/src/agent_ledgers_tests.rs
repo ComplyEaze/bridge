@@ -6046,6 +6046,57 @@ mod through_the_tool {
             assert!(std::hint::black_box(MARK) > standard);
         }
 
+        /// A book too large for one read, read without balances on one Currency
+        /// master (#2265): each part is its master pair alone, joined and
+        /// covered as a read with balances is, and no other request is sent.
+        #[tokio::test]
+        async fn a_read_in_parts_without_balances_sends_no_balance_pair() {
+            let rows = book(compliance_master_ledgers_per_read(ComplianceRead::Standard) + 1);
+            let all = rows.iter().collect::<Vec<_>>();
+            let reads = vec![
+                generated_catalogue(&all),
+                generated_masters(&under(&rows, &[BIG])),
+                generated_masters(&under(&rows, &[OTHER])),
+                groups(),
+            ];
+            let mut plans =
+                marked_compliance_plans(MARK, reads, Some(extent_with_master_mark(MARK)));
+            let plans = plans.split_off(identity_plans().len());
+            let total = plans.len();
+
+            let companies =
+                crate::tally::xml_parser::parse_companies_from_collection(&companies()).unwrap();
+            let row = companies
+                .iter()
+                .find(|row| row.guid.as_deref() == Some(GUID))
+                .unwrap();
+            let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
+                row.name.clone(),
+                crate::tally::test_company_guid(GUID),
+                row.company_number.clone().unwrap(),
+                row.books_from.clone().unwrap(),
+                &companies,
+            )
+            .unwrap();
+            let simulator = SequenceSimulator::spawn(plans).unwrap();
+            let listing = crate::tally::runtime::TallyRuntime::default()
+                .fetch_agent_party_ledger_masters_with_evidence(
+                    crate::tally::TallyConfig {
+                        host: "127.0.0.1".into(),
+                        port: simulator.address().port(),
+                    },
+                    &identity,
+                    TallyDate::parse("20990101").unwrap(),
+                    ComplianceRead::WithoutBalances,
+                )
+                .await
+                .unwrap();
+            let observed = simulator.finish().unwrap();
+            assert_eq!(observed.len(), total);
+            assert_eq!(listing.records.len(), rows.len());
+            assert!(listing.mixed_currency_ledgers_excluded.is_empty());
+        }
+
         /// A book one ledger over what a details read holds is one whole read
         /// without the flag and a read in parts with it, each part requested
         /// with the details; a book of exactly what it holds is one whole

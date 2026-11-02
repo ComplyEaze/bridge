@@ -3488,7 +3488,7 @@ impl TallyRuntime {
         .await
     }
 
-    /// Retain the three actual request body commitments alongside their paired
+    /// Retain the actual request body commitments alongside their paired
     /// source responses, and include the currency observation that admitted them.
     fn party_ledger_master_source_evidence(
         source: &PartyLedgerMasterSource,

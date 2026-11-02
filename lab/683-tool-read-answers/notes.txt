@@ -1,0 +1,4 @@
+2026-11-02 #683 tool read, UTC. Build digest, exe and pdfium equal.
+14:14 Book loaded alone by filter; client launched; 7.2 Silver, one company.
+14:15 Marks m0. One vouchers call, 2.85 s. Marks m1, byte-equal. egress_log read.
+14:17 Client ended. Company shut; Select Company, none loaded.

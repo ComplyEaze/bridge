@@ -1,0 +1,6 @@
+Originals of the tool answers stay on the lab PC. sha256, bytes, file.
+c3bcef83f5b344ae07a12b1bb8b40b5da4af39de49b5620492dc8459e2a05011  169107  answers/000-tools.json
+7a468987c454d24b9cd71e64a3ce5ba16597e5d2956c741558e95cdab25ee8f7  1573  answers/001-companies.json
+b661e8c9cabb29770ff0a9e6797659860206e5abb3c9d24af22f14759acb7b8e  1827  answers/002-status.json
+d609c0e76455a7bd02db57b00a4eaee2a03983bc4ecf42d30acf930331f7dcf0  20107  answers/003-vouchers.json
+5821ff4609b787a790f301c66d54c0a2845372c32d9d3bd56373ed62a24c28f0  22077  answers/004-egress.json

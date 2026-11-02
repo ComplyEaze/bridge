@@ -1520,12 +1520,16 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
     ));
-    // A pair the dialog named is in the approved binding, so the queue lets it
-    // on; the same twin outside the binding was refused just above (#626).
+    // This batch is Journals, not the measured shape, so naming the other
+    // ledger in the binding does not let it on (#626).
     let shown = twinned_parents
         .bind_selected(requested.iter().cloned().chain(["Cash\r\n".to_string()]))
         .unwrap();
-    recheck_bound(&twinned, &shown).expect("the pair the dialog named");
+    let error = recheck_bound(&twinned, &shown).expect_err("not the measured shape");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
 }
 
 /// #1688: a ledger whose ALIAS folds equal to a named ledger is a twin too, and
@@ -2038,6 +2042,54 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             Some(ApprovedImportAdmissionError::AdmissionInconsistent)
         ));
     }
+
+    // A pair the dialog named goes on in the queue, on the measured shape: this
+    // Payment's debit ledger, its twin in the approved binding (#626). The same
+    // twin outside the binding is refused.
+    let debit = payment.vouchers[0]
+        .entries
+        .iter()
+        .find(|entry| entry.side == EntrySide::Dr)
+        .unwrap()
+        .ledger
+        .clone();
+    let twin = catalogue.replace("WR2 Sales", &format!("{debit}&#13;&#10;"));
+    let parents = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &twin,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap();
+    let named = payment.vouchers[0]
+        .entries
+        .iter()
+        .map(|entry| entry.ledger.clone())
+        .collect::<Vec<_>>();
+    let recheck_twin = |binding: &_| {
+        recheck_import_admission(
+            &payment,
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
+            &captured,
+            &captured,
+            &twin,
+            Some(&groups),
+            &single_currency,
+            binding,
+            InvoiceIdentity::ByNumber,
+            None,
+            None,
+        )
+    };
+    let shown = parents
+        .bind_selected(named.iter().cloned().chain([format!("{debit}\r\n")]))
+        .unwrap();
+    recheck_twin(&shown).expect("the pair the dialog named");
+    let unshown = parents.bind_selected(named).unwrap();
+    let error = recheck_twin(&unshown).expect_err("a twin the dialog did not name");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
 }
 
 #[test]

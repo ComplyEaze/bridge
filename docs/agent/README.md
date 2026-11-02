@@ -2507,7 +2507,8 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      `validate_masters` again.
    - A ledger with a twin is refused as `ledger_has_folded_twin`, with one
      exception (#626): two ledgers that differ only by a trailing line break,
-     named by one's exact bytes. The batch may not name both. The approval
+     named by one's exact bytes on the debit side alone of a Payment, off
+     bill-wise, the shape measured. The batch may not name both. The approval
      dialog names both ledgers, each with its group, and says which one the
      post uses, and a twin that appears after approval is refused.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,

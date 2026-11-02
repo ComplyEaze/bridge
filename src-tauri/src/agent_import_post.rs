@@ -972,8 +972,9 @@ impl Server {
             // taken for it by Tally's import lookup (bridge#626). Refused as the
             // build refuses it, including for a batch built before the twin
             // appeared or before the build checked for one. A pair that differs
-            // only by a trailing line break goes on, for the dialog to name; the
-            // desktop's review does not name one, so it refuses that too.
+            // only by a trailing line break goes on, on the shape it was measured
+            // on, for the dialog to name; the desktop's review does not name one,
+            // so it refuses that too.
             let requested = requested_ledger_names(&payload);
             let twins = folded_twins(
                 &requested,
@@ -982,7 +983,9 @@ impl Server {
             );
             let line_break_twins = twins
                 .iter()
-                .filter_map(|twins| twins.line_break_twin(&requested))
+                .filter_map(|twins| {
+                    twins.admitted_pair(&requested, &payload.vouchers, &catalogue_identities)
+                })
                 .collect::<Vec<_>>();
             if line_break_twins.len() < twins.len()
                 || (scope == PostScope::JournalOnly && !twins.is_empty())
@@ -2618,11 +2621,13 @@ fn recheck_import_admission(
         .into_iter()
         .collect::<Vec<_>>();
     let shown = |twins: &FoldedTwins| {
-        twins.line_break_twin(&named).is_some_and(|twin| {
-            ledger_binding
-                .pairs()
-                .any(|(name, _)| name == twin.other.as_str())
-        })
+        twins
+            .admitted_pair(&named, &line.vouchers, &catalogue)
+            .is_some_and(|twin| {
+                ledger_binding
+                    .pairs()
+                    .any(|(name, _)| name == twin.other.as_str())
+            })
     };
     if !folded_twins(&named, parents.parents(), parents.aliases())
         .iter()

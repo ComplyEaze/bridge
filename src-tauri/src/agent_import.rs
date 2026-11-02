@@ -563,13 +563,51 @@ struct FoldedTwins {
 /// A ledger named by its exact bytes whose one twin differs from it only by a
 /// trailing CR LF, in another row of the book. Tally posted to the ledger whose
 /// bytes were sent, in both creation orders (protocol reference §9.4e), so the
-/// pair is not refused, and the dialog names both (bridge#626).
+/// pair is not refused on the shape that was measured, and the dialog names both
+/// (bridge#626).
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct LineBreakTwin {
     named: String,
     named_group: String,
     other: String,
     other_group: String,
+}
+
+impl LineBreakTwin {
+    /// Whether every voucher naming this ledger is the one shape a pair was
+    /// posted on (protocol reference §9.4e), and at least one does: a Payment,
+    /// which carries no invoice, with the ledger off bill-wise and on the debit
+    /// side alone. That is the leg Bridge writes as the party, which Tally read
+    /// back as the credit ledger, never a pair. Every other shape is unmeasured
+    /// and refused.
+    fn on_the_measured_shape(
+        &self,
+        vouchers: &[ImportVoucher],
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> bool {
+        let off_bill_wise = catalogue.bill_wise_flags().any(|(name, _, flag)| {
+            name == self.named && flag == bridge_tally_protocol::BillWiseFlag::Off
+        });
+        let mut naming = vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher
+                    .entries
+                    .iter()
+                    .any(|entry| entry.ledger == self.named)
+            })
+            .peekable();
+        off_bill_wise
+            && naming.peek().is_some()
+            && naming.all(|voucher| {
+                matches!(voucher.voucher_type, VoucherType::Payment)
+                    && voucher
+                        .entries
+                        .iter()
+                        .filter(|entry| entry.ledger == self.named)
+                        .all(|entry| entry.side == EntrySide::Dr)
+            })
+    }
 }
 
 impl FoldedTwins {
@@ -616,7 +654,22 @@ impl FoldedTwins {
     }
 }
 
-/// The families of `twins` a batch naming `requested` is refused for.
+impl FoldedTwins {
+    /// This family as a [`LineBreakTwin`] a batch may post: the pair, on the
+    /// shape it was measured on. Any other family is refused.
+    fn admitted_pair(
+        &self,
+        requested: &[String],
+        vouchers: &[ImportVoucher],
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> Option<LineBreakTwin> {
+        self.line_break_twin(requested)
+            .filter(|twin| twin.on_the_measured_shape(vouchers, catalogue))
+    }
+}
+
+/// The families of `twins` a list of `requested` names, with no voucher to
+/// judge, does not hold as a pair.
 fn refused_twins(twins: Vec<FoldedTwins>, requested: &[String]) -> Vec<FoldedTwins> {
     twins
         .into_iter()
@@ -4785,14 +4838,18 @@ fn unbindable_masters(
         }));
     }
     let twins = in_batch_order(
-        refused_twins(
-            folded_twins(
-                requested_names,
-                ledger_masters.catalog().parents(),
-                ledger_masters.catalog().aliases(),
-            ),
+        folded_twins(
             requested_names,
-        ),
+            ledger_masters.catalog().parents(),
+            ledger_masters.catalog().aliases(),
+        )
+        .into_iter()
+        .filter(|twins| {
+            twins
+                .admitted_pair(requested_names, vouchers, ledger_masters)
+                .is_none()
+        })
+        .collect(),
         vouchers,
         |twins| twins.requested.as_str(),
     );

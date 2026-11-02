@@ -950,9 +950,17 @@ Every voucher below was imported as a file over the gateway, with no errors. The
 - **The pairs.** One pair was created plain name first, the other CR LF name first, by request. Each create answered `CREATED` 1, `ALTERED` 0. Each ledger kept its own GUID, the first of each pair was unchanged by the second, and each ledger's `NAME` attribute and `NAME` element held the same bytes.
 - **The vouchers.** Four Payments, one naming each ledger with `&#13;&#10;` for the break, each answered `CREATED` 1. Each debit entry read back with the bytes sent, and those matched exactly one ledger row.
 - **`PARTYLEDGERNAME`.** Tally read it back as `Cash`, the credit ledger, on all four, though each file named the twin. The ledger entries are what this run used.
-- **Not established:** a name equal to neither twin (the 2026-10-13 run above, on 7.1); case twins; alias twins; twins made on Tally's screens; Gold, other releases, any other book; a post through Bridge's own path; a balance or report read of either ledger (which ledger a voucher landed on is read from the entry's name).
+- **Not established:** a name equal to neither twin (the 2026-10-13 run above, on 7.1); case twins; alias twins; twins made on Tally's screens; Gold, other releases, any other book.
 
-bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`). Neither the 2026-10-13 run nor this one changes that. Since bridge#626 the one exception is two ledgers that differ only by a trailing CR LF, named by one's exact bytes, with the approval dialog naming both.
+**Through Bridge's own path, each Payment moved the ledger it named and no other. VERIFIED 2026-11-02, licensed TallyPrime 7.2 Silver, one synthetic company, two pairs, one sitting. Confidence: PARTIAL.** Branch `lab/626-r3-answers`, `7d506fe4`, bridge#626. The pairs were seeded by request, one in each creation order, under Indirect Expenses and Indirect Incomes.
+- **The vouchers.** Four Payments went through `build_import_xml` and `post_import`, each debiting one ledger of a pair and crediting one bank ledger. Each debit entry read back with the bytes sent.
+- **The balances.** Each ledger's closing balance moved by its own Payment and no other, and the bank's was their sum. So the landing holds at the balance as well as at the entry.
+- **The dialog.** Each one named both ledgers of the pair, its group, and which is used. A twin created with the dialog open was refused as `ledger_has_folded_twin` when it was answered, and nothing was attempted.
+- **`PARTYLEDGERNAME`.** Bridge's file names the debit ledger of a Payment here, so it named the pair; Tally read it back as the bank ledger, as in the run above. No row has a pair as the ledger read back as the party.
+- **`verify_import`.** It answered `posted_verified` for each voucher. That this rests on the entries' bytes was read from the code, not measured apart from the entries above.
+- **Not established:** any voucher type but a Payment; a pair on a credit leg, or as a Receipt's party; a pair on a bill-wise ledger or an invoice line; the dialog's totals form; the other limits of the run above.
+
+bridge#708 has Bridge refuse to build or post against a ledger that has a folded twin (`ledger_has_folded_twin`). Neither the 2026-10-13 run nor these change that. Since bridge#626 the one exception is the shape measured above: two ledgers that differ only by a trailing CR LF, named by one's exact bytes on the debit side alone of a Payment, off bill-wise, with the approval dialog naming both. Every other shape stays refused. Releases other than 7.1 and 7.2 Silver are admitted without a row of their own; `verify_import` compares the entry's bytes after the post, so a wrong landing there would be caught, not prevented.
 
 **Encoding a CR LF in a master name: `&#13;&#10;`. VERIFIED on one run (licensed TallyPrime 7.1
 Gold, one client book, 2026-09-28).**

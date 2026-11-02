@@ -118,6 +118,18 @@ transport crate).
 Not measured: a dropped connection, a size limit or an abandoned send in place of the cut; a
 second process sending meanwhile; other reads, books and editions.
 
+**An abandoned ledger create runs, and a read answered after it sees it, with a long read or a
+long import in front. PARTIAL: TallyPrime 7.2 Silver, one synthetic book, 29 to 30 October and
+2 November 2026 (`lab/1713-settle-order-answers`, `lab/2176-n1-answers`).** With the long work
+holding the gateway, a ledger create was abandoned at 20 s, and a ledger read was written before
+the long work's first byte and so answered after it. In all ten rows that counted, that read
+showed the ledger, it stayed present at +1, +5, +15 and +30 minutes, and the master mark moved by
+exactly one. Eight rows had a long read in front, on new and on reused connections. Two had an
+import of 2,700 Journals in front, every request on a new connection, holding the gateway about
+56 s, about 1 s past those rows' 55 s floor. This is the order `confirmed_absent` rests on (#2176).
+Not measured: a create on a reused connection during an import, Gold, other releases, other
+master types, a restart with a create queued.
+
 **Consequences:**
 
 1. **Abandoning a request frees your socket, not Tally.** There is no observed way to cancel
@@ -1877,3 +1889,4 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-31 | §12a.23: the parser now refuses a hidden or control character in a name or quantity, a group with no line after it, and lines in more than one unit. |
 | 2026-10-31 | §12a.23: named the closed set of characters the parser refuses in a name or quantity, and added a godown name holding a tab to Not measured. |
 | 2026-11-02 | §11c.4: the one window that sent fewer requests is explained from the run's retained trails: the three data parts of the widened window, which the census-only corroboration does not read (#1240). |
+| 2026-11-02 | §11b.2: an abandoned ledger create, with a long read or a long import in front, was seen by the read answered after it (#2176). §9.4e: for a trailing CR LF, exact bytes decided in both creation orders on 7.2 Silver (#626). |

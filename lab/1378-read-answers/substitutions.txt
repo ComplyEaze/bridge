@@ -1,0 +1,3 @@
+The two invented GSTINs are masked as 15 X everywhere here, so sizes stand; sha256 in the logs are of the originals. company_number values go first, by a JSON parser. Other replacements in the text files, with counts:
+<company number>: 4
+<lab folder>: 1

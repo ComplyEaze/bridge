@@ -1,0 +1,28 @@
+isError False False evidence complete complete state complete reason None profile agent_vouchers_v1_filters agent_vouchers_v1_filters
+rows 3 3 seconds 2.305 2.109
+Sales 1 e_invoice key True | other keys equal step 2 True | differing []
+    {"ack_date": {"state": "present", "value": "20250403"}, "ack_no": {"state": "present", "value": "112233"}, "irn": {"state": "present", "value": "a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8"}}
+Sales 2 e_invoice key True | other keys equal step 2 True | differing []
+    {"ack_date": {"state": "absent"}, "ack_no": {"state": "absent"}, "irn": {"state": "absent"}}
+Payment 1 e_invoice key False | other keys equal step 2 True | differing []
+step 3 equal step 4 as whole JSON False
+equal apart from read time and snapshot id False
+  differs /evidence/duration_ms 2206 | 2040
+  differs /evidence/read_at 2026-11-02T19:56:33.385Z | 2026-11-02T19:56:36.534Z
+  differs /result/window/parts[0]/ms 767 | 741
+  differs /result/window/census/ms 704 | 669
+  differs /result/window/marks/ms 606 | 572
+  differs /result/snapshot/id 53b88fe5-4a82-4324-a7c0-115d91768f50 | d5bec0c6-57cd-45f1-832b-f324bcdcd377
+  differs /result/snapshot/read_at 2026-11-02T19:56:33.384Z | 2026-11-02T19:56:36.534Z
+  differs /read_at 2026-11-02T19:56:31.178Z | 2026-11-02T19:56:34.494Z
+voucher FETCH seen DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE | files ['req-b7b2380def07cd2e.bin'] | equal EXPECT False
+voucher FETCH seen DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE,IRN,IRNACKNO,IRNACKDATE | files ['req-e0702cbb980e35f7.bin'] | equal EXPECT True
+the EXPECT list seen True plain list seen True
+relay rows 71 dropped 0
+Sales 1 keys ['alter_id', 'cancelled', 'date', 'e_invoice', 'guid', 'is_invoice', 'master_id', 'narration', 'optional', 'party', 'party_gstin', 'post_dated', 'voucher_number', 'voucher_type'] is_invoice True None [('BRIDGE IRN Customer', '-1180.00'), ('BRIDGE IRN Sales', '1000.00'), ('BRIDGE IRN IGST', '180.00')]
+Sales 2 keys ['alter_id', 'cancelled', 'date', 'e_invoice', 'guid', 'is_invoice', 'master_id', 'narration', 'optional', 'party', 'party_gstin', 'post_dated', 'voucher_number', 'voucher_type'] is_invoice True None [('BRIDGE IRN Customer', '-1180.00'), ('BRIDGE IRN Sales', '1000.00'), ('BRIDGE IRN IGST', '180.00')]
+Payment 1 keys ['alter_id', 'cancelled', 'date', 'guid', 'is_invoice', 'master_id', 'narration', 'optional', 'party', 'post_dated', 'voucher_number', 'voucher_type'] is_invoice False None [('BRIDGE IRN Customer', '-50.00'), ('Cash', '50.00')]
+not_reported count 0
+b7b2380def07cd2e 2 e0702cbb980e35f7 4
+1794 b'\xff\xfe'
+<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Agent Vouchers</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>BRIDGE EINVOICE LAB</SVCURRENTCOMPANY><SVFROMDATE TYPE="Date">20250403</SVFROMDATE><SVTODATE TYPE="Date">20250403</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE="Formulae" NAME="BridgeAgentWindow">$Date &gt;= $$Date:"20250403" AND $Date &lt;= $$Date:"20250403"</SYSTEM><COLLECTION NAME="Bridge Agent Vouchers" ISMODIFY="No"><TYPE>Voucher</TYPE><FETCH>DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,RE

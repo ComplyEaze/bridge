@@ -1,0 +1,1 @@
+#2243-C1, 2 Nov 2026 UTC, master 3876be074 on the day. Each book loaded alone by Select Company, shut by Company > Shut. A, B, C, then A again after a fresh load.

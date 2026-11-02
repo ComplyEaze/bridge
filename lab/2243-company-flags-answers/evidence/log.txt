@@ -1,0 +1,48 @@
+a-marks0 req 978 B b1780211a850474a sent 2026-11-02T18:19:41.411Z answered 2026-11-02T18:19:41.548Z exit 0 printed "200 3306" content_length 3306 equal True bytes 3306 sha256 cae7559fa7757ca5e2e4c7b41b0b3a91ffb77783ef01f23a2eb3756d21fbadb8
+a marks [('GUID', 'c3edf50d-3dca-4213-a1f1-1d9fa331a674'), ('ALTMSTID', ' 207')]
+a-company req 1012 B ed18cab060fb5560 sent 2026-11-02T18:19:41.554Z answered 2026-11-02T18:19:41.645Z exit 0 printed "200 4432" content_length 4432 equal True bytes 4432 sha256 1e8f8a969cc6df0d4184a53cc1eb3c91efde62431e7d4052f10b9d880e15c0f2
+a /ENVELOPE/BODY/DATA/TALLYMESSAGE/COMPANY count 1; STATUS 1
+a ISINTEGRATED: verbatim '<ISINTEGRATED TYPE="Logical">Yes</ISINTEGRATED>'; present; direct child of COMPANY True
+a ISINVENTORYON: verbatim '<ISINVENTORYON TYPE="Logical">Yes</ISINVENTORYON>'; present; direct child of COMPANY True
+a NUMSTOCKITEMS: verbatim '<NUMSTOCKITEMS TYPE="Number">0</NUMSTOCKITEMS>'; present; direct child of COMPANY True
+a COMPANY children ['BOOKSFROM', 'NAME', 'GUID', 'ISINVENTORYON', 'ISINTEGRATED', 'ISDEEMEDPOSITIVE', 'CANDELETE', 'NUMSTOCKITEMS', 'MASTERID']
+a-items req 1260 B ddba74f9c330b3b0 sent 2026-11-02T18:19:41.659Z answered 2026-11-02T18:19:41.732Z exit 0 printed "200 2998" content_length 2998 equal True bytes 2998 sha256 cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+a stock item rows 0: []
+a-marks1 req 978 B b1780211a850474a sent 2026-11-02T18:19:41.732Z answered 2026-11-02T18:19:41.816Z exit 0 printed "200 3306" content_length 3306 equal True bytes 3306 sha256 cae7559fa7757ca5e2e4c7b41b0b3a91ffb77783ef01f23a2eb3756d21fbadb8
+a marks after same bytes True
+b-marks0 req 976 B a98987c65a39652c sent 2026-11-02T18:20:45.086Z answered 2026-11-02T18:20:45.157Z exit 0 printed "200 3392" content_length 3392 equal True bytes 3392 sha256 79fc62dd4b26e6ad0c64199f43c1aa48c32d67630d7fcd4eaf1fafc0fbfd0ba4
+b marks [('GUID', '1edb9b05-8d35-4c0c-9959-dce655730463'), ('ALTVCHID', ' 4'), ('ALTMSTID', ' 292')]
+b-company req 1008 B f7754ccff1d4e3fe sent 2026-11-02T18:20:45.164Z answered 2026-11-02T18:20:45.229Z exit 0 printed "200 4430" content_length 4430 equal True bytes 4430 sha256 cbf5fd01791126b2df38c77f4562ef17933525c0bb531c9716fd9f531eec22d4
+b /ENVELOPE/BODY/DATA/TALLYMESSAGE/COMPANY count 1; STATUS 1
+b ISINTEGRATED: verbatim '<ISINTEGRATED TYPE="Logical">Yes</ISINTEGRATED>'; present; direct child of COMPANY True
+b ISINVENTORYON: verbatim '<ISINVENTORYON TYPE="Logical">Yes</ISINVENTORYON>'; present; direct child of COMPANY True
+b NUMSTOCKITEMS: verbatim '<NUMSTOCKITEMS TYPE="Number"> 55</NUMSTOCKITEMS>'; present; direct child of COMPANY True
+b COMPANY children ['BOOKSFROM', 'NAME', 'GUID', 'ISINVENTORYON', 'ISINTEGRATED', 'ISDEEMEDPOSITIVE', 'CANDELETE', 'NUMSTOCKITEMS', 'MASTERID']
+b-items req 1258 B a2aa2aa4cc0d8521 sent 2026-11-02T18:20:45.235Z answered 2026-11-02T18:20:45.336Z exit 0 printed "200 72398" content_length 72398 equal True bytes 72398 sha256 85bd948419d8a73adaf711e47eb9b83480a131678297eece6ebac9a310319e2f
+b stock item rows 55: ["Lab Item's 08", 'Lab Item 01', 'Lab Item 02', 'Lab Item 03', 'Lab Item 04', 'Lab Item 05', 'Lab Item 06', 'Lab Item 11', 'Lab Item 13', 'Lab Item 14', 'Lab Item A & B 07', 'Lab Item No. 09', 'Stale Bulk 001', 'Stale Bulk 002', 'Stale Bulk 003', 'Stale Bulk 004', 'Stale Bulk 005', 'Stale Bulk 006', 'Stale Bulk 007', 'Stale Bulk 008', 'Stale Bulk 009', 'Stale Bulk 010', 'Stale Bulk 011', 'Stale Bulk 012', 'Stale Bulk 013', 'Stale Bulk 014', 'Stale Bulk 015', 'Stale Bulk 016', 'Stale Bulk 017', 'Stale Bulk 018', 'Stale Bulk 019', 'Stale Bulk 020', 'Stale Bulk 021', 'Stale Bulk 022', 'Stale Bulk 023', 'Stale Bulk 024', 'Stale Bulk 025', 'Stale Bulk 026', 'Stale Bulk 027', 'Stale Bulk 028', 'Stale Bulk 029', 'Stale Bulk 030', 'Stale Bulk 031', 'Stale Bulk 032', 'Stale Bulk 033', 'Stale Bulk 034', 'Stale Bulk 035', 'Stale Bulk 036', 'Stale Bulk 037', 'Stale Bulk 038', 'Stale Bulk 039', 'Stale Bulk 040', 'Stale Test 01', 'Stale Test 02 Renamed', 'Stale Test 03']
+b-marks1 req 976 B a98987c65a39652c sent 2026-11-02T18:20:45.347Z answered 2026-11-02T18:20:45.429Z exit 0 printed "200 3392" content_length 3392 equal True bytes 3392 sha256 79fc62dd4b26e6ad0c64199f43c1aa48c32d67630d7fcd4eaf1fafc0fbfd0ba4
+b marks after same bytes True
+c-marks0 req 980 B 95266693e3e2fe59 sent 2026-11-02T18:21:31.334Z answered 2026-11-02T18:21:31.408Z exit 0 printed "200 3398" content_length 3398 equal True bytes 3398 sha256 c81aa1f0b1b5e510d0fb926d932f4c2eca7acdf1be8fca18dea5c643052c398a
+c marks [('GUID', '5342454a-478e-4d59-a663-16ec7b8c84a8'), ('ALTVCHID', ' 11'), ('ALTMSTID', ' 214')]
+c-company req 1016 B 6934e7100329a8b8 sent 2026-11-02T18:21:31.411Z answered 2026-11-02T18:21:31.476Z exit 0 printed "200 4434" content_length 4434 equal True bytes 4434 sha256 03c9ea7e96b39f8c9726b56cb96fed0338d4cfaad0233bc135f26646ba1e4ba9
+c /ENVELOPE/BODY/DATA/TALLYMESSAGE/COMPANY count 1; STATUS 1
+c ISINTEGRATED: verbatim '<ISINTEGRATED TYPE="Logical">No</ISINTEGRATED>'; present; direct child of COMPANY True
+c ISINVENTORYON: verbatim '<ISINVENTORYON TYPE="Logical">No</ISINVENTORYON>'; present; direct child of COMPANY True
+c NUMSTOCKITEMS: verbatim '<NUMSTOCKITEMS TYPE="Number">0</NUMSTOCKITEMS>'; present; direct child of COMPANY True
+c COMPANY children ['BOOKSFROM', 'NAME', 'GUID', 'ISINVENTORYON', 'ISINTEGRATED', 'ISDEEMEDPOSITIVE', 'CANDELETE', 'NUMSTOCKITEMS', 'MASTERID']
+c-items req 1262 B 8493be3af3ac7858 sent 2026-11-02T18:21:31.488Z answered 2026-11-02T18:21:31.554Z exit 0 printed "200 2998" content_length 2998 equal True bytes 2998 sha256 cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+c stock item rows 0: []
+c-marks1 req 980 B 95266693e3e2fe59 sent 2026-11-02T18:21:31.556Z answered 2026-11-02T18:21:31.634Z exit 0 printed "200 3398" content_length 3398 equal True bytes 3398 sha256 c81aa1f0b1b5e510d0fb926d932f4c2eca7acdf1be8fca18dea5c643052c398a
+c marks after same bytes True
+a2-marks0 req 978 B b1780211a850474a sent 2026-11-02T18:22:26.429Z answered 2026-11-02T18:22:26.495Z exit 0 printed "200 3306" content_length 3306 equal True bytes 3306 sha256 cae7559fa7757ca5e2e4c7b41b0b3a91ffb77783ef01f23a2eb3756d21fbadb8
+a2 marks [('GUID', 'c3edf50d-3dca-4213-a1f1-1d9fa331a674'), ('ALTMSTID', ' 207')]
+a2-company req 1012 B ed18cab060fb5560 sent 2026-11-02T18:22:26.495Z answered 2026-11-02T18:22:26.578Z exit 0 printed "200 4432" content_length 4432 equal True bytes 4432 sha256 1e8f8a969cc6df0d4184a53cc1eb3c91efde62431e7d4052f10b9d880e15c0f2
+a2 /ENVELOPE/BODY/DATA/TALLYMESSAGE/COMPANY count 1; STATUS 1
+a2 ISINTEGRATED: verbatim '<ISINTEGRATED TYPE="Logical">Yes</ISINTEGRATED>'; present; direct child of COMPANY True
+a2 ISINVENTORYON: verbatim '<ISINVENTORYON TYPE="Logical">Yes</ISINVENTORYON>'; present; direct child of COMPANY True
+a2 NUMSTOCKITEMS: verbatim '<NUMSTOCKITEMS TYPE="Number">0</NUMSTOCKITEMS>'; present; direct child of COMPANY True
+a2 COMPANY children ['BOOKSFROM', 'NAME', 'GUID', 'ISINVENTORYON', 'ISINTEGRATED', 'ISDEEMEDPOSITIVE', 'CANDELETE', 'NUMSTOCKITEMS', 'MASTERID']
+a2-items req 1260 B ddba74f9c330b3b0 sent 2026-11-02T18:22:26.591Z answered 2026-11-02T18:22:26.661Z exit 0 printed "200 2998" content_length 2998 equal True bytes 2998 sha256 cf34fa0a514109d2691ae8ccd750fd83338927b5153541d55f810b0530658a1a
+a2 stock item rows 0: []
+a2-marks1 req 978 B b1780211a850474a sent 2026-11-02T18:22:26.664Z answered 2026-11-02T18:22:26.741Z exit 0 printed "200 3306" content_length 3306 equal True bytes 3306 sha256 cae7559fa7757ca5e2e4c7b41b0b3a91ffb77783ef01f23a2eb3756d21fbadb8
+a2 marks after same bytes True

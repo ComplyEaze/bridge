@@ -13,32 +13,84 @@ const WINDOW: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/window-20250401-20250430.utf16le.xml"
 );
 
-macro_rules! trial_balance {
-    ($to:literal) => {
-        (
-            $to,
-            include_bytes!(concat!(
-                "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-",
-                $to,
-                ".utf16le.xml"
-            ))
-            .as_slice(),
-        )
-    };
-}
-
 const TRIAL_BALANCES: [(&str, &[u8]); 11] = [
-    trial_balance!("20250402"),
-    trial_balance!("20250403"),
-    trial_balance!("20250404"),
-    trial_balance!("20250405"),
-    trial_balance!("20250407"),
-    trial_balance!("20250408"),
-    trial_balance!("20250409"),
-    trial_balance!("20250410"),
-    trial_balance!("20250411"),
-    trial_balance!("20250425"),
-    trial_balance!("20250430"),
+    (
+        "20250402",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250402.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250403",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250403.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250404",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250404.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250405",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250405.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250407",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250407.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250408",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250408.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250409",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250409.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250410",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250410.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250411",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250411.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250425",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250425.utf16le.xml"
+        )
+        .as_slice(),
+    ),
+    (
+        "20250430",
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250430.utf16le.xml"
+        )
+        .as_slice(),
+    ),
 ];
 
 fn text(bytes: &[u8]) -> String {

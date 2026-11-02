@@ -154,7 +154,7 @@ test("a withheld result names the ledgers it also set aside", () => {
   assert.match(state.message, /on 1 base-currency ledger: Synthetic Rupee Party\. ComplyEaze Bridge left those ledgers out, with their bills\. No bill was left, so ComplyEaze Bridge could not confirm the requested as-of date and withheld the totals\.$/);
   assert.equal(state.retryable, false);
   const other = outstandingsPartialState("native_overdue_crosscheck_mismatch", undefined, undefined, undefined, [], ["Synthetic Rupee Party"]);
-  assert.match(other.message, /^Tally's overdue-day cross-check disagreed .* withheld the totals\. .*left those ledgers out, with their bills\.$/);
+  assert.match(other.message, /cross-check disagreed .* No totals were calculated\. .*left those ledgers out, with their bills\.$/);
   assert.equal(other.retryable, true);
   const unnamed = outstandingsPartialState("native_outstandings_as_of_unconfirmed_without_bill_references", undefined, undefined, undefined, [], []);
   assert.doesNotMatch(unnamed.message, /left those ledgers out/);

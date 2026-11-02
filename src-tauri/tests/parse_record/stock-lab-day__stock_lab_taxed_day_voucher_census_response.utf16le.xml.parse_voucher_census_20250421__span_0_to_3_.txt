@@ -1,5 +1,5 @@
 # fixture: stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml
-# parser: parse_voucher_census(20250421)
+# parser: parse_voucher_census(20250421, span 0 to 3)
 # source: captured
 Ok([
     CensusRow {

@@ -1,0 +1,17 @@
+# Stock Query, Tally's screen, Godown/Batch Details, period 1-4-2026 to 30-4-2026, as read from the captures. item | godown | batch | quantity. An item with no line and its Closing Balance: item | none | none | closing.
+Carton Box Small | Main Location | Primary Batch | 100
+Caustic Soda Flakes | Main Location | Primary Batch | 200.000
+Caustic Soda Flakes | Main Location | B-2504-A | 200.000
+Cleaning Kit A | Main Location | Primary Batch | 25
+Cleaning Kit A | Main Location | K-2504-A | -13
+Cleaning Kit B | none | none | 0
+Descaler Concentrate | none | none | 0
+HDPE Drum 50L | Main Location | Primary Batch | 40
+Hydrochloric Acid 33pc | Main Location | Primary Batch | 150.000
+Hydrochloric Acid 33pc | Main Location | H-2504-A | 300.000
+Hydrochloric Acid 33pc | Factory Floor | H-2504-B | 366.667
+Label Roll | none | none | 0
+Soda Ash Light | Main Location | Primary Batch | 1350.000
+Soda Ash Light | Factory Floor | Primary Batch | -50.000
+Sulphuric Acid 98pc | Main Location | Primary Batch | 100.000
+Zero Stock Item | Main Location | Primary Batch | -50.000

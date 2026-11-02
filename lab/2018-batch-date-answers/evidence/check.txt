@@ -1,0 +1,26 @@
+window {'from': '20260401', 'to': '20260430'} as_of 20260430 state complete evidence complete | first row window {'from': '20250401', 'to': '20260331'} as_of 20260331
+items 11 lines 13 screen lines 13
+Carton Box Small | state tied | tool 100 | row 2 100 | lines [('Main Location', 'Primary Batch', '100')] | equal row 2 True | equal screen True
+Caustic Soda Flakes | state tied | tool 400.000 | row 2 400.000 | lines [('Main Location', 'Primary Batch', '200.000'), ('Main Location', 'B-2504-A', '200.000')] | equal row 2 True | equal screen True
+Cleaning Kit A | state tied | tool 12 | row 2 12 | lines [('Main Location', 'Primary Batch', '25'), ('Main Location', 'K-2504-A', '-13')] | equal row 2 True | equal screen True
+Cleaning Kit B | state no_movement | tool no line | row 2 no line | lines [] | equal row 2 True | equal screen True
+Descaler Concentrate | state no_movement | tool no line | row 2 no line | lines [] | equal row 2 True | equal screen True
+HDPE Drum 50L | state tied | tool 40 | row 2 40 | lines [('Main Location', 'Primary Batch', '40')] | equal row 2 True | equal screen True
+Hydrochloric Acid 33pc | state tied | tool 816.667 | row 2 816.667 | lines [('Main Location', 'Primary Batch', '150.000'), ('Main Location', 'H-2504-A', '300.000'), ('Factory Floor', 'H-2504-B', '366.667')] | equal row 2 True | equal screen True
+Label Roll | state no_movement | tool no line | row 2 no line | lines [] | equal row 2 True | equal screen True
+Soda Ash Light | state tied | tool 1300.000 | row 2 1300.000 | lines [('Main Location', 'Primary Batch', '1350.000'), ('Factory Floor', 'Primary Batch', '-50.000')] | equal row 2 True | equal screen True
+Sulphuric Acid 98pc | state tied | tool 100.000 | row 2 100.000 | lines [('Main Location', 'Primary Batch', '100.000')] | equal row 2 True | equal screen True
+Zero Stock Item | state tied | tool -50.000 | row 2 -50.000 | lines [('Main Location', 'Primary Batch', '-50.000')] | equal row 2 True | equal screen True
+differences 0
+step 4 equal step 2 as whole JSON False | equal apart from read time and snapshot id False
+  differs /evidence/bytes 63772 | 65884
+  differs /evidence/duration_ms 1633 | 1683
+  differs /evidence/read_at 2026-11-02T23:42:27.940Z | 2026-11-02T23:45:17.904Z
+  differs /evidence/response_sha256 a836189d2a12e439009825a24f6fff4797e35fbabad2f775890211c993bc | 77f73d1eae8860281f6c7693be983a6a13cdf0e3a4d93741e23b243e016e
+  differs /read_at 2026-11-02T23:42:26.307Z | 2026-11-02T23:45:16.221Z
+audit stock items, same request bytes True | answer bytes 16946 18002 | added lines 11 ['<LANGUAGEID TYPE="Number">0</LANGUAGEID>'] | paired reads equal True True | extra over the pair 2112
+Stock Query answers, 11 of step 2 equal 11 of step 4, by bytes True 22
+the first row, its first and second read of the same call shape, evidence bytes [68328, 70440] difference 2112
+marks byte-equal True
+vouchers in the window 1 [{"date": "20260420", "voucher_type": "Purchase", "voucher_number": "1", "party": "Chem Supplier 1", "amounts": [{"amount": "1234.00", "bill_allocations": [{"amount": "1234.00", "bill_date": "20260420", "bill_type": "New Ref", "reference": {"kind": "named", "name": "RD6-REFDATE-1"}}], "is_deemed_positive": "No", "ledger": "Chem Supplier 1"}, {"amount": "-1234.00", "bill_allocations": [], "is_deemed_positive": "Yes", "ledger": "Purchase - Local"}], "cancelled": false, "optional": false}]
+request ('Stock Query', '20260401', '20260430') 22 ['\\req-0024', '\\req-0025', '\\req-0026']

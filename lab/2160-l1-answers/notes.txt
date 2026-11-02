@@ -1,0 +1,4 @@
+#2160-L1, 2 Nov 2026 UTC. Master 559eff14c; requests from master format strings. Book BRIDGE SHAPE LAB, on which the refusal repeated. Tally 7.2 Silver, 28316 before the restart.
+Restart a: Quit at Select Company, none loaded; started outside the package, PID 28052; the demo company loaded by the ini, shut; SHAPE loaded alone; pair a, pair b, marks.
+Step c: company shut and reloaded, same Tally; pair c, marks.
+Restart d: company shut, Quit, started, PID 1200; demo shut; SHAPE loaded alone; ledger read; pair d, marks. Close: company shut.

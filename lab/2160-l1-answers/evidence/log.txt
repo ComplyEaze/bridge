@@ -1,0 +1,49 @@
+a-1 vt sent 2026-11-02T17:23:31.298Z answered 2026-11-02T17:23:31.510Z exit 0 printed "200 48456" content_length 48456 bytes 48456 sha256 1410f760ace55cf257ee17ab2bd7f2c969163e0ec21e2e52c5bf6896a41cb918
+a-between status exit 0 printed "200 51"
+a-2 vt sent 2026-11-02T17:23:31.574Z answered 2026-11-02T17:23:31.655Z exit 0 printed "200 48648" content_length 48648 bytes 48648 sha256 2220d9abde2e459a4bb6b8af749123c6ecbf853573d6f76d7c0db0eddab9af20
+a-after status exit 0 printed "200 51"
+BYTES DIFFER: 48456 vs 48648 B, first at offset 44874
+first  around: 'ST TYPE="String">\r\n       <NAME>Shape Purchase</NAME>\r\n      </NAME.LIST>\r\n     </LANGUAGENAME.LIST>\r\n    </VOUCHERTYPE>\r\n    <VOUCHERTYPE NAME="Shape Sales" RE'
+second around: 'ST TYPE="String">\r\n       <NAME>Shape Purchase</NAME>\r\n      </NAME.LIST>\r\n      <LANGUAGEID TYPE="Number">0</LANGUAGEID>\r\n     </LANGUAGENAME.LIST>\r\n    </VOUC'
+rows 26 vs 26; order equal True; same set True
+first field difference, row 'Shape Purchase': [] vs [('/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID@TYPE', 'Number'), ('/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID', '0')]
+rows with any field difference: 2
+whole answer: 737 vs 741 values; first differing value index 685: [('/ENVELOPE/BODY/DATA/COLLECTION/VOUCHERTYPE@NAME', 'Shape Sales')] vs [('/ENVELOPE/BODY/DATA/COLLECTION/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID@TYPE', 'Number')]
+a: rows 26
+b-1 vt sent 2026-11-02T17:23:32.339Z answered 2026-11-02T17:23:32.686Z exit 0 printed "200 48648" content_length 48648 bytes 48648 sha256 2220d9abde2e459a4bb6b8af749123c6ecbf853573d6f76d7c0db0eddab9af20
+b-between status exit 0 printed "200 51"
+b-2 vt sent 2026-11-02T17:23:32.813Z answered 2026-11-02T17:23:32.895Z exit 0 printed "200 48648" content_length 48648 bytes 48648 sha256 2220d9abde2e459a4bb6b8af749123c6ecbf853573d6f76d7c0db0eddab9af20
+b-after status exit 0 printed "200 51"
+bytes equal, 48648 B
+b: rows 26
+a-marks marks sent 2026-11-02T17:23:33.755Z answered 2026-11-02T17:23:33.844Z exit 0 printed "200 3396" content_length 3396 bytes 3396 sha256 c71056a0dcd9deb501b80363ae1dbc9f711e7659f01f491b074b22e992407c59
+a-marks {'GUID': '3a6bd6e1-b835-4bff-89dd-8a6af138c346', 'ALTVCHID': '112', 'ALTMSTID': '292'}
+c-1 vt sent 2026-11-02T17:24:31.331Z answered 2026-11-02T17:24:31.409Z exit 0 printed "200 48456" content_length 48456 bytes 48456 sha256 1410f760ace55cf257ee17ab2bd7f2c969163e0ec21e2e52c5bf6896a41cb918
+c-between status exit 0 printed "200 51"
+c-2 vt sent 2026-11-02T17:24:31.456Z answered 2026-11-02T17:24:31.565Z exit 0 printed "200 48648" content_length 48648 bytes 48648 sha256 2220d9abde2e459a4bb6b8af749123c6ecbf853573d6f76d7c0db0eddab9af20
+c-after status exit 0 printed "200 51"
+BYTES DIFFER: 48456 vs 48648 B, first at offset 44874
+first  around: 'ST TYPE="String">\r\n       <NAME>Shape Purchase</NAME>\r\n      </NAME.LIST>\r\n     </LANGUAGENAME.LIST>\r\n    </VOUCHERTYPE>\r\n    <VOUCHERTYPE NAME="Shape Sales" RE'
+second around: 'ST TYPE="String">\r\n       <NAME>Shape Purchase</NAME>\r\n      </NAME.LIST>\r\n      <LANGUAGEID TYPE="Number">0</LANGUAGEID>\r\n     </LANGUAGENAME.LIST>\r\n    </VOUC'
+rows 26 vs 26; order equal True; same set True
+first field difference, row 'Shape Purchase': [] vs [('/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID@TYPE', 'Number'), ('/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID', '0')]
+rows with any field difference: 2
+whole answer: 737 vs 741 values; first differing value index 685: [('/ENVELOPE/BODY/DATA/COLLECTION/VOUCHERTYPE@NAME', 'Shape Sales')] vs [('/ENVELOPE/BODY/DATA/COLLECTION/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID@TYPE', 'Number')]
+c: rows 26
+c-marks marks sent 2026-11-02T17:24:32.185Z answered 2026-11-02T17:24:32.264Z exit 0 printed "200 3396" content_length 3396 bytes 3396 sha256 c71056a0dcd9deb501b80363ae1dbc9f711e7659f01f491b074b22e992407c59
+c-marks {'GUID': '3a6bd6e1-b835-4bff-89dd-8a6af138c346', 'ALTVCHID': '112', 'ALTMSTID': '292'}
+d-ledgers led sent 2026-11-02T17:26:34.890Z answered 2026-11-02T17:26:35.062Z exit 0 printed "200 50824" content_length 50824 bytes 50824 sha256 80f260e74d91429c9c4208b26d343bac7199eff8337337460384a47fa5da8360
+d-1 vt sent 2026-11-02T17:26:35.684Z answered 2026-11-02T17:26:35.783Z exit 0 printed "200 48456" content_length 48456 bytes 48456 sha256 1410f760ace55cf257ee17ab2bd7f2c969163e0ec21e2e52c5bf6896a41cb918
+d-between status exit 0 printed "200 51"
+d-2 vt sent 2026-11-02T17:26:35.855Z answered 2026-11-02T17:26:35.932Z exit 0 printed "200 48648" content_length 48648 bytes 48648 sha256 2220d9abde2e459a4bb6b8af749123c6ecbf853573d6f76d7c0db0eddab9af20
+d-after status exit 0 printed "200 51"
+BYTES DIFFER: 48456 vs 48648 B, first at offset 44874
+first  around: 'ST TYPE="String">\r\n       <NAME>Shape Purchase</NAME>\r\n      </NAME.LIST>\r\n     </LANGUAGENAME.LIST>\r\n    </VOUCHERTYPE>\r\n    <VOUCHERTYPE NAME="Shape Sales" RE'
+second around: 'ST TYPE="String">\r\n       <NAME>Shape Purchase</NAME>\r\n      </NAME.LIST>\r\n      <LANGUAGEID TYPE="Number">0</LANGUAGEID>\r\n     </LANGUAGENAME.LIST>\r\n    </VOUC'
+rows 26 vs 26; order equal True; same set True
+first field difference, row 'Shape Purchase': [] vs [('/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID@TYPE', 'Number'), ('/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID', '0')]
+rows with any field difference: 2
+whole answer: 737 vs 741 values; first differing value index 685: [('/ENVELOPE/BODY/DATA/COLLECTION/VOUCHERTYPE@NAME', 'Shape Sales')] vs [('/ENVELOPE/BODY/DATA/COLLECTION/VOUCHERTYPE/LANGUAGENAME.LIST/LANGUAGEID@TYPE', 'Number')]
+d: rows 26
+d-marks marks sent 2026-11-02T17:26:36.651Z answered 2026-11-02T17:26:36.732Z exit 0 printed "200 3396" content_length 3396 bytes 3396 sha256 c71056a0dcd9deb501b80363ae1dbc9f711e7659f01f491b074b22e992407c59
+d-marks {'GUID': '3a6bd6e1-b835-4bff-89dd-8a6af138c346', 'ALTVCHID': '112', 'ALTMSTID': '292'}

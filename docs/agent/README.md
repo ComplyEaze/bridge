@@ -279,12 +279,28 @@ measured (4,902 bytes: a party with two short dated entries; UNVERIFIED for a po
 or longer address lines is larger), so a read holds at most 3,200 ledgers
 (the 16 MB budget over the constant, not measured); a book that fits a standard read may come back in more parts, or be
 refused as `parent_over_budget`, never truncated. A held listing is served only to a page that asks for the same mode, so
-repeat `include_mailing_details` on later pages. Measured on one synthetic book (TallyPrime 7.1, and 7.2 for a second dated entry on one party, oldest first); three or more entries,
-an entry with no date and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
-local file, names the mailing details only where the book's master-alteration mark is at most 3,200 (the
-whole read fits their bound) and otherwise sends the standard request, as before #1490, so a book that exported
-before is never refused for the larger estimate; its header then says that no ledger's mailing details were
-observed and the status column reads not observed. Where it reads them it shows only the entry in force on its
+repeat `include_mailing_details` on later pages. Measured on synthetic books (TallyPrime 7.1, and 7.2 for a second dated entry
+on one party, oldest first, and in lab row 2074-L for ten dated entries on one party, at about 924 bytes each beyond the
+first); an entry with no date, a book of many populated parties and other releases are not measured. The party/ledger master workbook, which the desktop app writes to a
+local file, names the mailing details only where the whole read is estimated to fit their bound: a
+master-alteration mark of at most 3,200, or, where its ledgers are counted to size the read (a mark past 4,266),
+the counted ledgers, each allowed four further mailing entries the mark may not show (one save can add several),
+with one more entry allowed for each alteration beyond them (#2074). These are allowances from one lab row, not
+bounds, and every figure is an unverified estimate. Otherwise it sends the standard request, as before #1490; its header
+then says that no ledger's mailing details were observed and the status column reads not observed. A counted book that
+the standard request exported before can now be sent the larger mailing request. The export fails where that read
+runs out of time, or passes the 32 MiB response limit without Tally declaring it, since Tally may still be working on
+it; its error says the mailing addresses were part of the failed read. After any other failure of that read, the
+workbook reads the book once more with the standard request, and its header says how the larger read failed (#2214):
+an oversize Tally declared, an answer that broke off, could not be read, did not decode or never came, an HTTP error
+status, a post that did not reach Tally, the pair's two answers differing, or any refusal of a whole answer (Tally's
+own failure answer, a missing STATUS, XML that does not parse, a row the grammar refuses, as markup inside a mailing
+field does, a wrong company, a passed bound, a repeated ledger or a ledger count that differs). After an answer that
+broke off, could not be read, did not decode or never came, Tally may still be sending it, so while the standard
+post is refused as draining before anything of it was sent, the export waits and tries again, for at most 60 s, a
+bound not measured, and fails past it. The standard read keeps every refusal it has without the mailing details.
+Only the declared oversize, and a separate read after it, have been seen live. `ledger_masters` with
+`include_mailing_details` asked for them by name, so it keeps its failure. Where it reads them it shows only the entry in force on its
 Balances-as-of date.
 `ledger_masters fields=compliance` takes one more argument, `include_gst_details` (a JSON boolean, default
 false). With any other `fields`, a true value is refused before any read as `ledger_masters_gst_details_requires_compliance`,
@@ -3110,17 +3126,29 @@ serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection and with the
 create, the read or both on a reused connection (#2176). Their answers carry
 `verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
-absent state only when the read-back's Tally reports TallyPrime 7.2 Silver,
-licensed. On any other the batch stays open, its name held, with a reason that
-names what is not covered: `absent_not_measured_on_this_product` (the product is
-not exactly TallyPrime), `absent_not_measured_on_gold`,
+absent state only when the read-back's Tally reports TallyPrime 7.2, licensed,
+Silver or Gold: Gold is the same product with multi-user access, so the edition
+is no bound, though no order row ran on Gold. On any other the batch stays open,
+its name held, with a reason that names what is not covered:
+`absent_not_measured_on_this_product` (the product is not exactly TallyPrime),
 `absent_not_measured_on_this_release`, `absent_not_measured_in_education` or
 `absent_tally_release_not_known`, and a next step that says so: calling again
-on the same Tally will not close it, so on TallyPrime 7.1, Gold, Education or
-another product such a batch holds its name until the company is read back on
-7.2 Silver. Before this, `confirmed_absent` was given on any Tally. An absent
+on the same Tally will not close it, so on TallyPrime 7.1, Education or another
+product such a batch holds its name until the company is read back on licensed
+TallyPrime 7.2. Before this, `confirmed_absent` was given on any Tally. An absent
 name kept open also names what else the read showed (`master_new_since_intent`,
 `mark_went_back_since_intent`).
+
+`master_write_located_elsewhere` releases the name too, so the same limit applies
+when the read found the name absent and no answer from Tally is on file: on any
+other Tally the state is `reconciliation_required`, its reasons include
+`other_company_mark_moved` and one of the reasons above, and an answer that read
+the book back leads with the alert to check every loaded company. With Tally's
+answer on file no create is waiting, and `master_write_located_elsewhere` stands
+on any Tally. With a ledger of that name in the book it stands too, like the
+other verdicts that close a batch on a ledger found there
+(`posted_into_existing_master`, `posted_unattributed`): that company's book itself
+refuses a new create of that name for as long as that master stands.
 
 Later calls cannot settle these states, and their batches keep holding the name: a
 read that found the name absent while the company's master mark moved back, or
@@ -3138,7 +3166,7 @@ and judges it. A book whose set of loaded companies changed is read and judged:
 the answer is `reconciliation_required` with `company_scope_changed` among its
 reasons, and it says to load the same companies and call again; a read that shows
 a changed existing master or another company's mark moved keeps the state for
-that. A read-back that read the book,
+that, unless the limit above holds the batch open. A read-back that read the book,
 found the name absent and did not settle says that ComplyEaze Bridge cannot settle
 the batch now, because a create it sent may still be waiting in Tally; the name
 stays held, and a later call sends nothing, reads the book back, shows whether a

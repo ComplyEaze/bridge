@@ -228,17 +228,29 @@ request is predicted over a budget well below the cap.
    - Otherwise, a **census** of the window: one row per voucher carrying only `GUID`, `ALTERID` and
      `DATE` (the §12.7 witness fetch), **every census request bounded before it is sent**. A date
      range can hold every voucher the book has, so a date census is bounded only by the mark itself:
-     a book whose mark fits one census is counted in **one date census of the window**. A larger
-     book is counted in **AlterID spans across `(0, mark]`, each also narrowed to the window's
-     dates**, and each bounded by construction because AlterIDs are distinct. The spans are produced
-     one at a time, and a mark needing more than 256 of them is refused before any census is sent.
+     every census is an **AlterID span across `(0, mark]`, narrowed to the window's dates**, and
+     bounded by construction because AlterIDs are distinct. A book whose mark fits one census is
+     counted in the one span `(0, mark]`; a larger book in spans of the census's capacity. The one
+     span keeps a voucher saved after the mark was read out of the count (#2145). On five synthetic
+     books, in every window whose unspanned census held no row above the mark, the spanned answer
+     was byte-equal to the unspanned one (PARTIAL: one sitting each, 28 and 30 Oct 2026). A
+     voucher saved between the marks read and the census is outside the span, so it is caught
+     elsewhere: a part of a whole read that returns it is refused as a census mismatch, and a
+     count-only read reads the marks again after its census, one request or several, and refuses
+     a voucher mark that moved. The spans are produced one at a time, and a mark needing more than 256 of
+     them is refused before any census is sent.
    - **A census is sized against the whole transport cap,** not the half-budget: 8,192 rows at the
      planning figure of 4 KiB a row. The half-budget exists to absorb the error in an *estimated*
      data part; a census span's row count is fixed by construction, so its only uncertainty is the
      per-row figure, measured live at 2.42–2.72 KB on earlier books (§11c.5) and at about
      3.27 KB on the wire (about 1.64 KB decoded) on a book with a mark of about 1.03M (PARTIAL,
-     30-Sep-2026, bridge#899). A full census is about 22 to 27 MB of the 33.5 MB cap: about 1.25x
-     headroom on the heaviest row seen. Whether a heavier row exists is UNVERIFIED.
+     30-Sep-2026, bridge#899), and at 3.24 to 3.38 KB on three spanned reads of 1,986 to 5,029
+     rows of one real book, the widest span read so far (PARTIAL, one sitting, 2-Nov-2026,
+     bridge#899). A full census is about 22 to 27 MB of the 33.5 MB cap: about 1.25x
+     headroom on the heaviest row seen. Whether a heavier row exists is UNVERIFIED. Bytes bound a
+     span; time does not follow them: that sitting's financial year took 21.35 s for 2,022 rows
+     against 5.55 s for a month's 1,986, and a repeated day 0.035 s against 2.62 s, so no time per
+     span is read from it.
    - The cost is a census count proportional to the **book**, not the window: a mark of 250,000 is
      31 census requests however short the window. It is a cost in elapsed time, not in gateway
      safety: every request stays bounded, so a caller that abandons the read leaves at most one
@@ -391,29 +403,34 @@ request is predicted over a budget well below the cap.
 - **The empty-window corroboration reuses the first read's marks.** Its widened read (±1 day) opens
   on the marks the window's own read observed. On a book large enough to be counted it is a census of
   its own and no read of the widened window's vouchers (#1240): the census carries each voucher's day,
-  which is all the control needs. A census sent in several requests is bracketed, and then a change
-  anywhere in the company since the marks the first read opened on refuses it; one sent in a single
-  request is not. Before #1240 a widened read that the book needed in several data parts was bracketed
-  too, so a book counted in one census with a busy neighbouring day was refused on moved marks and now
-  answers from the one observation; and a widened window whose data plan exceeded the read allowance was
+  which is all the control needs. The census is bracketed whether it is sent in one request or several
+  (#2145): the company marks are read again after it, and a voucher mark that moved since the marks the
+  first read opened on refuses it. A master saved in that time does not, since a census counts vouchers.
+  A single census is spanned to the opening voucher mark, so a voucher saved after it is outside the
+  span, and only the voucher mark read again shows it. Before #1240 a widened read that the book needed
+  in several data parts was bracketed by both marks; and a widened window whose data plan exceeded the read allowance was
   refused at planning, which no longer applies because no data part is sent (a census of several spans can
-  still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before. Either way a voucher in the
-  window refuses the read as `window_contradicted` (a census of several requests whose marks moved refuses as
+  still refuse mid-census when its count passes the allowance). A book that fits one request is read whole, uncounted, as before, and is not bracketed. Either way a voucher in the
+  window refuses the read as `window_contradicted` (on a counted book, a voucher mark that moved refuses it as
   `voucher_window_changed_during_read` first), and otherwise the empty result is corroborated or
   reported partial by the existing empty-window control. **Confidence: PARTIAL**: one live run (26 Oct 2026,
   TallyPrime 7.2 Silver, two synthetic books; `RESULTS.md` on the branch `lab/1240-empty-window-live-answers` at
-  `ce849cc6`) gave the same state, reason and items as the previous build on all five windows read. On the book
+  `ce849cc6`) gave the same state, reason and items as the previous build on all five windows read. Those counts
+  are of the build before #2145, which did not bracket a census of one request. On the book
   counted in one request it sent 28 and 34 requests where the previous build sent 34 and 40, as the doubles predict.
   On the book counted in four requests it sent 76 against 76 where the widened window was empty, and 70 against 88
   (475 KB of answers against 6.08 MB) where a neighbouring day held vouchers. The run's sheet had predicted equal
   counts there, which holds only for an empty widened window. The 18 requests are three data parts of six sends each:
   the two builds' retained trails (the last 32 sends) match except that the previous build read three parts of the
   widened window after its census, of about 1.4 MB, 1.4 MB and 3 KB, each sent twice, and this build read none, as the
-  doubles expect. The counts that follow are from scripted doubles through the tool call: for a neighbour-empty widened window
-  a census of one request replaces one paired window read and so saves six requests (a census of
-  several requests adds a closing marks read, so a small widened window saves none), and with vouchers on the
-  neighbouring days it saves every part those days would have taken. The saving is counted in requests;
-  the bytes of a census and of the parts it replaces were not compared.
+  doubles expect. The counts that follow are from scripted doubles through the tool call, since #2145. Every
+  census adds a closing marks read of six requests. For a neighbour-empty widened window the census replaces
+  one paired window read, and the voucher mark read after it is also the company's mark the control decides
+  by, so the six requests of a separate marks read are not sent: the corroboration is 6k + 6 requests for a
+  census of k requests, the census and the marks read again. With vouchers on the neighbouring days it saves
+  every part those days would have taken; against a widened read that would have been undivided, which sent no
+  marks read after its parts, it costs the six of the closing marks read too. The saving is counted in requests; the bytes of a census and
+  of the parts it replaces were not compared.
 - **AlterID 0.** Every span starts above an exclusive lower bound of 0, so a voucher with AlterID 0
   could not be read by a divided day. None has been observed; a census row carrying AlterID 0 is
   refused rather than planned around.
@@ -491,6 +508,8 @@ Bridge's own reads, and nothing else was changed in between.
 | Enable cost centres, create one, make a ledger applicable | 0 | +3 | PARTIAL |
 | Regroup a ledger; change its opening balance; create a ledger; delete it | 0 | +1 each | VERIFIED |
 | Rename the base currency, then restore it (a company with no vouchers) | absent throughout | +2, then +1 | PARTIAL |
+
+Deleting a ledger with no vouchers moves only its own step: on Tally's screen the master mark rose by one and the other ledgers kept their `ALTERID`s (`lab/1713-row-s-answers`, TallyPrime 7.2 Silver, one delete; group `ALTERID`s not read). PARTIAL.
 
 Further observations from the same runs:
 
@@ -1888,5 +1907,6 @@ Not shown: a book above a few thousand ledgers (size and time), or a ledger whos
 | 2026-10-31 | §12a.23: the lines' bullet cut to six fixture items tied to the stock-item fixture, with every lab-only claim given its branch; the year-end closings were Tally's Stock Query screens, not the Stock Summary; three items, not two, answered empty at the year end; the shapes the parser still reads; a later period start and four other gaps added to Not measured. PARTIAL |
 | 2026-10-31 | §12a.23: the parser now refuses a hidden or control character in a name or quantity, a group with no line after it, and lines in more than one unit. |
 | 2026-10-31 | §12a.23: named the closed set of characters the parser refuses in a name or quantity, and added a godown name holding a tab to Not measured. |
+| 2026-11-02 | §11c.3: census bytes per row on three spanned reads of 1,986 to 5,029 rows of one real book, and that the time of one sitting did not follow the rows. PARTIAL (bridge#899) |
 | 2026-11-02 | §11c.4: the one window that sent fewer requests is explained from the run's retained trails: the three data parts of the widened window, which the census-only corroboration does not read (#1240). |
 | 2026-11-02 | §11b.2: an abandoned ledger create, with a long read or a long import in front, was seen by the read answered after it (#2176). §9.4e: for a trailing CR LF, exact bytes decided in both creation orders on 7.2 Silver (#626). |

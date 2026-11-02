@@ -3,7 +3,9 @@ use super::{TallyClient, TallyCompany, TallyConfig, TallyLedger, VerifiedCompany
 use crate::endpoint_wire::WireGateConfig;
 use crate::reports::party_ledger_master::{BalanceDateBasis, PartyLedgerMasterSource};
 use crate::tally::connection::canonical_loopback_origin;
-use crate::tally::connection::{ComplianceRead, NativePairedRead, PairedReadValidationError};
+use crate::tally::connection::{
+    ComplianceRead, ComplianceScope, NativePairedRead, PairedReadValidationError,
+};
 use crate::tally::connector::SealedReadRequest;
 use crate::tally::runtime_control::{
     CircuitRejectReason, EndpointCircuitState, EndpointIdentity, EndpointRuntimeSnapshot,
@@ -1264,6 +1266,11 @@ impl ClassifiedCompanyCurrencyRead {
         self.evidence.clone()
     }
 
+    /// The identified base of an INR book, which a composite is read against (bridge#683).
+    pub(crate) fn inr_base(self) -> Option<IdentifiedBaseCurrency> {
+        self.identified.filter(IdentifiedBaseCurrency::is_inr)
+    }
+
     /// INR for the identified base, by its mailing name; the codes are
     /// `admit_inr`'s.
     pub(crate) fn admit_inr_classified(self) -> Result<ClassifiedCurrencyWitness, &'static str> {
@@ -1819,11 +1826,9 @@ pub(crate) fn observed_opening_boundary(
 
 /// An invoice plan's reads on `client` (#1337). First the plan's precheck is
 /// asked, on the marks the queue read as its binding reads began and the
-/// currencies it read: the currency and the size limits are judged, as the
-/// build judges them, before any read of the plan is sent. When the book is
-/// over the master mark the precheck asks for the ledger count, which is read
-/// and the precheck asked again. Then the reads, in the order the admission
-/// makes them: the compliance listing, the rates, the voucher types, the
+/// currencies it read: the currency and the size limit are judged, as the
+/// build judges them, before any read of the plan is sent. Then the reads, in
+/// the order the admission makes them: the compliance listing, the rates, the voucher types, the
 /// number, the number's control, the company's registration, the company
 /// object's HSN/SAC fields and the groups' (always read here, though the build
 /// reads the groups only when a ledger's own row defers to them). Each goes
@@ -1836,7 +1841,7 @@ async fn read_invoice_plan(
     marks: &str,
     currencies: &str,
 ) -> anyhow::Result<(super::approved_import::InvoiceAnswers, RuntimeReadEvidence)> {
-    use super::approved_import::{InvoicePrecheck, InvoicePrecheckInput};
+    use super::approved_import::InvoicePrecheckInput;
     async fn paired(
         client: &TallyClient,
         identity: &VerifiedCompanyIdentity,
@@ -1854,26 +1859,11 @@ async fn read_invoice_plan(
         marks: Some(marks.to_string()),
         ..Default::default()
     };
-    let precheck = |ledger_count: Option<&str>| {
-        (plan.precheck)(&InvoicePrecheckInput {
-            marks,
-            currencies,
-            ledger_count,
-            company_name: &plan.company_name,
-            company_guid: identity.company_guid(),
-        })
-    };
-    if precheck(None)? == InvoicePrecheck::NeedsLedgerCount {
-        let count = paired(client, identity, &plan.ledger_count, &mut evidence).await?;
-        let verdict = precheck(Some(&count));
-        answers.ledger_count = Some(count);
-        // Asked with its answer, the precheck admits or refuses.
-        if verdict? == InvoicePrecheck::NeedsLedgerCount {
-            return Err(
-                super::approved_import::ApprovedImportAdmissionError::AdmissionInconsistent.into(),
-            );
-        }
-    }
+    (plan.precheck)(&InvoicePrecheckInput {
+        marks,
+        currencies,
+        company_guid: identity.company_guid(),
+    })?;
     let currency_read = read_classified_currency_with_extent(client, identity)
         .await
         .map_err(|error| with_read_evidence(error, evidence.clone()))?;
@@ -1884,7 +1874,7 @@ async fn read_invoice_plan(
         identity,
         assertion,
         &BalanceDateBasis::HostToday(plan.listing_as_of.clone()),
-        ComplianceRead::Standard,
+        &ComplianceScope::Ledgers(plan.listing_ledgers.clone()),
     )
     .await
     .map_err(|error| {
@@ -2009,7 +1999,7 @@ async fn read_party_ledger_master_source(
     identity: &VerifiedCompanyIdentity,
     currency_assertion: PartyLedgerMasterCurrencyAssertion,
     basis: &BalanceDateBasis,
-    read: ComplianceRead,
+    scope: &ComplianceScope,
 ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
     let mut evidence = RuntimeReadEvidence::empty();
     let result = async {
@@ -2022,7 +2012,7 @@ async fn read_party_ledger_master_source(
                 boundary_profile,
                 currency_assertion,
                 basis,
-                read,
+                scope,
             )
             .await?;
         evidence = TallyRuntime::party_ledger_master_source_evidence(&source, evidence.clone())
@@ -3237,19 +3227,38 @@ impl TallyRuntime {
         basis: BalanceDateBasis,
         read: ComplianceRead,
     ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
+        self.fetch_scoped_party_ledger_master_source(
+            config,
+            identity,
+            currency_assertion,
+            basis,
+            ComplianceScope::Book(read),
+        )
+        .await
+    }
+
+    async fn fetch_scoped_party_ledger_master_source(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        currency_assertion: PartyLedgerMasterCurrencyAssertion,
+        basis: BalanceDateBasis,
+        scope: ComplianceScope,
+    ) -> anyhow::Result<(PartyLedgerMasterSource, RuntimeReadEvidence)> {
         let _lease = self.begin_ordinary_read(&config)?;
         let identity = identity.clone();
         self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
             let identity = identity.clone();
             let currency_assertion = currency_assertion.clone();
             let basis = basis.clone();
+            let scope = scope.clone();
             async move {
                 read_party_ledger_master_source(
                     &client,
                     &identity,
                     currency_assertion,
                     &basis,
-                    read,
+                    &scope,
                 )
                 .await
             }
@@ -3276,6 +3285,39 @@ impl TallyRuntime {
         today: TallyDate,
         read: ComplianceRead,
     ) -> anyhow::Result<PartyLedgerMasterListing> {
+        self.fetch_scoped_agent_party_ledger_masters(
+            config,
+            identity,
+            today,
+            ComplianceScope::Book(read),
+        )
+        .await
+    }
+
+    /// The same read of only `ledgers`, with the groups whole (#1331).
+    pub(crate) async fn fetch_named_ledger_masters_with_evidence(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        today: TallyDate,
+        ledgers: bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
+    ) -> anyhow::Result<PartyLedgerMasterListing> {
+        self.fetch_scoped_agent_party_ledger_masters(
+            config,
+            identity,
+            today,
+            ComplianceScope::Ledgers(ledgers),
+        )
+        .await
+    }
+
+    async fn fetch_scoped_agent_party_ledger_masters(
+        &self,
+        config: TallyConfig,
+        identity: &VerifiedCompanyIdentity,
+        today: TallyDate,
+        scope: ComplianceScope,
+    ) -> anyhow::Result<PartyLedgerMasterListing> {
         // The classified read admits a book with several Currency masters
         // when Tally identifies an INR base (bridge#551); the source then
         // leaves foreign ledgers out by name.
@@ -3284,12 +3326,12 @@ impl TallyRuntime {
             .await?;
         let assertion = admitted_listing_assertion(&currency_read)?;
         let (source, source_evidence) = self
-            .fetch_party_ledger_master_source_with_evidence(
+            .fetch_scoped_party_ledger_master_source(
                 config,
                 identity,
                 assertion,
                 BalanceDateBasis::HostToday(today),
-                read,
+                scope,
             )
             .await
             .map_err(|error| with_read_evidence(error, currency_read.evidence()))?;
@@ -3762,7 +3804,7 @@ impl TallyRuntime {
                                 },
                                 None,
                             ) => super::approved_import::QueuedAdmission::Masters {
-                                item: masters.item(),
+                                batch: masters.batch(),
                                 company: masters.company(),
                                 ledgers_first,
                                 ledgers_second,

@@ -1834,9 +1834,17 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// changes waiting behind it add 334 bytes between them, which puts the last two lists
 /// over by 181 and 297. Those two budgets went up by 500, leaving margins of 319
 /// and 203 once all three have landed; the first two lists stay within theirs.
-/// On 2 Nov 2026 `stock_by_batch` (#2018), which is in the default list, was measured on the
-/// merged tree at 208,661, 234,680, 237,189 and 242,307 bytes, over each budget by 1,161, 1,180,
-/// 1,189 and 1,307. Each budget went up by 1,400, leaving margins of 239, 220, 211 and 93.
+/// Also on 2 Nov 2026, provenance detail came out of the `vouchers`, `masters`, `ledger_masters`
+/// and `post_import` texts, 1,298 bytes off the first list and 1,424 off the other three. On the
+/// merged tree the lists measure 205,920, 231,813, 234,322 and 239,440 bytes, leaving margins of
+/// 1,580, 1,687, 1,678 and 1,560. The budgets stay: that room is for the changes behind it.
+/// Creating several ledgers in one request added 259 bytes to the master-writes list alone,
+/// measured on the merged tree: the lists are 205,920, 231,813, 234,322 and 239,699 bytes,
+/// leaving margins of 1,580, 1,687, 1,678 and 1,301.
+/// `stock_by_batch` (#2018), in the default list, adds 1,714 bytes to each list: on the merged
+/// tree they measure 207,634, 233,527, 236,036 and 241,413, over by 134, 27, 36 and 413. Each
+/// budget went up by 1,400. The e-invoice argument (#1378) and the review of a twin ledger (#626)
+/// add 362 bytes between them, leaving margins of 904, 1,011, 1,002 and 625 once all have landed.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [208_900, 234_900, 237_400, 242_400];

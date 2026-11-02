@@ -1268,6 +1268,17 @@ fn the_markdown_proof_follows_the_verification_status() {
     );
     assert!(clean.contains("- Duplicates in this batch: 0"), "{clean}");
     assert!(!clean.contains("| Duplicate in this batch |"), "{clean}");
+    // #2152: the saved proof's note that no dispatch is on record is shown, and
+    // it is a line, not a banner.
+    assert!(!clean.contains("Dispatch record"), "{clean}");
+    let mut unsent = proof(Some("posted_verified"), json!([]));
+    verification::mark_found_not_sent(&mut unsent);
+    let unsent = render_proof_markdown(&unsent);
+    assert!(
+        unsent.contains("- Dispatch record: none on this computer — found in the book, not sent by ComplyEaze Bridge\n"),
+        "{unsent}"
+    );
+    assert!(!unsent.contains(banner), "{unsent}");
     // Not verified with no duplicates, or no status at all, is not clean either:
     // the banner follows the status, not the duplicate list. With no dispatch
     // record Bridge did not send the batch, so the banner forbids no resend.
@@ -2613,6 +2624,66 @@ pub(super) fn lab_invoice_rates_hsn() -> &'static [u8] {
     })
 }
 
+/// DERIVED, not Tally's bytes: a compliance answer of the whole book cut to an
+/// invoice's ledgers by [`rates_cut_to`], the answer to the listing the code reads
+/// for them by GUID (#1331). On 31 Oct 2026 the lab's answers to those two
+/// requests, for five ledgers of this company at 18, 10,018 and 20,018 ledgers,
+/// held exactly those rows, each equal to its row of the whole read at 18
+/// (`lab/1331-scoped-masters-answers`, g4 and g5). Those answers are not in this
+/// tree, so no test holds the cut to them.
+fn listing_cut_to(
+    cell: &'static std::sync::OnceLock<Vec<u8>>,
+    answer: &[u8],
+    legs: &[&str],
+) -> &'static [u8] {
+    cell.get_or_init(|| {
+        rates_cut_to(&utf16le(answer), legs)
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect()
+    })
+}
+
+/// The compliance master answer for `BP/26-27/0010` ([`listing_cut_to`]).
+pub(super) fn lab_invoice_listing() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
+        &LAB_INVOICE_LEGS,
+    )
+}
+
+/// The compliance balance answer for `BP/26-27/0010` ([`listing_cut_to`]).
+pub(super) fn lab_invoice_balances() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
+        &LAB_INVOICE_LEGS,
+    )
+}
+
+/// The compliance master answer for the W18 invoice ([`listing_cut_to`]).
+pub(super) fn w18_invoice_listing() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-compliance.utf16le.xml"),
+        &W18_INVOICE_LEGS,
+    )
+}
+
+/// The compliance balance answer for the W18 invoice ([`listing_cut_to`]).
+pub(super) fn w18_invoice_balances() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    listing_cut_to(
+        &BYTES,
+        include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledgers-paired.utf16le.xml"),
+        &W18_INVOICE_LEGS,
+    )
+}
+
 /// The sha256 of the rates read the code sends for `BP/26-27/0010`: the request
 /// the lab answered on 31 Oct 2026 (`pilot-lab-ledger-rates-guid.request`) with
 /// only its GUIDs changed to the six ledgers' (DERIVED: the shape is the lab's;
@@ -3863,6 +3934,9 @@ mod mode_tests;
 
 #[path = "agent_import_invoice_admission_tests.rs"]
 mod invoice_admission_tests;
+
+#[path = "agent_import_amount_pin_tests.rs"]
+mod amount_pin_tests;
 
 #[test]
 fn voucher_and_import_read_filters_use_literal_dates_independently_of_static_periods() {
@@ -6265,6 +6339,40 @@ async fn numbered_journal_built_against(plans: Vec<ScenarioPlan>) -> (Value, usi
     )
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, a build is refused under the admission lock: it writes no file and
+/// no journal record, and the copy is left as it was.
+#[tokio::test]
+async fn a_build_beside_a_second_journal_is_refused_and_writes_nothing() {
+    use super::split_journal::{tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA};
+    let at = layout();
+    let other = at.copy.join(super::local_data::JOURNAL_FILE);
+    fs::write(&other, super::local_data::tests::journal(true)).unwrap();
+    let simulator =
+        SequenceSimulator::spawn(whole_build(build_numbering_plans(&[]))).expect("build plan");
+    let server = numbering_server(&at.data, simulator.address().port());
+    let mut input = captured_catalogue_payload();
+    input.vouchers.truncate(1);
+    input.vouchers[0].voucher_number = Some("TEST-1".into());
+    let failure = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            server.build_import_xml(&serde_json::to_value(input).unwrap()),
+        )
+        .await
+        .err()
+        .expect("refused");
+    simulator.cancel();
+    assert_eq!(failure.code, IMPORT_JOURNAL_SPLIT);
+    assert_eq!(failure.cause, Some(SplitJournal::OtherHoldsBatches.cause()));
+    assert_eq!(written_files(&at.data), 0);
+    assert!(!at.data.join(super::local_data::JOURNAL_FILE).exists());
+    assert_eq!(
+        fs::read(&other).unwrap(),
+        super::local_data::tests::journal(true)
+    );
+}
+
 /// The numbering read with the Journal type numbered Manual and its series'
 /// duplicate setting read as prevented (the capture reads it as not).
 fn manual_journal_preventing_duplicates() -> Vec<ScenarioPlan> {
@@ -6538,11 +6646,11 @@ async fn the_build_names_the_route_at_the_batch_limit_and_never_both_routes() {
             assert!(next_step.starts_with("Tell the user that this connection cannot post."));
             for text in [first, next_step] {
                 assert!(
-                    text.contains("once this batch is posted, do not import this file"),
+                    text.contains("Once this batch is posted, do not import this file"),
                     "{text}"
                 );
                 assert!(
-                    text.contains("once this file is imported, do not post this batch"),
+                    text.contains("If this file is imported first, post_import"),
                     "{text}"
                 );
             }

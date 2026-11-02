@@ -194,7 +194,7 @@ async fn refusal_ending_with(
             DateBoundaryProfile::ModeAgnostic,
             assertion,
             &BalanceDateBasis::HostToday(TallyDate::parse("20990101").unwrap()),
-            read,
+            &crate::tally::connection::ComplianceScope::Book(read),
         ),
     )
     .await

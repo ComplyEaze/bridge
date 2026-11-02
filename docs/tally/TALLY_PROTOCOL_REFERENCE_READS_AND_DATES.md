@@ -614,6 +614,15 @@ Every other composite kept a whole or empty rate. The 7.2 layout (the foreign sy
 digits) is otherwise unchanged. Bridge sets such a balance aside by name and never reads its rate
 (`currency_composite::is_unspaced_currency_composite`, bridge#2228).
 
+**A voucher on TallyPrime 7.2 writes the same layout (PARTIAL: one synthetic book, one read of one
+day, `lab/683-v72-voucher-answers`, the fixture `vouchers-forex-unspaced-20250401`).** Eleven vouchers
+of 1 April 2025, eight with composites: each entry's and bill allocation's `AMOUNT` is
+`-$100.00 @ ₹ 86/$ = -₹ 8600.00`, and `VATEXPAMOUNT` repeats it. A keyed rate of 86.4125 is written
+as `86.4125`. Each voucher's entries net to zero on the amounts after `=`, and on every composite
+there that amount is the foreign amount times the rate exactly, so no rounding case is shown.
+`vouchers` reads the amount after `=`, and leaves a voucher withheld when they do not net to zero
+(bridge#683).
+
 **Adding the field changes nothing else.** On FOREX the response was otherwise byte-identical to
 the same request without it. The same holds for the native Trial Balance request
 (`TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING` plus `CURRENCYNAME`): measured on FOREX and

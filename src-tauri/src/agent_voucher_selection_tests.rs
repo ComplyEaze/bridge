@@ -603,6 +603,7 @@ async fn call_filtered_vouchers_args(
     max_bytes: usize,
     redaction: Redaction,
 ) -> Value {
+    let composites = window.contains(" @ ");
     let vouchers = ScenarioPlan::new(Fixture::SyntheticXml(window))
         .with_encoding(WireEncoding::Utf16Le)
         .with_framing(ResponseFraming::ContentLength);
@@ -612,10 +613,12 @@ async fn call_filtered_vouchers_args(
     // The census of the window (#1029), then the window itself.
     plans.extend(paired_with(&cycle, &vouchers));
     plans.extend(paired_with(&cycle, &vouchers));
+    plans.extend(composites.then(unreadable_base_plan));
+    let second_catalogue = plans.len();
     plans.extend(cycle[4..10].iter().cloned());
-    // The two catalogue reads: legs 5 and 7, then 29 and 31 after the six
-    // marks, six census and six window legs.
-    for index in [5, 7, 29, 31] {
+    // The two catalogue reads: legs 5 and 7, then the second set after the six
+    // marks, six census and six window legs and any base read.
+    for index in [5, 7, second_catalogue + 1, second_catalogue + 3] {
         let body = catalogue(&plans[index].fixture.body());
         plans[index].fixture = Fixture::SyntheticXml(body);
     }
@@ -954,6 +957,13 @@ fn decoded(bytes: &[u8]) -> String {
 /// Voucher 1 of the captured three-voucher window made a composite one.
 fn window_with_a_composite_voucher() -> String {
     window_with_composite_vouchers(1)
+}
+
+/// The first leg of a base read that fails, as one with no answer does: the voucher stays withheld.
+fn unreadable_base_plan() -> ScenarioPlan {
+    ScenarioPlan::new(Fixture::SyntheticXml("<ENVELOPE></ENVELOPE>".to_string()))
+        .with_encoding(WireEncoding::Utf16Le)
+        .with_framing(ResponseFraming::ContentLength)
 }
 
 /// The `vouchers` plans of a small book (marks, census, window), each of the last two serving `window`.

@@ -985,9 +985,8 @@ redaction setting hides it, so the tool is refused as `audit_redaction_unsupport
 
 Refusals: `audit_part_deadline_exceeded` (a part ran past the 20 seconds a request is given; the same
 request would be sent again and Tally may still be building the abandoned answer, so do not retry as it
-stands), `audit_part_drain_required` (a previous request was abandoned, in this call or an earlier one,
-and Tally may still be building its answer: nothing was sent. ComplyEaze Bridge does not yet probe Tally to
-clear that, so the refusal stays until ComplyEaze Bridge is restarted; look at Tally first), `C6-moved`
+stands), `tally_endpoint_draining` (an earlier request was cut, and Tally has not yet answered that it has finished:
+the request was not sent. Call again after `retry_after_s` seconds), `C6-moved`
 and `voucher_window_changed_during_read` (someone changed the book during the read: it may be tried
 again), `audit_window_divided_by_alterid` (a day too heavy for one request: the read is refused, because
 the engine's windows must tile the period by date; refused before any voucher is read when the count

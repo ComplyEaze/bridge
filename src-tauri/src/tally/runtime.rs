@@ -262,25 +262,6 @@ async fn fetch_admitted_agent_read(
 pub(crate) const AUDIT_PART_DEADLINE: std::time::Duration =
     bridge_tally_transport::DEFAULT_REQUEST_TIMEOUT;
 
-/// Each drain probe gets its own short deadline. That makes an unanswered probe
-/// give up sooner; it does not stop the probe reaching Tally, which is why
-/// probes are also spaced and capped below.
-const AUDIT_DRAIN_PROBE_DEADLINE: std::time::Duration = std::time::Duration::from_secs(5);
-/// A probe answered more slowly than this does not count towards the drain.
-const AUDIT_DRAIN_PROBE_SLOW: std::time::Duration = std::time::Duration::from_secs(2);
-/// Consecutive quick probe answers that clear a drain debt.
-const AUDIT_DRAIN_QUICK_PROBES: u8 = 2;
-/// The least time between two probes of one endpoint.
-const AUDIT_DRAIN_PROBE_INTERVAL: std::time::Duration = std::time::Duration::from_secs(10);
-/// Probes that went unanswered before the runtime stops probing and needs the
-/// operator. Repeated silence is not "Tally is down": a modal dialog on the
-/// Tally screen looks the same, and more requests only queue behind it.
-const AUDIT_DRAIN_ABANDONED_PROBES: u8 = 2;
-/// A probe started longer ago than this and never finished was dropped by its
-/// caller: it counts as abandoned, and another may be sent. Generous, because a
-/// live probe can wait up to the endpoint queue's 30 s before its own 5 s.
-const AUDIT_DRAIN_PROBE_STALE: std::time::Duration = std::time::Duration::from_secs(60);
-
 /// How an audit_read part is read. Voucher parts are read once; masters are
 /// read twice and admitted only when the two responses match byte for byte.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -321,9 +302,6 @@ pub(crate) struct AuditPart {
 /// whole or not at all.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AuditPartFailureKind {
-    /// A previous response was abandoned and Tally may still be building it.
-    /// Nothing was sent.
-    DrainRequired,
     /// The request did not name exactly the verified company. Nothing was sent.
     RequestNotCompanyScoped,
     Deadline,
@@ -362,7 +340,6 @@ pub(crate) enum AuditPartFailureKind {
 impl AuditPartFailureKind {
     pub(crate) const fn code(self) -> &'static str {
         match self {
-            Self::DrainRequired => "audit_part_drain_required",
             Self::RequestNotCompanyScoped => "audit_part_request_not_company_scoped",
             Self::Deadline => "audit_part_deadline_exceeded",
             Self::SizeLimit => "audit_part_response_size_limit_exceeded",
@@ -386,29 +363,12 @@ impl AuditPartFailureKind {
     pub(crate) const fn retryable(self) -> bool {
         matches!(
             self,
-            Self::DrainRequired
-                | Self::Deadline
+            Self::Deadline
                 | Self::ConnectionDropped
                 | Self::Cancelled
                 | Self::Unreachable
                 | Self::NotSent(_)
                 | Self::PairDrift
-        )
-    }
-
-    /// Whether Bridge may have stopped listening before Tally finished
-    /// answering, so Tally may still be building or sending the response. A
-    /// client deadline does not stop Tally working (the lab gateway stayed
-    /// busy for over 40 minutes after one abandoned read), so no later audit
-    /// part is sent to that endpoint until it has been drained.
-    pub(crate) const fn owes_drain(self) -> bool {
-        matches!(
-            self,
-            Self::Deadline
-                | Self::ConnectionDropped
-                | Self::SizeLimit
-                | Self::HeadRejected(_)
-                | Self::Cancelled
         )
     }
 }
@@ -433,141 +393,10 @@ impl AuditPartFailure {
     }
 }
 
-/// Where an endpoint's drain stands after [`TallyRuntime::drain_probe`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum AuditDrainStatus {
-    Clear,
-    Owed {
-        quick_probes: u8,
-        abandoned_probes: u8,
-    },
-    /// No probe was sent: the last one was too recent.
-    Wait {
-        retry_after: std::time::Duration,
-    },
-    /// No probe was sent, and none will be: probes went unanswered too often.
-    /// Someone must look at the Tally screen, and restart Tally if it is
-    /// stuck, before [`TallyRuntime::clear_audit_drain_after_operator_check`].
-    OperatorRequired,
-}
-
-/// One endpoint's drain debt. `ticket` names the part that armed it; an armed
-/// part clears only its own entry.
-#[derive(Clone, Copy, Debug)]
-struct AuditDrainDebt {
-    ticket: u64,
-    /// Armed by a part that has not settled. A part whose future was dropped
-    /// never settles, so its debt stays owed.
-    in_flight: bool,
-    quick_probes: u8,
-    abandoned_probes: u8,
-    last_probe: Option<Instant>,
-    /// When a probe for this debt was started and has not finished. A
-    /// concurrent call sends nothing; a start older than
-    /// `AUDIT_DRAIN_PROBE_STALE` was dropped by its caller.
-    probe_started: Option<Instant>,
-}
-
-impl AuditDrainDebt {
-    fn armed(ticket: u64) -> Self {
-        Self {
-            ticket,
-            in_flight: true,
-            quick_probes: 0,
-            abandoned_probes: 0,
-            last_probe: None,
-            probe_started: None,
-        }
-    }
-}
-
-type AuditDrainRegistry = Arc<Mutex<HashMap<EndpointKey, AuditDrainDebt>>>;
-
-/// The registry holds plain counters that no update leaves half-written, so a
-/// poisoned lock is recovered rather than refusing every endpoint forever.
-fn audit_drain_lock(
-    registry: &AuditDrainRegistry,
-) -> std::sync::MutexGuard<'_, HashMap<EndpointKey, AuditDrainDebt>> {
-    registry
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
-/// Names each armed part, so a part settles only the debt it armed.
-static AUDIT_DRAIN_TICKET: AtomicU64 = AtomicU64::new(1);
-
-/// Raised inside the endpoint gate when a drain became owed while this part
-/// was queued behind the part that abandoned a response.
-#[derive(Debug, thiserror::Error)]
-#[error("audit_part_drain_required")]
-struct AuditDrainOwedAtDispatch;
-
 /// A complete response whose export status was not success.
 #[derive(Debug, thiserror::Error)]
 #[error("audit_part_response_rejected")]
 struct AuditResponseRejected;
-
-/// Arm this endpoint's drain for `ticket` immediately before anything is sent,
-/// inside the endpoint gate, refusing if any debt is already recorded.
-fn arm_audit_drain(
-    registry: &AuditDrainRegistry,
-    endpoint: &EndpointKey,
-    ticket: u64,
-) -> anyhow::Result<()> {
-    let mut owed = audit_drain_lock(registry);
-    if owed.contains_key(endpoint) {
-        return Err(AuditDrainOwedAtDispatch.into());
-    }
-    owed.insert(endpoint.clone(), AuditDrainDebt::armed(ticket));
-    Ok(())
-}
-
-/// A part's armed debt. The part settles it with what it knows; if the part's
-/// future is dropped first (a caller timeout, a cancel, an abort), dropping the
-/// guard leaves the debt owed. So `in_flight` means a part that is still
-/// running, never one that was abandoned.
-struct ArmedAuditDrain {
-    registry: AuditDrainRegistry,
-    endpoint: EndpointKey,
-    ticket: u64,
-    settled: bool,
-}
-
-impl ArmedAuditDrain {
-    fn settle(mut self, owed_now: bool) {
-        self.settled = true;
-        settle_audit_drain(&self.registry, &self.endpoint, self.ticket, owed_now);
-    }
-}
-
-impl Drop for ArmedAuditDrain {
-    fn drop(&mut self) {
-        if !self.settled {
-            settle_audit_drain(&self.registry, &self.endpoint, self.ticket, true);
-        }
-    }
-}
-
-/// Settle the entry `ticket` armed: remove it when nothing was left running in
-/// Tally, or keep it as an owed debt when something may have been.
-fn settle_audit_drain(
-    registry: &AuditDrainRegistry,
-    endpoint: &EndpointKey,
-    ticket: u64,
-    owed_now: bool,
-) {
-    let mut owed = audit_drain_lock(registry);
-    match owed.get_mut(endpoint) {
-        Some(debt) if debt.ticket == ticket && debt.in_flight => {
-            if owed_now {
-                debt.in_flight = false;
-            } else {
-                owed.remove(endpoint);
-            }
-        }
-        _ => {}
-    }
-}
 
 /// Whether `request` names exactly one `SVCURRENTCOMPANY`, in
 /// `ENVELOPE/BODY/DESC/STATICVARIABLES` where Tally reads it, equal to the
@@ -625,11 +454,6 @@ fn request_scopes_company(request: &str, company: &str) -> bool {
 
 fn classify_audit_part_failure(error: &anyhow::Error) -> AuditPartFailure {
     let kind = if error
-        .chain()
-        .any(|cause| cause.is::<AuditDrainOwedAtDispatch>())
-    {
-        AuditPartFailureKind::DrainRequired
-    } else if error
         .chain()
         .any(|cause| cause.is::<EducationBoundaryRefusal>())
     {
@@ -2674,13 +2498,6 @@ struct SessionSlot {
 #[derive(Clone)]
 pub struct TallyRuntime {
     sessions: Arc<Mutex<HashMap<EndpointKey, SessionSlot>>>,
-    /// Endpoints owed a drain after an abandoned audit part, with the count of
-    /// consecutive quick probe answers so far. Kept here, not on a session,
-    /// because a session can be evicted while Tally is still busy.
-    audit_drain: AuditDrainRegistry,
-    audit_drain_probe_interval: std::time::Duration,
-    audit_drain_probe_stale: std::time::Duration,
-    audit_drain_probe_slow: std::time::Duration,
     control: PortableReadRuntime,
     /// The per-port wire lock every session's client gates its sends on
     /// (`endpoint_wire`).
@@ -2811,10 +2628,6 @@ impl TallyRuntime {
     pub(crate) fn ungated() -> Self {
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            audit_drain: Arc::new(Mutex::new(HashMap::new())),
-            audit_drain_probe_interval: AUDIT_DRAIN_PROBE_INTERVAL,
-            audit_drain_probe_stale: AUDIT_DRAIN_PROBE_STALE,
-            audit_drain_probe_slow: AUDIT_DRAIN_PROBE_SLOW,
             control: PortableReadRuntime::default(),
             wire: WireGateConfig::default(),
             terms: None,
@@ -3540,23 +3353,11 @@ impl TallyRuntime {
     /// One audit_read part: a single attempt, bracketed by the complete company
     /// identity, whose response entity is kept byte-for-byte.
     ///
-    /// Nothing partial is ever returned. The drain debt is armed inside the
-    /// endpoint gate immediately before anything is sent, and cleared only when
-    /// the part settles with nothing left running in Tally. So a part that
-    /// abandons a response, is cancelled, or whose future is dropped leaves the
-    /// endpoint owed, and every later audit part to it, including one already
-    /// queued, is refused without sending anything until [`Self::drain_probe`]
-    /// clears it.
+    /// Nothing partial is ever returned. A part that may have left Tally working
+    /// owes the drain on the endpoint's wire record, which every later post to
+    /// that port meets first, from any process.
     ///
     /// What this does not do, and a caller must:
-    /// - Other runtime reads (`fetch_agent_read`, status, catalogue reads)
-    ///   ignore the debt. A caller must send no other read to the endpoint
-    ///   while a debt is owed.
-    /// - The debt lives in this process's memory. It is not shared with another
-    ///   Bridge process on the same machine and does not survive a restart.
-    ///   It is keyed by the canonical loopback origin, so `127.0.0.1` and
-    ///   `localhost` share one debt, but another spelling of the same instance
-    ///   would not.
     /// - It proves nothing about the state of the book between the brackets
     ///   (see [`AuditPart`]).
     /// - A part whose window Education would not honour is refused as
@@ -3576,224 +3377,22 @@ impl TallyRuntime {
         request: super::agent_read_request::AgentReadRequest,
         shape: AuditPartShape,
     ) -> Result<AuditPart, AuditPartFailure> {
-        let endpoint = EndpointKey::from_config(&config)
-            .map_err(|_| AuditPartFailure::new(AuditPartFailureKind::Other("endpoint_invalid")))?;
         if !request_scopes_company(&request.clone().into_xml(), identity.display_name()) {
             return Err(AuditPartFailure::new(
                 AuditPartFailureKind::RequestNotCompanyScoped,
             ));
         }
-        if self.audit_drain_owed(&endpoint) {
-            return Err(AuditPartFailure::new(AuditPartFailureKind::DrainRequired));
-        }
         let _lease = self
             .begin_ordinary_read(&config)
             .map_err(|error| classify_audit_part_failure(&error))?;
-        let ticket = AUDIT_DRAIN_TICKET.fetch_add(1, Ordering::Relaxed);
-        let registry = Arc::clone(&self.audit_drain);
         let identity = identity.clone();
-        let armed_endpoint = endpoint;
-        let result = self
-            .execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
-                let identity = identity.clone();
-                let request = request.clone();
-                let registry = Arc::clone(&registry);
-                let endpoint = armed_endpoint.clone();
-                async move {
-                    arm_audit_drain(&registry, &endpoint, ticket)?;
-                    let armed = ArmedAuditDrain {
-                        registry,
-                        endpoint,
-                        ticket,
-                        settled: false,
-                    };
-                    match fetch_admitted_audit_part(&client, &identity, request, shape).await {
-                        Ok(part) => {
-                            armed.settle(false);
-                            Ok(part)
-                        }
-                        Err(error) => {
-                            armed.settle(classify_audit_part_failure(&error).kind.owes_drain());
-                            Err(error)
-                        }
-                    }
-                }
-            })
-            .await;
-        // An armed part has settled its own debt inside the gate, or left it
-        // owed by being dropped; a failure before arming sent nothing.
-        result.map_err(|error| classify_audit_part_failure(&error))
-    }
-
-    /// At most one status probe, with its own short deadline, towards clearing
-    /// an endpoint's drain debt.
-    ///
-    /// - The debt clears only after `AUDIT_DRAIN_QUICK_PROBES` consecutive
-    ///   probes each answered within `AUDIT_DRAIN_PROBE_SLOW`. A slow, failed
-    ///   or unanswered probe starts the count again.
-    /// - Probes are spaced at least `AUDIT_DRAIN_PROBE_INTERVAL` apart; a call
-    ///   sooner sends nothing and returns [`AuditDrainStatus::Wait`].
-    /// - After `AUDIT_DRAIN_ABANDONED_PROBES` unanswered probes, no more are
-    ///   sent until the operator has looked at Tally
-    ///   ([`AuditDrainStatus::OperatorRequired`]).
-    /// - Sends nothing when nothing is owed.
-    ///
-    /// Unmeasured premise, for live qualification: that Tally answers
-    /// `/status` quickly only once it has finished building an abandoned
-    /// response. Protocol reference §1.2 (a modal error dialog blocks the
-    /// gateway) records `/status` answering nothing while a dialog is open.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by the audit_read orchestrator, plan step 7")
-    )]
-    pub(crate) async fn drain_probe(&self, config: TallyConfig) -> AuditDrainStatus {
-        let Ok(endpoint) = EndpointKey::from_config(&config) else {
-            return AuditDrainStatus::OperatorRequired;
-        };
-        let captured = {
-            let mut owed = audit_drain_lock(&self.audit_drain);
-            let Some(debt) = owed.get_mut(&endpoint) else {
-                return AuditDrainStatus::Clear;
-            };
-            if debt.abandoned_probes >= AUDIT_DRAIN_ABANDONED_PROBES {
-                return AuditDrainStatus::OperatorRequired;
-            }
-            // A part is still running and has not settled: there is nothing to
-            // drain yet, and a probe now would only queue behind it.
-            if debt.in_flight {
-                return AuditDrainStatus::Wait {
-                    retry_after: self.audit_drain_probe_interval,
-                };
-            }
-            if let Some(started) = debt.probe_started {
-                let running = started.elapsed();
-                if running < self.audit_drain_probe_stale {
-                    return AuditDrainStatus::Wait {
-                        retry_after: self.audit_drain_probe_stale - running,
-                    };
-                }
-                // Its caller stopped waiting; the request may still be queued
-                // behind a busy responder. Count it, then carry on.
-                debt.probe_started = None;
-                debt.quick_probes = 0;
-                debt.abandoned_probes = debt.abandoned_probes.saturating_add(1);
-                if debt.abandoned_probes >= AUDIT_DRAIN_ABANDONED_PROBES {
-                    return AuditDrainStatus::OperatorRequired;
-                }
-            }
-            if let Some(last) = debt.last_probe {
-                let since = last.elapsed();
-                if since < self.audit_drain_probe_interval {
-                    return AuditDrainStatus::Wait {
-                        retry_after: self.audit_drain_probe_interval - since,
-                    };
-                }
-            }
-            debt.last_probe = Some(Instant::now());
-            debt.probe_started = Some(Instant::now());
-            (debt.ticket, debt.in_flight)
-        };
-        let outcome = match self.begin_ordinary_read(&config) {
-            Ok(_lease) => self
-                .execute(
-                    config,
-                    ReadRetryPolicy::SINGLE_ATTEMPT,
-                    |client| async move {
-                        let started = Instant::now();
-                        tokio::time::timeout(AUDIT_DRAIN_PROBE_DEADLINE, client.status_probe())
-                            .await
-                            .map_err(|_| TallyTransportError::RequestTimedOut)??;
-                        Ok(started.elapsed())
-                    },
-                )
-                .await
-                .map_err(|error| classify_audit_part_failure(&error).kind),
-            Err(_) => Err(AuditPartFailureKind::NotSent("endpoint_read_reserved")),
-        };
-        let mut owed = audit_drain_lock(&self.audit_drain);
-        let Some(debt) = owed.get_mut(&endpoint) else {
-            return AuditDrainStatus::Clear;
-        };
-        debt.probe_started = None;
-        // A probe counts only towards the debt it was sent for.
-        if (debt.ticket, debt.in_flight) != captured {
-            return AuditDrainStatus::Owed {
-                quick_probes: debt.quick_probes,
-                abandoned_probes: debt.abandoned_probes,
-            };
-        }
-        match outcome {
-            Ok(elapsed) if elapsed <= self.audit_drain_probe_slow => {
-                debt.quick_probes = debt.quick_probes.saturating_add(1);
-            }
-            Ok(_) => debt.quick_probes = 0,
-            Err(kind) => {
-                debt.quick_probes = 0;
-                if kind.owes_drain() {
-                    debt.abandoned_probes = debt.abandoned_probes.saturating_add(1);
-                }
-            }
-        }
-        if debt.quick_probes >= AUDIT_DRAIN_QUICK_PROBES {
-            owed.remove(&endpoint);
-            return AuditDrainStatus::Clear;
-        }
-        if debt.abandoned_probes >= AUDIT_DRAIN_ABANDONED_PROBES {
-            return AuditDrainStatus::OperatorRequired;
-        }
-        AuditDrainStatus::Owed {
-            quick_probes: debt.quick_probes,
-            abandoned_probes: debt.abandoned_probes,
-        }
-    }
-
-    /// Clear an endpoint's drain debt after the operator has looked at the
-    /// Tally screen and, if it was stuck, restarted Tally. Only for a debt
-    /// that reached [`AuditDrainStatus::OperatorRequired`].
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by the audit_read orchestrator, plan step 7")
-    )]
-    pub(crate) fn clear_audit_drain_after_operator_check(&self, config: &TallyConfig) -> bool {
-        let Ok(endpoint) = EndpointKey::from_config(config) else {
-            return false;
-        };
-        let mut owed = audit_drain_lock(&self.audit_drain);
-        match owed.get(&endpoint) {
-            Some(debt) if debt.abandoned_probes >= AUDIT_DRAIN_ABANDONED_PROBES => {
-                owed.remove(&endpoint);
-                true
-            }
-            _ => false,
-        }
-    }
-
-    /// Whether a settled debt is owed. A part still in flight is not a debt
-    /// yet: a later part waits behind it in the endpoint queue and is checked
-    /// again at dispatch ([`arm_audit_drain`]), where an in-flight entry left
-    /// by a dropped part also refuses.
-    fn audit_drain_owed(&self, endpoint: &EndpointKey) -> bool {
-        audit_drain_lock(&self.audit_drain)
-            .get(endpoint)
-            .is_some_and(|debt| !debt.in_flight)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_audit_drain_probe_slow(mut self, slow: std::time::Duration) -> Self {
-        self.audit_drain_probe_slow = slow;
-        self
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_audit_drain_probe_stale(mut self, stale: std::time::Duration) -> Self {
-        self.audit_drain_probe_stale = stale;
-        self
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_audit_drain_probe_interval(mut self, interval: std::time::Duration) -> Self {
-        self.audit_drain_probe_interval = interval;
-        self
+        self.execute(config, ReadRetryPolicy::SINGLE_ATTEMPT, move |client| {
+            let identity = identity.clone();
+            let request = request.clone();
+            async move { fetch_admitted_audit_part(&client, &identity, request, shape).await }
+        })
+        .await
+        .map_err(|error| classify_audit_part_failure(&error))
     }
 
     /// One approved mutation through the shared endpoint queue. The durable

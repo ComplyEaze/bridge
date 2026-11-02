@@ -4664,9 +4664,9 @@ async fn an_audit_window_the_book_changed_under_is_retryable() {
 }
 
 /// A part whose connection drops stops the window at that part, typed with the
-/// part's kind, and the endpoint then owes a drain: no later window reads.
+/// part's kind.
 #[tokio::test]
-async fn an_audit_window_stops_at_a_dropped_part_and_owes_a_drain() {
+async fn an_audit_window_stops_at_a_dropped_part() {
     let mut reads = divided_window_reads(marks_plan(3, 7));
     reads[2] = reads[2].clone().with_delivery(
         tally_protocol_simulator::Delivery::ResetAfterRequestProcessed {
@@ -4674,7 +4674,7 @@ async fn an_audit_window_stops_at_a_dropped_part_and_owes_a_drain() {
         },
     );
     let runtime = TallyRuntime::default();
-    let (outcome, retained, failure, observed, config) = read_audit_window(
+    let (outcome, retained, failure, observed, _) = read_audit_window(
         single(&marks_plan(3, 7))
             .into_iter()
             .chain(reads.iter().take(3).flat_map(single).take(8))
@@ -4694,35 +4694,6 @@ async fn an_audit_window_stops_at_a_dropped_part_and_owes_a_drain() {
     // failed window yields no retained reads.
     assert!(retained.is_none());
     assert_eq!(observed.len(), 11);
-    // A second window to the same endpoint is refused before sending anything:
-    // the drain debt is keyed by endpoint, and the check precedes any request,
-    // so it holds even with nothing listening there any more.
-    let reader = AuditWindowReader::new(&runtime, config);
-    let identity = identity();
-    let again = read_voucher_window_with(
-        &reader,
-        &identity,
-        identity.display_name(),
-        &tally_date("20260801"),
-        &tally_date("20260802"),
-        VoucherReadShape::EntryWildcard,
-        WindowPlanSource::Estimate { known_marks: None },
-        three_a_read(),
-        |xml| parse_agent_rows(xml, GUID),
-    )
-    .await;
-    let again_failure = again
-        .as_ref()
-        .err()
-        .map(|failure| audit_window_failure(failure, &reader));
-    assert!(again.is_err());
-    assert!(reader.into_retained(&again).is_none());
-    assert_eq!(
-        again_failure,
-        Some(AuditWindowFailure::Part(
-            crate::tally::runtime::AuditPartFailureKind::DrainRequired
-        ))
-    );
 }
 
 /// A later part is planned at the cost the first part measured, and the audit

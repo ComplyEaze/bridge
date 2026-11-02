@@ -2536,14 +2536,6 @@ impl TallyClient {
         Ok(first)
     }
 
-    /// The smallest request Tally answers: its status page. Used to learn
-    /// whether a responder that was left building an abandoned response has
-    /// finished; it proves nothing else.
-    pub(crate) async fn status_probe(&self) -> anyhow::Result<()> {
-        self.http.get_status_decoded().await?;
-        Ok(())
-    }
-
     fn record_observed_encoding(&self, encoding: TallyTextEncoding) {
         let value = match encoding {
             TallyTextEncoding::Utf8 => ENCODING_UTF8,

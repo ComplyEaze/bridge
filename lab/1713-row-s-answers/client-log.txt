@@ -1,0 +1,13 @@
+2026-11-02T16:28:28Z exe sha256 15c423e05b8d057d25370ea169809a5e79dc530fb677929d34bc42d5cf96987b ok; launch-env.json sha256 25a7781acd6b64732f566c1a07f55c6e39a353b1131d577db72524b6e00e9311; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_MASTER_WRITES', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-02T16:28:28Z launched pid 27592; stderr to server-stderr-20261102T162828Z.log
+2026-11-02T16:28:28Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-02T16:28:33Z 000-tools.json tool=list secs=0.017 isError=None error=None saved_sha256=26980a299dc5d6d5ef918e7453b942cfffc1d7d87eac4e06703562edf8dcc4e0
+2026-11-02T16:28:34Z 001-companies.json tool=list_companies secs=0.126 isError=False error=None saved_sha256=7c6c6c95b5f896db9e3d9b33de5845a2ebf2206d3b6880ea17ea9032886aabd6
+2026-11-02T16:28:35Z 002-status.json tool=tally_status secs=0.091 isError=False error=None saved_sha256=6b9074926fe731efc3e11faee0024fd3a75710c1d86a91660cf7552da8ef1fb6
+2026-11-02T16:28:43Z 003-s2-prepare.json tool=prepare_ledger_creates secs=0.065 isError=True error=None saved_sha256=4fe3473decd0f96b1e2e8e58fc31c757545c451d139c4cc1272c67ebb06513d6
+2026-11-02T16:28:53Z 004-s2-prepare2.json tool=prepare_ledger_creates secs=1.347 isError=False error=None saved_sha256=564d568efdc5803b4d32c08327f1afca03f068c1e7338d62cd294087b2b1bc81
+2026-11-02T16:29:40Z 005-s2-post.json tool=post_ledger_creates secs=32.152 isError=True error=None saved_sha256=c8f17f5bdfa783493962c824b14c7ad3727b40194ee9380596513c0d2269c967
+2026-11-02T16:31:12Z 006-s5-post.json tool=post_ledger_creates secs=5.985 isError=False error=None saved_sha256=0661a0389c711071b1826139c838f9d4c740fc352ee3c7026b2f19f2a821748f
+2026-11-02T16:31:25Z 007-s6-prepare.json tool=prepare_ledger_creates secs=1.423 isError=False error=None saved_sha256=86da763009dc1f32db9345a27625b625ba4c7e255c6d7be844d101dccb8db334
+2026-11-02T16:31:43Z 008-s6-post.json tool=post_ledger_creates secs=4.372 isError=True error=None saved_sha256=f66bb5275e080977f26eddb7425afbffd855e52e3f30a167437f4fd76969baf1
+2026-11-02T16:32:02Z session ended; server pid 27592 exit code 0

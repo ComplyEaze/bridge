@@ -1,0 +1,9 @@
+2026-11-02T16:28:32.515Z 000-tools.json list secs 0.017 bytes 240782 isError None
+2026-11-02T16:28:33.657Z 001-companies.json list_companies secs 0.126 bytes 1567 isError False
+2026-11-02T16:28:34.757Z 002-status.json tally_status secs 0.091 bytes 1821 isError False
+2026-11-02T16:28:43.082Z 003-s2-prepare.json prepare_ledger_creates secs 0.065 bytes 1561 isError True
+2026-11-02T16:28:51.770Z 004-s2-prepare2.json prepare_ledger_creates secs 1.347 bytes 2459 isError False
+2026-11-02T16:29:08.825Z 005-s2-post.json post_ledger_creates secs 32.152 bytes 2740 isError True
+2026-11-02T16:31:06.075Z 006-s5-post.json post_ledger_creates secs 5.985 bytes 6697 isError False
+2026-11-02T16:31:23.768Z 007-s6-prepare.json prepare_ledger_creates secs 1.423 bytes 2459 isError False
+2026-11-02T16:31:39.138Z 008-s6-post.json post_ledger_creates secs 4.372 bytes 2230 isError True

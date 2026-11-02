@@ -4609,9 +4609,11 @@ mod through_the_tool {
     /// bridge#2071 and #683, through the tool: a rupee ledger whose closing balance is a composite
     /// is set aside by name, in the layout of the 7.1 captures (a space after the foreign symbol)
     /// and in the layout TallyPrime 7.2 wrote in the lab (`-$100.00 @ ₹ 87/$ = -₹ 8700.00`, as
-    /// in the lab's Lab Bank row: no space after the foreign symbol, one before `=`). A layout no
-    /// capture shows (here a rate with decimals) is not recognised, so the row stays a plain amount
-    /// and the compliance read is refused, with the code and cause the lab measured and the step.
+    /// in the lab's Lab Bank row: no space after the foreign symbol, one before `=`), also with a rate
+    /// that has decimals, which the later sitting captured (#2228). A layout no capture shows (here
+    /// the base amount written against its symbol) is not recognised, so the row stays a plain
+    /// amount and the compliance read is refused, with the code and cause the lab measured and the
+    /// step.
     /// The balance answer is the committed capture of the several-currency book with one closing
     /// balance replaced.
     #[tokio::test]
@@ -4629,9 +4631,11 @@ mod through_the_tool {
                 .count();
             assert_eq!(named, 1, "{result}");
         };
-        // The lab's 7.2 layout, and the captured 7.1 layout of the same balance.
+        // The lab's 7.2 layout with a whole and with a decimal rate, and the captured 7.1 layout
+        // of the same balance.
         for composite in [
             "-$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00",
+            "-$100.00 @ \u{20b9} 87.5/$ = -\u{20b9} 8750.00",
             "-$ 100.00 @ \u{20b9} 87/$  = -\u{20b9} 8700.00",
         ] {
             let one = OneServer::spawn(several_currency_compliance_plans(forex_balances_with(
@@ -4639,8 +4643,8 @@ mod through_the_tool {
             )));
             set_aside(&one.call(args.clone()).await);
         }
-        // A rate with decimals is in neither layout.
-        let unrecognised = "-$100.00 @ \u{20b9} 87.5/$ = -\u{20b9} 8750.00";
+        // A base amount written against its symbol is in neither layout.
+        let unrecognised = "-$100.00 @ \u{20b9} 87/$ = -\u{20b9}8700.00";
         let one = OneServer::spawn(several_currency_compliance_plans(forex_balances_with(
             unrecognised,
         )));

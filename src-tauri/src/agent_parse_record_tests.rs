@@ -155,7 +155,7 @@ fn census(text: &str, on: &str) -> String {
     coded(parse_voucher_census(text, (day(on), day(on)), None))
 }
 
-/// A census over a window and one AlterID span, as a ledger-scoped census read asks for it.
+/// A census over a window and one AlterID span, as every census read asks for it (#2145).
 fn census_span(text: &str, (from, to): (&str, &str), (after, through): (u64, u64)) -> String {
     coded(parse_voucher_census(
         text,
@@ -502,8 +502,8 @@ fn rows() -> Vec<Row> {
     ));
     rows.push(row!(
         "stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml",
-        "parse_voucher_census(20250421)",
-        |_, t| census(t, "20250421")
+        "parse_voucher_census(20250421, span 0 to 3)",
+        |_, t| census_span(t, ("20250421", "20250421"), (0, 3))
     ));
     // Import verification and span reads (`agent_import_ack_tests.rs`,
     // `agent_import_index_tests.rs`, `agent_import_span_identity_tests.rs`).

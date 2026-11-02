@@ -681,7 +681,9 @@ async fn oversized_untrusted_names_and_selectors_never_expand_receipts() {
 async fn incomplete_receipt_log_stops_session_but_preserves_durable_batch_recovery() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("agent-egress.jsonl");
-    fs::write(&path, b"{\"partial").unwrap();
+    // A whole line Bridge did not write, before a cut tail: no repair vouches for it (#2172), so
+    // the log stays unusable and the session must stop.
+    fs::write(&path, b"\0\0\0\n{\"partial").unwrap();
     let server = server(directory.path());
     let batch_id = "12345678-abcd-4abc-8abc-123456789012";
     let mut output = Vec::new();
@@ -705,7 +707,7 @@ async fn incomplete_receipt_log_stops_session_but_preserves_durable_batch_recove
     let response: Value = serde_json::from_slice(&output).unwrap();
     assert_eq!(response["error"]["message"], "egress_log_incomplete");
     assert_eq!(response["error"]["data"]["batch_id"], batch_id);
-    assert_eq!(fs::read(&path).unwrap(), b"{\"partial");
+    assert_eq!(fs::read(&path).unwrap(), b"\0\0\0\n{\"partial");
 
     // The stdio loop propagates the terminal receipt error before another call.
     let requests = [
@@ -729,7 +731,7 @@ async fn incomplete_receipt_log_stops_session_but_preserves_durable_batch_recove
         .collect();
     assert_eq!(responses.len(), 1);
     assert_eq!(responses[0]["id"], 1);
-    assert_eq!(fs::read(path).unwrap(), b"{\"partial");
+    assert_eq!(fs::read(path).unwrap(), b"\0\0\0\n{\"partial");
 }
 
 #[path = "agent_protocol_evidence_tests.rs"]

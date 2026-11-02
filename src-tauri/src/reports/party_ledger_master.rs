@@ -37,6 +37,9 @@ pub enum SourceNoteKind {
     LaterDatedVoucher,
     /// The typed date was moved to the next date Tally accepts as a boundary.
     DateMoved,
+    /// The mailing details were asked for, that read failed, and the book was
+    /// read again without them (bridge#2214).
+    MailingDetailsReadFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -89,6 +92,10 @@ pub(crate) struct PartyLedgerMasterSource {
     /// was checked against the company's own ledger count (#938); `None` when
     /// no census ran.
     pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
+    /// How the read that asked for the mailing details failed, where the book
+    /// was then read again without them (bridge#2214); `None` for every other
+    /// read. Only that retry sets it.
+    pub(crate) mailing_details_read_failed: Option<crate::tally::connection::MailingReadFailure>,
 }
 
 impl PartyLedgerMasterSource {
@@ -127,6 +134,52 @@ impl PartyLedgerMasterSource {
         }
     }
 
+    /// Said in the workbook when the read that asked for the mailing details
+    /// failed and the book was read again without them (bridge#2214), in place
+    /// of the note that none were observed: the columns are empty because that
+    /// read failed, not because Tally returned none.
+    pub(crate) fn mailing_details_read_failed_note(&self) -> Option<String> {
+        use crate::tally::connection::MailingReadFailure;
+        let why = match self.mailing_details_read_failed? {
+            MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: true,
+            } => "Tally's answer to that read passed the 32 MiB limit",
+            MailingReadFailure::Truncated => {
+                "Tally's answer to that read broke off before it ended"
+            }
+            MailingReadFailure::ReadFailed => "Tally's answer to that read could not be read",
+            MailingReadFailure::NoAnswer => "that read failed before Tally answered it",
+            MailingReadFailure::Undecodable => {
+                "Tally's answer to that read could not be decoded as text"
+            }
+            MailingReadFailure::HttpStatus => "Tally answered that read with an HTTP error",
+            MailingReadFailure::NotSent => "that read did not reach Tally",
+            MailingReadFailure::AnswersDiffered => "Tally's two answers to that read differed",
+            MailingReadFailure::TallyFailed => "Tally answered that read with a failure",
+            MailingReadFailure::StatusAbsent => "Tally's answer to that read carried no status",
+            MailingReadFailure::Malformed => "Tally's answer to that read was not well-formed XML",
+            MailingReadFailure::RowRefused => {
+                "Tally's answer to that read held a ledger entry ComplyEaze Bridge could not read"
+            }
+            MailingReadFailure::OtherCompany => {
+                "Tally's answer to that read was not for this company"
+            }
+            MailingReadFailure::BoundPassed => {
+                "Tally's answer to that read passed one of ComplyEaze Bridge's count limits"
+            }
+            MailingReadFailure::IdentityRepeated => "Tally's answer to that read repeated a ledger",
+            MailingReadFailure::CountDiffers => {
+                "Tally's answer to that read held another number of ledgers than were counted"
+            }
+            // Never read again: such a read fails the export instead.
+            MailingReadFailure::Deadline
+            | MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: false,
+            } => return None,
+        };
+        Some(format!("The mailing details were asked for, and {why}, so this workbook was read again without them. The Mailing columns are empty and their status says not observed: that is not the same as a party having no mailing address. Read the address in Tally."))
+    }
+
     /// The notes of this source, the moved date first.
     pub(crate) fn notes(&self) -> Vec<SourceNote> {
         [
@@ -134,6 +187,10 @@ impl PartyLedgerMasterSource {
             (
                 SourceNoteKind::LaterDatedVoucher,
                 self.later_dated_vouchers_note(),
+            ),
+            (
+                SourceNoteKind::MailingDetailsReadFailed,
+                self.mailing_details_read_failed_note(),
             ),
         ]
         .into_iter()

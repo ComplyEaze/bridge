@@ -8,7 +8,7 @@
 //! holding the same bytes.
 use super::*;
 use crate::agent::voucher_window::{
-    AuditWindowFailure, RetainedWindowRead, SmallBooks, WindowPart,
+    AuditWindowFailure, ReadCountRefusal, RetainedWindowRead, SmallBooks, WindowPart,
 };
 use crate::tally::runtime::{AuditPartFailureKind, RuntimeReadEvidence};
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
@@ -213,6 +213,16 @@ impl Replay {
     }
 }
 
+/// The audit's window counts a small book and refuses its read count only at
+/// the floor (#2173), whatever limits it is given; every other read keeps the
+/// default's refusal point.
+#[test]
+fn the_audit_window_counts_small_books_and_refuses_at_the_floor() {
+    let limits = audit_window_limits(WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard));
+    assert_eq!(limits.small_books, SmallBooks::Count);
+    assert_eq!(limits.read_count_refusal, ReadCountRefusal::AtTheFloor);
+}
+
 /// The whole period fits one request: without the audit read's own rule, the
 /// window would plan no census (`SmallBooks::Skip`).
 fn one_request_window() -> WindowReadLimits {
@@ -221,6 +231,7 @@ fn one_request_window() -> WindowReadLimits {
         default_bytes_per_voucher: 1024,
         max_reads: 128,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     }
 }
 

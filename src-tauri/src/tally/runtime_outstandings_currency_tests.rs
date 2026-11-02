@@ -768,13 +768,26 @@ fn assert_mixed_ledger_set_aside(result: &OutstandingsLoadResult) {
 /// FOREX's native outstandings read with its ledger snapshot replaced, for
 /// labelled edits of the captured ledgers.
 fn forex_native_plans_with_ledgers(ledgers: String) -> Vec<ScenarioPlan> {
+    forex_native_plans_with_receivable_and_ledgers(forex_receivable(), ledgers)
+}
+
+fn forex_receivable() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_live.utf16le.xml"
+    ))
+}
+
+/// As [`forex_native_plans_with_ledgers`], with the receivable report replaced
+/// too, for labelled edits of the captured bills.
+fn forex_native_plans_with_receivable_and_ledgers(
+    receivable: String,
+    ledgers: String,
+) -> Vec<ScenarioPlan> {
     let extent = xml(extents());
     let mut plans = vec![status(), xml(companies()), xml(companies())];
     pair(&mut plans, extent.clone());
     for plan in [
-        fixture(include_bytes!(
-            "../../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_live.utf16le.xml"
-        )),
+        xml(receivable),
         fixture(include_bytes!(
             "../../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
         )),
@@ -923,6 +936,97 @@ async fn a_rupee_ledger_with_a_composite_balance_is_set_aside_by_the_several_cur
         .unwrap();
     simulator.cancel();
     assert_mixed_ledger_set_aside(&result);
+}
+
+/// A labelled edit of the captured FOREX receivable report: the closing amount
+/// of "FX USD Debtor 02"'s only bill, row 10, emptied, as Tally sends a bill
+/// settled in full at another rate (bridge#2071).
+fn forex_receivable_with_an_empty_debtor_02_amount() -> String {
+    let captured = forex_receivable();
+    let bill =
+        "<BILLPARTY>FX USD Debtor 02</BILLPARTY>\r\n</BILLFIXED>\r\n <BILLCL>-172000.00</BILLCL>";
+    assert_eq!(captured.matches(bill).count(), 1);
+    captured.replace(
+        bill,
+        "<BILLPARTY>FX USD Debtor 02</BILLPARTY>\r\n</BILLFIXED>\r\n <BILLCL></BILLCL>",
+    )
+}
+
+/// A labelled edit of the captured FOREX ledgers: "FX USD Debtor 02" in the
+/// base currency with a plain rupee closing balance, so the read does not set
+/// it aside.
+fn forex_ledgers_with_debtor_02_in_rupees() -> String {
+    let composite = "-$ 2000.00 @ I\u{20b9} 86/$  = -I\u{20b9} 172000.00";
+    let mixed = forex_ledgers_with_a_mixed_rupee_ledger();
+    assert_eq!(mixed.matches(composite).count(), 1);
+    mixed.replace(composite, "-172000.00")
+}
+
+async fn forex_outstandings_read(
+    receivable: String,
+    ledgers: String,
+) -> anyhow::Result<OutstandingsLoadResult> {
+    let mut plans = forex_classified_currency_plans();
+    plans.extend(forex_native_plans_with_receivable_and_ledgers(
+        receivable, ledgers,
+    ));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let config = TallyConfig {
+        host: simulator.address().ip().to_string(),
+        port: simulator.address().port(),
+    };
+    let identity = identity_for_guid(&companies(), FOREX_GUID);
+    let runtime = TallyRuntime::default();
+    let witness = runtime
+        .detect_classified_base_currency_with_extent(config.clone(), &identity)
+        .await
+        .unwrap()
+        .admit_inr_classified()
+        .unwrap();
+    let result = runtime
+        .fetch_agent_outstandings_with_evidence(
+            config,
+            &identity,
+            TallyDate::parse("20250930").unwrap(),
+            witness,
+            OutstandingsAgeingAnchor::DueDate,
+        )
+        .await
+        .map(|(result, _)| result);
+    simulator.cancel();
+    result
+}
+
+/// bridge#2071 through the runtime: an empty closing amount on a set-aside
+/// party's bill is dropped with the party before any amount is admitted, and
+/// the read answers as it does without the edit. The same bill on a party the
+/// read keeps still refuses, typed, naming the receivable report and its row.
+#[tokio::test]
+async fn an_empty_closing_amount_is_dropped_only_with_a_set_aside_party() {
+    let result = forex_outstandings_read(
+        forex_receivable_with_an_empty_debtor_02_amount(),
+        forex_ledgers_with_a_mixed_rupee_ledger(),
+    )
+    .await
+    .unwrap();
+    assert_mixed_ledger_set_aside(&result);
+
+    let error = forex_outstandings_read(
+        forex_receivable_with_an_empty_debtor_02_amount(),
+        forex_ledgers_with_debtor_02_in_rupees(),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<NativeOutstandingsError>()),
+        Some(&NativeOutstandingsError::BillRow {
+            report: Some("receivable"),
+            row: 10,
+            cause: Box::new(NativeOutstandingsError::InvalidAmount),
+        })
+    );
 }
 
 /// bridge#551: on a book with one master the classified read sends exactly

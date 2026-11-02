@@ -1029,12 +1029,13 @@ fn show_review_acknowledgement(count: VoucherCount, preview: &str) -> bool {
         .collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the post's box (`show_review`): topmost with
@@ -1092,12 +1093,13 @@ fn show_create_ledger(count: VoucherCount, preview: &str) -> bool {
     // line tells the person to press Y or N, and in one lab run on Windows 10
     // MB_SETFOREGROUND alone did not give it the keyboard when it opened
     // seconds after the last input went to Tally (#1780).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the post's box (`show_review`): topmost with
@@ -1144,13 +1146,14 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = post_question(count).encode_utf16().chain(Some(0)).collect();
     // The box cannot scroll: `guarded` measures it when it opens and, if it is
     // not wholly on the screen, never returns (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: Both buffers are NUL-terminated and live for the synchronous
-        // dialog; no parent HWND is borrowed. No application state is exposed
+        // dialog; the owner is `guarded`'s hidden window, alive until the box
+        // returns. No application state is exposed
         // to callbacks.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // Topmost: a window the connector opens while Tally fills the
@@ -1162,7 +1165,9 @@ fn show_review(count: VoucherCount, preview: &str) -> bool {
                 // click and a key while the box was open (#1780). That run did
                 // not test what else a system-modal box changes: the taskbar
                 // showed no task buttons while it was open, cause not tested
-                // (#2161). When Windows lets it,
+                // (#2161). It is also owned by `guarded`'s hidden topmost
+                // window, the other way a stand-in box was seen to stay on top
+                // (#1780); an owned box has no taskbar button. When Windows lets it,
                 // MB_SETFOREGROUND also gives the box the foreground, so a key
                 // typed for Tally can answer it; the parent puts a first line on
                 // its text that says what Y and N do (#1780). No stays the
@@ -1252,12 +1257,13 @@ fn show_release_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = release_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the review's box: topmost with MB_SYSTEMMODAL, taking
@@ -1312,12 +1318,13 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
-    let answer = super::box_fit::guarded(|| {
+    let answer = super::box_fit::guarded(|owner| {
         // SAFETY: as for `show_review`: both buffers are NUL-terminated and
-        // live for the synchronous dialog, and no parent HWND is borrowed.
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
         unsafe {
             MessageBoxW(
-                std::ptr::null_mut(),
+                owner,
                 text.as_ptr(),
                 title.as_ptr(),
                 // As for the review's box: topmost with MB_SYSTEMMODAL, taking
@@ -1505,7 +1512,7 @@ const CONFIRM_REVIEW_WITH: &str = r#"async fn confirm_review_with(
 /// box that did not fit return a result would approve with no box or a
 /// clipped one.
 const BOX_FIT_GUARDED: &str = r#"#[cfg(windows)]
-pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
+pub(crate) fn guarded(show: impl FnOnce(windows_sys::Win32::Foundation::HWND) -> i32) -> i32 {
     if !windows_hook::make_dpi_aware() {
         // Rectangles could not be read in one unit, so no box is shown. Said on
         // the error output, so a run by hand on an older Windows names the cause.
@@ -1521,7 +1528,18 @@ pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
         std::process::exit(0);
     };
     let front = windows_hook::Front::start();
-    let result = show();
+    // A box owned by a topmost window stays above Tally where its own topmost
+    // flag was seen not to be kept (#1780). Made after the hook, on this
+    // thread, and never shown; the hook does not measure it if Windows
+    // activates it as the box closes, so the fit check measures only the box.
+    // Destroyed once the box has returned.
+    let owner = windows_hook::TopmostOwner::create();
+    let result = show(
+        owner
+            .as_ref()
+            .map_or(std::ptr::null_mut(), windows_hook::TopmostOwner::handle),
+    );
+    drop(owner);
     let seen = windows_hook::seen();
     drop(front);
     drop(hook);
@@ -1538,6 +1556,7 @@ pub(crate) fn guarded(show: impl FnOnce() -> i32) -> i32 {
 const BOX_FIT_HOOK: &str = r#"#[cfg(windows)]
 mod windows_hook {
     use super::{Rect, Seen};
+    use std::cell::Cell;
     use std::ffi::c_void;
     use std::io::Write;
     use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -1550,10 +1569,11 @@ mod windows_hook {
     };
     use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        BringWindowToTop, CallNextHookEx, EnumThreadWindows, FlashWindowEx, GetForegroundWindow,
-        GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, PostMessageW,
-        SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx, FLASHWINFO, FLASHW_ALL,
-        FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT, WM_COMMAND,
+        BringWindowToTop, CallNextHookEx, CreateWindowExW, DestroyWindow, EnumThreadWindows,
+        FlashWindowEx, GetForegroundWindow, GetWindowRect, GetWindowThreadProcessId,
+        IsWindowVisible, PostMessageW, SetForegroundWindow, SetWindowsHookExW, UnhookWindowsHookEx,
+        FLASHWINFO, FLASHW_ALL, FLASHW_TIMERNOFG, HCBT_ACTIVATE, HHOOK, IDCANCEL, WH_CBT,
+        WM_COMMAND, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
     };
 
     #[link(name = "kernel32")]
@@ -1616,7 +1636,9 @@ mod windows_hook {
     /// background process is often refused the foreground, and a box nobody
     /// sees is a box nobody answers. It never takes the foreground back after
     /// that single attempt, so a person who moves to another window is not
-    /// pulled away from it. It stops when dropped.
+    /// pulled away from it. It stops when dropped. A box with an owner has no
+    /// taskbar button (#1780), so the flash then reaches only its title bar,
+    /// and the box's place on top is what shows it.
     pub(super) struct Front {
         stop: Arc<AtomicBool>,
         worker: Option<std::thread::JoinHandle<()>>,
@@ -1642,6 +1664,67 @@ mod windows_hook {
             if let Some(worker) = self.worker.take() {
                 let _ = worker.join();
             }
+        }
+    }
+
+    /// The box's owner (#1780): a hidden, topmost tool window of the box's own
+    /// thread, never shown, destroyed when dropped. A window owned by a topmost
+    /// window is kept above every window that is not topmost; the owner is a
+    /// tool window and the box an owned one, so neither has a taskbar button.
+    pub(super) struct TopmostOwner(HWND);
+
+    thread_local! {
+        /// The owner this thread made, or null. The hook, which runs on the
+        /// same thread, does not measure it: Windows may activate a box's
+        /// owner as the box closes, and the owner's empty rectangle would read
+        /// as a box that did not fit, refusing an answer already given.
+        static OWNER: Cell<HWND> = const { Cell::new(std::ptr::null_mut()) };
+    }
+
+    impl TopmostOwner {
+        /// A new owner, or `None` if Windows refuses to make one.
+        pub(super) fn create() -> Option<Self> {
+            let class: Vec<u16> = "Static".encode_utf16().chain(Some(0)).collect();
+            // SAFETY: a system class's NUL-terminated name that outlives the
+            // call, no title, no parent, menu, instance or creation data; the
+            // handle returned is checked before it is used.
+            let window = unsafe {
+                CreateWindowExW(
+                    WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+                    class.as_ptr(),
+                    std::ptr::null(),
+                    WS_POPUP,
+                    0,
+                    0,
+                    0,
+                    0,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    std::ptr::null(),
+                )
+            };
+            if window.is_null() {
+                return None;
+            }
+            OWNER.with(|owner| owner.set(window));
+            Some(Self(window))
+        }
+
+        /// The owner's handle, for `MessageBoxW`.
+        pub(super) fn handle(&self) -> HWND {
+            self.0
+        }
+    }
+
+    impl Drop for TopmostOwner {
+        fn drop(&mut self) {
+            // SAFETY: the handle came from `CreateWindowExW` on this thread and
+            // is destroyed once, here.
+            unsafe {
+                DestroyWindow(self.0);
+            }
+            OWNER.with(|owner| owner.set(std::ptr::null_mut()));
         }
     }
 
@@ -1857,9 +1940,10 @@ mod windows_hook {
     }
 
     /// The hook procedure: when the box is about to be activated, measure it;
-    /// if it does not fit, post it a Cancel and remember that it did not.
+    /// if it does not fit, post it a Cancel and remember that it did not. The
+    /// box's owner is not the box and is not measured.
     unsafe extern "system" fn on_activate(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-        if code == HCBT_ACTIVATE as i32 {
+        if code == HCBT_ACTIVATE as i32 && wparam as HWND != OWNER.with(Cell::get) {
             let window = wparam as HWND;
             let fitted = fits(window);
             remember(seen().after(fitted));
@@ -1877,16 +1961,18 @@ mod windows_hook {
     }
 }"#;
 
-/// Every `cfg` in box_fit.rs: the inner attribute, the two Windows items and
-/// the test module. The last entry counts the bare text `cfg`.
+/// Every `cfg` in box_fit.rs: the inner attribute, the two Windows items, the
+/// test module and its two Windows-only tests (the box's owner, and the hook
+/// leaving it unmeasured). The last entry
+/// counts the bare text `cfg`.
 const BOX_FIT_CFG_CENSUS: [(&str, usize); 4] = [
     (
         "#![cfg_attr(all(not(windows), not(test)), allow(dead_code))]",
         1,
     ),
-    ("#[cfg(windows)]", 2),
+    ("#[cfg(windows)]", 4),
     ("#[cfg(test)]", 1),
-    ("cfg", 4),
+    ("cfg", 6),
 ];
 
 fn box_fit_problems(source: &str) -> Vec<String> {
@@ -1930,12 +2016,16 @@ fn the_fit_check_that_guards_both_windows_dialogs_is_pinned() {
         source.replacen("Outcome::Answered(result) => result,", "Outcome::Answered(_) => 6,", 1),
         // No hook: the box is shown unmeasured, or the answer is made up.
         source.replacen("        std::process::exit(0);\n    };\n    let front", "        return show();\n    };\n    let front", 1),
-        source.replacen("let result = show();", "let result = { show(); 6 };", 1),
+        source.replacen("    let result = show(\n", "    let result = 6;\n    let _ = show(\n", 1),
         source.replacen("let seen = windows_hook::seen();", "let seen = Seen::Fits;", 1),
         // The measurement always finds a fit, or never cancels.
         source.replacen("rect.is_wholly_inside(work));", "true);", 1),
         source.replacen("if !fitted {", "if false {", 1),
         source.replacen("remember(seen().after(fitted));", "remember(Seen::Fits);", 1),
+        // The hook measures the box's hidden owner again, so an owner Windows
+        // activates as the box closes refuses the answer just given (#1780).
+        source.replacen(" && wparam as HWND != OWNER.with(Cell::get) {", " {", 1),
+        source.replacen("            OWNER.with(|owner| owner.set(window));\n", "", 1),
         source.replacen("let fitted = measured.is_some_and(", "let fitted = measured.is_none() || measured.is_some_and(", 1),
         source.replacen("== 0 {\n            return None;", "== 0 {\n            return Some((Rect { left: 0, top: 0, right: 1, bottom: 1 }, Rect { left: 0, top: 0, right: 2, bottom: 2 }));", 1),
         // The guard made non-Windows beside a Windows twin that approves.
@@ -2206,8 +2296,14 @@ fn each_dialog_answers_only_on_its_positive_button() {
             "",
             1,
         ),
-        source.replacen("super::box_fit::guarded(|| {", "(|| {", 1),
-        replace_last(&source, "super::box_fit::guarded(|| {", "(|| {"),
+        source.replacen("super::box_fit::guarded(|owner| {", "(|owner| {", 1),
+        replace_last(&source, "super::box_fit::guarded(|owner| {", "(|owner| {"),
+        // The post's box no longer owned by the hidden topmost window (#1780).
+        source.replacen(
+            POST_DIALOG_WINDOWS,
+            &POST_DIALOG_WINDOWS.replacen("                owner,\n", "                std::ptr::null_mut(),\n", 1),
+            1,
+        ),
         source.replacen(
             "box_did_not_fit: status.code() == Some(super::box_fit::DOES_NOT_FIT_EXIT),",
             "box_did_not_fit: false,",

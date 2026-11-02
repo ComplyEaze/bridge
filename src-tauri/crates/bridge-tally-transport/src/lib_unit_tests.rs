@@ -101,3 +101,48 @@ fn xml_request_cap_is_inclusive_for_utf8_source_bytes() {
         hex_digest(Sha256::digest(&prepared.body))
     );
 }
+
+/// #2142: which ended posts owe a drain, every error named once: those that
+/// were sent, or perhaps sent, and not answered owe one; those Tally answered
+/// with a whole head, and those that never reached Tally, do not.
+#[test]
+fn every_transport_error_is_classed_for_the_drain() {
+    use TallyTransportError as E;
+    for (error, owes) in [
+        (E::RequestTimedOut, true),
+        (E::RequestFailed, true),
+        (
+            E::ResponseTooLarge {
+                limit: 1,
+                declared_by_peer: false,
+            },
+            true,
+        ),
+        (E::ResponseTruncated, true),
+        (E::ResponseReadFailed, true),
+        (E::HttpStatus { status: 500 }, false),
+        (
+            E::ResponseTooLarge {
+                limit: 1,
+                declared_by_peer: true,
+            },
+            false,
+        ),
+        (E::UnsupportedContentEncoding, false),
+        (E::InvalidEncoding { code: "x" }, false),
+        (E::EndpointInvalid { code: "x" }, false),
+        (E::PolicyInvalid { code: "x" }, false),
+        (E::ClientInitializationFailed, false),
+        (E::RequestTooLarge { limit: 1 }, false),
+        (E::ConnectionFailed, false),
+        (
+            E::WireRefused {
+                refusal: WireRefusal::Busy,
+            },
+            false,
+        ),
+        (E::SendWithdrawn, false),
+    ] {
+        assert_eq!(drain::owes_drain(&error), owes, "{error:?}");
+    }
+}

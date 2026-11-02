@@ -42,11 +42,13 @@
 //!   failure is closed and loud, and a fold change has to weigh it.
 //! - An intent with no terminal verdict blocks every overlapping batch. The
 //!   terminal verdicts are `posted_verified`, `posted_into_existing_master`,
-//!   `master_write_located_elsewhere`, `posted_unattributed` and
-//!   `confirmed_absent`; the last two are decided only by a reconcile
-//!   (`agent_master_verdict.rs`). `confirmed_absent` is given when its paired
-//!   read-back shows the ledger absent, and a new batch for the same ledger then
-//!   needs a new approval: nothing is ever sent again automatically.
+//!   `master_write_located_elsewhere`, `posted_unattributed`,
+//!   `confirmed_absent` and `confirmed_absent_after_change`; the last three are
+//!   decided only by a reconcile (`agent_master_verdict.rs`). The two absent
+//!   states are given when the paired read-back shows the ledger absent (the
+//!   second after another master change moved the company's mark), and a new
+//!   batch for the same ledger then needs a new approval: nothing is ever sent
+//!   again automatically.
 //!   `posted_unattributed` is given when no answer from Tally is on file and the
 //!   ledger was found as sent, written by the first master change after the
 //!   mark the intent recorded.
@@ -362,9 +364,26 @@ pub(super) enum MasterVerdictState {
     /// Settled, never verified: with Tally's answer lost, nothing shows that
     /// change was this create rather than a person keying the identical ledger.
     PostedUnattributed,
+    /// After an outcome was unknown, a paired read-back showed the ledger
+    /// absent, no pre-image master changed or missing, no ledger or group new
+    /// since the intent, and the company's master mark moved forward since the
+    /// intent (another master change, or the create and a later change to its
+    /// ledger). Whether the create ran is not known; the batch is closed and is
+    /// never sent again. Like `confirmed_absent`, it rests on the order Tally
+    /// serves requests in: a read sent after the create's send ended, once
+    /// answered, was served after the create.
+    ConfirmedAbsentAfterChange,
 }
 
 impl MasterVerdictState {
+    /// The two states that say the ledger is not in the book.
+    pub(super) fn is_absent(self) -> bool {
+        matches!(
+            self,
+            Self::ConfirmedAbsent | Self::ConfirmedAbsentAfterChange
+        )
+    }
+
     /// Whether the outcome of the write is settled: the first terminal verdict
     /// of a batch is its last, and it stops blocking later batches of the same
     /// ledgers. A verdict that asks for a person's reconciliation, or that
@@ -375,7 +394,8 @@ impl MasterVerdictState {
             | Self::PostedIntoExistingMaster
             | Self::MasterWriteLocatedElsewhere
             | Self::ConfirmedAbsent
-            | Self::PostedUnattributed => true,
+            | Self::PostedUnattributed
+            | Self::ConfirmedAbsentAfterChange => true,
             Self::ReconciliationRequired | Self::MastersAfterPostUnconfirmed => false,
         }
     }
@@ -537,9 +557,10 @@ pub(super) enum Invalid {
     /// A `posted_verified` verdict with no answer from Tally on record: a
     /// verified create needs Tally's counters, so its answer is appended first.
     VerifiedWithoutResponse,
-    /// A `confirmed_absent` verdict against an answer on record whose counters
-    /// say Tally created or altered something: absence is never concluded
-    /// against Tally's own count of a write.
+    /// A `confirmed_absent` or `confirmed_absent_after_change` verdict against
+    /// an answer on record whose counters say Tally created or altered
+    /// something: absence is never concluded against Tally's own count of a
+    /// write.
     AbsentAgainstCounters,
     /// A `posted_unattributed` verdict for a batch with an answer on record,
     /// with or without counters: that state exists only for an answer that was
@@ -555,7 +576,8 @@ pub(super) enum Invalid {
     ItemsMismatch,
     /// `posted_verified` or `posted_unattributed` for an item with no GUID.
     VerifiedWithoutGuid,
-    /// `confirmed_absent` for an item that names a GUID.
+    /// `confirmed_absent` or `confirmed_absent_after_change` for an item that
+    /// names a GUID.
     AbsentWithGuid,
 }
 
@@ -808,15 +830,14 @@ impl MasterVerdict {
             | MasterVerdictState::PostedIntoExistingMaster
             | MasterVerdictState::MastersAfterPostUnconfirmed
             | MasterVerdictState::MasterWriteLocatedElsewhere
-            | MasterVerdictState::ConfirmedAbsent => false,
+            | MasterVerdictState::ConfirmedAbsent
+            | MasterVerdictState::ConfirmedAbsentAfterChange => false,
         };
         if all_found && self.items.iter().any(|item| item.guid.is_none()) {
             return Err(Invalid::VerifiedWithoutGuid);
         }
         // A ledger confirmed absent has no GUID to name.
-        if self.state == MasterVerdictState::ConfirmedAbsent
-            && self.items.iter().any(|item| item.guid.is_some())
-        {
+        if self.state.is_absent() && self.items.iter().any(|item| item.guid.is_some()) {
             return Err(Invalid::AbsentWithGuid);
         }
         Ok(())
@@ -1094,7 +1115,7 @@ impl MasterJournal {
                     .as_ref()
                     .and_then(|response| response.counters)
                     .is_some_and(|counters| counters.created > 0 || counters.altered > 0);
-                if verdict.state == MasterVerdictState::ConfirmedAbsent && counted_a_write {
+                if verdict.state.is_absent() && counted_a_write {
                     return Err(MasterLedgerError::Invalid(Invalid::AbsentAgainstCounters));
                 }
                 if verdict.state == MasterVerdictState::PostedUnattributed

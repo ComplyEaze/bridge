@@ -520,7 +520,7 @@ fn parameter_description(tool: &str, parameter: &str) -> Option<&'static str> {
         ("negative_stock", "to") => "The last day of the window (YYYYMMDD or YYYY-MM-DD), on or after from. The quantities are as at this date; only a window within one financial year was measured.",
         (_, "from") => "The first day of the date range, included (YYYYMMDD or YYYY-MM-DD).",
         (_, "to") => "The last day of the date range, included (YYYYMMDD or YYYY-MM-DD).",
-        (_, "limit") => "The most rows to return on this page. The default and the maximum are this server's row limit (500 unless it is configured otherwise).",
+        (_, "limit") => "Most rows per page; default and maximum 500 unless configured otherwise. A byte limit can end it sooner: continue from next_offset.",
         (_, "offset") => "How many rows to skip before this page: 0, the default, is the first page.",
         (_, "snapshot_id") => "Optional, on a later page only: the first page's snapshot_id, so the call is refused (listing_snapshot_changed) rather than continuing from a different read.",
         ("gst_status" | "gst_uncertain_vouchers", "voucher_type_name") => "The exact name of ONE voucher type in the book, as masters lists it (for example the name of a Sales type). A type of the same class under another name is not read. At most 100 characters, with no double quote, backslash, & < > ' or control character and no space at either end (gst_status_type_name_invalid).",

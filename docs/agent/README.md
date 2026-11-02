@@ -37,7 +37,7 @@ Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
 (default `500`), `BRIDGE_AGENT_MAX_BYTES` (default `200000`), and
 `BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`).
-`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer. Control replies (to
+`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer, so a page can end before `limit`, marked truncated with its `next_offset`. Control replies (to
 `initialize`, `ping` and `tools/list`), which the build fixes and which carry no
 book data, are held to 1,000,000 bytes, or to it if it is larger. The host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
 The resolved data path must be valid Unicode so saved artifact paths can be

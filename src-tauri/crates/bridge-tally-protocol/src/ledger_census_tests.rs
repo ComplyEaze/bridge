@@ -361,3 +361,49 @@ fn the_stock_item_slice_request_is_the_ledger_formula_over_stock_items() {
     assert_eq!(request.matches("$$").count(), 1);
     assert!(!request.contains("SVFROMDATE") && !request.contains("SVTODATE"));
 }
+
+/// The stock-item request's bytes are unchanged by its sharing a template with the stock-group
+/// request: these are the bytes of a request sent to a lab book from #2168's builder.
+#[test]
+fn the_stock_item_slice_request_keeps_its_bytes() {
+    let plan = CensusPlan::<StockItems>::new(
+        300,
+        CensusLimits {
+            slice_width: 100,
+            max_slices: 3,
+        },
+    )
+    .unwrap();
+    let sent = crate::encode_tally_xml_request_utf16le(&render_stock_item_census_slice_request(
+        "BRIDGE STOCK LAB",
+        &plan.slices()[0],
+    ));
+    assert_eq!(sent.len(), 1278);
+    assert_eq!(
+        sha256_hex(&sent),
+        "42e10b108bd529e58ae553650e4d6aada926aa24cd9ba181057701a1102ae84a"
+    );
+}
+
+/// The stock-group request is the stock-item request over `StockGroup`, under its own collection
+/// name, and its refusals have codes of their own.
+#[test]
+fn the_stock_group_slice_request_is_the_stock_item_shape_over_stock_groups() {
+    let plan = CensusPlan::<StockGroups>::new(10, LIMITS).unwrap();
+    let groups = render_stock_group_census_slice_request("A & B <LAB>", &plan.slices()[0]);
+    let items = render_stock_item_census_slice_request(
+        "A & B <LAB>",
+        &CensusPlan::<StockItems>::new(10, LIMITS).unwrap().slices()[0],
+    );
+    assert_eq!(
+        groups,
+        items
+            .replace("BridgeStockItemCensus", "BridgeStockGroupCensus")
+            .replace("<TYPE>StockItem</TYPE>", "<TYPE>StockGroup</TYPE>")
+    );
+    assert_eq!(groups.matches("BridgeStockGroupCensus").count(), 2);
+    let codes = every_refusal::<StockGroups>().map(CensusError::safe_code);
+    assert!(codes
+        .iter()
+        .all(|code| code.starts_with("stock_group_span_")));
+}

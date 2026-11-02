@@ -1,0 +1,29 @@
+2026-11-02T13:26:36.387Z watch start: tally window 0x20d27ec; see within 40 s; answer by 100 s
+2026-11-02T13:26:38.903Z BOX SEEN 0x1ee2832 pid 3504 title 'ComplyEaze Bridge — create 3 ledgers?' class #32770
+2026-11-02T13:26:38.992Z rect 686,304,1252,802 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-02T13:26:39.053Z foreground 0x1ee2832 pid 3504 bridge_mcp title 'ComplyEaze Bridge — create 3 ledgers?'
+2026-11-02T13:26:39.085Z child Button rect 901,746,1001,779 text: &Yes
+2026-11-02T13:26:39.102Z child Button rect 1011,746,1111,779 text: &No
+2026-11-02T13:26:39.119Z child Button rect 1121,746,1221,779 text: Cancel
+2026-11-02T13:26:39.137Z child Static rect 723,375,763,415 text: 
+2026-11-02T13:26:39.158Z child Static rect 773,375,1203,700 text: Press Y (or click Yes) to create these 3 ledgers in Tally. Press N (or click No) to cancel. Nothing
+is created until you answer.
+
+Create 3 ledgers in "BRIDGE LEDGERBOX CI LAB"
+Company GUID: 5848d0ca-ed85-4c97-ab20-e045893a9803
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9001
+
+Create ledger "L1 Creditor A" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L1 Creditor B" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L1 Creditor C" under Sundry Creditors
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.
+2026-11-02T13:26:39.755Z capture l3-open.png 1920x1080 348812 B sha256 146ba5e93c0e09968b64e3d668e64eac9c131c9b190e55490d8f269bc9295323
+2026-11-02T13:26:39.793Z WAITING for <lab folder>\box\l3.answer
+2026-11-02T13:26:52.156Z before click: foreground 0x1ee2832 pid 3504 bridge_mcp title 'ComplyEaze Bridge — create 3 ledgers?'
+2026-11-02T13:26:52.372Z CLICKED Yes at 951,762 (physical) 2026-11-02T13:26:52.181Z; seen-to-click 13.3 s
+2026-11-02T13:26:53.316Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

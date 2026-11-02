@@ -1,0 +1,3 @@
+2026-11-02T13:23:55.144Z watch start: tally window 0x20d27ec; see within 3 s; answer by 70 s
+2026-11-02T13:23:58.302Z NO BOX seen within 3 s
+2026-11-02T13:23:58.958Z capture dry-nobox.png 1920x1080 385566 B sha256 666b78db432c82eceef7a88772e72ab0acf184bf48e585c1d3ec52df1b2d1627

@@ -1,0 +1,3 @@
+2026-11-02T13:28:00.636Z watch start: tally window 0x20d27ec; see within 7 s; answer by 5 s
+2026-11-02T13:28:07.762Z NO BOX seen within 7 s
+2026-11-02T13:28:08.167Z capture l6-nobox.png 1920x1080 299292 B sha256 22f5f9b3d22f6dfa751ba35f237e08184e9478f4c8ab233fc222afca997a8273

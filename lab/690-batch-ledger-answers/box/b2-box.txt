@@ -1,0 +1,43 @@
+2026-11-02T13:24:14.216Z watch start: tally window 0x20d27ec; see within 40 s; answer by 100 s
+2026-11-02T13:24:16.650Z BOX SEEN 0x1ba2cb2 pid 10884 title 'ComplyEaze Bridge — create 10 ledgers?' class #32770
+2026-11-02T13:24:16.773Z rect 696,171,1242,935 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-02T13:24:16.832Z foreground 0x1ba2cb2 pid 10884 bridge_mcp title 'ComplyEaze Bridge — create 10 ledgers?'
+2026-11-02T13:24:16.860Z child Button rect 891,879,991,912 text: &Yes
+2026-11-02T13:24:16.885Z child Button rect 1001,879,1101,912 text: &No
+2026-11-02T13:24:16.905Z child Button rect 1111,879,1211,912 text: Cancel
+2026-11-02T13:24:16.927Z child Static rect 733,242,773,282 text: 
+2026-11-02T13:24:16.950Z child Static rect 783,242,1193,833 text: Press Y (or click Yes) to create these 10 ledgers in Tally. Press N (or click No) to cancel. Nothing
+is created until you answer.
+
+Create 10 ledgers in "BRIDGE LEDGERBOX CI LAB"
+Company GUID: 5848d0ca-ed85-4c97-ab20-e045893a9803
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9001
+
+Create ledger "L0b Box 01" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 02" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 03" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 04" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 05" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 06" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 07" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 08" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 09" under Sundry Creditors
+no GST, bill-by-bill No
+Create ledger "L0b Box 10" under Sundry Creditors
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.
+2026-11-02T13:24:17.837Z capture b2-open.png 1920x1080 399776 B sha256 872bd00217cbe3b7c67bc4c1fd221ee15208c94a1b9296a679fe303eda466407
+2026-11-02T13:24:17.887Z WAITING for <lab folder>\box\b2.answer
+2026-11-02T13:24:34.949Z before click: foreground 0x1ba2cb2 pid 10884 bridge_mcp title 'ComplyEaze Bridge — create 10 ledgers?'
+2026-11-02T13:24:35.199Z CLICKED No at 1051,896 (physical) 2026-11-02T13:24:34.984Z; seen-to-click 18.4 s
+2026-11-02T13:24:36.200Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

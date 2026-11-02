@@ -1,0 +1,4 @@
+Replaced in every file here, with counts. company_number values are replaced by a JSON parser first.
+<company number>: 16
+<desktop client>: 4
+<lab folder>: 3

@@ -1,0 +1,17 @@
+2026-11-02T13:23:29.823Z 000-tools.json list secs 0.014 bytes 240933 isError None
+2026-11-02T13:23:30.581Z 001-companies.json list_companies secs 0.097 bytes 1577 isError False
+2026-11-02T13:23:31.683Z 002-status.json tally_status secs 0.099 bytes 1831 isError False
+2026-11-02T13:23:33.026Z 003-m0.json ledger_masters secs 0.815 bytes 2766 isError False
+2026-11-02T13:23:39.631Z 004-b1.json prepare_ledger_creates secs 1.302 bytes 4945 isError False
+2026-11-02T13:24:14.688Z 005-b2.json post_ledger_creates secs 20.422 bytes 2232 isError True
+2026-11-02T13:24:50.048Z 006-b4.json ledger_masters secs 0.844 bytes 2766 isError False
+2026-11-02T13:26:13.096Z 007-l0.json ledger_masters secs 0.875 bytes 2766 isError False
+2026-11-02T13:26:14.977Z 008-l1.json prepare_ledger_creates secs 1.333 bytes 3212 isError False
+2026-11-02T13:26:17.358Z 009-l2.json ledger_masters secs 0.805 bytes 2767 isError False
+2026-11-02T13:26:36.805Z 010-l3.json post_ledger_creates secs 19.143 bytes 4695 isError False
+2026-11-02T13:27:09.632Z 011-l4.json ledger_masters secs 0.906 bytes 3517 isError False
+2026-11-02T13:27:35.909Z 012-l5c.json ledger_masters secs 1.559 bytes 12558 isError False
+2026-11-02T13:28:01.513Z 013-l6.json post_ledger_creates secs 0.227 bytes 2932 isError False
+2026-11-02T13:28:09.015Z 014-l7.json ledger_masters secs 0.933 bytes 3517 isError False
+2026-11-02T13:28:10.958Z 015-egress.json egress_log secs 0.093 bytes 92134 isError False
+2026-11-02T13:31:18.639Z 016-l8.json ledger_masters secs 1.053 bytes 2767 isError False

@@ -1,0 +1,12 @@
+2026-11-02 690 rows, UTC. Sheet at c8ab4506, 3 of 3 files equal. Build digest, exe and pdfium equal.
+13:22 Step 0: no company loaded; one tally.exe owns 9001; status 200. Display 1920x1080, 125 percent.
+13:23 Book loaded alone; client launched; M 208, three ledgers.
+13:23 B1 prepare, ten ledgers, 27 preview lines.
+13:24 B2 post; box seen; capture read; B3 No by click; declined. B4 M 208.
+13:25 L0 BK0 by Tally's screen; M 208.
+13:26 L1 prepare; L2 M 208; L3 post; box seen; capture read; Yes by click; posted_verified.
+13:27 L4 M 211; three rows. Compliance read for ALTERIDs: none returned.
+13:28 L6 same call: no box, 0.227 s. L7 M 211; egress read.
+13:30 Word for the restore received.
+13:31 Book shut; BK0 restored; loaded alone; L8 M 208, same rows. Exe hash equal. Client ended, exit 0.
+13:33 Book shut; Select Company, none loaded.

@@ -1,0 +1,21 @@
+2026-11-02T13:23:28Z exe sha256 af74d0ced3f5f4056f1d9848ccca5f6fd30b54454459e7696c2d6c71203f7973 ok; launch-env.json sha256 1c00bfdc85cd0f8183d53d452893c8ffcd5b644829115df94b522005f68341a7; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_MASTER_WRITES', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-02T13:23:28Z launched pid 13424; stderr to server-stderr-20261102T132328Z.log
+2026-11-02T13:23:28Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-02T13:23:29Z 000-tools.json tool=list secs=0.014 isError=None error=None saved_sha256=c2d9cfe2a6edb28bf38dc9e5531c193db32adc317743386a94613a9744cc2e00
+2026-11-02T13:23:31Z 001-companies.json tool=list_companies secs=0.097 isError=False error=None saved_sha256=b5829f7e99bf09c580b1fcdbe9c589abb441e29b0423137c5c51c73bf33bc242
+2026-11-02T13:23:32Z 002-status.json tool=tally_status secs=0.099 isError=False error=None saved_sha256=662b23938654fe7151813483c91969b561a54b7cc788cdb41e6c84fade4f26a3
+2026-11-02T13:23:33Z 003-m0.json tool=ledger_masters secs=0.815 isError=False error=None saved_sha256=fb48b2dd15eb7c7336a38b5e9bbdc7f89240f79f206cff4438b04feeabd12fd2
+2026-11-02T13:23:41Z 004-b1.json tool=prepare_ledger_creates secs=1.302 isError=False error=None saved_sha256=29319a6d0d24e31d409beec4113fe4b3442756171c62a396b1a2fb29b5dfea47
+2026-11-02T13:24:35Z 005-b2.json tool=post_ledger_creates secs=20.422 isError=True error=None saved_sha256=10de3de9aca0c0ac81694fbf350cd96b63b74272ccca8871e1bbad62d4c87cf2
+2026-11-02T13:24:51Z 006-b4.json tool=ledger_masters secs=0.844 isError=False error=None saved_sha256=3554bb36365f0033a44a93e9dd7e26a83eddd4c401104b5f1d0aa21491124a2a
+2026-11-02T13:26:14Z 007-l0.json tool=ledger_masters secs=0.875 isError=False error=None saved_sha256=c8d0270b0ec94245047e7455ccdf50d51339f82525401946c676423f202005a3
+2026-11-02T13:26:16Z 008-l1.json tool=prepare_ledger_creates secs=1.333 isError=False error=None saved_sha256=c3ea67b6b8be6bc4d0c3ceb2635bb3d74e689d96addada1f7c9f9794fe361ead
+2026-11-02T13:26:18Z 009-l2.json tool=ledger_masters secs=0.805 isError=False error=None saved_sha256=9dca0ae2f5382033a701771a35bfda91ba24f84c9cd5dfd4cf88dc90621f7cb0
+2026-11-02T13:26:56Z 010-l3.json tool=post_ledger_creates secs=19.143 isError=False error=None saved_sha256=62ece99161ea6a574b027657bb128bb104dd7fa5c6f8e4fe7361090b34daa4b4
+2026-11-02T13:27:10Z 011-l4.json tool=ledger_masters secs=0.906 isError=False error=None saved_sha256=128a306ae672dc07858bc2bff4d159b3583a0bc776c88043da1733907e1ac9e2
+2026-11-02T13:27:37Z 012-l5c.json tool=ledger_masters secs=1.559 isError=False error=None saved_sha256=a762ea490af54b23a3c7447ccfd45138f51d1d971f7d0f712d5167bdddabf982
+2026-11-02T13:28:02Z 013-l6.json tool=post_ledger_creates secs=0.227 isError=False error=None saved_sha256=32f45525a43984913e1da63e2736673e1d8eecd7ea416fbe53bd7bb19c0edb1d
+2026-11-02T13:28:10Z 014-l7.json tool=ledger_masters secs=0.933 isError=False error=None saved_sha256=25254f457c7da89f08a54d86455cb8568fa258dfdad4838fda894a10af5a857c
+2026-11-02T13:28:11Z 015-egress.json tool=egress_log secs=0.093 isError=False error=None saved_sha256=5f9b085280a1d5f8bf1dc530975773ce6cd7bea26fd491e9be9925c0fadbcd96
+2026-11-02T13:31:19Z 016-l8.json tool=ledger_masters secs=1.053 isError=False error=None saved_sha256=9b65c798035d628f3ccc9fa3757fdebb0a6e801f35341c1c82aa4c770ed56d9d
+2026-11-02T13:31:21Z session ended; server pid 13424 exit code 0

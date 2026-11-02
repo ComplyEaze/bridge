@@ -3052,9 +3052,18 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
 const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
-     (26 Oct 2026, #1392), with no row here: no parser or test reads it yet, and the pull request \
-     that adds the day reader replays it and changes this reason; \
+     (26 Oct 2026, #1392), with no row here: the app crate's day reader \
+     (src/agent_transfer_pairing.rs) parses it, and the whole_day tests in \
+     src/agent_transfer_pairing_tests.rs serve it in the reader's order, each request checked byte \
+     for byte, and pin what each read admits; \
      agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
+const TRANSFER_DAYS_READ: &str = "an answer of the transfer days' lab run on BRIDGE TRANSFER LAB \
+     (2 Nov 2026, #1392), with no row here: the app crate's day reader and transfers section \
+     (src/agent_transfer_pairing.rs, src/agent_import_transfers.rs) parse it, and the whole_day \
+     tests in src/agent_transfer_pairing_tests.rs, with src/agent_import_transfers_tests.rs and \
+     src/agent_import_transfer_flow_tests.rs, serve it in the reader's order, each request checked \
+     byte for byte, and pin what each read admits; agent/transfer-days-lab/PROVENANCE.md says what \
+     each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 const FOREX_OPEN_BILL: &str = "a Bills Receivable answer of BRIDGE FOREXGROUP LAB (30 Oct 2026, \
@@ -3907,6 +3916,99 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
         WHOLE_DAY_READ,
+    ),
+    // The transfer days' answers on BRIDGE TRANSFER LAB (#1392).
+    (
+        "tests/fixtures/agent/transfer-days-lab/cat1.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/cat2.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-c.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/m2.utf16le.xml",
+        TRANSFER_DAYS_READ,
     ),
     // Built-in reports no parser reads.
     (

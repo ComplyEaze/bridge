@@ -1438,7 +1438,7 @@ fn every_amount_consuming_parse_still_refuses_the_composite_window() {
 /// holds one is not withheld and its window refuses, as it did before that layout was known
 /// (#683, #2071). The same entry in the captured 7.1 layout is withheld.
 #[test]
-fn a_72_layout_composite_on_a_voucher_entry_still_refuses_the_window() {
+fn a_72_layout_composite_on_a_voucher_entry_withholds_its_voucher() {
     let captured = captured_forex_composite_vouchers();
     let composite = "-$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 8600.00";
     let at = captured.find(composite).unwrap();
@@ -1452,10 +1452,170 @@ fn a_72_layout_composite_on_a_voucher_entry_still_refuses_the_window() {
             "-$100.00 @ \u{20b9} 86/$ = -\u{20b9} 8600.00"
         )
     );
-    assert_eq!(
-        parse_agent_rows_withholding(&unspaced, FOREX_COMPANY_GUID).unwrap_err(),
-        "voucher_amount_invalid"
+    let rows = parse_agent_rows_withholding(&unspaced, FOREX_COMPANY_GUID).unwrap();
+    assert!(rows.iter().all(VoucherRow::is_withheld));
+}
+
+use bridge_tally_protocol::native_outstandings::{
+    parse_company_currency_name, parse_currency_master_list,
+};
+
+const FOREX_72_COMPANY_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+
+fn decoded_utf16le(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The 7.2 lab book's answer of one day: eleven vouchers, eight with composites
+/// (fixtures/agent/vouchers-forex-72-20250401.PROVENANCE.md).
+fn captured_72_vouchers() -> String {
+    decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-72-20250401.utf16le.xml"
+    ))
+}
+
+/// That book's base and masters, from its own captured currency reads.
+fn captured_72_book() -> IdentifiedBaseCurrency {
+    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml"
+    )))
+    .unwrap();
+    let company = parse_company_currency_name(
+        &decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+    )
+    .unwrap();
+    masters.identify_base(Some(&company)).unwrap()
+}
+
+fn read_under_the_72_book(xml: &str) -> Vec<VoucherRow> {
+    parse_agent_rows_withholding(xml, FOREX_72_COMPANY_GUID)
+        .unwrap()
+        .into_iter()
+        .map(|row| row.read_under(&captured_72_book()))
+        .collect()
+}
+
+#[test]
+fn a_captured_72_window_is_read_as_rupee_amounts_with_the_foreign_amount_apart() {
+    let captured = captured_72_vouchers();
+    let withheld = parse_agent_rows_withholding(&captured, FOREX_72_COMPANY_GUID).unwrap();
+    assert_eq!(withheld.iter().filter(|row| row.is_withheld()).count(), 8);
+    assert_eq!(withheld.len(), 11);
+
+    let rows = read_under_the_72_book(&captured)
+        .into_iter()
+        .map(|row| match row {
+            VoucherRow::Read(row) => row,
+            VoucherRow::Withheld(_) => panic!("every composite here is readable"),
+        })
+        .collect::<Vec<_>>();
+    let with_rate = |rate: &str| {
+        rows.iter()
+            .flat_map(|row| row["amounts"].as_array().unwrap())
+            .filter(|entry| entry["foreign"]["rate"] == rate)
+            .collect::<Vec<_>>()
+    };
+    let decimal_rate = with_rate("86.4125");
+    assert_eq!(decimal_rate.len(), 2);
+    for entry in decimal_rate {
+        let sign = entry["amount"]
+            .as_str()
+            .unwrap()
+            .strip_suffix("8641.25")
+            .unwrap();
+        assert_eq!(
+            entry["foreign"],
+            json!({"currency": "$", "amount": format!("{sign}100.00"), "rate": "86.4125"})
+        );
+    }
+    let allocations = rows
+        .iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+        .flat_map(|entry| entry["bill_allocations"].as_array().unwrap())
+        .collect::<Vec<_>>();
+    assert!(allocations
+        .iter()
+        .any(|allocation| allocation["foreign"]["currency"] == "$"));
+    for allocation in allocations {
+        let amount = allocation["amount"].as_str().unwrap();
+        assert!(ExactDecimal::parse(amount.to_string()).is_ok(), "{amount}");
+    }
+    // A plain voucher of the same window comes through as it was.
+    let plain = rows
+        .iter()
+        .filter(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|entry| entry.get("foreign").is_none())
+        })
+        .count();
+    assert_eq!(plain, 3);
+}
+
+#[test]
+fn a_captured_71_voucher_is_read_under_its_own_base_symbol() {
+    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+    )))
+    .unwrap();
+    let book = masters.identify_base(Some("\u{20b9}")).unwrap();
+    let rows =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert_eq!(rows.len(), 1);
+    let row = match rows.into_iter().next().unwrap().read_under(&book) {
+        VoucherRow::Read(row) => row,
+        VoucherRow::Withheld(_) => panic!("the captured composite is readable"),
+    };
+    assert_eq!(row["amounts"][0]["amount"], "-8600.00");
+    assert_eq!(row["amounts"][0]["foreign"]["rate"], "86");
+    // The same voucher in the 7.2 book's terms: its base symbol is not this book's.
+    let other =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert!(other
+        .into_iter()
+        .all(|row| row.read_under(&captured_72_book()).is_withheld()));
+}
+
+#[test]
+fn a_voucher_that_will_not_read_stays_withheld_and_shows_no_amount() {
+    let captured = captured_72_vouchers();
+    // One side's base moved a paisa, so the entries no longer net to zero.
+    let unbalanced = captured.replace("= -\u{20b9} 8641.25", "= -\u{20b9} 8641.26");
+    // A symbol that is no master of this book.
+    let unknown = captured.replace(
+        "-$100.00 @ \u{20b9} 86.4125/$",
+        "-\u{20ac}100.00 @ \u{20b9} 86.4125/\u{20ac}",
     );
+    // A shape the parse refuses, which the withholding classifier still admits.
+    let empty_rate = captured.replace("\u{20b9} 86.4125/$", "\u{20b9} /$");
+    for (name, xml) in [
+        ("unbalanced", unbalanced),
+        ("unknown", unknown),
+        ("empty_rate", empty_rate),
+    ] {
+        assert_ne!(xml, captured, "{name}");
+        let rows = read_under_the_72_book(&xml);
+        assert_eq!(
+            rows.iter().filter(|row| row.is_withheld()).count(),
+            1,
+            "{name}"
+        );
+        let view = withheld_view(rows.iter().find(|row| row.is_withheld()).unwrap());
+        assert!(view["amounts"][0].get("amount").is_none(), "{name}");
+    }
 }
 
 #[test]

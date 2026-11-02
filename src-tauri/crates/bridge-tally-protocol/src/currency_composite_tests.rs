@@ -776,10 +776,30 @@ fn the_shapes_the_unspaced_check_admits_without_a_capture_are_pinned() {
 /// Reading a composite into its parts is unchanged and still the 7.1 layout alone: the 7.2
 /// layout is classified, not read, until a capture shows the arithmetic the parse needs.
 #[test]
-fn the_composite_parse_still_refuses_the_unspaced_layout() {
+fn the_composite_parse_reads_the_unspaced_layout_and_its_decimal_rate() {
     let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");
-    assert_eq!(
-        parse_currency_composite("-$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00", &base),
-        Err(CompositeRefusal::NotComposite)
-    );
+    let parsed = parse_currency_composite("-$100.00 @ \u{20b9} 86.4125/$ = -\u{20b9} 8641.25", &base);
+    let Ok(CurrencyComposite::Valued(composite)) = parsed else {
+        panic!("{parsed:?}");
+    };
+    assert_eq!(composite.side(), Side::Negative);
+    assert_eq!(composite.foreign_symbol(), "$");
+    assert_eq!(composite.foreign().magnitude().as_str(), "100.00");
+    assert_eq!(composite.rate().as_str(), "86.4125");
+    assert_eq!(composite.base().magnitude().as_str(), "8641.25");
+}
+
+#[test]
+fn the_composite_parse_applies_its_refusals_to_the_unspaced_layout() {
+    let base = BaseCurrencyName::among_several_for_tests("\u{20b9}");
+    for (text, refusal) in [
+        ("$100.00 @ I\u{20b9} 87/$ = I\u{20b9} 8700.00", CompositeRefusal::BaseNotBookBase),
+        ("$100.00 @ \u{20b9} 87/$ = -\u{20b9} 8700.00", CompositeRefusal::SignsDisagree),
+        ("$100.00 @ \u{20b9} 87.12345/$ = \u{20b9} 8712.34", CompositeRefusal::RatePrecision),
+        ("$0100.00 @ \u{20b9} 87/$ = \u{20b9} 8700.00", CompositeRefusal::LeadingZero),
+        ("$100.00 @ \u{20b9} /$ = \u{20b9} 8700.00", CompositeRefusal::EmptyRateWithValue),
+        ("$100.00 @ \u{20b9} 87/$  = \u{20b9} 8700.00", CompositeRefusal::NotComposite),
+    ] {
+        assert_eq!(parse_currency_composite(text, &base), Err(refusal), "{text}");
+    }
 }

@@ -1430,6 +1430,11 @@ impl ClassifiedCompanyCurrencyRead {
         self.evidence.clone()
     }
 
+    /// The identified base of an INR book, which a composite is read against (bridge#683).
+    pub(crate) fn inr_base(self) -> Option<IdentifiedBaseCurrency> {
+        self.identified.filter(IdentifiedBaseCurrency::is_inr)
+    }
+
     /// INR for the identified base, by its mailing name; the codes are
     /// `admit_inr`'s.
     pub(crate) fn admit_inr_classified(self) -> Result<ClassifiedCurrencyWitness, &'static str> {

@@ -12,6 +12,11 @@ mod goods_lines;
 #[path = "agent_voucher_scalars.rs"]
 mod scalars;
 use bank_allocations::BankAllocationCollector;
+use bridge_tally_core::ExactDecimal;
+use bridge_tally_protocol::currency_composite::{
+    is_balance_composite, parse_currency_composite, CurrencyComposite, Side,
+};
+use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
 use cost_centres::CostCentreCollector;
 pub(super) use cost_centres::CostCentreProblem;
 use entry_gst::EntryGstCollector;
@@ -226,10 +231,53 @@ enum CompositePolicy {
 
 impl CompositePolicy {
     fn withholds(self, amount: &str) -> bool {
-        self == Self::Withhold
-            && bridge_tally_protocol::currency_composite::is_currency_composite(amount)
-            && composite_signs_agree(amount)
+        self == Self::Withhold && is_balance_composite(amount) && composite_signs_agree(amount)
     }
+}
+
+/// A voucher with an amount Tally stored as a composite, read with the base amount as `amount`
+/// and the foreign amount, its currency and the rate apart under `foreign` (#683). `None`, so the
+/// voucher stays withheld, for a composite [`parse_currency_composite`] refuses or that writes no
+/// amount, a foreign symbol that is not one of the book's masters, or base entries that do not
+/// net to zero.
+fn read_composites(row: &Value, book: &IdentifiedBaseCurrency) -> Option<Value> {
+    let mut row = row.clone();
+    let mut net = ExactDecimal::zero();
+    for entry in row["amounts"].as_array_mut()? {
+        read_composite_amount(entry, book)?;
+        for allocation in entry["bill_allocations"].as_array_mut()? {
+            read_composite_amount(allocation, book)?;
+        }
+        let amount = ExactDecimal::parse(entry["amount"].as_str()?.to_string()).ok()?;
+        net = net.checked_add(&amount).ok()?;
+    }
+    net.is_zero().then_some(row)
+}
+
+fn read_composite_amount(holder: &mut Value, book: &IdentifiedBaseCurrency) -> Option<()> {
+    let amount = holder["amount"].as_str()?;
+    if ExactDecimal::parse(amount.to_string()).is_ok() {
+        return Some(());
+    }
+    let CurrencyComposite::Valued(composite) =
+        parse_currency_composite(amount, book.base()).ok()?
+    else {
+        return None;
+    };
+    if !book.is_foreign_master(composite.foreign_symbol()) {
+        return None;
+    }
+    let sign = match composite.side() {
+        Side::Positive => "",
+        Side::Negative => "-",
+    };
+    holder["amount"] = json!(format!("{sign}{}", composite.base().magnitude().as_str()));
+    holder["foreign"] = json!({
+        "currency": composite.foreign_symbol(),
+        "amount": format!("{sign}{}", composite.foreign().magnitude().as_str()),
+        "rate": composite.rate().as_str(),
+    });
+    Some(())
 }
 
 /// A voucher entry's composite carries one sign on both amounts, as every
@@ -243,10 +291,11 @@ fn composite_signs_agree(composite: &str) -> bool {
     let Some((_, base)) = rest.split_once(" = ") else {
         return false;
     };
+    // The amount follows its symbol, with a space in the 7.1 layout and none in the 7.2 one.
     let foreign_is_zero = foreign
-        .trim_start_matches('-')
-        .split_once(' ')
-        .is_some_and(|(_, digits)| digits.bytes().all(|b| b == b'0' || b == b'.'));
+        .rsplit(|c: char| !c.is_ascii_digit() && c != '.')
+        .next()
+        .is_some_and(|digits| digits.bytes().all(|b| b == b'0' || b == b'.'));
     foreign_is_zero || foreign.starts_with('-') == base.starts_with('-')
 }
 
@@ -265,8 +314,9 @@ fn refused_composites(rows: Vec<(Value, bool)>) -> Result<Vec<Value>, String> {
 }
 
 /// A `vouchers` row: read in full, or withheld because an amount was stored as
-/// a foreign-currency composite (#674). A withheld voucher carries no amount,
-/// so no path that sums, matches or verifies amounts can take one.
+/// a foreign-currency composite (#674). A withheld voucher shows no amount,
+/// so no path that sums, matches or verifies amounts can take one, until
+/// [`Self::read_under`] has read it.
 #[derive(Debug, Clone)]
 pub(super) enum VoucherRow {
     Read(Value),
@@ -274,9 +324,24 @@ pub(super) enum VoucherRow {
 }
 
 /// A withheld voucher: its identity, type fields and entry ledgers, never an
-/// amount. The field is private; [`Self::filter_view`] is the only way out.
-#[derive(Debug, Clone)]
-pub(super) struct WithheldVoucher(Value);
+/// amount. The fields are private; [`Self::filter_view`] is the only way out
+/// but for [`VoucherRow::read_under`].
+#[derive(Clone)]
+pub(super) struct WithheldVoucher {
+    view: Value,
+    /// The parsed voucher, composites as Tally wrote them.
+    parsed: Value,
+}
+
+/// The view alone, so no debug output shows an amount this type withholds.
+impl std::fmt::Debug for WithheldVoucher {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_tuple("WithheldVoucher")
+            .field(&self.view)
+            .finish()
+    }
+}
 
 /// Why a voucher is withheld; the only cause so far.
 pub(super) const WITHHELD_FOREIGN_CURRENCY: &str = "foreign_currency_amount_unparsed";
@@ -285,7 +350,8 @@ pub(super) const WITHHELD_FOREIGN_CURRENCY: &str = "foreign_currency_amount_unpa
 pub(super) const WITHHELD_MARKER: &str = "withheld_cause";
 
 impl WithheldVoucher {
-    fn from_parsed(mut row: Value) -> Self {
+    fn from_parsed(parsed: Value) -> Self {
+        let mut row = parsed.clone();
         // Keep each entry's ledger (the ledger filter reads it) and drop
         // everything that carries an amount.
         let ledgers = row["amounts"]
@@ -299,7 +365,7 @@ impl WithheldVoucher {
             .unwrap_or_default();
         row["amounts"] = Value::Array(ledgers);
         row[WITHHELD_MARKER] = json!(WITHHELD_FOREIGN_CURRENCY);
-        Self(row)
+        Self { view: row, parsed }
     }
 
     /// The row as the date, ledger and voucher-type filters read it: the parsed
@@ -307,7 +373,7 @@ impl WithheldVoucher {
     /// amount. The view never leaves the tool: `vouchers` lists a withheld
     /// voucher by GUID, date, type, number and cause only.
     pub(super) fn filter_view(&self) -> Value {
-        self.0.clone()
+        self.view.clone()
     }
 }
 
@@ -329,6 +395,22 @@ impl super::voucher_window::WindowRow for VoucherRow {
 impl VoucherRow {
     /// The row the date, ledger and voucher-type filters read: a read voucher
     /// whole, a withheld one as its [`WithheldVoucher::filter_view`].
+    pub(super) fn is_withheld(&self) -> bool {
+        matches!(self, Self::Withheld(_))
+    }
+
+    /// A withheld voucher read in a book whose base and masters are known, or left withheld
+    /// where [`read_composites`] will not read it.
+    pub(super) fn read_under(self, book: &IdentifiedBaseCurrency) -> Self {
+        match self {
+            Self::Withheld(withheld) => match read_composites(&withheld.parsed, book) {
+                Some(row) => Self::Read(row),
+                None => Self::Withheld(withheld),
+            },
+            read => read,
+        }
+    }
+
     pub(super) fn into_filter_row(self) -> Value {
         match self {
             Self::Read(row) => row,
@@ -339,7 +421,7 @@ impl VoucherRow {
     fn row(&self) -> &Value {
         match self {
             Self::Read(row) => row,
-            Self::Withheld(WithheldVoucher(row)) => row,
+            Self::Withheld(withheld) => &withheld.view,
         }
     }
 }

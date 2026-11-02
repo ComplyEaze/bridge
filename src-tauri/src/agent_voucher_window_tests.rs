@@ -6196,6 +6196,8 @@ async fn a_partial_window_is_not_held_and_a_named_snapshot_of_it_refuses() {
     plans.extend(paired(&mark(3)));
     plans.extend(paired(&composite));
     plans.extend(paired(&composite));
+    // The base read fails at its first leg, so the voucher stays withheld.
+    plans.push(xml_plan("<ENVELOPE></ENVELOPE>".to_string()));
     let first_len = plans.len();
     // The second page of a window nothing is held for: no marks read for
     // nothing, then the window afresh.
@@ -6203,6 +6205,7 @@ async fn a_partial_window_is_not_held_and_a_named_snapshot_of_it_refuses() {
     plans.extend(paired(&mark(3)));
     plans.extend(paired(&composite));
     plans.extend(paired(&composite));
+    plans.push(xml_plan("<ENVELOPE></ENVELOPE>".to_string()));
     // The third, naming a snapshot there is none of: refused after the identity read alone.
     plans.extend(identity_plans());
     let total = plans.len();
@@ -7981,6 +7984,8 @@ async fn a_group_summary_of_a_window_with_a_withheld_voucher_is_partial_and_says
     plans.extend(paired(&xml_plan(with_first_voucher_composite(
         &three_vouchers(),
     ))));
+    // The base read fails at its first leg, so the voucher stays withheld.
+    plans.push(xml_plan("<ENVELOPE></ENVELOPE>".to_string()));
     plans.extend(paired(&xml_plan(ledger_catalogue())));
     plans.extend(paired(&xml_plan(wr2_group_snapshot())));
     let one = OneServer::spawn(plans);

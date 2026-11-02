@@ -1,0 +1,16 @@
+# Tally's screens, period 1-Apr-25 to 31-Aug-25, as read from the captures, two passes. screen title | subtitles | line | quantity | rate | value
+Godown Summary | - | Lab Second | 5 Nos | 2.00 | 10.00
+Godown Summary | - | Main Location | - | - | 435.00
+Godown Summary | - | Grand Total | 5 Nos | - | 445.00
+Godown Summary | Lab Second | Lab Group One | 5 Nos | 2.00 | 10.00
+Godown Summary | Godown: Lab Second, Lab Group One | Lab Depth1 Nut | 5 Nos | 2.00 | 10.00
+Godown Summary | Main Location | Lab Group One | - | - | 385.00
+Godown Summary | Main Location | Lab Root Bolt | 10 Nos | 5.00 | 50.00
+Godown Summary | Godown: Main Location, Lab Group One | Lab Group Two | - | - | 105.00
+Godown Summary | Godown: Main Location, Lab Group One | Lab Depth1 Nut | 15 Nos | 2.00 | 30.00
+Godown Summary | Godown: Main Location, Lab Group One | Lab Depth1 Powder | 2.500 Kgs | 100.00 | 250.00
+Stock Summary | - | Lab Group One | - | - | 395.00
+Stock Summary | - | Lab Root Bolt | 10 Nos | 5.00 | 50.00
+Stock Group Summary | Lab Group One | Lab Group Two | - | - | 105.00
+Stock Group Summary | Lab Group One | Lab Depth1 Nut | 20 Nos | 2.00 | 40.00
+Stock Group Summary | Lab Group One | Lab Depth1 Powder | 2.500 Kgs | 100.00 | 250.00

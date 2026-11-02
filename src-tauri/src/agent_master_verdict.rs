@@ -19,7 +19,9 @@
 //! 2. a pre-image master's `ALTERID` changed, `ALTERED` above zero, or the name
 //!    resolves to a pre-image master: `posted_into_existing_master`;
 //! 3. another loaded company's `ALTMSTID` moved:
-//!    `master_write_located_elsewhere`;
+//!    `master_write_located_elsewhere`, except that with Tally's answer lost
+//!    it too needs [`OrderCoverage`], and elsewhere the batch stays open with
+//!    the reason;
 //! 4. on a reconcile only, the name absent under every key of the index, no pre-image
 //!    master changed or missing, no loaded company's mark moved and no counter
 //!    claiming a create: `confirmed_absent`; the same, but with the target
@@ -118,9 +120,10 @@ pub(super) struct ReadBack {
 }
 
 /// Whether the order Tally serves requests in, which both absent states rest
-/// on, was measured on the Tally a read-back went to. It was measured only on
-/// TallyPrime 7.2 Silver, licensed (the abandoned-create rows and the order
-/// rows of #1713): the product must be exactly `TallyPrime`, since another
+/// on, was measured on the Tally a read-back went to. It was measured on
+/// TallyPrime 7.2, licensed (the abandoned-create rows and the order rows of
+/// #1713, on Silver; Gold is the same product with multi-user access, so the
+/// edition is no bound): the product must be exactly `TallyPrime`, since another
 /// product of the same release and tier can open the same data folder. Built
 /// only from what the read's identity brackets saw, so no caller can claim a
 /// measured Tally it did not read.
@@ -133,7 +136,6 @@ pub(super) enum OrderCoverage {
 
 impl OrderCoverage {
     pub(super) fn of(tally: &crate::tally::ObservedTally) -> Self {
-        use bridge_tally_core::LicenseTier;
         if tally.education {
             return Self::NotMeasured("absent_not_measured_in_education");
         }
@@ -142,11 +144,8 @@ impl OrderCoverage {
             return Self::NotMeasured("absent_not_measured_on_this_product");
         }
         match (product, tally.release.as_deref(), tally.license_tier) {
-            (Some("TallyPrime"), Some("7.2"), Some(LicenseTier::Silver)) => Self::Measured,
-            (_, _, Some(LicenseTier::Gold)) => Self::NotMeasured("absent_not_measured_on_gold"),
-            (Some(_), Some(_), Some(LicenseTier::Silver)) => {
-                Self::NotMeasured("absent_not_measured_on_this_release")
-            }
+            (Some("TallyPrime"), Some("7.2"), Some(_)) => Self::Measured,
+            (Some(_), Some(_), Some(_)) => Self::NotMeasured("absent_not_measured_on_this_release"),
             _ => Self::NotMeasured("absent_tally_release_not_known"),
         }
     }
@@ -679,9 +678,31 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         };
     }
 
-    // 3. Another loaded company's master mark moved.
+    // Either absent state is given only where its basis was measured; on any
+    // other Tally the batch stays open, with the reason naming what is not.
+    let uncovered = match read.order_coverage {
+        OrderCoverage::Measured => None,
+        OrderCoverage::NotMeasured(reason) => Some(reason),
+    };
+
+    // 3. Another loaded company's master mark moved. This verdict releases the
+    // name too, so with the name absent and Tally's answer lost, when a create
+    // may still be waiting, it needs the same measured order as the absent
+    // states; elsewhere the batch stays open with the reason. With the name in
+    // the book the book itself refuses a new create, as at steps 2 and 6.
     if others_moved {
         reasons.push("other_company_mark_moved");
+        if let Some(uncovered) = uncovered.filter(|_| name_absent && !facts.answer_held) {
+            reasons.push(uncovered);
+            return Judgement {
+                state: MasterVerdictState::ReconciliationRequired,
+                guid: None,
+                checks,
+                reasons,
+                name_absent_in_read_book: name_absent,
+                sealed: (),
+            };
+        }
         return Judgement {
             state: MasterVerdictState::MasterWriteLocatedElsewhere,
             guid: None,
@@ -702,12 +723,6 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
         && !missing
         && same_companies
         && !counters_claim_a_write;
-    // Either absent state is given only where its basis was measured; on any
-    // other Tally the batch stays open, with the reason naming what is not.
-    let uncovered = match read.order_coverage {
-        OrderCoverage::Measured => None,
-        OrderCoverage::NotMeasured(reason) => Some(reason),
-    };
     if absent_and_unchanged {
         reasons.extend(uncovered);
     }

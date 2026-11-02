@@ -41,11 +41,13 @@ TallyPrime, and what has not, is listed below.
 [How to connect Claude to TallyPrime](./docs/guides/connect-claude-to-tallyprime.md) ·
 [How to choose a TallyPrime MCP server safely](./docs/guides/choose-a-tallyprime-mcp-server-safely.md)
 
-Not yet code-signed; your computer may warn you before opening it.
+Not yet code-signed.
 
 **Get it:** the [Download page](https://bridge.complyeaze.com/download.html)
-offers the file for your computer; compare it with its `.sha256` file as
-[the install guide](./docs/agent/INSTALL.md#for-it-staff) says. ComplyEaze Bridge does not
+lists the current file for each operating system; compare yours with its `.sha256` file as
+[the install guide](./docs/agent/INSTALL.md#for-it-staff) says (that shows the file arrived whole, not who made it).
+On Windows, ComplyEaze Bridge also needs Microsoft's Visual C++ Redistributable (x64); the install guide's
+[Before you start](./docs/agent/INSTALL.md#before-you-start) has Microsoft's download link. ComplyEaze Bridge does not
 update itself, so look for a newer version on the
 [releases page](https://github.com/ComplyEaze/bridge/releases).
 
@@ -62,9 +64,9 @@ update itself, so look for a newer version on the
 - **Partly:** profit and loss and the balance sheet (a book with stock items is read only when Tally's own closing stock closes every gap, measured on one synthetic book; a book with several currencies is refused); closing stock value at a month's last day, and its closing quantity (compared with Tally's own Stock Summary for an item on a line of its own, the item list's own for an item inside a stock group), on small books, checked on two lab books; and a file of Payment, Receipt and Contra vouchers from a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda PDF statement, which you check and import in Tally yourself. It creates no ledger, it cannot build onto a Cash-in-Hand ledger, and it has not yet been run on a real bank statement.
 - **Not in this release:** GST returns or GSTR-2B matching, making sales or purchase invoices or GST entries, tax-audit flags (one test, the cash share of receipts and payments against the s.44AB(a) limit, is off by default and not yet run against a live TallyPrime), and Tally's Funds Flow and Ratio Analysis reports.
 
-"You can ask" means it answered on the books and builds we ran it on; the program inside the published Windows x64 0.7.0 file (checked against its `.sha256` file) has had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 30 October 2026, started directly by our test client rather than installed in Claude Desktop; it reported version 0.7.0, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted; the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 (#1780) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
+"You can ask" means it answered on the books and builds we ran it on; the program inside the published Windows x64 0.7.0 file (checked against its `.sha256` file) has had one read-only run against a live TallyPrime 7.2 Silver, on one Windows computer on 30 October 2026, started directly by our test client rather than installed in Claude Desktop; it reported version 0.7.0, read Tally's status, the company list and the ledger masters of one synthetic company; nothing was posted; the macOS file has not been run against TallyPrime; our one recorded run of the published 0.6.0 file against a live TallyPrime posted one Contra to a synthetic company on one Windows computer on 16 October 2026 ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)) and read it back; the other 0.6.0 posts ran on a release-candidate build and a rehearsal build. Very large books can fail or take longer than the assistant waits, and a book with several currencies is read only in part. Check any figure you rely on against Tally. The [Questions page](https://bridge.complyeaze.com/faq.html#what-can-i-ask) has the full table and its limits.
 
-**Its tools.** In name order; release 0.7.0 installs 34 of them, 33 offered by default (`audit_test_run` appears only when its setting is on). None of them changes your TallyPrime books; with posting on, two more appear, and with posting and master writes both on, two more again that create one ledger, described below the table. Every call adds a receipt line,
+**Its tools.** In name order; release 0.7.0 installs 34 of them, 33 offered by default (`audit_test_run` appears only when its setting is on), and `stock_by_godown` is in source, not yet in a published build. None of them changes your TallyPrime books; with posting on, two more appear, and with posting and master writes both on, two more again that create one ledger, described below the table. Every call adds a receipt line,
 with no figures, to a log on this computer.
 
 | Tool | What it gives you | What it writes besides that receipt |
@@ -94,6 +96,7 @@ with no figures, to a log on this computer.
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |
 | `sales_register` | Sales and Credit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `statement_tie_out` | Whether the bank ledger stands where a parsed bank statement says it stood at the start and at the end of the statement's dates, or of whole calendar months of it: three gaps and the dates; the balances themselves are not returned | Nothing |
+| `stock_by_godown` | Closing stock by godown at a month's last day from Tally’s own Godown Summary, returned only when the godowns add up to Tally’s Stock Summary total; for an item directly under the root, its value in each godown at that godown’s own cost; an item inside a stock group gets no value per godown; measured on one lab book | Nothing |
 | `stock_summary` | The closing stock value of each item as of a month's last day, and its closing quantity where Tally's own Stock Summary shows the item on a line of its own; an item inside a stock group returns its own quantity from Tally's stock item list, marked as not compared; small books only (a book with many masters of any kind is refused, and so is a date that is not a month's last day); month ends inside the year were checked on two lab books | Nothing |
 | `tally_status` | Whether TallyPrime’s gateway answers, and which companies are loaded | Nothing |
 | `trial_balance` | The ledger-wise Trial Balance for a date range | Nothing |
@@ -135,7 +138,7 @@ The Claude Desktop extension has no setting for master writes. When posting is o
   When you turn posting on, each post waits for your approval in a separate
   ComplyEaze Bridge window (for a batch, its summary). On Windows that window
   also takes the keyboard: in a test of the published 0.6.0 (a full-screen Tally,
-  one screen, #1780) a typed n declined it and a typed y approved it, so when you
+  one screen, [#1780](https://github.com/ComplyEaze/bridge/issues/1780)) a typed n declined it and a typed y approved it, so when you
   ask for a post, stop typing in Tally until you have answered it with the mouse.
   No Bridge tool lets the assistant approve
   it, and an approval counts only when that window returns a fresh one-time
@@ -275,13 +278,13 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   posted after one approval. Every post created what it sent, and every voucher read `posted_verified` in the post's own
   readback and again in `verify_import`. The approval window showed in front of a full-screen Tally and of Claude Desktop (one screen, one run), with No as the
   default, and took keyboard focus (a Down arrow meant for Tally moved the selection inside the window; Enter alone refuses,
-  arrow keys then Enter can reach Yes; a typed letter was not tried in that run; later that day, on the published file, a typed n declined the window and a typed y approved it: #1780). Then a package built by the release
+  arrow keys then Enter can reach Yes; a typed letter was not tried in that run; later that day, on the published file, a typed n declined the window and a typed y approved it: [#1780](https://github.com/ComplyEaze/bridge/issues/1780)). Then a package built by the release
   workflow's own steps (rehearsal run 38885882661, `bridge_mcp.exe` SHA-256
   `10e4614f74eab975897834ec1c9750edbe9fc7ad91584b802e5cde57a8180899`) was installed over it, kept its port and posting settings (the same version, not an upgrade), and posted one more
   Journal the same way. The published file (`bridge-tally-mcp-v0.6.0-windows-x64.mcpb` SHA-256
   `7bf81f08e058fc7ae00ccc51b3dceec10dc50d45dca8477a0438fd9b5a2852ca`, `bridge_mcp.exe` SHA-256
   `1e41e039fbf3daaf6be5a3c8e2f5e0bd1245a745abc5e78349fd83ce678224c1`) is neither of those: its exe differs from the rehearsal's in
-  77 of 26,503,168 bytes, and on a live TallyPrime it was run only in the probes of 16 October 2026 (#1780) noted above: a typed n declined; a typed y approved a post that came too late in the call to be sent; the call made again 27 minutes later, after that approval had expired, opened a new window; answered with a mouse click on Yes, it posted one Contra, read back `posted_verified`. What was not run on any of these builds, among others: a batch of Journals, a batch of
+  77 of 26,503,168 bytes, and on a live TallyPrime it was run only in the probes of 16 October 2026 ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)) noted above: a typed n declined; a typed y approved a post that came too late in the call to be sent; the call made again 27 minutes later, after that approval had expired, opened a new window; answered with a mouse click on Yes, it posted one Contra, read back `posted_verified`. What was not run on any of these builds, among others: a batch of Journals, a batch of
   more than 3, a refused or partly landed post, amendments, the review window, an On Account approval, the retired batch
   variable, the voucher-numbering rows (#724, #1668), `voucher_read_cost` against a real `vouchers` call, the Store-install
   proof of the lock (#1584, #1459), a second monitor, the batch `headline` on a live post, the Import menu, the desktop app,
@@ -332,7 +335,7 @@ TallyPrime Silver 7.1 and synthetic companies unless stated. The
   that file or read it back, and no real statement has been run.
 
 Not yet run by us in a controlled test: posting with a published package
-against a live TallyPrime beyond the one Contra of 16 October 2026 (#1780); each way of declining in the Windows approval window
+against a live TallyPrime beyond the one Contra of 16 October 2026 ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)); each way of declining in the Windows approval window
 (one was tried); the tools answering through Claude Desktop on macOS after the
 Terms are accepted (`tally_status` and `list_companies` answered on a CI build
 of 0.4.1, again on a CI build of 0.4.2 and on one Mac on a CI build of 0.5.0); posting on TallyPrime Education; posting on TallyPrime Gold
@@ -527,7 +530,7 @@ it. Before you do, know what it is and is not:
 
 - **Bridge is still being developed.** A release may contain errors, so try it
   on test data first and keep current backups. It is not yet code-signed or
-  notarized, so your operating system may warn before opening it.
+  notarized.
   Each package has a `.sha256` file and a provenance record so you can confirm
   exactly which bytes and which source commit you downloaded.
 - **Checked only as far as launching.** The release build confirms the package
@@ -535,7 +538,7 @@ it. Before you do, know what it is and is not:
   your Tally, or in conversation inside Claude Desktop. What has been run
   against a real TallyPrime, and on which builds, is
   [listed above](#what-has-been-run-against-a-real-tallyprime); the published
-  0.6.0 package itself has been run by us against a live TallyPrime on one day, 16 October 2026 (#1780), where it posted one Contra to a synthetic company; the programs in the published Windows 0.6.1 and 0.7.0 files have each had one read-only run, on 27 and 30 October 2026, and have not posted (see those entries above), and neither release's macOS file has been run against TallyPrime; two other builds of 0.6.0, made by
+  0.6.0 package itself has been run by us against a live TallyPrime on one day, 16 October 2026 ([#1780](https://github.com/ComplyEaze/bridge/issues/1780)), where it posted one Contra to a synthetic company; the programs in the published Windows 0.6.1 and 0.7.0 files have each had one read-only run, on 27 and 30 October 2026, and have not posted (see those entries above), and neither release's macOS file has been run against TallyPrime; two other builds of 0.6.0, made by
   our checks from the same source, were run against TallyPrime 7.1 Silver on one Windows computer
   (see the 16 October 2026 entry above).
 - **Windows x64 and Apple Silicon Macs only.** Intel Macs are not supported.

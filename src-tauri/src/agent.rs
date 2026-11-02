@@ -29,8 +29,6 @@ mod lab;
 mod bank_statement;
 #[path = "agent_catalog.rs"]
 mod catalog;
-// Nothing calls the pairing view until the import journal is wired to it.
-#[allow(dead_code)]
 #[path = "agent_transfer_pairing.rs"]
 mod transfer_pairing;
 #[cfg(test)]
@@ -64,6 +62,8 @@ mod month_register;
 mod negative_ledgers;
 #[path = "agent_negative_stock.rs"]
 mod negative_stock;
+#[path = "agent_stock_by_godown.rs"]
+mod stock_by_godown;
 use ledger_candidates::{
     ledger_match_json, resolve_catalogue_ledger_or_refuse, resolve_ledger_or_refuse,
     CatalogueLedger,
@@ -377,7 +377,7 @@ fn present_voucher_goods_lines(mut voucher: Value, shown: GoodsLinesShown) -> Va
 
 /// Whether an answer that returns a voucher's entries shows their GST details (#2027): each
 /// entry's rates per duty head, taxability and type of supply. Only `vouchers` called with
-/// `include_gst_details: true` shows them; the parse always reads them.
+/// `include_gst_details: true` shows them, and only that call's parse reads them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum GstDetailsShown {
     Withheld,
@@ -1047,6 +1047,20 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
                 limit_master_alter_id: *limit_master_alter_id,
             });
         }
+        if let Some(crate::tally::runtime::StockByGodownReadError::TooLarge {
+            master_alter_id,
+            estimated_bytes,
+            limit_bytes,
+            limit_master_alter_id,
+        }) = cause.downcast_ref::<crate::tally::runtime::StockByGodownReadError>()
+        {
+            return Some(ReadSize {
+                master_alter_id: *master_alter_id,
+                estimated_bytes: *estimated_bytes,
+                limit_bytes: *limit_bytes,
+                limit_master_alter_id: *limit_master_alter_id,
+            });
+        }
         match cause
             .downcast_ref::<crate::tally::connection::PartyLedgerMasterSourceValidationError>()?
         {
@@ -1219,6 +1233,11 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         }
         if let Some(crate::tally::runtime::NegativeStockReadError::PremiseViolated(reason)) =
             cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        {
+            return Some(reason);
+        }
+        if let Some(crate::tally::runtime::StockByGodownReadError::PremiseViolated(reason)) =
+            cause.downcast_ref::<crate::tally::runtime::StockByGodownReadError>()
         {
             return Some(reason);
         }
@@ -1510,6 +1529,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              stated guess, not a measurement of this report. A larger book refuses; retrying \
              this call refuses again.",
         ),
+        // The stock-by-godown read's own size refusal (`size` carries the mark).
+        "stock_by_godown_too_large" => Some(
+            "The company's master-alteration mark (`size.master_alter_id`) times an assumed \
+             worst-case row is over ComplyEaze Bridge's response budget (`size.limit_bytes`), \
+             so no report was requested. The mark counts masters of every kind, and the \
+             ceiling is a stated guess, not a measurement of these reports. A larger book \
+             refuses; retrying this call refuses again.",
+        ),
         // The stock summary read whose rows differ from Tally's own item count
         // (`counts` carries both numbers).
         "stock_summary_item_count_differs" => Some(
@@ -1538,6 +1565,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
             "stock_summary reads only an `as_of` that is the last day of a month, and no \
+             request was sent. Ask for the last day of that month, or of another month; \
+             retrying the same date refuses again.",
+        ),
+        // The stock-by-godown read's date refusal: it costs no Tally request.
+        "stock_by_godown_as_of_not_measured" => Some(
+            "stock_by_godown reads only an `as_of` that is the last day of a month, and no \
              request was sent. Ask for the last day of that month, or of another month; \
              retrying the same date refuses again.",
         ),
@@ -1600,6 +1633,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         | "currency_to_master_extent_changed"
         | "masters_extent_changed"
         | "month_register_extent_changed"
+        | "stock_by_godown_extent_changed"
         | "stock_summary_extent_changed" => Some(
             "The company's books changed in Tally while this call was being read, so the call \
              stopped and nothing was changed in Tally. Saving in Tally can do it, and so can a report that raises the voucher \
@@ -2122,19 +2156,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              customer's GST registration applies from in Tally. Then build again.",
         ),
         "invoice_ledger_parent_unnameable"
-        | "invoice_scope_parent_folds"
-        | "invoice_ledger_scope_too_large"
+        | "invoice_ledger_guid_unnameable"
         | "invoice_ledger_scope_unplannable" => Some(
-            "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers under the groups \
-             of the ledgers this invoice names, and it could not name that read safely: a \
-             ledger's group has no name it can write into a request (it is empty, holds a \
-             quote or a control character, or starts or ends with a space), or another group \
-             of the book differs from one of these only in letter case (the filter Tally was \
-             measured to apply would return both), or the groups hold more ledgers than one \
-             read may. Where `detail` is shown it names the ledger, the group or the cause. \
-             Nothing was written, and building again gives the same refusal until the book \
-             changes. Ask the user to check the group of the ledgers on the invoice in Tally, \
-             or tell them this invoice has to be entered in Tally itself.",
+            "ComplyEaze Bridge reads a ledger's tax rate only for the ledgers this invoice \
+             names, by the identifier Tally gave each, and it could not name that read \
+             safely: a ledger has no group it can check the answer against (none, or one the \
+             ledger list could not carry: blank, over 1,024 bytes, or holding a control or \
+             invisible character), or Tally gave it an identifier of another form. \
+             Where `detail` is shown it names the ledger or the cause. Nothing was written, and \
+             building again gives the same refusal until the book changes. Ask the user to \
+             check the group of the ledgers on the invoice in Tally, or tell them this invoice \
+             has to be entered in Tally itself.",
         ),
         "invoice_ledger_rates_rows_differ" => Some(
             "Tally's answer about the tax rates of this invoice's ledgers did not hold exactly \
@@ -2489,6 +2521,10 @@ impl ToolFailure {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::NegativeStockReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::StockByGodownReadError>()
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
@@ -3243,6 +3279,7 @@ impl Server {
                 in_own_frame(|| self.register(register::RegisterKind::Sales, args)).await
             }
             "statement_tie_out" => in_own_frame(|| self.statement_tie_out(args)).await,
+            "stock_by_godown" => in_own_frame(|| self.stock_by_godown(args)).await,
             "stock_summary" => in_own_frame(|| self.stock_summary(args)).await,
             "tally_status" => {
                 let (result, evidence) = in_own_frame(|| self.status()).await?;

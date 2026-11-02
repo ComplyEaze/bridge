@@ -1477,14 +1477,88 @@ fn a_rollback_seen_on_one_batch_covers_an_earlier_batch_of_the_company() {
         );
         assert_eq!(scan.records, journal.len() as u64);
     }
-    // The answer that recorded it names P1 as the batch to verify again.
+    // The answer that recorded it names what its record covers: P1, to verify
+    // again, and P2 itself.
     assert_eq!(
-        covered_by_records_of(Cursor::new(journal.concat()), "p2").unwrap(),
-        vec!["p1".to_string()]
+        covered_by_last_record(Cursor::new(journal.concat())).unwrap(),
+        vec!["p1".to_string(), "p2".to_string()]
     );
-    assert!(covered_by_records_of(Cursor::new(journal.concat()), "p1")
+    // A last record of another kind covers nothing.
+    journal.push(record(&placed(
+        "p3",
+        "BRIDGE ROLLBACK LAB",
+        Some(PLACE_ENDPOINT),
+    )));
+    assert!(covered_by_last_record(Cursor::new(journal.concat()))
         .unwrap()
         .is_empty());
+}
+
+/// #1050, a restore seen at the post: the post that read the mark has no
+/// dispatch intent yet, so its record names the first batch of its company it
+/// newly covers. That record is admitted, covers that batch, and does not
+/// cover the post, whose intent comes after the count the reading carries.
+#[test]
+fn a_posts_reading_is_recorded_on_the_first_batch_it_covers() {
+    let created = captured_outcome().counters().created;
+    assert!(created > 0);
+    let p1 = placed("p1", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let p2 = placed("p2", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let poster = placed("poster", "BRIDGE ROLLBACK LAB", Some(PLACE_ENDPOINT));
+    let elsewhere = placed(
+        "elsewhere",
+        "BRIDGE ROLLBACK LAB COPY",
+        Some(PLACE_ENDPOINT),
+    );
+    let mut journal = vec![
+        record(&elsewhere),
+        intent(&elsewhere, Some(1)),
+        answered(&elsewhere),
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        record(&p2),
+        intent(&p2, Some(1 + created)),
+        answered(&p2),
+        record(&poster),
+    ];
+    let read = journal.len() as u64;
+    let named = first_newly_covered(Cursor::new(journal.concat()), "poster", 1, read).unwrap();
+    assert_eq!(
+        named.as_deref(),
+        Some("p1"),
+        "the first, not another company's"
+    );
+    // Nothing new to cover at a mark no post's floor is above.
+    assert_eq!(
+        first_newly_covered(
+            Cursor::new(journal.concat()),
+            "poster",
+            1 + 2 * created,
+            read
+        )
+        .unwrap(),
+        None
+    );
+    journal.push(seen(&p1, 1, read));
+    journal.push(intent(&poster, Some(1)));
+    for id in ["p1", "p2"] {
+        assert_eq!(
+            cover(&journal, id).covered_by,
+            Some(RollbackCover {
+                mark_read: 1,
+                seen_by: "p1".into()
+            }),
+            "{id}"
+        );
+    }
+    assert_eq!(cover(&journal, "poster").covered_by, None);
+    assert_eq!(cover(&journal, "elsewhere").covered_by, None);
+    // Once recorded, the same reading covers nothing new.
+    assert_eq!(
+        first_newly_covered(Cursor::new(journal.concat()), "poster", 1, read).unwrap(),
+        None
+    );
 }
 
 /// #1050: in the local data report's count, a native post a recorded restore
@@ -1650,7 +1724,7 @@ fn an_answer_reporting_status_zero_raises_no_floor() {
     assert!(!rollback_record_extends(Cursor::new(journal.concat()), "seer", 1, read).unwrap());
     journal.push(seen(&seer, 1, read));
     assert_eq!(cover(&journal, "refused").covered_by, None);
-    assert!(covered_by_records_of(Cursor::new(journal.concat()), "seer")
+    assert!(covered_by_last_record(Cursor::new(journal.concat()))
         .unwrap()
         .is_empty());
 }

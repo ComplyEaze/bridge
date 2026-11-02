@@ -36,16 +36,19 @@ pub use ledger_currency::{
     ForeignCurrencyLedger, IdentifiedBaseCurrency, LedgerCurrencies, LedgerCurrencyRefusal,
 };
 pub use model::{
-    AgeingAnchor, CompanyCurrency, LedgerSnapshotEntry, NativeBillRow, NativeOutstandingsError,
-    NativeOutstandingsResult, NativeOverdueCrosscheck, PartyResidual,
+    AgeingAnchor, BillClosing, CompanyCurrency, LedgerSnapshotEntry, NativeBillRow,
+    NativeOutstandingsError, NativeOutstandingsResult, NativeOverdueCrosscheck, PartyResidual,
+    UnadmittedBillRow, UnadmittedBillRows,
 };
 pub use request::{
-    parent_filter_parts, render_company_base_currency_request, render_company_currency_request,
-    render_company_currency_request_with_originalname, render_native_bills_request,
-    render_native_group_snapshot_request, render_native_ledger_export_request,
-    render_native_ledger_snapshot_request, render_native_ledger_snapshot_request_for_parents,
-    render_native_voucher_export_request, render_native_voucher_type_export_request,
-    render_party_ledger_master_request, render_party_ledger_master_request_for_parents,
+    ledger_guid_filter_parts, parent_filter_parts, render_company_base_currency_request,
+    render_company_currency_request, render_company_currency_request_with_originalname,
+    render_native_bills_request, render_native_group_snapshot_request,
+    render_native_ledger_export_request, render_native_ledger_snapshot_request,
+    render_native_ledger_snapshot_request_for_ledgers,
+    render_native_ledger_snapshot_request_for_parents, render_native_voucher_export_request,
+    render_native_voucher_type_export_request, render_party_ledger_master_request,
+    render_party_ledger_master_request_for_ledgers, render_party_ledger_master_request_for_parents,
     render_party_ledger_master_request_for_parents_with_gst_details,
     render_party_ledger_master_request_for_parents_with_mailing_details,
     render_party_ledger_master_request_with_gst_details,
@@ -56,9 +59,9 @@ pub use request::{
 pub(crate) use wire::is_foreign_currency_balance;
 pub use wire::{
     parse_company_currency, parse_company_currency_name, parse_native_bill_rows,
-    parse_native_group_snapshot, parse_native_group_snapshot_with_evidence,
-    parse_native_ledger_snapshot, parse_native_ledger_snapshot_classified,
-    parse_native_ledger_snapshot_classified_for_company, parse_native_ledger_snapshot_for_company,
-    ClassifiedLedgerSnapshot, NativeGroupSnapshotEntry,
+    parse_native_bill_rows_unadmitted, parse_native_group_snapshot,
+    parse_native_group_snapshot_with_evidence, parse_native_ledger_snapshot,
+    parse_native_ledger_snapshot_classified, parse_native_ledger_snapshot_classified_for_company,
+    parse_native_ledger_snapshot_for_company, ClassifiedLedgerSnapshot, NativeGroupSnapshotEntry,
 };
 pub use wire::{parse_compliance_ledger_snapshot_for_company, ComplianceLedgerSnapshot};

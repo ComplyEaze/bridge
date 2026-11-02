@@ -1,0 +1,68 @@
+# fixture: tests/fixtures/native/trial_balance_forex_decimal_rate.utf16le.xml
+# parser: parse_native_trial_balance_with_currency(FOREXGROUP base)
+# source: captured
+Ok(CurrencyScopedTrialBalance {
+    report: NativeTrialBalance {
+        rows: [
+            NativeTrialBalanceRow {
+                name: "BRIDGE INR Customer",
+                guid: "1bb48be5-baba-45b2-90d8-7593244915a9-000000d2",
+                parent: Returned(
+                    "Sundry Debtors",
+                ),
+                opening: Present(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+                debit: Present(
+                    ExactDecimal(
+                        "-5000.00",
+                    ),
+                ),
+                credit: Present(
+                    ExactDecimal(
+                        "2000.00",
+                    ),
+                ),
+                closing: Present(
+                    ExactDecimal(
+                        "-3000.00",
+                    ),
+                ),
+            },
+            NativeTrialBalanceRow {
+                name: "Cash",
+                guid: "1bb48be5-baba-45b2-90d8-7593244915a9-0000001f",
+                parent: Returned(
+                    "Cash-in-Hand",
+                ),
+                opening: Present(
+                    ExactDecimal(
+                        "0.00",
+                    ),
+                ),
+                debit: Present(
+                    ExactDecimal(
+                        "-3000.00",
+                    ),
+                ),
+                credit: PresentEmpty,
+                closing: Present(
+                    ExactDecimal(
+                        "-3000.00",
+                    ),
+                ),
+            },
+        ],
+    },
+    foreign_currency_ledgers: [],
+    mixed_currency_ledgers: [
+        "BRIDGE Export Sales",
+        "BRIDGE Import Purchases",
+        "BRIDGE Lab Bank",
+        "BRIDGE USD Customer",
+        "BRIDGE USD Supplier",
+        "Profit & Loss A/c",
+    ],
+})

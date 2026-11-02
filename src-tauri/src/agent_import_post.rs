@@ -1231,6 +1231,16 @@ impl Server {
             // the mark, so binding the post to its own span never rests on a mark
             // read after the POST (agent_import_span_identity.rs).
             let aimed_mark = std::sync::Mutex::new(None::<u64>);
+            // How many journal records there were before the queue reads that
+            // mark (#1050): a restore the aim reads is recorded against what the
+            // journal held then. A record appended meanwhile is left out, which
+            // can only prove a lower floor, so it never covers a post wrongly.
+            let records_before_mark = self
+                .rollback_scan(batch_id)
+                .map_err(ToolFailure::from)?
+                .records;
+            // The batches a restore this post's aim read covers, once recorded.
+            let rollback_at_post = std::sync::Mutex::new(None::<Vec<String>>);
             // Read inside the endpoint's dispatch lease, so no other post of
             // this machine to this endpoint can be sent between this read and
             // the queued recheck that uses it.
@@ -1334,6 +1344,23 @@ impl Server {
                             aimed_mark.lock().ok().and_then(|aimed| *aimed).ok_or(
                                 BeforeDispatchError::Refused(UnderLockRefusal::MarkUnrecorded),
                             )?;
+                        // A restore this post's own aim reads (#1050) is
+                        // recorded here, before the intent and before the
+                        // approval is spent. A record that cannot be written,
+                        // or a journal that cannot be read for it, refuses the
+                        // post with nothing recorded for it and nothing sent.
+                        let covered = self
+                            .record_rollback_seen_at_post_while_admitted(
+                                batch_id,
+                                pre_post_voucher_mark,
+                                records_before_mark,
+                            )
+                            .map_err(|_| {
+                                BeforeDispatchError::Refused(UnderLockRefusal::RollbackUnrecorded)
+                            })?;
+                        if let (Some(covered), Ok(mut seen)) = (covered, rollback_at_post.lock()) {
+                            *seen = Some(covered);
+                        }
                         // Spent here, once, under this lock and before the
                         // intent: a revoked approval (the call was cancelled)
                         // or a second redemption writes no intent (#725).
@@ -1556,6 +1583,15 @@ impl Server {
             proof.evidence = accumulated.clone();
             if let Some(located) = post_location.clone() {
                 proof.payload["result"]["post_location"] = located;
+            }
+            // A restore this post's aim read was recorded before it was sent:
+            // the earlier posts it covers keep their status until each is
+            // verified again.
+            if let Some(covered) = rollback_at_post.lock().ok().and_then(|seen| seen.clone()) {
+                proof.payload["result"]["rollback_recorded_at_post"] = json!({
+                    "count": covered.len(),
+                    "first": covered.iter().take(10).collect::<Vec<_>>(),
+                });
             }
             // The send happened and was read back: say how the batch ended.
             if let Some(headline) = super::verification::batch_headline(&proof.payload["result"]) {
@@ -2099,8 +2135,9 @@ const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a nar
 /// What a caller is told when the approval window for a saved batch was too
 /// large to show whole, by the batch's length or for the screen it would open
 /// on, before any attempt (#1780). The desktop's Journal screen shows the
-/// message alone.
-const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
+/// message alone. A Mac measures its window against the screen before it opens
+/// it, so the screen's remedies are named for both.
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help; on a Mac, so may moving the Dock to the side or hiding it. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };

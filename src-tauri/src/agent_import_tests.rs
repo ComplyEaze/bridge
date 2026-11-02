@@ -2434,39 +2434,156 @@ fn utf16le(bytes: &[u8]) -> String {
     .unwrap()
 }
 
-/// DERIVED, not Tally's bytes: the answer to the rates read the code sends
-/// (`pilot-lab-ledger-rates-scoped-hsn`, which the lab answered on 21 Oct 2026
-/// for the book as it then stood), for the book of
-/// the lab's W18 sittings (`pilot-lab-w18`), which the lab was not asked the
-/// scoped rates request on either. The rows are the lab's W16 answer's rows of
-/// the ledgers that the W18 catalogue holds under the four parents (the two
-/// books hold the same 18 ledgers), counted and asserted equal, name for name.
+/// DERIVED, not Tally's bytes: the answer to the rates read the code sends for
+/// the invoice of the lab's W18 sittings (`pilot-lab-w18`), which names
+/// `BRIDGE Svc 4D 5%` where `BP/26-27/0010` names `BRIDGE Svc 998313 5%`. The
+/// W18 catalogue is byte-equal to the catalogue the lab read with the
+/// four-parent answer on 21 Oct 2026 and again on 31 Oct 2026, when that answer
+/// came back byte for byte the same (`pilot-lab-ledger-rates-scoped-hsn`), so
+/// this is that answer cut to the invoice's six ledgers by [`rates_cut_to`].
 pub(super) fn w18_scoped_rates_hsn() -> String {
-    let catalogue = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-w18/w18-ledger-catalogue-v2.utf16le.xml"));
-    let mut wanted = Vec::new();
-    let mut rest = catalogue.as_str();
-    while let Some(at) = rest.find("<LEDGER NAME=\"") {
-        let from = at + "<LEDGER NAME=\"".len();
-        let end = from + rest[from..].find("</LEDGER>").unwrap();
-        let row = &rest[from..end];
-        if SCOPE_PARENTS
-            .iter()
-            .any(|parent| row.contains(&format!(">{parent}</PARENT>")))
-        {
-            wanted.push(row[..row.find('"').unwrap()].to_string());
-        }
-        rest = &rest[end..];
-    }
-    derived_scoped_rates_hsn(&wanted)
+    rates_cut_to(
+        &utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml")),
+        &W18_INVOICE_LEGS,
+    )
 }
 
-/// The four parents of the lab invoices' ledgers.
-const SCOPE_PARENTS: [&str; 4] = [
-    "Duties &amp; Taxes",
-    "Indirect Expenses",
-    "Sales Accounts",
-    "Sundry Debtors",
+/// The ledgers of the W18 invoice `BP/26-27/0040`.
+pub(super) const W18_INVOICE_LEGS: [&str; 6] = [
+    "BRIDGE Walk-in",
+    "BRIDGE Svc 4D 5%",
+    "BRIDGE Svc 998314 5%",
+    "BRIDGE CGST 2.5%",
+    "BRIDGE SGST 2.5%",
+    "BRIDGE Round Off",
 ];
+
+/// DERIVED, not Tally's bytes: `answer` with every ledger row whose name is not
+/// in `names` removed, with the whitespace after it. That is what the rate read
+/// restricted to those ledgers by GUID (#1331) answers on the book that gave
+/// `answer`: on 31 Oct 2026 the lab's answers to it, for five and for four of an
+/// invoice's ledgers, were byte for byte its answer to the four-parent read cut
+/// this way (`a_guid_answer_is_the_parent_answer_cut_to_the_named_rows`). Each
+/// name keeps exactly one row.
+pub(super) fn rates_cut_to(answer: &str, names: &[&str]) -> String {
+    let mut out = answer.to_string();
+    let mut kept = Vec::new();
+    let mut at = 0;
+    while let Some(start) = out[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
+        let end = start + out[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
+        let name = ledger_row_names(&out[start..end]).remove(0);
+        if names.contains(&name.as_str()) {
+            kept.push(name);
+            at = end;
+        } else {
+            let rest = &out[end..];
+            let after = end + rest.len() - rest.trim_start_matches([' ', '\r', '\n', '\t']).len();
+            out.replace_range(start..after, "");
+            at = start;
+        }
+    }
+    let mut wanted = names.iter().map(ToString::to_string).collect::<Vec<_>>();
+    wanted.sort();
+    wanted.dedup();
+    kept.sort();
+    assert_eq!(kept, wanted, "each named ledger keeps exactly one row");
+    out
+}
+
+/// The ledgers of the lab invoice `BP/26-27/0010`: the customer, two sales
+/// ledgers, the two tax ledgers and the round off.
+pub(super) const LAB_INVOICE_LEGS: [&str; 6] = [
+    "BRIDGE Walk-in",
+    "BRIDGE Svc 998313 5%",
+    "BRIDGE Svc 998314 5%",
+    "BRIDGE CGST 2.5%",
+    "BRIDGE SGST 2.5%",
+    "BRIDGE Round Off",
+];
+
+/// DERIVED, not Tally's bytes: the lab's answer of 21 Oct 2026 to the
+/// four-parent rates read with the HSN/SAC fields
+/// (`pilot-lab-ledger-rates-scoped-hsn`), cut to the six ledgers of
+/// `BP/26-27/0010` by [`rates_cut_to`]: the answer to the read the code sends
+/// for that invoice, which names them by GUID. UTF-16LE, as the lab's answers
+/// are stored.
+pub(super) fn lab_invoice_rates_hsn() -> &'static [u8] {
+    static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
+    BYTES.get_or_init(|| {
+        let answer = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"));
+        rates_cut_to(&answer, &LAB_INVOICE_LEGS)
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect()
+    })
+}
+
+/// The sha256 of the rates read the code sends for `BP/26-27/0010`: the request
+/// the lab answered on 31 Oct 2026 (`pilot-lab-ledger-rates-guid.request`) with
+/// only its GUIDs changed to the six ledgers' (DERIVED: the shape is the lab's;
+/// the request with these GUIDs was not sent).
+pub(super) const LAB_INVOICE_GUID_RATES_SHA256: &str =
+    "182f598aafaf333bc8284b6976e664cee00af1eadb5a29bd4f73c295f8601e08";
+
+/// The same for the W18 invoice's six ledgers ([`W18_INVOICE_LEGS`]).
+pub(super) const W18_INVOICE_GUID_RATES_SHA256: &str =
+    "a7ced791a7af67b3bcda6de614970891ebfb1ff82da8b9a580fafc6e12b654b2";
+
+#[test]
+fn the_lab_invoice_rates_request_is_the_captured_one_with_its_guids() {
+    let captured = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.request.utf16le.xml"));
+    let formula = |suffixes: &[&str]| {
+        suffixes
+            .iter()
+            .map(|suffix| format!("$GUID = \"6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000{suffix}\""))
+            .collect::<Vec<_>>()
+            .join(" OR ")
+    };
+    let five = formula(&["00d0", "00d3", "00d5", "00d7", "00d8"]);
+    assert_eq!(captured.matches(&five).count(), 1);
+    for (suffixes, pinned) in [
+        (
+            ["00d0", "00d1", "00d2", "00d4", "00d6", "00d8"],
+            LAB_INVOICE_GUID_RATES_SHA256,
+        ),
+        (
+            ["00d0", "00d2", "00d4", "00d6", "00d8", "00e5"],
+            W18_INVOICE_GUID_RATES_SHA256,
+        ),
+    ] {
+        let six = captured.replace(&five, &formula(&suffixes));
+        let bytes = six
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>();
+        assert_eq!(crate::agent::sha256_hex(&bytes), pinned);
+    }
+}
+
+/// The cut [`rates_cut_to`] makes is, on the lab's own bytes, Tally's answer to
+/// the read by GUID: the four-parent answer of 31 Oct 2026 cut to the lab
+/// invoice's five ledgers, and to four of them, equals the answers the lab gave
+/// that day to the GUID filter naming those ledgers (the four-ledger request
+/// also named a GUID the book does not hold, which added nothing).
+#[test]
+fn a_guid_answer_is_the_parent_answer_cut_to_the_named_rows() {
+    let parents = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"));
+    let five = [
+        "BRIDGE Walk-in",
+        "BRIDGE Goods 18%",
+        "BRIDGE CGST 9%",
+        "BRIDGE SGST 9%",
+        "BRIDGE Round Off",
+    ];
+    assert_eq!(
+        rates_cut_to(&parents, &five),
+        utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid.utf16le.xml"))
+    );
+    assert_eq!(
+        rates_cut_to(&parents, &five[..4]),
+        utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-guid-one-absent.utf16le.xml"))
+    );
+}
 
 /// The names of the `<LEDGER NAME="…">` rows of an answer, in answer order.
 fn ledger_row_names(xml: &str) -> Vec<String> {
@@ -2478,41 +2595,6 @@ fn ledger_row_names(xml: &str) -> Vec<String> {
         rest = &rest[from..];
     }
     out
-}
-
-/// The lab's W16 answer (the unrestricted rates read with the HSN/SAC fields)
-/// with every ledger row removed whose name is not in `wanted`; the removal is
-/// counted, each row left is under one of the four parents, and the rows left
-/// are `wanted`, name for name.
-fn derived_scoped_rates_hsn(wanted: &[String]) -> String {
-    let whole = utf16le(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-hsn.utf16le.xml"));
-    let mut kept = whole.clone();
-    let mut removed = 0;
-    let mut at = 0;
-    while let Some(start) = kept[at..].find("<LEDGER NAME=\"").map(|found| found + at) {
-        let end = start + kept[start..].find("</LEDGER>").unwrap() + "</LEDGER>".len();
-        let name = ledger_row_names(&kept[start..end]).remove(0);
-        if wanted.contains(&name) {
-            assert!(
-                SCOPE_PARENTS
-                    .iter()
-                    .any(|parent| kept[start..end].contains(&format!(">{parent}</PARENT>"))),
-                "{name} is under none of the four parents"
-            );
-            at = end;
-        } else {
-            kept.replace_range(start..end, "");
-            removed += 1;
-            at = start;
-        }
-    }
-    assert_eq!(
-        removed,
-        ledger_row_names(&whole).len() - wanted.len(),
-        "rows removed"
-    );
-    assert_eq!(&ledger_row_names(&kept), wanted, "the rows left are wanted");
-    kept
 }
 
 /// BRIDGE PILOT LAB's GUID, from its captured company list.
@@ -6455,4 +6537,62 @@ fn a_folded_twin_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
     assert_eq!(shown[0]["parent"], "&#4; Primary");
     assert_eq!(shown[1]["parent"], "Primary");
     assert_eq!(shown[2]["parent"], Value::Null);
+}
+
+/// Tally's own import catalogue of a book whose ledgers carry aliases, after the aliases keyed on
+/// its screen and after two ledgers were created with one each by import (`alias-lab-1688`).
+fn alias_lab_catalogue(bytes: &[u8]) -> bridge_tally_protocol::StandardLedgerCatalogV2 {
+    let xml = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .expect("UTF-16LE");
+    crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+        &xml,
+        "BRIDGE ALIAS LAB",
+        "021bda0c-b1b1-44c8-8279-5212ce87c9c7",
+    )
+    .expect("the captured import catalogue parses")
+}
+
+/// On the captured catalogues, each alias names its ledger in `alias_of` as Tally lists it, at both
+/// points the lab read; the screen's alias typed in capitals names none.
+#[test]
+fn each_captured_alias_names_its_ledger_and_a_case_variant_names_none() {
+    let screen = alias_lab_catalogue(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/k3-cv2.utf16le.xml"
+    ));
+    let imported = alias_lab_catalogue(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/i1-cv2.utf16le.xml"
+    ));
+    let screen_rows = [
+        ("Lab Plain Alias", Some("Lab Plain Ledger"), "near_miss"),
+        ("Lab Other First", Some("Lab Other Ledger"), "near_miss"),
+        ("Lab Other Second", Some("Lab Other Ledger"), "near_miss"),
+        ("Lab Caf\u{e9} Sales", Some("Lab Sales"), "near_miss"),
+        ("LAB PLAIN ALIAS", None, "near_miss"),
+    ];
+    let imported_rows = [
+        ("Lab Shape Alias", Some("Lab Alias Shape"), "near_miss"),
+        (
+            "\u{932}\u{948}\u{92c} \u{916}\u{93e}\u{924}\u{93e}",
+            Some("Lab Alias Script"),
+            "missing",
+        ),
+    ];
+    for (catalogue, rows) in [
+        (&screen, &screen_rows[..]),
+        (&imported, &screen_rows[..]),
+        (&imported, &imported_rows[..]),
+    ] {
+        let names = rows.iter().map(|(name, _, _)| *name).collect::<Vec<_>>();
+        let report = alias_report(&names, catalogue.catalog());
+        assert_eq!(report.len(), rows.len());
+        for ((name, owner, state), entry) in rows.iter().zip(&report) {
+            assert_eq!(alias_of(entry), *owner, "{name}: {entry}");
+            assert_eq!(entry["match_state"], *state, "{name}: {entry}");
+        }
+    }
 }

@@ -238,7 +238,9 @@ class MergeGateControls(unittest.TestCase):
     # -- Compatibility-surface schema (schema 3 at head; 2 or 3 at the base) --
 
     def test_surface_fetch_failure_is_indeterminate(self):
-        self.assert_indeterminate("surface-fetch-fail", "could not read and validate compatibility surface at " + SHORT)
+        result = self.assert_indeterminate("surface-fetch-fail", "could not read and validate compatibility surface at " + SHORT)
+        # A failure with no HTTP status is not tried again, and the line names the commit and the error.
+        self.assertIn(SHORT + " (commit " + HEAD[:12] + ", after 1 try: controlled surface read failure)", result.stdout)
 
     def test_surface_malformed_is_indeterminate(self):
         self.assert_indeterminate("surface-malformed", "could not read and validate compatibility surface at " + SHORT)
@@ -328,7 +330,8 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("ack-path-not-a-repository-path", "has a line that is not a repository path")
 
     def test_an_unreadable_ack_is_indeterminate(self):
-        self.assert_indeterminate("ack-unreadable", "could not read " + ACK_PATH)
+        result = self.assert_indeterminate("ack-unreadable", "could not read " + ACK_PATH)
+        self.assertIn(SHORT + " (commit " + HEAD[:12] + ", after 1 try: controlled acknowledgement read failure)", result.stdout)
 
     def test_an_ack_with_no_pinned_path_touched_blocks(self):
         self.assert_blocked("ack-without-pinned-change", "no pinned path is touched, so no acknowledgement may be added")
@@ -450,6 +453,54 @@ class MergeGateControls(unittest.TestCase):
 
     def test_a_404_for_a_commit_outside_the_pr_is_not_tried_again(self):
         self.assert_flaky_not_retried("history-flaky-404-outside-the-pr", "(commit d2d2d2d2d2d2, HTTP 404, after 1 try: gh: Not Found (HTTP 404))")
+
+    # -- The other contents reads, tried again the same way (#2179) ------------------
+
+    # Each read: the commit it names (12 characters), the line that reports it, and how many times a run
+    # that passes reads that file at that commit (the branch history check reads the head's and the base
+    # tip's pin lists once more, and those reads answer at once).
+    OTHER_READS = {
+        "head-surface": (HEAD[:12], "could not read and validate compatibility surface at " + SHORT, 3),
+        "base-surface": ("a" * 12, "could not read and validate compatibility surface at base aaaaaaa", 3),
+        "merge-base-surface": ("b" * 12, "could not read and validate compatibility surface at merge base bbbbbbb", 2),
+        "ack": (HEAD[:12], "could not read " + ACK_PATH + " at " + SHORT, 2),
+    }
+
+    def assert_other_read_passes(self, read, kind):
+        result, waits, calls = self.run_flaky(read + "-flaky-" + kind)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("INDETERMINATE", result.stdout)
+        self.assertEqual((waits, calls), (["2"], self.OTHER_READS[read][2]), "one failed read, one wait of 2 s, then reads that answered")
+
+    def test_a_server_error_on_any_other_contents_read_is_tried_again_and_passes(self):
+        for read in self.OTHER_READS:
+            with self.subTest(read=read):
+                self.assert_other_read_passes(read, "502-once")
+
+    def test_a_404_at_the_head_is_tried_again_and_passes(self):
+        for read in ("head-surface", "ack"):
+            with self.subTest(read=read):
+                self.assert_other_read_passes(read, "404-once")
+
+    def test_a_server_error_that_persists_on_any_other_contents_read_stays_indeterminate_and_names_it(self):
+        for read, (ref, line, _) in self.OTHER_READS.items():
+            with self.subTest(read=read):
+                result, waits, calls = self.run_flaky(read + "-flaky-502-always")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn("MAY MERGE", result.stdout)
+                self.assertIn(line + " (commit " + ref + ", HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
+                self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
+
+    def test_a_404_at_the_base_tip_or_the_merge_base_is_not_tried_again(self):
+        for read in ("base-surface", "merge-base-surface"):
+            ref, line, _ = self.OTHER_READS[read]
+            with self.subTest(read=read):
+                result, waits, calls = self.run_flaky(read + "-flaky-404-once")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn("MAY MERGE", result.stdout)
+                self.assertIn(line + " (commit " + ref + ", HTTP 404, after 1 try: gh: Not Found (HTTP 404))", result.stdout)
+                self.assertEqual((waits, calls), ([], 1), "a 404 for a commit outside the PR is not tried again")
 
     def test_removed_pin_line_for_a_pin_that_is_kept_blocks(self):
         self.assert_blocked("pin-removed-line-for-a-kept-pin", "has removed-pin line(s) for pin(s) the PR does not remove: src/other.rs")

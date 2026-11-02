@@ -402,6 +402,14 @@ tokio::task_local! {
     pub(super) static TEST_QUALIFIED_VOUCHER_TYPES: &'static [VoucherType];
 }
 
+#[cfg(test)]
+tokio::task_local! {
+    /// Test-only: the rollback-seen record a post would write for its own
+    /// reading (#1050) fails to append, as a full disk would make it; no tool
+    /// call can set it.
+    pub(super) static TEST_ROLLBACK_AT_POST_APPEND_FAILS: ();
+}
+
 /// The voucher types the build, the post and the verification accept. Always
 /// the live list outside a test.
 fn qualified_voucher_types() -> &'static [VoucherType] {
@@ -1652,10 +1660,12 @@ impl Server {
             }
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
-            if let Some(error) = persistence::persist_build(&imports, &line, xml.as_bytes(), || {
+            let folder_left = match persistence::persist_build(&imports, &line, xml.as_bytes(), || {
                 self.append_import_ledger_while_admitted(&line)
             })? {
-                return Ok(ToolOutcome {
+                persistence::Persisted::Built { folder_left } => folder_left,
+                persistence::Persisted::Incomplete(error) => {
+                    return Ok(ToolOutcome {
                     payload: json!({"result":{"batch_id":batch_id,"error":{"code":error,
                         "message":"Local batch publication is incomplete; reconcile its recovery journal before continuing."}}}),
                     evidence: Evidence {
@@ -1666,7 +1676,8 @@ impl Server {
                     company_guid: Some(line.company_guid.clone()),
                     truncated: false,
                 });
-            }
+                }
+            };
             // Reuse the posting admission path to describe only a route that
             // this exact saved batch can take. A manual-only batch is still a
             // successful build.
@@ -1716,6 +1727,11 @@ impl Server {
             // Appended last, so neither rewrite of the first warning above
             // can replace it.
             let hsn_warnings = hsn_warnings_of(&line.vouchers, &mut warnings);
+            if let (Some(cause), Some(list)) = (folder_left, warnings.as_array_mut()) {
+                list.push(json!(format!(
+                    "This batch is built and on record, but its temporary folder could not be removed ({cause}). The next build or post clears the folder if it is empty; if anything is left in it, they are refused until a person checks it."
+                )));
+            }
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                     "batch_id": batch_id, "sha256": sha256,
                     "amendment": amendment,
@@ -2968,7 +2984,10 @@ impl Server {
             .import_snapshot_while_admitted(Some(&line.batch_id))?
             .ok_or_else(|| "import_batch_not_found".to_string())?;
         let others = match self.import_journal_while_admitted()? {
-            Some(reader) => ledger::covered_by_records_of(reader, &line.batch_id)?,
+            Some(reader) => ledger::covered_by_last_record(reader)?
+                .into_iter()
+                .filter(|batch_id| *batch_id != line.batch_id)
+                .collect(),
             None => Vec::new(),
         };
         Ok(Some((recorded.generation, others)))
@@ -2990,6 +3009,49 @@ impl Server {
             }
             None => Ok(false),
         }
+    }
+
+    /// A post's own reading of the voucher mark (#1050): when `mark`, which its
+    /// aim read after `records_before_read` journal records, is below a floor an
+    /// earlier native post of the company had proved, and no record on file
+    /// covers that post, it is recorded here, before the post's dispatch intent.
+    /// The post has no intent yet, so the record names the first batch it
+    /// covers, which admission accepts. Under the exclusive admission lock.
+    /// Returns the batches the record covers, or `None` when it would cover
+    /// nothing new. A record that cannot be written is an error, and the caller
+    /// sends nothing: a restore seen and not recorded is the false verified
+    /// this guards, and once this post's vouchers raise the mark no later
+    /// reading can see it.
+    pub(super) fn record_rollback_seen_at_post_while_admitted(
+        &self,
+        poster: &str,
+        mark: u64,
+        records_before_read: u64,
+    ) -> Result<Option<Vec<String>>, String> {
+        let Some(reader) = self.import_journal_while_admitted()? else {
+            return Ok(None);
+        };
+        let Some(named) = ledger::first_newly_covered(reader, poster, mark, records_before_read)?
+        else {
+            return Ok(None);
+        };
+        let snapshot = self
+            .import_snapshot_while_admitted(Some(&named))?
+            .ok_or_else(|| "import_batch_not_found".to_string())?;
+        #[cfg(test)]
+        if TEST_ROLLBACK_AT_POST_APPEND_FAILS.try_with(|()| ()).is_ok() {
+            return Err("import_ledger_write_failed".into());
+        }
+        self.append_import_record_while_admitted(&ledger::StatusRecord::rollback_seen(
+            &snapshot.batch,
+            mark,
+            records_before_read,
+        ))?;
+        let covered = match self.import_journal_while_admitted()? {
+            Some(reader) => ledger::covered_by_last_record(reader)?,
+            None => Vec::new(),
+        };
+        Ok(Some(covered))
     }
 
     /// Every GUID another batch's post-span verdict bound.

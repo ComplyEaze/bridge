@@ -2848,6 +2848,24 @@ fn saved_captured_batch(server: &Server) -> Value {
 }
 
 fn saved_captured_line(server: &Server) -> ImportLedgerLine {
+    saved_captured_line_edited(server, |_| {})
+}
+
+/// The captured batch saved under `batch_id`, its one voucher's transaction id
+/// `txn_id`: the same voucher content, another row.
+fn saved_line_as(server: &Server, batch_id: &str, txn_id: &str) -> ImportLedgerLine {
+    saved_captured_line_edited(server, |line| {
+        line.batch_id = batch_id.to_string();
+        line.txn_ids = vec![txn_id.to_string()];
+        line.vouchers[0].bridge_txn_id = txn_id.to_string();
+    })
+}
+
+/// The captured batch, with `edit` applied before it is rendered and saved.
+fn saved_captured_line_edited(
+    server: &Server,
+    edit: impl FnOnce(&mut ImportLedgerLine),
+) -> ImportLedgerLine {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-6c79872c-aab6-4be5-a181-18182c8148be", "identity_scheme":"batch_v1",
@@ -2864,6 +2882,7 @@ fn saved_captured_line(server: &Server) -> ImportLedgerLine {
                 {"ledger":"Cash","amount":"12.61","side":"Cr"}]}]
     }))
     .unwrap();
+    edit(&mut line);
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
     line.sha256 = sha256_hex(rendered.as_bytes());
     bind_to_captured_catalogue(&mut line);
@@ -7141,12 +7160,13 @@ macro_rules! pilot_queue_block {
 // (fixtures/agent/pilot-lab/PROVENANCE.md), except that the two voucher-numbering
 // answers (X and Y) were read on 16 Oct 2026, after the book had moved on, and
 // are served DERIVED: their rows above the master mark 223 removed
-// (`pilot_types_as_of_the_round`). Two more are from 21 Oct 2026, after the book
-// gained ledgers: the ledger catalogue `k` and the rates read `Q`, which is the
-// read restricted to the parents of the invoice's ledgers (#1331) with the
-// HSN/SAC fields (#691). They are one coherent pair read in the same minute (the
-// scoped answer holds exactly the catalogue's ledgers under those parents),
-// paired here with the earlier answers of the same book (the 9 Oct listings,
+// (`pilot_types_as_of_the_round`). Two more come from 21 Oct 2026, after the
+// book gained ledgers: the ledger catalogue `k`, Tally's own bytes, and the
+// rates read `Q`, which is DERIVED: the lab's answer of that minute to the read
+// restricted to the parents of the invoice's ledgers (with the HSN/SAC fields,
+// #691) cut to the invoice's six ledgers (`lab_invoice_rates_hsn`), because the
+// code now names those ledgers by GUID (#1331) and that six-GUID request was
+// never sent to the lab. They are paired here with the earlier answers of the same book (the 9 Oct listings,
 // groups and tax units; the 12 Oct company object `O` and groups with HSN `G`;
 // the 16 Oct numbering answers `X` and `Y`, DERIVED above); the pairing was not
 // observed at one time. The order below is the order the
@@ -7154,8 +7174,8 @@ macro_rules! pilot_queue_block {
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
 // L compliance listing, Q the same listing with each ledger's GST rate and
-// rounding, restricted to the parents of the invoice's ledgers and with the
-// HSN/SAC rows (21 Oct 2026), P paired listing, g groups, T
+// rounding and the HSN/SAC rows, restricted to the invoice's ledgers by GUID
+// (DERIVED, above), P paired listing, g groups, T
 // voucher types, N number read, k ledger catalogue, w/W the 1-Aug window
 // before/after, C tax units, O the company object (W16, read after the
 // classification admits), X the voucher types bounded by the master mark and Y
@@ -7186,7 +7206,9 @@ const PILOT_REQUEST_SHA256: &str =
 /// `pilot-lab-invoice-post-request`): the answer at a position is Tally's
 /// answer to that request and no other. X and Y are the requests the code
 /// renders, sent to the lab in the 16 Oct 2026 sitting (their answers are the
-/// numbering fixtures, served derived).
+/// numbering fixtures, served derived). Q is the exception to "Tally's answer
+/// to that request": it is the code's request, never sent with these GUIDs, and
+/// its answer is DERIVED from the answer to the four-parent request.
 fn pilot_request_sha256(letter: char) -> &'static str {
     match letter {
         'e' => "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8", // r01-company-extent.xml
@@ -7195,10 +7217,12 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
         'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
-        // The rates read restricted to the four parents (#1331) with the three
-        // HSN/SAC fields: the request the code renders, which the lab was
-        // sent on 21 Oct 2026 (req-1640-q1-hsn-rates-four-parents.xml).
-        'Q' => "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc",
+        // The rates read restricted to the invoice's ledgers by GUID (#1331):
+        // the code's request, never sent to the lab with these six GUIDs; the
+        // lab answered the same request naming five other ledgers on 31 Oct
+        // 2026, and a test derives this pin from that request
+        // (`LAB_INVOICE_GUID_RATES_SHA256`).
+        'Q' => super::super::tests::LAB_INVOICE_GUID_RATES_SHA256,
         'O' => "72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648", // w14-company-object.xml
         'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml
         'P' => "71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f", // r06-ledgers-paired.xml
@@ -7316,7 +7340,8 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
         'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
-        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"),
+        // DERIVED: see `lab_invoice_rates_hsn`.
+        'Q' => super::super::tests::lab_invoice_rates_hsn(),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'G' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml"),
         'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
@@ -8407,4 +8432,160 @@ async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
     );
     assert_eq!(observed.len(), 0);
     assert_eq!(journal(directory.path()), before);
+}
+
+/// #1050, a restore seen at the post: post A natively (its voucher mark 10
+/// before, one create, 11 after), then a restore puts the book back at 10, and
+/// a second batch B, of the same company at the same address, is posted with
+/// no verification between. B's aim reads 10, below the floor 11 that A had
+/// proved. Returns B's response, the journal's records, how many import
+/// requests B's simulator saw, A's batch id, and B's approval lapse note.
+async fn post_after_a_restore(
+    fail_the_record: bool,
+) -> (Value, Vec<Value>, usize, String, Option<Value>) {
+    // A: the whole native post, read back.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let first = saved_captured_batch(&server);
+    let first_batch = first["batch_id"].as_str().unwrap().to_string();
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", first),
+        )
+        .await;
+    let _ = sent(simulator);
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
+    // B, at the same address: the journal's origin moves to the new simulator,
+    // as a verification on another simulator does.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    plans.extend(probe());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let later = server_at(simulator.address(), directory.path());
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let later_origin =
+        super::super::super::canonical_loopback_origin(&later.settings.endpoint).unwrap();
+    let text = String::from_utf8(journal(directory.path())).unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        text.replace(&origin, &later_origin),
+    )
+    .unwrap();
+    let records_before = text.lines().count();
+    let second = saved_line_as(
+        &later,
+        &crate::agent::agent_import::tests::sentinel_batch_id(0x1060),
+        "BRIDGE_MCP_LIVE_20260906_B1",
+    );
+    let args = json!({"company_guid":GUID,"batch_id":second.batch_id});
+    let call = SCRIPTED_APPROVAL.scope(
+        ScriptedApproval::approving(),
+        later.call_tool("post_import", args),
+    );
+    let response = if fail_the_record {
+        crate::agent::agent_import::TEST_ROLLBACK_AT_POST_APPEND_FAILS
+            .scope((), call)
+            .await
+    } else {
+        call.await
+    };
+    let observed = sent(simulator);
+    // An import request, in whichever encoding it was sent.
+    let is_import = |bytes: &[u8]| {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf8_lossy(bytes).contains("Import Data")
+            || String::from_utf16_lossy(&units).contains("Import Data")
+    };
+    let posts = observed
+        .iter()
+        .filter(|request| is_import(&request.request_body))
+        .count();
+    let records = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert!(records.len() > records_before);
+    let lapse = later.post_approvals.lapse_note(&second.batch_id);
+    (response, records, posts, first_batch, lapse)
+}
+
+/// The record is written before B's dispatch intent, on A (the batch it
+/// covers: B has no intent yet), with the mark B's aim read and the journal
+/// count from before that read; B is sent, and its answer names A as covered.
+#[tokio::test]
+async fn a_restore_the_posts_aim_reads_is_recorded_before_its_intent() {
+    let (response, records, posts, first_batch, lapse) = post_after_a_restore(false).await;
+    // The approval was spent on the send: nothing lapsed.
+    assert!(lapse.is_none(), "{lapse:?}");
+    let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
+    assert_eq!(posts, 1, "B was sent once: {response}");
+    let seen = records
+        .iter()
+        .position(|record| record["record_type"] == "rollback_seen")
+        .unwrap_or_else(|| panic!("no rollback record: {response}"));
+    let intent = records
+        .iter()
+        .position(|record| {
+            record["record_type"] == "dispatch_intent" && record["batch_id"] == second_batch
+        })
+        .unwrap();
+    assert!(seen < intent, "recorded before B's intent");
+    assert_eq!(records[seen]["batch_id"], first_batch);
+    assert_eq!(records[seen]["mark_read"], 10);
+    assert!(records[seen]["records_before_read"].as_u64().unwrap() as usize <= seen);
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record["record_type"] == "rollback_seen")
+            .count(),
+        1
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["rollback_recorded_at_post"],
+        json!({"count": 1, "first": [first_batch]}),
+        "{response}"
+    );
+}
+
+/// A record that cannot be written refuses B before its intent, with the typed
+/// refusal: nothing is recorded for B and nothing is sent.
+#[tokio::test]
+async fn a_restore_the_post_cannot_record_refuses_it_with_nothing_sent() {
+    let (response, records, posts, _, lapse) = post_after_a_restore(true).await;
+    // Refused before the approval was spent: it lapsed unspent, so the next
+    // call asks the person again.
+    assert_eq!(
+        lapse.as_ref().map(|note| note["reason"].clone()),
+        Some(json!("post_refused_before_intent")),
+        "{lapse:?}"
+    );
+    let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
+    assert_eq!(posts, 0, "nothing was sent: {response}");
+    assert_eq!(response["isError"], json!(true), "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        crate::tally::approved_import::UnderLockRefusal::RollbackUnrecorded.code(),
+        "{response}"
+    );
+    assert!(!records.iter().any(|record| {
+        record["record_type"] == "dispatch_intent" && record["batch_id"] == second_batch
+    }));
+    assert!(!records
+        .iter()
+        .any(|record| record["record_type"] == "rollback_seen"));
 }

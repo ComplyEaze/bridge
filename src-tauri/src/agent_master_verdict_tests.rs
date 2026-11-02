@@ -1,5 +1,6 @@
 //! The verdict function over constructed inputs: every state, and one test per
 //! check that flips it. Nothing here reads or sends anything.
+use super::super::verify::{judged_next_step, NEXT_LOAD_SAME_COMPANIES};
 use super::*;
 use crate::tally::ledger_create_item::{AdmittedDutyHead, MasterName, PartySide, VerifiedGstin};
 use bridge_tally_protocol::GstDutyHead;
@@ -1946,8 +1947,9 @@ fn an_open_judgement_is_never_terminal() {
     }
 }
 
-/// The order an absent state rests on was measured on TallyPrime 7.2 Silver,
-/// licensed, only: every other Tally, an unknown one included, is not covered.
+/// The order an absent state rests on was measured on TallyPrime 7.2, licensed,
+/// and the edition is no bound: every other Tally, an unknown one included, is
+/// not covered.
 #[test]
 fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
     use crate::tally::ObservedTally;
@@ -1965,7 +1967,11 @@ fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
         ),
         (
             tally(Some("7.2"), Some(LicenseTier::Gold), false),
-            OrderCoverage::NotMeasured("absent_not_measured_on_gold"),
+            OrderCoverage::Measured,
+        ),
+        (
+            tally(Some("7.1"), Some(LicenseTier::Gold), false),
+            OrderCoverage::NotMeasured("absent_not_measured_on_this_release"),
         ),
         (
             tally(Some("7.1"), Some(LicenseTier::Silver), false),
@@ -2019,7 +2025,6 @@ fn only_tallyprime_7_2_silver_licensed_covers_an_absent_state() {
 fn neither_absent_state_is_given_on_a_tally_not_covered() {
     for reason in [
         "absent_not_measured_on_this_product",
-        "absent_not_measured_on_gold",
         "absent_not_measured_on_this_release",
         "absent_tally_release_not_known",
         "absent_not_measured_in_education",
@@ -2074,6 +2079,60 @@ fn an_uncovered_absent_name_names_the_tally_and_the_cause() {
             judgement.reasons
         );
     }
+}
+
+/// `master_write_located_elsewhere` releases the name, so with the name absent
+/// and Tally's answer lost, when a create may still be waiting, it needs the
+/// measured order too. With the answer on file no create is waiting, and with
+/// the name in the book the book refuses a new create: it stands on any Tally.
+#[test]
+fn another_companys_moved_mark_needs_the_measured_order_when_the_answer_is_lost() {
+    let uncovered = "absent_not_measured_on_this_release";
+    let mut absent = World::untouched(suspense());
+    absent.marks()[1] = mark(other(), 4);
+    absent.read.order_coverage = OrderCoverage::NotMeasured(uncovered);
+    let judgement = absent.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    assert!(!judgement.state.is_terminal());
+    assert_eq!(
+        judgement.reasons,
+        vec!["other_company_mark_moved", uncovered]
+    );
+    assert_eq!(judgement.guid, None);
+    absent.answer_held = true;
+    assert_eq!(
+        absent.judge().state,
+        MasterVerdictState::MasterWriteLocatedElsewhere
+    );
+
+    let mut in_the_book = World::lost_answer(suspense());
+    in_the_book.marks()[1] = mark(other(), 4);
+    in_the_book.read.order_coverage = OrderCoverage::NotMeasured(uncovered);
+    let judgement = in_the_book.judge();
+    assert_eq!(
+        judgement.state,
+        MasterVerdictState::MasterWriteLocatedElsewhere
+    );
+    assert_eq!(judgement.reasons, vec!["other_company_mark_moved"]);
+}
+
+/// With the set of loaded companies changed as well, loading them comes first:
+/// the create may have landed in one that is not loaded.
+#[test]
+fn a_held_located_elsewhere_with_a_changed_company_set_asks_to_load_them_first() {
+    let mut world = World::untouched(suspense());
+    world.marks()[1] = mark(other(), 4);
+    world.marks().push(mark(crate::synthetic_guid(0x3333), 1));
+    world.read.order_coverage = OrderCoverage::NotMeasured("absent_not_measured_on_this_release");
+    let judgement = world.judge();
+    assert_eq!(judgement.state, MasterVerdictState::ReconciliationRequired);
+    for reason in ["company_scope_changed", "other_company_mark_moved"] {
+        assert!(judgement.reasons.contains(&reason), "{reason}");
+    }
+    assert_eq!(
+        judged_next_step(&judgement, Moment::Reconcile),
+        NEXT_LOAD_SAME_COMPANIES
+    );
 }
 
 /// The captured company lists, read by the parser a shipped build uses: the

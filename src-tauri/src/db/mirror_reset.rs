@@ -18,6 +18,9 @@
 //!   it, or when the file is a plaintext SQLite database: SQLCipher answers "not a database" for
 //!   a damaged first page or a changed cipher setting exactly as it does for a wrong key, so a
 //!   right-length key of this database's own is never discarded on that answer;
+//! - refuses when a right-length key kept under another account name fails to open it, for the same
+//!   reason: that answer cannot tell a wrong key from this mirror's own key after a profile move, so
+//!   a reset is offered for a database only when every stored key is of another length;
 //! - carries the database path and the key store it proved, so a different path or store cannot be
 //!   passed to the deletion.
 //!
@@ -76,6 +79,12 @@ pub enum ResetRefusal {
     /// told apart; the key may be the only way to recover the data.
     #[error("The key stored for this Tally mirror does not open it, so it is not reset")]
     StoredKeyDoesNotOpen,
+    /// A stored key of the right length, under another account name, does not open the database.
+    /// SQLCipher answers "not a database" with the right key too, for a damaged first page or a
+    /// changed cipher setting, so a key that belongs to this mirror (after a profile move, say)
+    /// cannot be told from another mirror's; none is treated as wrong.
+    #[error("A key stored under another name may be this Tally mirror's, so it is not reset")]
+    AnotherKeyNotProvenWrong,
     /// The file is a plaintext SQLite database, not an encrypted mirror.
     #[error("The Tally mirror file is not encrypted, so it is not reset")]
     NotEncrypted,
@@ -161,18 +170,28 @@ impl<S: ResettableKeyStore> ResettableMirror<S> {
             }
             let keys = key_store.all_keys().map_err(ResetRefusal::KeysUnlistable)?;
             let own_key = key_store.load().map_err(|_| ResetRefusal::Undetermined)?;
+            let mut failed_with_not_a_database = 0_usize;
             for key in keys.into_iter().filter(|key| key.len() == MIRROR_KEY_BYTES) {
                 match probe_encrypted_key(database_path, key).await {
                     Ok(()) => return Err(ResetRefusal::KeyOpensTheMirror),
                     Err(error) => match error.downcast_ref::<EncryptedOpenError>() {
-                        // SQLCipher says this key is not the one: the only answer that counts.
-                        Some(EncryptedOpenError::UnreadableWithSuppliedKey { .. }) => {}
+                        // SQLCipher says this key is not the one, or that the first page cannot
+                        // be read with it; the two cannot be told apart.
+                        Some(EncryptedOpenError::UnreadableWithSuppliedKey { .. }) => {
+                            failed_with_not_a_database += 1;
+                        }
                         _ => return Err(ResetRefusal::Undetermined),
                     },
                 }
             }
             if own_key.is_some_and(|key| key.len() == MIRROR_KEY_BYTES) {
                 return Err(ResetRefusal::StoredKeyDoesNotOpen);
+            }
+            // The own entry is not a right-length key, so each failure above is a key kept
+            // under another name. One of them may be this mirror's, so the reset is refused
+            // rather than offered on the strength of an answer that cannot say.
+            if failed_with_not_a_database > 0 {
+                return Err(ResetRefusal::AnotherKeyNotProvenWrong);
             }
             ResettableState::DatabaseNoKeyOpens
         } else {

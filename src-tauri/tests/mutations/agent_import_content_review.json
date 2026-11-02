@@ -29,6 +29,12 @@
       "tests_at": "this_commit",
       "tests_matching_filter": 1914,
       "command": "as the hand run, for the eleven hand-written mutants that survived at base and are not accepted"
+    },
+    {
+      "run": "h14_again",
+      "tests_at": "the change for #2261",
+      "tests_matching_filter": 1927,
+      "command": "as the hand run, for H14 as it now reads, applied to the file as that change leaves it; the same filter passes whole without the mutant"
     }
   ],
   "summary": {
@@ -421,16 +427,16 @@
       "killer_at": "base"
     },
     "H14": {
-      "what": "review_preview: a read with no matching count claims every voucher matched",
+      "what": "review_preview: a read with no rows to count claims every voucher matched",
       "edits": [
         {
-          "from": "        .as_u64()\n        .unwrap_or(0);",
-          "to": "        .as_u64()\n        .unwrap_or(count as u64);"
+          "from": "    let matched = verification::content_matches_in_the_accounts(&result[\"vouchers\"]);",
+          "to": "    let matched = line.vouchers.len();"
         }
       ],
-      "mutation": "74fbb607282a7adadda1b886c5f3f3b3",
+      "mutation": "f112c6557f0b625417b669daf0e39b96",
       "verdict": "caught",
-      "before_this_change": "missed",
+      "applied_to": "the file as the change for #2261 leaves it, not base_commit: that change replaces the line this mutant first edited (`.as_u64().unwrap_or(0);`, mutation 74fbb607282a7adadda1b886c5f3f3b3, killed by the same test) with a call that counts the rows of the read",
       "killer": "agent::agent_import::post::e2e_tests::stop_tests::content_review_tests::the_review_dialog_shows_only_what_the_batch_and_the_read_hold",
       "killer_at": "this_commit"
     },

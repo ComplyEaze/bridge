@@ -3400,6 +3400,16 @@
       "seed_basis": "synthetic lab book; see stock-query/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "8754cc09a4f0662596c9e4b8d6a30a80953d8f4c3ae57ca9dcb79fbfb6bc6553",
       "size": 310
+    },
+    {
+      "blob": "35658805ae0b247e38e4e1ce48282642c49b0e6a",
+      "capture_id": "vouchers-forex-unspaced-20250401.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-v72-voucher-answers at 03940570",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/vouchers-forex-unspaced-20250401.PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "92e0e0548596cb6103f974c7d8b44afdea09c39ee8fcaf425ddceb3ae67c9369",
+      "size": 387856
     }
   ]
 }

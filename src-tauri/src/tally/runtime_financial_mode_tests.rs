@@ -864,8 +864,8 @@ fn transport_errors(error: &anyhow::Error) -> Vec<&bridge_tally_transport::Tally
 /// one case measured live, is sent once more as the standard request, and the source is that
 /// read's: every row, the standard requests' commitment, and the failure named. The mailing
 /// request was sent once, and nothing before the master pair was sent again. It is read under the
-/// measured drain policy: a declared oversize owes no drain, so no `/status` probe comes before
-/// the standard read.
+/// measured drain policy: a head refused for its declared size owes a drain (#2142), so three
+/// `/status` probes come before the standard read.
 #[tokio::test]
 async fn an_export_whose_mailing_answer_tally_declared_too_large_is_read_again_without_the_details()
 {
@@ -890,9 +890,13 @@ async fn an_export_whose_mailing_answer_tally_declared_too_large_is_read_again_w
             },
             WireGateConfig::default().with_drain(bridge_tally_transport::DrainPolicy::MEASURED),
         );
-        let (source, seen) = export_read(Export, plans_after_a_failed_master(failing), wire).await;
+        let mut plans = plans_after_a_failed_master(failing);
+        for _ in 0..3 {
+            plans.insert(MASTER + 1, status());
+        }
+        let (source, seen) = export_read(Export, plans, wire).await;
         let source = source.unwrap_or_else(|error| panic!("{cause:?}: {error:#}"));
-        assert_eq!(seen.len(), standard_seen.len() + 1, "{cause:?}");
+        assert_eq!(seen.len(), standard_seen.len() + 4, "{cause:?}");
         let mailing = &seen[MASTER].request_body_sha256;
         assert_ne!(mailing, &standard_seen[MASTER].request_body_sha256);
         assert_eq!(
@@ -909,7 +913,10 @@ async fn an_export_whose_mailing_answer_tally_declared_too_large_is_read_again_w
                 .collect::<Vec<_>>()
         };
         assert_eq!(shas(&seen[..MASTER]), shas(&standard_seen[..MASTER]));
-        assert_eq!(shas(&seen[MASTER + 1..]), shas(&standard_seen[MASTER..]));
+        assert!(seen[MASTER + 1..MASTER + 4]
+            .iter()
+            .all(|request| request.method == "GET" && request.path == "/status"));
+        assert_eq!(shas(&seen[MASTER + 4..]), shas(&standard_seen[MASTER..]));
         assert_eq!(source.rows.len(), standard.rows.len());
         assert_eq!(source.request_sha256, standard.request_sha256);
         assert_eq!(source.mailing_details_read_failed, Some(cause));
@@ -1272,10 +1279,10 @@ async fn a_drain_past_the_export_wait_fails_it_with_the_mailing_failure() {
 }
 
 /// bridge#2214: a draining refusal is waited out only where nothing of the standard read was
-/// sent. After a mailing answer that broke off (whose drain the transport clears with three
-/// probes before the standard master post) or one Tally declared past the cap (which owes no
-/// drain), a refusal at the standard master pair's second post, or at the balance pair after
-/// the master pair answered, fails the standard read as itself, and nothing is sent again.
+/// sent. After a mailing answer that broke off or one Tally declared past the cap (whose drain
+/// the transport clears with three probes before the standard master post), a refusal at the
+/// standard master pair's second post, or at the balance pair after the master pair answered,
+/// fails the standard read as itself, and nothing is sent again.
 #[tokio::test]
 async fn a_draining_refusal_after_part_of_the_standard_read_was_sent_is_not_waited_out() {
     use crate::tally::connection::{
@@ -1285,7 +1292,7 @@ async fn a_draining_refusal_after_part_of_the_standard_read_was_sent_is_not_wait
     // grants they add: between three quick probes the lock is released and taken twice more.
     for (failing, probes, regranted) in [
         (broken_off_master(), 3, 2),
-        (declared_too_large_master(), 0, 0),
+        (declared_too_large_master(), 3, 2),
     ] {
         // The standard read's requests answered before the refused send: its master post and
         // check, then its second post and check.

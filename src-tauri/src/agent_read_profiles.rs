@@ -153,19 +153,19 @@ pub(super) fn render_agent_class_vouchers_in_span(
 }
 
 /// The pre-flight census of protocol reference §11c: one light row per voucher
-/// in the window, optionally only those whose AlterID falls in `span`.
+/// in the window whose AlterID falls in `span`.
 ///
 /// The `FETCH` is the one §12.7 qualified for the empty-partition witness, and
 /// the AlterID range is the segment filter the outstandings scanner sends. The
 /// date window keeps a census cheap; the span bounds the response by
 /// construction — with distinct AlterIDs it cannot return more than
-/// `span.through - span.after` rows — and is used whenever the book's mark is
-/// larger than one census (protocol reference §11c.3).
+/// `span.through - span.after` rows. Every census carries one: a census with no
+/// span cannot be rendered (protocol reference §11c.3, #2145).
 pub(super) fn render_agent_voucher_census(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    span: Option<AlterIdSpan>,
+    span: AlterIdSpan,
 ) -> Result<String, String> {
     render_voucher_census(company, VoucherScope::Book, from, to, span)
 }
@@ -187,7 +187,7 @@ pub(super) fn render_agent_ledger_census(
     to: &TallyDate,
     span: AlterIdSpan,
 ) -> Result<String, String> {
-    render_voucher_census(company, VoucherScope::Ledger(ledger), from, to, Some(span))
+    render_voucher_census(company, VoucherScope::Ledger(ledger), from, to, span)
 }
 
 /// The vouchers a windowed request reads: the book's, or one ledger's (#485). A ledger enters a
@@ -220,13 +220,13 @@ fn render_voucher_census(
     scope: VoucherScope<'_>,
     from: &TallyDate,
     to: &TallyDate,
-    span: Option<AlterIdSpan>,
+    span: AlterIdSpan,
 ) -> Result<String, String> {
     let (collection, type_element) =
         scope.collection("Bridge Agent Voucher Census", "Bridge Agent Ledger Census");
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
-    let span_filter = span.map(AlterIdSpan::filter).unwrap_or_default();
+    let span_filter = span.filter();
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
@@ -684,7 +684,7 @@ pub(super) fn voucher_census_read(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    span: Option<AlterIdSpan>,
+    span: AlterIdSpan,
 ) -> Result<ReadRequest, String> {
     render_agent_voucher_census(company, from, to, span).map(ReadRequest)
 }
@@ -799,10 +799,10 @@ mod sealed_read_tests {
     #[test]
     fn every_sealed_profile_renders_an_admitted_read_envelope() {
         let company = "Bridge Sealed Read Co";
-        let span = Some(AlterIdSpan {
+        let span = AlterIdSpan {
             after: 10,
             through: 20,
-        });
+        };
         let (from, to) = (tally_date("20260401"), tally_date("20260430"));
         let mut reads = vec![
             company_high_water_read(company),
@@ -823,7 +823,7 @@ mod sealed_read_tests {
             super::super::voucher_window::VoucherReadShape::EntryWildcard,
             super::super::voucher_window::VoucherReadShape::ClassEntryWildcard,
         ] {
-            for part_span in [None, span] {
+            for part_span in [None, Some(span)] {
                 reads
                     .push(voucher_window_part_read(shape, company, &from, &to, part_span).unwrap());
             }

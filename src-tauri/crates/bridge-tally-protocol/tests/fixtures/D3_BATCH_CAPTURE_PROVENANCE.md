@@ -36,6 +36,36 @@ fixture for reviewing a doubted batch end to end (`acknowledge_post_review` over
 | `agent/d3-batch-journal.jsonl` | 17410 | `922b2c13173ce23e39a13ed067bda5f87098ebc719e6f42dddefce3719289b54` |
 | `agent/d3-batch-import.xml` | 31052 | `1b7ff4ddc901fcab949218b78005ad7bd8870ac5cd34f00465f1bb71712dcec5` |
 
+## The census spanned to the mark (#2145)
+
+Since #2145 the call sends this capture's census spanned to the voucher mark it read, `(0, 1469]`: the recorded census
+request with ` AND $AlterID &gt; 0 AND $AlterID &lt;= 1469` added to its formula and nothing else changed, sha256
+`3ae647206cdff8225eaaa74582c87ffb8a14a3cf6f7eb37df220987f3499f6d5` (`requests/a-d3batch_c2_spanned_0_1469.request.utf16le.xml`
+on the run sheet `lab/2145-spanned-census-captures` at `6a968f01`). This capture holds no answer to that request, and an
+answer captured for the unspanned census may not stand in for it (#899). The batch review test, which pins every request,
+therefore no longer reads this capture: the book was read again on 30 Oct 2026 with the census spanned
+(`AMEND_NOW_CAPTURE_PROVENANCE.md`), and that test now reads it and pins the book as it is now.
+
+Six tests in `agent_import_ack_tests.rs` still replay this capture, so its unspanned census answers the spanned request
+`(0, 1469]`: `an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt`,
+`an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged`,
+`an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_doubt`,
+`a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt`,
+`a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finishes` and
+`a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown`. By the rule above, that is a stand-in. None of
+them pins the census request, and each needs the batch reading back whole and matched, a state the book no longer
+holds: on the 30 Oct capture each review is refused `ack_readback_not_matched` before the check it tests (measured for
+the first and the fifth), and the hand-imported batch's premise is all 50 vouchers matching. The census holds its 50
+vouchers at ALTERIDs 1420 to 1469, all inside the span, so a spanned answer of the batch's state would carry the same
+rows, but it was never captured. Whether these six may keep this answer, or wait for a new capture of that state, is
+for the maintainers to decide on #2145.
+
+The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026 (`lab/2145-spanned-census-captures-answers`
+at `993d96bc`), after the book had moved on: its voucher mark read 1829. Three of the capture's vouchers now carry ALTERIDs
+above 1469 (1677, 1680 and 1685), as the sheet expected, so the spanned answer
+(`08bdf64948cf5ab9bc78fd9bcfd17925276d54fbd5b430d5eb059681b3bc4f22`, 114,704 bytes) leaves them out, and neither answer stands
+for this capture.
+
 ## What it establishes
 
 - A 50-voucher readback of Bridge's own batch, as Tally returns it to the import-verification read:

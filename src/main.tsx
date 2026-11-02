@@ -622,20 +622,6 @@ function App() {
         setOpenCompanyNames([]);
         setUntrustedDiscoveredCompanies([]);
         setUntrustedDiscoveryError(null);
-        if (result.profile.transports.xml_http?.safe_reason_code === "direct_company_report_untrusted") {
-          const discoveryResultsVersion = tallyResultsVersion.current;
-          try {
-            const discovered = await invoke<UntrustedCompanyCandidate[]>("fetch_tally_companies", { config });
-            if (discoveryResultsVersion === tallyResultsVersion.current) {
-              setUntrustedDiscoveredCompanies(discovered);
-              setOpenCompanyNames(discovered.map((candidate) => candidate.name));
-            }
-          } catch (error) {
-            if (discoveryResultsVersion === tallyResultsVersion.current) {
-              setUntrustedDiscoveryError(toOperatorError(error));
-            }
-          }
-        }
       }
     } catch (error) {
       if (resultsVersion === tallyResultsVersion.current) {

@@ -88,7 +88,8 @@ pub(super) enum Step {
 
 /// What an agent post's approval steps need to know about the post they serve,
 /// whichever kind it is: the tool a caller is told to call again, the batch,
-/// the company, and how many vouchers (one for a master) it would send.
+/// the company, and how many vouchers it would send (for a master batch, its
+/// ledgers).
 pub(super) struct ApprovalTarget<'a> {
     pub(super) tool: &'a str,
     pub(super) batch_id: &'a str,

@@ -11,7 +11,7 @@ pub(super) const MAX_RECORD_BYTES: usize = 32 * 1024 * 1024;
 /// dispatch intent may record: the writer refuses more and the reader admits
 /// no more. Imports of 50 were measured on the raw gateway (protocol reference
 /// §11c.5, PARTIAL); through Bridge's own post path it is not yet measured.
-pub(super) const MAX_BATCH_POST_VOUCHERS: usize = 50;
+pub(super) const MAX_BATCH_POST_VOUCHERS: usize = 200;
 
 /// The name of one saved proof pair: when it was saved and the SHA-256 of
 /// its JSON, written `<UTC stamp>.<sha256>`, so a person listing the folder

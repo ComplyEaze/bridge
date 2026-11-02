@@ -1768,6 +1768,52 @@ async fn a_verification_part_tally_cannot_serve_is_halved_left_first() {
     );
 }
 
+/// #2142: a part refused at its head owes the drain and the split sends its
+/// first half at once, so the half meets the probes. On an idle Tally they
+/// clear and the read completes as it would without a drain.
+#[tokio::test]
+async fn a_part_refused_at_its_head_is_halved_through_the_drain() {
+    let shape = VoucherReadShape::ImportVerification;
+    let mut plans = oversized();
+    plans.extend([status_plan(), status_plan(), status_plan()]);
+    plans.extend(paired(&xml_plan(three_vouchers())));
+    plans.extend(paired(&xml_plan(empty_collection())));
+    plans.extend(paired(&mark(1)));
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = TallyRuntime::default().with_wire_gate_config(
+        crate::endpoint_wire::WireGateConfig::default().with_drain(
+            bridge_tally_transport::DrainPolicy {
+                spacing: std::time::Duration::from_millis(1),
+                ..bridge_tally_transport::DrainPolicy::MEASURED
+            },
+        ),
+    );
+    let identity = identity();
+    let outcome = server
+        .read_voucher_window(
+            &identity,
+            identity.display_name(),
+            &tally_date("20260801"),
+            &tally_date("20260802"),
+            shape,
+            WindowPlanSource::Estimate {
+                known_marks: Some(marks_of(1)),
+            },
+            WindowReadLimits::for_shape(shape),
+            |xml| parse_agent_rows(xml, GUID),
+        )
+        .await;
+    let mut observed = simulator.finish().unwrap();
+    assert_eq!(observed.len(), 23);
+    // The refused part is the second send; the probes follow it directly.
+    assert!(observed
+        .drain(2..5)
+        .all(|request| request.path == "/status"));
+    split_read_checks(outcome.unwrap(), &observed, shape);
+}
+
 fn split_read_checks(
     outcome: WindowReadOutcome<Value>,
     observed: &[tally_protocol_simulator::ObservedRequest],

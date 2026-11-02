@@ -215,16 +215,55 @@ fn the_rupee_control_book_reads_its_rupee_bill_and_sets_the_dollar_party_aside()
     assert_eq!(result.overdue_crosscheck, NativeOverdueCrosscheck::Honored);
 }
 
-/// After the dollar purchases, the supplier's settled bill is dropped with its party; the
-/// remaining rows are the rupee bill. That book's own snapshot is not classified here: its
-/// Profit & Loss balance carries a rate with decimals, which no detector admits yet (#2071).
+/// After the dollar purchases, the book's own snapshot sets both dollar parties aside, the
+/// supplier's settled bill is dropped with its party, and the rupee bill is the whole report.
 #[test]
 fn the_settled_suppliers_row_is_dropped_with_its_party() {
+    let snapshot = parse_native_ledger_snapshot_classified(
+        &decode(include_bytes!(
+            "../../tests/fixtures/native/ledger_snapshot_forex_decimal_rate.utf16le.xml"
+        )),
+        &rupee(),
+    )
+    .expect("the snapshot classifies");
+    assert!(snapshot.foreign.is_empty());
+    for party in [CUSTOMER, SUPPLIER] {
+        assert!(snapshot.mixed.iter().any(|name| name == party));
+    }
     let receivable = rows(&receivable_settled_supplier())
-        .admit_except(&[], &[CUSTOMER.to_owned(), SUPPLIER.to_owned()])
+        .admit_except(&snapshot.foreign, &snapshot.mixed)
         .unwrap();
+    let payable = rows(&payable())
+        .admit_except(&snapshot.foreign, &snapshot.mixed)
+        .unwrap();
+    assert_eq!(payable, []);
     assert_eq!(receivable.len(), 1);
     assert_eq!(receivable[0].party, RUPEE_PARTY);
+
+    let groups = parse_native_group_snapshot(
+        &decode(include_bytes!(
+            "../../tests/fixtures/native/group_snapshot_forexgroup_lab.utf16le.xml"
+        )),
+        COMPANY,
+    )
+    .expect("the captured groups");
+    let result = compute_native_outstandings_with_exclusions(
+        "BRIDGE FOREXGROUP LAB",
+        &receivable,
+        &payable,
+        NativeMasterSnapshot {
+            ledgers: &snapshot.base,
+            groups: NativeGroupSnapshot::Complete(&groups),
+        },
+        &snapshot.foreign,
+        &snapshot.mixed,
+        AgeingAnchor::DueDate,
+        &date("20250430"),
+        0,
+    )
+    .expect("the base-currency bills are computed");
+    assert_eq!(result.mixed_currency_ledgers_excluded, snapshot.mixed);
+    assert_eq!(result.overdue_crosscheck, NativeOverdueCrosscheck::Honored);
 }
 
 /// A labelled edit of the capture: a closing amount that is present but not a decimal still

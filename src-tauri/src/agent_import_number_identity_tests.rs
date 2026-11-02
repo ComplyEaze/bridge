@@ -466,3 +466,48 @@ fn a_verification_beside_an_unsettled_batch_matches_the_invoice_by_its_figures()
     drop(held);
     assert!(!absent(&verdict(&server)));
 }
+
+/// Sign-rule site 3 at its canonical caller (#1872): an unsettled batch is the twin of an
+/// invoice by its figures, whatever lexeme each was written in. A batch saved with `0001181.00`
+/// is found by an invoice holding `1181.00`, and a different figure is not found. The figures are
+/// compared in canonical form, where the renderers use the lexeme.
+#[test]
+fn an_unsettled_twin_is_found_whatever_lexeme_its_figures_were_written_in() {
+    let directory = tempfile::tempdir().expect("temporary data directory");
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let mut earlier = invoice_batch("INV/26-27/011");
+    earlier.batch_id = sentinel_batch_id(0xb);
+    for entry in &mut earlier.vouchers[0].entries {
+        entry.amount = format!("000{}", entry.amount);
+    }
+    let invoice = invoice_batch("INV/26-27/002");
+    let mut other = invoice_batch("INV/26-27/003");
+    other.vouchers[0].entries[0].amount = "1181.01".into();
+    server.append_import_ledger(&earlier).expect("saved batch");
+    let held = server.lock_import_admission().expect("admission lock");
+    server
+        .append_import_record_while_admitted(&ledger::StatusRecord::dispatch(&earlier))
+        .expect("dispatch intent");
+    drop(held);
+    assert_eq!(
+        server.import_unsettled_invoice_twin_for_refusal(&invoice),
+        Some(Ok(Some(earlier.batch_id.clone())))
+    );
+    assert_eq!(
+        server.import_unsettled_invoice_twin_for_refusal(&other),
+        Some(Ok(None))
+    );
+}

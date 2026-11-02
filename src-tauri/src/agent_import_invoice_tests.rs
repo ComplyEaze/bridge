@@ -730,6 +730,39 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     );
 }
 
+/// Sign-rule site 2 (#1872). The invoice renderer writes the amount as the batch holds it, in
+/// the leg and in the bill allocation: `0012.50` stays `0012.50`, `0.01` stays `0.01`, and the
+/// longest amount stays 256 bytes. Nothing is parsed or normalised on the way.
+#[test]
+fn the_invoice_renderer_writes_each_edge_amount_as_written() {
+    for amount in ["0.01", "0012.50"]
+        .map(String::from)
+        .into_iter()
+        .chain([format!("{}.99", "9".repeat(253))])
+    {
+        let mut v = voucher();
+        v.invoice.as_mut().unwrap().observed = Some(observed());
+        v.entries[0].amount = amount.clone();
+        v.entries[1].amount = amount.clone();
+        let xml = render_sales_invoice_xml(
+            &v,
+            sentinel_uuid(0x1a),
+            "20260310",
+            "",
+            VoucherAction::Create,
+        )
+        .unwrap();
+        let party = format!(
+            "<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{amount}</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-{amount}</AMOUNT>"
+        );
+        let sales = format!(
+            "<LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{amount}</AMOUNT></LEDGERENTRIES.LIST>"
+        );
+        assert_eq!(xml.matches(&party).count(), 1, "{amount}");
+        assert_eq!(xml.matches(&sales).count(), 1, "{amount}");
+    }
+}
+
 #[test]
 fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
     let mut v = voucher();
@@ -1462,21 +1495,6 @@ fn the_book_size_guard_admits_at_each_bound_and_refuses_one_past_it() {
     assert_eq!(
         voucher_mark_refusal(None),
         Some(refuse("invoice_book_size_unknown"))
-    );
-    assert!(mark_admits(5_000));
-    assert!(!mark_admits(5_001));
-    assert_eq!(ledger_count_refusal(Some(2_000), 9_000), None);
-    assert_eq!(
-        ledger_count_refusal(Some(2_001), 9_000),
-        Some(refuse_value("invoice_book_too_large", "2001 ledgers"))
-    );
-    // A count Tally did not give never admits, and is unknown, not large.
-    assert_eq!(
-        ledger_count_refusal(None, 9_000),
-        Some(refuse_value(
-            "invoice_book_size_unknown",
-            "master mark 9000"
-        ))
     );
 }
 

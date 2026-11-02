@@ -1,0 +1,20 @@
+# fixture: agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml
+# parser: parse_voucher_census(20260804 to 20260805, (0, 68])
+# source: captured
+Ok([
+    CensusRow {
+        day: 2026-08-04,
+        alter_id: 31,
+        guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000017",
+    },
+    CensusRow {
+        day: 2026-08-04,
+        alter_id: 32,
+        guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000018",
+    },
+    CensusRow {
+        day: 2026-08-05,
+        alter_id: 35,
+        guid: "6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000001a",
+    },
+])

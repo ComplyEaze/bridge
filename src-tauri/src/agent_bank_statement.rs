@@ -46,7 +46,6 @@ use bridge_bank_statement::proposals::{
     format_amount, tie_out_window, Direction, Disposition, VoucherType,
 };
 use bridge_bank_statement::Refusal;
-use std::fs;
 use std::io::Read;
 use std::path::Path;
 use zeroize::Zeroizing;
@@ -480,26 +479,8 @@ fn persist(
         .map_err(|_| "statement_proposals_serialization_failed".to_string())?;
     let path = directory.join(format!("{proposals_id}.json"));
     let staged = directory.join(format!(".{proposals_id}.json.partial"));
-    // A private write, then a rename: a reader never sees a partial file under
-    // the published name.
-    let written = (|| {
-        let mut file = local_file::open_local_file(&staged, true)
-            .map_err(|_| "statement_proposals_write_failed".to_string())?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            file.set_permissions(fs::Permissions::from_mode(0o600))
-                .map_err(|_| "statement_proposals_write_failed".to_string())?;
-        }
-        std::io::Write::write_all(&mut file, &bytes)
-            .and_then(|()| file.sync_all())
-            .map_err(|_| "statement_proposals_write_failed".to_string())?;
-        fs::rename(&staged, &path).map_err(|_| "statement_proposals_write_failed".to_string())
-    })();
-    if let Err(error) = written {
-        let _ = fs::remove_file(&staged);
-        return Err(error);
-    }
+    local_file::replace_private_file(&staged, &path, &bytes)
+        .map_err(|_| "statement_proposals_write_failed".to_string())?;
     Ok((proposals_id, sha256_hex(&bytes)))
 }
 

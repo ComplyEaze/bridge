@@ -53,3 +53,17 @@ Build: run 41297868762, artifact 13080855097, head 4cdfe448, zip digest equal; 3
 - **Looked at twice:** trial_balance's first page held 300 rows, while its schema names a row limit of 500. The page was marked truncated with a next offset, so nothing was dropped, but why it stopped at 300 was not read. [partial]
 
 **Confidence:** one sitting, one real book, one call each: PARTIAL.
+
+## B4, the last pair on master
+Build as B3, in a new launch and data folder.
+
+| call | outcome | rows | answer bytes saved | bytes read from Tally | seconds |
+|---|---|---|---|---|---|
+| vouchers, one day | answered, complete, state `complete`, read cost `window_fits` | 1 | 7986 | 880228 | 86.93 |
+| cash_flow, last financial year | answered, complete, state `not_established`, reason `cash_flow_money_group_unmeasured`; net total `not_checked` | - | 10563 | 29340842 | 4.32 |
+
+- **Marks:** read raw before and after, byte-equal to the first read. `GET /status` 200; the Gateway, no dialog; one tally.exe. [verified]
+- **Looked at twice:** one day's single voucher took 86.93 s for 880,228 B read, against 2.62 s for the same day's census in Part H. The call answered and its read cost says the window fits. Where the time went was not read. [partial]
+- **cash_flow's two unmeasured entries** are listed in the answer; what they mean for this book was not read. [partial]
+
+**Confidence:** one sitting, one real book, one call each: PARTIAL.

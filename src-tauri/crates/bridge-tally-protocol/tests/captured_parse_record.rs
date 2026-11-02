@@ -2758,7 +2758,9 @@ const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slic
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
 const INVENTORY_FETCH_NO_PARSER: &str = "a voucher collection export whose FETCH asks for \
-     ALLINVENTORYENTRIES.* in place of ALLLEDGERENTRIES.*: no parser reads this shape yet (#2016); \
+     ALLINVENTORYENTRIES.* in place of ALLLEDGERENTRIES.*: neither the protocol crate's nor the app \
+     crate's record reads it yet (#2016); bridge-tax-audit's `inventory_lines` reads the same lists \
+     from an AuditVouchersV1 part, whose FETCH is field by field rather than this wildcard; \
      STOCK_MOVEMENT_CAPTURE_PROVENANCE.md says what it holds";
 const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";

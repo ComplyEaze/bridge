@@ -245,6 +245,7 @@ async fn a_failed_send_is_a_partial_answer_that_says_so_first() {
     let page = result(&response);
     assert_eq!(page["state"], "partial");
     assert!(page["stopped"]["code"].is_string());
+    assert_eq!(page["verification"], "stopped_before_the_closing_reads");
     let states = page["items"]
         .as_array()
         .unwrap()

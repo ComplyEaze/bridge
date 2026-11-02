@@ -15,6 +15,7 @@ use bridge_tally_protocol::native_stock_summary::{
 pub(super) const MAX_STOCK_BY_BATCH_ITEMS: usize = 20;
 
 const VERIFICATION: &str = "each_item_tied_to_its_closing_in_one_company_mode_and_extent_bracket";
+const VERIFICATION_STOPPED: &str = "stopped_before_the_closing_reads";
 
 /// Tally's own text for stock kept in no named batch.
 const DEFAULT_BATCH: &str = "Primary Batch";
@@ -28,7 +29,7 @@ const LIMITATIONS: [&str; 9] = [
     "Units are compared as Tally writes them, and never converted. An item with an alternate unit is `not_comparable`: Stock Query writes its base unit only, and its closing is written in both",
     "Godown and batch names are compared as sent: two that differ only in letter case are two",
     "Tally's failure answer is read as Tally's failure (`stock_query_tally_reported_failure`); no Stock Query answer has been seen in that shape (UNVERIFIED)",
-    "Measured on TallyPrime 7.2 on one synthetic book, at the year end and at the opening day; other releases and books are not measured",
+    "Measured on TallyPrime 7.2 on one synthetic book, at two month ends of its first year; other releases and books are not measured",
     "Under mask_parties an item's `name` and every godown and named batch are masked, because they are text a person types, which can carry a customer's or supplier's name; `Primary Batch` is Tally's own text and is not masked, and `guid` is not masked",
 ];
 
@@ -169,6 +170,7 @@ fn stock_by_batch_result(
         .map(|item| item_json(item, &mut basis))
         .collect::<Vec<_>>();
     let whole = basis.whole();
+    let stopped = read.stopped.is_some();
     let result = json!({
         "state": if whole { "complete" } else { "partial" },
         "company_guid": guid,
@@ -177,7 +179,7 @@ fn stock_by_batch_result(
         "batch_wise": batch_wise(read.inventory.batchwise),
         "stopped": read.stopped.map(|code| json!({"code": code})),
         "items": items,
-        "verification": VERIFICATION,
+        "verification": if stopped { VERIFICATION_STOPPED } else { VERIFICATION },
         "limitations": LIMITATIONS,
     });
     let headline = basis.headline(&headline::CompanyName::new(&company.name), &read.to);

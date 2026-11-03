@@ -196,11 +196,44 @@ fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).expect("a calendar date")
 }
 
-/// The number read the code renders is, for each spelling row S4 sent (3 Nov
-/// 2026, #2162), the request the lab sent, by the SHA-256 of its file (which
-/// begins with the byte order mark the request is sent with).
+/// The SHA-256 of a request as it is sent: its file begins with the byte order
+/// mark.
+fn sent_sha256(request: &str) -> String {
+    let sent = [0xFF, 0xFE]
+        .into_iter()
+        .chain(request.encode_utf16().flat_map(u16::to_le_bytes))
+        .collect::<Vec<u8>>();
+    crate::agent::sha256_hex(&sent)
+}
+
+/// The number read the code renders is, for the two numbers row 2162-IRN sent
+/// (4 Nov 2026, #2162 item 8), the request the lab sent, by the SHA-256 of its
+/// file (`NI-1.xml`, `NI-2.xml` of `lab/2162-irn-read-sheet` at 8b1573e8).
 #[test]
-fn the_number_read_is_the_one_the_lab_answered_for_each_spelling() {
+fn the_number_read_is_the_one_the_lab_answered_with_the_e_invoice_words() {
+    let (from, to) = (date("20250401"), date("20260331"));
+    for (text, sha256) in [
+        (
+            "1",
+            "43048185958e9be86e9bbdd403670a160ba9f5e49bd2e55dde3232be12cb8d1c",
+        ),
+        (
+            "2",
+            "43cec4b9b334012bea51cd1c68c019b61111577befb3304c3a165a70d7b145a5",
+        ),
+    ] {
+        let rendered =
+            render_invoice_number_request("BRIDGE EINVOICE LAB", &number(text), (&from, &to));
+        assert_eq!(sent_sha256(&rendered), sha256, "{text}");
+    }
+}
+
+/// Without the e-invoice words, the number read is, for each spelling row S4
+/// sent (3 Nov 2026, #2162), the request the lab sent: the S4 answers replayed
+/// to the read are answers to that request (DERIVED, see the pilot lab's
+/// PROVENANCE).
+#[test]
+fn the_number_read_less_the_e_invoice_words_is_the_one_the_lab_answered_for_each_spelling() {
     let (from, to) = (date("20260401"), date("20270331"));
     for (text, sha256) in [
         (
@@ -218,11 +251,13 @@ fn the_number_read_is_the_one_the_lab_answered_for_each_spelling() {
     ] {
         let rendered =
             render_invoice_number_request("BRIDGE PILOT LAB", &number(text), (&from, &to));
-        let sent = [0xFF, 0xFE]
-            .into_iter()
-            .chain(rendered.encode_utf16().flat_map(u16::to_le_bytes))
-            .collect::<Vec<u8>>();
-        assert_eq!(crate::agent::sha256_hex(&sent), sha256, "{text}");
+        let words = ", IRN, IRNACKNO, IRNACKDATE</FETCH>";
+        assert_eq!(rendered.matches(words).count(), 1, "{text}");
+        assert_eq!(
+            sent_sha256(&rendered.replace(words, "</FETCH>")),
+            sha256,
+            "{text}"
+        );
     }
 }
 
@@ -313,6 +348,54 @@ fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
     assert_eq!(
         count_sales_vouchers("<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><DATA><COLLECTION></COLLECTION></DATA></ENVELOPE>"),
         Err("invoice_read_status_not_success")
+    );
+}
+
+/// The number read with the e-invoice words as the lab answered it (4 Nov 2026,
+/// #2162 item 8, `einvoice-lab`): number `1` is held by a Sales invoice with an
+/// IRN and by a Payment, number `2` by a Sales invoice without one.
+#[test]
+fn the_captured_number_reads_say_whether_the_sales_holder_carries_an_irn() {
+    let with = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
+    ));
+    let without = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml"
+    ));
+    assert_eq!(count_vouchers(&with), Ok(2));
+    assert_eq!(count_sales_vouchers(&with), Ok(1));
+    assert_eq!(sales_holder_has_irn(&with), Ok(true));
+    assert_eq!(count_sales_vouchers(&without), Ok(1));
+    assert_eq!(sales_holder_has_irn(&without), Ok(false));
+}
+
+/// The holder's IRN is said only when it came back with text; an empty or
+/// missing one claims nothing, and only a Sales-class holder's counts.
+#[test]
+fn only_a_sales_holder_with_an_irn_says_the_number_carries_one() {
+    let wrap = |rows: &str| {
+        format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
+    };
+    let row = |class: &str, irn: &str| {
+        format!("<VOUCHER><VOUCHERNUMBER>1</VOUCHERNUMBER>{irn}<BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
+    };
+    let with = "<IRN TYPE=\"String\">ab12</IRN>";
+    let empty = "<IRN TYPE=\"String\"></IRN>";
+    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", with))), Ok(true));
+    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", empty))), Ok(false));
+    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", ""))), Ok(false));
+    assert_eq!(sales_holder_has_irn(&wrap(&row("No", with))), Ok(false));
+    assert_eq!(
+        sales_holder_has_irn(&wrap(&(row("No", empty) + &row("Yes", with)))),
+        Ok(true)
+    );
+    assert_eq!(
+        sales_holder_has_irn(&wrap(&row("Yes", &format!("{with}{with}")))),
+        Err("invoice_read_field_repeated")
+    );
+    assert_eq!(
+        sales_holder_has_irn(&wrap(&row("Maybe", with))),
+        Err("invoice_number_class_unread")
     );
 }
 

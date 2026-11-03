@@ -3276,6 +3276,11 @@ const FOREX_REGISTER_READ: &str = "an answer of the registers' lab run on BRIDGE
      under both composite policies; the extent answers carry the lab's redacted company number, \
      which those tests replace at load; agent/forex-register/PROVENANCE.md says what each file is";
 
+const EINVOICE_NUMBER_READ: &str = "an answer of the e-invoice lab book (4 Nov 2026, #2162 \
+     item 8), with no row here: the app crate's invoice tests (src/agent_import_invoice_wire_tests.rs \
+     on the parsers, src/agent_import_invoice_admission_tests.rs through the server) pin what each \
+     parse returns; agent/einvoice-lab/PROVENANCE.md says what each file is";
+
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
@@ -4488,6 +4493,15 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/forex-register/forex-register-marks.utf16le.xml",
         FOREX_REGISTER_READ,
+    ),
+    // The number read with the e-invoice words (#2162 item 8).
+    (
+        "tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml",
+        EINVOICE_NUMBER_READ,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml",
+        EINVOICE_NUMBER_READ,
     ),
 ];
 

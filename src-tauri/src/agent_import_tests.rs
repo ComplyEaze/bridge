@@ -2762,6 +2762,64 @@ fn the_lab_invoice_rates_request_is_the_captured_one_with_its_guids() {
     }
 }
 
+/// The sha256 of the number reads the code sends for `BP/26-27/0010`,
+/// `BP/26-27/0001` and the W18 invoice's `BP/26-27/0040`: the lab's
+/// `r09-number-new-invoice.xml`, `r10-number-control-k0.xml` and
+/// `w18-number-0040.xml` with `IRN, IRNACKNO, IRNACKDATE` added to the
+/// fetch list (DERIVED: the requests with those words were not sent to this
+/// book, and the answers replayed to them were captured without them; on
+/// another book the words changed nothing else in the answer,
+/// `lab/2162-irn-read-answers` R1, #2162 item 8).
+pub(super) const LAB_NUMBER_NEW_INVOICE_SHA256: &str =
+    "fa77d18300e04e0aeb542c664aa4f1390e43a5c08442d6329f6a0352714c3e9d";
+pub(super) const LAB_NUMBER_CONTROL_SHA256: &str =
+    "9750f0fffe721ba905ffaeb9ebf2e3b84d503eebe39112fcb400393bdeac6b49";
+pub(super) const W18_NUMBER_SHA256: &str =
+    "ec2a6c29deb324d0c14302ff4456b8a28a8f5e12cfab5b358a5ee9265f0e3726";
+
+#[test]
+fn the_lab_number_reads_are_the_sent_ones_with_the_e_invoice_words() {
+    let window = (stored_date("20260401"), stored_date("20270331"));
+    let sha256 = |request: &str| {
+        let sent = [0xFF, 0xFE]
+            .into_iter()
+            .chain(request.encode_utf16().flat_map(u16::to_le_bytes))
+            .collect::<Vec<u8>>();
+        crate::agent::sha256_hex(&sent)
+    };
+    for (number, sent, pinned) in [
+        (
+            "BP/26-27/0010",
+            "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985",
+            LAB_NUMBER_NEW_INVOICE_SHA256,
+        ),
+        (
+            "BP/26-27/0001",
+            "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6",
+            LAB_NUMBER_CONTROL_SHA256,
+        ),
+        (
+            "BP/26-27/0040",
+            "84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8",
+            W18_NUMBER_SHA256,
+        ),
+    ] {
+        let rendered = invoice::render_invoice_number_request(
+            "BRIDGE PILOT LAB",
+            &invoice::InvoiceNumber::parse(number).unwrap(),
+            (&window.0, &window.1),
+        );
+        let words = ", IRN, IRNACKNO, IRNACKDATE</FETCH>";
+        assert_eq!(rendered.matches(words).count(), 1, "{number}");
+        assert_eq!(
+            sha256(&rendered.replace(words, "</FETCH>")),
+            sent,
+            "{number}"
+        );
+        assert_eq!(sha256(&rendered), pinned, "{number}");
+    }
+}
+
 /// The cut [`rates_cut_to`] makes is, on the lab's own bytes, Tally's answer to
 /// the read by GUID: the four-parent answer of 31 Oct 2026 cut to the lab
 /// invoice's five ledgers, and to four of them, equals the answers the lab gave

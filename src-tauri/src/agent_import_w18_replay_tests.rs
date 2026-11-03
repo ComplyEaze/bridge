@@ -41,7 +41,8 @@ const W18_GUID: &str = PILOT_GUID;
 /// The SHA-256 of the request the build sends for each kind of read. Each is
 /// a request the lab answered, as in the 9 Oct replay, except: the number
 /// read, which is `w18-number-0040.xml` (`../r09-number-new-invoice.xml` with
-/// the number changed only); `L` and `P`, the listing by GUID, and `Q`, the
+/// the number changed only) with the e-invoice words added (DERIVED, see
+/// `W18_NUMBER_SHA256`); `L` and `P`, the listing by GUID, and `Q`, the
 /// rates request by GUID, which are the code's and were never sent with these GUIDs (a
 /// test derives its pin from the lab's 31 Oct 2026 request naming five other
 /// ledgers; see `w18_scoped_rates_hsn`); and `X` and `Y`, which are the code's requests the
@@ -49,7 +50,7 @@ const W18_GUID: &str = PILOT_GUID;
 /// `w18_types_as_of_the_book`).
 fn w18_request_sha256(letter: char) -> &'static str {
     match letter {
-        'N' => "84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8",
+        'N' => super::super::super::tests::W18_NUMBER_SHA256,
         // The listing by GUID (#1331): the code's requests for this invoice's
         // six ledgers, never sent with these GUIDs. Their answers are cut from
         // W18c's whole-book ones, sent with the dates these carry (SVTODATE

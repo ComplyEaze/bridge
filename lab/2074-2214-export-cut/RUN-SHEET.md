@@ -4,6 +4,8 @@ Not for merge. About two hours, one sitting, in this order, because each part ne
 
 **Needs before it starts:** the desktop app installed from the row's artifact and driven by the lab. 2074-L's install landed in a virtualized folder and its screen grant was declined, so that row's Part W never ran. Without the app, stop and tell the run coordinator: this row does not go round it.
 
+**X-only cut (the run coordinator's ruling, 3 Nov 2026).** The W rows wait for the owner, so this sitting runs by tool alone, with no app installed, after rows N2 and #2210, and only if N2 shows Tally serves a front first on a warmed connection; if it does not, the front is rewritten before this runs. Run P0, S0, B5 and R1; A1 for `create-000` only and A2 expecting `total` 12, with no `create-probe` and no A3; M1 and M2 with `total` 172, no W2; Part F without `front-w4.xml`; X1 to X3, with Whole expecting `total` 174; then Close. The only build is `bridge_mcp.exe`, taken as those two rows take theirs. A hang is still a C9 STOP, with nothing sent, but in this cut the lab may restart Tally on its standing authority and reports it. Read the Decides table without W4: X rows that pass show a cut by tool, and any ruling on `Deadline` also waits for W4.
+
 **Writes to the book: YES, to THE COMPANY only, undone at the end by restoring BK-2074-2214.**
 - One party ledger, `Lab Mark Probe`, created by request, then altered back and forth to raise the master mark past 4,266, as 2074-L.
 - Party ledgers `Lab Mail Load 000` to `Lab Mail Load 200`, as the 2214 row.

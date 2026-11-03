@@ -813,6 +813,7 @@ pub(super) struct Settlement {
 }
 
 /// Validate the whole journal and count its batches by settlement (#local-data).
+#[cfg(test)]
 pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
     settlement_at(reader, &std::cell::Cell::new(0))
 }

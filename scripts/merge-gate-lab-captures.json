@@ -3850,6 +3850,56 @@
       "seed_basis": "synthetic lab book; see agent/vouchers-forex-unspaced-20250401.PROVENANCE.md in the pull request that adds the capture",
       "sha256": "92e0e0548596cb6103f974c7d8b44afdea09c39ee8fcaf425ddceb3ae67c9369",
       "size": 387856
+    },
+    {
+      "blob": "c8139dbd504ada8a52bc8b22f3d6d423c262c581",
+      "capture_id": "build-read-class-party-in-karnataka.utf16le.xml",
+      "company": "BRIDGE NOTES LAB",
+      "lab_ref": "branch lab/2027-window-read-answers at 307427aa",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/gst-note-fields-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "59129b0498c014f627c6d79bb665ad1d2dd5c84cc0384cc79b16ae3e3fc84b51",
+      "size": 53430
+    },
+    {
+      "blob": "9232641a3704c5c20ae7268088a782b247ef7c2c",
+      "capture_id": "build-read-four-vouchers.utf16le.xml",
+      "company": "BRIDGE NOTES LAB",
+      "lab_ref": "branch lab/2027-window-read-answers at 307427aa",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/gst-note-fields-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1cffb726951c0ace349993bad49cff08b2ba25256bd72bdf973d8811da875e56",
+      "size": 252224
+    },
+    {
+      "blob": "e88642117af542171a103d19d7f595f9ffaba4c8",
+      "capture_id": "native-four-vouchers.utf16le.xml",
+      "company": "BRIDGE NOTES LAB",
+      "lab_ref": "branch lab/2027-gst-note-fields-capture-answers at 07e3bc34",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/native-four-vouchers.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/gst-note-fields-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5086cafe18aa020b82fa590d6e897f2c761af7351bf4462494eef87037b6cb41",
+      "size": 232288
+    },
+    {
+      "blob": "e2a6aa92d6fbc6fffe7b2e981c45323a62128c8b",
+      "capture_id": "shipped-read-credit-note.utf16le.xml",
+      "company": "BRIDGE NOTES LAB",
+      "lab_ref": "branch lab/2027-gst-note-fields-capture-answers at 07e3bc34",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/shipped-read-credit-note.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/gst-note-fields-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "5dc3d8c34f83656b7ca032f9726e05f91e0c8a9a380c78a0c32da626f3547146",
+      "size": 65226
+    },
+    {
+      "blob": "61ddbfcc36bd7cf8a75dcc2bb428b1fc05e1c22d",
+      "capture_id": "window-read-inter-state-sale.utf16le.xml",
+      "company": "BRIDGE NOTES LAB",
+      "lab_ref": "branch lab/2027-voucher-gst-fields-fetch-answers at 67039e2b",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/gst-note-fields-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "83f00cdb6dbf9f54e9d800247017a8e4e3a4962cfaeeea7ffc96d010b6797912",
+      "size": 51938
     }
   ]
 }

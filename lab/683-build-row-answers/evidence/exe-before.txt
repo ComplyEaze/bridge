@@ -1,0 +1,5 @@
+2026-11-03T21:26:29Z
+f8a6388b2271696a0fc4ae1d2cfacf03909325f65859bcbe96129c9b23fe43e4 *<build folder>/mq683b-a4b4adff/artifact.zip
+780dab593492d8e4e0ba6904e8d0e5dba2ecb9aa8dda15a31694aca34b8c0993 *<build folder>/mq683b-a4b4adff/unz/bridge-tally.mcpb
+c1bc36a46d158432f7b19fc3ba73a07d8f799f1f33fe0b9a4fee2eb39c2f6876 *<build folder>/mq683b-a4b4adff/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe
+79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118 *<build folder>/mq683b-a4b4adff/mcpb/bin/x86_64-pc-windows-msvc/pdfium.dll

@@ -1,0 +1,13 @@
+PASS 1 read forwarded byte for byte
+PASS 1 answer returned byte for byte
+PASS 2 request kept
+PASS 2 answer kept
+PASS 3 second read answered
+PASS 3 second read kept
+PASS 3 one upstream connection
+PASS 4 import (utf-16le) not forwarded
+PASS 4 import (utf-16le) closed with no answer
+PASS 4 import (utf-8) not forwarded
+PASS 4 import (utf-8) closed with no answer
+PASS 4 import_refused logged twice
+PASS 5 non-empty OUTDIR refused

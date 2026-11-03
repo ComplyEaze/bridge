@@ -12,6 +12,12 @@
 //! (`100.000 Kgs`, `25.00/Kgs`). A voucher whose stock does not sit under a ledger entry
 //! (a Stock Journal, whose entry list is empty in this read) has no goods lines here.
 //!
+//! A `vouchers` call with `stock_lines` (#2016) reads the voucher's own
+//! `ALLINVENTORYENTRIES.LIST` instead, through the same collector, one per voucher: that request
+//! returns no ledger entries, and it is the one read that reaches a Stock Journal's lines. Each
+//! line there adds `ISDEEMEDPOSITIVE`, its only direction, since a quantity is unsigned (protocol
+//! reference §8.2i).
+//!
 //! Like the cost-centre and bank collectors this never refuses the read: a line that cannot
 //! be read whole leaves its entry carrying a typed reason and no partial list. A line's batch
 //! amounts must add up to its amount when both are given, as they do on every captured line.
@@ -20,6 +26,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 const LINE_LIST: &str = "INVENTORYALLOCATIONS.LIST";
+pub(in crate::agent) const STOCK_LINE_LIST: &str = "ALLINVENTORYENTRIES.LIST";
 const BATCH_LIST: &str = "BATCHALLOCATIONS.LIST";
 /// Most lines kept for one entry, and most batch rows for one line. Bounds chosen here,
 /// not measured; a list past either is reported, not truncated.
@@ -45,6 +52,8 @@ pub(in crate::agent) enum GoodsLineProblem {
     /// A line or batch list nested anywhere but where the captures show it, or an
     /// element inside a field that is read.
     ShapeUnrecognised,
+    /// A stock line whose `ISDEEMEDPOSITIVE` is neither `Yes` nor `No`.
+    DirectionUnreadable,
 }
 
 impl GoodsLineProblem {
@@ -57,6 +66,7 @@ impl GoodsLineProblem {
             Self::TextUndecodable => "goods_line_text_undecodable",
             Self::TooMany => "goods_lines_too_many",
             Self::ShapeUnrecognised => "goods_line_shape_unrecognised",
+            Self::DirectionUnreadable => "goods_line_direction_unreadable",
         }
     }
 }
@@ -69,6 +79,19 @@ const LINE_FIELDS: [(&str, &str); 5] = [
     ("RATE", "rate"),
     ("AMOUNT", "amount"),
 ];
+
+/// The fields read from a stock line: a goods line's and the side it moves stock to.
+const STOCK_LINE_FIELDS: [(&str, &str); 6] = [
+    ("STOCKITEMNAME", "stock_item"),
+    ("ACTUALQTY", "actual_quantity"),
+    ("BILLEDQTY", "billed_quantity"),
+    ("RATE", "rate"),
+    ("AMOUNT", "amount"),
+    ("ISDEEMEDPOSITIVE", DEEMED_POSITIVE),
+];
+
+/// Held while a stock line is read; the tool returns `direction` in its place.
+const DEEMED_POSITIVE: &str = "deemed_positive";
 
 /// The fields read from a batch row, in the same form.
 const BATCH_FIELDS: [(&str, &str); 5] = [
@@ -124,10 +147,38 @@ impl Draft {
     }
 }
 
-/// Fed by the voucher row loop with the path below `ALLLEDGERENTRIES.LIST`
-/// (`tail`). One collector serves one entry at a time; `reset` starts the next.
+/// Which list a collector reads.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub(in crate::agent) enum GoodsLineList {
+    /// A ledger entry's `INVENTORYALLOCATIONS.LIST`.
+    #[default]
+    EntryAllocations,
+    /// A voucher's `ALLINVENTORYENTRIES.LIST`, each line with its direction.
+    VoucherStockLines,
+}
+
+impl GoodsLineList {
+    const fn tag(self) -> &'static str {
+        match self {
+            Self::EntryAllocations => LINE_LIST,
+            Self::VoucherStockLines => STOCK_LINE_LIST,
+        }
+    }
+
+    const fn fields(self) -> &'static [(&'static str, &'static str)] {
+        match self {
+            Self::EntryAllocations => &LINE_FIELDS,
+            Self::VoucherStockLines => &STOCK_LINE_FIELDS,
+        }
+    }
+}
+
+/// Fed by the voucher row loop with the path below `ALLLEDGERENTRIES.LIST`, or below `VOUCHER` for
+/// [`GoodsLineList::VoucherStockLines`] (`tail`). One collector serves one entry or voucher at a
+/// time; `reset` starts the next.
 #[derive(Default)]
 pub(in crate::agent) struct GoodsLineCollector {
+    list: GoodsLineList,
     line: Option<Draft>,
     batch: Option<Draft>,
     batches: Vec<Draft>,
@@ -136,8 +187,15 @@ pub(in crate::agent) struct GoodsLineCollector {
 }
 
 impl GoodsLineCollector {
+    pub(in crate::agent) fn of_list(list: GoodsLineList) -> Self {
+        Self {
+            list,
+            ..Self::default()
+        }
+    }
+
     pub(in crate::agent) fn reset(&mut self) {
-        *self = Self::default();
+        *self = Self::of_list(self.list);
     }
 
     fn note(&mut self, problem: GoodsLineProblem) {
@@ -151,13 +209,15 @@ impl GoodsLineCollector {
 
     /// `tail` is the path of the PARENT of the element that starts.
     pub(in crate::agent) fn start(&mut self, tail: &[String], tag: &str) {
+        let list = self.list.tag();
+        let line_fields = self.list.fields();
         match (tail, tag) {
-            ([], LINE_LIST) => {
+            ([], tag) if tag == list => {
                 self.line = Some(Draft::default());
                 self.batches.clear();
             }
-            (_, LINE_LIST) => self.note(GoodsLineProblem::ShapeUnrecognised),
-            ([c], BATCH_LIST) if c == LINE_LIST => {
+            (_, tag) if tag == list => self.note(GoodsLineProblem::ShapeUnrecognised),
+            ([c], BATCH_LIST) if c == list => {
                 if let Some(line) = self.line.as_mut() {
                     line.any_child = true;
                 }
@@ -165,26 +225,26 @@ impl GoodsLineCollector {
             }
             (_, BATCH_LIST) => self.note(GoodsLineProblem::ShapeUnrecognised),
             // An element inside a field that is read: its text would be cut in two.
-            ([c, field], _) if c == LINE_LIST && wanted(&LINE_FIELDS, field).is_some() => {
+            ([c, field], _) if c == list && wanted(line_fields, field).is_some() => {
                 self.note(GoodsLineProblem::ShapeUnrecognised)
             }
             ([c, k, field], _)
-                if c == LINE_LIST && k == BATCH_LIST && wanted(&BATCH_FIELDS, field).is_some() =>
+                if c == list && k == BATCH_LIST && wanted(&BATCH_FIELDS, field).is_some() =>
             {
                 self.note(GoodsLineProblem::ShapeUnrecognised)
             }
-            ([c], field) if c == LINE_LIST => {
+            ([c], field) if c == list => {
                 let Some(line) = self.line.as_mut() else {
                     return;
                 };
                 line.any_child = true;
-                if let Some(name) = wanted(&LINE_FIELDS, field) {
+                if let Some(name) = wanted(line_fields, field) {
                     if !line.open_field(name) {
                         self.note(GoodsLineProblem::FieldDuplicated);
                     }
                 }
             }
-            ([c, k], field) if c == LINE_LIST && k == BATCH_LIST => {
+            ([c, k], field) if c == list && k == BATCH_LIST => {
                 let Some(batch) = self.batch.as_mut() else {
                     return;
                 };
@@ -207,9 +267,13 @@ impl GoodsLineCollector {
         if tail.last().is_none_or(|last| last != tag) {
             return;
         }
+        let list = self.list.tag();
+        let line_fields = self.list.fields();
         let (draft, fields) = match tail {
-            [c, _] if c == LINE_LIST => (self.line.as_mut(), &LINE_FIELDS),
-            [c, k, _] if c == LINE_LIST && k == BATCH_LIST => (self.batch.as_mut(), &BATCH_FIELDS),
+            [c, _] if c == list => (self.line.as_mut(), line_fields),
+            [c, k, _] if c == list && k == BATCH_LIST => {
+                (self.batch.as_mut(), BATCH_FIELDS.as_slice())
+            }
             _ => return,
         };
         if let (Some(draft), Some(name)) = (draft, wanted(fields, tag)) {
@@ -221,9 +285,10 @@ impl GoodsLineCollector {
 
     /// `tail` includes the element that ends.
     pub(in crate::agent) fn end(&mut self, tail: &[String]) {
+        let list = self.list.tag();
         match tail {
-            [c, k] if c == LINE_LIST && k == BATCH_LIST => self.finish_batch(),
-            [c] if c == LINE_LIST => self.finish_line(),
+            [c, k] if c == list && k == BATCH_LIST => self.finish_batch(),
+            [c] if c == list => self.finish_line(),
             _ => {}
         }
     }
@@ -284,11 +349,20 @@ impl GoodsLineCollector {
                 }
             }
         }
-        let mut row = line.states(&LINE_FIELDS);
+        let mut row = line.states(self.list.fields());
         row.insert(
             "stock_item".to_string(),
             json!(line.fields["stock_item"].trim()),
         );
+        if self.list == GoodsLineList::VoucherStockLines {
+            row.remove(DEEMED_POSITIVE);
+            let direction = match line.fields.get(DEEMED_POSITIVE).map(|value| value.trim()) {
+                Some("Yes") => "in",
+                Some("No") => "out",
+                _ => return self.note(GoodsLineProblem::DirectionUnreadable),
+            };
+            row.insert("direction".to_string(), json!(direction));
+        }
         if !batches.is_empty() {
             row.insert(
                 "batches".to_string(),
@@ -307,7 +381,7 @@ impl GoodsLineCollector {
         }
     }
 
-    /// The entry's goods lines, or why they could not be read. An entry with none
+    /// The entry's or voucher's lines, or why they could not be read. One with none
     /// yields an empty list.
     pub(in crate::agent) fn finish(&mut self) -> Result<Vec<Value>, GoodsLineProblem> {
         match self.problem {

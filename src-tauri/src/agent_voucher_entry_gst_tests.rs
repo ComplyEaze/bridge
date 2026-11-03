@@ -26,6 +26,7 @@ fn parse(xml: &str) -> Vec<Value> {
         COMPANY_GUID,
         GstDetailsShown::Shown,
         EInvoiceFields::NotAsked,
+        StockLines::NotAsked,
     )
     .expect("the read still succeeds")
 }
@@ -319,6 +320,7 @@ fn a_read_that_does_not_ask_parses_no_gst_details() {
         COMPANY_GUID,
         GstDetailsShown::Withheld,
         EInvoiceFields::NotAsked,
+        StockLines::NotAsked,
     )
     .unwrap();
     assert_eq!(plain, withheld);
@@ -466,6 +468,7 @@ fn the_entry_holding_an_item_invoices_goods_line_carries_no_rates() {
         "aae372c5-a894-491c-8843-5532e43d2d2f",
         GstDetailsShown::Shown,
         EInvoiceFields::NotAsked,
+        StockLines::NotAsked,
     )
     .expect("the read still succeeds");
     assert_eq!(rows.len(), 1);

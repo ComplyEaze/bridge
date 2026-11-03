@@ -20,7 +20,7 @@ use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
 use cost_centres::CostCentreCollector;
 pub(super) use cost_centres::CostCentreProblem;
 use entry_gst::EntryGstCollector;
-use goods_lines::GoodsLineCollector;
+use goods_lines::{GoodsLineCollector, GoodsLineList, STOCK_LINE_LIST};
 pub(super) use scalars::*;
 
 /// Shares the native collection boundary used by the protocol crate: CMPINFO
@@ -73,6 +73,15 @@ impl NativeCollectionScope {
     pub(super) fn in_bank_allocations(&self) -> bool {
         self.entry_tail()
             .is_some_and(|tail| tail.first().is_some_and(|c| c == "BANKALLOCATIONS.LIST"))
+    }
+    /// The path below the current `VOUCHER`, for a voucher's own stock lines: `None` outside a
+    /// voucher and inside any other list of it, such as a Stock Journal's in and out sides, which
+    /// repeat the same lines without their godowns (protocol reference §8.2i).
+    pub(super) fn stock_line_tail(&self) -> Option<&[String]> {
+        (self.path.len() >= 5
+            && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
+            && self.path.get(5).is_none_or(|c| c == STOCK_LINE_LIST))
+        .then(|| &self.path[5..])
     }
     /// Whether the element being read lies inside an `INVENTORYALLOCATIONS.LIST`.
     pub(super) fn in_goods_lines(&self) -> bool {
@@ -146,7 +155,7 @@ pub(super) fn parse_import_verification_rows(
         company_guid,
         CompositePolicy::Refuse,
         GstDetailsShown::Withheld,
-        EInvoiceFields::NotAsked,
+        (EInvoiceFields::NotAsked, StockLines::NotAsked),
     )?)
 }
 
@@ -162,7 +171,7 @@ pub(super) fn parse_agent_rows_with_accounting_state(
         company_guid,
         CompositePolicy::Refuse,
         GstDetailsShown::Withheld,
-        EInvoiceFields::NotAsked,
+        (EInvoiceFields::NotAsked, StockLines::NotAsked),
     )?)
 }
 
@@ -173,6 +182,7 @@ pub(super) fn parse_agent_rows_reading_gst(
     company_guid: &str,
     gst: GstDetailsShown,
     e_invoice: EInvoiceFields,
+    stock: StockLines,
 ) -> Result<Vec<Value>, String> {
     refused_composites(parse_voucher_rows(
         xml,
@@ -181,7 +191,7 @@ pub(super) fn parse_agent_rows_reading_gst(
         company_guid,
         CompositePolicy::Refuse,
         gst,
-        e_invoice,
+        (e_invoice, stock),
     )?)
 }
 
@@ -200,6 +210,7 @@ pub(super) fn parse_agent_rows_withholding(
         company_guid,
         GstDetailsShown::Withheld,
         EInvoiceFields::NotAsked,
+        StockLines::NotAsked,
     )
 }
 
@@ -210,6 +221,7 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
     company_guid: &str,
     gst: GstDetailsShown,
     e_invoice: EInvoiceFields,
+    stock: StockLines,
 ) -> Result<Vec<VoucherRow>, String> {
     Ok(parse_voucher_rows(
         xml,
@@ -218,7 +230,7 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
         company_guid,
         CompositePolicy::Withhold,
         gst,
-        e_invoice,
+        (e_invoice, stock),
     )?
     .into_iter()
     .map(|(row, withheld)| {
@@ -299,6 +311,56 @@ impl EInvoiceFields {
             "ack_no": ack_no.to_json(),
             "ack_date": ack_date.to_json(),
         })))
+    }
+}
+
+/// Whether a `vouchers` call read each voucher's stock lines in place of its ledger entries
+/// (#2016).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum StockLines {
+    Asked,
+    NotAsked,
+}
+
+/// What needs a voucher's ledger entries, which the stock-line request does not return: each
+/// would answer empty or wrong without saying so, so it is refused with this argument.
+const NEEDS_LEDGER_ENTRIES: [&str; 8] = [
+    "ledger",
+    "amount",
+    "suspense_tagged",
+    "summarise_by",
+    "bank_allocations",
+    "goods_lines",
+    "include_gst_details",
+    "include_e_invoice",
+];
+
+/// The voucher types whose stock lines were captured on this request (protocol reference §8.2i).
+/// A type the user made under one has no reserved name, so it is not among them.
+const STOCK_LINE_RESERVED_TYPES: [&str; 3] = ["Stock Journal", "Delivery Note", "Receipt Note"];
+
+impl StockLines {
+    /// From the `stock_lines` argument: absent or false does not ask.
+    pub(super) fn from_args(args: &Value) -> Result<Self, String> {
+        if optional_bool(args, "stock_lines")? != Some(true) {
+            return Ok(Self::NotAsked);
+        }
+        match NEEDS_LEDGER_ENTRIES.iter().find(|name| {
+            args.get(**name)
+                .is_some_and(|value| !value.is_null() && *value != Value::Bool(false))
+        }) {
+            Some(name) => Err(format!("voucher_stock_lines_excludes_{name}")),
+            None => Ok(Self::Asked),
+        }
+    }
+
+    /// Whether this request's lines are read for a voucher of `kind`, resolved by Tally in the
+    /// same response. A kind no capture covers is named, never read on trust.
+    fn covers(kind: Option<&ResolvedVoucherType>) -> bool {
+        kind.is_some_and(|kind| {
+            kind.class == Some(ReservedVoucherClass::CreditNote)
+                || STOCK_LINE_RESERVED_TYPES.contains(&kind.reserved_name.as_str())
+        })
     }
 }
 
@@ -519,11 +581,12 @@ fn parse_voucher_rows(
     company_guid: &str,
     composites: CompositePolicy,
     gst_details: GstDetailsShown,
-    e_invoice: EInvoiceFields,
+    (e_invoice, stock): (EInvoiceFields, StockLines),
 ) -> Result<Vec<(Value, bool)>, String> {
     // An entry's GST details are read only for a call that shows them (#2027): a read that does
     // not ask holds, sizes and returns exactly the rows it did before.
     let read_gst = gst_details == GstDetailsShown::Shown;
+    let read_stock = stock == StockLines::Asked;
     // Tally's collection XML varies by release; use a deliberately conservative
     // extractor and never infer a missing field. Malformed rows fail before
     // optional selectors can hide them as an apparently complete empty result.
@@ -542,6 +605,7 @@ fn parse_voucher_rows(
     let mut cost = CostCentreCollector::default();
     let mut bank = BankAllocationCollector::default();
     let mut goods = GoodsLineCollector::default();
+    let mut stock_lines = GoodsLineCollector::of_list(GoodsLineList::VoucherStockLines);
     let mut gst = EntryGstCollector::default();
     let mut current_tag = String::new();
     let mut scope = NativeCollectionScope::default();
@@ -573,6 +637,7 @@ fn parse_voucher_rows(
                     current = Some(row);
                     entries.clear();
                     withheld = false;
+                    stock_lines.reset();
                 }
                 if tag == "ALLLEDGERENTRIES.LIST" && scope.row("VOUCHER") {
                     entry = Some(BTreeMap::new());
@@ -587,6 +652,9 @@ fn parse_voucher_rows(
                     bank.start(tail, &tag);
                     goods.start(tail, &tag);
                     gst.start(tail, &tag);
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.start(tail, &tag);
                 }
                 if tag == "BILLALLOCATIONS.LIST" && scope.child("VOUCHER", "ALLLEDGERENTRIES.LIST")
                 {
@@ -610,6 +678,12 @@ fn parse_voucher_rows(
                     match decoded_agent_text(text.clone()) {
                         Ok(value) => gst.text(tail, &current_tag, &value),
                         Err(_) => gst.undecodable(tail),
+                    }
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    match decoded_agent_text(text.clone()) {
+                        Ok(value) => stock_lines.text(tail, &current_tag, &value),
+                        Err(_) => stock_lines.undecodable(),
                     }
                 }
                 if scope.in_cost_centres() {
@@ -649,6 +723,9 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::CData(text)) => {
                 let value = text.to_string();
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.text(tail, &current_tag, &value);
+                }
                 if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
                     gst.text(tail, &current_tag, &value);
                 }
@@ -673,6 +750,12 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::GeneralRef(reference)) => {
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    match decoded_agent_reference(reference.clone()) {
+                        Ok(value) => stock_lines.text(tail, &current_tag, &value),
+                        Err(_) => stock_lines.undecodable(),
+                    }
+                }
                 if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
                     match decoded_agent_reference(reference.clone()) {
                         Ok(value) => gst.text(tail, &current_tag, &value),
@@ -716,6 +799,9 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::End(event)) => {
                 let end = event.name().as_ref().to_ascii_uppercase();
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.end(tail);
+                }
                 if let Some(tail) = scope.entry_tail() {
                     cost.end(tail);
                     bank.end(tail);
@@ -948,7 +1034,20 @@ fn parse_voucher_rows(
                         let mut parsed = json!({"date": row.get("DATE"), "voucher_number": row.get("VOUCHERNUMBER"), "voucher_type": row.get("VOUCHERTYPENAME"), "party": row.get("PARTYLEDGERNAME"), "narration": row.get("NARRATION"), "guid": row.get("GUID"), "alter_id": parse_optional_tally_alter_id(row.get("ALTERID").map(String::as_str))?, "master_id": master_id, "amounts": amounts});
                         // Present only when the read asked Tally to resolve the
                         // row's voucher type (bridge#625).
-                        if let Some(resolved) = resolve_row_voucher_type(&row, company_guid)? {
+                        let kind = resolve_row_voucher_type(&row, company_guid)?;
+                        if read_stock {
+                            if !StockLines::covers(kind.as_ref()) {
+                                parsed["stock_lines_not_read"] = Value::Bool(true);
+                            } else {
+                                match stock_lines.finish() {
+                                    Ok(lines) => parsed["stock_lines"] = Value::Array(lines),
+                                    Err(problem) => {
+                                        parsed["stock_lines_unreadable"] = json!(problem.reason());
+                                    }
+                                }
+                            }
+                        }
+                        if let Some(resolved) = kind {
                             parsed["voucher_type_guid"] = json!(resolved.guid);
                             parsed["voucher_type_reserved_name"] = json!(resolved.reserved_name);
                             parsed["voucher_class"] =
@@ -1091,6 +1190,9 @@ fn parse_voucher_rows(
                     goods.start(tail, &name);
                     gst.start(tail, &name);
                 }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.start(tail, &name);
+                }
                 scope.start(name.clone());
                 if scope.repeated_collection {
                     return Err("agent_read_protocol_invalid".into());
@@ -1100,6 +1202,9 @@ fn parse_voucher_rows(
                     bank.end(tail);
                     goods.end(tail);
                     gst.end(tail);
+                }
+                if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
+                    stock_lines.end(tail);
                 }
                 scope.end(&name)?;
             }

@@ -143,6 +143,17 @@ fn agent_rows(text: &str, guid: &str) -> String {
     coded(parse_agent_rows(text, guid))
 }
 
+fn stock_line_rows(text: &str, guid: &str) -> String {
+    use super::voucher_parse::{parse_agent_rows_reading_gst, EInvoiceFields, StockLines};
+    coded(parse_agent_rows_reading_gst(
+        text,
+        guid,
+        super::GstDetailsShown::Withheld,
+        EInvoiceFields::NotAsked,
+        StockLines::Asked,
+    ))
+}
+
 fn withholding(text: &str, guid: &str) -> String {
     coded(parse_agent_rows_withholding(text, guid))
 }
@@ -769,6 +780,26 @@ fn rows() -> Vec<Row> {
         "stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml",
         "parse_agent_rows(SHAPE_LAB)",
         |_, t| agent_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
     ));
     rows.push(row!(
         "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",

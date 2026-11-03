@@ -73,6 +73,9 @@ pub(super) enum VoucherReadShape {
     EInvoiceEntryWildcard,
     /// [`Self::ClassEntryWildcard`] naming the e-invoice details (#1378).
     EInvoiceClassEntryWildcard,
+    /// `render_agent_stock_line_vouchers_in_span`: `ALLINVENTORYENTRIES.*` in place of the entry
+    /// wildcard, with each row's voucher type resolved by Tally (#2016).
+    ClassInventoryWildcard,
 }
 
 impl VoucherReadShape {
@@ -90,6 +93,14 @@ impl VoucherReadShape {
         match self {
             Self::EInvoiceEntryWildcard | Self::EInvoiceClassEntryWildcard => EInvoiceFields::Asked,
             _ => EInvoiceFields::NotAsked,
+        }
+    }
+
+    /// Whether this shape's request returns stock lines in place of ledger entries.
+    pub(super) const fn stock_lines(self) -> StockLines {
+        match self {
+            Self::ClassInventoryWildcard => StockLines::Asked,
+            _ => StockLines::NotAsked,
         }
     }
 
@@ -111,7 +122,8 @@ impl VoucherReadShape {
             Self::EntryWildcard
             | Self::ClassEntryWildcard
             | Self::EInvoiceEntryWildcard
-            | Self::EInvoiceClassEntryWildcard => 384 * 1024,
+            | Self::EInvoiceClassEntryWildcard
+            | Self::ClassInventoryWildcard => 384 * 1024,
         }
     }
 
@@ -132,7 +144,8 @@ impl VoucherReadShape {
             | Self::EntryWildcard
             | Self::ClassEntryWildcard
             | Self::EInvoiceEntryWildcard
-            | Self::EInvoiceClassEntryWildcard => "voucher_window_day_not_readable",
+            | Self::EInvoiceClassEntryWildcard
+            | Self::ClassInventoryWildcard => "voucher_window_day_not_readable",
         }
     }
 
@@ -169,6 +182,9 @@ impl VoucherReadShape {
             }
             (Self::EInvoiceClassEntryWildcard, _) => {
                 render_agent_e_invoice_vouchers_in_span(company, from, to, span, true)
+            }
+            (Self::ClassInventoryWildcard, _) => {
+                render_agent_stock_line_vouchers_in_span(company, from, to, span)
             }
         }
     }

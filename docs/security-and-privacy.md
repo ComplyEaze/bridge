@@ -186,6 +186,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     - An invoice's e-invoice details (the `e_invoice` field `vouchers` adds with
       `include_e_invoice`: the IRN, the acknowledgement number and its date) are
       sent as the book has them under every setting.
+    - A voucher's stock lines (the `stock_lines` field `vouchers` adds when asked:
+      direction, item, quantities, rate, amount, godown and batch) are sent only
+      for a call that asks. Item, godown and batch names are masked under
+      `mask_parties`, as a goods line's are.
     - The cost centre and cost category lists (two new kinds of the masters
       read) send each one's name, its parent (a cost centre's parent is another
       cost centre or the top level), its category for a cost centre, three

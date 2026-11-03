@@ -57,6 +57,14 @@ const AGENT_VOUCHER_E_INVOICE_FETCH: &str =
 GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
 REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE,IRN,IRNACKNO,IRNACKDATE";
 
+/// [`AGENT_VOUCHER_FETCH`] with `ALLINVENTORYENTRIES.*` in place of `ALLLEDGERENTRIES.*`, sent only
+/// by a `vouchers` call that asks for stock lines (#2016): the request captured on each kind of
+/// voucher it reads (protocol reference §8.2i).
+const AGENT_VOUCHER_STOCK_LINE_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
+GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLINVENTORYENTRIES.*,\
+REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
+
 /// The window read's list without `REFERENCEDATE`: the list every ledger-scoped window read the lab
 /// sent carried (the bill trail's, #1356, on two books), and the book-wide window reads it was
 /// compared with. [`AGENT_VOUCHER_FETCH`] added `REFERENCEDATE` later (#1363) and has not been
@@ -180,6 +188,25 @@ pub(super) fn render_agent_e_invoice_vouchers_in_span(
         } else {
             String::new()
         },
+    )
+}
+
+/// The stock lines of a window's vouchers in place of their ledger entries, each row's voucher type
+/// resolved as [`render_agent_class_vouchers_in_span`] resolves it: which vouchers' lines are read
+/// depends on the type, and a type can be renamed.
+pub(super) fn render_agent_stock_line_vouchers_in_span(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: Option<AlterIdSpan>,
+) -> Result<String, String> {
+    render_windowed_vouchers(
+        company,
+        from,
+        to,
+        &span.map(AlterIdSpan::filter).unwrap_or_default(),
+        AGENT_VOUCHER_STOCK_LINE_FETCH,
+        &voucher_type_class_computes(),
     )
 }
 

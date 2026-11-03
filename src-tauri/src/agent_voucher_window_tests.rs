@@ -7404,15 +7404,29 @@ async fn a_bucket_page_stops_at_a_fifth_of_the_response_budget_and_says_more_rem
         selected_ledger: None,
         placements: None,
     };
-    let body = vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500), WITHHELD)
-        .expect("renders");
+    let body = vouchers::render_page_body(
+        &one.server,
+        &rows,
+        Some(&request),
+        (0, 500),
+        WITHHELD,
+        StockLines::NotAsked,
+    )
+    .expect("renders");
     assert_eq!(body.items.len(), 3, "{:?}", body.items);
     assert_eq!(body.total, 4);
     assert!(body.truncated);
     // Under a budget that holds everything the page is whole.
     one.server.settings.max_bytes = 200_000;
-    let whole = vouchers::render_page_body(&one.server, &rows, Some(&request), (0, 500), WITHHELD)
-        .expect("renders");
+    let whole = vouchers::render_page_body(
+        &one.server,
+        &rows,
+        Some(&request),
+        (0, 500),
+        WITHHELD,
+        StockLines::NotAsked,
+    )
+    .expect("renders");
     assert_eq!(whole.items.len(), 4);
     assert!(!whole.truncated);
 }
@@ -9131,6 +9145,23 @@ async fn a_page_asking_for_e_invoice_details_is_not_served_from_a_window_held_wi
     let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
     let second = one
         .call(json!({"offset": 1, "limit": 1, "snapshot_id": id, "include_e_invoice": true}))
+        .await;
+    let error = refusal_of(&second);
+    assert_eq!(error["code"], "listing_snapshot_changed", "{second}");
+    assert_eq!(one.requests(), total);
+}
+
+/// #2016: a window held without stock lines does not serve a page that asks for them.
+#[tokio::test]
+async fn a_page_asking_for_stock_lines_is_not_served_from_a_window_held_without_them() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(identity_plans());
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": id, "stock_lines": true}))
         .await;
     let error = refusal_of(&second);
     assert_eq!(error["code"], "listing_snapshot_changed", "{second}");

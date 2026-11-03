@@ -2330,6 +2330,7 @@ fn e_invoice_of(xml: &str) -> Value {
         CAPTURED_VOUCHER_COMPANY_GUID,
         GstDetailsShown::Withheld,
         EInvoiceFields::Asked,
+        StockLines::NotAsked,
     )
     .unwrap();
     rows[0]["e_invoice"].clone()
@@ -2379,6 +2380,7 @@ fn an_acknowledgement_date_that_is_no_date_refuses_the_read() {
             CAPTURED_VOUCHER_COMPANY_GUID,
             GstDetailsShown::Withheld,
             EInvoiceFields::Asked,
+            StockLines::NotAsked,
         ),
         Err("voucher_irn_ack_date_invalid".to_string())
     );
@@ -2397,6 +2399,7 @@ fn a_read_that_did_not_ask_returns_no_e_invoice_key() {
         CAPTURED_VOUCHER_COMPANY_GUID,
         GstDetailsShown::Withheld,
         EInvoiceFields::NotAsked,
+        StockLines::NotAsked,
     )
     .unwrap();
     assert!(rows[0].get("e_invoice").is_none());

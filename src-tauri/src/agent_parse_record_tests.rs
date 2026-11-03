@@ -61,6 +61,8 @@ const IMPORT_LAB: &str = "17a10910-773c-42c6-bd66-7bba9a392536";
 /// The line-break ledger capture's company (`agent_import_span_identity_tests.rs`'
 /// `LINE_BREAK_COMPANY_GUID`).
 const LINE_BREAK_LAB: &str = "224e7f8c-a0aa-45ce-889a-ad4b7fdbe852";
+/// The census row's company (`agent_import_ack_tests.rs`' `REVIEW_GUID`).
+const REVIEW_LAB: &str = "63292d7c-d541-42e5-aa9d-2ab5f8b993ff";
 const FOREX_LAB: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
 const FX_72_LAB: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
 const AARAV: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
@@ -240,6 +242,10 @@ fn rows() -> Vec<Row> {
         IMPORT_LAB
     ));
     rows.extend(high_water_rows!(
+        "agent/review-lab-company-high-water.utf16le.xml",
+        REVIEW_LAB
+    ));
+    rows.extend(high_water_rows!(
         "agent/post-span-company-high-water-after.utf16le.xml",
         IMPORT_LAB
     ));
@@ -407,6 +413,16 @@ fn rows() -> Vec<Row> {
         |_, t| census_span(t, ("20260403", "20260403"), (0, 1829))
     ));
     rows.push(row!(
+        "agent/review-lab-batch-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260402, (0, 251])",
+        |_, t| census_span(t, ("20260402", "20260402"), (0, 251))
+    ));
+    rows.push(row!(
+        "agent/review-lab-payment-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260404, (0, 251])",
+        |_, t| census_span(t, ("20260404", "20260404"), (0, 251))
+    ));
+    rows.push(row!(
         "agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
         "parse_voucher_census(20260804 to 20260805, (0, 68])",
         |_, t| census_span(t, ("20260804", "20260805"), (0, 68))
@@ -537,6 +553,16 @@ fn rows() -> Vec<Row> {
         "agent/amend-now-wa1-import-verification.utf16le.xml",
         "parse_import_verification_rows(IMPORT_LAB)",
         |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/review-lab-batch-import-verification.utf16le.xml",
+        "parse_import_verification_rows(REVIEW_LAB)",
+        |_, t| verification(t, REVIEW_LAB)
+    ));
+    rows.push(row!(
+        "agent/review-lab-payment-import-verification.utf16le.xml",
+        "parse_import_verification_rows(REVIEW_LAB)",
+        |_, t| verification(t, REVIEW_LAB)
     ));
     rows.push(row!(
         "agent/post-span-alterid-span-read.utf16le.xml",

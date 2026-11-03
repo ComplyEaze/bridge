@@ -1,0 +1,63 @@
+== reads: label, http, bytes, seconds, rows
+s0-marks 200 3418 0.008028 {'LEDGER': 0, 'GROUP': 0}
+s1-catalogue 200 11490082 2.351749 {'LEDGER': 10123, 'GROUP': 0}
+s2-groups 200 56016 0.026275 {'LEDGER': 0, 'GROUP': 29}
+s3-balance 200 12667522 2.623952 {'LEDGER': 10123, 'GROUP': 0}
+s4a-debtors 200 10895042 2.407965 {'LEDGER': 4120, 'GROUP': 0}
+s4b-creditors 200 10755006 2.170634 {'LEDGER': 4000, 'GROUP': 0}
+s7-marks 200 3418 0.003610 {'LEDGER': 0, 'GROUP': 0}
+s8-1-catalogue 200 11490082 0.520917 {'LEDGER': 10123, 'GROUP': 0}
+s8-2-groups 200 56016 0.009532 {'LEDGER': 0, 'GROUP': 29}
+s8-3-balance 200 12667522 0.646444 {'LEDGER': 10123, 'GROUP': 0}
+s8-4a-debtors 200 10895042 0.753608 {'LEDGER': 4120, 'GROUP': 0}
+s8-4b-creditors 200 10755006 0.725575 {'LEDGER': 4000, 'GROUP': 0}
+s8-marks 200 3418 0.004399 {'LEDGER': 0, 'GROUP': 0}
+== repeat byte-equal to the first pass
+s1-catalogue s8-1-catalogue True
+s2-groups s8-2-groups True
+s3-balance s8-3-balance True
+s4a-debtors s8-4a-debtors True
+s4b-creditors s8-4b-creditors True
+s0-marks s7-marks True
+s0-marks s8-marks True
+== answer bytes per ledger, master read
+Sundry Debtors, 120 before the seed 1856.0
+Sundry Debtors, the 4,000 seeded 2667.3
+Sundry Creditors, the 4,000 seeded 2688.0
+== one register call on the seeded book, through a capture relay: request, sends, answer bytes, largest answer
+BridgeCompanyExtent 90 361800 4020
+BridgeCompanyBookExtentV2 16 61856 3866
+BridgeCompanyCurrencies 4 13632 3408
+catalogue 4 45960328 11490082
+master $Parent = "Cash-in-Hand" OR $Parent = "Sales Accounts" OR $Parent = "Sundry Debtors" OR $Parent = "&#4; Primary" 4 43602496 10900624
+master $Parent = "Sundry Creditors" 4 43020024 10755006
+master $Parent = "Lab Scale Sub Debtors" 4 21281288 5320322
+List of Groups 4 224064 56016
+Bridge Agent Voucher Census 8 11790492 5886156
+Bridge Agent Vouchers 62 172379040 2908786
+Bridge Agent Company High Water 4 13672 3418
+sum 338708692
+the new group, the 2,000 seeded 2658.7
+== imports
+i000-group seconds 0.257558 CREATED 1 others ['0'] lineerrors 0 marks 328 329
+i001-debtor seconds 9.490417 CREATED 500 others ['0'] lineerrors 0 marks 329 829
+i002-debtor seconds 6.083782 CREATED 500 others ['0'] lineerrors 0 marks 829 1329
+i003-debtor seconds 5.754593 CREATED 500 others ['0'] lineerrors 0 marks 1329 1829
+i004-debtor seconds 5.827981 CREATED 500 others ['0'] lineerrors 0 marks 1829 2329
+i005-debtor seconds 5.732965 CREATED 500 others ['0'] lineerrors 0 marks 2329 2829
+i006-debtor seconds 5.946555 CREATED 500 others ['0'] lineerrors 0 marks 2829 3329
+i007-debtor seconds 7.558206 CREATED 500 others ['0'] lineerrors 0 marks 3329 3829
+i008-debtor seconds 5.961549 CREATED 500 others ['0'] lineerrors 0 marks 3829 4329
+i009-creditor seconds 5.950252 CREATED 500 others ['0'] lineerrors 0 marks 4329 4829
+i010-creditor seconds 6.509897 CREATED 500 others ['0'] lineerrors 0 marks 4829 5329
+i011-creditor seconds 6.249716 CREATED 500 others ['0'] lineerrors 0 marks 5329 5829
+i012-creditor seconds 6.787809 CREATED 500 others ['0'] lineerrors 0 marks 5829 6329
+i013-creditor seconds 6.188776 CREATED 500 others ['0'] lineerrors 0 marks 6329 6829
+i014-creditor seconds 6.127621 CREATED 500 others ['0'] lineerrors 0 marks 6829 7329
+i015-creditor seconds 6.114859 CREATED 500 others ['0'] lineerrors 0 marks 7329 7829
+i016-creditor seconds 6.277203 CREATED 500 others ['0'] lineerrors 0 marks 7829 8329
+i017-sub seconds 6.048979 CREATED 500 others ['0'] lineerrors 0 marks 8329 8829
+i018-sub seconds 6.280554 CREATED 500 others ['0'] lineerrors 0 marks 8829 9329
+i019-sub seconds 6.509864 CREATED 500 others ['0'] lineerrors 0 marks 9329 9829
+i020-sub seconds 6.194618 CREATED 500 others ['0'] lineerrors 0 marks 9829 10329
+created 10001 seconds 127.9

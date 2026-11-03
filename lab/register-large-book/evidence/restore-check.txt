@@ -1,0 +1,14 @@
+marks r1 byte-identical True 3406 3406
+marks r2 byte-identical True 3406 3406
+extent r1 byte-identical True 2926 2926
+extent r2 byte-identical True 2926 2926
+catalogue r1 byte-identical True 138074 138074
+catalogue r2 byte-identical True 138074 138074
+groups r1 byte-identical True 54280 54280
+groups r2 byte-identical True 54280 54280
+balance r1 byte-identical True 155514 155514
+balance r2 byte-identical True 155514 155514
+debtors r1 byte-identical True 225718 225718
+debtors r2 byte-identical True 225718 225718
+creditors r1 byte-identical True 2994 2994
+creditors r2 byte-identical True 2994 2994

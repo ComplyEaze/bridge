@@ -1,0 +1,2 @@
+2026-11-03T00:15:29.577Z i000-group exit 0 printed 200 538 0.574557  {"CREATED": "1", "ALTERED": "0", "DELETED": "0", "LASTVCHID": "0", "LASTMID": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0"} lineerrors 0 marks 328 329
+2026-11-03T00:15:30.407Z i001-debtor exit 0 printed 200 542 13.297232  {"CREATED": "500", "ALTERED": "0", "DELETED": "0", "LASTVCHID": "0", "LASTMID": "0", "COMBINED": "0", "IGNORED": "0", "ERRORS": "0", "CANCELLED": "0", "EXCEPTIONS": "0"} lineerrors 0 marks 329 829

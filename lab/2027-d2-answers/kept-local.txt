@@ -1,8 +1,7 @@
-Stay on the lab PC: every answer (a-*.xml) and every screen. sha256, bytes, name.
+Stay on the lab PC: every answer (a-*.xml) except a-r1-CEGD.xml (in answers/), and every screen. sha256, bytes, name.
 16523f121b4f734cb380dfbe990286e64bae8d3785994f1db15d7b7b3a2fd5c9  101597  s0-gateway.jpg
 72fad09594b0f3bc54e6ac6fd390a49ced3ac3c7eb7a57c5441d7acb3b736f08  29748  s9-gateway.jpg
 f4675bc9728ad276c3662a99387fede82ce9c64b5ddb7b4bb51fe2295f636d3d  134510  a-r1-CEG.xml
-920de15ec49f2412c6045f56a04e514fc1fdbb3af52d2ea72571e46a9d129104  136934  a-r1-CEGD.xml
 c81394ace67282ceb990a33d545ad6d6ae8a62cf919bc892b77aef3b461960c4  133646  a-r1-CG.xml
 962f418344117eb2b906648eddf0761eca58c2c37098752b0834c820f7b2c3a2  136070  a-r1-CGD.xml
 6b938acbdbc2bb7305fb0001bdb44732818db7d2dc1b4da18828939e6cdf9427  130276  a-r1-EG.xml

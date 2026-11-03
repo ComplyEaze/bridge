@@ -4,7 +4,8 @@ use crate::endpoint_wire::WireGateConfig;
 use crate::reports::party_ledger_master::{BalanceDateBasis, PartyLedgerMasterSource};
 use crate::tally::connection::canonical_loopback_origin;
 use crate::tally::connection::{
-    ComplianceRead, ComplianceScope, NativePairedRead, PairedReadValidationError,
+    ComplianceRead, ComplianceScope, LedgerReadRequest, LedgerRequestFailed, NativePairedRead,
+    PairedReadValidationError,
 };
 use crate::tally::connector::SealedReadRequest;
 use crate::tally::runtime_control::{
@@ -811,6 +812,17 @@ pub(crate) struct RuntimeReadFailure {
     pub(crate) evidence: RuntimeReadEvidence,
     #[source]
     source: anyhow::Error,
+}
+
+/// The request of the party ledger read that failed (#2265). Context is found by downcast from
+/// the error it wraps, and not from a concrete error around it, so each `RuntimeReadFailure` in
+/// the chain is opened.
+pub(crate) fn failed_ledger_request(error: &anyhow::Error) -> Option<LedgerReadRequest> {
+    error
+        .chain()
+        .filter_map(|cause| cause.downcast_ref::<RuntimeReadFailure>())
+        .find_map(|failure| failure.source.downcast_ref::<LedgerRequestFailed>())
+        .map(|failed| failed.request)
 }
 
 pub(crate) fn with_read_evidence(
@@ -1898,7 +1910,9 @@ async fn read_classified_currency_with_extent(
         bracket_verified_company_identity(client, identity).await?;
         let extent = client.fetch_company_book_extent(identity).await?;
         let (currency_count, identified) =
-            read_classified_currency(client, identity, &mut evidence).await?;
+            read_classified_currency(client, identity, &mut evidence)
+                .await
+                .map_err(|error| LedgerReadRequest::BaseCurrency.failed(error))?;
         let closing_extent = client.fetch_company_book_extent(identity).await?;
         if closing_extent != extent {
             return Err(anyhow::Error::new(

@@ -9,7 +9,7 @@ here = pathlib.Path(__file__).resolve().parent
 GUID = "eb2f5190-292e-4ed8-bfd3-eace839fe699"
 NUMBER_TAGS = ["DATE", "VOUCHERNUMBER", "VOUCHERTYPENAME", "ISCANCELLED", "BRIDGEVCHISSALES"]
 IRN_TAGS = ["IRN", "IRNACKNO", "IRNACKDATE"]
-SHOWN = {"1", "2", "Sales", "Credit Note", "Yes", "No", "20250403", "112233",
+SHOWN = {"1", "2", "Sales", "Payment", "Credit Note", "Yes", "No", "20250403", "112233",
          "DN-71", "DD-72", "ROADWAY", "Mysuru", "CARRIER-73", "LR-74", "KA-75"}
 KEYED = ["DN-71", "DD-72", "ROADWAY", "Mysuru", "CARRIER-73", "LR-74", "KA-75"]
 DISPATCH = re.compile(r"SHIP|DISPATCH|DESTINATION|CARRIER|LADING|VEHICLE|DELIVERY|TRANSPORT")
@@ -51,7 +51,7 @@ for name, (root, size, gstins) in parsed.items():
             print(f"  {show(v.findtext('VOUCHERNUMBER'))} {show(v.findtext('DATE'))} {show(v.findtext('VOUCHERTYPENAME'))}")
     elif "-N-" in name or "-NI-" in name or name.endswith("V-named.xml"):
         for v in found:
-            print(f"  row {show(v.findtext('VOUCHERNUMBER'))}: {len(list(v))} children")
+            print(f"  row {show(v.findtext('VOUCHERNUMBER'))} {show(v.findtext('VOUCHERTYPENAME'))}: {len(list(v))} children")
             for tag in NUMBER_TAGS + IRN_TAGS:
                 elements = v.findall(tag)
                 if not elements:
@@ -93,8 +93,9 @@ for name, (root, _, _) in parsed.items():
           f" each IRN tag once in every row: {'yes' if irn_rows and all(len(r.findall(t)) == 1 for r in irn_rows for t in IRN_TAGS) else 'no'};"
           f" otherwise equal: {'yes' if irn_rows and [rest(r) for r in irn_rows] == [rest(r) for r in plain_rows] else 'no'}")
     if named:
-        by_number = {r.findtext("VOUCHERNUMBER"): r for r in rows(named[0])}
+        key = lambda r: (r.findtext("VOUCHERNUMBER"), r.findtext("VOUCHERTYPENAME"))
+        by_number = {key(r): r for r in rows(named[0])}
         for r in irn_rows:
-            other = by_number.get(r.findtext("VOUCHERNUMBER"))
+            other = by_number.get(key(r))
             same = [t for t in IRN_TAGS if other is not None and r.findtext(t) == other.findtext(t)]
-            print(f"  against V-named row {show(r.findtext('VOUCHERNUMBER'))}: equal on {', '.join(same) or 'none'}")
+            print(f"  against V-named row {show(r.findtext('VOUCHERNUMBER'))} {show(r.findtext('VOUCHERTYPENAME'))}: equal on {', '.join(same) or 'none'}")

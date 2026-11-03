@@ -4,12 +4,18 @@ Two rows, one sitting, on one book.
 - **R1, reads only (#2162):** the build's number read with `IRN`, `IRNACKNO` and `IRNACKDATE` added to its fetch list, against one invoice with the details and one without, with the plain read as a control.
 - **R2, one write (#2027):** dispatch details filled on one Credit Note by hand, then that note read in full.
 
-**Book.** `BRIDGE EINVOICE LAB`, GUID `eb2f5190-292e-4ed8-bfd3-eace839fe699`: the book of `lab/1378-irn-capture-answers` (183ae58c). It was made new for #1378 on 2 Nov 2026, with masters from one import of invented values and finished by hand. It was left at its backup BK1: no vouchers, `ALTMSTID` 215. TallyPrime 7.2 Silver, as in #1378. Load it alone.
+**Book.** `BRIDGE EINVOICE LAB`, GUID `eb2f5190-292e-4ed8-bfd3-eace839fe699`: the book of `lab/1378-irn-capture-answers` (183ae58c). It was made new for #1378 on 2 Nov 2026, with masters from one import of invented values and finished by hand. `lab/1378-read-answers` (95b0a2e5) then left it holding three vouchers, all dated 3-Apr-25:
+- invoice A, Sales 1, with the e-invoice details;
+- invoice B, Sales 2, without them;
+- a Payment, numbered 1.
+
+Its marks were then V 3, M 215. TallyPrime 7.2 Silver, as in #1378. Load it alone.
 
 **No Bridge build.** Every request is raw, sent one at a time through `run.py`, which is `lab/2162-s4-sheet:lab/2162-s4/run.py` byte-equal.
 - `run.py` sends `Content-Type: text/xml; charset=utf-16`.
 - It stops at a curl failure, and at an answer that says Unknown Request.
-- `count.py` counts every answer with an XML parser, and it prints only tags, counts, lengths, yes or no, and the values this sheet names. Close every other Bridge process first.
+- `count.py` counts every answer with an XML parser, and it prints only tags, counts, lengths, yes or no, and the values this sheet names.
+- Record any other Bridge process. None of them may take a call.
 
 **Output: shapes and counts only.** `RESULTS.md` carries:
 - the whole output of `python3 -I count.py`;
@@ -31,22 +37,17 @@ UTF-16LE with a BOM, as sent. `SHA256.txt` lists every file.
 - `gen.py` makes N, NI and F again from `template-n-0001.utf16le.xml` (`lab/2162-s4-sheet:lab/2162-s4/`, byte-equal) and `template-full-1.utf16le.xml` (1378's `reqs/full1.xml`, byte-equal). It asserts each change.
 
 ## Steps (`python3 -I run.py <gateway URL> <label> <files>`)
-1. **Check the book.** `run.py URL s1 M-marks.xml L-list.xml`, then `count.py`. It must show:
+1. **Check the book.** `run.py URL s1 M-marks.xml L-list.xml V-named.xml`, then `count.py`. It must show:
    - GUID is the book's: yes;
-   - `ALTVCHID` empty and `ALTMSTID` 215;
-   - L with 0 rows.
+   - `ALTMSTID` 215, with `ALTVCHID` recorded;
+   - L with three rows, all 20250403: `1` Sales, `2` Sales, and `1` of another type;
+   - in V-named:
+     - Sales `1` with `IRN` of length 64, `IRNACKNO` `112233` and `IRNACKDATE` 20250403;
+     - Sales `2` and the Payment `1` with all three present and empty;
+     - 3 rows in all.
 
-   Then take BK on Tally's screen. Write down the release and the Gateway's date.
-2. **Set up: key the two invoices again, by hand, as #1378 did** (its `RESULTS.md`, answers 2 and 3). Each is a Sales voucher dated 3-Apr-25, party `BRIDGE IRN Customer`, `BRIDGE IRN Sales` 1,000.00, `BRIDGE IRN IGST` 180.00 typed. Accept `Dispatch Details` and `Party Details` as offered, with nothing typed.
-   - **A**, number 1: `Provide e-Invoice details` Yes. In `e-Invoice Details`:
-     - `Ack No.` 112233;
-     - `Ack Date` 3-Apr-25;
-     - `IRN`: the 64 characters of the `IRN` element in `reads/full-a.xml` on `lab/1378-irn-capture-answers`.
-
-     Screenshot the panel before saving. Saving raises no prompt.
-   - **B**, number 2: the three left blank. On save, "Do you want to generate e-Invoice?": press n.
-
-   Then `run.py URL s2 M-marks.xml L-list.xml`. L must hold two rows, `1` and `2`, both 20250403 and Sales.
+   Then take BK on Tally's screen. Write down the release and the Gateway's date and period.
+2. **No set-up.** Step 1 found invoice A (Sales 1, with the details) and invoice B (Sales 2, without them), so nothing is keyed.
 3. **R1.** Run `run.py URL r1 N-1.xml NI-1.xml N-2.xml NI-2.xml V-named.xml M-marks.xml`. Then open A in Display from the Day Book, with no Alter. Screenshot the e-Invoice details if that screen shows them, and if it does not, say so.
 4. **R2, the one write.** Key one Credit Note in invoice mode, as Tally offers it:
    - dated 3-Apr-25, party `BRIDGE IRN Customer`;
@@ -72,11 +73,11 @@ UTF-16LE with a BOM, as sent. `SHA256.txt` lists every file.
    Screenshot the dispatch section before saving. On save, "Do you want to generate e-Invoice?": press n.
 
    Then `run.py URL r2 L-list.xml F-note.xml M-marks.xml`.
-5. **Undo.** Close the company, then restore the step 1 BK by #1378's path: Data > Backup & Restore > Restore, the BK folder, Accept, Replace. Load the book alone. Then run `run.py URL s9 M-marks.xml L-list.xml` and `count.py`.
+5. **Undo.** Close the company, then restore the BK taken at step 1 by #1378's path: Data > Backup & Restore > Restore, the BK folder, Accept, Replace. Load the book alone. Then run `run.py URL s9 M-marks.xml L-list.xml` and `count.py`.
    - M's values must equal s1's: the GUID, `ALTVCHID` and `ALTMSTID`. Values, not bytes: #1378's marks answers before and after its restore held the same three values with different sha256.
-   - L must hold 0 rows.
+   - L must hold the same three rows as s1.
 
-   This restore is the undo of R2's note and of step 2's invoices. Nothing else in the book changes.
+   This restore is the undo of R2's note, the sitting's one write. Nothing else in the book changes.
 
 ## Stop
 **Stop with no key pressed** if any of these happen:
@@ -89,14 +90,13 @@ Screenshot the window, keep the answers, and ask before anything else is pressed
 Also stop in these cases:
 - **Step 1:** any check fails, or the book is not in Tally's list. Nothing has been keyed: report and end.
 - **`run.py` stops:** do not resend. Go to step 5.
-- **Step 2:** L does not hold exactly A and B as written. Go to step 5.
-- **Step 3:** M's `ALTVCHID` or `ALTMSTID` differ from s2's, so a read changed the book. Go to step 5 and report.
+- **Step 3:** M's `ALTVCHID` or `ALTMSTID` differ from s1's, so a read changed the book. Go to step 5 and report.
 - **Step 4:**
   - The note's screens show no dispatch section. Escape without saving, accept the quit, record it, and go to step 5.
   - F-note holds other than one voucher. Record it and go to step 5.
 - **Step 5:** the checks fail. Key nothing more and report.
 
-An N that holds 0 rows, or more than 1, is a result: record it and go on.
+An N whose rows differ from Expected is a result: record it and go on.
 
 ## Record
 `count.py` prints all of the following.
@@ -117,23 +117,24 @@ An N that holds 0 rows, or more than 1, is a result: record it and go on.
 - **Every answer:** its bytes and the count of GSTIN shapes in it.
 
 ## Expected
-- **s1:** GUID yes, `ALTVCHID` empty, `ALTMSTID` 215. L holds 0 rows.
-- **s2:** L holds `1` and `2`, both 20250403 and Sales. M's `ALTVCHID` is no longer empty.
+- **s1:** GUID yes, `ALTMSTID` 215. L holds three rows. V-named holds 3 rows: A with its details, and B and the Payment with the three elements present and empty.
 - **r1:**
-  - N-1 and N-2 hold 1 row each, Sales, with `BRIDGEVCHISSALES` Yes.
-  - For NI-1, #1378's V answer predicts, but does not prove:
+  - N-1 holds 2 rows: Sales `1` with `BRIDGEVCHISSALES` Yes, and the Payment `1` with No. The number read matches a number in any type.
+  - N-2 holds 1 row, Sales `2`, with Yes.
+  - For NI-1's Sales row, #1378's V answer predicts, but does not prove:
     - `IRN` once, `TYPE` String, length 64;
     - `IRNACKNO` once, String, `112233`;
     - `IRNACKDATE` once, `TYPE` Date, 20250403.
   - NI-2 has all three once and empty.
   - Both NI are equal on the three tags with V, and otherwise equal to N.
-  - M's two marks are the same as in s2.
-- **r2:** L holds three rows, the third a Credit Note dated 20250403. F holds one voucher of type Credit Note. Where each keyed value lands is not predicted; that is this row's question. M's `ALTVCHID` is above r1's.
-- **s9:** M's values equal s1's, and L holds 0 rows.
+  - V predicts that NI-1's Payment row carries all three, present and empty. If it does not, "each IRN tag once in every row" prints no: read the per-row lines.
+  - M's two marks are the same as in s1.
+- **r2:** L holds four rows, the new one a Credit Note dated 20250403. F holds one voucher of type Credit Note. Where each keyed value lands is not predicted; that is this row's question. M's `ALTVCHID` is above r1's.
+- **s9:** M's values equal s1's, and L holds s1's three rows.
 
 ## Decides
 - **R1:**
-  - **All three hold on both numbers.** The number read can carry the e-invoice details with no change to what it already answers. Adding the three tags to `render_invoice_number_request` is then measured.
+  - **All three hold on both Sales rows.** The number read can carry the e-invoice details with no change to what it already answers. Adding the three tags to `render_invoice_number_request` is then measured.
   - **A tag is absent or repeated, or "otherwise equal" is no.** The code change waits, and the answer decides it.
 - **R2:**
   - **A value lands in exactly one element.** That element is the field's home, and #2027's dispatch row takes its name.

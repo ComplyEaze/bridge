@@ -3,3 +3,4 @@ The company number is X at equal length in raw files, the journal and bodies/ (w
 <desktop client>: 2
 <lab folder>: 9
 <lab root>: 1
+<build folder>: the build folder in the two exe hash files, written in the shell's /d/ form, replaced after the first push (forward fix).

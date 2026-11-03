@@ -146,13 +146,14 @@ recorded checking in Tally (`acknowledge_post_review` with `doubt` set to
 `content_only`), still not settled and never verified; `not_settled_restored`
 counts the native posts a recorded restore covers (bridge#1050), not settled
 whatever their latest status reads; they never read `posted_verified` again,
-and nothing in ComplyEaze Bridge clears that count yet, so they stay there, in
-no other count, with their rows held: check them in Tally;
+so they stay there, in no other count, with their rows held, until a person
+releases their rows: check them in Tally;
 none of these overlaps
 `not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`;
 `settled_by_person` counts the native posts Tally answered as creating none of their vouchers that a person
-settled (`acknowledge_post_review` with `doubt` set to `not_created`), which are in none of the `not_settled`
-counts),
+settled (`acknowledge_post_review` with `doubt` set to `not_created`), and `released_by_person` the covered
+posts whose rows a person released (`doubt` set to `rolled_back`, bridge#1038), which are in none of the
+`not_settled` counts),
 batches with no recorded dispatch that were never found posted
 (`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
@@ -3686,8 +3687,8 @@ rolled back, and a covered Sales invoice batch stops that company's invoices
 until it is released; a repair or rewrite of the company's data that lowered the
 voucher mark (not measured) would be recorded the same way. An older build refuses a journal holding the record: do not
 downgrade after posting. Bridge still records those rows as posted, so a rebuilt batch holding
-them is refused as `import_txn_already_posted`; re-entering them in that book is
-the person's decision. The result's `post_span_binding` names the binding's
+them is refused as `import_txn_already_posted` until a person releases them
+(below). The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
 example `binding_effective_date_not_observed`, when the read left out a
 Payment, Receipt or Contra's effective date: never refused for it, and decided
@@ -3755,6 +3756,32 @@ a later answer from Tally with an outcome, a binding or a recorded rollback of t
 written when the batch's records change while the dialog is open (`ack_changed_while_reviewing`). A build older
 than this record refuses the whole import journal once one is written, as for a stop release: do not downgrade
 after recording one.
+
+A native post that reads `book_rolled_back` keeps its rows held, since its vouchers may be gone and ComplyEaze
+Bridge cannot tell whether they are. Once the person has checked in Tally that none of its vouchers is in the
+book, including any keyed again with other figures, `acknowledge_post_review` with `doubt` set to `rolled_back`
+releases its rows (bridge#1038), in its own dialog (`--confirm-row-release`, titled to release the batch's rows),
+which the model cannot answer and which lists every voucher of the batch. It is admitted only for a batch sent
+natively with its voucher mark recorded before the POST (`ack_batch_not_posted` for a batch never sent), holding
+only Journal, Payment and Receipt vouchers (`ack_release_type_not_admitted`: a Sales invoice or a Contra is also
+held by readers a release does not reach), whose vouchers the dialog can all list, at most ten, each shown within
+the dialog's limits (`ack_release_vouchers_not_listed`), while a recorded rollback covers it, as a fresh readback
+reports (`book_rolled_back`; `ack_rolled_back_not_established` otherwise; `ack_already_recorded` while one stands).
+The dialog shows the voucher mark that rollback's verification read, below the mark the post left, and says the
+mark may read higher now: a newer backup restored since can read at or above it. The record, in
+the import journal, names the cover it rests on and the batch's company and endpoint; it changes nothing in Tally
+and no status or verdict, removes no record and sends nothing. The batch keeps its record and still reads
+`book_rolled_back`; `verify_import` reports the release as `row_release`, with its own `next_step`, and
+`local_data_report` counts the batch as `released_by_person` instead of `not_settled_restored`. Its one effect is
+that the batch no longer holds its rows for a build or a post (`import_txn_already_posted`), so they can be built
+again as a new batch, which is checked against the book and approved like any other, and whose binding may take a
+voucher GUID the released batch had bound, as a restored book can give the next voucher; a skip of one of those rows
+in a statement is still refused (`skip_row_already_posted`). The person is the only guard against a voucher keyed
+again with any difference: the fresh post's book check matches by content and does not see it. A release is
+never undone. Nothing is written when the batch's records change, or its cover changes, while the dialog is open
+(`ack_changed_while_reviewing`). A build older than this record refuses the whole import journal once one is
+written: do not install a release older than the one that ships it; to recover, install that release or a later
+one again, and never edit the journal by hand.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an

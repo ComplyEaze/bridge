@@ -202,18 +202,19 @@ async fn a_rolled_back_batch_s_rows_are_released_only_by_the_person() {
     assert_eq!(approval.review_kinds(), [ReviewKind::RowRelease]);
     assert_eq!(approval.review_counts(), [1]);
     let listed = super::super::listed_voucher_lines(&line).unwrap().unwrap();
-    assert_eq!(approval.reviews(), [release_preview(&line, &listed)]);
+    assert_eq!(approval.reviews(), [release_preview(&line, 10, &listed)]);
     let records = records_of(directory.path(), "row_release");
     assert_eq!(records.len(), 1, "{records:?}");
     assert_eq!(records[0]["batch_id"], line.batch_id.as_str());
     assert_eq!(records[0]["status"], "rows_released");
-    assert_eq!(records[0]["mark_read"], seen[0]["mark_read"]);
-    assert_eq!(records[0]["seen_by"], seen[0]["batch_id"]);
+    let cover = &records[0]["release_cover"];
+    assert_eq!(cover["mark_read"], seen[0]["mark_read"]);
+    assert_eq!(cover["seen_by"], seen[0]["batch_id"]);
     assert_eq!(
-        records[0]["company"],
+        cover["company"],
         serde_json::to_value(&line.company).unwrap()
     );
-    assert_eq!(records[0]["endpoint_origin"], origin(&server));
+    assert_eq!(cover["endpoint_origin"], origin(&server));
     let after = counted(directory.path());
     assert_eq!(
         (
@@ -288,6 +289,58 @@ async fn a_rolled_back_batch_s_rows_are_released_only_by_the_person() {
     assert!(!sent(simulator).is_empty(), "{response}");
 }
 
+/// After a restore the next voucher created can take a removed voucher's GUID
+/// (one lab run on 7.1). So the fresh post of a released batch's rows binds
+/// the GUID the released batch had bound, and still reads `posted_verified`:
+/// the GUIDs a bind refuses leave out those only a released batch bound.
+#[tokio::test]
+async fn a_fresh_post_of_released_rows_binds_the_guid_the_released_batch_bound() {
+    let Restored {
+        directory,
+        server,
+        simulator,
+        line,
+    } = posted_then_read(rolled_back_reads(1)).await;
+    let released = release(&server, release_args(&line), ScriptedApproval::approving()).await;
+    assert_eq!(result(&released)["state"], "rows_released", "{released}");
+    let _ = sent(simulator);
+
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    plans.extend(probe());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = moved_to(&server, simulator.address(), directory.path());
+    let fresh = saved_line_as(&server, &format!("bridge-{}", Uuid::new_v4()), ROW);
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool(
+                "post_import",
+                json!({"company_guid":GUID,"batch_id":fresh.batch_id}),
+            ),
+        )
+        .await;
+    let _ = sent(simulator);
+    let guids = |batch_id: &str| -> Vec<Value> {
+        records_of(directory.path(), "post_span_verdict")
+            .iter()
+            .filter(|verdict| verdict["batch_id"] == batch_id)
+            .flat_map(|verdict| verdict["bindings"].as_array().cloned().unwrap_or_default())
+            .map(|bound| bound["guid"].clone())
+            .collect()
+    };
+    let bound = guids(&line.batch_id);
+    assert_eq!(bound.len(), 1, "the released batch was bound");
+    assert_eq!(guids(&fresh.batch_id), bound, "{posted}");
+    assert_eq!(
+        result(&posted)["dispatch"]["state"],
+        "posted_verified",
+        "{posted}"
+    );
+}
+
 async fn refused_before_any_read(server: &Server, args: Value, code: &str) {
     let approval = ScriptedApproval::approving();
     let response = release(server, args, approval.clone()).await;
@@ -297,8 +350,10 @@ async fn refused_before_any_read(server: &Server, args: Value, code: &str) {
 
 /// Refused before any read or dialog, and nothing is recorded: a batch never
 /// sent, one named under another company, one whose post recorded no
-/// pre-POST mark (no rollback record can cover it), one holding a Contra, and
-/// one of more vouchers than the dialog lists. No request is sent.
+/// pre-POST mark (no rollback record can cover it), one holding a Contra, one
+/// holding a Journal and then a Contra (every voucher must be admitted, not
+/// one), a Sales invoice, and one of more vouchers than the dialog lists. No
+/// request is sent.
 #[tokio::test]
 async fn a_batch_a_release_cannot_rest_on_is_refused_before_any_read() {
     let directory = tempfile::tempdir().unwrap();
@@ -332,6 +387,35 @@ async fn a_batch_a_release_cannot_rest_on_is_refused_before_any_read() {
     refused_before_any_read(
         &server,
         release_args(&contra),
+        "ack_release_type_not_admitted",
+    )
+    .await;
+
+    let mixed = saved_captured_line_edited(&server, |line| {
+        line.batch_id = fresh();
+        let mut contra = line.vouchers[0].clone();
+        contra.bridge_txn_id = "BRIDGE_RELEASE_MIXED_CONTRA".into();
+        contra.voucher_type = VoucherType::Contra;
+        line.txn_ids.push(contra.bridge_txn_id.clone());
+        line.vouchers.push(contra);
+    });
+    assert_eq!(mixed.vouchers[0].voucher_type, VoucherType::Journal);
+    sent_natively(&server, &mixed, Some(10));
+    refused_before_any_read(
+        &server,
+        release_args(&mixed),
+        "ack_release_type_not_admitted",
+    )
+    .await;
+
+    let sales = saved_captured_line_edited(&server, |line| {
+        line.batch_id = fresh();
+        line.vouchers[0].voucher_type = VoucherType::Sales;
+    });
+    sent_natively(&server, &sales, Some(10));
+    refused_before_any_read(
+        &server,
+        release_args(&sales),
         "ack_release_type_not_admitted",
     )
     .await;
@@ -377,12 +461,13 @@ async fn a_read_that_does_not_show_the_book_rolled_back_asks_nothing() {
 }
 
 /// What the person was shown must still hold when the record is written: a
-/// batch that reads verified while the dialog is open, or whose cover another
-/// batch's check moves to a lower restore, is refused, and nothing is
-/// written.
+/// batch that reads verified while the dialog is open, whose cover another
+/// batch's check moves to a lower restore, or that another verification
+/// reads again (a record the journal would still admit a release after), is
+/// refused, and nothing is written.
 #[tokio::test]
 async fn a_change_while_the_dialog_is_open_writes_nothing() {
-    for change in ["verified", "rolled back lower"] {
+    for change in ["verified", "rolled back lower", "read again"] {
         let Restored {
             directory,
             server,
@@ -401,14 +486,14 @@ async fn a_change_while_the_dialog_is_open_writes_nothing() {
         let (other, other_line) = (std::sync::Arc::clone(&server), line.clone());
         let approval = ScriptedApproval::approving_after(move || {
             let records = fs::read_to_string(&ledger_path).unwrap().lines().count() as u64;
-            let record = if change == "verified" {
-                serde_json::from_value::<ledger::StatusRecord>(json!({
+            let record = match change {
+                "rolled back lower" => ledger::StatusRecord::rollback_seen(&seer, 1, records),
+                status => serde_json::from_value::<ledger::StatusRecord>(json!({
                     "record_type":"verification_status","batch_id":other_line.batch_id,
-                    "batch_sha256":other_line.sha256,"status":"posted_verified"
+                    "batch_sha256":other_line.sha256,
+                    "status": if status == "verified" { "posted_verified" } else { "reconciliation_required" }
                 }))
-                .unwrap()
-            } else {
-                ledger::StatusRecord::rollback_seen(&seer, 1, records)
+                .unwrap(),
             };
             let _lock = other.lock_import_admission().unwrap();
             other.append_import_record_while_admitted(&record).unwrap();
@@ -429,10 +514,10 @@ async fn a_change_while_the_dialog_is_open_writes_nothing() {
 }
 
 /// The dialog says first what the release does and does not do, then the
-/// batch, what the last verification read and every voucher, then what the
-/// person confirms. It fits the box for one voucher and for ten; eleven are
-/// not listed, so never released; a company name without spaces is broken to
-/// fit.
+/// batch, the mark the cover's verification read (never that the book reads
+/// it now) and every voucher, then what the person confirms. It fits the box
+/// for one voucher and for ten; eleven are not listed, so never released; a
+/// company name without spaces, or the largest mark, is broken to fit.
 #[test]
 fn the_release_dialog_lists_every_voucher_and_fits_the_box() {
     let directory = tempfile::tempdir().unwrap();
@@ -451,7 +536,7 @@ fn the_release_dialog_lists_every_voucher_and_fits_the_box() {
         listed[2].starts_with("Journal 7-Sep-2026  12.61"),
         "{listed:?}"
     );
-    let preview = release_preview(&line, &listed);
+    let preview = release_preview(&line, 10, &listed);
     assert_eq!(
         preview,
         format!(
@@ -462,7 +547,8 @@ fn the_release_dialog_lists_every_voucher_and_fits_the_box() {
              Company: WR2 Unicode Lab\n\
              Batch: {}\n\
              Built 6-Sep-2026 and sent to Tally by ComplyEaze Bridge: 1 voucher.\n\
-             The last verification read the company's voucher mark below the mark this post left.\n\
+             A verification read this company's voucher mark at 10, below the mark this post left.\n\
+             It may read higher now.\n\
              \n\
              {}\n\
              \n\
@@ -481,7 +567,7 @@ fn the_release_dialog_lists_every_voucher_and_fits_the_box() {
     let (ten, _) = saved_journal_batch(&server, &["12.61"; 10]);
     let listed_ten = super::super::listed_voucher_lines(&ten).unwrap().unwrap();
     assert_eq!(listed_ten.len(), 12, "{listed_ten:?}");
-    let preview = release_preview(&ten, &listed_ten);
+    let preview = release_preview(&ten, 10, &listed_ten);
     assert!(
         preview.contains("Built 6-Sep-2026 and sent to Tally by ComplyEaze Bridge: 10 vouchers."),
         "{preview}"
@@ -503,7 +589,7 @@ fn the_release_dialog_lists_every_voucher_and_fits_the_box() {
 
     let mut long = line.clone();
     long.company.as_mut().unwrap().name = "A".repeat(250);
-    let preview = release_preview(&long, &listed);
+    let preview = release_preview(&long, u64::MAX, &listed);
     assert!(
         preview.lines().all(|shown| shown.chars().count() <= 100),
         "{preview}"

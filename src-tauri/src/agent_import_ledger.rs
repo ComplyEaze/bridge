@@ -140,8 +140,9 @@ enum StatusKind {
     /// said none of its listed vouchers is in the book. It names the cover it
     /// rests on and the batch's company and endpoint, and is never a batch
     /// status: the batch keeps its history and reads `book_rolled_back`, and
-    /// only [`vouchers_already_posted`] reads it, so those rows may be built
-    /// again as an ordinary batch. It is never voided, and at most one stands
+    /// only [`vouchers_already_posted`] and [`guids_bound_elsewhere`] act on
+    /// it, so those rows may be built again as an ordinary batch and bound to
+    /// a GUID the batch had bound. It is never voided, and at most one stands
     /// per batch. A binary older than this kind refuses the whole journal
     /// holding one, as for a stop release.
     RowRelease,
@@ -249,8 +250,7 @@ pub(in crate::agent) struct StatusRecord {
     release_seen: Option<ReleaseSeen>,
     /// A rollback-seen record's company voucher mark as the verification read
     /// it (present in Tally's answer, never an omitted mark read as zero).
-    /// `Some` only on a rollback-seen record, and on a row release, where it is
-    /// the mark of the cover it rests on. A binary older than this field
+    /// `Some` only on a rollback-seen record. A binary older than this field
     /// refuses a journal holding one (`deny_unknown_fields`, and the record
     /// kind is unknown to it): the release notes say not to downgrade.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -268,19 +268,24 @@ pub(in crate::agent) struct StatusRecord {
     /// kind is unknown to it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     reviewed_binding: Option<ReviewedBinding>,
-    /// A row release's cover: the batch whose verification read `mark_read`.
-    /// `Some` only on a row release (#1038), as are the two fields below. A
-    /// binary older than these fields refuses a journal holding one
-    /// (`deny_unknown_fields`, and the record kind is unknown to it).
+    /// A row release's cover and the batch's place. `Some` only on a row
+    /// release (#1038). A binary older than this field refuses a journal
+    /// holding one (`deny_unknown_fields`, and the record kind is unknown to
+    /// it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    seen_by: Option<String>,
-    /// A row release's record of the batch's company, all four fields, as its
-    /// full record named it when the person released its rows.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    company: Option<ImportCompanyTuple>,
-    /// A row release's record of the batch's Tally address, likewise.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    endpoint_origin: Option<String>,
+    release_cover: Option<ReleaseCover>,
+}
+
+/// What a row release rests on: the cover's mark and the batch whose
+/// verification read it, and the batch's company, all four fields, and Tally
+/// address as its full record named them when the person released its rows.
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReleaseCover {
+    mark_read: u64,
+    seen_by: String,
+    company: ImportCompanyTuple,
+    endpoint_origin: String,
 }
 
 /// What the read at a stop release saw of the batch's invoice, as journaled
@@ -334,9 +339,7 @@ impl StatusRecord {
             mark_read: None,
             records_before_read: None,
             reviewed_binding: None,
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
     /// The dispatch intent of one native post, bound to the request it sends:
@@ -391,9 +394,7 @@ impl StatusRecord {
             mark_read: None,
             records_before_read: None,
             reviewed_binding: None,
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
 
@@ -436,9 +437,7 @@ impl StatusRecord {
             mark_read: Some(mark_read),
             records_before_read: Some(records_before_read),
             reviewed_binding: None,
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
 
@@ -462,9 +461,7 @@ impl StatusRecord {
             mark_read: None,
             records_before_read: None,
             reviewed_binding: None,
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
 
@@ -488,9 +485,7 @@ impl StatusRecord {
             mark_read: None,
             records_before_read: None,
             reviewed_binding: Some(reviewed),
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
 
@@ -514,9 +509,7 @@ impl StatusRecord {
             mark_read: None,
             records_before_read: None,
             reviewed_binding: None,
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
 
@@ -524,8 +517,16 @@ impl StatusRecord {
     /// (#1038). The only way to make one: a cover comes only from
     /// [`rollback_cover`], and [`row_release_after`] admits the record only
     /// while that cover still stands for the company and endpoint it names.
-    pub(super) fn row_release(batch: &ImportLedgerLine, cover: &RollbackCover) -> Self {
-        Self {
+    /// `None` for a batch whose record names no company or no address, which
+    /// no cover covers.
+    pub(super) fn row_release(batch: &ImportLedgerLine, cover: &RollbackCover) -> Option<Self> {
+        let release_cover = ReleaseCover {
+            mark_read: cover.mark_read,
+            seen_by: cover.seen_by.clone(),
+            company: batch.company.clone()?,
+            endpoint_origin: batch.endpoint_origin.clone()?,
+        };
+        Some(Self {
             record_type: StatusKind::RowRelease,
             batch_id: batch.batch_id.clone(),
             batch_sha256: batch.sha256.clone(),
@@ -539,13 +540,11 @@ impl StatusRecord {
             binding_refusal: None,
             proof: None,
             release_seen: None,
-            mark_read: Some(cover.mark_read),
+            mark_read: None,
             records_before_read: None,
             reviewed_binding: None,
-            seen_by: Some(cover.seen_by.clone()),
-            company: batch.company.clone(),
-            endpoint_origin: batch.endpoint_origin.clone(),
-        }
+            release_cover: Some(release_cover),
+        })
     }
 
     /// The proof this record names current: a verification record names its
@@ -584,9 +583,7 @@ impl StatusRecord {
             mark_read: None,
             records_before_read: None,
             reviewed_binding: None,
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
 }
@@ -619,9 +616,7 @@ impl StatusRecord {
             mark_read: None,
             records_before_read: None,
             reviewed_binding: None,
-            seen_by: None,
-            company: None,
-            endpoint_origin: None,
+            release_cover: None,
         }
     }
 }
@@ -1718,16 +1713,13 @@ fn scan_records(
                 {
                     return Err("import_ledger_invalid".into());
                 }
-            } else if update.records_before_read.is_some()
-                || (update.mark_read.is_some()
-                    && !matches!(update.record_type, StatusKind::RowRelease))
-            {
+            } else if update.mark_read.is_some() || update.records_before_read.is_some() {
                 return Err("import_ledger_invalid".into());
             }
             // A row release follows a native dispatch intent that recorded a
             // pre-POST mark, names the cover it rests on and the batch's
             // company and endpoint, is made only while the batch is not
-            // verified (a covered batch never is: an extra guard), and is
+            // verified (a covered batch never is: an extra guard, kept), and is
             // refused while another stands. Whether that cover still stands is
             // the writer's admission ([`row_release_after`]), not the scan's:
             // a later restore can change which record covers the batch. Every
@@ -1736,18 +1728,12 @@ fn scan_records(
                 if !marked.contains(&update.batch_id)
                     || verified.contains(&update.batch_id)
                     || update.status != ROW_RELEASE_STATUS
-                    || update.mark_read.is_none()
-                    || update.seen_by.is_none()
-                    || update.company.is_none()
-                    || update.endpoint_origin.is_none()
+                    || update.release_cover.is_none()
                     || !released.insert(update.batch_id.clone())
                 {
                     return Err("import_ledger_invalid".into());
                 }
-            } else if update.seen_by.is_some()
-                || update.company.is_some()
-                || update.endpoint_origin.is_some()
-            {
+            } else if update.release_cover.is_some() {
                 return Err("import_ledger_invalid".into());
             }
             // A saved proof belongs only to a verification status record.
@@ -2049,12 +2035,13 @@ pub(super) fn row_release_after(
     let Some((Some(cover), Some((company, endpoint_origin)))) = at_release else {
         return Ok(false);
     };
-    Ok(record.mark_read == Some(cover.mark_read)
-        && record.seen_by.as_deref() == Some(cover.seen_by.as_str())
-        && record.company.is_some()
-        && record.company == company
-        && record.endpoint_origin.is_some()
-        && record.endpoint_origin == endpoint_origin)
+    let Some(on) = &record.release_cover else {
+        return Ok(false);
+    };
+    Ok(on.mark_read == cover.mark_read
+        && on.seen_by == cover.seen_by
+        && company.as_ref() == Some(&on.company)
+        && endpoint_origin.as_deref() == Some(on.endpoint_origin.as_str()))
 }
 
 /// What the rollback-seen records say about one batch (#1050), from one scan.
@@ -2384,25 +2371,37 @@ impl RollbackFacts {
 
 /// Every GUID that a batch other than `own_batch_id` has bound, the whole
 /// journal admitted on the way. A bind refuses to claim one of these again.
+/// A GUID bound only by a batch whose rows a person released is left out
+/// (#1038): the person said none of its vouchers is in the book, and after a
+/// restore the next voucher created took a removed voucher's GUID (one lab
+/// run on 7.1), so a fresh post of those rows can be bound to it.
 pub(super) fn guids_bound_elsewhere(
     reader: impl BufRead,
     own_batch_id: &str,
 ) -> Result<BTreeSet<String>, String> {
-    let mut guids = BTreeSet::new();
+    let mut bound = Vec::new();
+    let mut released = BTreeSet::new();
     scan_records(reader, |record, _| {
         if let Record::Status(update) = record {
             if update.batch_id != own_batch_id {
-                guids.extend(
+                if matches!(update.record_type, StatusKind::RowRelease) {
+                    released.insert(update.batch_id.clone());
+                }
+                bound.extend(
                     update
                         .bindings
                         .iter()
                         .flatten()
-                        .map(|bound| bound.guid.clone()),
+                        .map(|identity| (update.batch_id.clone(), identity.guid.clone())),
                 );
             }
         }
     })?;
-    Ok(guids)
+    Ok(bound
+        .into_iter()
+        .filter(|(batch_id, _)| !released.contains(batch_id))
+        .map(|(_, guid)| guid)
+        .collect())
 }
 
 /// Admits one post-span verdict, or refuses the journal. It must follow the

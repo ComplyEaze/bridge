@@ -2533,6 +2533,23 @@ pub(crate) fn wrapped(text: &str, limit: usize) -> String {
     lines
 }
 
+/// `text`, a line of a review box, broken at spaces into lines of at most 100
+/// characters, then any word longer than a line broken where it reaches the
+/// limit, so a name without spaces cannot make the box refuse.
+pub(crate) fn wrapped_to_fit(text: String) -> String {
+    wrapped(&text, 100)
+        .lines()
+        .flat_map(|line| {
+            line.chars()
+                .collect::<Vec<_>>()
+                .chunks(100)
+                .map(|part| part.iter().collect::<String>())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// What the native box holds of a post or review text (#1780): the lines and
 /// characters of one voucher's text and of a batch's. The builders refuse a
 /// preview over them, never cut it. The box also shows the answer text above

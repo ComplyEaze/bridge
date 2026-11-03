@@ -2471,7 +2471,7 @@ fn covered_post(line: &ImportLedgerLine) -> Vec<Vec<u8>> {
 /// The release a person would record for `line` on the journal's cover.
 fn release_on(journal: &[Vec<u8>], line: &ImportLedgerLine) -> StatusRecord {
     let cover = cover(journal, &line.batch_id).covered_by.unwrap();
-    StatusRecord::row_release(line, &cover)
+    StatusRecord::row_release(line, &cover).unwrap()
 }
 
 fn release_after(journal: &[Vec<u8>], release: &StatusRecord) -> Result<bool, String> {
@@ -2491,10 +2491,14 @@ fn a_row_release_is_admitted_only_while_its_cover_stands() {
     let shape = serde_json::to_value(&release).unwrap();
     assert_eq!(shape["record_type"], "row_release");
     assert_eq!(shape["status"], "rows_released");
-    assert_eq!(shape["mark_read"], 1);
-    assert_eq!(shape["seen_by"], "p1");
-    assert_eq!(shape["company"]["name"], "BRIDGE RELEASE LAB");
-    assert_eq!(shape["endpoint_origin"], PLACE_ENDPOINT);
+    assert_eq!(shape["release_cover"]["mark_read"], 1);
+    assert_eq!(shape["release_cover"]["seen_by"], "p1");
+    assert_eq!(
+        shape["release_cover"]["company"]["name"],
+        "BRIDGE RELEASE LAB"
+    );
+    assert_eq!(shape["release_cover"]["endpoint_origin"], PLACE_ENDPOINT);
+    assert!(shape.get("mark_read").is_none());
     assert!(shape.get("records_before_read").is_none());
     assert_eq!(release_after(&journal, &release), Ok(true));
     assert_eq!(row_release(Cursor::new(journal.concat()), "p1"), Ok(false));
@@ -2516,26 +2520,32 @@ fn a_row_release_is_admitted_only_while_its_cover_stands() {
     // Not covered: no rollback record, or none whose mark is below the floor.
     let uncovered = journal[..3].to_vec();
     assert_eq!(release_after(&uncovered, &release), Ok(false));
-    // Covered for another company field, another endpoint, or by another cover.
+    // Covered for another company field, another endpoint, or by another
+    // cover: another mark, or the same mark read by another batch.
     let renamed = placed("p1", "BRIDGE RELEASE LAB OLD", Some(PLACE_ENDPOINT));
     let cover_now = cover(&journal, "p1").covered_by.unwrap();
+    let on = |line: &ImportLedgerLine, cover: &RollbackCover| {
+        StatusRecord::row_release(line, cover).unwrap()
+    };
     assert_eq!(
-        release_after(&journal, &StatusRecord::row_release(&renamed, &cover_now)),
+        release_after(&journal, &on(&renamed, &cover_now)),
         Ok(false)
     );
     let moved = placed("p1", "BRIDGE RELEASE LAB", Some("http://127.0.0.1:9002"));
-    assert_eq!(
-        release_after(&journal, &StatusRecord::row_release(&moved, &cover_now)),
-        Ok(false)
-    );
-    let other_cover = RollbackCover {
+    assert_eq!(release_after(&journal, &on(&moved, &cover_now)), Ok(false));
+    let other_mark = RollbackCover {
         mark_read: 0,
         seen_by: "p1".into(),
     };
-    assert_eq!(
-        release_after(&journal, &StatusRecord::row_release(&p1, &other_cover)),
-        Ok(false)
-    );
+    assert_eq!(release_after(&journal, &on(&p1, &other_mark)), Ok(false));
+    let other_seer = RollbackCover {
+        mark_read: cover_now.mark_read,
+        seen_by: "p2".into(),
+    };
+    assert_eq!(release_after(&journal, &on(&p1, &other_seer)), Ok(false));
+    // A batch whose record names no address is never covered, so never released.
+    let unplaced = placed("p1", "BRIDGE RELEASE LAB", None);
+    assert!(StatusRecord::row_release(&unplaced, &cover_now).is_none());
     // A lower restore recorded since the dialog's read moves the cover.
     let mut lower = journal.clone();
     lower.push(seen(&p1, 0, journal.len() as u64));
@@ -2562,11 +2572,23 @@ fn a_row_release_is_admitted_only_in_its_one_shape() {
             && settlement(Cursor::new(whole.concat())).is_err()
     };
     assert!(!refused(vec![record(&release)]));
+    let mut uncovered = release.clone();
+    uncovered.as_object_mut().unwrap().remove("release_cover");
+    assert!(refused(vec![record(&uncovered)]));
     for field in ["mark_read", "seen_by", "company", "endpoint_origin"] {
         let mut changed = release.clone();
-        changed.as_object_mut().unwrap().remove(field);
+        changed["release_cover"]
+            .as_object_mut()
+            .unwrap()
+            .remove(field);
         assert!(refused(vec![record(&changed)]), "{field}");
     }
+    let mut widened = release.clone();
+    widened["release_cover"]["records_before_read"] = json!(1);
+    assert!(refused(vec![record(&widened)]));
+    let mut marked = release.clone();
+    marked["mark_read"] = json!(1);
+    assert!(refused(vec![record(&marked)]));
     let mut counted = release.clone();
     counted["records_before_read"] = json!(1);
     assert!(refused(vec![record(&counted)]));
@@ -2577,16 +2599,14 @@ fn a_row_release_is_admitted_only_in_its_one_shape() {
     // No pre-POST mark: never covered, never released.
     let unmarked = [record(&p1), intent(&p1, None), record(&release)];
     assert!(row_release(Cursor::new(unmarked.concat()), "p1").is_err());
-    // Its fields on another kind, and a mark on any kind but these two.
+    // Its cover on another kind, and a mark on any kind but a rollback-seen.
     let carrier = json!({
         "record_type":"verification_status","batch_id":p1.batch_id,
         "batch_sha256":p1.sha256,"status":"reconciliation_required"
     });
     assert!(!refused(vec![record(&carrier)]));
     for (field, value) in [
-        ("seen_by", json!("p1")),
-        ("company", release["company"].clone()),
-        ("endpoint_origin", json!(PLACE_ENDPOINT)),
+        ("release_cover", release["release_cover"].clone()),
         ("mark_read", json!(1)),
     ] {
         let mut stray = carrier.clone();
@@ -2683,4 +2703,38 @@ fn a_released_batch_moves_from_restored_to_released_by_person() {
     assert_eq!(after.sent_or_found, 1, "{after:?}");
     // The cover stays: the batch still reads rolled back.
     assert!(cover(&released, "p1").covered_by.is_some());
+}
+
+/// A GUID bound only by a batch whose rows a person released is left out of
+/// those a bind refuses (#1038): after a restore, the fresh post of those rows
+/// can take the removed voucher's GUID. One another batch bound, not
+/// released, is still refused, whether or not a released batch bound it too.
+#[test]
+fn a_released_batch_s_bound_guids_may_be_bound_again() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let mut journal = vec![
+        record(&p1),
+        intent(&p1, Some(1)),
+        answered(&p1),
+        bound_as(&p1),
+    ];
+    let read = journal.len() as u64;
+    journal.push(seen(&p1, 1, read));
+    fn elsewhere(journal: &[Vec<u8>]) -> std::collections::BTreeSet<String> {
+        guids_bound_elsewhere(Cursor::new(journal.concat()), "p3").unwrap()
+    }
+    let guid = std::collections::BTreeSet::from(["aaaa-00000064".to_string()]);
+    assert_eq!(elsewhere(&journal), guid);
+    let mut released = journal.clone();
+    released.push(record(&release_on(&journal, &p1)));
+    assert!(elsewhere(&released).is_empty());
+    let p2 = placed("p2", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let mut both = released.clone();
+    both.extend([
+        record(&p2),
+        intent(&p2, Some(2)),
+        answered(&p2),
+        bound_as(&p2),
+    ]);
+    assert_eq!(elsewhere(&both), guid);
 }

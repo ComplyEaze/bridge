@@ -8167,15 +8167,47 @@ const MCP_V0_7_0_STATUS_KINDS: [&str; 8] = [
     "person_settlement",
 ];
 
+/// Every field path of a status record `mcp-v0.7.0` reads, from its
+/// `StatusRecord`, `DispatchResponse` and `PostedVoucherIdentity` at the tag
+/// (`fcfb5ff6`), each of which refuses a field it does not know. A response's
+/// `outcome` is read there without refusing one, so its members are not
+/// compared.
+const MCP_V0_7_0_STATUS_RECORD_FIELDS: &[&str] = &[
+    "/batch_id",
+    "/batch_sha256",
+    "/binding_refusal",
+    "/bindings",
+    "/bindings[]/bridge_txn_id",
+    "/bindings[]/guid",
+    "/bindings[]/master_id",
+    "/mark_read",
+    "/native_remote_id",
+    "/native_remote_ids",
+    "/native_request_sha256",
+    "/pre_post_voucher_mark",
+    "/proof",
+    "/record_type",
+    "/records_before_read",
+    "/release_seen",
+    "/response",
+    "/response/bytes",
+    "/response/outcome",
+    "/response/request_sha256",
+    "/response/response_sha256",
+    "/reviewed_binding",
+    "/status",
+];
+
 /// The whole release flow (#1038): a post read back verified, the restore
 /// seen by the release's own read, the release, then a fresh batch of the
-/// released row posted. The one record it writes that `mcp-v0.7.0` cannot
-/// read is the release itself, which refuses the journal there (ADR 0018,
-/// the #1038 amendment). The fresh batch's lines hold no field and no enum
-/// value beyond those that release wrote for the Sales replay, with a
-/// Journal's `voucher_type`, which its `VoucherType` at the tag holds. A kind
-/// or field added to this flow fails this: leave it out when it is empty, or
-/// raise the release the notes name.
+/// released row posted and read back verified. The one record it writes that
+/// `mcp-v0.7.0` cannot read is the release itself, which refuses the journal
+/// there (ADR 0018, the #1038 amendment). Every other record is walked: the
+/// batch lines hold no field and no enum value beyond those that release
+/// wrote for the Sales replay, with a Journal's `voucher_type`, which its
+/// `VoucherType` at the tag holds, and the status records no field beyond its
+/// `StatusRecord`'s. A kind or field added to this flow fails this: leave it
+/// out when it is empty, or raise the release the notes name.
 #[tokio::test]
 async fn a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads() {
     let release_tests::Restored {
@@ -8220,17 +8252,15 @@ async fn a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads() {
         )
         .await;
     let _ = sent(simulator);
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
     let records: Vec<Value> = String::from_utf8(journal(directory.path()))
         .unwrap()
         .lines()
         .map(|line| serde_json::from_str::<Value>(line).unwrap())
         .collect();
-    assert!(
-        records.iter().any(|record| {
-            record["record_type"] == "dispatch_response" && record["batch_id"] == fresh.batch_id
-        }),
-        "the fresh batch was sent and answered: {posted}"
-    );
 
     let kinds: std::collections::BTreeSet<&str> = records
         .iter()
@@ -8247,22 +8277,33 @@ async fn a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads() {
         .map(|field| field.to_string())
         .collect();
     known.insert("/vouchers[]/voucher_type=Journal".into());
-    let lines: Vec<&Value> = records
+    let status_fields: std::collections::BTreeSet<String> = MCP_V0_7_0_STATUS_RECORD_FIELDS
         .iter()
-        .filter(|record| {
-            record.get("record_type").is_none() && record["batch_id"] == fresh.batch_id
-        })
+        .map(|field| field.to_string())
         .collect();
-    assert!(!lines.is_empty(), "{records:?}");
-    for line in lines {
+    let mut walked = std::collections::BTreeSet::new();
+    for record in records
+        .iter()
+        .filter(|record| record["record_type"] != "row_release")
+    {
         let mut written = std::collections::BTreeSet::new();
-        journal_line_fields(line, "", &mut written);
-        let unknown: Vec<&String> = written.difference(&known).collect();
+        journal_line_fields(record, "", &mut written);
+        let unknown: Vec<&String> = if record.get("record_type").is_none() {
+            walked.insert(record["batch_id"].as_str().unwrap_or_default());
+            written.difference(&known).collect()
+        } else {
+            written
+                .difference(&status_fields)
+                .filter(|field| !field.starts_with("/response/outcome/"))
+                .collect()
+        };
         assert!(
             unknown.is_empty(),
-            "fields mcp-v0.7.0 never wrote, so it refuses the journal: {unknown:?}"
+            "fields mcp-v0.7.0 does not know, so it refuses the journal: {unknown:?} in {record}"
         );
     }
+    assert!(walked.contains(line.batch_id.as_str()), "{walked:?}");
+    assert!(walked.contains(fresh.batch_id.as_str()), "{walked:?}");
 }
 
 /// The post was refused in the queue, loud and before anything was recorded or

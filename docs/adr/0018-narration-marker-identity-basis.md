@@ -283,20 +283,27 @@ the post-span basis never frees the rows; a person may (bridge#1038).
   batch's vouchers is in the book, including any keyed again with other
   figures. It is recorded only after its own native dialog, which the model
   cannot answer and which lists every voucher of the batch, and only while a
-  fresh readback shows the batch `book_rolled_back`. The `row_release` record
-  is made by one constructor, from the batch's line and the `RollbackCover`
-  the cover's scan returns, whose fields are private. It names the cover it
+  recorded rollback covers the batch, as a fresh readback reports
+  (`book_rolled_back`). The dialog shows the voucher mark the cover's
+  verification read, not the mark now, which a newer backup restored since
+  can put at or above the post's. The `row_release` record is made by one
+  constructor, from the batch's line and the `RollbackCover` the cover's scan
+  returns, whose fields are private. Its `release_cover` names the cover it
   rests on (`mark_read`, `seen_by`) and the batch's company and endpoint, and
-  is written under the exclusive admission lock only if the batch's records
+  it is written under the exclusive admission lock only if the batch's records
   are unchanged since the dialog's read and that cover still stands for that
   company and endpoint (`row_release_after`). A release is never undone.
 - **What it changes, and only that.** The lookup of rows already posted
   (`vouchers_already_posted`) leaves the batch out, so the rows can go through
   an ordinary fresh build and post, with the book check and the approval
-  dialog every batch meets, and fresh REMOTEIDs. The batch keeps its records
-  and still reads `book_rolled_back`; no verdict, status or binding changes.
-  The skips' own scan (`rows_held_as_vouchers`) is not changed: a statement
-  that skips a released row is still refused, which fails closed.
+  dialog every batch meets, and fresh REMOTEIDs. The GUIDs a bind refuses to
+  claim again (`guids_bound_elsewhere`) leave out those only a released batch
+  bound: after a restore the next voucher created took a removed voucher's
+  GUID (one lab run on 7.1), so the fresh post must be able to bind it. The
+  batch keeps its records and still reads `book_rolled_back`; no verdict,
+  status or binding of it changes. The skips' own scan
+  (`rows_held_as_vouchers`) is not changed: a statement that skips a released
+  row is still refused, which fails closed.
 - **The type limit is an allow-list.** Only a batch of Journal, Payment and
   Receipt vouchers is released (`ack_release_type_not_admitted` otherwise). A
   Sales invoice is also held by the invoice readers and a Contra by the
@@ -304,8 +311,9 @@ the post-span basis never frees the rows; a person may (bridge#1038).
   refused until it is named, so it fails closed.
 - **The person is the only guard** against a voucher keyed again with any
   difference: the fresh post's book check matches by content. So a batch
-  whose vouchers the dialog cannot all list, more than ten, is never released
-  (`ack_release_vouchers_not_listed`), and its rows are entered by hand. A
+  whose vouchers the dialog cannot all list (more than ten, or one it cannot
+  show within its limits) is never released (`ack_release_vouchers_not_listed`),
+  and its rows are entered by hand. A
   later restore of a newer backup that holds the original vouchers, after the
   fresh post, leaves both in the book; nothing here detects it.
 - **A downgrade.** A release older than this record refuses the whole import
@@ -327,9 +335,10 @@ the post-span basis never frees the rows; a person may (bridge#1038).
     (`src-tauri/src/agent_import_post_e2e_tests.rs`) runs the flow, post,
     restore seen, release and a fresh post of the released row, and checks
     that every record kind it writes is one of the eight that tag's
-    `StatusKind` holds except `row_release`, and that the fresh batch's lines
-    hold no field path or enum value beyond those that tag wrote for the Sales
-    replay, with a Journal's voucher type.
+    `StatusKind` holds except `row_release`, that every batch line holds no
+    field path or enum value beyond those that tag wrote for the Sales replay,
+    with a Journal's voucher type, and that every other status record holds no
+    field beyond those of that tag's `StatusRecord`.
 - **Evidence owed (P1).** One lab row on a synthetic book on TallyPrime 7.1
   Silver, after the build exists: post a small batch, restore a backup taken
   before it, verify, release, then build and post the same rows (expected

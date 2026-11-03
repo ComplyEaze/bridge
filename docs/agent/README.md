@@ -3758,15 +3758,18 @@ releases its rows (bridge#1038), in its own dialog (`--confirm-row-release`, tit
 which the model cannot answer and which lists every voucher of the batch. It is admitted only for a batch sent
 natively with its voucher mark recorded before the POST (`ack_batch_not_posted` for a batch never sent), holding
 only Journal, Payment and Receipt vouchers (`ack_release_type_not_admitted`: a Sales invoice or a Contra is also
-held by readers a release does not reach), whose vouchers the dialog can all list, at most ten
-(`ack_release_vouchers_not_listed`), while a fresh readback shows it `book_rolled_back` and a recorded rollback
-covers it (`ack_rolled_back_not_established` otherwise; `ack_already_recorded` while one stands). The record, in
+held by readers a release does not reach), whose vouchers the dialog can all list, at most ten, each shown within
+the dialog's limits (`ack_release_vouchers_not_listed`), while a recorded rollback covers it, as a fresh readback
+reports (`book_rolled_back`; `ack_rolled_back_not_established` otherwise; `ack_already_recorded` while one stands).
+The dialog shows the voucher mark that rollback's verification read, below the mark the post left, and says the
+mark may read higher now: a newer backup restored since can read at or above it. The record, in
 the import journal, names the cover it rests on and the batch's company and endpoint; it changes nothing in Tally
 and no status or verdict, removes no record and sends nothing. The batch keeps its record and still reads
 `book_rolled_back`; `verify_import` reports the release as `row_release`, with its own `next_step`, and
 `local_data_report` counts the batch as `released_by_person` instead of `not_settled_restored`. Its one effect is
 that the batch no longer holds its rows for a build or a post (`import_txn_already_posted`), so they can be built
-again as a new batch, which is checked against the book and approved like any other; a skip of one of those rows
+again as a new batch, which is checked against the book and approved like any other, and whose binding may take a
+voucher GUID the released batch had bound, as a restored book can give the next voucher; a skip of one of those rows
 in a statement is still refused (`skip_row_already_posted`). The person is the only guard against a voucher keyed
 again with any difference: the fresh post's book check matches by content and does not see it. A release is
 never undone. Nothing is written when the batch's records change, or its cover changes, while the dialog is open

@@ -9,10 +9,12 @@
 //! vouchers is in the book, including any keyed again with other figures,
 //! this records that they released its rows. It changes nothing in Tally,
 //! changes no verdict and no status, removes no record and sends nothing. Its
-//! one effect is that the lookup of rows already posted
+//! effect is that the lookup of rows already posted
 //! (`ledger::vouchers_already_posted`) no longer counts the batch, so those
 //! rows can go through an ordinary fresh build and post, with every check an
-//! ordinary batch meets. `local_data_report` counts it as released by a person
+//! ordinary batch meets, and that the fresh post may bind a GUID the batch had
+//! bound (`ledger::guids_bound_elsewhere`), as a restored book can give the
+//! next voucher. `local_data_report` counts it as released by a person
 //! and `verify_import` reports the release beside `book_rolled_back`. It is
 //! written only after the native row release dialog, which the model cannot
 //! answer, and it is never undone or voided.
@@ -49,7 +51,8 @@ fn type_admitted(voucher_type: &VoucherType) -> bool {
 }
 
 /// Whether a verification's `result` shows the batch's book rolled back: its
-/// binding reads `book_rolled_back`, and it does not read `posted_verified`.
+/// binding reads `book_rolled_back`, and it does not read `posted_verified`
+/// (a covered batch never does: an extra guard, kept).
 pub(super) fn shown_rolled_back(result: &Value) -> bool {
     result["verification_status"] != "posted_verified"
         && result["post_span_binding"]["state"] == "book_rolled_back"
@@ -63,11 +66,15 @@ fn built_on(built_at: &str) -> String {
 }
 
 /// The words of the dialog: what the release does and does not do first, then
-/// the batch, what the last verification read, every voucher, and what the
-/// person confirms. `listed` is the batch's vouchers as
-/// [`post::listed_voucher_lines`] gives them. Every line is at most 100
-/// characters, as the box requires.
-pub(super) fn release_preview(line: &ImportLedgerLine, listed: &[String]) -> String {
+/// the batch, the voucher mark a verification read (`mark_read`, the cover's),
+/// every voucher, and what the person confirms. `listed` is the batch's
+/// vouchers as [`post::listed_voucher_lines`] gives them. Every line is at
+/// most 100 characters, as the box requires.
+pub(super) fn release_preview(
+    line: &ImportLedgerLine,
+    mark_read: u64,
+    listed: &[String],
+) -> String {
     let company = line
         .company
         .as_ref()
@@ -88,21 +95,7 @@ pub(super) fn release_preview(line: &ImportLedgerLine, listed: &[String]) -> Str
              book, including any keyed again with other figures.",
         )
     };
-    // Broken at spaces, then any word longer than a line broken where it
-    // reaches the limit, so a name without spaces cannot make the box refuse.
-    let wrap = |text: String| {
-        crate::tally::approved_import::wrapped(&text, 100)
-            .lines()
-            .flat_map(|line| {
-                line.chars()
-                    .collect::<Vec<_>>()
-                    .chunks(100)
-                    .map(|part| part.iter().collect::<String>())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
+    let wrap = crate::tally::approved_import::wrapped_to_fit;
     let mut lines = vec![
         wrap("THIS RELEASES THIS BATCH'S ROWS, SO THAT THEY CAN BE BUILT AND POSTED AGAIN.".into()),
         wrap(
@@ -117,10 +110,13 @@ pub(super) fn release_preview(line: &ImportLedgerLine, listed: &[String]) -> Str
             "Built {} and sent to Tally by ComplyEaze Bridge: {count} {noun}.",
             stop::shown(&built_on(&line.built_at))
         )),
-        wrap(
-            "The last verification read the company's voucher mark below the mark this post left."
-                .into(),
-        ),
+        // What the cover records, not what the book reads now: a newer
+        // backup restored since can read at or above this post's mark.
+        wrap(format!(
+            "A verification read this company's voucher mark at {mark_read}, below the mark this \
+             post left."
+        )),
+        wrap("It may read higher now.".into()),
         String::new(),
     ];
     lines.extend(listed.iter().cloned());
@@ -199,8 +195,9 @@ impl Server {
             .map_err(|code| fail(&code))?
             .covered_by
             .ok_or_else(|| fail(ROLLED_BACK_NOT_ESTABLISHED))?;
-        let record = ledger::StatusRecord::row_release(&held.batch, &cover);
-        let preview = release_preview(&held.batch, &listed);
+        let record = ledger::StatusRecord::row_release(&held.batch, &cover)
+            .ok_or_else(|| fail(ROLLED_BACK_NOT_ESTABLISHED))?;
+        let preview = release_preview(&held.batch, cover.mark_read(), &listed);
         let count =
             VoucherCount::new(line.vouchers.len()).ok_or_else(|| fail("ack_batch_not_posted"))?;
         let _acknowledged = ReviewAcknowledged::confirm(ReviewKind::RowRelease, count, &preview)
@@ -211,7 +208,9 @@ impl Server {
         // was recorded since the read the person was shown, and the journal
         // would admit the record: the same cover still standing for the
         // company and endpoint it names, no release standing, and the batch
-        // not verified.
+        // not verified. A release another call wrote meanwhile is refused by
+        // the journal's own rule, so it reads as a change here
+        // (`ack_changed_while_reviewing`), as for a settlement.
         let _lock = self.lock_import_admission()?;
         let current = self
             .import_snapshot_while_admitted(Some(&line.batch_id))

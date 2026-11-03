@@ -995,7 +995,8 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
         // unless a person releases its rows (#1038).
         assert!(text.contains("when verify_import reports that batch book_rolled_back"));
         assert!(text.contains(
-            "unless it holds only Journal, Payment and Receipt vouchers: then the user may check \
+            "unless it holds only Journal, Payment and Receipt vouchers and the release dialog \
+             can list them all (at most ten, each within its limits): then the user may check \
              in Tally that none of them is in the book, including any keyed again with other \
              figures, and release its rows (acknowledge_post_review, doubt rolled_back)"
         ));

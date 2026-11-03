@@ -1597,6 +1597,8 @@ enum GstStatusDifference {
     Excluded,
     /// All three flags No: the return does not list it at all.
     NotInReturn,
+    /// Tally marks it post-dated, whatever its three flags state.
+    PostDated,
     /// A person accepted it as it stands (Accept As Is).
     Overridden,
     /// The flags came back in a combination that states no status.
@@ -1611,6 +1613,7 @@ impl GstStatusDifference {
             Self::Uncertain => "gst_status_uncertain",
             Self::Excluded => "gst_status_excluded",
             Self::NotInReturn => "gst_status_not_in_return",
+            Self::PostDated => "gst_status_post_dated",
             Self::Overridden => "gst_status_overridden",
             Self::Unreadable => "gst_status_unreadable",
             Self::NotReported => "gst_status_not_reported",
@@ -1629,31 +1632,34 @@ impl GstStatusDifference {
 }
 
 /// What Tally's own GSTR-1 says of the posted invoice, through the GST status
-/// read's own readings of the four flags (`status_of_flags`, `overridden_of`).
-/// Only an invoice the return lists as included, and that no one accepted as
-/// it stands, is clean (§9.16). A flag that did not come back is never a pass.
+/// read's own reading of the voucher (`status_of_voucher`, `overridden_of`).
+/// Only an invoice the return lists as included, that is not post-dated, and
+/// that no one accepted as it stands, is clean (§9.16). A flag that did not
+/// come back is never a pass.
 fn gst_status_differences(fields: &BTreeMap<String, String>) -> Vec<GstStatusDifference> {
-    use super::super::gst_status::{overridden_of, status_of_flags, FlagStatus};
+    use super::super::gst_status::{overridden_of, status_of_voucher, GstStatus};
     let flag = |name: &str| fields.get(name).map(String::as_str);
-    // `status_of_flags` reads the three status flags only, so it never states a cancelled,
-    // optional or post-dated invoice (the status tool decides those from `ISCANCELLED`,
-    // `ISOPTIONAL` and `ISPOSTDATED` first). A cancelled or optional invoice is refused
-    // earlier, by the field comparison, which wants both flags `No`. A post-dated one is
-    // not: the read-back does not fetch `ISPOSTDATED`, so an invoice a person marks
-    // post-dated after the post reads included here and stays verified (on master's status
-    // read the flag reads Yes on such a voucher and its three flags still read included).
-    // Fetching it changes the request the lab answered, so it needs a lab answer first: the
-    // follow-up fetches `ISPOSTDATED` and decides the state with `status_of_voucher`.
-    let status = match status_of_flags(
-        flag("VCHGSTSTATUSISINCLUDED"),
-        flag("VCHGSTSTATUSISUNCERTAIN"),
-        flag("VCHGSTSTATUSISEXCLUDED"),
-    ) {
-        Ok(FlagStatus::Included) => None,
-        Ok(FlagStatus::Uncertain) => Some(GstStatusDifference::Uncertain),
-        Ok(FlagStatus::Excluded) => Some(GstStatusDifference::Excluded),
-        Ok(FlagStatus::NotInReturn) => Some(GstStatusDifference::NotInReturn),
-        Err(code) => Some(GstStatusDifference::unread(code)),
+    // A post-dated invoice reads its three flags included (lab, 3 Nov 2026), so the state
+    // comes from `ISPOSTDATED` first. A cancelled or optional invoice is refused by the
+    // field comparison, which wants both flags `No`, so it adds no second finding here.
+    // The request names `ISPOSTDATED`, so an answer without it did not report the state.
+    let status = match flag("ISPOSTDATED").map(|_| {
+        status_of_voucher(
+            flag("ISCANCELLED"),
+            flag("ISOPTIONAL"),
+            flag("ISPOSTDATED"),
+            flag("VCHGSTSTATUSISINCLUDED"),
+            flag("VCHGSTSTATUSISUNCERTAIN"),
+            flag("VCHGSTSTATUSISEXCLUDED"),
+        )
+    }) {
+        None => Some(GstStatusDifference::NotReported),
+        Some(Ok(GstStatus::Included | GstStatus::Cancelled | GstStatus::Optional)) => None,
+        Some(Ok(GstStatus::Uncertain)) => Some(GstStatusDifference::Uncertain),
+        Some(Ok(GstStatus::Excluded)) => Some(GstStatusDifference::Excluded),
+        Some(Ok(GstStatus::NotInReturn)) => Some(GstStatusDifference::NotInReturn),
+        Some(Ok(GstStatus::PostDated)) => Some(GstStatusDifference::PostDated),
+        Some(Err(code)) => Some(GstStatusDifference::unread(code)),
     };
     let overridden = match overridden_of(flag("ISGSTOVERRIDDEN")) {
         Ok(false) => None,

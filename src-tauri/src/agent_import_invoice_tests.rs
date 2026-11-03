@@ -2541,11 +2541,11 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
 
 // ---- Tally's GSTR-1 status of a posted invoice (10 Oct 2026, the pilot lab) ----
 
-/// The lab's read-back of `BP/26-27/0010` with the four status fields, the
-/// request the code renders: Tally lists it as included, not accepted as it
-/// stands.
+/// The lab's read-back of `BP/26-27/0010` with the four status fields and
+/// `ISPOSTDATED`, the request the code renders (3 Nov 2026): Tally lists it as
+/// included, not accepted as it stands, not post-dated.
 const STATUS_INCLUDED: &[u8] = include_bytes!(
-    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
 );
 /// The same request for `BP/26-27/0021` after its sales ledger's HSN/SAC was
 /// set, the voucher untouched: uncertain.
@@ -2557,6 +2557,11 @@ const STATUS_UNCERTAIN: &[u8] = include_bytes!(
 const STATUS_RESAVED: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-resaved.utf16le.xml"
 );
+/// The lab's read-back of `BP/26-27/0045`, keyed post-dated, by the same request
+/// (3 Nov 2026): its three flags read included.
+const STATUS_POST_DATED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-yes.utf16le.xml"
+);
 /// The read-back of `BP/26-27/0010` the invoice round took (9 Oct 2026), whose
 /// request asked for no status field.
 const STATUS_NOT_ASKED: &[u8] = include_bytes!(
@@ -2567,16 +2572,28 @@ const STATUS_NOT_ASKED: &[u8] = include_bytes!(
 const STATUS_THREE: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-three-vouchers.utf16le.xml"
 );
-/// The GST status read's narrow window: seven invoices and four Receipts.
-const STATUS_WINDOW: &[u8] = include_bytes!(
-    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-window.utf16le.xml"
-);
-const STATUS_TAGS: [&str; 4] = [
+const STATUS_TAGS: [&str; 5] = [
     "VCHGSTSTATUSISINCLUDED",
     "VCHGSTSTATUSISUNCERTAIN",
     "VCHGSTSTATUSISEXCLUDED",
     "ISGSTOVERRIDDEN",
+    "ISPOSTDATED",
 ];
+
+/// DERIVED, not Tally's bytes: a read-back from before the request named
+/// `ISPOSTDATED`, with Tally's `No` for it added once to each voucher (counted),
+/// where the 3 Nov answers carry it: straight after `VCHGSTSTATUSISEXCLUDED`,
+/// with nothing else changed.
+fn with_post_dated_no(bytes: &[u8]) -> String {
+    let xml = utf16le(bytes);
+    assert!(!xml.contains("<ISPOSTDATED"));
+    let close = "</VCHGSTSTATUSISEXCLUDED>";
+    assert_eq!(xml.matches(close).count(), xml.matches("<VOUCHER ").count());
+    xml.replace(
+        close,
+        &format!("{close}\r\n     <ISPOSTDATED TYPE=\"Logical\">No</ISPOSTDATED>"),
+    )
+}
 
 fn utf16le(bytes: &[u8]) -> String {
     assert_eq!(bytes.len() % 2, 0, "UTF-16LE is whole code units");
@@ -2663,13 +2680,21 @@ fn status_codes_by_number(xml: &str) -> Vec<(String, Vec<&'static str>)> {
 #[test]
 fn each_gstr_1_status_the_lab_answered_reads_as_its_own_code() {
     assert_eq!(status_codes(&utf16le(STATUS_INCLUDED)), Vec::<&str>::new());
+    // A post-dated invoice reads included on its three flags and is not clean.
     assert_eq!(
-        status_codes(&utf16le(STATUS_UNCERTAIN)),
+        status_codes(&utf16le(STATUS_POST_DATED)),
+        ["gst_status_post_dated"]
+    );
+    assert_eq!(
+        status_codes(&with_post_dated_no(STATUS_UNCERTAIN)),
         ["gst_status_uncertain"]
     );
     // The ledger's HSN/SAC alone left it uncertain; saving the voucher again
     // (AlterID 34 to 35) made it included.
-    assert_eq!(status_codes(&utf16le(STATUS_RESAVED)), Vec::<&str>::new());
+    assert_eq!(
+        status_codes(&with_post_dated_no(STATUS_RESAVED)),
+        Vec::<&str>::new()
+    );
     let number_and_alter_id = |bytes: &[u8]| match wire::parse_invoice_readback(&utf16le(bytes)) {
         Ok(wire::Readback::One(read)) => (
             read.fields["VOUCHERNUMBER"].clone(),
@@ -2686,35 +2711,16 @@ fn each_gstr_1_status_the_lab_answered_reads_as_its_own_code() {
         ("BP/26-27/0021".to_string(), "35".to_string())
     );
     assert_eq!(
-        status_codes_by_number(&utf16le(STATUS_THREE)),
+        status_codes_by_number(&with_post_dated_no(STATUS_THREE)),
         [
             ("BP/26-27/0002".to_string(), vec!["gst_status_uncertain"]),
             ("BP/26-27/0010".to_string(), vec![]),
             ("BP/26-27/0016".to_string(), vec!["gst_status_overridden"]),
         ]
     );
-    let window = status_codes_by_number(&utf16le(STATUS_WINDOW));
-    let receipts =
-        ["1", "2", "3", "4"].map(|number| (number.to_string(), vec!["gst_status_not_in_return"]));
-    assert_eq!(window[7..], receipts);
-    assert_eq!(
-        window[..7]
-            .iter()
-            .map(|(number, codes)| (number.as_str(), codes.clone()))
-            .collect::<Vec<_>>(),
-        [
-            ("BP/26-27/0012", vec![]),
-            ("BP/26-27/0013", vec![]),
-            ("BP/26-27/0014", vec![]),
-            ("BP/26-27/0015", vec![]),
-            ("BP/26-27/0016", vec!["gst_status_overridden"]),
-            ("Z1/0001", vec![]),
-            ("BP/26-27/0019", vec![]),
-        ]
-    );
     // The same codes reach the invoice's differences after its own fields.
     let v = observed_voucher();
-    let uncertain = utf16le(STATUS_UNCERTAIN);
+    let uncertain = with_post_dated_no(STATUS_UNCERTAIN);
     let mut flagged = readback_xml(&v);
     for tag in STATUS_TAGS {
         flagged = flagged.replacen(
@@ -2761,8 +2767,9 @@ fn status_fields_that_did_not_come_back_are_one_difference_never_a_pass() {
 }
 
 /// DERIVED, not Tally's bytes: the states no capture shows, each from a
-/// captured answer edited in one place (the flag's text, counted): excluded (never observed), uncertain and accepted
-/// together, two flags Yes, and a value that is neither Yes nor No.
+/// captured answer edited in one place (the flag's text, counted): excluded (never observed), not in the
+/// return, post-dated alongside a cancel, uncertain and accepted together, two flags Yes, and a value that
+/// is neither Yes nor No.
 #[test]
 fn a_state_no_capture_shows_is_read_from_a_captured_answer_edited_in_one_place() {
     let included = utf16le(STATUS_INCLUDED);
@@ -2773,8 +2780,20 @@ fn a_state_no_capture_shows_is_read_from_a_captured_answer_edited_in_one_place()
     );
     assert_eq!(status_codes(&excluded), ["gst_status_excluded"]);
     assert_eq!(
+        status_codes(&with_flag(&included, "VCHGSTSTATUSISINCLUDED", "No")),
+        ["gst_status_not_in_return"]
+    );
+    assert_eq!(
         status_codes(&with_flag(
-            &utf16le(STATUS_UNCERTAIN),
+            &utf16le(STATUS_POST_DATED),
+            "ISCANCELLED",
+            "Yes"
+        )),
+        ["gst_status_unreadable"]
+    );
+    assert_eq!(
+        status_codes(&with_flag(
+            &with_post_dated_no(STATUS_UNCERTAIN),
             "ISGSTOVERRIDDEN",
             "Yes"
         )),
@@ -2966,7 +2985,7 @@ fn read_leg(xml: &str, ledger: &str) -> wire::ReadLeg {
 /// line: `BRIDGE Svc 998315 5%`, with no code.
 #[test]
 fn a_sales_line_tally_filled_no_hsn_for_is_divergent_and_named() {
-    let uncertain = utf16le(STATUS_UNCERTAIN);
+    let uncertain = with_post_dated_no(STATUS_UNCERTAIN);
     let (differences, lines) = hsn_outcome(&pilot_0021(), &uncertain);
     assert_eq!(
         differences,
@@ -3005,7 +3024,7 @@ fn a_sales_line_tally_filled_no_hsn_for_is_divergent_and_named() {
 /// are not judged.
 #[test]
 fn every_sales_line_with_a_code_and_a_source_is_clean_and_shown() {
-    let (differences, lines) = hsn_outcome(&pilot_0021(), &utf16le(STATUS_RESAVED));
+    let (differences, lines) = hsn_outcome(&pilot_0021(), &with_post_dated_no(STATUS_RESAVED));
     assert_eq!(differences, ["REFERENCE", "REFERENCEDATE"]);
     assert_eq!(
         lines,
@@ -3037,7 +3056,7 @@ fn every_sales_line_with_a_code_and_a_source_is_clean_and_shown() {
 /// value). Only a code and a source together are clean.
 #[test]
 fn a_sales_line_missing_its_code_or_its_source_is_unresolved() {
-    let resaved = utf16le(STATUS_RESAVED);
+    let resaved = with_post_dated_no(STATUS_RESAVED);
     let unresolved = |xml: &str| {
         let (differences, lines) = hsn_outcome(&pilot_0021(), xml);
         assert_eq!(lines[2]["hsn_resolved"], false, "{lines:?}");

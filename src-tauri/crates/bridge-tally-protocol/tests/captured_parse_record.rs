@@ -3286,6 +3286,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_READBACK,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-yes.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml",
         PILOT_LAB_PARENT_FILTER,
     ),

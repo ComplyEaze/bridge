@@ -1107,10 +1107,11 @@ fn a_row_the_lab_did_not_measure_is_marked_and_an_unrelated_row_cannot_fail_the_
     );
 }
 
-/// The read-back request with the four GSTR-1 status fields is, byte for byte,
-/// the one the lab answered for `BP/26-27/0010` on 10 Oct 2026 (the file begins
-/// with the byte order mark the request is sent with); for `BP/26-27/0021` it
-/// has the SHA-256 of the request file the lab sent for that number.
+/// The read-back request with the four GSTR-1 status fields and `ISPOSTDATED`
+/// is, byte for byte, the one the lab answered for `BP/26-27/0010` on 3 Nov 2026
+/// (the file begins with the byte order mark the request is sent with): the 10 Oct
+/// request with that one word added. For `BP/26-27/0021` it is that file with the
+/// number changed.
 #[test]
 fn the_status_read_back_request_is_the_one_the_lab_answered() {
     let type_guid =
@@ -1129,12 +1130,12 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
             .collect::<Vec<u8>>()
     };
     let answered: &[u8] = include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.request.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated.request.utf16le.xml"
     );
     assert_eq!(sent("BP/26-27/0010"), answered);
     assert_eq!(
         crate::agent::sha256_hex(&sent("BP/26-27/0021")),
-        "b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5"
+        "e560b89b9d63ab53375a6e03f19ad5ad3b895063052bda0edf9568c805000693"
     );
 }
 

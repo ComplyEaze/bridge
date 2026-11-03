@@ -7354,7 +7354,7 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'w' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'W' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'C' => "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38", // r16-tax-units.xml
-        'R' => "352dfca912a53499f058643e61db4febc301f6b53b753de54d7f2aac475db9c1", // w8-readback-status-single.xml
+        'R' => "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21", // R-0010.xml of the 2162-S1 sheet
         'Z' => "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e", // r14-invoice-post.xml
         'X' => "229f54c9de4cd51c2b76480129a9c6965314cd04b82d3d40d87f462167cce0d5", // r18-numbering-masters.xml
         'Y' => "e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276", // r19-numbering-series.xml
@@ -7475,7 +7475,7 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
-        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"),
+        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"),
         'Z' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"),
         other => panic!("unknown kind {other}"),
     })
@@ -8129,7 +8129,7 @@ fn pilot_element<'a>(xml: &'a str, tag: &str) -> &'a str {
 /// changes.
 fn pilot_readback_uncertain() -> String {
     let included = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
     ));
     let uncertain = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-uncertain.utf16le.xml"

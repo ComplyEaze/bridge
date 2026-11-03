@@ -460,6 +460,10 @@
     {
       "uuid": "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0",
       "note": "company identifier of the synthetic lab company BRIDGE NOTES LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/ (pull request 2301; lab branches lab/2027-gst-note-fields-capture-answers at 07e3bc34, lab/2027-voucher-gst-fields-fetch-answers at 67039e2b and lab/2027-window-read-answers at 307427aa); the voucher identifiers in those captures and their parse records are this value with a suffix"
+    },
+    {
+      "uuid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff",
+      "note": "company identifier of the synthetic lab company BRIDGE REVIEW LAB, as TallyPrime 7.2 returned it in the captures of 3 November 2026 (lab branch lab/2210-census-answers at b52cd5ec); the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-company-extent.utf16le.xml (pull request 2308) names it BRIDGE REVIEW LAB beside this GUID; the GUIDs and master identifiers of that company's vouchers and ledgers in its captures are this value with a suffix"
     }
   ]
 }

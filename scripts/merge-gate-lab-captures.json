@@ -3930,6 +3930,76 @@
       "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21",
       "size": 2278
+    },
+    {
+      "blob": "9df481349e975e37850f5712f8f172a8092ce75c",
+      "capture_id": "review-lab-company-extent.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-census-answers at b52cd5ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-company-extent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
+      "sha256": "bfdf843eb115e73a4a1c41cbdd5f61a2674a46d9f19a9f601c4c12dae4f9af77",
+      "size": 4020
+    },
+    {
+      "blob": "f93158c347d71447c4018fbb0cd45c221dc5d4e6",
+      "capture_id": "review-lab-company-high-water.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-census-answers at b52cd5ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-company-high-water.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
+      "sha256": "e470bf1c5493725cd212ced59e9e4dc455d165d33340fa4ed7259f85103c6077",
+      "size": 3414
+    },
+    {
+      "blob": "1c19b528841a482dd3642870d19601dbf7d830ce",
+      "capture_id": "review-lab-batch-voucher-census.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-census-answers at b52cd5ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-voucher-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
+      "sha256": "61d85a9b8bc3bb0efb137b825b26af89c05ff1032e1580e5d8de7bbfaafe49c3",
+      "size": 124242
+    },
+    {
+      "blob": "f55308ec0897c3f5b2292de6bd694c09d18e2b39",
+      "capture_id": "review-lab-batch-import-verification.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-census-answers at b52cd5ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import-verification.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
+      "sha256": "a8a8403d83bbb942aa081bc7d37e97662ccaa543cfb99b8ebfb6e8538bd3364a",
+      "size": 248988
+    },
+    {
+      "blob": "919f9973d905f266608c61801719b6218a45fab3",
+      "capture_id": "review-lab-payment-voucher-census.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-census-answers at b52cd5ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-payment-voucher-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
+      "sha256": "99014b3efe3748a5b6ecefb3dc26e18d9fca59fd89962176894620d44fc5807c",
+      "size": 5458
+    },
+    {
+      "blob": "d1b0a7a5af0d2f463925c5a959963b4d7c620804",
+      "capture_id": "review-lab-payment-import-verification.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-census-answers at b52cd5ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-payment-import-verification.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
+      "sha256": "99b619afdeb06a34eff2e033abb5cf7ed27327351d536b8827fe2423901faef6",
+      "size": 7960
+    },
+    {
+      "blob": "9cd62fa4e0514c55f4d70e02b24fd3ea2d318e61",
+      "capture_id": "review-lab-ledger-catalogue-v2.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-census-answers at b52cd5ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-ledger-catalogue-v2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
+      "sha256": "652e419a35ccf772d05adb25a3e36bca6b8fc9a966d3243b9dcf4d09623c9338",
+      "size": 6658
     }
   ]
 }

@@ -1,0 +1,7 @@
+Restore BK (2162-S3a), 3 Nov 2026.
+Folder: <backup folder>, holding this one file only
+File: TDBK1800_<company number>.001, 90,051 B, sha256 4091d87c8be559b15dc1882d3a232af35835f6564e298e643382d3889dc4b35c, taken 03-11-2026 10:04 local
+Company: BRIDGE PILOT LAB
+Restore Data Path: Tally's data folder
+Prompts expected and the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace" = Replace
+After: run.py s6 M-marks.xml, byte-identical to s1's (8a0c4268...)

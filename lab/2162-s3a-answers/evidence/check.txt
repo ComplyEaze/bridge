@@ -1,0 +1,31 @@
+== a-s1-M-marks.xml: 3394 B sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['68'] ALTMSTID ['245']
+== a-s2-B-bills.xml: 46 B sha256 8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+   BILLFIXED groups for BRIDGE Walk-in BW 0 | all BILLFIXED groups 0
+== a-s2-R-0047.xml: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+   VOUCHER elements 0
+== a-s3-L-ledger.xml: 538 B sha256 1b72152a8fd20ccb9366277864bf32357b8891e536cde2a54992adaa60a97010
+   {'CREATED': ['1'], 'ALTERED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['0']} LINEERROR []
+== a-s4-I-0047.xml: 540 B sha256 fdcd8435c6fcf95ab624cbe2cff2c887078df500626f7c9c37cfa834a1cdb6ea
+   {'CREATED': ['1'], 'ALTERED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['45']} LINEERROR []
+== a-s5-B-bills.xml: 510 B sha256 748ddd365f95a50c99728c9de9267cd463e25e37d6af4f5797c5e3c75d309adb
+   group BILLREF ['BP/26-27/0047'] BILLDATE ['1-Aug-26'] BILLCL after it -1051.00
+   BILLFIXED groups for BRIDGE Walk-in BW 1 | all BILLFIXED groups 1
+== a-s5-M-marks.xml: 3396 B sha256 17c5bde53bf5e459f4ae36fce8ee62e8bfe5eb636f47f1970faff44c230a59ed
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['69'] ALTMSTID ['246']
+== a-s5-R-0047.xml: 95834 B sha256 e8a4c19130200c082abac2f389137192cf64268ee259639ed5d893d24c5a9aa8
+   VOUCHER elements 1
+   number ['BP/26-27/0047'] date ['20260801'] ALTERID ['69'] GUID ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d'] INCLUDED ['Yes'] UNCERTAIN ['No'] EXCLUDED ['No']
+   legs 6 | party legs 1 ['ALLLEDGERENTRIES.LIST']
+     party leg AMOUNT ['-1051.00'] | BILLALLOCATIONS.LIST direct children 1
+       NAME ['BP/26-27/0047'] BILLTYPE ['New Ref'] AMOUNT ['-1051.00']
+   BILLALLOCATIONS.LIST under every other leg 5
+== a-s6-M-marks.xml: 3394 B sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['68'] ALTMSTID ['245']
+== s5 R, counted both ways, per ALLLEDGERENTRIES.LIST leg (as agreed after the s5 stop)
+   BRIDGE Walk-in BW: BILLALLOCATIONS.LIST elements 1 (whitespace-only 0); with a NAME child 1; TAXBILLALLOCATIONS.LIST elements 1 (whitespace-only 1)
+   BRIDGE Svc 998313 5%: BILLALLOCATIONS.LIST elements 1 (whitespace-only 1); with a NAME child 0; TAXBILLALLOCATIONS.LIST elements 1 (whitespace-only 1)
+   BRIDGE Svc 998314 5%: BILLALLOCATIONS.LIST elements 1 (whitespace-only 1); with a NAME child 0; TAXBILLALLOCATIONS.LIST elements 1 (whitespace-only 1)
+   BRIDGE CGST 2.5%: BILLALLOCATIONS.LIST elements 1 (whitespace-only 1); with a NAME child 0; TAXBILLALLOCATIONS.LIST elements 1 (whitespace-only 1)
+   BRIDGE SGST 2.5%: BILLALLOCATIONS.LIST elements 1 (whitespace-only 1); with a NAME child 0; TAXBILLALLOCATIONS.LIST elements 1 (whitespace-only 1)
+   BRIDGE Round Off: BILLALLOCATIONS.LIST elements 1 (whitespace-only 1); with a NAME child 0; TAXBILLALLOCATIONS.LIST elements 1 (whitespace-only 1)

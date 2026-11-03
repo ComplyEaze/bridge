@@ -2358,10 +2358,9 @@ With `include_gst_details: true`, a row of `vouchers` for an invoice, or for any
 `voucher_gst`: `place_of_supply`, `party_state`, `registration_type`, `note_reason`, `party_note_number` and `party_note_date`,
 each stated as `e_invoice` states its details. `party_note_date` is `YYYYMMDD`; one that is not a date refuses the read
 (`voucher_party_note_date_invalid`). A note's original invoice is its `reference` and `reference_date`, and the party's own note is
-`party_note_number` and `party_note_date`. `party_state` is Tally's `STATENAME`, the party's state by the element's name only: every
-capture has it equal to the company's. Reads without this argument or `include_e_invoice` send the request they did before.
-Measured on one synthetic book, one voucher of each kind, keyed by hand: not unregistered parties, exports, a note without an
-original invoice or a party in another state (protocol reference 8.2k).
+`party_note_number` and `party_note_date`. Reads without this argument or `include_e_invoice` send the request they did before.
+Measured on one synthetic book, one voucher of each kind, with one party in another state: not unregistered parties, exports
+or a note without an original invoice (protocol reference 8.2k).
 
 ### Cost-centre allocations in voucher reads
 

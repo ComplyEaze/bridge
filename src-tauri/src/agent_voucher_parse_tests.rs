@@ -2460,10 +2460,9 @@ fn present(value: &str) -> Value {
     json!({"state": "present", "value": value})
 }
 
-/// #2027, measured on the lab's four vouchers: a note says its reason and the party's own note
-/// number and date, and the Sales and the Purchase say those are absent.
-#[test]
-fn each_captured_voucher_says_its_gst_and_note_details() {
+/// What the lab's four vouchers say: a note its reason and the party's own note number and date,
+/// and the Sales and the Purchase that those are absent.
+fn four_vouchers_details() -> Vec<Value> {
     let details = |reason: Value, number: Value, date: Value| {
         json!({
             "place_of_supply": present("Maharashtra"),
@@ -2475,43 +2474,56 @@ fn each_captured_voucher_says_its_gst_and_note_details() {
         })
     };
     let absent = || json!({"state": "absent"});
+    vec![
+        details(absent(), absent(), absent()),
+        details(
+            present("01-Sales Return"),
+            present("SYN-NOTE-1"),
+            present("20250513"),
+        ),
+        details(
+            present("04-Correction in Invoice"),
+            present("SYN-NOTE-2"),
+            present("20250515"),
+        ),
+        details(absent(), absent(), absent()),
+    ]
+}
+
+/// #2027, measured on the lab's four vouchers by a native read.
+#[test]
+fn each_captured_voucher_says_its_gst_and_note_details() {
     assert_eq!(
         voucher_gst_of(&notes_lab_native_answer()).unwrap(),
-        vec![
-            details(absent(), absent(), absent()),
-            details(
-                present("01-Sales Return"),
-                present("SYN-NOTE-1"),
-                present("20250513")
-            ),
-            details(
-                present("04-Correction in Invoice"),
-                present("SYN-NOTE-2"),
-                present("20250515")
-            ),
-            details(absent(), absent(), absent()),
-        ]
+        four_vouchers_details()
     );
 }
 
-/// The window request's own answers: a note's details, and on an inter-state Sales a keyed place of
-/// supply apart from the party's state, with each unset note field an empty element that says absent.
+/// The window request's own answers: the build's read of the four vouchers says what the native
+/// read does, with each unset note field an empty element that says absent; a keyed place of supply
+/// reads apart from the party's state, and a party in another state reads as that state.
 #[test]
 fn each_window_answer_says_its_details_and_an_empty_note_field_says_absent() {
     assert_eq!(
         notes_lab_window_answer(include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/window-read-credit-note.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml"
         )),
-        vec![json!({
-            "place_of_supply": present("Maharashtra"),
-            "party_state": present("Maharashtra"),
-            "registration_type": present("Regular"),
-            "note_reason": present("01-Sales Return"),
-            "party_note_number": present("SYN-NOTE-1"),
-            "party_note_date": present("20250513"),
-        })]
+        four_vouchers_details()
     );
     let absent = json!({"state": "absent"});
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml"
+        )),
+        vec![json!({
+            "place_of_supply": present("Karnataka"),
+            "party_state": present("Karnataka"),
+            "registration_type": present("Regular"),
+            "note_reason": absent,
+            "party_note_number": absent,
+            "party_note_date": absent,
+        })]
+    );
     assert_eq!(
         notes_lab_window_answer(include_bytes!(
             "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml"

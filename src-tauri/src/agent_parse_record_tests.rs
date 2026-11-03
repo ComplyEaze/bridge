@@ -597,12 +597,17 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, NOTES_LAB)
     ));
     rows.push(row!(
-        "agent/gst-note-fields-lab/window-read-credit-note.utf16le.xml",
+        "agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml",
         "parse_agent_rows(NOTES_LAB)",
         |_, t| agent_rows(t, NOTES_LAB)
     ));
     rows.push(row!(
         "agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml",
         "parse_agent_rows(NOTES_LAB)",
         |_, t| agent_rows(t, NOTES_LAB)
     ));

@@ -3825,11 +3825,15 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
-        "tests/fixtures/agent/gst-note-fields-lab/window-read-credit-note.utf16le.xml",
+        "tests/fixtures/agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (
         "tests/fixtures/agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

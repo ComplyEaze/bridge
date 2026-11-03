@@ -749,7 +749,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let counted = read.counted();
         // A withheld voucher goes through every date, ledger and type check as
         // a row with no amounts, and is set aside only after them (#674).
-        let voucher_rows = server.read_withheld_composites(&identity, read.rows, &mut accumulated).await;
+        let (voucher_rows, _) = server.read_withheld_composites(&identity, read.rows, &mut accumulated).await;
         let rows = voucher_rows.into_iter().map(VoucherRow::into_filter_row).collect();
         let mut rows = validate_then_filter_voucher_rows(rows, from.as_str(), to.as_str(), None)?;
         let empty_window = if rows.is_empty() {
@@ -1338,17 +1338,22 @@ impl Server {
     }
 
     /// The window's rows, each voucher withheld for a composite read under the book's classified
-    /// base where that can be done (#683). A book whose base is not established, or whose base
-    /// read fails, leaves them withheld.
-    async fn read_withheld_composites(
+    /// base where that can be done (#683), and the cause a voucher still withheld is under. A book
+    /// whose base is not established, or whose base read fails, leaves them withheld; a failed
+    /// read is told apart, as `voucher_presence` tells it apart (#2314).
+    pub(super) async fn read_withheld_composites(
         &self,
         identity: &VerifiedCompanyIdentity,
         rows: Vec<VoucherRow>,
         accumulated: &mut Option<Evidence>,
-    ) -> Vec<VoucherRow> {
+    ) -> (Vec<VoucherRow>, &'static str) {
         match self.composite_base(identity, &rows, accumulated).await {
-            Ok(Some(book)) => rows.into_iter().map(|row| row.read_under(&book)).collect(),
-            _ => rows,
+            Ok(Some(book)) => (
+                rows.into_iter().map(|row| row.read_under(&book)).collect(),
+                WITHHELD_FOREIGN_CURRENCY,
+            ),
+            Ok(None) => (rows, WITHHELD_FOREIGN_CURRENCY),
+            Err(_) => (rows, "company_currency_probe_failed"),
         }
     }
 

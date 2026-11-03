@@ -20,7 +20,8 @@ run sent (#683).
   headers declare two bytes fewer, the length before the redaction). Bridge reads
   that field, so the replay tests (`with_synthetic_company_number` in
   `src/agent_register_server_tests.rs`) put the synthetic value ` 1` there when they load these
-  two answers, as #2314's test does for this book's extent. Every other byte is served as
+  two answers, with the leading space the other captured extent answers carry. #2314's test
+  likewise gives this book's extent a synthetic number, `1`. Every other byte is served as
   captured.
 - **Requests:** `purchase_register` and `gst_by_counter_ledger` sent the same requests, in the
   same order, and got the same answers (exchanges 113 to 176 and 177 to 240). Every repeated

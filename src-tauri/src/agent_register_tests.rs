@@ -1497,3 +1497,76 @@ fn cost_centre_names_in_the_side_list_of_unplaced_ledgers_are_masked_too() {
     assert!(!masked.contains("Side Centre"), "{masked}");
     assert!(!masked.contains("Side Category"), "{masked}");
 }
+
+/// The several-currency book's masters and its registers' window as the window parse leaves it
+/// (`forex-register`, #683): eight of its eleven vouchers are withheld.
+fn forex_withheld_window() -> (MasterIndex, Vec<Value>) {
+    use crate::agent::voucher_parse::{captured_72_register_window, FOREX_72_COMPANY_GUID};
+    let masters: Vec<PartyLedgerMasterRecord> = parse_native_party_ledger_master_records_with_evidence(
+        &utf16(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-ledgers-master.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+    )
+    .expect("the master answer parses")
+    .records
+    .into_iter()
+    .map(|row| row.record)
+    .collect();
+    let groups = GroupIndex::build(
+        parse_native_group_snapshot(
+            &utf16(include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/native/group_snapshot_forexgroup_lab.utf16le.xml"
+            )),
+            FOREX_72_COMPANY_GUID,
+        )
+        .expect("the group answer parses"),
+    );
+    let index = MasterIndex::build(masters.iter(), &groups).expect("masters index");
+    let rows = captured_72_register_window();
+    let withheld = rows
+        .iter()
+        .filter(|row| row.get(WITHHELD_MARKER).is_some())
+        .count();
+    assert_eq!(withheld, 8);
+    (index, rows)
+}
+
+/// A withheld voucher is checked against the window with every other row, before it is set
+/// aside: one dated outside the window refuses as a read row does (#674).
+#[test]
+fn a_withheld_voucher_dated_outside_the_window_refuses_as_window_not_honoured() {
+    let (index, rows) = forex_withheld_window();
+    for kind in [RegisterKind::Sales, RegisterKind::Purchase] {
+        assert_eq!(
+            register_result(
+                kind,
+                &index,
+                rows.clone(),
+                ("20250402", "20250430"),
+                (0, 500),
+                Redaction::None,
+            )
+            .map(|_| ()),
+            Err("window_not_honoured".to_string())
+        );
+    }
+}
+
+/// A withheld voucher is classified by its ledgers like any other and counted among the
+/// vouchers observed; only one of the register's own classes is set aside.
+#[test]
+fn a_withheld_voucher_is_set_aside_only_in_its_own_registers_classes_and_still_counted() {
+    let (index, rows) = forex_withheld_window();
+    for kind in [RegisterKind::Sales, RegisterKind::Purchase] {
+        let page = super::classify_register(kind, &index, &rows).unwrap();
+        assert_eq!(page.vouchers_observed, 11);
+        let own = rows
+            .iter()
+            .filter(|row| row.get(WITHHELD_MARKER).is_some())
+            .filter(|row| is_register_class(kind, row["voucher_class"].as_str().unwrap()))
+            .count();
+        assert_eq!(page.withheld.len(), own);
+        assert!(page.rows.is_empty());
+    }
+}

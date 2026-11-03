@@ -13,6 +13,7 @@ use bridge_tally_protocol::group_ancestry::{AncestryChain, AncestryGap, GroupInd
 use bridge_tally_protocol::{GstDutyHeadObservation, PartyLedgerMasterRecord};
 use std::collections::BTreeMap;
 
+use super::voucher_parse::WITHHELD_MARKER;
 use super::vouchers::{listed_withheld, VoucherComposites};
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
@@ -280,6 +281,9 @@ pub(super) struct RegisterPage {
     /// Register-class vouchers with no entry on a Duties & Taxes ledger (exempt or unregistered
     /// ones, or tax booked to a ledger filed elsewhere): counted, not dropped.
     pub(super) register_class_without_duties_taxes_entry: Vec<Value>,
+    /// Register-class vouchers whose foreign-currency amounts could not be read in rupees, as
+    /// each one's [`WithheldVoucher::filter_view`]: no amount, so nothing classifies or sums them.
+    pub(super) withheld: Vec<Value>,
     pub(super) vouchers_observed: usize,
 }
 
@@ -305,6 +309,7 @@ pub(super) fn classify_register(
         unclassified_voucher_type: Vec::new(),
         vouchers_with_unplaced_ledgers: Vec::new(),
         register_class_without_duties_taxes_entry: Vec::new(),
+        withheld: Vec::new(),
         vouchers_observed: rows.len(),
     };
     for row in rows {
@@ -401,6 +406,16 @@ pub(super) fn classify_register(
             if let Some(value) = row.get(key) {
                 identity[key] = value.clone();
             }
+        }
+        // A voucher whose foreign-currency amounts could not be read is checked against the
+        // masters like any other; one of the register's classes is set aside, since its row or
+        // its count needs what was not read, and one of another class is listed apart by its
+        // ledgers as any voucher of that class is (#683).
+        if row.get(WITHHELD_MARKER).is_some()
+            && class.is_some_and(|class| is_register_class(kind, class))
+        {
+            page.withheld.push(row.clone());
+            continue;
         }
         if touched.is_empty() && unresolved.is_empty() {
             if class.is_some_and(|class| is_register_class(kind, class)) {
@@ -581,6 +596,8 @@ fn masters_drifted(first: &RegisterMasters, second: &RegisterMasters) -> Option<
 /// What the tool returns for one window, except `state` and `reason`, which depend on whether
 /// an empty window was corroborated.
 pub(super) struct RegisterResult {
+    /// The register-class vouchers set aside because their amounts could not be read.
+    pub(super) withheld: Vec<Value>,
     pub(super) result: Value,
     pub(super) truncated: bool,
 }
@@ -596,7 +613,8 @@ pub(super) fn register_result(
     redaction: Redaction,
 ) -> Result<RegisterResult, String> {
     // An undivided window read is admitted by its caller against the window: rows dated
-    // outside it would otherwise be returned as register rows.
+    // outside it would otherwise be returned as register rows. A withheld voucher is checked
+    // with the rest, before it is set aside (#674).
     let rows = validate_then_filter_voucher_rows(rows, from, to, None)?;
     let page = classify_register(kind, index, &rows)?;
     let total = page.rows.len();
@@ -634,7 +652,11 @@ pub(super) fn register_result(
         ),
     });
     result[kind.without_entry_key()] = side(&page.register_class_without_duties_taxes_entry);
-    Ok(RegisterResult { result, truncated })
+    Ok(RegisterResult {
+        withheld: page.withheld,
+        result,
+        truncated,
+    })
 }
 
 /// One page of the register: the rows from `offset`, at most `limit`, whether more remain and
@@ -652,14 +674,13 @@ fn paginate(rows: Vec<Value>, offset: usize, limit: usize) -> (Vec<Value>, bool,
 }
 
 /// What one register-shaped read saw: the masters it classifies against, the window's rows as
-/// read (not yet checked against the window's dates), the vouchers it withheld and the window's
-/// label.
+/// read (not yet checked against the window's dates), each voucher whose foreign-currency amounts
+/// could not be read among them as its [`WithheldVoucher::filter_view`], the cause such a voucher
+/// is withheld under and the window's label.
 pub(super) struct RegisterWindow {
     pub(super) index: MasterIndex,
     pub(super) rows: Vec<Value>,
-    /// Each voucher whose foreign-currency amounts could not be read under the book's base, as
-    /// its [`WithheldVoucher::filter_view`]: no amount, so nothing classifies or sums it.
-    pub(super) withheld: Vec<Value>,
+    pub(super) withheld_reason: &'static str,
     pub(super) state: &'static str,
     pub(super) reason: Option<&'static str>,
 }
@@ -688,22 +709,19 @@ impl Server {
             let RegisterWindow {
                 index,
                 rows,
-                withheld,
+                withheld_reason,
                 state,
                 reason,
             } = self
                 .read_register_window(&identity, &company.name, (&from, &to), &mut evidence)
                 .await?;
-            if state == "partial" {
-                evidence.state = "partial";
-                evidence.reason_code = reason.map(str::to_string);
-            }
             let offset = arg_usize(args, "offset", 0)?;
             let limit = arg_positive_usize(args, "limit", self.settings.max_rows)?
                 .min(self.settings.max_rows);
             let RegisterResult {
                 mut result,
                 truncated,
+                withheld,
             } = register_result(
                 kind,
                 &index,
@@ -712,6 +730,15 @@ impl Server {
                 (offset, limit),
                 self.settings.redaction,
             )?;
+            let (state, reason) = match (state, reason) {
+                // A window that withholds a voucher is not the whole window.
+                ("complete", _) if !withheld.is_empty() => ("partial", Some(withheld_reason)),
+                label => label,
+            };
+            if state == "partial" {
+                evidence.state = "partial";
+                evidence.reason_code = reason.map(str::to_string);
+            }
             result["state"] = json!(state);
             result["reason"] = json!(reason);
             if !withheld.is_empty() {
@@ -766,35 +793,16 @@ impl Server {
         *evidence = combine_evidence(evidence.clone(), window.all_evidence());
         let counted = window.counted();
         // A voucher Tally stored with a foreign-currency composite is read at its base amount,
-        // as `vouchers` reads it (#683); one that cannot be is withheld and listed apart. A base
-        // read that failed is told apart from amounts that cannot be read, as `voucher_presence`
-        // tells them apart (#2314).
+        // as `vouchers` reads it (#683); one that cannot be keeps its place among the rows, with
+        // no amount, through every check, and the register sets it aside after them.
         let mut base_evidence = None;
-        let base = self
-            .composite_base(identity, &window.rows, &mut base_evidence)
+        let (rows, withheld_reason) = self
+            .read_withheld_composites(identity, window.rows, &mut base_evidence)
             .await;
-        let withheld_reason = match &base {
-            Err(_) => "company_currency_probe_failed",
-            Ok(_) => WITHHELD_FOREIGN_CURRENCY,
-        };
-        let rows: Vec<VoucherRow> = match base {
-            Ok(Some(book)) => window
-                .rows
-                .into_iter()
-                .map(|row| row.read_under(&book))
-                .collect(),
-            _ => window.rows,
-        };
         if let Some(base_evidence) = base_evidence {
             *evidence = combine_evidence(evidence.clone(), base_evidence);
         }
-        let (withheld, rows): (Vec<_>, Vec<_>) =
-            rows.into_iter().partition(VoucherRow::is_withheld);
         let rows: Vec<Value> = rows.into_iter().map(VoucherRow::into_filter_row).collect();
-        let withheld: Vec<Value> = withheld
-            .into_iter()
-            .map(VoucherRow::into_filter_row)
-            .collect();
         let (marks_xml, closing_evidence, _) = self
             .post_read_observing_boundary(identity, company_high_water_read(company_name))
             .await?;
@@ -818,7 +826,7 @@ impl Server {
         // was admitted against a census of the window, and an empty one when its corroboration
         // read confirms it. A row's own `status` is about how its entries classified and is not
         // decided here.
-        let empty_window = if rows.is_empty() && withheld.is_empty() {
+        let empty_window = if rows.is_empty() {
             let (corroboration, partial, corroboration_reason) = self
                 .corroborate_empty_voucher_read(identity, company_name, from, to, Some(first.marks))
                 .await?;
@@ -827,15 +835,11 @@ impl Server {
         } else {
             None
         };
-        let (state, reason) = match register_window_label(counted, empty_window) {
-            // A window that withholds a voucher is not the whole window.
-            ("complete", _) if !withheld.is_empty() => ("partial", Some(withheld_reason)),
-            label => label,
-        };
+        let (state, reason) = register_window_label(counted, empty_window);
         Ok(RegisterWindow {
             index: first.index,
             rows,
-            withheld,
+            withheld_reason,
             state,
             reason,
         })

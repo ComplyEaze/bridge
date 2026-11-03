@@ -378,12 +378,12 @@ fn a_partial_window_has_no_totals() {
     let window = RegisterWindow {
         index: captured_index(),
         rows: captured_rows(),
-        withheld: Vec::new(),
+        withheld_reason: WITHHELD_FOREIGN_CURRENCY,
         state: "partial",
         reason: Some("nonempty_window_unqualified"),
     };
     assert_eq!(
-        CompleteWindow::admit(window).err(),
+        CompleteWindow::admit(window, ("20251101", "20251130")).err(),
         Some("gst_by_ledger_window_partial".to_string())
     );
 }
@@ -454,4 +454,25 @@ fn a_parent_that_is_tally_root_is_shown_as_tally_sent_it_and_is_not_masked() {
             "{redaction:?}"
         );
     }
+}
+
+/// A withheld voucher leaves the totals short, so the window refuses; it is checked against the
+/// window's dates first, so one dated outside the window refuses as any row does (#674, #683).
+#[test]
+fn a_withheld_voucher_refuses_the_totals_and_one_outside_the_window_refuses_as_not_honoured() {
+    let window = || RegisterWindow {
+        index: captured_index(),
+        rows: crate::agent::voucher_parse::captured_72_register_window(),
+        withheld_reason: WITHHELD_FOREIGN_CURRENCY,
+        state: "complete",
+        reason: None,
+    };
+    assert_eq!(
+        CompleteWindow::admit(window(), ("20250402", "20250430")).err(),
+        Some("window_not_honoured".to_string())
+    );
+    assert_eq!(
+        CompleteWindow::admit(window(), ("20250401", "20250401")).err(),
+        Some("gst_by_ledger_window_partial".to_string())
+    );
 }

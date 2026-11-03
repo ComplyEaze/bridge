@@ -3269,6 +3269,13 @@ const SPANNED_CENSUS_OTHER_BOOK_MARKS: &str = "BRIDGE OUTSTANDINGS LAB's marks a
      BRIDGE TRANSFER LAB's marks, as an answer that holds no row of that company, and pin that the \
      day's read fails on it (#1392); agent/spanned-census-two-books/PROVENANCE.md says what it is";
 
+const FOREX_REGISTER_READ: &str = "an answer of the registers' lab run on BRIDGE FOREXGROUP LAB \
+     (4 Nov 2026, #683), with no row here: the app crate's register tools parse it, and the forex \
+     tests in src/agent_register_server_tests.rs serve it in the reader's order, each request's \
+     sha256 checked, and pin what each tool returns; the window test there parses the window \
+     under both composite policies; the extent answers carry the lab's redacted company number, \
+     which those tests replace at load; agent/forex-register/PROVENANCE.md says what each file is";
+
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
 const NOT_RECORDED: &[(&str, &str)] = &[
@@ -4456,6 +4463,31 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/spanned-census-two-books/o-m2.utf16le.xml",
         SPANNED_CENSUS,
+    ),
+    // The registers' run on the several-currency book (#683).
+    (
+        "tests/fixtures/agent/forex-register/forex-register-extent.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-book-extent.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-ledgers-master.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-census.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-window.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-marks.utf16le.xml",
+        FOREX_REGISTER_READ,
     ),
 ];
 

@@ -1329,9 +1329,23 @@ async fn a_window_whose_composites_cannot_be_read_withholds_and_names_them_in_al
             result["reason"], "company_currency_probe_failed",
             "{tool}: {response}"
         );
-        assert_eq!(result["withheld_total"], 8, "{tool}: {response}");
+        // Each of the register's own vouchers is withheld or, with nothing composite on it,
+        // counted as carrying no Duties & Taxes entry; every voucher is observed.
+        assert_eq!(result["vouchers_observed"], 11, "{tool}: {response}");
+        let (list, own) = if tool == "sales_register" {
+            ("sales_vouchers_without_duties_taxes_entry", 3)
+        } else {
+            ("purchase_vouchers_without_duties_taxes_entry", 2)
+        };
+        let withheld = result["withheld_total"].as_u64().unwrap();
+        assert!(withheld > 0, "{tool}: {response}");
+        assert_eq!(
+            withheld + result[list]["total"].as_u64().unwrap(),
+            own,
+            "{tool}: {response}"
+        );
         let listed = result["withheld_vouchers"].as_array().unwrap();
-        assert_eq!(listed.len(), 8, "{tool}: {response}");
+        assert_eq!(listed.len() as u64, withheld, "{tool}: {response}");
         for voucher in listed {
             assert_eq!(
                 voucher["cause"], WITHHELD_FOREIGN_CURRENCY,

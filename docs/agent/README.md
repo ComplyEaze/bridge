@@ -1747,9 +1747,12 @@ or vouchers.
 - **Foreign-currency vouchers.** A voucher whose amounts Tally stored as
   currency composites is read at its rupee figure, as `vouchers` reads it. One
   that cannot be read (its entries do not net to zero, or its symbol is not one
-  of the book's Currency masters) is listed in `withheld_vouchers` with
-  `withheld_total`, and the window is `partial` with reason
-  `foreign_currency_amount_unparsed`.
+  of the book's Currency masters) is checked against the window's dates and the
+  masters like any other. One of the register's own classes is then listed in
+  `withheld_vouchers` with `withheld_total`, and the window is `partial` with
+  reason `foreign_currency_amount_unparsed`, or `company_currency_probe_failed`
+  when the book's base could not be read; one of another class is listed apart by
+  its ledgers as any voucher of that class is.
 - **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
   in an inventory allocation (`taxable_entries` may be empty for them); books
   with several currencies; any GSTIN, a `REFERENCEDATE` on a sale, or cancelled, optional or

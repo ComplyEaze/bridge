@@ -1137,6 +1137,28 @@ fn the_status_read_back_request_is_the_one_the_lab_answered() {
         crate::agent::sha256_hex(&sent("BP/26-27/0021")),
         "e560b89b9d63ab53375a6e03f19ad5ad3b895063052bda0edf9568c805000693"
     );
+    // The requests the bill-wise read-backs answered (3 Nov 2026, #2162 item 3),
+    // by the SHA-256 of each request file the lab sent.
+    for (text, sha256) in [
+        (
+            "BP/26-27/0047",
+            "42cc765c76b8a251268a14a76b8edf6165a58b42864b350061b7f40f3f673525",
+        ),
+        (
+            "BP/26-27/0048",
+            "86efe054a870f38702a4d2d3aec3a0a53db3878a15e16ae936e5f36451a52540",
+        ),
+        (
+            "BP/26-27/0049",
+            "4efe7527ac839af89b765952693064262778034531c74c8a6ea709b19297053b",
+        ),
+        (
+            "BP/26-27/0050",
+            "71c3f4ab3ed3d2371dd1b54d4345097a27726e580df06f663ca608ba80091946",
+        ),
+    ] {
+        assert_eq!(crate::agent::sha256_hex(&sent(text)), sha256, "{text}");
+    }
 }
 
 /// The group request is W16's: the group listing the compliance read sends

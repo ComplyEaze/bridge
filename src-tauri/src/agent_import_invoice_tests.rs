@@ -1372,17 +1372,22 @@ fn pilot_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<
 /// customer, unregistered and not bill-wise), numbered `number`, as the build
 /// saved it with what it observed.
 fn pilot_posted(number: &str) -> ImportVoucher {
+    pilot_posted_to(number, "BRIDGE Walk-in", false)
+}
+
+/// The same invoice to `party`, bill-wise as `bill_wise` says.
+fn pilot_posted_to(number: &str, party: &str, bill_wise: bool) -> ImportVoucher {
     serde_json::from_value(serde_json::json!({
         "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":number,
         "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan","round_off_ledger":"BRIDGE Round Off",
             "observed":{
                 "voucher_type_guid":format!("{}-000000ce", pilot_lab_guid()),
                 "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-                "party_bill_wise":false, "company_state":"Rajasthan",
+                "party_bill_wise":bill_wise, "company_state":"Rajasthan",
                 "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]
             }},
         "entries":[
-            {"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"},
+            {"ledger":party,"amount":"1051.00","side":"Dr"},
             {"ledger":"BRIDGE Svc 998313 5%","amount":"600.40","side":"Cr"},
             {"ledger":"BRIDGE Svc 998314 5%","amount":"400.40","side":"Cr"},
             {"ledger":"BRIDGE CGST 2.5%","amount":"25.02","side":"Cr"},
@@ -1414,6 +1419,80 @@ fn the_pilot_labs_posted_invoice_reads_back_as_planned_on_its_captured_answer() 
         pilot_differences(&pilot_posted("BP/26-27/0010"), STATUS_NOT_ASKED, "20260801"),
         vec!["gst_status_not_reported"]
     );
+}
+
+// ---- A bill-wise customer's invoice (3 Nov 2026, the pilot lab, #2162 item 3) ----
+//
+// Each invoice below was imported raw, as the build renders it for a bill-wise
+// party (one New Ref named by its number), and read back by the request the code
+// sends. The protocol reference's voucher-writes part records the rows (§9.16,
+// the bullet "A bill of the same name").
+
+/// `BP/26-27/0047` to `BRIDGE Walk-in BW`, which held no other bill: one New Ref
+/// named by the number, for the party amount (`lab/2162-s3a-answers`).
+const BILL_WISE_NEW: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-new.utf16le.xml"
+);
+/// `BP/26-27/0048` to `BRIDGE Walk-in BJ`, which already held an open bill of
+/// that name from a Journal: Tally stored the New Ref as an Agst Ref against it
+/// (`lab/2162-s3b-answers`, b1).
+const BILL_WISE_JOURNAL_BILL: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-journal-bill.utf16le.xml"
+);
+/// `BP/26-27/0049` to `BRIDGE Walk-in BS`, whose bill of that name a Receipt had
+/// settled: an Agst Ref, and the settled bill reopened (b2).
+const BILL_WISE_SETTLED_BILL: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml"
+);
+/// `BP/26-27/0050` to `BRIDGE Walk-in BO`, whose opening bill had that name: an
+/// Agst Ref against the opening bill (b3).
+const BILL_WISE_OPENING_BILL: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-opening-bill.utf16le.xml"
+);
+
+/// A bill-wise customer's invoice reads back as built only when Tally stored
+/// its New Ref. Where the customer already held a bill of that name, from a
+/// Journal, a settled bill or an opening balance, Tally stored an Agst Ref
+/// against that bill instead, and the read-back names it `bill_allocation`.
+/// The difference is read after the post: by then the existing bill holds the
+/// invoice's amount, so it fails closed for the verdict, not for the books.
+#[test]
+fn a_bill_wise_invoice_reads_back_as_built_only_where_tally_stored_its_new_ref() {
+    assert_eq!(
+        pilot_differences(
+            &pilot_posted_to("BP/26-27/0047", "BRIDGE Walk-in BW", true),
+            BILL_WISE_NEW,
+            "20260801"
+        ),
+        Vec::<String>::new()
+    );
+    for (bytes, number, party) in [
+        (BILL_WISE_JOURNAL_BILL, "BP/26-27/0048", "BRIDGE Walk-in BJ"),
+        (BILL_WISE_SETTLED_BILL, "BP/26-27/0049", "BRIDGE Walk-in BS"),
+        (BILL_WISE_OPENING_BILL, "BP/26-27/0050", "BRIDGE Walk-in BO"),
+    ] {
+        assert_eq!(
+            pilot_differences(&pilot_posted_to(number, party, true), bytes, "20260801"),
+            vec!["bill_allocation"],
+            "{number}"
+        );
+        let wire::Readback::One(read) = wire::parse_invoice_readback(&utf16le(bytes)).unwrap()
+        else {
+            panic!("one voucher expected: {number}");
+        };
+        let allocations = read
+            .legs
+            .iter()
+            .map(|leg| (leg.ledger.as_str(), leg.allocations.clone()))
+            .filter(|(_, allocations)| !allocations.is_empty())
+            .collect::<Vec<_>>();
+        let agst_ref = (
+            Some(number.to_string()),
+            Some("Agst Ref".to_string()),
+            "-1051.00".to_string(),
+        );
+        assert_eq!(allocations, vec![(party, vec![agst_ref])]);
+    }
 }
 
 #[test]

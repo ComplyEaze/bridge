@@ -1,0 +1,25 @@
+﻿2026-11-02T23:58:58.470Z watch start: tally window 0xa826a4; see within 60 s; answer by 70 s
+2026-11-02T23:59:02.498Z BOX SEEN 0x401dae pid 20376 title 'ComplyEaze Bridge — create one ledger?' class #32770
+2026-11-02T23:59:02.670Z rect 688,342,1252,764 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-02T23:59:02.752Z foreground 0x401dae pid 20376 bridge_mcp title 'ComplyEaze Bridge — create one ledger?'
+2026-11-02T23:59:02.829Z child Button rect 901,708,1001,741 text: &Yes
+2026-11-02T23:59:02.867Z child Button rect 1011,708,1111,741 text: &No
+2026-11-02T23:59:02.902Z child Button rect 1121,708,1221,741 text: Cancel
+2026-11-02T23:59:02.937Z child Static rect 725,413,765,453 text: 
+2026-11-02T23:59:02.982Z child Static rect 775,413,1203,662 text: Press Y (or click Yes) to create this ledger in Tally. Press N (or click No) to cancel. Nothing is
+created until you answer.
+
+Create ONE ledger in "BRIDGE ABANDON LAB"
+Company GUID: 5f4825c4-5d89-47fa-9872-6397cca3a591
+Company number: <company number>  Books from: 1-Apr-2025
+Tally: http://127.0.0.1:9002
+
+Create ledger "Lab Order R0L" under Suspense A/c
+no GST, bill-by-bill No
+
+Do not create or rename ledgers in Tally until this is done.
+2026-11-02T23:59:03.944Z capture p2-open.png 1920x1080 342325 B sha256 91f49049112d4b0994bde757b5b8a2d8e574eca582e83860ee8900a70a7aed2f
+2026-11-02T23:59:03.993Z WAITING for <lab folder>\box\p2.answer
+2026-11-02T23:59:05.172Z before click: foreground 0x401dae pid 20376 bridge_mcp title 'ComplyEaze Bridge — create one ledger?'
+2026-11-02T23:59:05.529Z CLICKED Yes at 951,724 (physical) 2026-11-02T23:59:05.257Z; seen-to-click 2.8 s
+2026-11-02T23:59:06.530Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

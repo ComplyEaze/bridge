@@ -1,0 +1,37 @@
+== out1 lines 93 mode pass
+connections opened 1 closed 1 most open at once 1
+  open conn 1 at 4013652.546 2026-11-02T23:57:14Z
+  close conn 1 requests 90 at 4013703.984 2026-11-02T23:58:06Z
+requests 90 by connection header {'KEEP-ALIVE': 90} empty bodies 31
+sent once: [(1, 71, 1004, '5c50f3f81e27', 'KEEP-ALIVE')]
+create: conn 1 request 71 Tally connection header KEEP-ALIVE sent 1004 sha 5c50f3f81e2750e2 answered 538 at 4013687.64 dropped False
+answers:
+  companies isError False seconds 0.156 state None error {"code": null, "cause": null} dispatch None attempt_recorded None
+  status isError False seconds 0.109 state None error {"code": null, "cause": null} dispatch None attempt_recorded None
+  prepare isError False seconds 1.489 state None error {"code": null, "cause": null} dispatch None attempt_recorded None
+  post isError False seconds 18.095 state posted_verified error {"code": null, "cause": null} dispatch {'resent': False, 'state': 'dispatched'} attempt_recorded True
+== out2 lines 103 mode drop
+connections opened 2 closed 2 most open at once 1
+  open conn 1 at 4013733.187 2026-11-02T23:58:35Z
+  open conn 2 at 4013786.718 2026-11-02T23:59:29Z
+  close conn 1 requests 71 at 4013785.531 2026-11-02T23:59:27Z
+  close conn 2 requests 26 at 4013848.812 2026-11-03T00:00:31Z
+  event {'event': 'bridge_closed', 'conn': 1, 'held_s': 19.578, 'utc': '2026-11-02T23:59:27Z', 'at': 4013785.531}
+requests 97 by connection header {'KEEP-ALIVE': 97} empty bodies 36
+sent once: [(1, 71, 1008, 'e766d64130d5', 'KEEP-ALIVE')]
+create: conn 1 request 71 Tally connection header KEEP-ALIVE sent 1008 sha e766d64130d54ce9 answered 538 at 4013765.953 dropped True
+held 19.578 held from about 4013765.953 requests after the create 26
+  after create: conn 2 request 1 sent 0 at 4013786.734 2026-11-02T23:59:29Z KEEP-ALIVE
+  after create: conn 2 request 2 sent 0 at 4013788.765 2026-11-02T23:59:31Z KEEP-ALIVE
+  after create: conn 2 request 3 sent 0 at 4013790.781 2026-11-02T23:59:33Z KEEP-ALIVE
+  after create: conn 2 request 4 sent 2524 at 4013790.812 2026-11-02T23:59:33Z KEEP-ALIVE
+  after create: conn 2 request 5 sent 0 at 4013790.812 2026-11-02T23:59:33Z KEEP-ALIVE
+  after create: conn 2 request 6 sent 2524 at 4013790.843 2026-11-02T23:59:33Z KEEP-ALIVE
+connection spans {1: [4013733.187, 4013785.531], 2: [4013786.718, 4013848.812]}
+answers:
+  companies isError False seconds 0.177 state None error {"code": null, "cause": null} dispatch None attempt_recorded None
+  status isError False seconds 0.09 state None error {"code": null, "cause": null} dispatch None attempt_recorded None
+  prepare isError False seconds 1.455 state None error {"code": null, "cause": null} dispatch None attempt_recorded None
+  post isError True seconds 27.556 state None error {"code": "import_dispatch_outcome_unknown", "cause": "request_deadline_exceeded"} dispatch {'resent': False, 'state': 'reconciliation_required'} attempt_recorded True
+  post2 isError False seconds 6.848 state posted_unattributed error {"code": null, "cause": null} dispatch {'resent': False, 'state': 'dispatched'} attempt_recorded True
+create.answer head HTTP/1.1 200 OK | Unicode: Yes | CONTENT-TYPE: text/xml; charset=utf-16 | RESPSTATUS: 1 | CONNECTION: KEEP-ALIVE | CONTENT-LENGTH: 538 {'CREATED': ['1'], 'ALTERED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LINEERROR': []}

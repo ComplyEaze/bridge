@@ -1,0 +1,5 @@
+GET /status HTTP/1.1
+content-type: text/xml
+accept: */*
+host: 127.0.0.1:9002
+

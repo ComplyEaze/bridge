@@ -1,0 +1,230 @@
+event listening conn None {}
+event open conn 1 {}
+ex 1 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.016
+ex 2 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 3 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 4 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 5 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 6 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 7 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.016
+ex 8 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 9 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 10 conn 1 line 'POST / HTTP/1.1' req 986 B 5b447d03d63414bb46753503faee9b105347e13c28cac548bfd51d6fdb9fb4b7 ans 3404 B 3d75dd1a8fb7252b93f55f9a492ddf449e2be3814feaa781685437f2548dafba request ['Export'] ['Collection'] ['Bridge Agent Company High Water'] first_byte_s 0.016
+ex 11 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 12 conn 1 line 'POST / HTTP/1.1' req 986 B 5b447d03d63414bb46753503faee9b105347e13c28cac548bfd51d6fdb9fb4b7 ans 3404 B 3d75dd1a8fb7252b93f55f9a492ddf449e2be3814feaa781685437f2548dafba request ['Export'] ['Collection'] ['Bridge Agent Company High Water'] first_byte_s 0.0
+ex 13 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 14 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.016
+ex 15 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.016
+ex 16 conn 1 line 'POST / HTTP/1.1' req 1530 B 12e97cc3a11334e443568e1d5a956718d429f1afce590246dc0cb0b1f3bf853c ans 29456 B 817075d4b105ce5fe2879f4f9a50037f9977ce9e5c4b857db11065d34e786472 request ['Export'] ['Collection'] ['Bridge Agent Voucher Census'] first_byte_s 0.078
+   VOUCHER 11; AMOUNT with " @ " 0; VATEXPAMOUNT with " @ " 0; AMOUNT elements 0
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {}; vouchers carrying any BRIDGEVCH*: 0
+   voucher child tags: ['ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'DATE', 'GUID', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'MASTERID', 'NUMBERINGSTYLE', 'PERSISTEDVIEW', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 17 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 18 conn 1 line 'POST / HTTP/1.1' req 1530 B 12e97cc3a11334e443568e1d5a956718d429f1afce590246dc0cb0b1f3bf853c ans 29456 B 817075d4b105ce5fe2879f4f9a50037f9977ce9e5c4b857db11065d34e786472 request ['Export'] ['Collection'] ['Bridge Agent Voucher Census'] first_byte_s 0.062
+   VOUCHER 11; AMOUNT with " @ " 0; VATEXPAMOUNT with " @ " 0; AMOUNT elements 0
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {}; vouchers carrying any BRIDGEVCH*: 0
+   voucher child tags: ['ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'DATE', 'GUID', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'MASTERID', 'NUMBERINGSTYLE', 'PERSISTEDVIEW', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 19 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 20 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 21 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.016
+ex 22 conn 1 line 'POST / HTTP/1.1' req 1750 B 986017edb475d126f599b25564467a4efa7228e760d07234d29dbb3028b25cef ans 388956 B 6608d39d02d7337ff73fbbee0f61ca246df86fd29c2678bb92fc56b55e177959 request ['Export'] ['Collection'] ['Bridge Agent Vouchers'] first_byte_s 0.125
+   VOUCHER 11; AMOUNT with " @ " 28; VATEXPAMOUNT with " @ " 12; AMOUNT elements 36
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {}; vouchers carrying any BRIDGEVCH*: 0
+   voucher child tags: ['ALLLEDGERENTRIES.LIST', 'ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'DATE', 'GUID', 'ISCANCELLED', 'ISDEEMEDPOSITIVE', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'ISOPTIONAL', 'ISPOSTDATED', 'MASTERID', 'NARRATION', 'NUMBERINGSTYLE', 'PARTYGSTIN', 'PARTYLEDGERNAME', 'PERSISTEDVIEW', 'REFERENCE', 'REFERENCEDATE', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 23 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 24 conn 1 line 'POST / HTTP/1.1' req 1750 B 986017edb475d126f599b25564467a4efa7228e760d07234d29dbb3028b25cef ans 388956 B 6608d39d02d7337ff73fbbee0f61ca246df86fd29c2678bb92fc56b55e177959 request ['Export'] ['Collection'] ['Bridge Agent Vouchers'] first_byte_s 0.141
+   VOUCHER 11; AMOUNT with " @ " 28; VATEXPAMOUNT with " @ " 12; AMOUNT elements 36
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {}; vouchers carrying any BRIDGEVCH*: 0
+   voucher child tags: ['ALLLEDGERENTRIES.LIST', 'ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'DATE', 'GUID', 'ISCANCELLED', 'ISDEEMEDPOSITIVE', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'ISOPTIONAL', 'ISPOSTDATED', 'MASTERID', 'NARRATION', 'NUMBERINGSTYLE', 'PARTYGSTIN', 'PARTYLEDGERNAME', 'PERSISTEDVIEW', 'REFERENCE', 'REFERENCEDATE', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 25 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 26 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.015
+ex 27 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 28 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 29 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 30 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 31 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 32 conn 1 line 'POST / HTTP/1.1' req 976 B df26219283f66347545cb3b93261014a2448719cc04778b40b734ebb799769cb ans 3796 B f5a1414a195194ff4f8b46f4c65cae0e0f7567143c71c6a2c465532334b3439a request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.016
+ex 33 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 34 conn 1 line 'POST / HTTP/1.1' req 976 B df26219283f66347545cb3b93261014a2448719cc04778b40b734ebb799769cb ans 3796 B f5a1414a195194ff4f8b46f4c65cae0e0f7567143c71c6a2c465532334b3439a request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.016
+ex 35 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 36 conn 1 line 'POST / HTTP/1.1' req 1004 B 0f10c96e7a00445ab6655dd915cb7ff50f9e1adbacef99bc42167a1d43a4c1bd ans 4000 B 3f0bfbcbb3bc0def49de13a7ac918e5d20d6a1d6885aa0e17635eb5af694aaf0 request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.0
+ex 37 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 38 conn 1 line 'POST / HTTP/1.1' req 1004 B 0f10c96e7a00445ab6655dd915cb7ff50f9e1adbacef99bc42167a1d43a4c1bd ans 4000 B 3f0bfbcbb3bc0def49de13a7ac918e5d20d6a1d6885aa0e17635eb5af694aaf0 request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.0
+ex 39 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 40 conn 1 line 'POST / HTTP/1.1' req 966 B 8f6205332f84a0b8bf3df5f55d9869dd79a0bd551d2e51b37a4fa6552a4b1fe0 ans 3434 B 52c33f519c9e5ee390d44ef30223ad46f8b3bbbe2c71e02a5c995e0672043df3 request ['Export'] ['Collection'] ['BridgeCompanyBaseCurrency'] first_byte_s 0.0
+ex 41 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 42 conn 1 line 'POST / HTTP/1.1' req 966 B 8f6205332f84a0b8bf3df5f55d9869dd79a0bd551d2e51b37a4fa6552a4b1fe0 ans 3434 B 52c33f519c9e5ee390d44ef30223ad46f8b3bbbe2c71e02a5c995e0672043df3 request ['Export'] ['Collection'] ['BridgeCompanyBaseCurrency'] first_byte_s 0.0
+ex 43 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 44 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.016
+ex 45 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 46 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 47 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 48 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 49 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 50 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 51 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 52 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 53 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.015
+ex 54 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 55 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 56 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 57 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 58 conn 1 line 'POST / HTTP/1.1' req 976 B df26219283f66347545cb3b93261014a2448719cc04778b40b734ebb799769cb ans 3796 B f5a1414a195194ff4f8b46f4c65cae0e0f7567143c71c6a2c465532334b3439a request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.0
+ex 59 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 60 conn 1 line 'POST / HTTP/1.1' req 976 B df26219283f66347545cb3b93261014a2448719cc04778b40b734ebb799769cb ans 3796 B f5a1414a195194ff4f8b46f4c65cae0e0f7567143c71c6a2c465532334b3439a request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.015
+ex 61 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 62 conn 1 line 'POST / HTTP/1.1' req 1004 B 0f10c96e7a00445ab6655dd915cb7ff50f9e1adbacef99bc42167a1d43a4c1bd ans 4000 B 3f0bfbcbb3bc0def49de13a7ac918e5d20d6a1d6885aa0e17635eb5af694aaf0 request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.0
+ex 63 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.016
+ex 64 conn 1 line 'POST / HTTP/1.1' req 1004 B 0f10c96e7a00445ab6655dd915cb7ff50f9e1adbacef99bc42167a1d43a4c1bd ans 4000 B 3f0bfbcbb3bc0def49de13a7ac918e5d20d6a1d6885aa0e17635eb5af694aaf0 request ['Export'] ['Collection'] ['BridgeCompanyCurrencies'] first_byte_s 0.0
+ex 65 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 66 conn 1 line 'POST / HTTP/1.1' req 966 B 8f6205332f84a0b8bf3df5f55d9869dd79a0bd551d2e51b37a4fa6552a4b1fe0 ans 3434 B 52c33f519c9e5ee390d44ef30223ad46f8b3bbbe2c71e02a5c995e0672043df3 request ['Export'] ['Collection'] ['BridgeCompanyBaseCurrency'] first_byte_s 0.0
+ex 67 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 68 conn 1 line 'POST / HTTP/1.1' req 966 B 8f6205332f84a0b8bf3df5f55d9869dd79a0bd551d2e51b37a4fa6552a4b1fe0 ans 3434 B 52c33f519c9e5ee390d44ef30223ad46f8b3bbbe2c71e02a5c995e0672043df3 request ['Export'] ['Collection'] ['BridgeCompanyBaseCurrency'] first_byte_s 0.0
+ex 69 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.016
+ex 70 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 71 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 72 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.015
+ex 73 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 74 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.016
+ex 75 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 76 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 77 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 78 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 79 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 80 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.015
+ex 81 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 82 conn 1 line 'POST / HTTP/1.1' req 1746 B b20e80b785c040a31c70051dab8ded0af0a7e5bdcff479a0ed78e8e5c3d2abb4 ans 19456 B 3460bd62e2db1ae65d90d1e1bc178bf61a926eeed55202fe0d9c7d4f153aa7d8 request ['Export'] ['Collection'] ['List of Ledgers'] first_byte_s 0.016
+   LEDGER rows 8; CURRENCYNAME values {'(no element)': 8}; CURRENCYNAME not base 0; OPENING/CLOSING with " @ " 0; tags ['ALTERID', 'BANKACCHOLDERNAME', 'BRIDGECOMPANYGUID', 'GUID', 'LANGUAGENAME.LIST', 'LEDADDRESS.LIST', 'LEDGSTPINCODE', 'LEDGSTREGDETAILS.LIST', 'LEDPINCODE', 'LEDUDYAMREGNUMBER', 'MASTERID', 'OPENINGBALANCE', 'PARENT', 'TAXTYPE']
+ex 83 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 84 conn 1 line 'POST / HTTP/1.1' req 1746 B b20e80b785c040a31c70051dab8ded0af0a7e5bdcff479a0ed78e8e5c3d2abb4 ans 19456 B 3460bd62e2db1ae65d90d1e1bc178bf61a926eeed55202fe0d9c7d4f153aa7d8 request ['Export'] ['Collection'] ['List of Ledgers'] first_byte_s 0.016
+   LEDGER rows 8; CURRENCYNAME values {'(no element)': 8}; CURRENCYNAME not base 0; OPENING/CLOSING with " @ " 0; tags ['ALTERID', 'BANKACCHOLDERNAME', 'BRIDGECOMPANYGUID', 'GUID', 'LANGUAGENAME.LIST', 'LEDADDRESS.LIST', 'LEDGSTPINCODE', 'LEDGSTREGDETAILS.LIST', 'LEDPINCODE', 'LEDUDYAMREGNUMBER', 'MASTERID', 'OPENINGBALANCE', 'PARENT', 'TAXTYPE']
+ex 85 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 86 conn 1 line 'POST / HTTP/1.1' req 1294 B 71e429b8c54e890e08152b37b5844932f653b89743462719b16eac4c4100de7b ans 13354 B 4c3796dff24e940f7b30348f6250fc1a440fa591317a7fb51fcdef71634efb87 request ['Export'] ['Collection'] ['List of Ledgers'] first_byte_s 0.0
+   LEDGER rows 8; CURRENCYNAME values {'₹': 8}; CURRENCYNAME not base 0; OPENING/CLOSING with " @ " 6; tags ['BRIDGECOMPANYGUID', 'CLOSINGBALANCE', 'CURRENCYNAME', 'ISBILLWISEON', 'LANGUAGENAME.LIST', 'OPENINGBALANCE', 'PARENT']
+ex 87 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 88 conn 1 line 'POST / HTTP/1.1' req 1294 B 71e429b8c54e890e08152b37b5844932f653b89743462719b16eac4c4100de7b ans 13354 B 4c3796dff24e940f7b30348f6250fc1a440fa591317a7fb51fcdef71634efb87 request ['Export'] ['Collection'] ['List of Ledgers'] first_byte_s 0.031
+   LEDGER rows 8; CURRENCYNAME values {'₹': 8}; CURRENCYNAME not base 0; OPENING/CLOSING with " @ " 6; tags ['BRIDGECOMPANYGUID', 'CLOSINGBALANCE', 'CURRENCYNAME', 'ISBILLWISEON', 'LANGUAGENAME.LIST', 'OPENINGBALANCE', 'PARENT']
+ex 89 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 90 conn 1 line 'POST / HTTP/1.1' req 1076 B 205458f1ef405f132ff4e87703f258f7cae16f6aadbafda2ea12943d434ec0e8 ans 54280 B de8ad96bc29a90ca10dc82f206e5988c74ebd5e3a82ca86ab8c8d34dfbbeccfc request ['Export'] ['Collection'] ['List of Groups'] first_byte_s 0.015
+ex 91 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 92 conn 1 line 'POST / HTTP/1.1' req 1076 B 205458f1ef405f132ff4e87703f258f7cae16f6aadbafda2ea12943d434ec0e8 ans 54280 B de8ad96bc29a90ca10dc82f206e5988c74ebd5e3a82ca86ab8c8d34dfbbeccfc request ['Export'] ['Collection'] ['List of Groups'] first_byte_s 0.0
+ex 93 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 94 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 95 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 96 conn 1 line 'POST / HTTP/1.1' req 1104 B 017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62 ans 3856 B fd2847b0cad9e2d57876e6a62bd1988e4b0b57d0b0684fc086234b5dc675ecd4 request ['Export'] ['Collection'] ['BridgeCompanyBookExtentV2'] first_byte_s 0.0
+ex 97 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 98 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 99 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 100 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 101 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.015
+ex 102 conn 1 line 'POST / HTTP/1.1' req 1530 B 12e97cc3a11334e443568e1d5a956718d429f1afce590246dc0cb0b1f3bf853c ans 29456 B 817075d4b105ce5fe2879f4f9a50037f9977ce9e5c4b857db11065d34e786472 request ['Export'] ['Collection'] ['Bridge Agent Voucher Census'] first_byte_s 0.063
+   VOUCHER 11; AMOUNT with " @ " 0; VATEXPAMOUNT with " @ " 0; AMOUNT elements 0
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {}; vouchers carrying any BRIDGEVCH*: 0
+   voucher child tags: ['ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'DATE', 'GUID', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'MASTERID', 'NUMBERINGSTYLE', 'PERSISTEDVIEW', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 103 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 104 conn 1 line 'POST / HTTP/1.1' req 1530 B 12e97cc3a11334e443568e1d5a956718d429f1afce590246dc0cb0b1f3bf853c ans 29456 B 817075d4b105ce5fe2879f4f9a50037f9977ce9e5c4b857db11065d34e786472 request ['Export'] ['Collection'] ['Bridge Agent Voucher Census'] first_byte_s 0.078
+   VOUCHER 11; AMOUNT with " @ " 0; VATEXPAMOUNT with " @ " 0; AMOUNT elements 0
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 0, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {}; vouchers carrying any BRIDGEVCH*: 0
+   voucher child tags: ['ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'DATE', 'GUID', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'MASTERID', 'NUMBERINGSTYLE', 'PERSISTEDVIEW', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 105 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 106 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 107 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0
+ex 108 conn 1 line 'POST / HTTP/1.1' req 3126 B ab78fbe5afeb6734a3ec36a940dc098371560faf0a1210ca7e511927ee3dd2f5 ans 404502 B c87866eb0db4d4b1622caf2d69d6a24e03efc1f6f80afef499852fd78cd7d771 request ['Export'] ['Collection'] ['Bridge Agent Vouchers'] first_byte_s 0.141
+   VOUCHER 11; AMOUNT with " @ " 28; VATEXPAMOUNT with " @ " 12; AMOUNT elements 36
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {'BRIDGEVCHTYPEGUID': 11, 'BRIDGEVCHRESERVEDNAME': 11, 'BRIDGEVCHISSALES': 11, 'BRIDGEVCHISPURCHASE': 11, 'BRIDGEVCHISPAYMENT': 11, 'BRIDGEVCHISRECEIPT': 11, 'BRIDGEVCHISCONTRA': 11, 'BRIDGEVCHISJOURNAL': 11, 'BRIDGEVCHISDEBITNOTE': 11, 'BRIDGEVCHISCREDITNOTE': 11}; vouchers carrying any BRIDGEVCH*: 11
+   voucher child tags: ['ALLLEDGERENTRIES.LIST', 'ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'BRIDGEVCHISCONTRA', 'BRIDGEVCHISCREDITNOTE', 'BRIDGEVCHISDEBITNOTE', 'BRIDGEVCHISJOURNAL', 'BRIDGEVCHISPAYMENT', 'BRIDGEVCHISPURCHASE', 'BRIDGEVCHISRECEIPT', 'BRIDGEVCHISSALES', 'BRIDGEVCHRESERVEDNAME', 'BRIDGEVCHTYPEGUID', 'DATE', 'GUID', 'ISCANCELLED', 'ISDEEMEDPOSITIVE', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'ISOPTIONAL', 'ISPOSTDATED', 'MASTERID', 'NARRATION', 'NUMBERINGSTYLE', 'PARTYGSTIN', 'PARTYLEDGERNAME', 'PERSISTEDVIEW', 'REFERENCE', 'REFERENCEDATE', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 109 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 110 conn 1 line 'POST / HTTP/1.1' req 3126 B ab78fbe5afeb6734a3ec36a940dc098371560faf0a1210ca7e511927ee3dd2f5 ans 404502 B c87866eb0db4d4b1622caf2d69d6a24e03efc1f6f80afef499852fd78cd7d771 request ['Export'] ['Collection'] ['Bridge Agent Vouchers'] first_byte_s 0.156
+   VOUCHER 11; AMOUNT with " @ " 28; VATEXPAMOUNT with " @ " 12; AMOUNT elements 36
+   voucher Sales 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Journal 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Sales 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Purchase 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 1: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Payment 2: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher Receipt 3: ALLLEDGERENTRIES.LIST 2, LEDGERENTRIES.LIST 0, children []
+   voucher-level class elements (tag: rows carrying it): {'BRIDGEVCHTYPEGUID': 11, 'BRIDGEVCHRESERVEDNAME': 11, 'BRIDGEVCHISSALES': 11, 'BRIDGEVCHISPURCHASE': 11, 'BRIDGEVCHISPAYMENT': 11, 'BRIDGEVCHISRECEIPT': 11, 'BRIDGEVCHISCONTRA': 11, 'BRIDGEVCHISJOURNAL': 11, 'BRIDGEVCHISDEBITNOTE': 11, 'BRIDGEVCHISCREDITNOTE': 11}; vouchers carrying any BRIDGEVCH*: 11
+   voucher child tags: ['ALLLEDGERENTRIES.LIST', 'ALTERID', 'ARESERIALMASTER', 'ASORIGINAL', 'ASPAYSLIP', 'BRIDGEVCHISCONTRA', 'BRIDGEVCHISCREDITNOTE', 'BRIDGEVCHISDEBITNOTE', 'BRIDGEVCHISJOURNAL', 'BRIDGEVCHISPAYMENT', 'BRIDGEVCHISPURCHASE', 'BRIDGEVCHISRECEIPT', 'BRIDGEVCHISSALES', 'BRIDGEVCHRESERVEDNAME', 'BRIDGEVCHTYPEGUID', 'DATE', 'GUID', 'ISCANCELLED', 'ISDEEMEDPOSITIVE', 'ISDELETED', 'ISDELETEDVCHRETAINED', 'ISINVOICE', 'ISNEGISPOSSET', 'ISOPTIONAL', 'ISPOSTDATED', 'MASTERID', 'NARRATION', 'NUMBERINGSTYLE', 'PARTYGSTIN', 'PARTYLEDGERNAME', 'PERSISTEDVIEW', 'REFERENCE', 'REFERENCEDATE', 'REQUESTORRULE', 'REUSEHOLEID', 'SERIALMASTER', 'VOUCHERKEY', 'VOUCHERNUMBER', 'VOUCHERNUMBERSERIES', 'VOUCHERRETAINKEY', 'VOUCHERTYPENAME']
+ex 111 conn 1 line 'GET /status HTTP/1.1' req 0 B e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855 ans 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800 request [] [] [] first_byte_s 0.0
+ex 112 conn 1 line 'POST / HTTP/1.1' req 2524 B 9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8 ans 4020 B c425f6449439fbd7b40ae75aea899a70df85aabeeffc9d3f8273e20b64c663d5 request ['Export'] ['Collection'] ['BridgeCompanyExtent'] first_byte_s 0.0

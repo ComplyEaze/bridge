@@ -1,0 +1,51 @@
+000-tools.json: no exchange
+001-list_companies.json: exchanges 4 (numbers 1 to 4)
+   BridgeCompanyExtent request 9df2a53f085d: 2
+   GET /status request e3b0c44298fc: 2
+002-vouchers.json: exchanges 44 (numbers 5 to 48)
+   BridgeCompanyExtent request 9df2a53f085d: 10
+   GET /status request e3b0c44298fc: 18
+   Bridge Agent Company High Water request 5b447d03d634: 2
+   Bridge Agent Voucher Census request 12e97cc3a113: 2
+   Bridge Agent Vouchers request 986017edb475: 2
+   BridgeCompanyBookExtentV2 request 017dd78479ff: 4
+   BridgeCompanyCurrencies request df26219283f6: 2
+   BridgeCompanyCurrencies request 0f10c96e7a00: 2
+   BridgeCompanyBaseCurrency request 8f6205332f84: 2
+003-sales_register.json: exchanges 64 (numbers 49 to 112)
+   BridgeCompanyExtent request 9df2a53f085d: 12
+   GET /status request e3b0c44298fc: 28
+   BridgeCompanyBookExtentV2 request 017dd78479ff: 8
+   BridgeCompanyCurrencies request df26219283f6: 2
+   BridgeCompanyCurrencies request 0f10c96e7a00: 2
+   BridgeCompanyBaseCurrency request 8f6205332f84: 2
+   List of Ledgers request b20e80b785c0: 2
+   List of Ledgers request 71e429b8c54e: 2
+   List of Groups request 205458f1ef40: 2
+   Bridge Agent Voucher Census request 12e97cc3a113: 2
+   Bridge Agent Vouchers request ab78fbe5afeb: 2
+004-purchase_register.json: exchanges 64 (numbers 113 to 176)
+   BridgeCompanyExtent request 9df2a53f085d: 12
+   GET /status request e3b0c44298fc: 28
+   BridgeCompanyBookExtentV2 request 017dd78479ff: 8
+   BridgeCompanyCurrencies request df26219283f6: 2
+   BridgeCompanyCurrencies request 0f10c96e7a00: 2
+   BridgeCompanyBaseCurrency request 8f6205332f84: 2
+   List of Ledgers request b20e80b785c0: 2
+   List of Ledgers request 71e429b8c54e: 2
+   List of Groups request 205458f1ef40: 2
+   Bridge Agent Voucher Census request 12e97cc3a113: 2
+   Bridge Agent Vouchers request ab78fbe5afeb: 2
+005-gst_by_counter_ledger.json: exchanges 64 (numbers 177 to 240)
+   BridgeCompanyExtent request 9df2a53f085d: 12
+   GET /status request e3b0c44298fc: 28
+   BridgeCompanyBookExtentV2 request 017dd78479ff: 8
+   BridgeCompanyCurrencies request df26219283f6: 2
+   BridgeCompanyCurrencies request 0f10c96e7a00: 2
+   BridgeCompanyBaseCurrency request 8f6205332f84: 2
+   List of Ledgers request b20e80b785c0: 2
+   List of Ledgers request 71e429b8c54e: 2
+   List of Groups request 205458f1ef40: 2
+   Bridge Agent Voucher Census request 12e97cc3a113: 2
+   Bridge Agent Vouchers request ab78fbe5afeb: 2
+outside any call: 0

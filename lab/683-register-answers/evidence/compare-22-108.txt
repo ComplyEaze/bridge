@@ -1,0 +1,17 @@
+vouchers plain 11 class 11 same GUIDs True
+amount texts equal 53 different 0 vouchers whose amount paths differ 0
+  path /ALLLEDGERENTRIES.LIST/AMOUNT 6
+  path /ALLLEDGERENTRIES.LIST/AMOUNT composite 16
+  path /ALLLEDGERENTRIES.LIST/BANKALLOCATIONS.LIST/AMOUNT composite 4
+  path /ALLLEDGERENTRIES.LIST/BILLALLOCATIONS.LIST/AMOUNT 2
+  path /ALLLEDGERENTRIES.LIST/BILLALLOCATIONS.LIST/AMOUNT composite 8
+  path /ALLLEDGERENTRIES.LIST/VATEXPAMOUNT 5
+  path /ALLLEDGERENTRIES.LIST/VATEXPAMOUNT composite 12
+  composite text shape '$999.99 @ ₹ 99.9999/$ = ₹ 9999.99' 2
+  composite text shape '$999.99 @ ₹ 99/$ = ₹ 9999.99' 13
+  composite text shape '$9999.99 @ ₹ 99/$ = ₹ 99999.99' 3
+  composite text shape '$9999999.99 @ ₹ 99/$ = ₹ 99999999.99' 2
+  composite text shape '-$999.99 @ ₹ 99.9999/$ = -₹ 9999.99' 2
+  composite text shape '-$999.99 @ ₹ 99/$ = -₹ 9999.99' 13
+  composite text shape '-$9999.99 @ ₹ 99/$ = -₹ 99999.99' 3
+  composite text shape '-$9999999.99 @ ₹ 99/$ = -₹ 99999999.99' 2

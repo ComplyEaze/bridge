@@ -1,0 +1,9 @@
+683-R1 notes (UTC unless marked IST)
+
+- Before step 0, at 18:43 (00:13 IST), a desktop-control "open application" call meant to bring the running TallyPrime (PID 1200, port 9001) forward started a SECOND tally.exe (PID 6764, started 00:13:18 IST, not listening on 9001). The company-name text typed next went to that copy's start screen. 1200's Select Company list showed an empty filter and no company loaded. PID 6764 was stopped by PID about a minute after it started, before any company was loaded in 1200 or any request was sent. Afterwards: one tally.exe (1200), 9001 listening, GET /status 200. Nothing was sent to 9001 by that copy that the row can see; the copy never listened on 9001.
+- Step 0: BRIDGE FOREXGROUP LAB loaded from Select Company by filter (typed in two parts with a space key), the one row read, Enter. No prompt. Gateway screen kept (shots/s0-gateway.jpg, local).
+- The marks request is the 1038 row's marks.utf16le.xml with only the company name changed (SVCURRENTCOMPANY); raw.py is the 1038 row's sender with its folder changed.
+- q.py writes each call's arguments from the sheet's args files unchanged.
+- tools/list was sent first (answer 000), before step 3; it sends nothing to Tally.
+- The relay was stopped by ending its process after the client had stopped; relay.jsonl's close line for connection 1 was written when the client's server exited (18:49:13), before the relay stopped.
+- Step 8: the screen after the row showed the Gateway with BRIDGE FOREXGROUP LAB and no dialog (shots/s8-gateway.jpg, local). The company is left loaded.

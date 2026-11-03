@@ -1,0 +1,5 @@
+fixture answer sha256 92e0e0548596cb6103f974c7d8b44afdea09c39ee8fcaf425ddceb3ae67c9369 request sha256 a105626a9f3ab64988c1c0041715f4a593086d07e87efba599ff8fa9407c4f1a
+fixture vouchers 11 class-entry vouchers 11 same GUIDs True
+amount texts equal 53 different 0 vouchers whose amount paths differ 0
+exchange 22 request body equal to the fixture request: False 1750 B against 860 B
+exchange 108 request body equal to the fixture request: False 3126 B against 860 B

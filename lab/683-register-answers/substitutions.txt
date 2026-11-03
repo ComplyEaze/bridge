@@ -1,0 +1,5 @@
+Relay requests, relay.jsonl, raw marks answers and relay answers without the company number are as received. Tool answers: company_number values replaced by a JSON parser first. Replacements, with counts:
+<build folder>: 8
+<company number>: 2
+<lab folder>: 11
+COMPANYNUMBER redacted (UTF-16LE): 76

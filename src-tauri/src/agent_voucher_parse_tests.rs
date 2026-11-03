@@ -2573,6 +2573,149 @@ fn a_party_note_date_that_is_no_date_refuses_the_read() {
     );
 }
 
+fn dispatch_of(xml: &str) -> Result<Vec<Value>, String> {
+    Ok(parse_agent_rows_reading_gst(
+        xml,
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )?
+    .into_iter()
+    .map(|mut row| row["dispatch"].take())
+    .collect())
+}
+
+fn every_dispatch_detail(state: Value) -> Value {
+    json!({
+        "doc_no": state,
+        "dispatched_through": state,
+        "destination": state,
+        "carrier": state,
+        "lading_no": state,
+        "lading_date": state,
+        "vehicle_no": state,
+    })
+}
+
+/// #2027: the lab's four invoices carry each dispatch element empty, so each says them absent; an
+/// answer that holds none of the seven says not reported.
+#[test]
+fn each_captured_invoice_says_its_dispatch_details_absent_and_a_read_without_them_not_reported() {
+    assert_eq!(
+        dispatch_of(&notes_lab_native_answer()).unwrap(),
+        vec![every_dispatch_detail(json!({"state": "absent"})); 4]
+    );
+    assert_eq!(
+        dispatch_of(&notes_lab_shipped_answer()).unwrap(),
+        vec![every_dispatch_detail(json!({"state": "not_reported"}))]
+    );
+}
+
+#[test]
+fn a_read_that_did_not_ask_returns_no_dispatch_key() {
+    let rows = parse_agent_rows_reading_gst(
+        &notes_lab_native_answer(),
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    assert!(rows.iter().all(|row| row.get("dispatch").is_none()));
+}
+
+#[test]
+fn a_voucher_that_is_no_invoice_says_dispatch_only_when_it_carries_a_detail() {
+    let said = |xml: &str| {
+        parse_agent_rows_reading_gst(
+            xml,
+            CAPTURED_VOUCHER_COMPANY_GUID,
+            GstDetailsShown::Withheld,
+            ASKING_VOUCHER_GST,
+            StockLines::NotAsked,
+        )
+        .unwrap()[0]["dispatch"]
+            .clone()
+    };
+    assert!(said(&captured_native_vouchers()).is_null());
+    assert!(said(&with_injected_voucher_element("<BASICSHIPPEDBY/>")).is_null());
+    let carried = said(&with_injected_voucher_element(
+        "<BASICSHIPPEDBY>ROADWAY</BASICSHIPPEDBY>",
+    ));
+    assert_eq!(carried["dispatched_through"], present("ROADWAY"));
+    assert_eq!(carried["doc_no"]["state"], "not_reported");
+}
+
+/// #2027: under `mask_parties` the carrier and the vehicle number are masked as a party name is;
+/// the other dispatch details, and both of these without the setting, stay as the book has them.
+#[test]
+fn under_mask_parties_the_carrier_and_vehicle_number_are_masked_and_the_rest_stay() {
+    let xml = with_injected_voucher_element(
+        "<BASICSHIPDOCUMENTNO>DSP-7</BASICSHIPDOCUMENTNO><BASICSHIPPEDBY>ROADWAY</BASICSHIPPEDBY>\
+         <BASICFINALDESTINATION>PUNE</BASICFINALDESTINATION><EICHECKPOST>SYN CARRIERS</EICHECKPOST>\
+         <BILLOFLADINGNO>LR-41</BILLOFLADINGNO><BASICSHIPVESSELNO>KA01AB1234</BASICSHIPVESSELNO>",
+    );
+    let marked: Vec<Value> = parse_agent_rows_reading_gst(
+        &xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )
+    .unwrap()
+    .into_iter()
+    .map(mark_voucher_party_names)
+    .collect();
+    let masked = redact_value(Value::Array(marked.clone()), Redaction::MaskParties);
+    let dispatch = &masked[0]["dispatch"];
+    for field in ["carrier", "vehicle_no"] {
+        assert_eq!(dispatch[field]["state"], "present");
+        assert_ne!(
+            dispatch[field]["value"],
+            marked[0]["dispatch"][field]["value"]
+        );
+    }
+    let text = masked.to_string();
+    assert!(
+        !text.contains("SYN CARRIERS") && !text.contains("KA01AB1234"),
+        "{text}"
+    );
+    for (field, value) in [
+        ("doc_no", "DSP-7"),
+        ("dispatched_through", "ROADWAY"),
+        ("destination", "PUNE"),
+        ("lading_no", "LR-41"),
+    ] {
+        assert_eq!(dispatch[field], present(value));
+    }
+    let plain = redact_value(Value::Array(marked), Redaction::None);
+    assert_eq!(plain[0]["dispatch"]["carrier"], present("SYN CARRIERS"));
+    assert_eq!(plain[0]["dispatch"]["vehicle_no"], present("KA01AB1234"));
+}
+
+#[test]
+fn a_lading_date_that_is_no_date_refuses_the_read() {
+    let xml = notes_lab_native_answer().replacen(
+        "<BILLOFLADINGDATE/>",
+        "<BILLOFLADINGDATE>3-Apr-25</BILLOFLADINGDATE>",
+        1,
+    );
+    assert_eq!(
+        dispatch_of(&xml),
+        Err("voucher_lading_date_invalid".to_string())
+    );
+    let dated = notes_lab_native_answer().replacen(
+        "<BILLOFLADINGDATE/>",
+        "<BILLOFLADINGDATE TYPE=\"Date\">20250403</BILLOFLADINGDATE>",
+        1,
+    );
+    assert_eq!(
+        dispatch_of(&dated).unwrap()[0]["lading_date"],
+        present("20250403")
+    );
+}
+
 /// The six are read at the voucher's own level only, and once: the captured siblings that end in
 /// the same words stay unread, and a repeated element is refused as any voucher field is.
 #[test]

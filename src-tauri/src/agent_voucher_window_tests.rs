@@ -9101,12 +9101,15 @@ mod ledger_window {
 }
 
 /// #1378, #2027: a shape that names more fields is the window request with those words and
-/// nothing else changed, and neither the plain nor the class request names them.
+/// nothing else changed, and neither the plain nor the class request names them. The GST details
+/// bring the seven dispatch words right after them: the one edit to the requests the lab answered
+/// before them (protocol reference §8.2l).
 #[test]
 fn only_a_read_that_asks_names_the_e_invoice_and_voucher_gst_details() {
     const E_INVOICE: &str = ",IRN,IRNACKNO,IRNACKDATE";
     const GST: &str = ",PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,GSTNATUREOFRETURN,\
-VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE";
+VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE,BASICSHIPDOCUMENTNO,BASICSHIPPEDBY,\
+BASICFINALDESTINATION,EICHECKPOST,BILLOFLADINGNO,BILLOFLADINGDATE,BASICSHIPVESSELNO";
     let day = TallyDate::parse("20250401").unwrap();
     let render = |shape: VoucherReadShape| shape.render("Lab", &day, &day, None).unwrap();
     let fields = |e_invoice, gst| NamedVoucherFields { e_invoice, gst };

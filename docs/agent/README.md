@@ -2439,6 +2439,12 @@ each stated as `e_invoice` states its details. `party_note_date` is `YYYYMMDD`; 
 Measured on one synthetic book, one voucher of each kind, with one party in another state: not unregistered parties, exports
 or a note without an original invoice (protocol reference 8.2k).
 
+The same argument also adds `dispatch`, stated the same way: `doc_no` (Dispatch Doc No.), `dispatched_through`, `destination`,
+`carrier` (Carrier Name/Agent), `lading_no` and `lading_date` (Bill of Lading/LR-RR No. and its date, `YYYYMMDD`; one that is not
+a date refuses the read as `voucher_lading_date_invalid`) and `vehicle_no` (Motor Vehicle No.). A Delivery Note number is not
+returned. Under `mask_parties` the carrier and the vehicle number are masked as a party name is; the rest stay as the book has
+them. Measured on one synthetic book, one Sales invoice and one Credit Note (protocol reference 8.2l).
+
 ### Cost-centre allocations in voucher reads
 
 Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of

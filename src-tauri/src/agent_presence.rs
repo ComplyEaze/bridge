@@ -5,6 +5,7 @@
 //! `docs/adr/0017-voucher-presence-authority.md`. This file owns only the two
 //! qualified reads that produce the evidence, the typed parse of the caller's
 //! proposals, and the response shape.
+use super::vouchers::VoucherComposites;
 use super::*;
 use std::collections::BTreeSet;
 
@@ -124,20 +125,28 @@ impl Server {
                 .await?;
 
             let read = self
-                .read_entry_wildcard_window(
+                .read_entry_window_rows(
                     &identity,
                     &company.name,
                     &from,
                     &to,
-                    None,
-                    SmallBooks::Count,
+                    VoucherReadShape::EntryWildcard,
+                    VoucherComposites::Withhold,
+                    GstDetailsShown::Withheld,
                 )
                 .await?;
             accumulate(&mut accumulated, read.all_evidence());
             let source_marks = read.witness.as_ref().map(|witness| witness.marks);
             let counted = read.counted();
-            let rows =
-                validate_then_filter_voucher_rows(read.rows, from.as_str(), to.as_str(), None)?;
+            let rows = self
+                .read_withheld_composites(&identity, read.rows, &mut accumulated)
+                .await;
+            let rows = validate_then_filter_voucher_rows(
+                rows_read_whole(rows)?,
+                from.as_str(),
+                to.as_str(),
+                None,
+            )?;
 
             // The window is independent evidence about which ledgers exist.
             // A row posting to an unlisted ledger proves the first catalogue
@@ -439,6 +448,18 @@ fn book_numbering_json(found: Option<&VoucherTypeNumbering>) -> (Value, bool) {
             ),
         },
     }
+}
+
+/// The window's rows, each composite read as its rupee amount as `vouchers` reads it (#683).
+/// Presence matches amounts, so a voucher still withheld refuses the window: it is never
+/// passed over, which could let a proposal it would have matched read as absent.
+fn rows_read_whole(rows: Vec<VoucherRow>) -> Result<Vec<Value>, String> {
+    rows.into_iter()
+        .map(|row| match row {
+            VoucherRow::Read(row) => Ok(row),
+            VoucherRow::Withheld(_) => Err(WITHHELD_FOREIGN_CURRENCY.to_string()),
+        })
+        .collect()
 }
 
 fn accumulate(target: &mut Option<Evidence>, next: Evidence) {

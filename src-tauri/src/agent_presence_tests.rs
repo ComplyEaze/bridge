@@ -2024,11 +2024,103 @@ async fn a_transaction_label_outside_the_published_nested_schema_is_refused_befo
     }
 }
 
-/// #674: `vouchers` withholds a foreign-currency voucher, but presence sums
-/// and matches amounts, so a composite still refuses its whole window, by the
-/// same code as before.
+/// #683: the 7.2 lab book's captured day, read under that book's own captured base and masters
+/// as `vouchers` reads it, reaches presence with every composite as its rupee amount, and a
+/// proposal of one of its foreign-currency invoices is found by those amounts.
+#[test]
+fn a_captured_composite_window_is_matched_on_its_rupee_amounts() {
+    use crate::agent::voucher_parse::{
+        captured_72_book, captured_72_vouchers, parse_agent_rows_withholding, FOREX_72_COMPANY_GUID,
+    };
+    let parsed =
+        parse_agent_rows_withholding(&captured_72_vouchers(), FOREX_72_COMPANY_GUID).unwrap();
+    assert_eq!(parsed.iter().filter(|row| row.is_withheld()).count(), 8);
+    let rows = rows_read_whole(
+        parsed
+            .into_iter()
+            .map(|row| row.read_under(&captured_72_book()))
+            .collect(),
+    )
+    .expect("every composite of the captured day is read");
+    assert_eq!(rows.len(), 11);
+
+    let window =
+        book_window("20250401", "20250401", WindowRead::Complete, &rows).expect("book window");
+    let entries = [
+        ObservedEntry {
+            ledger: "BRIDGE USD Customer",
+            amount: "-8641.25",
+        },
+        ObservedEntry {
+            ledger: "BRIDGE Export Sales",
+            amount: "8641.25",
+        },
+    ];
+    let proposals = ProposedVoucher::from_inputs([ProposedVoucherInput {
+        position: 0,
+        date: "20250401",
+        voucher_type: "Sales",
+        voucher_number: Some("2"),
+        remote_id: None,
+        narration_marker: None,
+        party: Some("BRIDGE USD Customer"),
+        entries: &entries,
+    }])
+    .expect("proposals");
+    let catalogue = rows
+        .iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+        .filter_map(|entry| entry["ledger"].as_str())
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let catalog = MasterCatalog::new(MasterClass::Ledger, &catalogue).expect("catalog");
+    // Only a number on a type declared Manual names a voucher `present`; the book's own
+    // numbering check is the tool's, before the window, and is not what this pins.
+    let numbering =
+        NumberingDeclaration::new([("Sales", NumberingMethod::Manual)]).expect("numbering");
+    let request =
+        PresenceRequest::new(&window, &catalog, &numbering, &proposals).expect("presence request");
+    let (result, _) = presence_result(
+        &book_presence::assess(&request),
+        &catalogue,
+        WindowRead::Complete,
+        None,
+        0,
+        10,
+        200_000,
+    );
+    let item = &result["items"][0];
+    assert_eq!(item["presence"], "present", "{result}");
+    assert!(
+        item.get("differences")
+            .and_then(Value::as_array)
+            .is_none_or(Vec::is_empty),
+        "the rupee amounts compared equal: {result}"
+    );
+}
+
+/// A composite left withheld (here, read under no book at all) refuses the window by its own
+/// code: presence never passes over a voucher whose amounts it could not read.
+#[test]
+fn a_composite_left_unread_refuses_the_window() {
+    use crate::agent::voucher_parse::{
+        captured_72_vouchers, parse_agent_rows_withholding, FOREX_72_COMPANY_GUID,
+    };
+    let parsed =
+        parse_agent_rows_withholding(&captured_72_vouchers(), FOREX_72_COMPANY_GUID).unwrap();
+    assert_eq!(
+        rows_read_whole(parsed).unwrap_err(),
+        "foreign_currency_amount_unparsed"
+    );
+}
+
+/// The same through the tool: the book's currencies are not served, so its base is not
+/// established, the composite stays withheld and the call refuses by that code, not by an
+/// amount code of the parse as before #683.
 #[tokio::test]
-async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() {
+async fn voucher_presence_refuses_a_composite_window_whose_base_is_not_established() {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue_xml()));
     steps.extend(paired_read(&high_water_xml()));
@@ -2078,7 +2170,8 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
     simulator.cancel();
     let _ = simulator.finish();
     assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"], "bill_allocation_amount_invalid",
+        response["structuredContent"]["result"]["error"]["code"],
+        "foreign_currency_amount_unparsed",
         "{response}"
     );
 }

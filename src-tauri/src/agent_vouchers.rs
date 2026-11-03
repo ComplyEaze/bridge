@@ -1223,12 +1223,13 @@ impl Server {
         // be, and this read uses the entry wildcard: it is bounded like any
         // other windowed read rather than trusted to be small.
         let wider = self
-            .read_entry_wildcard_window(
+            .read_entry_window_shaped(
                 identity,
                 company,
                 &wider_from,
                 &wider_to,
                 known_marks,
+                VoucherReadShape::EntryWildcard,
                 SmallBooks::Skip,
             )
             .await
@@ -1305,32 +1306,6 @@ impl Server {
 }
 
 impl Server {
-    /// A bounded read of the entry-wildcard voucher window (`render_agent_vouchers`)
-    /// shared by `voucher_presence` and the empty-window corroboration. Rows
-    /// are parsed per part and returned in date order; validating them is the
-    /// caller's job, over the union. `small_books` is whether a book that fits
-    /// one request is counted first (#1029).
-    pub(super) async fn read_entry_wildcard_window(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        company: &str,
-        from: &TallyDate,
-        to: &TallyDate,
-        known_marks: Option<CompanyMarks>,
-        small_books: SmallBooks,
-    ) -> Result<WindowReadOutcome<Value>, ToolFailure> {
-        self.read_entry_window_shaped(
-            identity,
-            company,
-            from,
-            to,
-            known_marks,
-            VoucherReadShape::EntryWildcard,
-            small_books,
-        )
-        .await
-    }
-
     /// The `vouchers` window in either entry-wildcard shape, parsed under
     /// `composites` (#674), with each entry's GST details when `gst` shows them (#2027).
     #[allow(clippy::too_many_arguments)]
@@ -1360,7 +1335,7 @@ impl Server {
     /// The window's rows, each voucher withheld for a composite read under the book's classified
     /// base where that can be done (#683). The base is read only for a window that holds one, and
     /// a book whose base is not established leaves them withheld.
-    async fn read_withheld_composites(
+    pub(super) async fn read_withheld_composites(
         &self,
         identity: &VerifiedCompanyIdentity,
         rows: Vec<VoucherRow>,
@@ -1383,8 +1358,10 @@ impl Server {
         rows.into_iter().map(|row| row.read_under(&book)).collect()
     }
 
-    /// [`Self::read_entry_wildcard_window`] in either entry-wildcard shape:
-    /// plain, or with each row's voucher type resolved (bridge#625).
+    /// A bounded read of the voucher window (`render_agent_vouchers`) in either entry-wildcard
+    /// shape: plain, or with each row's voucher type resolved (bridge#625). Rows are parsed per
+    /// part and returned in date order; validating them is the caller's job, over the union.
+    /// `small_books` is whether a book that fits one request is counted first (#1029).
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn read_entry_window_shaped(
         &self,

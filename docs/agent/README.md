@@ -2338,9 +2338,14 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 an
   decimal nor an exact composite still refuses the whole window. So does a
   composite whose foreign and base amounts carry opposite signs, unless the
   foreign amount is zero: a voucher entry's two amounts share one sign.
+- **`voucher_presence` reads it the same way** and matches proposals on the
+  rupee amount. It sends the same window request as `vouchers`, and the base
+  read only for a window that holds a composite. A voucher it cannot read so
+  refuses the call as `foreign_currency_amount_unparsed`: presence never passes
+  over a voucher whose amounts it could not compare.
 - **Every other voucher reader still refuses such a window** (for example
-  `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
-  voucher screen), because each of them sums, matches or verifies amounts.
+  `ledger_movement`, verify_import and the Bridge app's voucher screen),
+  because each of them sums, matches or verifies amounts.
 
 ### Bill allocations in voucher reads
 
@@ -4129,7 +4134,8 @@ Per tool:
      the read's own code, `masters_education_unqualified`). The check reads the numbering as it
      is now, holds for the moment of the read, and does not know how existing vouchers were
      numbered when they were entered;
-  4. the window read;
+  4. the window read, then the book's currency read when the window holds a
+     foreign-currency composite (#683);
   5. the corroboration (if empty);
   6. the ledger catalogue again.
 

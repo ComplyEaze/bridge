@@ -1,12 +1,14 @@
 //! #2152: a build that reads rows of its batch already in the book says that
 //! `post_import` would refuse it. The book is the repository's captured window
-//! holding one posted Journal; a rebuild under another batch id matches it by
-//! content, as the rebuild of a hand-imported file did on the lab book
+//! holding one Journal. That voucher is a native post carrying another batch's
+//! tag, so a batch under a batch id of its own matches it by content only, as
+//! the vouchers of a file imported in Tally matched the rebuild on the lab book
 //! (`lab/1738-rebuild-before-verify-answers` at 42037d89).
 use super::amend_tests::{build_plans_reading, simulated_server};
 use super::*;
 
-const TXN: &str = "BRIDGE_MCP_LIVE_20260906_A1";
+/// The captured row's transaction id; the post's test reads this constant too.
+pub(in crate::agent::agent_import) const TXN: &str = "BRIDGE_MCP_LIVE_20260906_A1";
 
 fn captured_window() -> String {
     String::from_utf16(
@@ -52,7 +54,7 @@ fn captured_source() -> ImportReadSource {
 
 const WARNING: &str = "1 of 1 rows of this batch already match vouchers in the book as this build read it (bridge_txn_id: BRIDGE_MCP_LIVE_20260906_A1). With Allow voucher posting on, post_import would refuse this batch as import_preexisting_identity before any approval, if the book is unchanged. Nothing in ComplyEaze Bridge checks an import of this file against the book either, so do not import it. Rows with the same date, type, ledgers and amounts match the same voucher: count the vouchers in Tally.";
 
-const NEXT_STEP: &str = "Do not post or import this batch yet: the vouchers named in the first warning are already in the book. Open them in Tally and confirm they are regular vouchers and the same transactions as these rows. If they are, leave those rows out and build the rest again. Never change a row's date, ledger, type or amount to get past this check.";
+const NEXT_STEP: &str = "Do not post or import this batch yet: the vouchers named in the first warning match vouchers already in the book. Open them in Tally and confirm they are regular vouchers and the same transactions as these rows. If they are, leave those rows out and build the rest again. If a row is a genuinely different transaction that shares the date, type, ledgers and amount of a voucher you have confirmed (the statement has more such rows than Tally holds vouchers), ComplyEaze Bridge cannot post the extra row yet: leave it out of this batch and tell the user so. Never change a row's date, ledger, type or amount to get past this check.";
 
 /// The build over the captured window: the warning leads the others, the next
 /// step stops the post and the import, the file is still written, and no request
@@ -66,11 +68,12 @@ async fn a_rebuild_of_a_row_the_book_holds_says_post_import_would_refuse_it() {
     assert_eq!(simulator.finish().unwrap().len(), QUALIFIED_BUILD_REQUESTS);
     let result = &built.payload["result"];
     assert_eq!(result["warnings"][0], WARNING, "{result}");
-    assert!(
-        result["warnings"][1]
-            .as_str()
-            .is_some_and(|text| text.starts_with("No import XML was sent to Tally.")),
-        "the guidance still follows: {result}"
+    // Posting is off on this server: the guidance's own first warning keeps its
+    // facts and loses its route (import the written file).
+    assert_eq!(
+        result["warnings"][1],
+        "No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post.",
+        "{result}"
     );
     assert_eq!(result["next_step"], NEXT_STEP, "{result}");
     let batch_id = result["batch_id"].as_str().unwrap();
@@ -80,6 +83,40 @@ async fn a_rebuild_of_a_row_the_book_holds_says_post_import_would_refuse_it() {
         .join(format!("{batch_id}.xml"))
         .exists());
     assert!(result.get("error").is_none(), "{result}");
+}
+
+/// The same build with posting on: the guidance's own first warning, which said
+/// to call `post_import`, keeps its fact and loses its route.
+#[tokio::test]
+async fn a_rebuild_with_posting_on_loses_the_route_of_the_guidance_too() {
+    let directory = tempfile::tempdir().unwrap();
+    let simulator = SequenceSimulator::spawn(build_plans_reading(Some(captured_window()))).unwrap();
+    let server = Server::new(crate::agent::Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: simulator.address().port(),
+        },
+        data_dir: directory.path().to_path_buf(),
+        max_rows: 10,
+        max_bytes: 200_000,
+        redaction: crate::agent::Redaction::None,
+        import_enabled: true,
+        posting: crate::agent::Posting::On,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    });
+    let built = server.build_import_xml(&rebuild_args()).await.unwrap();
+    let _ = simulator.finish().unwrap();
+    let result = &built.payload["result"];
+    assert_eq!(result["warnings"][0], WARNING, "{result}");
+    assert_eq!(
+        result["warnings"][1],
+        "No import XML was sent to Tally. Voucher posting is on in the extension settings.",
+        "{result}"
+    );
+    assert_eq!(result["next_step"], NEXT_STEP, "{result}");
+    let warnings = result["warnings"].to_string();
+    assert!(!warnings.contains("call post_import"), "{warnings}");
 }
 
 /// An empty window says nothing: the guidance is the one it was.
@@ -174,4 +211,42 @@ fn more_than_ten_rows_are_counted_and_ten_are_listed() {
     let one = rows_in_book_warning(&ids[..10], 10);
     assert!(one.contains("st-row-10)."), "{one}");
     assert!(!one.contains("more"), "{one}");
+}
+
+/// The guidance's first warning of a build whose rows are in the book, in each
+/// of the four arms: the facts, and no route (not "call post_import", not
+/// "import the written file").
+#[test]
+fn the_first_warning_with_rows_in_the_book_gives_no_route_in_any_arm() {
+    let code = Some("import_post_batch_too_large");
+    let reason = "this batch has more vouchers than native posting takes at once (50)";
+    let arms = [
+        (
+            first_warning_without_route(true, None),
+            "No import XML was sent to Tally. Voucher posting is on in the extension settings.".to_string(),
+        ),
+        (
+            first_warning_without_route(true, code),
+            format!("No import XML was sent to Tally. ComplyEaze Bridge cannot post this saved batch: post_import would refuse it as import_post_batch_too_large ({reason})."),
+        ),
+        (
+            first_warning_without_route(false, None),
+            "No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post.".to_string(),
+        ),
+        (
+            first_warning_without_route(false, code),
+            format!("No import XML was sent to Tally. Voucher posting is off, and with it on post_import would still refuse this saved batch as import_post_batch_too_large ({reason})."),
+        ),
+    ];
+    for (written, pinned) in arms {
+        assert_eq!(written, pinned);
+        for route in [
+            "call post_import",
+            "import the written file",
+            "Import",
+            "To post",
+        ] {
+            assert!(!written.contains(route), "{route} in {written}");
+        }
+    }
 }

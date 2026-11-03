@@ -1841,14 +1841,24 @@ impl Server {
             let next_step = match rows_in_book {
                 Some(ids) => {
                     if let Some(list) = warnings.as_array_mut() {
+                        // The guidance's own first warning gives a route (post
+                        // it, or import the file); it keeps its facts and
+                        // loses the route, as the amendment's does.
+                        if let Some(first) = list.first_mut() {
+                            *first = json!(first_warning_without_route(
+                                self.settings.posting.enabled(),
+                                native_post_refusal.as_deref()
+                            ));
+                        }
                         list.insert(0, json!(rows_in_book_warning(&ids, line.vouchers.len())));
                     }
                     ROWS_IN_BOOK_NEXT_STEP
                 }
                 None => next_step,
             };
-            // Appended last, so neither rewrite of the first warning above
-            // can replace it.
+            // Appended last, so none of the rewrites of the first warning above
+            // (an invoice's, an amendment's, rows already in the book) can
+            // replace it.
             let hsn_warnings = hsn_warnings_of(&line.vouchers, &mut warnings);
             if let (Some(cause), Some(list)) = (folder_left, warnings.as_array_mut()) {
                 list.push(json!(format!(
@@ -3705,7 +3715,29 @@ fn rows_in_book_warning(ids: &[String], voucher_count: usize) -> String {
     )
 }
 
-const ROWS_IN_BOOK_NEXT_STEP: &str = "Do not post or import this batch yet: the vouchers named in the first warning are already in the book. Open them in Tally and confirm they are regular vouchers and the same transactions as these rows. If they are, leave those rows out and build the rest again. Never change a row's date, ledger, type or amount to get past this check.";
+/// The guidance's first warning for a build whose rows are already in the book
+/// (#2152): the facts it states, that nothing was sent and whether this
+/// connection can post, and no route. Its own routes, post it or import the
+/// file, are the ones the rows-in-the-book warning rules out.
+fn first_warning_without_route(writes_enabled: bool, native_post_refusal: Option<&str>) -> String {
+    match (writes_enabled, native_post_refusal) {
+        (true, None) => {
+            "No import XML was sent to Tally. Voucher posting is on in the extension settings."
+                .to_string()
+        }
+        (true, Some(code)) => format!(
+            "No import XML was sent to Tally. ComplyEaze Bridge cannot post this saved batch: post_import would refuse it as {code} ({}).",
+            native_post_refusal_reason(code)
+        ),
+        (false, None) => "No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post.".to_string(),
+        (false, Some(code)) => format!(
+            "No import XML was sent to Tally. Voucher posting is off, and with it on post_import would still refuse this saved batch as {code} ({}).",
+            native_post_refusal_reason(code)
+        ),
+    }
+}
+
+const ROWS_IN_BOOK_NEXT_STEP: &str = "Do not post or import this batch yet: the vouchers named in the first warning match vouchers already in the book. Open them in Tally and confirm they are regular vouchers and the same transactions as these rows. If they are, leave those rows out and build the rest again. If a row is a genuinely different transaction that shares the date, type, ledgers and amount of a voucher you have confirmed (the statement has more such rows than Tally holds vouchers), ComplyEaze Bridge cannot post the extra row yet: leave it out of this batch and tell the user so. Never change a row's date, ledger, type or amount to get past this check.";
 
 /// Whether a batch holds an invoice: the one gate for every read of the journal's
 /// unsettled batches, so a bank batch never takes its lock for the number rule.

@@ -618,7 +618,9 @@ pub(super) fn simulated_server(directory: &std::path::Path, port: u16) -> Server
 }
 
 /// The Journal build sequence, with the preflight read answered by `book`.
-pub(super) fn build_plans_reading(book: Option<String>) -> Vec<ScenarioPlan> {
+pub(in crate::agent::agent_import) fn build_plans_reading(
+    book: Option<String>,
+) -> Vec<ScenarioPlan> {
     let mut plans = qualified_import_cycle_plans()[..QUALIFIED_BUILD_REQUESTS].to_vec();
     if let Some(book) = book {
         // probe (2) + first cycle (16) + numbering read + repeated catalogue

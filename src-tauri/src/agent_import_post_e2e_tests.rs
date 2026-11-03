@@ -4961,10 +4961,14 @@ fn before_approval_on_the_captured_book() -> Vec<ScenarioPlan> {
     plans
 }
 
-/// #2152: the post of a rebuilt row names the row the build warned of
-/// (`rebuild_warning_tests`, which reads the same captured window).
+/// #2152: the post of the captured row under a batch id of its own names the
+/// transaction id that the build's test pins (`rebuild_warning_tests::TXN`, the
+/// one constant both read), on the same captured window. One server cannot build
+/// and then post here: the build harness and this one serve different company
+/// listings, and the post of a built batch is refused as
+/// `company_identity_mismatch` before it reads the book.
 #[tokio::test]
-async fn the_post_of_a_rebuilt_row_names_the_row_the_build_named() {
+async fn the_post_of_a_rebuilt_row_names_the_id_the_build_test_pins() {
     let simulator =
         SequenceSimulator::spawn(with_sentinel(before_approval_on_the_captured_book())).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -4982,7 +4986,7 @@ async fn the_post_of_a_rebuilt_row_names_the_row_the_build_named() {
     assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
     assert_eq!(
         error["preexisting_txn_ids"],
-        json!(["BRIDGE_MCP_LIVE_20260906_A1"]),
+        json!([crate::agent::agent_import::tests::rebuild_warning_tests::TXN]),
         "{refused}"
     );
 }

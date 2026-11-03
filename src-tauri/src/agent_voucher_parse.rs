@@ -369,8 +369,8 @@ impl StockLines {
 
     /// Whether a voucher of `kind`, read here, must hold a line: one that exists only to move
     /// stock and answers none is a read that failed, never a voucher that moved nothing. A
-    /// cancelled one keeps no line: the live row's cancelled Delivery Note answered an empty
-    /// list (protocol reference §8.2i).
+    /// cancelled one is taken to keep no line: a cancelled Delivery Note answered an empty list
+    /// (protocol reference §8.2i); a cancelled Stock Journal or Receipt Note is unverified.
     fn needs_a_line(kind: Option<&ResolvedVoucherType>, cancelled: bool) -> bool {
         !cancelled && kind.is_some_and(|kind| kind.reserved_name != CREDIT_NOTE_RESERVED_TYPE)
     }

@@ -3,5 +3,5 @@
   voucher types of its own, Tally left one element out of two rows of that first read and sent it on every later one, so
   the first pair of reads disagreed on a book that had not changed. ComplyEaze Bridge now reads the voucher-types pair
   once more when, and only when, the first pair disagrees: one more pair at most, and a second disagreement is refused as
-  before. The `masters` answer shows the first pair's digests as `first_pair_differed`. A book that really changed
-  during the read is still refused.
+  before. The `masters` answer shows the first pair's combined digests as `first_pair_differed`. A moved book extent, or a
+  type saved above the master mark, is still refused; a type deleted between the pairs is not seen.

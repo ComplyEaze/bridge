@@ -167,14 +167,16 @@ impl Server {
 
 /// What an answer says of a voucher-types pair that disagreed with itself
 /// before a second pair agreed (#2160): the first pair's evidence, so a person
-/// can see the first disagreement without the call having refused. The digests
-/// are of the first pair's two reads, as a refusal's evidence would carry them.
+/// can see the first disagreement without the call having refused. The two
+/// digests are `RuntimeReadEvidence::combine` digests over the pair's two reads
+/// (as a refusal's evidence would carry them), not the hash of either read or
+/// of the request, and `bytes` is the sum of both reads.
 pub(super) fn first_pair_differed_json(first: &RuntimeReadEvidence) -> Value {
     json!({
         "request_sha256": first.request_sha256,
         "response_sha256": first.response_sha256,
         "bytes": first.bytes,
-        "note": "The voucher-types read was repeated once: its first pair disagreed and the second pair agreed. These are the first pair's digests. Tally leaves an element out of the first read after a company is loaded (protocol reference 12a.25).",
+        "note": "The voucher-types read was repeated once: its first pair disagreed and the second pair agreed. These are the first pair's combined digests over its two reads, and bytes is the sum of both. Tally leaves an element out of the first read after a company is loaded (protocol reference 12a.25).",
     })
 }
 

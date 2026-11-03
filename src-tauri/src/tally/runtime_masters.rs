@@ -213,9 +213,11 @@ pub(crate) fn check_numbering_premise(
 /// straight-line, with no loop: a second pair that disagrees too is refused as
 /// `masters_collection_changed`, as a first one was before, so a book that
 /// keeps changing is not read until it settles. The bytes used are still a pair
-/// of byte-identical answers. A change that really happened between the reads
-/// still refuses downstream: a moved book extent (`masters_extent_changed`),
-/// or an AlterID above the master mark (`masters_bound_premise_violated`).
+/// of byte-identical answers. Only what the checks after it see is still
+/// refused: a moved book extent (`masters_extent_changed`, the masters tool),
+/// or a type saved above the master mark (`masters_bound_premise_violated`).
+/// A type deleted between the pairs leaves a second pair that agrees and is
+/// accepted; whether a deletion moves the master mark is not measured.
 ///
 /// The disagreeing pair's evidence is added to `evidence`, so a refusal keeps
 /// all four reads, and is also set in `first_pair_differed`, so an answer that

@@ -1,0 +1,109 @@
+relay events {'listening': 1, 'open': 2, 'close': 2} requests 486 | relay_error or tally_closed: 0
+== per call: request order (S status, E extent, H marks, C census, V import verification, I import, L ledgers, T voucher types, U currencies, G groups)
+000-companies list_companies ESESSE
+001-status tally_status SE
+002-batch-build build_import_xml SEESESELSLSEEHSHSESEETSTSTSTSESEELSLSEECSCSEEVSVSESE
+   03:17:39 conn 1 req 20 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:17:39 conn 1 req 22 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:17:41 conn 1 req 46 C sent 824062fea36e answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 200 (0, {})
+   03:17:41 conn 1 req 48 C sent 824062fea36e answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 200 (0, {})
+   03:17:41 conn 1 req 52 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:17:41 conn 1 req 54 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+003-batch-post post_import SEESESEHSHSEECSCSEEVSVSEEVSVSESEESESELSLSEEUSUSESEEHSHSESEETSTSTSTSESESEEHELSLSEEUSUSESEEEVSVSEEVSVSEHIHSEESESEHSHSEECSCSEEVSVSEEVSVSEEHSHSE
+   03:17:59 conn 1 req 66 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:17:59 conn 1 req 68 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:18:00 conn 1 req 72 C sent 824062fea36e answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 200 (0, {})
+   03:18:00 conn 1 req 74 C sent 824062fea36e answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 200 (0, {})
+   03:18:01 conn 1 req 78 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:01 conn 1 req 80 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:01 conn 1 req 84 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:01 conn 1 req 86 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:05 conn 1 req 110 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:18:05 conn 1 req 112 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:18:15 conn 1 req 132 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:18:16 conn 1 req 149 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:16 conn 1 req 151 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:16 conn 1 req 155 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:16 conn 1 req 157 V sent 9e067c388a65 answer 3038 705cc63dbe80 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (0, {})
+   03:18:16 conn 1 req 160 H sent 388c28bc5c53 answer 3414 5c9a2c111935 mark ['200'] 
+   03:18:19 conn 1 req 161 I sent 1dd2385a8702 answer 544 13f11957a62a  
+   03:18:19 conn 1 req 162 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:18:21 conn 1 req 170 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:18:21 conn 1 req 172 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:18:22 conn 1 req 176 C sent 3f85d2fba4cf answer 124242 44a5a415d8be $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 250 (50, {'20260402': 50})
+   03:18:22 conn 1 req 178 C sent 3f85d2fba4cf answer 124242 44a5a415d8be $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 250 (50, {'20260402': 50})
+   03:18:23 conn 1 req 182 V sent 9e067c388a65 answer 248988 90ab784e67bf $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:18:23 conn 1 req 184 V sent 9e067c388a65 answer 248988 90ab784e67bf $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:18:24 conn 1 req 188 V sent 9e067c388a65 answer 248988 90ab784e67bf $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:18:24 conn 1 req 190 V sent 9e067c388a65 answer 248988 90ab784e67bf $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:18:25 conn 1 req 194 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:18:25 conn 1 req 196 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+004-pay-build build_import_xml SEESESELSLSEEGSGSEEHSHSESEETSTSTSTSESEELSLSEEGSGSEECSCSEEVSVSESE
+   03:20:25 conn 2 req 20 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:25 conn 2 req 22 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:28 conn 2 req 52 C sent ea6f9602f6fb answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 250 (0, {})
+   03:20:28 conn 2 req 54 C sent ea6f9602f6fb answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 250 (0, {})
+   03:20:28 conn 2 req 58 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:28 conn 2 req 60 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+005-pay-post post_import SEESESEHSHSEECSCSEEVSVSEEVSVSESEESESELSLSEEGSGSEEUSUSESEEHSHSESEETSTSTSTSESESEEHELSLSEEGSGSEEUSUSESEEEVSVSEEVSVSEHIHSEESESEHSHSEECSCSEEVSVSEEVSVSEEHSHSE
+   03:20:40 conn 2 req 72 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:40 conn 2 req 74 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:40 conn 2 req 78 C sent ea6f9602f6fb answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 250 (0, {})
+   03:20:40 conn 2 req 80 C sent ea6f9602f6fb answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 250 (0, {})
+   03:20:41 conn 2 req 84 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:41 conn 2 req 86 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:42 conn 2 req 90 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:42 conn 2 req 92 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:46 conn 2 req 122 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:46 conn 2 req 124 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:56 conn 2 req 144 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:56 conn 2 req 167 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:56 conn 2 req 169 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:56 conn 2 req 173 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:56 conn 2 req 175 V sent a3c8f4352a30 answer 3038 681699442416 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (0, {})
+   03:20:56 conn 2 req 178 H sent 388c28bc5c53 answer 3414 87ca61cc975d mark ['250'] 
+   03:20:57 conn 2 req 179 I sent 31972e147d0f answer 542 7fd10d4d4fb5  
+   03:20:58 conn 2 req 180 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:20:59 conn 2 req 188 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:20:59 conn 2 req 190 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:00 conn 2 req 194 C sent e64bc76bc429 answer 5458 99014b3efe37 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 251 (1, {'20260404': 1})
+   03:21:00 conn 2 req 196 C sent e64bc76bc429 answer 5458 99014b3efe37 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 251 (1, {'20260404': 1})
+   03:21:00 conn 2 req 200 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:00 conn 2 req 202 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:01 conn 2 req 206 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:01 conn 2 req 208 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:02 conn 2 req 212 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:02 conn 2 req 214 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+006-verify-batch verify_import SEESESEHSHSEECSCSEEVSVSEEVSVSEEHSHSESE
+   03:21:48 conn 2 req 224 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:48 conn 2 req 226 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:49 conn 2 req 230 C sent 770156b36af8 answer 124242 61d85a9b8bc3 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 251 (50, {'20260402': 50})
+   03:21:49 conn 2 req 232 C sent 770156b36af8 answer 124242 61d85a9b8bc3 $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" AND $AlterID > 0 AND $AlterID <= 251 (50, {'20260402': 50})
+   03:21:50 conn 2 req 236 V sent 9e067c388a65 answer 248988 a8a8403d83bb $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:21:50 conn 2 req 238 V sent 9e067c388a65 answer 248988 a8a8403d83bb $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:21:50 conn 2 req 242 V sent 9e067c388a65 answer 248988 a8a8403d83bb $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:21:50 conn 2 req 244 V sent 9e067c388a65 answer 248988 a8a8403d83bb $Date >= $$Date:"20260402" AND $Date <= $$Date:"20260402" (50, {'20260402': 50})
+   03:21:51 conn 2 req 248 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:51 conn 2 req 250 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+007-verify-pay verify_import SEESESEHSHSEECSCSEEVSVSEEVSVSEEHSHSE
+   03:21:53 conn 2 req 260 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:53 conn 2 req 262 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:54 conn 2 req 266 C sent e64bc76bc429 answer 5458 99014b3efe37 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 251 (1, {'20260404': 1})
+   03:21:54 conn 2 req 268 C sent e64bc76bc429 answer 5458 99014b3efe37 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" AND $AlterID > 0 AND $AlterID <= 251 (1, {'20260404': 1})
+   03:21:55 conn 2 req 272 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:55 conn 2 req 274 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:55 conn 2 req 278 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:55 conn 2 req 280 V sent a3c8f4352a30 answer 7960 99b619afdeb0 $Date >= $$Date:"20260404" AND $Date <= $$Date:"20260404" (1, {'20260404': 1})
+   03:21:56 conn 2 req 284 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+   03:21:56 conn 2 req 286 H sent 388c28bc5c53 answer 3414 e470bf1c5493 mark ['251'] 
+== repeats: each request sha with more than one answer sha
+E 9df2a53f085d answers in order [(1, 1, 'a51790084dde'), (1, 3, 'a51790084dde'), (1, 6, 'a51790084dde'), (1, 8, 'a51790084dde'), (1, 9, 'a51790084dde'), (1, 11, 'a51790084dde'), (1, 13, 'a51790084dde'), (1, 18, 'a51790084dde'), (1, 19, 'a51790084dde'), (1, 24, 'a51790084dde'), (1, 26, 'a51790084dde'), (1, 27, 'a51790084dde'), (1, 36, 'a51790084dde'), (1, 38, 'a51790084dde'), (1, 39, 'a51790084dde'), (1, 44, 'a51790084dde'), (1, 45, 'a51790084dde'), (1, 50, 'a51790084dde'), (1, 51, 'a51790084dde'), (1, 56, 'a51790084dde'), (1, 58, 'a51790084dde'), (1, 60, 'a51790084dde'), (1, 61, 'a51790084dde'), (1, 63, 'a51790084dde'), (1, 65, 'a51790084dde'), (1, 70, 'a51790084dde'), (1, 71, 'a51790084dde'), (1, 76, 'a51790084dde'), (1, 77, 'a51790084dde'), (1, 82, 'a51790084dde'), (1, 83, 'a51790084dde'), (1, 88, 'a51790084dde'), (1, 90, 'a51790084dde'), (1, 91, 'a51790084dde'), (1, 93, 'a51790084dde'), (1, 95, 'a51790084dde'), (1, 100, 'a51790084dde'), (1, 101, 'a51790084dde'), (1, 106, 'a51790084dde'), (1, 108, 'a51790084dde'), (1, 109, 'a51790084dde'), (1, 114, 'a51790084dde'), (1, 116, 'a51790084dde'), (1, 117, 'a51790084dde'), (1, 126, 'a51790084dde'), (1, 128, 'a51790084dde'), (1, 130, 'a51790084dde'), (1, 131, 'a51790084dde'), (1, 133, 'a51790084dde'), (1, 138, 'a51790084dde'), (1, 139, 'a51790084dde'), (1, 144, 'a51790084dde'), (1, 146, 'a51790084dde'), (1, 147, 'a51790084dde'), (1, 148, 'a51790084dde'), (1, 153, 'a51790084dde'), (1, 154, 'a51790084dde'), (1, 159, 'a51790084dde'), (1, 164, 'fec5f38c58e7'), (1, 165, 'fec5f38c58e7'), (1, 167, 'fec5f38c58e7'), (1, 169, 'fec5f38c58e7'), (1, 174, 'fec5f38c58e7'), (1, 175, 'fec5f38c58e7'), (1, 180, 'fec5f38c58e7'), (1, 181, 'fec5f38c58e7'), (1, 186, 'fec5f38c58e7'), (1, 187, 'fec5f38c58e7'), (1, 192, 'fec5f38c58e7'), (1, 193, 'fec5f38c58e7'), (1, 198, 'fec5f38c58e7'), (2, 2, 'fec5f38c58e7'), (2, 3, 'fec5f38c58e7'), (2, 5, 'fec5f38c58e7'), (2, 7, 'fec5f38c58e7'), (2, 12, 'fec5f38c58e7'), (2, 13, 'fec5f38c58e7'), (2, 18, 'fec5f38c58e7'), (2, 19, 'fec5f38c58e7'), (2, 24, 'fec5f38c58e7'), (2, 26, 'fec5f38c58e7'), (2, 27, 'fec5f38c58e7'), (2, 36, 'fec5f38c58e7'), (2, 38, 'fec5f38c58e7'), (2, 39, 'fec5f38c58e7'), (2, 44, 'fec5f38c58e7'), (2, 45, 'fec5f38c58e7'), (2, 50, 'fec5f38c58e7'), (2, 51, 'fec5f38c58e7'), (2, 56, 'fec5f38c58e7'), (2, 57, 'fec5f38c58e7'), (2, 62, 'fec5f38c58e7'), (2, 64, 'fec5f38c58e7'), (2, 66, 'fec5f38c58e7'), (2, 67, 'fec5f38c58e7'), (2, 69, 'fec5f38c58e7'), (2, 71, 'fec5f38c58e7'), (2, 76, 'fec5f38c58e7'), (2, 77, 'fec5f38c58e7'), (2, 82, 'fec5f38c58e7'), (2, 83, 'fec5f38c58e7'), (2, 88, 'fec5f38c58e7'), (2, 89, 'fec5f38c58e7'), (2, 94, 'fec5f38c58e7'), (2, 96, 'fec5f38c58e7'), (2, 97, 'fec5f38c58e7'), (2, 99, 'fec5f38c58e7'), (2, 101, 'fec5f38c58e7'), (2, 106, 'fec5f38c58e7'), (2, 107, 'fec5f38c58e7'), (2, 112, 'fec5f38c58e7'), (2, 113, 'fec5f38c58e7'), (2, 118, 'fec5f38c58e7'), (2, 120, 'fec5f38c58e7'), (2, 121, 'fec5f38c58e7'), (2, 126, 'fec5f38c58e7'), (2, 128, 'fec5f38c58e7'), (2, 129, 'fec5f38c58e7'), (2, 138, 'fec5f38c58e7'), (2, 140, 'fec5f38c58e7'), (2, 142, 'fec5f38c58e7'), (2, 143, 'fec5f38c58e7'), (2, 145, 'fec5f38c58e7'), (2, 150, 'fec5f38c58e7'), (2, 151, 'fec5f38c58e7'), (2, 156, 'fec5f38c58e7'), (2, 157, 'fec5f38c58e7'), (2, 162, 'fec5f38c58e7'), (2, 164, 'fec5f38c58e7'), (2, 165, 'fec5f38c58e7'), (2, 166, 'fec5f38c58e7'), (2, 171, 'fec5f38c58e7'), (2, 172, 'fec5f38c58e7'), (2, 177, 'fec5f38c58e7'), (2, 182, 'bfdf843eb115'), (2, 183, 'bfdf843eb115'), (2, 185, 'bfdf843eb115'), (2, 187, 'bfdf843eb115'), (2, 192, 'bfdf843eb115'), (2, 193, 'bfdf843eb115'), (2, 198, 'bfdf843eb115'), (2, 199, 'bfdf843eb115'), (2, 204, 'bfdf843eb115'), (2, 205, 'bfdf843eb115'), (2, 210, 'bfdf843eb115'), (2, 211, 'bfdf843eb115'), (2, 216, 'bfdf843eb115'), (2, 218, 'bfdf843eb115'), (2, 219, 'bfdf843eb115'), (2, 221, 'bfdf843eb115'), (2, 223, 'bfdf843eb115'), (2, 228, 'bfdf843eb115'), (2, 229, 'bfdf843eb115'), (2, 234, 'bfdf843eb115'), (2, 235, 'bfdf843eb115'), (2, 240, 'bfdf843eb115'), (2, 241, 'bfdf843eb115'), (2, 246, 'bfdf843eb115'), (2, 247, 'bfdf843eb115'), (2, 252, 'bfdf843eb115'), (2, 254, 'bfdf843eb115'), (2, 255, 'bfdf843eb115'), (2, 257, 'bfdf843eb115'), (2, 259, 'bfdf843eb115'), (2, 264, 'bfdf843eb115'), (2, 265, 'bfdf843eb115'), (2, 270, 'bfdf843eb115'), (2, 271, 'bfdf843eb115'), (2, 276, 'bfdf843eb115'), (2, 277, 'bfdf843eb115'), (2, 282, 'bfdf843eb115'), (2, 283, 'bfdf843eb115'), (2, 288, 'bfdf843eb115')]
+L 215735dac614 answers in order [(1, 14, '652e419a35cc'), (1, 16, '652e419a35cc'), (1, 40, '652e419a35cc'), (1, 42, '652e419a35cc'), (1, 96, '652e419a35cc'), (1, 98, '652e419a35cc'), (1, 134, '652e419a35cc'), (1, 136, '652e419a35cc'), (2, 8, '9fc172b3564b'), (2, 10, '9fc172b3564b'), (2, 40, '9fc172b3564b'), (2, 42, '9fc172b3564b'), (2, 102, '9fc172b3564b'), (2, 104, '9fc172b3564b'), (2, 146, '9fc172b3564b'), (2, 148, '9fc172b3564b')]
+H 388c28bc5c53 answers in order [(1, 20, '5c9a2c111935'), (1, 22, '5c9a2c111935'), (1, 66, '5c9a2c111935'), (1, 68, '5c9a2c111935'), (1, 110, '5c9a2c111935'), (1, 112, '5c9a2c111935'), (1, 132, '5c9a2c111935'), (1, 160, '5c9a2c111935'), (1, 162, '87ca61cc975d'), (1, 170, '87ca61cc975d'), (1, 172, '87ca61cc975d'), (1, 194, '87ca61cc975d'), (1, 196, '87ca61cc975d'), (2, 20, '87ca61cc975d'), (2, 22, '87ca61cc975d'), (2, 72, '87ca61cc975d'), (2, 74, '87ca61cc975d'), (2, 122, '87ca61cc975d'), (2, 124, '87ca61cc975d'), (2, 144, '87ca61cc975d'), (2, 178, '87ca61cc975d'), (2, 180, 'e470bf1c5493'), (2, 188, 'e470bf1c5493'), (2, 190, 'e470bf1c5493'), (2, 212, 'e470bf1c5493'), (2, 214, 'e470bf1c5493'), (2, 224, 'e470bf1c5493'), (2, 226, 'e470bf1c5493'), (2, 248, 'e470bf1c5493'), (2, 250, 'e470bf1c5493'), (2, 260, 'e470bf1c5493'), (2, 262, 'e470bf1c5493'), (2, 284, 'e470bf1c5493'), (2, 286, 'e470bf1c5493')]
+T 8a0838cc5ab8 answers in order [(1, 28, '0958af715dd2'), (1, 30, '0958af715dd2'), (1, 118, '0958af715dd2'), (1, 120, '0958af715dd2'), (2, 28, '9dd5b06fcbeb'), (2, 30, '9dd5b06fcbeb'), (2, 130, '9dd5b06fcbeb'), (2, 132, '9dd5b06fcbeb')]
+T 5e8a7c0ab0e7 answers in order [(1, 32, '5c4ceb9073b5'), (1, 34, '5c4ceb9073b5'), (1, 122, '5c4ceb9073b5'), (1, 124, '5c4ceb9073b5'), (2, 32, '3e2ebd67225e'), (2, 34, '3e2ebd67225e'), (2, 134, '3e2ebd67225e'), (2, 136, '3e2ebd67225e')]
+V 9e067c388a65 answers in order [(1, 52, '705cc63dbe80'), (1, 54, '705cc63dbe80'), (1, 78, '705cc63dbe80'), (1, 80, '705cc63dbe80'), (1, 84, '705cc63dbe80'), (1, 86, '705cc63dbe80'), (1, 149, '705cc63dbe80'), (1, 151, '705cc63dbe80'), (1, 155, '705cc63dbe80'), (1, 157, '705cc63dbe80'), (1, 182, '90ab784e67bf'), (1, 184, '90ab784e67bf'), (1, 188, '90ab784e67bf'), (1, 190, '90ab784e67bf'), (2, 236, 'a8a8403d83bb'), (2, 238, 'a8a8403d83bb'), (2, 242, 'a8a8403d83bb'), (2, 244, 'a8a8403d83bb')]
+U 6d9e3a4b8f5f answers in order [(1, 102, '414d8ee7184b'), (1, 104, '414d8ee7184b'), (1, 140, '414d8ee7184b'), (1, 142, '414d8ee7184b'), (2, 114, 'bdc6edc1f6ff'), (2, 116, 'bdc6edc1f6ff'), (2, 158, 'bdc6edc1f6ff'), (2, 160, 'bdc6edc1f6ff')]
+V a3c8f4352a30 answers in order [(2, 58, '681699442416'), (2, 60, '681699442416'), (2, 84, '681699442416'), (2, 86, '681699442416'), (2, 90, '681699442416'), (2, 92, '681699442416'), (2, 167, '681699442416'), (2, 169, '681699442416'), (2, 173, '681699442416'), (2, 175, '681699442416'), (2, 200, '99b619afdeb0'), (2, 202, '99b619afdeb0'), (2, 206, '99b619afdeb0'), (2, 208, '99b619afdeb0'), (2, 272, '99b619afdeb0'), (2, 274, '99b619afdeb0'), (2, 278, '99b619afdeb0'), (2, 280, '99b619afdeb0')]
+== consecutive repeats (same request sent twice in a row, S between): differing answers
+   pairs differing: 0

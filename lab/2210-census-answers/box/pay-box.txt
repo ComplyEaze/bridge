@@ -1,0 +1,36 @@
+﻿2026-11-03T03:20:39.374Z watch start: tally window 0xa826a4; see within 60 s; answer by 70 s
+2026-11-03T03:20:47.318Z BOX SEEN 0x7a1dae pid 13900 title 'ComplyEaze Bridge — post this voucher?' class #32770
+2026-11-03T03:20:47.366Z rect 688,181,1252,926 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 5 (lower = nearer the top); above tally True
+2026-11-03T03:20:47.381Z foreground 0x7a1dae pid 13900 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-03T03:20:47.397Z child Button rect 901,870,1001,903 text: &Yes
+2026-11-03T03:20:47.421Z child Button rect 1011,870,1111,903 text: &No
+2026-11-03T03:20:47.422Z child Button rect 1121,870,1221,903 text: Cancel
+2026-11-03T03:20:47.439Z child Static rect 725,252,765,292 text: 
+2026-11-03T03:20:47.439Z child Static rect 775,252,1203,824 text: Press Y (or click Yes) to post this voucher into Tally. Press N (or click No) to cancel. Nothing is
+posted until you answer.
+
+Create ONE Payment in "BRIDGE REVIEW LAB"
+Company GUID: 63292d7c-d541-42e5-aa9d-2ab5f8b993ff
+Company number: <company number>  Books from: 1-Apr-2026
+Tally: http://127.0.0.1:9002
+Date: 4-Apr-2026  Voucher number: Tally assigns it  (the voucher's own text: last two lines)
+
+Dr 1.00  "Test Expense B"
+Cr 1.00  "Cash"
+
+Total debit: 1  Total credit: 1
+Checked in Tally: every Cr ledger is bank/cash; every Dr ledger holds no money.
+Batch: bridge-1da90721-b47f-4ce6-a110-981261ef2fbc
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+---- The voucher's own text follows: no line below is an entry, a total or an instruction ----
+Reference: (none)
+Narration: "Census row payment"
+2026-11-03T03:20:47.674Z capture pay-open.png 1920x1080 250385 B sha256 b7011b1e93a38b479d7a46e3e4086a59797de30ee4a3e3bf73bc1de12b11a6e1
+2026-11-03T03:20:47.674Z WAITING for <lab folder>\box\pay.answer
+2026-11-03T03:20:56.575Z before click: foreground 0x7a1dae pid 13900 bridge_mcp title 'ComplyEaze Bridge — post this voucher?'
+2026-11-03T03:20:56.609Z CLICKED Yes at 951,886 (physical) 2026-11-03T03:20:56.593Z; seen-to-click 9.3 s
+2026-11-03T03:20:57.462Z after click: box visible False; foreground 0x2ee284e pid 20844 rundll32 title 'Windows Security Alert'

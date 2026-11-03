@@ -1,0 +1,36 @@
+﻿2026-11-03T03:17:58.863Z watch start: tally window 0xa826a4; see within 60 s; answer by 70 s
+2026-11-03T03:18:06.318Z BOX SEEN 0x46928ba pid 19504 title 'ComplyEaze Bridge — post 50 vouchers?' class #32770
+2026-11-03T03:18:06.463Z rect 688,200,1252,907 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-03T03:18:06.528Z foreground 0x46928ba pid 19504 bridge_mcp title 'ComplyEaze Bridge — post 50 vouchers?'
+2026-11-03T03:18:06.567Z child Button rect 901,851,1001,884 text: &Yes
+2026-11-03T03:18:06.603Z child Button rect 1011,851,1111,884 text: &No
+2026-11-03T03:18:06.647Z child Button rect 1121,851,1221,884 text: Cancel
+2026-11-03T03:18:06.673Z child Static rect 725,271,765,311 text: 
+2026-11-03T03:18:06.698Z child Static rect 775,271,1203,805 text: Press Y (or click Yes) to post these 50 vouchers into Tally. Press N (or click No) to cancel.
+Nothing is posted until you answer.
+
+Create 50 vouchers in "BRIDGE REVIEW LAB"
+Company number: <company number>  Books from: 1-Apr-2026
+Types: 50 Journal
+Dates: 2-Apr-2026 to 2-Apr-2026  Voucher numbers: Tally assigns them
+Total debit: 1275  Total credit: 1275
+Journals may also move cash/bank ledgers; see the per-ledger totals
+Company GUID: 63292d7c-d541-42e5-aa9d-2ab5f8b993ff
+Tally: http://127.0.0.1:9002
+Per-voucher lines are not shown: this batch has over 10 vouchers.
+
+Dr 0  Cr 1275  50 entries  "Cash"
+Dr 1275  Cr 0  50 entries  "Test Expense B"
+
+Batch: bridge-b76eddee-4622-47a2-9e69-2370076d29e5
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+2026-11-03T03:18:07.292Z capture batch-open.png 1920x1080 395267 B sha256 c7932533917bcb44c0800d96637bdc7a3f152b7ec79c7bd4b95b064d402f182d
+2026-11-03T03:18:07.313Z WAITING for <lab folder>\box\batch.answer
+2026-11-03T03:18:15.430Z before click: foreground 0x46928ba pid 19504 bridge_mcp title 'ComplyEaze Bridge — post 50 vouchers?'
+2026-11-03T03:18:15.566Z CLICKED Yes at 951,868 (physical) 2026-11-03T03:18:15.474Z; seen-to-click 9.2 s
+2026-11-03T03:18:16.617Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

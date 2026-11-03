@@ -723,7 +723,7 @@ fn saved_batch_of_two(server: &Server) -> (ImportLedgerLine, Value) {
         second
             .entries
             .iter_mut()
-            .for_each(|entry| entry.amount = "7.25".into());
+            .for_each(|entry| entry.amount = ImportAmount::parse("7.25").unwrap());
     })
 }
 
@@ -1072,8 +1072,8 @@ async fn post_import_refuses_an_amendment_before_any_read_or_approval() {
     let mut amendment = original.clone();
     amendment.batch_id = "bridge-00000000-0000-4000-8000-000000000632".into();
     amendment.amends_batch_id = Some(original.batch_id.clone());
-    amendment.vouchers[0].entries[0].amount = "13.50".into();
-    amendment.vouchers[0].entries[1].amount = "13.50".into();
+    amendment.vouchers[0].entries[0].amount = ImportAmount::parse("13.50").unwrap();
+    amendment.vouchers[0].entries[1].amount = ImportAmount::parse("13.50").unwrap();
     let rendered = render_import_xml(
         "WR2 Unicode Lab",
         &amendment.vouchers,
@@ -6081,7 +6081,7 @@ fn saved_journal_batch(server: &Server, amounts: &[&str]) -> (ImportLedgerLine, 
             voucher
                 .entries
                 .iter_mut()
-                .for_each(|entry| entry.amount = (*amount).into());
+                .for_each(|entry| entry.amount = ImportAmount::parse(amount).unwrap());
             voucher
         })
         .collect();

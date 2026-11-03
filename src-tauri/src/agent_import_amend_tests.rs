@@ -88,10 +88,7 @@ fn book_row(line: &ImportLedgerLine) -> ReadVoucher {
             .rev()
             .map(|entry| ReadEntry {
                 ledger: entry.ledger.clone(),
-                amount: match entry.side {
-                    EntrySide::Dr => format!("-{}", entry.amount),
-                    EntrySide::Cr => entry.amount.clone(),
-                },
+                amount: entry.amount.signed_lexeme(&entry.side),
                 is_deemed_positive: entry.side.tally_positive().into(),
             })
             .collect(),

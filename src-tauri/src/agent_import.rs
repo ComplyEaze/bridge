@@ -27,6 +27,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{Seek, SeekFrom, Write};
 
+#[path = "agent_import_amount.rs"]
+mod amount;
+use amount::{ImportAmount, NotAnImportAmount, PayloadAmount};
 #[path = "agent_import_bill_wise.rs"]
 mod bill_wise;
 // Candidate requests that remove a voucher Bridge posted (#2062): nothing sends them yet.
@@ -107,8 +110,8 @@ use crate::local_files::visible_path::user_visible_path;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 use verification::{
-    actual_entry_fingerprint, alter_id_delta, canonical_verification_amount,
-    company_high_water_mark, corroborate_verification_window, expected_entry_fingerprint,
+    actual_entry_fingerprint, alter_id_delta, canonical_entry_fingerprint,
+    canonical_verification_amount, company_high_water_mark, corroborate_verification_window,
     final_verification_status, mark_verification_names, parse_import_voucher_rows,
     parse_import_vouchers, render_proof_markdown, verification_response_page, verification_status,
     verification_window_identities, verify_batch_as, voucher_diffs,
@@ -117,8 +120,8 @@ use verification::{
 };
 #[cfg(test)]
 use verification::{
-    batch_duplicate_sets, duplicates, expected_fingerprint, observed_fingerprint,
-    observed_voucher_identity, verify_batch, VERIFICATION_NAME_FIELDS,
+    batch_duplicate_sets, duplicates, expected_entry_fingerprint, expected_fingerprint,
+    observed_fingerprint, observed_voucher_identity, verify_batch, VERIFICATION_NAME_FIELDS,
 };
 
 struct ImportProfileObservation {
@@ -187,10 +190,16 @@ fn pre_import_mark_of(xml: &str, guid: &str) -> Result<PreImportMark, String> {
 }
 
 /// A batch's vouchers. `D` is the voucher date: the tool's text as
-/// `parse_payload` reads it, and a `TallyDate` from `validate_payload` on.
+/// `parse_payload` reads it, and a `TallyDate` from `validate_payload` on. It also names the
+/// stage of every entry's amount (`PayloadDate::Amount`): the caller's text, then an
+/// `ImportAmount`.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ImportPayload<D = TallyDate> {
+#[serde(bound(
+    deserialize = "D: Deserialize<'de>, D::Amount: Deserialize<'de>",
+    serialize = "D: Serialize, D::Amount: Serialize"
+))]
+struct ImportPayload<D: PayloadDate = TallyDate> {
     company_guid: String,
     vouchers: Vec<ImportVoucher<D>>,
     /// A batch this Bridge built whose vouchers this build corrects in place.
@@ -200,7 +209,11 @@ struct ImportPayload<D = TallyDate> {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ImportVoucher<D = TallyDate> {
+#[serde(bound(
+    deserialize = "D: Deserialize<'de>, D::Amount: Deserialize<'de>",
+    serialize = "D: Serialize, D::Amount: Serialize"
+))]
+struct ImportVoucher<D: PayloadDate = TallyDate> {
     bridge_txn_id: String,
     date: D,
     voucher_type: VoucherType,
@@ -215,10 +228,10 @@ struct ImportVoucher<D = TallyDate> {
     /// every record written before invoices existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     invoice: Option<invoice::InvoiceDetail>,
-    entries: Vec<ImportEntry>,
+    entries: Vec<ImportEntry<D::Amount>>,
 }
 
-impl<D> ImportVoucher<D> {
+impl<D: PayloadDate> ImportVoucher<D> {
     /// The display name of the voucher type this voucher is filed under in the
     /// book: the caller-named type for an invoice, the class name otherwise.
     /// What a read-back must find, and what a render writes.
@@ -251,28 +264,33 @@ impl<D> ImportVoucher<D> {
         }
     }
 
-    /// This voucher, holding `date` as its date.
-    fn dated(self, date: TallyDate) -> ImportVoucher {
-        let ImportVoucher {
-            bridge_txn_id,
-            date: _,
-            voucher_type,
-            narration,
-            reference,
-            voucher_number,
-            invoice,
-            entries,
-        } = self;
+    /// This voucher, admitted: `date` as its date and `entries` as its entries, each
+    /// amount parsed. The fields that name neither are kept.
+    fn admitted(&self, date: TallyDate, entries: Vec<ImportEntry>) -> ImportVoucher {
         ImportVoucher {
-            bridge_txn_id,
+            bridge_txn_id: self.bridge_txn_id.clone(),
             date,
-            voucher_type,
-            narration,
-            reference,
-            voucher_number,
-            invoice,
+            voucher_type: self.voucher_type.clone(),
+            narration: self.narration.clone(),
+            reference: self.reference.clone(),
+            voucher_number: self.voucher_number.clone(),
+            invoice: self.invoice.clone(),
             entries,
         }
+    }
+
+    /// Each entry with its amount parsed.
+    fn parsed_entries(&self) -> Result<Vec<ImportEntry>, NotAnImportAmount> {
+        self.entries
+            .iter()
+            .map(|entry| {
+                Ok(ImportEntry {
+                    ledger: entry.ledger.clone(),
+                    amount: entry.amount.import_amount()?,
+                    side: entry.side.clone(),
+                })
+            })
+            .collect()
     }
 }
 
@@ -280,16 +298,25 @@ impl<D> ImportVoucher<D> {
 /// stands for. A tool's date is the caller's text, parsed by `normalized_date`;
 /// a saved batch's date already is one.
 trait PayloadDate {
+    /// What an entry's amount is at the stage this date belongs to: the caller's text
+    /// before admission, an `ImportAmount` after (#1872). The stages move together, so a
+    /// `D` names both and the batch types keep their one parameter.
+    type Amount: PayloadAmount;
+
     fn tally_date(&self) -> Result<TallyDate, String>;
 }
 
 impl PayloadDate for String {
+    type Amount = String;
+
     fn tally_date(&self) -> Result<TallyDate, String> {
         normalized_date(self)
     }
 }
 
 impl PayloadDate for TallyDate {
+    type Amount = ImportAmount;
+
     fn tally_date(&self) -> Result<TallyDate, String> {
         Ok(self.clone())
     }
@@ -437,9 +464,9 @@ impl EntrySide {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ImportEntry {
+struct ImportEntry<A = ImportAmount> {
     ledger: String,
-    amount: String,
+    amount: A,
     side: EntrySide,
 }
 
@@ -3610,7 +3637,12 @@ impl Server {
             .map(|voucher| {
                 let date = normalized_date(&voucher.date)
                     .map_err(|_| "proposals_file_invalid".to_string())?;
-                Ok(voucher.dated(date))
+                // An amount that is not an import amount is refused here as the date is: the
+                // build would refuse it later (#1872).
+                let entries = voucher
+                    .parsed_entries()
+                    .map_err(|_| "proposals_file_invalid".to_string())?;
+                Ok(voucher.admitted(date, entries))
             })
             .collect::<Result<Vec<ImportVoucher>, String>>()?;
         let _admission_lock = self.lock_import_admission_shared()?;
@@ -4266,7 +4298,7 @@ fn live_evidence(vouchers: &[ImportVoucher]) -> Vec<Value> {
 /// let alone a written file.
 /// `qualified` is a parameter so the guard can be exercised against a
 /// narrowed list as well as the real one.
-fn refuse_unqualified_types<D>(
+fn refuse_unqualified_types<D: PayloadDate>(
     vouchers: &[ImportVoucher<D>],
     qualified: &[VoucherType],
 ) -> Result<(), String> {
@@ -4298,7 +4330,7 @@ fn renders_bank_shape(vouchers: &[ImportVoucher]) -> bool {
 /// (§9.8 against §9.13). No file mixing the two has been imported — the
 /// reallocation Journals went in on their own — so the union is refused rather
 /// than assumed from holding both citations at once.
-fn refuse_mixed_shapes<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
+fn refuse_mixed_shapes<D: PayloadDate>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
     // An invoice is its own shape and is built alone: its masters, its type's
     // numbering and its party are read for that one voucher.
     let invoices = vouchers
@@ -4333,12 +4365,12 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
     }
     let mut txn_ids = BTreeSet::new();
     let mut ledger_names = BTreeSet::new();
-    let mut dates = Vec::with_capacity(payload.vouchers.len());
+    let mut vouchers = Vec::with_capacity(payload.vouchers.len());
     for voucher in &payload.vouchers {
         if !valid_txn_id(&voucher.bridge_txn_id) || !txn_ids.insert(&voucher.bridge_txn_id) {
             return Err("bridge_txn_id_invalid_or_duplicate".to_string());
         }
-        dates.push(voucher.date.tally_date()?);
+        let date = voucher.date.tally_date()?;
         if voucher.entries.len() < 2 {
             return Err("voucher_entries_too_few".to_string());
         }
@@ -4384,39 +4416,46 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
         }) {
             return Err("voucher_number_invalid".to_string());
         }
+        // The amount is parsed here, where its text used to be checked, so a batch with
+        // several defects is refused for the same one as before (#1872).
+        let mut entries = Vec::with_capacity(voucher.entries.len());
         for entry in &voucher.entries {
-            if entry.ledger.trim().is_empty()
-                || entry.ledger.chars().count() > MAX_MASTER_NAME_CHARS
-                || without_trailing_crlf(&entry.ledger)
-                    .chars()
-                    .any(char::is_control)
-                || reads_back_as_other_text(&entry.ledger)
-                || !valid_2dp_amount(&entry.amount)
-            {
+            let amount = entry.amount.import_amount();
+            let (false, Ok(amount)) = (
+                entry.ledger.trim().is_empty()
+                    || entry.ledger.chars().count() > MAX_MASTER_NAME_CHARS
+                    || without_trailing_crlf(&entry.ledger)
+                        .chars()
+                        .any(char::is_control)
+                    || reads_back_as_other_text(&entry.ledger),
+                amount,
+            ) else {
                 return Err("voucher_entry_invalid".to_string());
-            }
+            };
             ledger_names.insert(entry.ledger.as_str());
             if ledger_names.len() > MAX_MASTER_NAMES {
                 return Err("voucher_unique_ledger_limit_exceeded".to_string());
             }
+            entries.push(ImportEntry {
+                ledger: entry.ledger.clone(),
+                amount,
+                side: entry.side.clone(),
+            });
         }
-        let (debit, credit) = totals(std::slice::from_ref(voucher))?;
+        let admitted = voucher.admitted(date, entries);
+        let (debit, credit) = totals(std::slice::from_ref(&admitted))?;
         if !debit.numeric_eq(&credit) {
             return Err("voucher_not_balanced".to_string());
         }
-        if voucher.voucher_type.bank_shape().is_some() {
-            validate_bank_voucher_shape(voucher)?;
+        if admitted.voucher_type.bank_shape().is_some() {
+            validate_bank_voucher_shape(&admitted)?;
         }
-        invoice::validate_invoice_voucher(voucher)?;
+        invoice::validate_invoice_voucher(&admitted)?;
+        vouchers.push(admitted);
     }
     Ok(ImportPayload {
         company_guid: payload.company_guid,
-        vouchers: payload
-            .vouchers
-            .into_iter()
-            .zip(dates)
-            .map(|(voucher, date)| voucher.dated(date))
-            .collect(),
+        vouchers,
         amends_batch_id: payload.amends_batch_id,
     })
 }
@@ -4437,7 +4476,7 @@ fn validate_payload<D: PayloadDate>(payload: ImportPayload<D>) -> Result<ImportP
 /// through Tally's Import menu.
 ///
 /// One ledger on both sides would net inside the voucher, so it is refused.
-fn validate_bank_voucher_shape<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
+fn validate_bank_voucher_shape<D: PayloadDate>(voucher: &ImportVoucher<D>) -> Result<(), String> {
     let debits = voucher
         .entries
         .iter()
@@ -4893,33 +4932,20 @@ pub(in crate::agent) fn valid_txn_id(value: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
-fn valid_2dp_amount(value: &str) -> bool {
-    let Some((whole, fractional)) = value.split_once('.') else {
-        return false;
-    };
-    !whole.is_empty()
-        && whole.bytes().all(|byte| byte.is_ascii_digit())
-        && fractional.len() == 2
-        && fractional.bytes().all(|byte| byte.is_ascii_digit())
-        && ExactDecimal::parse(value.to_string())
-            .is_ok_and(|amount| !amount.is_zero() && !amount.is_negative())
-}
-
-fn totals<D>(vouchers: &[ImportVoucher<D>]) -> Result<(ExactDecimal, ExactDecimal), String> {
+fn totals(vouchers: &[ImportVoucher]) -> Result<(ExactDecimal, ExactDecimal), String> {
     let mut debit = ExactDecimal::zero();
     let mut credit = ExactDecimal::zero();
     for entry in vouchers.iter().flat_map(|voucher| &voucher.entries) {
-        let amount = ExactDecimal::parse(entry.amount.clone())
-            .map_err(|_| "voucher_amount_invalid".to_string())?;
+        let amount = entry.amount.decimal();
         match entry.side {
             EntrySide::Dr => {
                 debit = debit
-                    .checked_add(&amount)
+                    .checked_add(amount)
                     .map_err(|_| "voucher_amount_overflow".to_string())?
             }
             EntrySide::Cr => {
                 credit = credit
-                    .checked_add(&amount)
+                    .checked_add(amount)
                     .map_err(|_| "voucher_amount_overflow".to_string())?
             }
         }
@@ -5578,7 +5604,7 @@ fn render_voucher_xml(
         });
     }
     let entries = ordered.iter().map(|entry| {
-        let amount = match entry.side { EntrySide::Dr => format!("-{}", entry.amount), EntrySide::Cr => entry.amount.clone() };
+        let amount = entry.amount.signed_lexeme(&entry.side);
         format!("<ALLLEDGERENTRIES.LIST><LEDGERNAME>{}</LEDGERNAME><ISDEEMEDPOSITIVE>{}</ISDEEMEDPOSITIVE><AMOUNT>{}</AMOUNT></ALLLEDGERENTRIES.LIST>", xml_escape(&entry.ledger), entry.side.tally_positive(), amount)
     }).collect::<String>();
     let date = voucher.date.as_str();

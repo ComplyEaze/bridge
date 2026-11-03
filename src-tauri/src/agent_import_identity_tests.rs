@@ -604,8 +604,8 @@ fn a_batch_written_with_a_padded_amount_verifies_against_its_row() {
     let plain = verify_batch(&line, &captured, Attribution::Tag).unwrap();
     assert_eq!(plain["counts"]["posted_verified"], 1, "{plain}");
     for entry in &mut line.vouchers[0].entries {
-        assert_eq!(entry.amount, "12.61");
-        entry.amount = "0012.61".into();
+        assert_eq!(entry.amount.as_str(), "12.61");
+        entry.amount = ImportAmount::parse("0012.61").unwrap();
     }
     let padded = verify_batch(&line, &captured, Attribution::Tag).unwrap();
     assert_eq!(padded["counts"], plain["counts"], "{padded}");

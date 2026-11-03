@@ -2110,7 +2110,7 @@ fn the_agent_preview_says_when_the_post_happens() {
     second
         .entries
         .iter_mut()
-        .for_each(|entry| entry.amount = "7.25".into());
+        .for_each(|entry| entry.amount = ImportAmount::parse("7.25").unwrap());
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     assert!(batch.ends_with(&format!("\n{now}")), "{batch}");
@@ -2172,10 +2172,10 @@ fn journal_of(saved: &ImportLedgerLine, entries: usize) -> ImportLedgerLine {
     let mut lines = Vec::new();
     for _ in 0..entries - 1 {
         let mut entry = debit.clone();
-        entry.amount = "1.00".into();
+        entry.amount = ImportAmount::parse("1.00").unwrap();
         lines.push(entry);
     }
-    credit.amount = format!("{}.00", entries - 1);
+    credit.amount = ImportAmount::parse(&(format!("{}.00", entries - 1))).unwrap();
     lines.push(credit);
     line.vouchers[0].entries = lines;
     line.sha256 =

@@ -46,7 +46,7 @@ fn target_mark(bytes: &[u8]) -> u64 {
 fn entry(ledger: &str, side: EntrySide, amount: &str) -> ImportEntry {
     ImportEntry {
         ledger: ledger.into(),
-        amount: amount.into(),
+        amount: ImportAmount::parse(amount).unwrap(),
         side,
     }
 }
@@ -455,7 +455,7 @@ fn content_that_differs_from_what_was_sent_refuses_at_its_position() {
     // The seventh amount changed by one paisa.
     let mut reamounted = sent();
     for entry in &mut reamounted[6].entries {
-        entry.amount = "99.01".into();
+        entry.amount = ImportAmount::parse("99.01").unwrap();
     }
     assert_eq!(
         refusal(bind(
@@ -1129,17 +1129,65 @@ fn a_padded_amount_binds_against_the_row_tally_holds() {
     let read = span_read();
     let mut padded = sent();
     for entry in &mut padded[5].entries {
-        assert_eq!(entry.amount, "3450.50");
-        entry.amount = "03450.50".into();
+        assert_eq!(entry.amount.as_str(), "3450.50");
+        entry.amount = ImportAmount::parse("03450.50").unwrap();
     }
     let bound = bind(&span, COMPANY_GUID, &padded, &read, &BTreeSet::new()).unwrap();
     assert_eq!(bound.len(), 10);
     let mut paisa = sent();
     for entry in &mut paisa[5].entries {
-        entry.amount = "03450.51".into();
+        entry.amount = ImportAmount::parse("03450.51").unwrap();
     }
     assert_eq!(
         refusal(bind(&span, COMPANY_GUID, &paisa, &read, &BTreeSet::new())),
+        SpanRefusal::Content {
+            position: 5,
+            fields: vec!["entries"]
+        }
+    );
+}
+
+/// What the amount type does with the 256-byte amount here (#1872): nothing. A debit is
+/// compared signed, and the signed text of the longest amount is 257 bytes, one over what
+/// `ExactDecimal` holds, so the comparison errors and is read as a difference in the entries,
+/// as it was before the type. The book's row below holds that very amount, so the refusal is
+/// the 257-byte limit and not a different figure. The row is built here from the sixth captured
+/// one with its amounts replaced; no Tally capture holds such a voucher.
+#[test]
+fn a_256_byte_debit_cannot_be_matched_because_its_signed_text_is_257_bytes() {
+    let span = span();
+    let longest = format!("{}.99", "9".repeat(253));
+    assert_eq!(longest.len(), 256);
+    let mut rows = parse_import_voucher_rows(&captured(SPAN_READ), COMPANY_GUID).unwrap();
+    let position = rows
+        .iter()
+        .position(|row| {
+            row.entries
+                .iter()
+                .any(|entry| entry.amount.ends_with("3450.50"))
+        })
+        .expect("the sixth captured voucher");
+    for entry in &mut rows[position].entries {
+        entry.amount = if entry.is_deemed_positive == "Yes" {
+            format!("-{longest}")
+        } else {
+            longest.clone()
+        };
+    }
+    let read = ImportReadSource::admit(rows).unwrap();
+    let mut long = sent();
+    for entry in &mut long[5].entries {
+        entry.amount = ImportAmount::parse(&longest).unwrap();
+    }
+    assert_eq!(
+        long[5].entries[0]
+            .amount
+            .signed_lexeme(&EntrySide::Dr)
+            .len(),
+        257
+    );
+    assert_eq!(
+        refusal(bind(&span, COMPANY_GUID, &long, &read, &BTreeSet::new())),
         SpanRefusal::Content {
             position: 5,
             fields: vec!["entries"]

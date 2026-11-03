@@ -19,8 +19,8 @@ pub(in crate::agent::agent_import) fn journal(sent: bool) -> Vec<u8> {
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn","date":"20260901","voucher_type":"Journal",
             "narration":"n","reference":null,"voucher_number":null,"entries":[
-                {"ledger":"Cash","amount":"1","side":"Dr"},
-                {"ledger":"Synthetic Ledger","amount":"1","side":"Cr"}]}]
+                {"ledger":"Cash","amount":"1.00","side":"Dr"},
+                {"ledger":"Synthetic Ledger","amount":"1.00","side":"Cr"}]}]
     }))
     .unwrap();
     let mut bytes = serde_json::to_vec(&line).unwrap();
@@ -901,6 +901,29 @@ fn a_half_written_last_line_is_read_again_once() {
         Journal::Read(_)
     ));
     assert!(!waited);
+}
+
+/// A line whose amount is not an import amount (#1872) is a line the report cannot read: the
+/// journal is shown as invalid, as for any other record the build refuses, and it is read twice
+/// before it is said.
+#[test]
+fn a_journal_line_with_a_signed_amount_is_shown_as_invalid() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let whole = String::from_utf8(journal(true)).unwrap();
+    assert_eq!(whole.matches("\"amount\":\"1.00\"").count(), 2, "{whole}");
+    write(
+        &path,
+        whole
+            .replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1)
+            .as_bytes(),
+    );
+    let mut waited = false;
+    assert_eq!(
+        read_journal(directory.path(), || waited = true),
+        Journal::NotRead(JOURNAL_INVALID)
+    );
+    assert!(waited);
 }
 
 /// A folder that exists but cannot be listed is named, not read as empty. A file

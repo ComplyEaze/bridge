@@ -17,7 +17,7 @@ fn scalar_schema_limits_match_existing_boundary_admission() {
         (format!("{}.99", "9".repeat(253)), true),
         (format!("{}.99", "9".repeat(254)), false),
     ] {
-        assert_eq!(valid_2dp_amount(&value), valid);
+        assert_eq!(ImportAmount::parse(&value).is_ok(), valid);
     }
     let whitespace: Vec<char> = (0..=char::MAX as u32)
         .filter_map(char::from_u32)

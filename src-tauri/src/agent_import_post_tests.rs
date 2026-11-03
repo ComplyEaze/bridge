@@ -1956,7 +1956,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let mut absent = line;
     absent.batch_id = "bridge-00000000-0000-4000-8000-000000000003".into();
     for entry in &mut absent.vouchers[0].entries {
-        entry.amount = "12.62".into();
+        entry.amount = ImportAmount::parse("12.62").unwrap();
     }
     recheck_import_admission(
         &absent,
@@ -2163,8 +2163,8 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
 
     // The record is self-consistent; the file holds a different Journal.
     let mut other = line.vouchers.clone();
-    other[0].entries[0].amount = "99.00".into();
-    other[0].entries[1].amount = "99.00".into();
+    other[0].entries[0].amount = ImportAmount::parse("99.00").unwrap();
+    other[0].entries[1].amount = ImportAmount::parse("99.00").unwrap();
     fs::write(
         &path,
         render_import_xml("Synthetic Accounts", &other, &line.batch_id),
@@ -2261,12 +2261,12 @@ fn payment_with(parties: usize, name: impl Fn(usize) -> String) -> ImportLedgerL
     voucher.entries = (0..parties)
         .map(|index| ImportEntry {
             ledger: name(index),
-            amount: "1.00".into(),
+            amount: ImportAmount::parse("1.00").unwrap(),
             side: EntrySide::Dr,
         })
         .chain(std::iter::once(ImportEntry {
             ledger: "Cash".into(),
-            amount: format!("{parties}.00"),
+            amount: ImportAmount::parse(&format!("{parties}.00")).unwrap(),
             side: EntrySide::Cr,
         }))
         .collect();

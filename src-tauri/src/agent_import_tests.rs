@@ -184,10 +184,10 @@ fn saved(wire: &ImportPayload<String>) -> ImportPayload {
         vouchers: wire
             .vouchers
             .iter()
-            .cloned()
             .map(|voucher| {
                 let date = normalized_date(&voucher.date).expect("a valid sample date");
-                voucher.dated(date)
+                let entries = voucher.parsed_entries().expect("a sample amount");
+                voucher.admitted(date, entries)
             })
             .collect(),
         amends_batch_id: wire.amends_batch_id.clone(),
@@ -666,7 +666,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     let input = admitted_payload();
     payload_verdict(&input).expect("valid payload");
     let mut unbalanced = input.clone();
-    unbalanced.vouchers[0].entries[1].amount = "12.49".to_string();
+    unbalanced.vouchers[0].entries[1].amount = ImportAmount::parse("12.49").unwrap();
     assert_eq!(
         payload_verdict(&unbalanced),
         Err("voucher_not_balanced".to_string())
@@ -1866,7 +1866,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
 fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let mut input = admitted_payload();
     for entry in &mut input.vouchers[0].entries {
-        entry.amount = "0012.50".to_string();
+        entry.amount = ImportAmount::parse("0012.50").unwrap();
     }
     payload_verdict(&input).expect("leading zeros satisfy the input contract");
     let line = ImportLedgerLine {

@@ -322,7 +322,7 @@ pub(super) fn gstin_state(gstin: &str) -> Option<&'static str> {
     state_name_for_code(gstin.get(..2)?)
 }
 
-/// Paise of a plain two-decimal amount (`valid_2dp_amount` has run).
+/// Paise of a plain two-decimal amount (an `ImportAmount` has been parsed).
 fn paise(amount: &str) -> Option<i128> {
     let (whole, fraction) = amount.split_once('.')?;
     if fraction.len() != 2 {
@@ -574,7 +574,9 @@ impl InvoiceNumber {
 /// What Tally returned is the build's to record, never the caller's: refused
 /// on the way in. A saved batch carries it (and `admit_saved` requires it), so
 /// this runs only on a caller's payload.
-pub(super) fn refuse_supplied_observed<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
+pub(super) fn refuse_supplied_observed<D: super::PayloadDate>(
+    vouchers: &[ImportVoucher<D>],
+) -> Result<(), String> {
     if vouchers.iter().any(|voucher| {
         voucher
             .invoice
@@ -601,7 +603,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
-pub(super) fn validate_invoice_voucher<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
+pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
     if !voucher.voucher_type.is_invoice() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
@@ -885,7 +887,7 @@ pub(super) fn classify_sales_invoice(
         cgst_index.expect("checked"),
         state_index.expect("checked"),
     );
-    let amount = |index: usize| paise(&voucher.entries[index].amount);
+    let amount = |index: usize| paise(voucher.entries[index].amount.as_str());
     let lines = sales
         .iter()
         .map(|index| amount(*index))
@@ -1441,7 +1443,7 @@ fn invoice_readback_differences(
         .entries
         .iter()
         .map(|entry| {
-            let value = paise(&entry.amount).unwrap_or(i128::MIN);
+            let value = paise(entry.amount.as_str()).unwrap_or(i128::MIN);
             match entry.side {
                 EntrySide::Dr => key(&entry.ledger, -value, true),
                 EntrySide::Cr => key(&entry.ledger, value, false),
@@ -1471,7 +1473,7 @@ fn invoice_readback_differences(
         .entries
         .iter()
         .find(|entry| entry.ledger == party)
-        .and_then(|entry| paise(&entry.amount))
+        .and_then(|entry| paise(entry.amount.as_str()))
         .map(|value| -value);
     let allocation_ok = read.legs.iter().all(|leg| {
         if leg.ledger == party && observed.party_bill_wise {
@@ -2646,10 +2648,7 @@ pub(super) fn render_sales_invoice_xml(
     let number = voucher.voucher_number.as_deref()?;
     let party_entry = party_entry(voucher)?;
     let leg = |entry: &ImportEntry, bill: bool| {
-        let signed = match entry.side {
-            EntrySide::Dr => format!("-{}", entry.amount),
-            EntrySide::Cr => entry.amount.clone(),
-        };
+        let signed = entry.amount.signed_lexeme(&entry.side);
         let allocation = if bill {
             format!(
                 "<BILLALLOCATIONS.LIST><NAME>{}</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>{signed}</AMOUNT></BILLALLOCATIONS.LIST>",

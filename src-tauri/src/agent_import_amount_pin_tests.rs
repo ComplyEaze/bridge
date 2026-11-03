@@ -57,7 +57,8 @@ fn voucher_with_amount(voucher_type: &str, amount: &str) -> ImportVoucher {
                    {"ledger":"Bank","amount":amount,"side":"Cr"}]}))
     .expect("voucher");
     let date = normalized_date(&voucher.date).unwrap();
-    voucher.dated(date)
+    let entries = voucher.parsed_entries().expect("an import amount");
+    voucher.admitted(date, entries)
 }
 
 /// The first byte at which two texts differ, or `None` when equal.
@@ -78,8 +79,8 @@ fn assert_reproduces_its_saved_file(journal: &str, saved: &[u8], batch_id: &str)
         // The captured runs carried only whole amounts with two zero decimals, which is why the
         // edge forms below are pinned on their own.
         assert!(
-            entry.amount.ends_with(".00")
-                && entry.amount[..entry.amount.len() - 3]
+            entry.amount.as_str().ends_with(".00")
+                && entry.amount.as_str()[..entry.amount.as_str().len() - 3]
                     .bytes()
                     .all(|byte| byte.is_ascii_digit()),
             "{}",

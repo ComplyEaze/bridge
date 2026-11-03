@@ -12,8 +12,8 @@ fn batch(id: &str, narration: &str) -> ImportLedgerLine {
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn","date":"20260901","voucher_type":"Journal",
             "narration":narration,"reference":null,"voucher_number":null,"entries":[
-                {"ledger":"Cash","amount":"1","side":"Dr"},
-                {"ledger":"Synthetic Ledger","amount":"1","side":"Cr"}]}]
+                {"ledger":"Cash","amount":"1.00","side":"Dr"},
+                {"ledger":"Synthetic Ledger","amount":"1.00","side":"Cr"}]}]
     }))
     .unwrap()
 }
@@ -564,8 +564,8 @@ fn plain(id: &str, txn_id: &str, entries: &[(&str, &str, &str)]) -> ImportLedger
     row_batch(id, "synthetic-guid", txn_id, 'a', entries)
 }
 
-const BANK_TO_A: &[(&str, &str, &str)] = &[("Bank", "500", "Cr"), ("Ledger A", "500", "Dr")];
-const BANK_TO_B: &[(&str, &str, &str)] = &[("Bank", "500.00", "Cr"), ("Ledger B", "500", "Dr")];
+const BANK_TO_A: &[(&str, &str, &str)] = &[("Bank", "500.00", "Cr"), ("Ledger A", "500.00", "Dr")];
+const BANK_TO_B: &[(&str, &str, &str)] = &[("Bank", "500.00", "Cr"), ("Ledger B", "500.00", "Dr")];
 
 fn sent(batch: &ImportLedgerLine) -> Vec<u8> {
     record(&StatusRecord::dispatch_native(
@@ -709,14 +709,14 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     let same = plain(
         "new",
         "t1",
-        &[("Ledger B", "500.0", "Dr"), ("Bank", "500", "Cr")],
+        &[("Ledger B", "0500.00", "Dr"), ("Bank", "500.00", "Cr")],
     );
     assert!(already_posted(journal(&old), &same));
     // Same id, other amount or date: another transaction.
     let amount = plain(
         "new",
         "t1",
-        &[("Bank", "600", "Cr"), ("Ledger B", "600", "Dr")],
+        &[("Bank", "600.00", "Cr"), ("Ledger B", "600.00", "Dr")],
     );
     assert!(!already_posted(journal(&old), &amount));
     // The shape holds the amounts and their sides, not which ledger takes
@@ -724,7 +724,7 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
     let reversed = plain(
         "new",
         "t1",
-        &[("Bank", "500", "Dr"), ("Ledger B", "500", "Cr")],
+        &[("Bank", "500.00", "Dr"), ("Ledger B", "500.00", "Cr")],
     );
     assert!(already_posted(journal(&old), &reversed));
     // An extra Dr entry changes the sides, so it is not the same row.
@@ -732,9 +732,9 @@ fn a_typed_transaction_id_matches_only_the_same_shape() {
         "new",
         "t1",
         &[
-            ("Bank", "500", "Cr"),
-            ("Ledger B", "300", "Dr"),
-            ("Ledger C", "200", "Dr"),
+            ("Bank", "500.00", "Cr"),
+            ("Ledger B", "300.00", "Dr"),
+            ("Ledger C", "200.00", "Dr"),
         ],
     );
     assert!(!already_posted(journal(&old), &extra));
@@ -755,36 +755,46 @@ fn a_statement_row_is_the_same_row_although_its_shape_changed() {
         "new",
         STATEMENT_ID,
         &[
-            ("Bank", "500", "Cr"),
-            ("Ledger A", "450", "Dr"),
-            ("TDS", "50", "Dr"),
+            ("Bank", "500.00", "Cr"),
+            ("Ledger A", "450.00", "Dr"),
+            ("TDS", "50.00", "Dr"),
         ],
     );
     assert!(already_posted(vec![record(&old), sent(&old)], &split));
 }
 
-/// An amount that cannot be read does not open a way round the check.
+/// A batch line is a journal line only if its amounts are import amounts (#1872): one that is
+/// not (a sign, a zero, a missing decimal, text) is a line no build wrote, and the journal is
+/// refused whole, by every reader, with the one code. This is the cost of reading the amount
+/// where the date is read: the lines before and after it are not read either.
 #[test]
-fn an_unreadable_amount_fails_closed() {
-    let old = plain(
-        "old",
-        "t1",
-        &[("Bank", "not-a-number", "Cr"), ("Ledger A", "1", "Dr")],
-    );
+fn a_line_whose_amount_is_not_an_import_amount_refuses_the_whole_journal() {
+    let before = plain("before", "t0", BANK_TO_A);
+    let after = plain("after", "t2", BANK_TO_B);
     let candidate = plain("new", "t1", BANK_TO_B);
-    assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
-}
-
-/// The same holds when it is the candidate's own amount that cannot be read.
-#[test]
-fn an_unreadable_candidate_amount_fails_closed() {
-    let old = plain("old", "t1", BANK_TO_A);
-    let candidate = plain(
-        "new",
-        "t1",
-        &[("Bank", "not-a-number", "Cr"), ("Ledger B", "1", "Dr")],
-    );
-    assert!(already_posted(vec![record(&old), sent(&old)], &candidate));
+    let invoice = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
+    let refused = Some("import_ledger_invalid".to_string());
+    for bad in ["not-a-number", "-13.00", "+13.00", "0.00", "13", "13.5", ""] {
+        let line = plain("old", "t1", BANK_TO_A);
+        let mut value = serde_json::to_value(&line).unwrap();
+        value["vouchers"][0]["entries"][0]["amount"] = json!(bad);
+        let journal = [record(&before), record(&value), record(&after)].concat();
+        let read = || Cursor::new(journal.clone());
+        assert_eq!(settlement(read()).err(), refused, "{bad:?}");
+        assert_eq!(read_history(read()).err(), refused, "{bad:?}");
+        assert_eq!(
+            rows_already_posted(read(), &candidate).err(),
+            refused,
+            "{bad:?}"
+        );
+        assert_eq!(
+            unsettled_invoice_twin(read(), &invoice).err(),
+            refused,
+            "{bad:?}"
+        );
+        // The same journal without that line reads.
+        assert!(settlement(Cursor::new([record(&before), record(&after)].concat())).is_ok());
+    }
 }
 
 /// One Sales invoice dated 1 Sep 2026 under `number`, over `entries`.
@@ -805,7 +815,7 @@ fn invoice_batch(
     line
 }
 
-const SALE: &[(&str, &str, &str)] = &[("Customer", "118", "Dr"), ("Sales", "118.00", "Cr")];
+const SALE: &[(&str, &str, &str)] = &[("Customer", "118.00", "Dr"), ("Sales", "118.00", "Cr")];
 
 /// What the journal offers as the control for a build's number read: a
 /// verified invoice of the company (its batch, number and date), preferring one of the
@@ -910,7 +920,7 @@ fn an_invoice_sent_and_not_found_posted_is_the_unsettled_twin_of_its_figures() {
         "second",
         'b',
         ("INV/2", "Sales Manual"),
-        &[("Customer", "118.00", "Dr"), ("Sales", "118", "Cr")],
+        &[("Customer", "118.00", "Dr"), ("Sales", "118.00", "Cr")],
     );
     assert_eq!(
         twin(vec![record(&first), sent(&first), record(&second)], &second),
@@ -931,7 +941,7 @@ fn an_invoice_sent_and_not_found_posted_is_the_unsettled_twin_of_its_figures() {
         "dearer",
         'c',
         ("INV/1", "Sales Manual"),
-        &[("Customer", "119", "Dr"), ("Sales", "119", "Cr")],
+        &[("Customer", "119.00", "Dr"), ("Sales", "119.00", "Cr")],
     );
     let other_type = invoice_batch("other-type", 'd', ("INV/1", "Sales Export"), SALE);
     let mut elsewhere = invoice_batch("elsewhere", 'e', ("INV/1", "Sales Manual"), SALE);
@@ -963,32 +973,6 @@ fn a_batch_sent_again_after_it_was_found_posted_is_unsettled_again() {
     assert_eq!(
         unsettled_invoice_twin(Cursor::new(journal), &second),
         Ok(Some("first".to_string()))
-    );
-}
-
-/// The guard fails closed. A saved batch whose invoice cannot be read counts
-/// as a twin once sent; an invoice of the batch itself that cannot be read is
-/// an error, never "no figures, nothing to match".
-#[test]
-fn an_invoice_that_cannot_be_read_never_switches_the_guard_off() {
-    let unreadable = invoice_batch(
-        "unreadable",
-        'a',
-        ("INV/1", "Sales Manual"),
-        &[
-            ("Customer", "not-a-number", "Dr"),
-            ("Sales", "118.00", "Cr"),
-        ],
-    );
-    let second = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
-    let journal = [record(&unreadable), sent(&unreadable), record(&second)].concat();
-    assert_eq!(
-        unsettled_invoice_twin(Cursor::new(journal), &second),
-        Ok(Some("unreadable".to_string()))
-    );
-    assert_eq!(
-        unsettled_invoice_twin(Cursor::new(Vec::new()), &unreadable),
-        Err("import_invoice_figures_unreadable".to_string())
     );
 }
 

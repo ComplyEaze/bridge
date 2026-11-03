@@ -3845,10 +3845,8 @@ fn voucher_review_lines(
             .iter()
             .filter(|entry| entry.side == EntrySide::Dr)
         {
-            let amount = ExactDecimal::parse(entry.amount.clone())
-                .map_err(|_| "voucher_amount_invalid".to_string())?;
             value = value
-                .checked_add(&amount)
+                .checked_add(entry.amount.decimal())
                 .map_err(|_| "voucher_amount_overflow".to_string())?;
         }
         let shown = |name: &str| {
@@ -3967,11 +3965,9 @@ fn batch_review_text(
     for voucher in &line.vouchers {
         require_native_numbering(voucher)?;
     }
-    let add = |total: &mut ExactDecimal, amount: &str| -> Result<(), String> {
-        let amount = ExactDecimal::parse(amount.to_string())
-            .map_err(|_| "voucher_amount_invalid".to_string())?;
+    let add = |total: &mut ExactDecimal, amount: &ImportAmount| -> Result<(), String> {
         *total = total
-            .checked_add(&amount)
+            .checked_add(amount.decimal())
             .map_err(|_| "voucher_amount_overflow".to_string())?;
         Ok(())
     };

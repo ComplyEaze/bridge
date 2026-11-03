@@ -1,0 +1,4 @@
+14:02:23	R-0048.xml	a-s2-R-0048.xml	curl 0
+14:02:23	R-0049.xml	a-s2-R-0049.xml	curl 0
+14:02:23	R-0050.xml	a-s2-R-0050.xml	curl 0
+14:02:23	B-bills.xml	a-s2-B-bills.xml	curl 0

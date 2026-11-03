@@ -1,0 +1,93 @@
+== a-s1-M-marks.xml: 3394 B sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['68'] ALTMSTID ['245']
+== a-s2-B-bills.xml: 46 B sha256 8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3
+   all BILLFIXED groups 0
+   BRIDGE Walk-in BJ: groups 0
+   BRIDGE Walk-in BS: groups 0
+   BRIDGE Walk-in BO: groups 0
+== a-s2-R-0048.xml: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+   VOUCHER elements 0 | customer None
+== a-s2-R-0049.xml: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+   VOUCHER elements 0 | customer None
+== a-s2-R-0050.xml: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+   VOUCHER elements 0 | customer None
+== a-s3-L-ledgers.xml: 538 B sha256 ffc14cedba19841d110a550729c935a520f5dfda3944320b4daf5ea9c55a8d0b
+   {'CREATED': ['4'], 'ALTERED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['0']} LINEERROR []
+== a-s4-B-bills.xml: 976 B sha256 1f3ecd6a1c18621407a633406edfa4312b8aefc7002ee65b5a2090d24eeb1ff0
+   all BILLFIXED groups 2
+   BRIDGE Walk-in BJ: BILLREF ['BP/26-27/0048'] BILLDATE ['1-Jul-26'] BILLCL after it -500.00
+   BRIDGE Walk-in BJ: groups 1
+   BRIDGE Walk-in BS: groups 0
+   BRIDGE Walk-in BO: BILLREF ['BP/26-27/0050'] BILLDATE ['31-Mar-26'] BILLCL after it -500.00
+   BRIDGE Walk-in BO: groups 1
+== a-s4-M-marks.xml: 3396 B sha256 97f279d75c76325c00beacbbc1c7dda26861a74bd47823529290a07c22dbc247
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['71'] ALTMSTID ['250']
+== a-s4-V-days.xml: 98012 B sha256 30117e5c24a76bd8dac8ac629c4fc432d0882bbe1486d4dc82f152ce8f8b65a5
+   VOUCHER elements 3
+   voucher ['Journal'] no ['1'] date ['20260701'] ALTERID ['69'] legs [['BRIDGE Walk-in BJ', '-500.00'], ['BRIDGE Seed Income', '500.00']]
+     leg ['BRIDGE Walk-in BJ'] AMOUNT ['-500.00']: allocations with NAME 1, whitespace-only 0, elements 1
+       NAME ['BP/26-27/0048'] BILLTYPE ['New Ref'] AMOUNT ['-500.00']
+   voucher ['Journal'] no ['2'] date ['20260701'] ALTERID ['70'] legs [['BRIDGE Walk-in BS', '-500.00'], ['BRIDGE Seed Income', '500.00']]
+     leg ['BRIDGE Walk-in BS'] AMOUNT ['-500.00']: allocations with NAME 1, whitespace-only 0, elements 1
+       NAME ['BP/26-27/0049'] BILLTYPE ['New Ref'] AMOUNT ['-500.00']
+   voucher ['Receipt'] no ['5'] date ['20260702'] ALTERID ['71'] legs [['BRIDGE Walk-in BS', '500.00'], ['Cash', '-500.00']]
+     leg ['BRIDGE Walk-in BS'] AMOUNT ['500.00']: allocations with NAME 1, whitespace-only 0, elements 1
+       NAME ['BP/26-27/0049'] BILLTYPE ['Agst Ref'] AMOUNT ['500.00']
+== a-s5-I-0048.xml: 540 B sha256 e6540f6534095f5608f3c59f802c1f40a3ae13529a7e9041847b460f03c32fec
+   {'CREATED': ['1'], 'ALTERED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['48']} LINEERROR []
+== a-s5r-B-bills.xml: 978 B sha256 4fef953ff66bcb4821aa265ffb0c01a19d1f357f60bad2ac26876402ed573135
+   all BILLFIXED groups 2
+   BRIDGE Walk-in BJ: BILLREF ['BP/26-27/0048'] BILLDATE ['1-Jul-26'] BILLCL after it -1551.00
+   BRIDGE Walk-in BJ: groups 1
+   BRIDGE Walk-in BS: groups 0
+   BRIDGE Walk-in BO: BILLREF ['BP/26-27/0050'] BILLDATE ['31-Mar-26'] BILLCL after it -500.00
+   BRIDGE Walk-in BO: groups 1
+== a-s5r-M-marks.xml: 3396 B sha256 5a561243bb3150a9aee84a258266698d64d2fabae86e81aee90535bdc6bea9f1
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['72'] ALTMSTID ['250']
+== a-s5r-R-0048.xml: 95836 B sha256 0e01dbf4588315ab27721e4309aa54950a227c0c64940718e7727d99705dcdcf
+   VOUCHER elements 1 | customer BRIDGE Walk-in BJ
+   number ['BP/26-27/0048'] date ['20260801'] ALTERID ['72'] GUID ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000030'] INCLUDED ['Yes'] UNCERTAIN ['No'] EXCLUDED ['No']
+   legs 6 | customer legs 1
+     customer leg AMOUNT ['-1051.00']: allocations with NAME 1, whitespace-only 0
+       NAME ['BP/26-27/0048'] BILLTYPE ['Agst Ref'] AMOUNT ['-1051.00']
+   other legs: allocations with NAME 0 | whitespace-only 5
+== a-s6-I-0049.xml: 540 B sha256 93e331323bb1235565ab31f2ddbbaf7afaa752ce6770d0ae7ae145d7b3244234
+   {'CREATED': ['1'], 'ALTERED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['49']} LINEERROR []
+== a-s6r-B-bills.xml: 1440 B sha256 0a7521b81edbf8639da08d0f42e078c73dac812c2a682c10384f6d212d23ab03
+   all BILLFIXED groups 3
+   BRIDGE Walk-in BJ: BILLREF ['BP/26-27/0048'] BILLDATE ['1-Jul-26'] BILLCL after it -1551.00
+   BRIDGE Walk-in BJ: groups 1
+   BRIDGE Walk-in BS: BILLREF ['BP/26-27/0049'] BILLDATE ['1-Jul-26'] BILLCL after it -1051.00
+   BRIDGE Walk-in BS: groups 1
+   BRIDGE Walk-in BO: BILLREF ['BP/26-27/0050'] BILLDATE ['31-Mar-26'] BILLCL after it -500.00
+   BRIDGE Walk-in BO: groups 1
+== a-s6r-M-marks.xml: 3396 B sha256 9a3697265a9528272ad817d7f44e93d11a4c8d723a95679282dbd7cbb93cd7e3
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['73'] ALTMSTID ['250']
+== a-s6r-R-0049.xml: 95836 B sha256 6496dd460ac6064968e475cd2cc721c8c625db1f2297f5222d85d7a5ea0fe6a3
+   VOUCHER elements 1 | customer BRIDGE Walk-in BS
+   number ['BP/26-27/0049'] date ['20260801'] ALTERID ['73'] GUID ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000031'] INCLUDED ['Yes'] UNCERTAIN ['No'] EXCLUDED ['No']
+   legs 6 | customer legs 1
+     customer leg AMOUNT ['-1051.00']: allocations with NAME 1, whitespace-only 0
+       NAME ['BP/26-27/0049'] BILLTYPE ['Agst Ref'] AMOUNT ['-1051.00']
+   other legs: allocations with NAME 0 | whitespace-only 5
+== a-s7-I-0050.xml: 540 B sha256 200c17e120c3ff582d28c9fce94b127ed22aaa4e5d10bbdd1d18e97a767f40c3
+   {'CREATED': ['1'], 'ALTERED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['50']} LINEERROR []
+== a-s7r-B-bills.xml: 1442 B sha256 a6d63b31d273a51a2c9141ceff5c49a035cc6c3cc4f54621c21938b8f759b21b
+   all BILLFIXED groups 3
+   BRIDGE Walk-in BJ: BILLREF ['BP/26-27/0048'] BILLDATE ['1-Jul-26'] BILLCL after it -1551.00
+   BRIDGE Walk-in BJ: groups 1
+   BRIDGE Walk-in BS: BILLREF ['BP/26-27/0049'] BILLDATE ['1-Jul-26'] BILLCL after it -1051.00
+   BRIDGE Walk-in BS: groups 1
+   BRIDGE Walk-in BO: BILLREF ['BP/26-27/0050'] BILLDATE ['31-Mar-26'] BILLCL after it -1551.00
+   BRIDGE Walk-in BO: groups 1
+== a-s7r-M-marks.xml: 3396 B sha256 4cc537c604cd03282bf5d12d45b8f2449b10b88296f9e0ae94cf5d84a3b46a60
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['74'] ALTMSTID ['250']
+== a-s7r-R-0050.xml: 95940 B sha256 ac53ba5f4a3f188fa286d22731ce66f142a65fd5f559971a52276b0bc0cbf364
+   VOUCHER elements 1 | customer BRIDGE Walk-in BO
+   number ['BP/26-27/0050'] date ['20260801'] ALTERID ['74'] GUID ['6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000032'] INCLUDED ['Yes'] UNCERTAIN ['No'] EXCLUDED ['No']
+   legs 6 | customer legs 1
+     customer leg AMOUNT ['-1051.00']: allocations with NAME 1, whitespace-only 0
+       NAME ['BP/26-27/0050'] BILLTYPE ['Agst Ref'] AMOUNT ['-1051.00']
+   other legs: allocations with NAME 0 | whitespace-only 5
+== a-s8-M-marks.xml: 3394 B sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+   COMPANY BRIDGE PILOT LAB ALTVCHID ['68'] ALTMSTID ['245']

@@ -1,0 +1,3 @@
+14:16:00	R-0049.xml	a-s6r-R-0049.xml	curl 0
+14:16:00	B-bills.xml	a-s6r-B-bills.xml	curl 0
+14:16:00	M-marks.xml	a-s6r-M-marks.xml	curl 0

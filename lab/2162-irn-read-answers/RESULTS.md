@@ -52,7 +52,9 @@ Tally: one tally.exe (PID 1200) on 9001, TallyPrime Silver (title band). That it
 The four Bridge connector servers of the desktop client were left running. Stopping them was refused here, and the row did not close them: PIDs 384 and 6668 (started 30 Oct 2026), 26480 and 26180 (started 2 Nov 2026), parent the desktop client. All four are unchanged before and after the sitting (`evidence/bridge-procs-before.txt`, `-after.txt`). No call was made to them from this sitting, and their calls were not measured. [verified as recorded]
 
 ## Kept local
-Every answer (`a-*.xml`) and every screen stays on the lab PC, listed by sha256, bytes and name in `kept-local.txt`. The full read of the note holds three GSTIN shapes (count.py). The backup stays local too.
+Every answer (`a-*.xml`) and every screen stays on the lab PC, listed by sha256, bytes and name in `kept-local.txt`. The exceptions are `a-r1-NI-1.xml` and `a-r1-NI-2.xml`, which are in `answers/` byte for byte as test fixtures. The full read of the note holds three GSTIN shapes (count.py). The backup stays local too.
+
+VOUCHERKEY carries 15-digit runs (Tally's internal key), kept as captured.
 
 ## `count.py` (the sheet's amended copy), whole output after s9
 

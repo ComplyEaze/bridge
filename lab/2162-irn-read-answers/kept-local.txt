@@ -1,4 +1,4 @@
-Stay on the lab PC: every answer (a-*.xml), every screen and the backup. sha256, bytes, name.
+Stay on the lab PC: every answer (a-*.xml) except a-r1-NI-1.xml and a-r1-NI-2.xml (in answers/), every screen and the backup. sha256, bytes, name.
 a47c3cc494e1b07990e7ea20bb36e1b9b8d54a05d7e627358e335d483b6edcff  310  bk.txt
 c2ba618f8c1cde00d937a6d27601822cf8711f2d088bc099101a5982f9c0f2be  4890  r1-daybook-buttonbar.jpg
 727adf0e2baa1ec631da47ab400cc6b106a5ba5d6738ddd89cb51b070f39ced5  112106  r1-daybook-enter-alter.jpg
@@ -18,8 +18,6 @@ ecdb7bf808668693f0187023f7b7a77e13b6ac90ee30e7d3cff50b6a73c973bf  103613  r2-not
 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887  3398  a-r1-M-marks.xml
 41b51eb64d02f3e4bf4947084b7e7446601e83c7ad3b55dd31849a96747eac95  8106  a-r1-N-1.xml
 8324d06e0f893dfd0b72aa4f2732f93d69d46c7392ec3000395777dd057f048e  5558  a-r1-N-2.xml
-bc0a594d61ebc09c170f2f9a4cca9987b7f506d1baa5f1b22c31e59badbead0a  8734  a-r1-NI-1.xml
-87ede2a7617036b876bb3972a7eef4fc0c2cb7e9673faf16db2945d5292454f2  5794  a-r1-NI-2.xml
 4a6b2216813034d2b7bee3482ca20f205e2459350ff075df507fad7005e9b92a  10826  a-r1-V-named.xml
 fba2b86c2e6a871a35bfdd56391f5759e35c72e95004b64c7193795b030f4eee  53090  a-r2-F-note.xml
 70fd0b0527dc5b13f06287d98c89f1126447d43ae400ebbc0793890596235351  12628  a-r2-L-list.xml

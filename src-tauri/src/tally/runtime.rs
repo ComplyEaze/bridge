@@ -78,6 +78,16 @@ pub(crate) use stock_summary::StockSummaryReadError;
 #[path = "runtime_stock_summary_tests.rs"]
 mod stock_summary_tests;
 
+#[path = "runtime_stock_by_batch.rs"]
+mod stock_by_batch;
+#[cfg(test)]
+pub(crate) use stock_by_batch::STOCK_QUERY_ANSWER_MAX_BYTES;
+pub(crate) use stock_by_batch::{StockByBatchItem, StockByBatchRead, StockByBatchReadError};
+
+#[cfg(test)]
+#[path = "runtime_stock_by_batch_tests.rs"]
+mod stock_by_batch_tests;
+
 #[path = "runtime_negative_stock.rs"]
 mod negative_stock;
 pub(crate) use negative_stock::{NegativeStockAnswer, NegativeStockReadError};

@@ -50,7 +50,7 @@ identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
 names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
-and stock-group parents, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+and stock-group parents, in `stock_by_batch` item, godown and batch names, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
 GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
@@ -110,6 +110,7 @@ The ordinary default tools, in name order:
 - `read_evidence`
 - `sales_register`
 - `statement_tie_out`
+- `stock_by_batch`
 - `stock_by_godown`
 - `stock_summary`
 - `tally_status`
@@ -125,7 +126,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
-not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_godown` is in the source after release 0.7.0 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_batch` and `stock_by_godown` are in the source after release 0.7.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -1126,6 +1127,43 @@ book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, whic
 unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
 Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
 Gold and other releases.
+
+### Stock by godown and batch (`stock_by_batch`)
+
+Use `stock_by_batch` with `company_guid`, `as_of` (a month's last day, as for `stock_summary`) and
+`items` (1 to 20 stock item GUIDs, each once, as `stock_summary` returns them; 20 is a chosen limit, since
+each item is one request sent after the last) for Tally's own Stock Query
+of each item: its quantity in each godown and batch at `as_of`. Quantities only: the report carries no
+value, rate, expiry or manufacturing date, and its last-purchase and last-sale groups are not returned.
+
+Each item's lines are tied as a whole to its closing quantity in Tally's stock item list for the same
+period, and its `state` says how: `tied`, `differs` (both sides are returned, `lines_total` and
+`closing`, and neither is adjusted), `not_comparable` (`closing_unread` for an item with an alternate
+unit, whose closing Tally writes in both units while Stock Query writes the base unit only;
+`units_differ`), `no_stock` (Tally's empty answer beside a closing of zero)
+or `no_movement` (the empty answer beside no closing at all, which does not say the item holds none).
+Tally sends the same empty answer for an item with no stock, one that never moved and a name it does
+not know, so it is never read as zero on its own. An item can also be `item_not_found`,
+`name_unmeasured` (its name holds a character no capture showed Stock Query selecting by, so nothing
+is sent for it), `refused` with `code` (the answer could not be read, or was over 262,144 bytes:
+`stock_query_answer_too_large`; the other items are still read), `not_read` with `code` (the send failed
+or timed out) or `not_sent`. A failed send stops the reads: the result is `partial`, `stopped` names
+the code, and the book was not checked for change after the items already read.
+
+`godowns` adds each godown's lines, by their positions in `lines`; it is compared with nothing and is
+not Tally's Godown Summary. Godown and batch names are compared as sent, so two that differ only in case
+are two. No line is compared with any voucher: a Stock Journal moves stock between godowns without an
+invoice goods line. `batch_wise` is the company's setting; with it off every line reads `Primary Batch`.
+The 262,144-byte limit is a choice, not a measurement: the largest answer measured is 3,152 bytes,
+and an item's lines grow with the godowns and batches that hold its stock, which no other read bounds.
+
+The read uses `stock_summary`'s bracket and its admission of the stock items, under this tool's own
+codes: `stock_by_batch_too_large` (with `size`), `stock_by_batch_census_refused`,
+`stock_by_batch_item_count_company_higher` and `stock_by_batch_bound_premise_violated` (each with
+`error.cause`), `stock_by_batch_as_of_not_measured`, `stock_by_batch_as_of_before_books`,
+`stock_by_batch_as_of_in_future`, `stock_by_batch_education_unqualified` and `stock_not_enabled`. A
+book that changed refuses as `stock_by_batch_extent_changed`. Measured on TallyPrime 7.2 on one
+synthetic book.
 
 ### Stock by godown (`stock_by_godown`)
 

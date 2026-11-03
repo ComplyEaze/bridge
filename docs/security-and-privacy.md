@@ -224,6 +224,13 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       chose (`kind`) and the report's name, the window's dates, and for each
       month, Tally's debit, credit and closing amounts. It holds no
       party, ledger or narration, and `mask_parties` has nothing to shorten in it.
+    - The stock-by-batch read (`stock_by_batch`) sends the company name and
+      its identifier and the date, and for each item asked for, its name
+      (shortened under `mask_parties`), its identifier, its closing quantity
+      in Tally's stock item list, and Tally's quantity per godown and batch,
+      each godown and named batch shortened under `mask_parties`. The
+      quantities are not masked under any setting. It holds no values, rates
+      or narrations.
     - The stock-by-godown read (`stock_by_godown`) sends the company name and
       its identifier and the dates, each godown's name (shortened under
       `mask_parties`), value and quantity, and for each item directly under

@@ -1992,7 +1992,7 @@ fn the_verified_and_absent_texts_say_what_is_checked_and_what_is_not() {
     ] {
         for text in [settled_note(state), settled_next_step(state)] {
             for fragment in [
-                "TallyPrime 7.2 Silver, not on Gold, for ledger creates",
+                "TallyPrime 7.2 Silver (no row ran on Gold, the same product with multi-user access), for ledger creates",
                 "behind a long read, for requests on new connections and with the create, the read or both on a reused one",
                 "behind a long import, for requests on new connections and with the create on a reused one and the read on a new one",
             ] {

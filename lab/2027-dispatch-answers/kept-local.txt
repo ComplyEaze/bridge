@@ -1,4 +1,4 @@
-Stay on the lab PC: every answer (a-*.xml), every screen and the backup. sha256, bytes, name.
+Stay on the lab PC: every answer (a-*.xml) except a-r1-WD.xml (in answers/), every screen and the backup. sha256, bytes, name.
 8b5e8e244d9d30c646792a02726bffed0279388fc9f98978b60a496d097367d1  110236  s0-gateway.jpg
 4e3679d665a998bf6ab8cdb47e9af785fd0362017c67abf319e795cf204662ac  26416  s1-bk-accept.jpg
 e8d12c486c43179605a2b6e9d3678829966a488917e05648e6a2faf6ab9e8cd9  40735  s2-sales-accept.jpg
@@ -16,7 +16,6 @@ d59c6739e7f9fc30e02b820f242c504bd8a39e155d318b16c20eae57df66743e  53092  a-r1-F-
 88280974782797343405f98948e8e2e4c00ea2fd1dea529fbc0b4fd6e6033c39  15020  a-r1-L-list.xml
 56e1087aa80244508e872a60b5e9915dacdae2450e3cdbadfbf38612d5d50cfa  3400  a-r1-M-marks.xml
 54b91911972c7ad62f3820b29516e066d4f72f79ee01132c362a32ad9e35b695  224824  a-r1-W.xml
-95bfd65fcaf939d85b9055dfab691c7bb1faec4750489d4d61e4519d17cba47a  229048  a-r1-WD.xml
 17dd4855cb5da5f1cf9829f063eb370457268644db110e5c74bf4b1d49212b80  10214  a-s1-L-list.xml
 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887  3398  a-s1-M-marks.xml
 17dd4855cb5da5f1cf9829f063eb370457268644db110e5c74bf4b1d49212b80  10214  a-s9-L-list.xml

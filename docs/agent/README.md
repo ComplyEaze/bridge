@@ -561,6 +561,10 @@ where the series printed none, or `{"unrecognised": "<raw text>"}` for any other
 text, a blank one included. A Manual series printed `Auto Retain` as well on
 both books read, which is not the numbering in force there, so it is not
 returned for one.
+The voucher-types collection pair is read once more when its first pair disagrees (Tally leaves
+an element out of the first read after a company is loaded; protocol reference 12a.25): the
+answer then carries `first_pair_differed`, the first pair's request and response digests and
+byte count, and a second pair that disagrees too refuses as `masters_collection_changed`.
 A type found in one answer only (`masters_numbering_names_differ`), or a GUID
 and name that disagree between the two answers
 (`masters_numbering_identity_differs`), refuses the whole read; so does the

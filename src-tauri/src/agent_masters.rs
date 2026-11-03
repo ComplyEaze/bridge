@@ -46,6 +46,12 @@ impl Server {
                         ToolFailure::from_runtime("masters_read_failed", error)
                             .with_prior_evidence(prior.clone())
                     })?;
+                // A voucher-types pair that disagreed before a second agreed is
+                // shown beside the rows, for as long as the listing is held.
+                let frame = read.first_pair_differed.as_ref().map_or(
+                    Value::Null,
+                    |first| json!({ "first_pair_differed": first_pair_differed_json(first) }),
+                );
                 let rows = match &read.rows {
                     MastersRows::Native(masters) => masters
                         .rows
@@ -77,7 +83,7 @@ impl Server {
                     extent,
                     rows,
                     None,
-                    Value::Null,
+                    frame,
                     evidence_from_runtime_read(read.evidence),
                 ))?
             }
@@ -135,24 +141,41 @@ impl Server {
             ),
             _ => {}
         }
+        let mut result = json!({
+            "state": "observed", "basis": "tally_native_masters",
+            "company_guid": guid, "kind": kind.as_str(),
+            "masters": rows, "total": total,
+            "offset": offset, "next_offset": next_offset,
+            "verification": "stable_paired_source_with_company_mode_and_extent_guards",
+            "snapshot": snapshot.describe(reused.is_some()),
+            "limitations": limitations,
+        });
+        if let Some(first) = snapshot.frame.get("first_pair_differed") {
+            result["first_pair_differed"] = first.clone();
+        }
         Ok(ToolOutcome {
             payload: json!({
                 "company": company_json(&company, std::slice::from_ref(&company)),
-                "result": {
-                    "state": "observed", "basis": "tally_native_masters",
-                    "company_guid": guid, "kind": kind.as_str(),
-                    "masters": rows, "total": total,
-                    "offset": offset, "next_offset": next_offset,
-                    "verification": "stable_paired_source_with_company_mode_and_extent_guards",
-                    "snapshot": snapshot.describe(reused.is_some()),
-                    "limitations": limitations,
-                },
+                "result": result,
             }),
             evidence,
             company_guid: Some(guid.to_string()),
             truncated,
         })
     }
+}
+
+/// What an answer says of a voucher-types pair that disagreed with itself
+/// before a second pair agreed (#2160): the first pair's evidence, so a person
+/// can see the first disagreement without the call having refused. The digests
+/// are of the first pair's two reads, as a refusal's evidence would carry them.
+pub(super) fn first_pair_differed_json(first: &RuntimeReadEvidence) -> Value {
+    json!({
+        "request_sha256": first.request_sha256,
+        "response_sha256": first.response_sha256,
+        "bytes": first.bytes,
+        "note": "The voucher-types read was repeated once: its first pair disagreed and the second pair agreed. These are the first pair's digests. Tally leaves an element out of the first read after a company is loaded (protocol reference 12a.25).",
+    })
 }
 
 /// What a `stock_items` answer says about its two lists. The size line names the

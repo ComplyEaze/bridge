@@ -50,7 +50,7 @@ identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
 names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
-and stock-group parents, in `stock_by_batch` item, godown and batch names, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+and stock-group parents, in `stock_by_batch` item, godown and batch names, and in `stock_by_godown` godown and item names; in `vouchers`' `dispatch` it masks `dispatched_through`, `carrier` and `vehicle_no`; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
 GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
@@ -2442,8 +2442,8 @@ or a note without an original invoice (protocol reference 8.2k).
 The same argument also adds `dispatch`, stated the same way: `doc_no` (Dispatch Doc No.), `dispatched_through`, `destination`,
 `carrier` (Carrier Name/Agent), `lading_no` and `lading_date` (Bill of Lading/LR-RR No. and its date, `YYYYMMDD`; one that is not
 a date refuses the read as `voucher_lading_date_invalid`) and `vehicle_no` (Motor Vehicle No.). A Delivery Note number is not
-returned. Under `mask_parties` the carrier and the vehicle number are masked as a party name is; the rest stay as the book has
-them. Measured on one synthetic book, one Sales invoice and one Credit Note (protocol reference 8.2l).
+returned. Under `mask_parties`, `dispatched_through`, the carrier and the vehicle number are masked as a party name is; the rest
+stay as the book has them. Measured on one synthetic book, one Sales invoice and one Credit Note (protocol reference 8.2l).
 
 ### Cost-centre allocations in voucher reads
 

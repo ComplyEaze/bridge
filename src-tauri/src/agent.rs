@@ -428,10 +428,11 @@ fn mark_voucher_party_names(mut voucher: Value) -> Value {
         }
     }
     mark_goods_line_party_names(&mut voucher, "stock_lines");
-    // The carrier and the vehicle number name or identify a business or person other than the
-    // book's own; the other dispatch details stay as the book has them, as place of supply does.
+    // The transporter, the carrier and the vehicle number name or identify a business or person
+    // other than the book's own; the other dispatch details stay as the book has them, as place of
+    // supply does.
     if let Some(dispatch) = voucher.get_mut("dispatch") {
-        for field in ["carrier", "vehicle_no"] {
+        for field in ["dispatched_through", "carrier", "vehicle_no"] {
             if let Some(state) = dispatch.get_mut(field) {
                 mark_party_field(state, "value");
             }

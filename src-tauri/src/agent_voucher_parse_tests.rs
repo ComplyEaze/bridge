@@ -2647,12 +2647,13 @@ fn a_voucher_that_is_no_invoice_says_dispatch_only_when_it_carries_a_detail() {
     assert_eq!(carried["doc_no"]["state"], "not_reported");
 }
 
-/// #2027: under `mask_parties` the carrier and the vehicle number are masked as a party name is;
-/// the other dispatch details, and both of these without the setting, stay as the book has them.
+/// #2027: under `mask_parties` the transporter, the carrier and the vehicle number are masked as a
+/// party name is; the other dispatch details, and these three without the setting, stay as the book
+/// has them.
 #[test]
-fn under_mask_parties_the_carrier_and_vehicle_number_are_masked_and_the_rest_stay() {
+fn under_mask_parties_the_transporter_carrier_and_vehicle_number_are_masked_and_the_rest_stay() {
     let xml = with_injected_voucher_element(
-        "<BASICSHIPDOCUMENTNO>DSP-7</BASICSHIPDOCUMENTNO><BASICSHIPPEDBY>ROADWAY</BASICSHIPPEDBY>\
+        "<BASICSHIPDOCUMENTNO>DSP-7</BASICSHIPDOCUMENTNO><BASICSHIPPEDBY>SYN ROADLINES</BASICSHIPPEDBY>\
          <BASICFINALDESTINATION>PUNE</BASICFINALDESTINATION><EICHECKPOST>SYN CARRIERS</EICHECKPOST>\
          <BILLOFLADINGNO>LR-41</BILLOFLADINGNO><BASICSHIPVESSELNO>KA01AB1234</BASICSHIPVESSELNO>",
     );
@@ -2669,7 +2670,7 @@ fn under_mask_parties_the_carrier_and_vehicle_number_are_masked_and_the_rest_sta
     .collect();
     let masked = redact_value(Value::Array(marked.clone()), Redaction::MaskParties);
     let dispatch = &masked[0]["dispatch"];
-    for field in ["carrier", "vehicle_no"] {
+    for field in ["dispatched_through", "carrier", "vehicle_no"] {
         assert_eq!(dispatch[field]["state"], "present");
         assert_ne!(
             dispatch[field]["value"],
@@ -2678,18 +2679,23 @@ fn under_mask_parties_the_carrier_and_vehicle_number_are_masked_and_the_rest_sta
     }
     let text = masked.to_string();
     assert!(
-        !text.contains("SYN CARRIERS") && !text.contains("KA01AB1234"),
+        !text.contains("SYN ROADLINES")
+            && !text.contains("SYN CARRIERS")
+            && !text.contains("KA01AB1234"),
         "{text}"
     );
     for (field, value) in [
         ("doc_no", "DSP-7"),
-        ("dispatched_through", "ROADWAY"),
         ("destination", "PUNE"),
         ("lading_no", "LR-41"),
     ] {
         assert_eq!(dispatch[field], present(value));
     }
     let plain = redact_value(Value::Array(marked), Redaction::None);
+    assert_eq!(
+        plain[0]["dispatch"]["dispatched_through"],
+        present("SYN ROADLINES")
+    );
     assert_eq!(plain[0]["dispatch"]["carrier"], present("SYN CARRIERS"));
     assert_eq!(plain[0]["dispatch"]["vehicle_no"], present("KA01AB1234"));
 }
@@ -2756,10 +2762,10 @@ fn the_captured_keyed_invoice_and_note_say_each_dispatch_detail() {
     assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
 }
 
-/// #2027: in the captured answer, `mask_parties` masks the keyed carrier and vehicle number and
-/// leaves the other details as the book has them.
+/// #2027: in the captured answer, `mask_parties` masks the keyed transporter, carrier and vehicle
+/// number and leaves the other details as the book has them.
 #[test]
-fn under_mask_parties_the_captured_carrier_and_vehicle_number_are_masked() {
+fn under_mask_parties_the_captured_transporter_carrier_and_vehicle_number_are_masked() {
     let marked: Vec<Value> = einvoice_lab_keyed_rows()
         .into_iter()
         .map(mark_voucher_party_names)
@@ -2767,14 +2773,15 @@ fn under_mask_parties_the_captured_carrier_and_vehicle_number_are_masked() {
     let masked = redact_value(Value::Array(marked), Redaction::MaskParties);
     let text = masked.to_string();
     assert!(
-        !text.contains("CARRIER-73") && !text.contains("KA-75"),
+        !text.contains("ROADWAY") && !text.contains("CARRIER-73") && !text.contains("KA-75"),
         "{text}"
     );
     let rows = masked.as_array().unwrap();
     for (voucher_type, number) in [("Sales", "3"), ("Credit Note", "1")] {
         let dispatch = &voucher(rows, voucher_type, number)["dispatch"];
-        assert_eq!(dispatch["carrier"]["state"], "present");
-        assert_eq!(dispatch["vehicle_no"]["state"], "present");
+        for field in ["dispatched_through", "carrier", "vehicle_no"] {
+            assert_eq!(dispatch[field]["state"], "present");
+        }
         assert_eq!(dispatch["doc_no"], present("DD-72"));
         assert_eq!(dispatch["destination"], present("Mysuru"));
         assert_eq!(dispatch["lading_no"], present("LR-74"));

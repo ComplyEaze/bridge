@@ -1,7 +1,7 @@
 {
  "file": "src-tauri/src/agent_import_ack.rs",
  "base_commit": "8520f071",
- "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. The tool and hand runs ran the bridge lib tests matching the filter, without the approval dialog seam tests, which need the stand-in example. Each mutant that survived its filtered run at base was run again at base against every bridge test, integration tests included, with the stand-in built (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent, and one that is not says why it is not killed yet. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the test modules as at base or, for survivors_again, as this change leaves them.",
+ "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at is base where the failing check exists at base, or this_commit where the change that adds this record adds it, as a new test or as cases added to a test that exists at base; before_this_change then gives the verdict at base. The tool and hand runs ran the bridge lib tests matching the filter, without the approval dialog seam tests, which need the stand-in example. Each mutant that survived its filtered run at base was run again at base against every bridge test, integration tests included, with the stand-in built (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent,. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the test modules as at base or, for survivors_again, as this change leaves them.",
  "runs": [
   {
    "run": "tool",
@@ -29,7 +29,7 @@
   {
    "run": "survivors_again",
    "tests_at": "this_commit",
-   "tests_matching_filter": 366,
+   "tests_matching_filter": 367,
    "command": "as the hand run, for the same twenty",
    "tree": "base_commit"
   }
@@ -41,8 +41,8 @@
    "unviable": 14
   },
   "hand": {
-   "caught": 44,
-   "missed": 5
+   "caught": 45,
+   "missed": 4
   },
   "survived_at_base": {
    "tool": 7,
@@ -51,9 +51,6 @@
   "equivalent": {
    "tool": 2,
    "hand": 4
-  },
-  "accepted_not_equivalent": {
-   "hand": 1
   }
  },
  "tool_results": {
@@ -1396,7 +1393,10 @@
     }
    ],
    "mutation": "50bd6117eca45d0e3aa3e1e0e35c2d0a",
-   "verdict": "missed"
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
   },
   "A29": {
    "what": "a record with no doubt hash reads as covering nothing",
@@ -1674,10 +1674,6 @@
   },
   "200:17 replace > with >= in still_the_only_doubt": {
    "reason": "equivalent: with one observed doubt select_doubt(None, ..) takes its one-element arm and returns Ok, so calling it changes nothing"
-  },
-  "A28": {
-   "mutation": "50bd6117eca45d0e3aa3e1e0e35c2d0a",
-   "reason": "not killed, and not equivalent: write_record_once is reached only with a ReviewAcknowledged, which only the native dialog makes, so the failed write must come after the approval while the second read still succeeds. A folder made read-only during the dialog fails that read first (import_file_permissions_failed), and the tests have no double that fails only the record's own write"
   },
   "A33": {
    "mutation": "1228573f8d89986e22212428e33f0cf6",

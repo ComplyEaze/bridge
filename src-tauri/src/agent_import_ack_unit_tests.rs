@@ -1370,6 +1370,38 @@ fn a_record_that_cannot_be_opened_is_unreadable_not_absent() {
     );
 }
 
+/// A record that cannot be placed says so, and is never taken for one already
+/// there. A test build's review dialog is the scripted one, so this holds a
+/// real approval.
+#[tokio::test]
+async fn a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded() {
+    use crate::tally::approved_import::test_seam::{ScriptedApproval, SCRIPTED_APPROVAL};
+    let approve = || async {
+        let one = VoucherCount::new(1).unwrap();
+        SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                ReviewAcknowledged::confirm(ReviewKind::Review, one, "review"),
+            )
+            .await
+            .unwrap()
+    };
+    let imports = tempfile::tempdir().unwrap();
+    let missing = imports.path().join("missing").join("record.json");
+    assert_eq!(
+        write_record_once(&missing, b"{}", approve().await),
+        Err("import_file_write_failed".to_string())
+    );
+    // Control: a name that holds a record keeps it, and reads as recorded.
+    let held = imports.path().join("record.json");
+    fs::write(&held, b"before").unwrap();
+    assert_eq!(
+        write_record_once(&held, b"{}", approve().await),
+        Err("ack_already_recorded".to_string())
+    );
+    assert_eq!(fs::read(&held).unwrap(), b"before");
+}
+
 /// A doubt file names each of its ledgers: an empty name is not a doubt a
 /// review can bind to.
 #[test]

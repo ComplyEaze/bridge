@@ -431,11 +431,14 @@ fn file_locations_capped(
     };
     let mut files: Vec<PathBuf> = Vec::new();
     let mut capped = false;
-    for (listed, entry) in entries.filter_map(Result::ok).enumerate() {
+    // Every entry counts toward the cap, one that could not be read too, as
+    // the report's own scan counts them.
+    for (listed, entry) in entries.enumerate() {
         if listed == cap {
             capped = true;
             break;
         }
+        let Ok(entry) = entry else { continue };
         if entry.file_type().is_ok_and(|kind| kind.is_file()) {
             files.push(entry.path());
         }
@@ -465,8 +468,13 @@ fn file_locations_capped(
 /// The part of `path` under `base`, comparing component by component in lower
 /// case, close to how Windows compares names (a `/` and a `\` are the same
 /// separator there). An 8.3 short name in one of the two is not matched to its
-/// long form, nor a verbatim `\\?\` path to its plain one.
+/// long form, nor a verbatim `\\?\` path to its plain one. `None` unless
+/// `base` is absolute and every component left of `path` is a plain name (no
+/// `..`, no root or drive), so the remainder names a folder inside `base`.
 fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
+    if !base.is_absolute() {
+        return None;
+    }
     let mut rest = path.components();
     for want in base.components() {
         let got = rest.next()?;
@@ -476,7 +484,9 @@ fn relative_to(base: &Path, path: &Path) -> Option<PathBuf> {
             return None;
         }
     }
-    Some(rest.as_path().to_path_buf())
+    rest.clone()
+        .all(|part| matches!(part, std::path::Component::Normal(_)))
+        .then(|| rest.as_path().to_path_buf())
 }
 
 /// The copies of a folder inside Store apps' packages.
@@ -731,8 +741,10 @@ fn to_json_resolving(
         if matches!(report.root, Root::Present) && !matches!(report.journal, Journal::Absent) {
             let journal = folder.join(JOURNAL_FILE);
             if is_link(&journal) {
-                // The report follows no link (the journal one is refused as
-                // unreadable): its target is not resolved, and could be a share.
+                // A journal file that is itself a link is refused as unreadable,
+                // so its target is not resolved either (it could be a share).
+                // A link above it, such as a data folder moved to another disk,
+                // is followed, as the report follows it.
                 value["journal_path"] = json!(journal.display().to_string());
                 value["journal_path_state"] = json!("link_not_followed");
             } else {

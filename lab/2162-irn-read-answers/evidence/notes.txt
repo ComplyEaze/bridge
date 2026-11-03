@@ -1,0 +1,1 @@
+- Step 3 Display: the Day Book for 3-Apr-25 lists Payment 1, Sales 1, Sales 2; its button bar offers 'Enter: Alter' for a row and no Display. A was not opened (the sheet says no Alter), so the e-Invoice details were not seen on screen. Day Book left with Escape. Screens: shots/r1-daybook-*.jpg (local).

@@ -1614,6 +1614,23 @@ impl Server {
                     });
                 }
             }
+            // The windows of the section's tally_unchecked rows are read here,
+            // under the admission lock and before the catalogue repeat and the
+            // write (#1392): nothing is read between the write and the reply,
+            // and a ledger renamed during these reads is import_catalogue_changed
+            // below. They change only which of those rows read not_found, which
+            // no admission reads, and a day read that fails keeps its rows
+            // unchecked.
+            let transfers = transfers
+                .summary_with_days_read(
+                    &super::voucher_window::AgentReader(self),
+                    &identity,
+                    &company.name,
+                    ledger_masters.catalog(),
+                    mark.value,
+                    &mut accumulated,
+                )
+                .await;
             let (_, _, _, repeated_catalogue_evidence) = self
                 .read_import_ledger_catalogue(&identity, &company.name)
                 .await?;
@@ -2011,6 +2028,20 @@ impl Server {
             }
             transfers::Admission::Admitted(summary) => summary,
         };
+        // As for a build: the windows of the tally_unchecked rows are read
+        // under the admission lock, before the record is appended (#1392).
+        let mut accumulated = accumulated;
+        let transfers = transfers
+            .summary_with_days_read(
+                &super::voucher_window::AgentReader(self),
+                &identity,
+                &company.name,
+                ledger_masters.catalog(),
+                None,
+                &mut accumulated,
+            )
+            .await;
+        let fail = |code: String| ToolFailure::from(code).with_prior_evidence(accumulated.clone());
         self.append_skip_record_while_admitted(&record)
             .map_err(fail)?;
         let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {

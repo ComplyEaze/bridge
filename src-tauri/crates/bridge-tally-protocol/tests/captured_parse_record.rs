@@ -3176,9 +3176,34 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
 const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
-     (26 Oct 2026, #1392), with no row here: no parser or test reads it yet, and the pull request \
-     that adds the day reader replays it and changes this reason; \
+     (26 Oct 2026, #1392), with no row here: the app crate's day reader \
+     (src/agent_transfer_pairing.rs) parses it, and the whole_day tests in \
+     src/agent_transfer_pairing_tests.rs serve it in the reader's order, each request checked byte \
+     for byte, and pin what each read admits; \
      agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
+const TRANSFER_DAYS_READ: &str = "an answer of the transfer days' lab run on BRIDGE TRANSFER LAB \
+     (2 Nov 2026, #1392), with no row here: the app crate's day reader and transfers section \
+     (src/agent_transfer_pairing.rs, src/agent_import_transfers.rs) parse it, and the whole_day \
+     tests in src/agent_transfer_pairing_tests.rs, with src/agent_import_transfers_tests.rs and \
+     src/agent_import_transfer_flow_tests.rs, serve it in the reader's order, each request checked \
+     byte for byte, and pin what each read admits; agent/transfer-days-lab/PROVENANCE.md says what \
+     each file is";
+const TRANSFER_DAYS_FIRST_CENSUS: &str = "a census answer of the transfer days' lab run on BRIDGE \
+     TRANSFER LAB (2 Nov 2026, #1392), read unspanned, with no row here: since #2199 the code \
+     spans every census, so the replays serve the spanned answer of the same day (dNN-c2) in its \
+     place, and the whole_day test each_spanned_census_holds_the_vouchers_of_the_days_first_read \
+     in src/agent_transfer_pairing_tests.rs parses this one with the census parser and pins that \
+     it holds the spanned answer's vouchers; agent/transfer-days-lab/PROVENANCE.md says what each \
+     file is";
+const TRANSFER_DAYS_SPANNED_CENSUS: &str =
+    "a census answer of the transfer days' lab row on BRIDGE \
+     TRANSFER LAB (3 Nov 2026, #1392), spanned (0, 12] as the code sends it since #2199, with no \
+     row here: the app crate's day reader parses it, the whole_day tests in \
+     src/agent_transfer_pairing_tests.rs, with src/agent_import_transfers_tests.rs and \
+     src/agent_import_transfer_flow_tests.rs, serve it in the reader's order, each request checked \
+     byte for byte, and each_spanned_census_holds_the_vouchers_of_the_days_first_read pins that it \
+     holds the vouchers of the same day's unspanned answer (dNN-c); \
+     agent/transfer-days-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 const FOREX_OPEN_BILL: &str = "a Bills Receivable answer of BRIDGE FOREXGROUP LAB (30 Oct 2026, \
@@ -3191,6 +3216,11 @@ const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRA
      BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
      yet, and the pull request that renders the census as a span replays it and changes this \
      reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
+const SPANNED_CENSUS_OTHER_BOOK_MARKS: &str = "BRIDGE OUTSTANDINGS LAB's marks answer from the \
+     span read's lab run (26 Oct 2026, #899), read with only that book loaded, with no row here: \
+     the whole_day tests in src/agent_transfer_pairing_tests.rs serve it to the lab request for \
+     BRIDGE TRANSFER LAB's marks, as an answer that holds no row of that company, and pin that the \
+     day's read fails on it (#1392); agent/spanned-census-two-books/PROVENANCE.md says what it is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
@@ -4120,6 +4150,139 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
         WHOLE_DAY_READ,
     ),
+    // The transfer days' answers on BRIDGE TRANSFER LAB (#1392).
+    (
+        "tests/fixtures/agent/transfer-days-lab/cat1.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/cat2.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/m2.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
     // Built-in reports no parser reads.
     (
         "tests/fixtures/builtin_ratio_analysis_probe_b_fy_live.utf16le.xml",
@@ -4158,7 +4321,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
-        SPANNED_CENSUS,
+        SPANNED_CENSUS_OTHER_BOOK_MARKS,
     ),
     (
         "tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",

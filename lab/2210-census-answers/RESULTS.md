@@ -81,3 +81,9 @@ Four other `bridge_mcp` processes ran under the desktop client as its connectors
 BRIDGE REVIEW LAB: V 251, M 207, holding the 148 set-up Journals from this row, the batch and the payment. It is not restored. Loaded, alone, one tally.exe on 9001.
 
 **Confidence:** one book, one sitting, one build, 7.2: PARTIAL.
+
+## Fix-forward, 3 Nov
+Two lines above are corrected here, read again from `out/relay.jsonl`, `run/client-log.txt` and the bodies. The lines stand as written; this section supersedes them.
+
+- **Request order, batch.** The batch's `verify_import` sent the same 36 exchanges as the payment's, `SEESESEHSHSEECSCSEEVSVSEEVSVSEEHSHSE`: conn 2, requests 217 to 252, 03:21:47 to 03:21:51. The extra `SE` the checker gave it is requests 215 and 216 at 03:21:02, the payment post's last status probe and extent read; that post ended at 03:21:02 and the batch's call began about 45 s later. The extra pair leads the batch's call; nothing trails it. The payment's call is requests 253 to 288. [verified]
+- **Import verification narrations.** Tally's answers hold the narrations without Bridge's marker: the batch's V answer (a8a8403d…) holds `Census row 1` to `Census row 50` with no `[BRIDGE:` anywhere in it, and the payment's likewise. The marker is only in the saved files in `copied/imports/`. Each voucher's `REMOTEID` attribute is its own `GUID` (50 of 50, and the payment's). [verified]

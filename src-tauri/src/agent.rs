@@ -2066,6 +2066,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              invoice, tell the user the number is in use and ask which invoice number to \
              use. Do not pick another number yourself.",
         ),
+        "invoice_number_already_used_with_irn" => Some(
+            "GST rule 46(b) needs an invoice number to be unique in the financial year (1 April \
+             to 31 March), and the read of that year's Sales vouchers found this number already \
+             in use on a voucher that carries an IRN, so the number belongs to an e-invoice and \
+             ComplyEaze Bridge refuses it. The voucher that has the number may be this same \
+             invoice, already in the book: open it in Tally first, and if an earlier batch for \
+             this invoice was sent, run verify_import on it. Only if it is another invoice, tell \
+             the user the number is in use and ask which invoice number to use. Do not pick \
+             another number yourself.",
+        ),
         // The control beside the number read (`NumberAbsence`): a read that
         // matches nothing must never pass as a number not in use.
         "invoice_number_control_missing" => Some(

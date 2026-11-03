@@ -42,6 +42,8 @@ The one-invoice round of #1342, sent by the same contributor on the same company
 
 `pilot-lab-number-new-invoice.utf16le.xml` and `pilot-lab-invoice-readback-before-post.utf16le.xml` are the same bytes: two requests whose answer was an empty collection of this company, which reads the same whatever the request.
 
+**The number reads are now answers to a derived request (partial, #2162 item 8).** Since the number read names `IRN, IRNACKNO, IRNACKDATE` in its fetch list, the code sends `r09-number-new-invoice.xml` and `r10-number-control-k0.xml` (and W18's `w18-number-0040.xml`, see `../pilot-lab-w18/PROVENANCE.md`) with those three words added, a request never sent to this book. The tests replay `pilot-lab-number-new-invoice.utf16le.xml`, `pilot-lab-number-in-use.utf16le.xml` and the S4 number answers below, all captured before the words were added, as answers to that request. They carry none of the three elements, so on them the build claims no IRN. This rests on one measurement on another book, `BRIDGE EINVOICE LAB` (`lab/2162-irn-read-answers` at 9a20049b, R1): with the words added, each row carried the three elements once and was otherwise the answer without them. The derived pins (`LAB_NUMBER_NEW_INVOICE_SHA256`, `LAB_NUMBER_CONTROL_SHA256`, `W18_NUMBER_SHA256`) are not captures: `the_lab_number_reads_are_the_sent_ones_with_the_e_invoice_words` asserts that removing the words, the one stated edit, gives each lab request file's sha256.
+
 The company's tax units were first read with a request typed by hand and sent as UTF-8 (the same collection under another name, before any voucher was keyed); that answer is not kept here, because it answers a request other than the one the code sends. `pilot-lab-tax-units.utf16le.xml` answers the code's own request.
 
 ## The voucher-numbering round (2026-10-16)
@@ -87,7 +89,7 @@ Read-backs of four invoices, each imported raw as the build renders it for a bil
 
 ## A number already in use, in another spelling (2026-11-03, #2162)
 
-Answers of row S4 on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, sent with curl, not through a build, and published on `lab/2162-s4-answers` at 3651c746 (the request files on `lab/2162-s4-sheet` at c5f69f97). Each file here is byte-equal to the file there. The invoice `BP/26-27/0051` they meet was seeded by direct XML to set the row up and is not evidence here. The book was restored from its backup afterwards. The answers are UTF-16LE with no byte order mark, as received. A test compares the SHA-256 of each number read the code renders with the request file the lab sent.
+Answers of row S4 on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, sent with curl, not through a build, and published on `lab/2162-s4-answers` at 3651c746 (the request files on `lab/2162-s4-sheet` at c5f69f97). Each file here is byte-equal to the file there. The invoice `BP/26-27/0051` they meet was seeded by direct XML to set the row up and is not evidence here. The book was restored from its backup afterwards. The answers are UTF-16LE with no byte order mark, as received. A test compares the SHA-256 of each number read the code renders, less the `, IRN, IRNACKNO, IRNACKDATE` it now adds to the fetch list (#2162 item 8), with the request file the lab sent.
 
 | Fixture | Bytes | SHA-256 | Published as | What it is |
 | --- | ---: | --- | --- | --- |

@@ -151,12 +151,13 @@ const ADMISSION_ORDER: &str = concat!(
     "eOsOse"
 );
 
-/// The lab's request files the tests pin a read to, by sha256: the number
-/// read for `BP/26-27/0010` (`r09-number-new-invoice.xml`), the same read for
-/// `BP/26-27/0001` (`r10-number-control-k0.xml`) and the company's tax units
+/// The requests the tests pin a read to, by sha256: the number read for
+/// `BP/26-27/0010` and the same read for `BP/26-27/0001`, each the lab's
+/// request file with the e-invoice words added (DERIVED, see
+/// `LAB_NUMBER_NEW_INVOICE_SHA256`), and the company's tax units
 /// (`r16-tax-units.xml`, the request the code sends).
-const LAB_R09_SHA256: &str = "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985";
-const LAB_R10_SHA256: &str = "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6";
+const R09_WITH_IRN_SHA256: &str = super::LAB_NUMBER_NEW_INVOICE_SHA256;
+const R10_WITH_IRN_SHA256: &str = super::LAB_NUMBER_CONTROL_SHA256;
 const LAB_R16_SHA256: &str = "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38";
 /// The rates read restricted to the lab invoice's ledgers by GUID (#1331): the
 /// request the code renders, never sent to the lab with these six GUIDs. The
@@ -663,11 +664,12 @@ async fn an_admission_makes_every_read_in_order_and_refuses_where_its_answer_dec
                 serde_json::to_value(observed.unwrap()).unwrap(),
                 pilot_observed()
             );
-            // Both sends of the number read and of the tax-unit read
-            // are the requests the lab sent, byte for byte.
+            // Both sends of the tax-unit read are the request the lab
+            // sent, byte for byte, and both of the number read are the
+            // lab's with the e-invoice words added (DERIVED).
             assert_eq!(
                 sent_as(ADMISSION_ORDER, &received, 'N'),
-                [LAB_R09_SHA256; 2]
+                [R09_WITH_IRN_SHA256; 2]
             );
             assert_eq!(
                 sent_as(ADMISSION_ORDER, &received, 'C'),
@@ -792,8 +794,9 @@ async fn a_re_read_that_finds_the_registration_composition_is_refused_as_not_reg
 /// A number the book already uses, on Tally's own answer: the number read for
 /// `BP/26-27/0001` finds the book's first invoice (`BRIDGE Sales`, Sales
 /// class), and the invoice is refused after that read, before the company's
-/// tax units are read (64 requests). Both sends of the read are the request the
-/// lab sent, byte for byte (`r10-number-control-k0.xml`).
+/// tax units are read (64 requests). Both sends of the read are the lab's
+/// `r10-number-control-k0.xml` with the e-invoice words added (DERIVED), and its
+/// answer, captured without them, names no IRN, so the refusal claims none.
 #[tokio::test]
 async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
     let order = ADMISSION_ORDER.replace('N', "U");
@@ -808,8 +811,32 @@ async fn a_number_the_book_already_uses_is_refused_after_the_number_read() {
         )])
     );
     assert_eq!(requests.len(), 64);
-    assert_eq!(sent_as(&order, &requests, 'U'), [LAB_R10_SHA256; 2]);
+    assert_eq!(sent_as(&order, &requests, 'U'), [R10_WITH_IRN_SHA256; 2]);
     assert!(voucher.invoice.as_ref().unwrap().observed.is_none());
+}
+
+/// A number held by a Sales voucher with an IRN is refused under its own code.
+/// DERIVED: the pilot lab answering as captured except the number read, which
+/// gets the e-invoice lab's answer for its number `1` (`einvoice-lab`), whose
+/// Sales holder carries an IRN; the judge reads the rows, not their number.
+#[tokio::test]
+async fn a_number_held_by_an_invoice_with_an_irn_is_refused_saying_so() {
+    let order = ADMISSION_ORDER.replace('N', "U");
+    let held = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
+    ));
+    let mut voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    voucher.voucher_number = Some("BP/26-27/0001".to_string());
+    let (seen, _, requests) =
+        admit_on(pilot_lab_over_replacing(&order, &[('U', held)]), voucher).await;
+    assert_eq!(
+        seen,
+        Err(vec![(
+            "invoice_number_already_used_with_irn",
+            "BP/26-27/0001".to_string()
+        )])
+    );
+    assert_eq!(requests.len(), 64);
 }
 
 /// The re-read a post makes before its approval window, and again after it,
@@ -1058,7 +1085,7 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
     // No control read: the number read is followed by the company's tax units.
     assert_eq!(
         sent_as(ADMISSION_ORDER, &requests, 'N'),
-        [LAB_R09_SHA256; 2]
+        [R09_WITH_IRN_SHA256; 2]
     );
     assert_eq!(
         sent_as(ADMISSION_ORDER, &requests, 'C'),
@@ -1069,8 +1096,14 @@ async fn an_admission_for_a_stopped_company_is_refused_before_any_read() {
         admission_after_a_sent_invoice(Then::Status("posted_verified"), &controlled).await;
     assert_eq!(outcome, Ok(()));
     assert_eq!(requests.len(), controlled.len());
-    assert_eq!(sent_as(&controlled, &requests, 'N'), [LAB_R09_SHA256; 2]);
-    assert_eq!(sent_as(&controlled, &requests, 'U'), [LAB_R10_SHA256; 2]);
+    assert_eq!(
+        sent_as(&controlled, &requests, 'N'),
+        [R09_WITH_IRN_SHA256; 2]
+    );
+    assert_eq!(
+        sent_as(&controlled, &requests, 'U'),
+        [R10_WITH_IRN_SHA256; 2]
+    );
     assert_eq!(sent_as(&controlled, &requests, 'C'), [LAB_R16_SHA256; 2]);
 }
 
@@ -1094,10 +1127,10 @@ async fn a_control_the_read_does_not_find_refuses_the_build_naming_its_batch() {
     assert_eq!(
         sent_as(&missing, &requests, 'N'),
         [
-            LAB_R09_SHA256,
-            LAB_R09_SHA256,
-            LAB_R10_SHA256,
-            LAB_R10_SHA256
+            R09_WITH_IRN_SHA256,
+            R09_WITH_IRN_SHA256,
+            R10_WITH_IRN_SHA256,
+            R10_WITH_IRN_SHA256
         ]
     );
     assert!(sent_as(&missing, &requests, 'C').is_empty());

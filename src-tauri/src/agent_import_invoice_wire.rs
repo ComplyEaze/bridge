@@ -422,7 +422,10 @@ impl VoucherTypeGuid {
 /// class is decided here, in the program, from that compute. Only measured
 /// primitives reach Tally: a date formula on literal dates (SVFROMDATE and
 /// SVTODATE do not limit a collection), a voucher-number equality (the form the
-/// hand-keyed invoice read used) and the class compute.
+/// hand-keyed invoice read used) and the class compute. The e-invoice details
+/// say whether a voucher holding the number carries an IRN: with them the lab's
+/// answers were the answers without them plus the three elements on each row
+/// (#2162 item 8, `lab/2162-irn-read-answers` R1, protocol reference §8.2j).
 pub(in crate::agent) fn render_invoice_number_request(
     company: &str,
     number: &InvoiceNumber,
@@ -430,7 +433,7 @@ pub(in crate::agent) fn render_invoice_number_request(
 ) -> String {
     let (number, from, to) = (number.as_str(), from.as_str(), to.as_str());
     format!(
-        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\" AND $VoucherNumber = \"{number}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
         company = xml_escape(company),
     )
 }
@@ -439,19 +442,37 @@ pub(in crate::agent) fn render_invoice_number_request(
 /// already use).
 const SALES_CLASS_TAG: &str = "BRIDGEVCHISSALES";
 
-/// How many of the returned vouchers are Sales-class. A row whose class
-/// element is missing or is neither Yes nor No is an error: an unknown function
-/// omits its element, so a gap is never a No.
-pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
-    let mut sales = 0;
+/// The returned vouchers that are Sales-class. A row whose class element is
+/// missing or is neither Yes nor No is an error: an unknown function omits its
+/// element, so a gap is never a No.
+fn sales_rows(xml: &str) -> Result<Vec<Row>, &'static str> {
+    let mut sales = Vec::new();
     for row in rows(xml, "VOUCHER")? {
         match row.one(SALES_CLASS_TAG)? {
-            Some("Yes") => sales += 1,
+            Some("Yes") => sales.push(row),
             Some("No") => {}
             _ => return Err("invoice_number_class_unread"),
         }
     }
     Ok(sales)
+}
+
+/// How many of the returned vouchers are Sales-class.
+pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
+    sales_rows(xml).map(|sales| sales.len())
+}
+
+/// Whether a Sales-class voucher holding the number carries an IRN: an `IRN`
+/// with text. One that came back empty or did not come back says nothing (the
+/// row reader keeps no empty field, so the two are not told apart), and never
+/// makes this true.
+pub(super) fn sales_holder_has_irn(xml: &str) -> Result<bool, &'static str> {
+    for row in sales_rows(xml)? {
+        if row.one("IRN")?.is_some() {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Whether the number read for a known invoice (the control) found it: a row

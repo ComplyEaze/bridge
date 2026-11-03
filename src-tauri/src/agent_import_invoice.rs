@@ -2289,10 +2289,14 @@ impl InvoiceJudge<'_> {
             .map_err(|code| Verdict::Failed(code.to_string()))?
             != 0
         {
-            return Err(refusing(refuse_value(
-                "invoice_number_already_used",
-                &number,
-            )));
+            let code = if wire::sales_holder_has_irn(number_body)
+                .map_err(|code| Verdict::Failed(code.to_string()))?
+            {
+                "invoice_number_already_used_with_irn"
+            } else {
+                "invoice_number_already_used"
+            };
+            return Err(refusing(refuse_value(code, &number)));
         }
         // 3c. "No voucher carries this number" is believed only beside a
         // control: the same read for an invoice this company is known to hold

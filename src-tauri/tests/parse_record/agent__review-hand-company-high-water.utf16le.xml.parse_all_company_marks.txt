@@ -1,0 +1,11 @@
+# fixture: agent/review-hand-company-high-water.utf16le.xml
+# parser: parse_all_company_marks
+# source: captured
+Ok([
+    LoadedCompanyMarks {
+        name: "BRIDGE REVIEW LAB",
+        guid: "63292d7c-d541-42e5-aa9d-2ab5f8b993ff",
+        vouchers: 302,
+        masters: 207,
+    },
+])

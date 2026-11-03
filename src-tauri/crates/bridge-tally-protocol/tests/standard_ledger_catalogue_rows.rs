@@ -421,7 +421,7 @@ struct V2Capture {
     bill_wise: usize,
 }
 
-const V2_CAPTURES: [V2Capture; 4] = [
+const V2_CAPTURES: [V2Capture; 5] = [
     V2Capture {
         company: "BRIDGE OUTSTANDINGS LAB",
         guid: "49f1fbda-ee59-4a4b-aacf-b45fe32402d7",
@@ -457,6 +457,14 @@ const V2_CAPTURES: [V2Capture; 4] = [
         provenance: include_str!("fixtures/agent/native-ledger-catalogue-v2.json"),
         ledgers: 9,
         bill_wise: 2,
+    },
+    V2Capture {
+        company: "BRIDGE REVIEW LAB",
+        guid: "63292d7c-d541-42e5-aa9d-2ab5f8b993ff",
+        xml: include_bytes!("fixtures/agent/review-lab-ledger-catalogue-v2.utf16le.xml"),
+        provenance: include_str!("fixtures/agent/review-lab-ledger-catalogue-v2.json"),
+        ledgers: 3,
+        bill_wise: 0,
     },
 ];
 

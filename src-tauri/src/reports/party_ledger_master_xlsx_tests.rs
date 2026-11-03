@@ -53,6 +53,7 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
         mailing_details_read_failed: None,
     }
@@ -124,6 +125,7 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
         mailing_details_read_failed: None,
     })
@@ -193,6 +195,7 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         }],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
         mailing_details_read_failed: None,
     })
@@ -260,6 +263,7 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
         mailing_details_read_failed: None,
     })
@@ -327,6 +331,7 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
         mailing_details_read_failed: None,
     })

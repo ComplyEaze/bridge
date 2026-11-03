@@ -2583,9 +2583,17 @@ impl TallyClient {
             let mut rows = Vec::new();
             let mut foreign_currency_ledgers_excluded = Vec::new();
             let mut mixed_currency_ledgers_excluded = Vec::new();
+            let mut set_aside_masters = Vec::new();
             for read in reads {
                 foreign_currency_ledgers_excluded.extend(read.foreign.iter().cloned());
                 mixed_currency_ledgers_excluded.extend(read.mixed.iter().cloned());
+                set_aside_masters.extend(
+                    read.master
+                        .records
+                        .iter()
+                        .filter(|source| read.set_aside.contains(&source.record.ledger.name))
+                        .cloned(),
+                );
                 rows.extend(join_party_ledger_master_part(read)?);
             }
             if several_parts {
@@ -2618,6 +2626,7 @@ impl TallyClient {
                 groups,
                 foreign_currency_ledgers_excluded,
                 mixed_currency_ledgers_excluded,
+                set_aside_masters,
                 mailing_details_read_failed,
             };
             Ok((source, count_evidence))

@@ -1439,6 +1439,27 @@ pub(super) fn captured_72_vouchers() -> String {
     ))
 }
 
+/// The registers' class-entry window of the same day (`forex-register`, #683), each voucher as
+/// the window parse leaves it before the book's base is read, in the shape the date, ledger and
+/// class checks read: every voucher with a composite is withheld.
+#[cfg(test)]
+pub(super) fn captured_72_register_window() -> Vec<Value> {
+    let shape = super::voucher_window::VoucherReadShape::ClassEntryWildcard;
+    parse_agent_rows_withholding_reading_gst(
+        &decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-window.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        shape.named_fields(),
+        shape.stock_lines(),
+    )
+    .expect("the captured register window parses")
+    .into_iter()
+    .map(VoucherRow::into_filter_row)
+    .collect()
+}
+
 /// That book's base and masters, from its own captured currency reads.
 #[cfg(test)]
 pub(super) fn captured_72_book() -> IdentifiedBaseCurrency {

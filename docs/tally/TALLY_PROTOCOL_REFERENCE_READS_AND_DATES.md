@@ -623,6 +623,14 @@ there that amount is the foreign amount times the rate exactly, so no rounding c
 `vouchers` reads the amount after `=`, and leaves a voucher withheld when they do not net to zero
 (bridge#683).
 
+**The registers' class-entry window writes the same texts (PARTIAL: one synthetic book, one read
+of the same day, `lab/683-register-answers`, the fixtures `forex-register`).** Its 53 `AMOUNT` and
+`VATEXPAMOUNT` texts equal the plain window's. Composites also sit in four
+`BANKALLOCATIONS.LIST/AMOUNT`s, which no parser reads. A typed bill allocation's amount is judged
+when its list closes, inside its entry, so a parse that refuses composites refuses there first,
+as `bill_allocation_amount_invalid`. The registers and `gst_by_counter_ledger` read the amount
+after `=` as `vouchers` does (bridge#683).
+
 **Adding the field changes nothing else.** On FOREX the response was otherwise byte-identical to
 the same request without it. The same holds for the native Trial Balance request
 (`TBALOPENING, DEBITTOTALS, CREDITTOTALS, TBALCLOSING` plus `CURRENCYNAME`): measured on FOREX and

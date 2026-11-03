@@ -56,8 +56,8 @@ test("desktop command invokes the one shared selected-voucher operation", async 
   assert.match(vouchers, /async fn read_entry_window_rows_reading_gst(?:(?!\bfn\s)[\s\S])*?read_voucher_window_with\((?:(?!\bfn\s)[\s\S])*?WindowReadLimits::for_shape\(shape\)/);
   assert.match(vouchers, /type_selector\.is_some\(\) \{\s*VoucherReadShape::ClassEntryWildcard\s*\} else \{\s*VoucherReadShape::EntryWildcard/);
   // The corroboration's widened read names the plain shape itself, since #683 deleted the
-  // wrapper that held it.
-  assert.match(vouchers, /let wider = self\s*\.read_entry_window_shaped\((?:(?!\bfn\s)[\s\S])*?VoucherReadShape::EntryWildcard,\s*SmallBooks::Skip,?\s*\)/);
+  // wrapper that held it, and refuses composites rather than withholding them.
+  assert.match(vouchers, /let wider = self\s*\.read_entry_window_shaped\((?:(?!\bfn\s)[\s\S])*?\(\s*VoucherReadShape::EntryWildcard,\s*VoucherComposites::Refuse,?\s*\),\s*SmallBooks::Skip,?\s*\)/);
   // The page is taken from the filtered and selected rows: the ledger filter runs first, then the rows are held for later
   // pages and `render_page_body` cuts the page: for a listing it calls `page_items` (which applies `skip(offset)` then
   // `take(limit)`), for a summary the bucket page. A served later page calls the same `render_page_body` on the held rows

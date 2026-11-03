@@ -1462,19 +1462,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              and ledger_movement do not support it yet (#716). Retrying this read refuses \
              again.",
         ),
-        "register_ledger_currency_excluded" => Some(
-            "A voucher in this window touches a ledger that the compliance read of the ledger \
-             masters set aside because it is kept in another currency (or its balance is a \
-             currency composite), so the purchase or sales register cannot classify the voucher and refuses \
-             the whole window rather than leave it out. Narrow from and to so the window holds \
-             no such voucher, or read it with `vouchers`. Retrying the same window refuses \
-             again.",
-        ),
         "gst_by_ledger_window_partial" => Some(
             "The voucher window was read but could not be checked against a separate count of its \
-             vouchers, so gst_by_counter_ledger gives no totals for it rather than totals that may \
-             be short. purchase_register for the same window returns the rows it read, marked \
-             partial.",
+             vouchers, or holds a voucher whose foreign-currency amounts could not be read, so \
+             gst_by_counter_ledger gives no totals for it rather than totals that may be short. \
+             purchase_register for the same window returns the rows it read, marked partial, \
+             and lists any voucher it withheld.",
         ),
         "register_master_mark_unavailable" => Some(
             "Tally did not report the company's master-alteration mark, which the purchase and sales \

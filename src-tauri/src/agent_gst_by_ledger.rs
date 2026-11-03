@@ -189,13 +189,10 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
         balance = balance
             .checked_add(&amount)
             .map_err(|_| "voucher_amount_invalid".to_string())?;
-        let ledger = index.by_name.get(name).ok_or_else(|| {
-            if index.excluded.contains(name) {
-                "register_ledger_currency_excluded".to_string()
-            } else {
-                "ledger_snapshot_drifted".to_string()
-            }
-        })?;
+        let ledger = index
+            .by_name
+            .get(name)
+            .ok_or_else(|| "ledger_snapshot_drifted".to_string())?;
         match (ledger.group, &ledger.head) {
             (LedgerGroup::DutiesAndTaxes, GstDutyHeadObservation::Recognized { head, .. }) => {
                 any_gst = true;
@@ -370,13 +367,20 @@ struct CompleteWindow {
 }
 
 impl CompleteWindow {
-    fn admit(window: RegisterWindow) -> Result<Self, String> {
+    /// A window whose label is `complete`, every row dated inside it, and no voucher withheld:
+    /// a withheld voucher's tax could not be read, so totals without it would be short (#683).
+    /// A withheld voucher's date is checked with the rest, before it refuses (#674).
+    fn admit(window: RegisterWindow, (from, to): (&str, &str)) -> Result<Self, String> {
         if window.state != "complete" {
+            return Err("gst_by_ledger_window_partial".to_string());
+        }
+        let rows = validate_then_filter_voucher_rows(window.rows, from, to, None)?;
+        if rows.iter().any(|row| row.get(WITHHELD_MARKER).is_some()) {
             return Err("gst_by_ledger_window_partial".to_string());
         }
         Ok(Self {
             index: window.index,
-            rows: window.rows,
+            rows,
         })
     }
 }
@@ -459,8 +463,8 @@ impl Server {
             let window = self
                 .read_register_window(&identity, &company.name, (&from, &to), &mut evidence)
                 .await?;
-            let CompleteWindow { index, rows } = CompleteWindow::admit(window)?;
-            let rows = validate_then_filter_voucher_rows(rows, from.as_str(), to.as_str(), None)?;
+            let CompleteWindow { index, rows } =
+                CompleteWindow::admit(window, (from.as_str(), to.as_str()))?;
             let totals = fold(&index, &rows)?;
             let mut result = gst_by_ledger_result(&index, &totals, self.settings.redaction);
             result["state"] = json!("complete");

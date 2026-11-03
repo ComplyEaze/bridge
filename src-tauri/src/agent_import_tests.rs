@@ -5725,7 +5725,7 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
     // first sales line names a group source, which no capture fills.
     let readback = String::from_utf16(
         &include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
         )
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))

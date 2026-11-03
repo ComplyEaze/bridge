@@ -1,6 +1,7 @@
 //! Master journal tests: local files and synthetic identifiers only.
 use super::*;
 use crate::agent::agent_import::tests::{sentinel_batch_id, sentinel_uuid};
+use bridge_tally_core::master_binding::{twin_fold_keys, MasterNameKeys};
 use serde_json::json;
 use std::io::Cursor;
 use std::path::Path;
@@ -109,8 +110,11 @@ fn verdict_for(batch: &MasterBatch, state: MasterVerdictState) -> MasterVerdict 
     )
 }
 
+/// Any open file stands in. One that already exists leaves no new file to create in the
+/// system temp folder, where a Windows runner has refused with access denied.
 fn lock() -> ExclusiveAdmission {
-    ExclusiveAdmission::standing_in(tempfile::tempfile().unwrap())
+    let held = std::fs::File::open(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap();
+    ExclusiveAdmission::standing_in(held)
 }
 
 /// `append` for any record: an intent goes through `append_intent`, as a caller's does.
@@ -1830,7 +1834,7 @@ fn an_open_dispatch_overlaps_on_matching_names_or_on_an_equal_recorded_key() {
 
 #[test]
 fn a_pair_agreeing_on_the_canonical_key_only_or_a_twin_fold_only_may_be_one_master() {
-    let one = |a: &str, b: &str| NameKeys::of(a).may_be_one_master(&NameKeys::of(b));
+    let one = |a: &str, b: &str| MasterNameKeys::of(a).may_be_one_master(&MasterNameKeys::of(b));
     let shares_a_twin_key = |a: &str, b: &str| {
         let b_keys = twin_fold_keys(b);
         twin_fold_keys(a).iter().any(|key| b_keys.contains(key))
@@ -2120,7 +2124,7 @@ fn a_sidecar_is_removed_checked() {
 
 #[test]
 fn two_names_differing_only_by_spaces_or_symbols_may_be_one_master() {
-    let one = |a: &str, b: &str| NameKeys::of(a).may_be_one_master(&NameKeys::of(b));
+    let one = |a: &str, b: &str| MasterNameKeys::of(a).may_be_one_master(&MasterNameKeys::of(b));
     let (dotted, plain) = ("Synthetic Probe Pvt. Ltd.", "Synthetic Probe Pvt Ltd");
     assert_ne!(canonical_master_key(dotted), canonical_master_key(plain));
     assert!(one(dotted, plain));

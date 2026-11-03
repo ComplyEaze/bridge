@@ -21,8 +21,13 @@ fn captured() -> String {
 
 /// The rows as `vouchers` reads them when the call asks for GST details.
 fn parse(xml: &str) -> Vec<Value> {
-    parse_agent_rows_reading_gst(xml, COMPANY_GUID, GstDetailsShown::Shown)
-        .expect("the read still succeeds")
+    parse_agent_rows_reading_gst(
+        xml,
+        COMPANY_GUID,
+        GstDetailsShown::Shown,
+        EInvoiceFields::NotAsked,
+    )
+    .expect("the read still succeeds")
 }
 
 /// A row with both GST keys taken off every entry.
@@ -309,8 +314,13 @@ fn an_absent_or_empty_taxability_is_reported_as_such() {
 fn a_read_that_does_not_ask_parses_no_gst_details() {
     let xml = captured();
     let plain = parse_agent_rows(&xml, COMPANY_GUID).unwrap();
-    let withheld =
-        parse_agent_rows_reading_gst(&xml, COMPANY_GUID, GstDetailsShown::Withheld).unwrap();
+    let withheld = parse_agent_rows_reading_gst(
+        &xml,
+        COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        EInvoiceFields::NotAsked,
+    )
+    .unwrap();
     assert_eq!(plain, withheld);
     let text = serde_json::to_string(&plain).unwrap();
     assert!(!text.contains("gst_details"));
@@ -455,6 +465,7 @@ fn the_entry_holding_an_item_invoices_goods_line_carries_no_rates() {
         &xml,
         "aae372c5-a894-491c-8843-5532e43d2d2f",
         GstDetailsShown::Shown,
+        EInvoiceFields::NotAsked,
     )
     .expect("the read still succeeds");
     assert_eq!(rows.len(), 1);

@@ -35,6 +35,54 @@ fn a_paired_report_response_marker_does_not_change_the_command_code() {
     }
 }
 
+/// The same property for the request a party ledger read names (#2265): the desktop export
+/// classifies this read by the same text, so the code is identical with and without it, each
+/// failure reaching the mapper the way a failed send does.
+#[test]
+fn a_named_ledger_request_does_not_change_the_command_code() {
+    use crate::tally::connection::LedgerReadRequest;
+    use crate::tally::runtime::{with_read_evidence, RuntimeReadEvidence};
+    use bridge_tally_transport::TallyTransportError;
+
+    let wrapped = |error| with_read_evidence(error, RuntimeReadEvidence::empty());
+    let failures = || {
+        [
+            (
+                anyhow::Error::new(TallyTransportError::ConnectionFailed),
+                "endpoint_unreachable",
+            ),
+            (
+                anyhow::Error::new(TallyTransportError::RequestTimedOut),
+                "tally_request_deadline_exceeded",
+            ),
+            (
+                anyhow::Error::new(TallyTransportError::ResponseTooLarge {
+                    limit: 1,
+                    declared_by_peer: true,
+                }),
+                "response_validation_failed",
+            ),
+            (
+                anyhow::anyhow!("The request was cancelled"),
+                "request_cancelled",
+            ),
+            (
+                anyhow::anyhow!("Tally company was not found"),
+                "tally_company_context_failed",
+            ),
+        ]
+    };
+    for ((bare, code), (failure, _)) in failures().into_iter().zip(failures()) {
+        let bare = party_ledger_master_runtime_command_error(wrapped(bare));
+        let named = party_ledger_master_runtime_command_error(wrapped(
+            LedgerReadRequest::LedgerMaster.failed(failure),
+        ));
+        assert_eq!(bare.code, code);
+        assert_eq!(named.code, code);
+        assert_eq!(named.message, bare.message);
+    }
+}
+
 use super::all_clients::migration::{
     load_client_group_labels_for_migration, prepare_client_group_label_migration_from_labels,
     ClientGroupLabelMigrationPreparationError,
@@ -509,12 +557,6 @@ fn tally_runtime_error_serialization_is_stable_and_redacted() {
     assert_eq!(deadline.code, "tally_request_deadline_exceeded");
     assert_eq!(deadline.retry, "after_change");
     assert!(deadline.remediation.contains("Do not retry"));
-
-    let discovery_limit = tally_runtime_command_error(anyhow::anyhow!(
-        "interactive discovery listing limit exceeded: synthetic company response"
-    ));
-    assert_eq!(discovery_limit.code, "untrusted_discovery_limit_exceeded");
-    assert_eq!(discovery_limit.category, "Discovery listing");
 }
 
 #[test]

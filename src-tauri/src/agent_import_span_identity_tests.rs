@@ -1035,6 +1035,27 @@ fn a_read_back_ledger_name_keeps_a_line_break_in_either_spelling() {
     }
 }
 
+/// #626: a voucher that landed on the other ledger of a line-break pair does
+/// not match what was sent, in either direction, so it cannot read verified.
+#[test]
+fn a_read_back_on_the_other_ledger_of_a_line_break_pair_does_not_match() {
+    let rows =
+        parse_import_voucher_rows(&captured(LINE_BREAK_READ), LINE_BREAK_COMPANY_GUID).unwrap();
+    let read = |ledger: &str| {
+        let mut row = rows[0].clone();
+        row.entries[0].ledger = ledger.to_string();
+        actual_entry_fingerprint(&row)
+    };
+    assert_eq!(
+        read("Lab Line Break Ledger\r\n"),
+        actual_entry_fingerprint(&rows[0])
+    );
+    assert_ne!(
+        read("Lab Line Break Ledger"),
+        actual_entry_fingerprint(&rows[0])
+    );
+}
+
 /// #1633: only a mark that moved by more than the post created, or a span that
 /// later held another number of vouchers, says another change was made during
 /// the post. The match has no wildcard, so a new refusal must be sorted here.
@@ -1097,4 +1118,31 @@ fn only_the_step_and_count_refusals_name_a_concurrent_change() {
         );
     }
     assert_eq!(concurrent_change_line_for("span_unknown_code"), None);
+}
+
+/// Sign-rule site 4 (#1872): the span identity compares what was sent with the row in canonical
+/// form, so the sixth captured voucher (3450.50) written `03450.50` still binds, and one paisa
+/// more does not. The batch-side text is a lexeme; the comparison is not.
+#[test]
+fn a_padded_amount_binds_against_the_row_tally_holds() {
+    let span = span();
+    let read = span_read();
+    let mut padded = sent();
+    for entry in &mut padded[5].entries {
+        assert_eq!(entry.amount, "3450.50");
+        entry.amount = "03450.50".into();
+    }
+    let bound = bind(&span, COMPANY_GUID, &padded, &read, &BTreeSet::new()).unwrap();
+    assert_eq!(bound.len(), 10);
+    let mut paisa = sent();
+    for entry in &mut paisa[5].entries {
+        entry.amount = "03450.51".into();
+    }
+    assert_eq!(
+        refusal(bind(&span, COMPANY_GUID, &paisa, &read, &BTreeSet::new())),
+        SpanRefusal::Content {
+            position: 5,
+            fields: vec!["entries"]
+        }
+    );
 }

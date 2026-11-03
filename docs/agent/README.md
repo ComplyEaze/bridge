@@ -37,7 +37,7 @@ Configure it with `BRIDGE_TALLY_HOST` (default `localhost`),
 platform application-data directory by default), `BRIDGE_AGENT_MAX_ROWS`
 (default `500`), `BRIDGE_AGENT_MAX_BYTES` (default `200000`), and
 `BRIDGE_AGENT_REDACTION` (`none`, `mask_parties`, or `drop_narration`).
-`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer. Control replies (to
+`BRIDGE_AGENT_MAX_BYTES` bounds each tool's answer, so a page can end before `limit`, marked truncated with its `next_offset`. Control replies (to
 `initialize`, `ping` and `tools/list`), which the build fixes and which carry no
 book data, are held to 1,000,000 bytes, or to it if it is larger. The host is validated by `bridge-tally-transport`; non-loopback hosts are refused.
 The resolved data path must be valid Unicode so saved artifact paths can be
@@ -50,7 +50,7 @@ identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
 names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
-and stock-group parents, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+and stock-group parents, in `stock_by_batch` item, godown and batch names, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
 GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
@@ -110,6 +110,7 @@ The ordinary default tools, in name order:
 - `read_evidence`
 - `sales_register`
 - `statement_tie_out`
+- `stock_by_batch`
 - `stock_by_godown`
 - `stock_summary`
 - `tally_status`
@@ -125,7 +126,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
-not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_godown` is in the source after release 0.7.0 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_batch` and `stock_by_godown` are in the source after release 0.7.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -195,6 +196,9 @@ byte count, completeness reason, and truncation state. A refused call returns
 puts `error` directly in `structuredContent`, with no `result`). Where a runtime
 refusal has a typed, data-free reason, the error also carries `cause`, which names why
 (for example `company_base_currency_undetermined` beside `party_ledger_master_read_failed`).
+The party ledger read is several requests, so a refusal where one of them failed also carries
+`failed_request`, which names it: `base_currency`, `book_extent`, `ledger_count`, `ledger_catalogue`,
+`ledger_master`, `ledger_balance` or `groups`.
 A read whose two paired halves differ, because the book changed while Bridge was reading it,
 carries `native_report_pair_changed` or a cause specific to that read (for example
 `masters_collection_changed` or `party_ledger_balance_changed`). A voucher-window part that is not admitted
@@ -338,8 +342,9 @@ When Bridge got no response it could read, the `cause` names why and the error a
 - An `endpoint_…` runtime code: Bridge held the request back and sent nothing. So do
   `tally_endpoint_busy` (with `retry_after_s`) and `tally_endpoint_lock_unavailable`, which
   come back as the `code` itself, and `tally_endpoint_draining` (with `retry_after_s`), when an
-  earlier post was cut for time and Tally has not yet answered `/status` three times in a row
-  since (#2142); a draining refusal may have sent `/status` checks, but not the request.
+  earlier request was cut, abandoned or refused at its head and Tally has not yet answered
+  `/status` three times in a row since (#2142); a draining refusal may have sent `/status`
+  checks, but not the request.
 
 A wrong or reset port therefore reads as an endpoint problem, not as a Tally data problem. A
 failed read without `endpoint` either received a response whose body then failed to read, decode,
@@ -1001,9 +1006,8 @@ redaction setting hides it, so the tool is refused as `audit_redaction_unsupport
 
 Refusals: `audit_part_deadline_exceeded` (a part ran past the 20 seconds a request is given; the same
 request would be sent again and Tally may still be building the abandoned answer, so do not retry as it
-stands), `audit_part_drain_required` (a previous request was abandoned, in this call or an earlier one,
-and Tally may still be building its answer: nothing was sent. ComplyEaze Bridge does not yet probe Tally to
-clear that, so the refusal stays until ComplyEaze Bridge is restarted; look at Tally first), `C6-moved`
+stands), `tally_endpoint_draining` (an earlier request was cut, and Tally has not yet answered that it has finished:
+the request was not sent. Call again after `retry_after_s` seconds), `C6-moved`
 and `voucher_window_changed_during_read` (someone changed the book during the read: it may be tried
 again), `audit_window_divided_by_alterid` (a day too heavy for one request: the read is refused, because
 the engine's windows must tile the period by date; refused before any voucher is read when the count
@@ -1123,6 +1127,43 @@ book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, whic
 unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
 Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
 Gold and other releases.
+
+### Stock by godown and batch (`stock_by_batch`)
+
+Use `stock_by_batch` with `company_guid`, `as_of` (a month's last day, as for `stock_summary`) and
+`items` (1 to 20 stock item GUIDs, each once, as `stock_summary` returns them; 20 is a chosen limit, since
+each item is one request sent after the last) for Tally's own Stock Query
+of each item: its quantity in each godown and batch at `as_of`. Quantities only: the report carries no
+value, rate, expiry or manufacturing date, and its last-purchase and last-sale groups are not returned.
+
+Each item's lines are tied as a whole to its closing quantity in Tally's stock item list for the same
+period, and its `state` says how: `tied`, `differs` (both sides are returned, `lines_total` and
+`closing`, and neither is adjusted), `not_comparable` (`closing_unread` for an item with an alternate
+unit, whose closing Tally writes in both units while Stock Query writes the base unit only;
+`units_differ`), `no_stock` (Tally's empty answer beside a closing of zero)
+or `no_movement` (the empty answer beside no closing at all, which does not say the item holds none).
+Tally sends the same empty answer for an item with no stock, one that never moved and a name it does
+not know, so it is never read as zero on its own. An item can also be `item_not_found`,
+`name_unmeasured` (its name holds a character no capture showed Stock Query selecting by, so nothing
+is sent for it), `refused` with `code` (the answer could not be read, or was over 262,144 bytes:
+`stock_query_answer_too_large`; the other items are still read), `not_read` with `code` (the send failed
+or timed out) or `not_sent`. A failed send stops the reads: the result is `partial`, `stopped` names
+the code, and the book was not checked for change after the items already read.
+
+`godowns` adds each godown's lines, by their positions in `lines`; it is compared with nothing and is
+not Tally's Godown Summary. Godown and batch names are compared as sent, so two that differ only in case
+are two. No line is compared with any voucher: a Stock Journal moves stock between godowns without an
+invoice goods line. `batch_wise` is the company's setting; with it off every line reads `Primary Batch`.
+The 262,144-byte limit is a choice, not a measurement: the largest answer measured is 3,152 bytes,
+and an item's lines grow with the godowns and batches that hold its stock, which no other read bounds.
+
+The read uses `stock_summary`'s bracket and its admission of the stock items, under this tool's own
+codes: `stock_by_batch_too_large` (with `size`), `stock_by_batch_census_refused`,
+`stock_by_batch_item_count_company_higher` and `stock_by_batch_bound_premise_violated` (each with
+`error.cause`), `stock_by_batch_as_of_not_measured`, `stock_by_batch_as_of_before_books`,
+`stock_by_batch_as_of_in_future`, `stock_by_batch_education_unqualified` and `stock_not_enabled`. A
+book that changed refuses as `stock_by_batch_extent_changed`. Measured on TallyPrime 7.2 on one
+synthetic book.
 
 ### Stock by godown (`stock_by_godown`)
 
@@ -1326,16 +1367,29 @@ A book whose `ISINVENTORYON` is `No` is refused as `stock_not_enabled` before an
 item is read; an absent flag is reported `unknown` and does not refuse. `offset`,
 `limit` and `snapshot_id` behave as in `masters`, and the result reports `snapshot`.
 
-Small books only. The items are read whole only when the master-alteration mark
+At most 874 stock items. The items are read whole only when the master-alteration mark
 (`ALTMSTID`) times an assumed worst-case row (18,296 bytes) fits 16,000,000 bytes, which admits
-a mark of at most 874. A larger book is refused before any item request as
-`stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
-`limit_bytes` and `limit_master_alter_id`), and retrying refuses again. Typical stock-heavy client books refuse
-today (the two measured had marks of about 100,000 and 300,000, protocol reference
-§12a.12), until a counted read lands. After a read, the row count and the response
-size are checked against the mark and the admitted size, and a breach refuses the
-whole read as `stock_summary_bound_premise_violated`, unless the closing extent
-shows the book moved (`stock_summary_extent_changed`). The stock-item request does
+a mark of at most 874. Past that mark the stock items and the stock groups are first
+counted by AlterID span, in slices of 4,000 AlterIDs (a mark of at most 400,000), and
+those counts admit the same single read: at most 874 counted items, and the items and
+groups together, times an assumed worst report line of 5,208 bytes (a guess from short
+names, not a measurement), within 16,000,000 bytes, which sizes the Stock Summary report
+before it is read. Tally's own item count only refuses, when it is higher than the
+count (`stock_summary_item_count_company_higher`), and counts above the mark refuse as
+`stock_summary_bound_premise_violated`. More items are refused before any item request
+as `stock_summary_too_large`, with `size` (`master_alter_id`, `estimated_bytes`,
+`limit_bytes` and `limit_master_alter_id`, and for a counted book `counted_items` and
+`limit_items`, `limit_master_alter_id` then carrying the same item limit), and retrying
+refuses again; a report too large refuses as
+`stock_summary_report_too_large`, and a count that could not be made as
+`stock_summary_census_refused`, with the census's own code (for example
+`stock_item_span_census_empty`, or `stock_census_slice_invalid` for a slice answer that
+did not read) in `error.cause`; a book with no stock group counts none. A refusal from the
+count is reported as `stock_summary_extent_changed` instead when the book moved meanwhile. The counted path has run
+once against a live book with a mark past 874. After a read, the row count and the
+response size are checked against the mark (and the count) and the admitted size, and a
+breach refuses the whole read as `stock_summary_bound_premise_violated`, unless the
+closing extent shows the book moved (`stock_summary_extent_changed`). The stock-item request does
 not fetch `ALTERID`, so the rows' AlterIDs are not checked as they are for `masters`.
 
 Evidence: one synthetic book on one licensed TallyPrime 7.1
@@ -1739,9 +1793,9 @@ rate or return section, and matches nothing against any portal.
   1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry
   `-1000.00`, each tax entry `-90.00` and the party entry `1180.00`, where a Sales
   row has the sales and tax entries positive and the party entry negative.
-- **The cost varies by book.** A call sends 102 requests on a book with 8
-  ledgers and one currency (96 were recorded before a small book was counted, plus
-  the six the count adds; not measured since) and 118 on one with 44 ledgers and two
+- **The cost varies by book.** A call sends 94 requests on a book with 8
+  ledgers and one currency (96 recorded, six more to count a small book, eight fewer
+  with no balance reads; not measured since) and 118 on one with 44 ledgers and two
   currencies (base-currency reads are added). The result does not report the cost.
 - **There are two recognised state-side heads.** One is `state_tax` (raw `State Tax`)
   on one measured book and the other `sgst_utgst` (raw `SGST/UTGST`) on another. Both are
@@ -2252,9 +2306,21 @@ is not kept in the fixture.
 ### Foreign-currency composites in `vouchers`
 
 A foreign amount entered on a rupee ledger can be stored by Tally as a
-composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
+composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 and
+`-$100.00 @ ₹ 86/$ = -₹ 8600.00` on 7.2 (#674, #683).
 
-- **`vouchers` withholds that voucher.** It passes every date, ledger and
+- **`vouchers` reads it.** The amount after `=` becomes the entry's or the bill
+  allocation's `amount`, and `foreign` holds `currency`, `amount` and `rate` as
+  Tally wrote them. Sums, summaries and an `amount` search use the rupee amount.
+  When a window holds a composite, `vouchers` also reads the book's currencies.
+  Measured on one book of each release, one currency. `ledger_movement` still
+  refuses such a window, so a `vouchers` summary holding these amounts cannot be
+  tied to it.
+- **It withholds a voucher it cannot read that way:** the book's base is not
+  established as INR, the amount after `=` is not in that base, the foreign
+  symbol is not one of the book's Currency masters, a composite has no rate or
+  no foreign amount, or the entries do not net to zero.
+- **A withheld voucher** passes every date, ledger and
   voucher-type check like any other, and is then listed in `withheld_vouchers`
   instead of `items`. The listing gives its GUID, date, type, number and cause,
   up to 100 vouchers, with an exact `withheld_total` that is the same on every
@@ -2262,7 +2328,7 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` (#674).
 - **The result says so.** `state` is `partial` with `reason`
   `vouchers_withheld`, `total` counts `items` only (the buckets, under `summarise_by`), and `coverage` says what
   was left out.
-- **No amount is read from a composite.** Anything that is neither a plain
+- **Nothing else is read as an amount.** Anything that is neither a plain
   decimal nor an exact composite still refuses the whole window. So does a
   composite whose foreign and base amounts carry opposite signs, unless the
   foreign amount is zero: a voucher entry's two amounts share one sign.
@@ -2314,6 +2380,15 @@ bank ledger ([reference §9.13](../tally/TALLY_PROTOCOL_REFERENCE.md), the scope
 Committed captures of a synthetic book's Payments carry the bank on some rows and the party on others. So the
 counterparty of a Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import`
 does not compare the field for a Receipt, Payment or Contra.
+
+### E-invoice details in `vouchers` (#1378)
+
+With `include_e_invoice: true`, a row of `vouchers` for an invoice, or for any voucher that carries a detail, holds
+`e_invoice`: `irn`, `ack_no` and `ack_date`, each `{"state":"present","value":...}`, `{"state":"absent"}` (asked for and empty) or
+`{"state":"not_reported"}` (this book or release did not send it). `ack_date` is `YYYYMMDD`; one that is not a date
+refuses the read (`voucher_irn_ack_date_invalid`). Every other read sends the request it did before. ComplyEaze Bridge never asks Tally
+to generate, cancel or upload an e-invoice. Measured on one synthetic book with details keyed by hand; a voucher
+the portal issued was not read (protocol reference 8.2j).
 
 ### Cost-centre allocations in voucher reads
 
@@ -2492,6 +2567,12 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      bound and Bridge never sends an alias: replace the name with `alias_of`
      only after an operator confirms that ledger is the one meant, then run
      `validate_masters` again.
+   - A ledger with a twin is refused as `ledger_has_folded_twin`, with one
+     exception (#626): two ledgers that differ only by a trailing line break,
+     named by one's exact bytes on the debit side alone of a Payment, off
+     bill-wise, the shape measured. The batch may not name both. The approval
+     dialog names both ledgers, each with its group, and says which one the
+     post uses, and a twin that appears after approval is refused.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
@@ -3020,6 +3101,35 @@ answer does, as the post dialog's does), and sends the create once;
 its approval, pending and approved answers behave as `post_import`'s do. A batch
 already sent is never sent again: a later call reads the book back, or reports
 what was recorded for a batch already settled.
+`prepare_ledger_creates` also takes `ledgers`, a list of two to 10 such ledgers
+in place of `ledger` (never both). They must all be of one kind and side, so
+under one parent group, and no two of their names may differ only in case,
+spaces or symbols; otherwise nothing is saved and the call is refused
+`master_batch_mixed_parents` or `master_batch_names_may_be_one_master` (a list
+of more than 10 is refused `argument_invalid:ledgers`). One dialog lists every ledger, two lines each, and
+one approval sends them to Tally together, in one request. The batch is judged
+as one: `posted_verified` needs every ledger new and as sent, Tally's counters
+to show one create per ledger and nothing altered, and the company's master
+mark to have moved by exactly one per ledger (on a later call, the ledgers'
+`ALTERID`s to be the marks right after the last read before the send).
+`verification.guids` gives each ledger's GUID in the order sent. A batch whose
+answer from Tally was lost is never `posted_unattributed`. It ends as
+`posted_into_existing_master` or `master_write_located_elsewhere` only when no
+ledger of it reads absent (with any absent, it stays `reconciliation_required`
+with `batch_ledger_absent_without_counters`, since that ledger's create may still
+be waiting in Tally), as `masters_after_post_unconfirmed` when the book cannot be
+read back, and as `confirmed_absent` or `confirmed_absent_after_change` only when
+every ledger reads absent on a Tally where the order that rests on was measured
+(below); otherwise it stays `reconciliation_required`. Batches of three and
+of ten were measured in one request on TallyPrime 7.2 (one synthetic company,
+once each): each counted one create per ledger, the master mark stepped by the
+batch's size and each new ledger took the next mark value in request order. The
+box is measured against the screen when it opens on Windows, and a box that is not
+wholly on the screen is refused (`master_review_too_large`) with nothing approved;
+whether a box of ten ledgers fits the lab's screen has not been tried. A ledger of the batch whose
+name was already taken was altered in place and took its own value in that
+order, so a write into an existing ledger does not show in the step; it shows as
+`ALTERED` and in the read-back, which answer `posted_into_existing_master`.
 With the setting off, posting off, or the retired `BRIDGE_AGENT_ENABLE_BATCH_POST`
 still set, neither tool is listed and a call to either
 is refused `master_writes_disabled`. A name that differs from an existing one
@@ -3093,7 +3203,10 @@ and a declined or timed-out answer's `next_step` says that the next call with th
 same `batch_id` opens a new dialog. `master_review_too_large` from
 `post_ledger_creates` says the dialog's text was over its limit or, on Windows,
 where the dialog is measured against the screen as the post's is, that it did not
-fit the screen whole; nothing was sent. In an answer,
+fit the screen whole; nothing was sent, and its `next_step` says to try a
+larger screen, then a new batch with fewer ledgers or shorter names. A batch
+read back with only some of its ledgers in the book, and not verified, says so
+in its `next_step`. In an answer,
 `verification.verdict_written` is true when this call appended the verdict (an
 open verdict already on file in the same words is not appended again);
 `verification.verdict_record_error` is the code of why the verdict was not
@@ -3156,19 +3269,32 @@ Both absent states rest on the order Tally serves requests in: the read that fin
 the name absent is sent after the create's send ended, and Tally has been seen to
 serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection and with the
-create, the read or both on a reused connection (#2176). Their answers carry
+create, the read or both on a reused connection, behind a long read, and with every
+request on a new connection behind a long import (#2176). Their answers carry
 `verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
-absent state only when the read-back's Tally reports TallyPrime 7.2 Silver,
-licensed. On any other the batch stays open, its name held, with a reason that
-names what is not covered: `absent_not_measured_on_this_product` (the product is
-not exactly TallyPrime), `absent_not_measured_on_gold`,
+absent state only when the read-back's Tally reports TallyPrime 7.2, licensed,
+Silver or Gold: Gold is the same product with multi-user access, so the edition
+is no bound, though no order row ran on Gold. On any other the batch stays open,
+its name held, with a reason that names what is not covered:
+`absent_not_measured_on_this_product` (the product is not exactly TallyPrime),
 `absent_not_measured_on_this_release`, `absent_not_measured_in_education` or
 `absent_tally_release_not_known`, and a next step that says so: calling again
-on the same Tally will not close it, so on TallyPrime 7.1, Gold, Education or
-another product such a batch holds its name until the company is read back on
-7.2 Silver. Before this, `confirmed_absent` was given on any Tally. An absent
+on the same Tally will not close it, so on TallyPrime 7.1, Education or another
+product such a batch holds its name until the company is read back on licensed
+TallyPrime 7.2. Before this, `confirmed_absent` was given on any Tally. An absent
 name kept open also names what else the read showed (`master_new_since_intent`,
 `mark_went_back_since_intent`).
+
+`master_write_located_elsewhere` releases the name too, so the same limit applies
+when the read found the name absent and no answer from Tally is on file: on any
+other Tally the state is `reconciliation_required`, its reasons include
+`other_company_mark_moved` and one of the reasons above, and an answer that read
+the book back leads with the alert to check every loaded company. With Tally's
+answer on file no create is waiting, and `master_write_located_elsewhere` stands
+on any Tally. With a ledger of that name in the book it stands too, like the
+other verdicts that close a batch on a ledger found there
+(`posted_into_existing_master`, `posted_unattributed`): that company's book itself
+refuses a new create of that name for as long as that master stands.
 
 Later calls cannot settle these states, and their batches keep holding the name: a
 read that found the name absent while the company's master mark moved back, or
@@ -3186,7 +3312,7 @@ and judges it. A book whose set of loaded companies changed is read and judged:
 the answer is `reconciliation_required` with `company_scope_changed` among its
 reasons, and it says to load the same companies and call again; a read that shows
 a changed existing master or another company's mark moved keeps the state for
-that. A read-back that read the book,
+that, unless the limit above holds the batch open. A read-back that read the book,
 found the name absent and did not settle says that ComplyEaze Bridge cannot settle
 the batch now, because a create it sent may still be waiting in Tally; the name
 stays held, and a later call sends nothing, reads the book back, shows whether a
@@ -4025,7 +4151,8 @@ Per tool:
 - `purchase_register` and `sales_register`, which send the same requests
   (`register` in `src-tauri/src/agent_register.rs`):
   1. the company read;
-  2. a masters read, as `ledger_masters` with `fields=compliance`;
+  2. a masters read, as `ledger_masters` with `fields=compliance`, without its
+     balance read on a book of one Currency master;
   3. the window read, with the marks already known from that masters read;
   4. a scoped read of the closing marks;
   5. the masters read again;
@@ -4428,11 +4555,11 @@ the status record in its `update.json` with the journal's last line, as JSON
 - an earlier, whole record: the append never began, and the earlier proof is
   current;
 - a torn last line: the append stopped part-way. Keep a copy of the journal,
-  then remove only that partial line;
-- no `update.json`: the stop came before the record was written, and the
-  journal is as it was.
+  then remove only that partial line.
 
-Then remove the folder. Proof files that no journal record names are left
+Then remove the folder. A build or verification folder with nothing in it needs
+none of this: the next admission removes it, since it means either that nothing
+was published or that the publication finished (#2269). Proof files that no journal record names are left
 over from the stopped verification; nothing reads them. Preserve the journal
 and generated XML; do not delete it merely to retry. This is explicit
 recovery after a partial file transaction, not a power-loss atomicity guarantee.

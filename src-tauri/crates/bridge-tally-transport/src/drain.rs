@@ -107,15 +107,17 @@ pub(crate) const fn owes_drain(error: &TallyTransportError) -> bool {
         }
         | TallyTransportError::ResponseTruncated
         | TallyTransportError::ResponseReadFailed => true,
-        // Tally answered with a whole head (a status, a declared length, a
-        // content type or encoding): it had finished the work.
+        // Refused at its head, so the body is abandoned unread, and a refusal
+        // on our side does not stop Tally finishing it (protocol reference
+        // §11c.2). An encoding refused after a whole body owes nothing real:
+        // a few probes.
         TallyTransportError::HttpStatus { .. }
         | TallyTransportError::ResponseTooLarge {
             declared_by_peer: true,
             ..
         }
         | TallyTransportError::UnsupportedContentEncoding
-        | TallyTransportError::InvalidEncoding { .. } => false,
+        | TallyTransportError::InvalidEncoding { .. } => true,
         // Nothing reached Tally.
         TallyTransportError::EndpointInvalid { .. }
         | TallyTransportError::PolicyInvalid { .. }

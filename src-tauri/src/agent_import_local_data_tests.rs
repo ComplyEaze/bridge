@@ -11,7 +11,7 @@ fn write(path: &Path, bytes: &[u8]) {
 }
 
 /// A minimal journal: one built batch, optionally sent.
-fn journal(sent: bool) -> Vec<u8> {
+pub(in crate::agent::agent_import) fn journal(sent: bool) -> Vec<u8> {
     let line: super::super::ImportLedgerLine = serde_json::from_value(serde_json::json!({
         "batch_id":"b1","company_guid":"synthetic-guid","company":null,
         "txn_ids":["txn"],"date_from":"20260901","date_to":"20260901",
@@ -598,17 +598,34 @@ fn a_listing_past_its_cap_says_so() {
 /// without regard to letter case; another folder is not.
 #[test]
 fn a_folder_is_matched_under_local_app_data_without_regard_to_case() {
-    let base = Path::new("/srv/Profile/AppData/Local");
+    // an absolute base on each platform (Windows needs a drive)
+    let root = if cfg!(windows) { "C:\\" } else { "/" };
+    let base = PathBuf::from(root)
+        .join("srv")
+        .join("Profile")
+        .join("AppData")
+        .join("Local");
+    let lower = PathBuf::from(base.display().to_string().to_lowercase());
     assert_eq!(
-        relative_to(base, Path::new("/srv/profile/appdata/local/Bridge/agent")),
+        relative_to(&base, &lower.join("Bridge").join("agent")),
         Some(PathBuf::from("Bridge").join("agent"))
     );
+    let sibling = base.parent().unwrap().join("LocalLow").join("Bridge");
+    assert_eq!(relative_to(&base, &sibling), None);
+    assert_eq!(relative_to(&base, base.parent().unwrap()), None);
+    assert_eq!(relative_to(&base, &base), Some(PathBuf::new()));
+    // a remainder that climbs out of the base, or a base that is not absolute,
+    // names no folder inside it
+    assert_eq!(relative_to(&base, &base.join("Bridge").join("..")), None);
     assert_eq!(
-        relative_to(base, Path::new("/srv/Profile/AppData/LocalLow/Bridge")),
+        relative_to(&base, &base.join("..").join("..").join("Bridge")),
         None
     );
-    assert_eq!(relative_to(base, Path::new("/srv/Profile")), None);
-    assert_eq!(relative_to(base, base), Some(PathBuf::new()));
+    assert_eq!(relative_to(Path::new(""), &base), None);
+    assert_eq!(
+        relative_to(Path::new("Local"), &Path::new("Local").join("Bridge")),
+        None
+    );
 }
 
 /// `package_copies` finds a copy of a data folder whose `%LOCALAPPDATA%` part
@@ -633,6 +650,11 @@ fn package_copies_match_without_regard_to_case() {
         serde_json::json!([copy.display().to_string()])
     );
     assert_eq!(package_copies(&base, &base), "not_under_local_app_data");
+    // a folder spelled with `..` below the base is not a package copy's name
+    assert_eq!(
+        package_copies(&base, &base.join("Bridge").join("..")),
+        "not_under_local_app_data"
+    );
 }
 
 /// A data folder that is a link (a folder moved to another disk) is followed,
@@ -656,8 +678,9 @@ fn a_data_folder_that_is_a_link_is_still_located() {
     assert_eq!(shown["folder_file_locations"]["files"], 1, "{shown}");
 }
 
-/// The report follows no link: a linked lease folder is not entered, and a
-/// linked journal's target is not resolved.
+/// A lease folder that is itself a link is not entered, and a journal file
+/// that is itself a link is not resolved; a link above them is followed (see
+/// `a_data_folder_that_is_a_link_is_still_located`).
 #[cfg(unix)]
 #[test]
 fn a_link_is_not_followed_for_a_path_shown() {

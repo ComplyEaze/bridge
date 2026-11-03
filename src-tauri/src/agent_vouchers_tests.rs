@@ -77,6 +77,7 @@ fn described(marks: CompanyMarks) -> Value {
             search: None,
             summary: None,
             gst_details: GstDetailsShown::Withheld,
+            e_invoice: EInvoiceFields::NotAsked,
         },
         marks,
         Arc::new(Vec::new()),

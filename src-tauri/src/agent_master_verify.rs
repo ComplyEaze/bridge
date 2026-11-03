@@ -37,6 +37,9 @@ use std::collections::BTreeMap;
 pub(super) const NEXT_VERIFIED: &str = "The read-back found exactly one ledger of this name, new, with the parent, tax fields and GSTIN as sent and no opening balance (bill-wise is not read back), no ledger or group that existed before changed, and no other loaded company's master mark moved. Nothing more is needed for this batch; do not post it again.";
 pub(super) const NEXT_INTO_EXISTING: &str = "Open the company in Tally now and check the ledger of this name, its group and the ledgers around it: a ledger that existed before may have been changed. Do not retry and do not post this batch again.";
 pub(super) const NEXT_ELSEWHERE: &str = "Open Tally now and check every loaded company: the change may have landed in a company other than the one approved. Do not retry and do not post this batch again.";
+/// The same alert with the batch kept open: Tally's answer is lost, and the
+/// order that would release the name was not measured on this Tally.
+pub(super) const NEXT_ELSEWHERE_UNCOVERED: &str = "Open Tally now and check every loaded company: the read found no ledger of this name in the company approved, a master changed in another company, and that change may be this create. ComplyEaze Bridge has no answer from Tally to the create on file, and it closes such a batch only on licensed TallyPrime 7.2, Silver or Gold, the one release where the order it rests on (a read sent after the create was served after it) was measured. The batch stays open, and ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for: a create it sent may still be waiting in Tally. Calling post_ledger_creates with this batch_id again sends nothing and reads the book back, but on this Tally it will not close the batch while the name stays absent. Do not retry, and do not create this ledger in Tally by hand. Never post this batch again.";
 pub(super) const NEXT_UNATTRIBUTED: &str = "A later read of the book found the ledger of this name with the parent, tax fields and GSTIN as sent and no opening balance (bill-wise is not read back), and its ALTERID shows it as the first master change in this company after ComplyEaze Bridge's last read of it before sending the create, and not changed since. ComplyEaze Bridge has no answer from Tally to the create on file (it could not be recorded, or Tally never answered), so it cannot show that this change was its own create and not the same ledger made by someone else: check the ledger in Tally. That read also does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for, which would change this ledger again. This batch is closed, and nothing is sent again from it; do not post it again.";
 pub(super) const NEXT_ABSENT: &str = "A later read of the book found no ledger of this name, and the company's master mark had not moved. This batch is closed, and nothing is sent again from it. That read also fits a create that Tally rejected. It was sent after the create's send ended, and Tally has been seen to serve such a read only after the create ran, for requests on new connections and with the create, the read or both on a reused one; it does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for. To create the ledger, first make sure Tally is idle and answering, then call prepare_ledger_creates for a new batch: it needs a new approval.";
 /// The read found the name absent after another master change: settled on the
@@ -54,9 +57,15 @@ pub(super) const NEXT_UNCONFIRMED: &str = "The ledger could not be read back thi
 pub(super) const NEXT_ABSENT_NOT_SETTLED: &str = "The read-back found no ledger of this name, and the outcome of this batch is not settled (see the reasons). ComplyEaze Bridge cannot settle it now: a create it sent may still be waiting in Tally. While the batch stays open, ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for, and will not create it again. Calling post_ledger_creates with this batch_id again, once Tally is idle, sends nothing: it reads the book back, shows whether a ledger of this name now exists, and judges one that has appeared. Never post this batch again.";
 /// The read found the name absent on a Tally where what an absent state rests
 /// on was not measured: the batch stays open.
-pub(super) const NEXT_ABSENT_UNCOVERED: &str = "The read-back found no ledger of this name, but ComplyEaze Bridge closes a batch on an absent ledger only on TallyPrime 7.2 Silver, licensed, the one Tally where the order it rests on (a read sent after the create was served after it) was measured; the reasons say how this Tally differs, and what else the read showed. The batch stays open, and ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for: a create it sent may still be waiting in Tally. Calling post_ledger_creates with this batch_id again sends nothing and reads the book back, but it can close the batch only when the company is open on TallyPrime 7.2 Silver, licensed: on this Tally, calling again will not close it. Check the company's ledgers in Tally, and do not create this ledger in Tally by hand. Never post this batch again.";
+pub(super) const NEXT_ABSENT_UNCOVERED: &str = "The read-back found no ledger of this name, but ComplyEaze Bridge closes a batch on an absent ledger only on licensed TallyPrime 7.2, Silver or Gold, the one release where the order it rests on (a read sent after the create was served after it) was measured; the reasons say how this Tally differs, and what else the read showed. The batch stays open, and ComplyEaze Bridge keeps this ledger name held in every company this data folder holds batches for: a create it sent may still be waiting in Tally. Calling post_ledger_creates with this batch_id again sends nothing and reads the book back, but it can close the batch only when the company is open on licensed TallyPrime 7.2: on this Tally, calling again will not close it. Check the company's ledgers in Tally, and do not create this ledger in Tally by hand. Never post this batch again.";
 /// A ledger of this name is in the book and the read-back could not verify it.
 pub(super) const NEXT_PRESENT_NOT_VERIFIED: &str = "A ledger of this name is in the book, but ComplyEaze Bridge could not verify that it is the one this batch sent (see the checks and reasons). There is nothing to create: compare the ledger in Tally with this batch by eye. Never post this batch again.";
+/// Every ledger of a batch of more than one is in the book and the read-back
+/// could not verify the batch: `NEXT_PRESENT_NOT_VERIFIED` for several.
+pub(super) const NEXT_ALL_PRESENT_NOT_VERIFIED: &str = "Every ledger of this batch is in the book (verification.guids gives each one's GUID, in the order sent), but ComplyEaze Bridge could not verify that they are the ones this batch sent (see the checks and reasons). There is nothing to create: compare each ledger in Tally with this batch by eye. Never post this batch again.";
+/// Some of a batch's ledgers are in the book and some are not, and the
+/// read-back could not verify the batch: there is something left to settle.
+pub(super) const NEXT_PARTLY_PRESENT: &str = "Some of this batch's ledgers are in the book and some are not (verification.guids gives a GUID for each one found, in the order sent), and ComplyEaze Bridge could not verify the batch (see the checks and reasons). Check the ledgers in Tally against the reasons given, then call post_ledger_creates with this batch_id again to read it back (it sends nothing). Do not create the ledger in Tally by hand meanwhile, for any of this batch's names. Never post this batch again.";
 /// The book was not compared: the batch's company is not loaded, was renamed,
 /// or the set of loaded companies is not the one the create was recorded under.
 pub(super) const NEXT_LOAD_SAME_COMPANIES: &str = "The book could not be compared with the one the create was recorded under: the batch's company is not loaded in Tally, was renamed, or the set of loaded companies has changed. Load the same companies, under the same names, then call post_ledger_creates with this batch_id again: it reads the book back and sends nothing. Do not create the ledger in Tally by hand meanwhile. Never post this batch again.";
@@ -109,12 +118,13 @@ pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'stati
     }
     if judgement.reasons().contains(&"company_scope_changed") {
         NEXT_LOAD_SAME_COMPANIES
+    } else if judgement.reasons().contains(&"other_company_mark_moved") {
+        NEXT_ELSEWHERE_UNCOVERED
     } else if judgement.reasons().iter().any(|reason| {
         matches!(
             *reason,
             "absent_not_measured_in_education"
                 | "absent_not_measured_on_this_product"
-                | "absent_not_measured_on_gold"
                 | "absent_not_measured_on_this_release"
                 | "absent_tally_release_not_known"
         )
@@ -122,8 +132,17 @@ pub(super) fn judged_next_step(judgement: &Judgement, moment: Moment) -> &'stati
         NEXT_ABSENT_UNCOVERED
     } else if moment == Moment::Reconcile && judgement.name_absent_in_read_book() {
         NEXT_ABSENT_NOT_SETTLED
-    } else if judgement.guid().is_some() {
-        NEXT_PRESENT_NOT_VERIFIED
+    } else if !judgement.guids().is_empty() && judgement.guids().iter().all(Option::is_some) {
+        // Every name is in the book: one ledger's GUID, or each of a batch's
+        // (a batch names no single GUID), in words chosen by the count.
+        if judgement.guids().len() > 1 {
+            NEXT_ALL_PRESENT_NOT_VERIFIED
+        } else {
+            NEXT_PRESENT_NOT_VERIFIED
+        }
+    } else if judgement.guids().iter().any(Option::is_some) {
+        // Only some of a batch's names are in the book.
+        NEXT_PARTLY_PRESENT
     } else {
         NEXT_RECONCILE
     }
@@ -138,7 +157,9 @@ pub(super) fn not_read_back_next_step(code: &str) -> &'static str {
         | "company_identity_incomplete"
         | "company_identity_mismatch"
         | "company_number_invalid" => NEXT_LOAD_SAME_COMPANIES,
-        "master_batch_invalid" | "master_intent_missing" => NEXT_RECORD_NOT_READABLE,
+        "master_batch_invalid" | "master_batch_too_large" | "master_intent_missing" => {
+            NEXT_RECORD_NOT_READABLE
+        }
         _ => NEXT_UNCONFIRMED,
     }
 }
@@ -279,7 +300,7 @@ impl Server {
     async fn read_master_book_back(
         &self,
         identity: &VerifiedCompanyIdentity,
-        item: &LedgerCreateItem,
+        creates: &LedgerCreateBatch,
         pre_image: &BTreeMap<String, u64>,
         call_started: std::time::Instant,
         evidence: &mut Evidence,
@@ -358,13 +379,13 @@ impl Server {
                 }
             }
         }
-        // 3. The party master of the item's parent, if there is a ledger for it
-        // to describe.
+        // 3. The party master of the batch's one parent, if there is a ledger
+        // for it to describe.
         let party = match (&masters, profile) {
             (Some(masters), Some(boundary)) => {
-                if party_read_needed(item, pre_image, masters) {
+                if party_read_needed(creates, pre_image, masters) {
                     let rows = self
-                        .read_party_rows(identity, item, boundary, evidence)
+                        .read_party_rows(identity, creates.parent(), boundary, evidence)
                         .await;
                     match rows {
                         Ok(rows) => {
@@ -399,7 +420,7 @@ impl Server {
     async fn read_party_rows(
         &self,
         identity: &VerifiedCompanyIdentity,
-        item: &LedgerCreateItem,
+        parent: &str,
         boundary: DateBoundaryProfile,
         evidence: &mut Evidence,
     ) -> Result<Vec<PartyView>, String> {
@@ -408,7 +429,7 @@ impl Server {
                 .map_err(|_| "period_invalid".to_string())?;
         let period = NativeLedgerExportPeriod::new(boundary, books_from.clone(), books_from)
             .map_err(|_| "period_unsupported".to_string())?;
-        let part = single_parent_part(item.parent()).ok_or("parent_unsupported".to_string())?;
+        let part = single_parent_part(parent).ok_or("parent_unsupported".to_string())?;
         let request = crate::agent::read_profiles::party_ledger_master_for_parent_read(
             identity.display_name(),
             &period,
@@ -444,7 +465,7 @@ impl Server {
         evidence: &mut Evidence,
         answer: PostedAnswer<'_>,
     ) -> Result<Value, String> {
-        let item = item_from_batch(&state.batch)?;
+        let creates = creates_from_batch(&state.batch)?;
         let intent = state
             .intent
             .as_ref()
@@ -469,7 +490,7 @@ impl Server {
                 let back = self
                     .read_master_book_back(
                         identity,
-                        &item,
+                        &creates,
                         pre_image.entries(),
                         call_started,
                         evidence,
@@ -478,7 +499,7 @@ impl Server {
                 let company_guid = identity.company_guid().to_ascii_lowercase();
                 let judgement = judge(
                     &Facts {
-                        item: &item,
+                        batch: &creates,
                         company_guid: &company_guid,
                         pre_image: pre_image.entries(),
                         pre_marks: intent.pre_post_master_marks(),
@@ -497,7 +518,7 @@ impl Server {
         };
         let recorded = self.record_master_verdict(state, &judgement, answer.unrecorded);
         Ok(verification_result(
-            state, &item, &judgement, status, &recorded, moment, counters,
+            state, &creates, &judgement, status, &recorded, moment, counters,
         ))
     }
 
@@ -510,7 +531,7 @@ impl Server {
         state: &BatchState,
         lease_code: &str,
     ) -> Result<Value, String> {
-        let item = item_from_batch(&state.batch)?;
+        let creates = creates_from_batch(&state.batch)?;
         let judgement = Judgement::open(
             super::verdict::OpenVerdict::MastersAfterPostUnconfirmed,
             "endpoint_dispatch_busy",
@@ -518,7 +539,7 @@ impl Server {
         let recorded = self.record_master_verdict(state, &judgement, None);
         Ok(verification_result(
             state,
-            &item,
+            &creates,
             &judgement,
             json!({"state": "not_attempted", "observation_lease": unavailable(lease_code)}),
             &recorded,
@@ -604,14 +625,21 @@ impl Server {
 /// outcomes, counters and static reasons.
 fn verification_result(
     state: &BatchState,
-    item: &LedgerCreateItem,
+    creates: &LedgerCreateBatch,
     judgement: &Judgement,
     read_back: Value,
     recorded: &Recording,
     moment: Moment,
     counters: Option<MasterCounters>,
 ) -> Value {
-    let alert = settled_alert(judgement.state());
+    // The one open state that leads with an alert: another company's mark
+    // moved, and the batch stays open.
+    let alert = settled_alert(judgement.state()).or_else(|| {
+        judgement
+            .reasons()
+            .contains(&"other_company_mark_moved")
+            .then_some(NOTE_ALERT_ELSEWHERE)
+    });
     let counters = counters.as_ref();
     let verdict_recorded = recorded.verdict.is_ok();
     let next_step = if verdict_recorded {
@@ -661,10 +689,19 @@ fn verification_result(
                 json!(COUNTERS_ABSENT_NOTE)
             };
     }
-    if let AdmittedLedgerKind::Party {
-        bill_wise: true, ..
-    } = item.kind()
-    {
+    if creates.len() > 1 {
+        // Each ledger's GUID in the order sent, null where none is named.
+        result["verification"]["guids"] = json!(judgement.guids());
+    }
+    if creates.items().iter().any(|item| {
+        matches!(
+            item.kind(),
+            AdmittedLedgerKind::Party {
+                bill_wise: true,
+                ..
+            }
+        )
+    }) {
         // The party read does not fetch ISBILLWISEON: said, not assumed.
         result["verification"]["not_read_back"] = json!(["bill_wise"]);
     }

@@ -3,4 +3,5 @@
   `listing_capped`), the import journal's own location and, on Windows, each copy of the data folder inside a Store app's
   package that exists. On a Microsoft Store install of Claude Desktop it shows where the files directly in each folder are
   (not those in its subfolders, such as `imports`) and, run outside Claude Desktop, that a second copy of the folder
-  exists. A journal file or a lease folder that is itself a link is not followed (`link_not_followed`) (#1459).
+  exists. A journal file or a lease folder that is itself a link is not followed (`link_not_followed`); a data folder
+  that is a link, or a link above them, is followed (#1459).

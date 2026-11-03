@@ -104,15 +104,7 @@ pub(super) fn settle_preview(line: &ImportLedgerLine, result: &Value) -> String 
     };
     // A match that is cancelled or optional is not in the accounts, so the
     // line never counts it as held, as the binding's summary does not.
-    let matched = result["vouchers"].as_array().map_or(0, |vouchers| {
-        vouchers
-            .iter()
-            .filter(|voucher| {
-                voucher["status"] == "matching_content_observed"
-                    && voucher["accounting_effective"] == true
-            })
-            .count()
-    });
+    let matched = verification::content_matches_in_the_accounts(&result["vouchers"]);
     let (noun, these, each) = if count == 1 {
         ("voucher", "this voucher", "the voucher")
     } else {

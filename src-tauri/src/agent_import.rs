@@ -64,6 +64,8 @@ mod approval;
 pub(super) mod ledger;
 #[path = "agent_import_local_data.rs"]
 pub(super) mod local_data;
+#[path = "agent_import_split_journal.rs"]
+mod split_journal;
 // The master write journal. The read-back piece, which follows the tools,
 // reads the parts of it the tools do not yet (the sidecar read, the verdict).
 #[cfg_attr(not(test), allow(dead_code))]
@@ -549,13 +551,132 @@ pub(super) struct CashInHandLedger {
 /// so one whose alias folds equal to the name is in the family too (#1688).
 /// Tally's import lookup also matches names loosely (§9.4d), and which of two
 /// such ledgers it would post to is not established, so a build naming either
-/// is refused.
+/// is refused, except for a [`LineBreakTwin`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FoldedTwins {
     requested: String,
     live: Vec<(String, Option<String>)>,
     /// For a live ledger in the family only through an alias of it: that alias.
     through_alias: BTreeMap<String, String>,
+    /// Whether any ledger of the family has an alias that folds equal to it.
+    has_alias: bool,
+}
+
+/// A ledger named by its exact bytes whose one twin differs from it only by a
+/// trailing CR LF, in another row of the book. Tally posted to the ledger whose
+/// bytes were sent, in both creation orders (protocol reference §9.4e), so the
+/// pair is not refused on the shape that was measured, and the dialog names both
+/// (bridge#626).
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LineBreakTwin {
+    named: String,
+    named_group: String,
+    other: String,
+    other_group: String,
+}
+
+impl LineBreakTwin {
+    /// Whether every voucher naming this ledger is the one shape a pair was
+    /// posted on (protocol reference §9.4e), and at least one does: a Payment,
+    /// which carries no invoice, with the ledger off bill-wise and on the debit
+    /// side alone. That is the leg Bridge writes as the party, which Tally read
+    /// back as the credit ledger, never a pair. Every other shape is unmeasured
+    /// and refused.
+    fn on_the_measured_shape(
+        &self,
+        vouchers: &[ImportVoucher],
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> bool {
+        let off_bill_wise = catalogue.bill_wise_flags().any(|(name, _, flag)| {
+            name == self.named && flag == bridge_tally_protocol::BillWiseFlag::Off
+        });
+        let mut naming = vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher
+                    .entries
+                    .iter()
+                    .any(|entry| entry.ledger == self.named)
+            })
+            .peekable();
+        off_bill_wise
+            && naming.peek().is_some()
+            && naming.all(|voucher| {
+                matches!(voucher.voucher_type, VoucherType::Payment)
+                    && voucher
+                        .entries
+                        .iter()
+                        .filter(|entry| entry.ledger == self.named)
+                        .all(|entry| entry.side == EntrySide::Dr)
+            })
+    }
+}
+
+impl FoldedTwins {
+    /// This family as a [`LineBreakTwin`], when it is exactly such a pair and
+    /// the batch's `requested` names do not take both of it. Every other family
+    /// is refused: a name that only folds, case or spacing twins, a third
+    /// ledger, and any alias.
+    fn line_break_twin(&self, requested: &[String]) -> Option<LineBreakTwin> {
+        let [first, second] = self.live.as_slice() else {
+            return None;
+        };
+        if self.has_alias {
+            return None;
+        }
+        let (named, other) = if first.0 == self.requested {
+            (first, second)
+        } else if second.0 == self.requested {
+            (second, first)
+        } else {
+            return None;
+        };
+        let (plain, broken) = if named.0.ends_with("\r\n") {
+            (&other.0, &named.0)
+        } else {
+            (&named.0, &other.0)
+        };
+        if plain.contains(['\r', '\n'])
+            || broken.strip_suffix("\r\n") != Some(plain.as_str())
+            || requested.contains(&other.0)
+        {
+            return None;
+        }
+        let group = |parent: &Option<String>| {
+            parent
+                .as_deref()
+                .map(|parent| bridge_tally_protocol::tally_root_as_sent(parent).to_string())
+        };
+        Some(LineBreakTwin {
+            named: named.0.clone(),
+            named_group: group(&named.1)?,
+            other: other.0.clone(),
+            other_group: group(&other.1)?,
+        })
+    }
+}
+
+impl FoldedTwins {
+    /// This family as a [`LineBreakTwin`] a batch may post: the pair, on the
+    /// shape it was measured on. Any other family is refused.
+    fn admitted_pair(
+        &self,
+        requested: &[String],
+        vouchers: &[ImportVoucher],
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> Option<LineBreakTwin> {
+        self.line_break_twin(requested)
+            .filter(|twin| twin.on_the_measured_shape(vouchers, catalogue))
+    }
+}
+
+/// The families of `twins` a list of `requested` names, with no voucher to
+/// judge, does not hold as a pair.
+fn refused_twins(twins: Vec<FoldedTwins>, requested: &[String]) -> Vec<FoldedTwins> {
+    twins
+        .into_iter()
+        .filter(|twins| twins.line_break_twin(requested).is_none())
+        .collect()
 }
 
 /// The requested names that fold equal to two or more live ledgers, in the
@@ -613,6 +734,7 @@ fn folded_twins<'a>(
                 .filter(|(index, _)| !family.contains(*index))
                 .map(|(index, alias)| (catalogue[*index].0.to_string(), alias.to_string()))
                 .collect::<BTreeMap<_, _>>();
+            let has_alias = !aliased.is_empty();
             family.extend(aliased.keys().copied());
             (family.len() > 1).then(|| FoldedTwins {
                 requested: name.clone(),
@@ -624,6 +746,7 @@ fn folded_twins<'a>(
                     })
                     .collect(),
                 through_alias,
+                has_alias,
             })
         })
         .collect()
@@ -655,7 +778,7 @@ fn annotate_folded_twins<'a>(
     catalogue: impl Iterator<Item = (&'a str, Option<&'a str>)>,
     aliases: impl Iterator<Item = (&'a str, &'a str)>,
 ) {
-    let twins = folded_twins(requested, catalogue, aliases);
+    let twins = refused_twins(folded_twins(requested, catalogue, aliases), requested);
     for (entry, name) in report.iter_mut().zip(requested) {
         if let Some(found) = twins.iter().find(|twins| &twins.requested == name) {
             entry["folded_twins"] = folded_live_ledgers_json(found);
@@ -780,7 +903,7 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
         }
         Some("unsettled") => "ComplyEaze Bridge could not finish matching this post to Tally just now; run the check again.",
         Some("not_bound") => "ComplyEaze Bridge has no readable answer from Tally to this post, so it cannot confirm it: check the vouchers in Tally and do not post them again.",
-        Some("book_rolled_back") => "The company's books were restored from a backup, or replaced by another copy, after this post, so its vouchers may be gone or may have been entered again by hand: check them in Tally before posting again.",
+        Some("book_rolled_back") => "The company's books were restored from a backup, or replaced by another copy, after this post, so its vouchers may be gone or may have been entered again in Tally: check them in Tally before posting again.",
         _ => return report,
     };
     // When Tally's own answer reported every voucher of this post as not
@@ -797,15 +920,7 @@ fn with_post_span_summary(mut report: Value, vouchers: &Value) -> Value {
     // the first line says what the book holds without making it this post's.
     // A match that is cancelled or optional is not in the accounts, so it is
     // never counted as held.
-    let matched_by_content = vouchers.as_array().map_or(0, |vouchers| {
-        vouchers
-            .iter()
-            .filter(|voucher| {
-                voucher["status"] == "matching_content_observed"
-                    && voucher["accounting_effective"] == true
-            })
-            .count()
-    });
+    let matched_by_content = verification::content_matches_in_the_accounts(vouchers);
     let summary = if reported_not_created {
         "Tally reported that this post created none of its vouchers: follow each voucher's next step."
     } else if report["state"] != "refused" || matched_by_content == 0 {
@@ -1278,6 +1393,11 @@ impl Server {
             // Admit the journal before publication; labels in older batches do not
             // collide with this build's independently generated wire identities.
             self.import_snapshot_while_admitted(None)?;
+            // No batch is written to a journal that cannot see a second one a
+            // Store package's copy of the data folder keeps (#2233).
+            split_journal::admit(&self.settings.data_dir).map_err(|split| {
+                ToolFailure::from(split).with_prior_evidence(accumulated.clone())
+            })?;
             // The admission above read the stop before this lock; a post may
             // have gone out since. No file is written for a stopped company.
             if payload.vouchers.iter().any(|voucher| voucher.voucher_type.is_invoice())
@@ -1670,10 +1790,12 @@ impl Server {
             }
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
-            if let Some(error) = persistence::persist_build(&imports, &line, xml.as_bytes(), || {
+            let folder_left = match persistence::persist_build(&imports, &line, xml.as_bytes(), || {
                 self.append_import_ledger_while_admitted(&line)
             })? {
-                return Ok(ToolOutcome {
+                persistence::Persisted::Built { folder_left } => folder_left,
+                persistence::Persisted::Incomplete(error) => {
+                    return Ok(ToolOutcome {
                     payload: json!({"result":{"batch_id":batch_id,"error":{"code":error,
                         "message":"Local batch publication is incomplete; reconcile its recovery journal before continuing."}}}),
                     evidence: Evidence {
@@ -1684,7 +1806,8 @@ impl Server {
                     company_guid: Some(line.company_guid.clone()),
                     truncated: false,
                 });
-            }
+                }
+            };
             // Reuse the posting admission path to describe only a route that
             // this exact saved batch can take. A manual-only batch is still a
             // successful build.
@@ -1734,6 +1857,11 @@ impl Server {
             // Appended last, so neither rewrite of the first warning above
             // can replace it.
             let hsn_warnings = hsn_warnings_of(&line.vouchers, &mut warnings);
+            if let (Some(cause), Some(list)) = (folder_left, warnings.as_array_mut()) {
+                list.push(json!(format!(
+                    "This batch is built and on record, but its temporary folder could not be removed ({cause}). The next build or post clears the folder if it is empty; if anything is left in it, they are refused until a person checks it."
+                )));
+            }
             let mut payload = json!({"company": company_json(&company, std::slice::from_ref(&company)), "result": {
                     "batch_id": batch_id, "sha256": sha256,
                     "amendment": amendment,
@@ -2514,6 +2642,10 @@ impl Server {
                 line.vouchers.len(),
             );
             payload["result"]["verification_status"] = json!(status.as_str());
+            // Said before it is saved, so every page of the proof carries it.
+            if !dispatched && status == VerificationStatus::PostedVerified {
+                verification::mark_found_not_sent(&mut payload["result"]);
+            }
             // Marked before it is saved, so the proof holds the marks too.
             mark_verification_names(&mut payload["result"]);
             self.persist_import_verification(&payload["result"], &line, status, generation)?;
@@ -3560,7 +3692,7 @@ fn holds_an_invoice(line: &ImportLedgerLine) -> bool {
 /// Why no file was written for a row another batch already sent (#876), and what
 /// to do instead. It never offers a hand import of this row: that is the second
 /// post the refusal exists to stop.
-const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and ComplyEaze Bridge cannot build the rest of that day from the statement yet), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch that was imported by hand, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch that was imported by hand, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so, and never build it again under a new bridge_txn_id to retry it. The same holds when verify_import reports that batch book_rolled_back: the company's voucher mark was seen below that batch's, which a book restored from a backup or replaced by another copy shows, and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too.";
+const BUILD_TXN_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was sent. Another batch of this company already went to Tally with a row of this one, or was found posted; blocking_batch_id names it. Call verify_import with that batch. If it finds the voucher, a row with a statement id (st-, from a bank-statement build) is the same bank row whatever ledger it names: build again without that row (parse the statement again with a narrower from and to; those are whole days, so a day that holds a posted row and an unposted one is left out whole, and ComplyEaze Bridge cannot build the rest of that day from the statement yet), and never import a file that carries it. A hand-typed id can repeat: this row matched because the id, date and amounts are equal (or an amount could not be read), and that is either the same transaction, already in the book, or a different real transaction that shares them. Do not decide which yourself: ask the user to open the existing voucher in Tally, compare it with this row, and say which. If it is the same transaction and its ledger or narration is wrong, correct the posted voucher in Tally (or, for a batch whose file was imported in Tally, amend it as described below); if it is a second real transaction that is not in the book, build that voucher under a new bridge_txn_id. ComplyEaze Bridge does not check the user's answer, and for a posted_verified voucher verify_import returns no date, amounts, ledgers or narration. Never rename a statement row this way: a statement row entered under any other id is not seen. To correct a voucher of a batch whose file was imported in Tally, build with amends_batch_id set to that batch. For an invoice, its number identifies it, not its bridge_txn_id. If the blocking batch was released (acknowledge_post_review, doubt invoice_stop) and that release reported seen_at_release found, the invoice is in Tally: do not build it again. If it was released and its read did not report it found, build the invoice again under a new bridge_txn_id and the SAME invoice number: before the approval ComplyEaze Bridge refuses the post if Tally holds a voucher of the invoice's type with that number on its date or, while the earlier batch is unverified, one with those figures under any number, and the build refuses the number where its read of the financial year works on that book. Never also tell the user to enter that invoice in Tally by hand: a retry after a hand entry is how a sale is booked twice. For any other voucher: if Tally rejected that batch and the voucher is not in Tally, ComplyEaze Bridge cannot write this row again, and nothing in ComplyEaze Bridge puts it in the book yet: tell the user so, and never build it again under a new bridge_txn_id to retry it. The same holds when verify_import reports that batch book_rolled_back: the company's voucher mark was seen below that batch's, which a book restored from a backup or replaced by another copy shows, and its voucher may be gone, but ComplyEaze Bridge cannot tell whether it is, so tell the user that too.";
 
 /// The code of the refusal that stops an invoice build while voucher posting
 /// is off (see `build_import_xml`); its text is in agent.rs.
@@ -3930,7 +4062,7 @@ fn build_import_guidance(
     };
     let manual_import_next_step = "Confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment";
     // A batch that two routes could put in the book: either direction books it twice.
-    let one_route = "Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.";
+    let one_route = "Use one route only. Once this batch is posted, do not import this file: nothing checks an import against an earlier post. If this file is imported first, post_import, which Allow voucher posting adds, reads the book before asking for approval and refuses the batch (import_preexisting_identity) if any of its vouchers is already there, matched by its narration tag, by date, voucher type and entries, or for an invoice by its number.";
     // A file import after a native post is not checked against it (the post
     // binds a fresh REMOTEID); a post after a file import is refused by the
     // post's own book read (import_preexisting_identity).
@@ -3956,7 +4088,7 @@ fn build_import_guidance(
             warnings(
                 &format!("No import XML was sent to Tally. Voucher posting is off in the extension settings, so this connection cannot post. With Allow voucher posting on (off by default; it means accepting the limits in Terms of Use section 9.2), the post_import tool, which that setting adds, would check this saved batch again and ask the local user to approve it in a separate window, and may still refuse it. Until then, import the written file in Tally, then use verify_import. {one_route}"),
             ),
-            "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment. Use one route only: once this file is imported, do not post this batch, and once this batch is posted, do not import this file; nothing checks an import against a post.",
+            "Tell the user that this connection cannot post. With Allow voucher posting on in the extension settings (off by default; it means accepting the limits in Terms of Use section 9.2), ComplyEaze Bridge would offer this saved batch for their approval in a separate window, after checking the book again, and may still refuse it. Do not say that it will be posted from this chat. Until then: confirm the loaded company matches this batch, import the file in Tally (Gateway of Tally → Import → Vouchers), then call verify_import right away: its first verification records each voucher's state for any later amendment. Use one route only. Once this batch is posted, do not import this file: nothing checks an import against an earlier post. If this file is imported first, post_import, which Allow voucher posting adds, reads the book before asking for approval and refuses the batch (import_preexisting_identity) if any of its vouchers is already there, matched by its narration tag, by date, voucher type and entries, or for an invoice by its number.",
         ),
         (false, Some(code)) => (
             warnings(&format!(
@@ -4752,7 +4884,14 @@ fn unbindable_masters(
             requested_names,
             ledger_masters.catalog().parents(),
             ledger_masters.catalog().aliases(),
-        ),
+        )
+        .into_iter()
+        .filter(|twins| {
+            twins
+                .admitted_pair(requested_names, vouchers, ledger_masters)
+                .is_none()
+        })
+        .collect(),
         vouchers,
         |twins| twins.requested.as_str(),
     );
@@ -5567,11 +5706,8 @@ fn write_masters_record(path: &Path, record: &Value) -> Result<(), String> {
     let staged = path.with_extension(format!("{}.next", Uuid::new_v4()));
     let bytes =
         serde_json::to_vec_pretty(record).map_err(|_| "proof_serialization_failed".to_string())?;
-    write_private(&staged, &bytes)?;
-    fs::rename(&staged, path).map_err(|_| {
-        let _ = fs::remove_file(&staged);
-        "import_file_write_failed".to_string()
-    })
+    super::local_file::replace_private_file(&staged, path, &bytes)
+        .map_err(|_| "import_file_write_failed".to_string())
 }
 
 impl Server {
@@ -5806,12 +5942,7 @@ fn verified_baselines(imports: &Path, lineage: &amend::Lineage) -> amend::Verifi
 }
 
 fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let mut file = super::local_file::open_local_file(path, true)
-        .map_err(|_| "import_file_write_failed".to_string())?;
-    set_private_file(&file)?;
-    file.set_len(0)
-        .and_then(|_| file.write_all(bytes))
-        .and_then(|_| file.sync_data())
+    super::local_file::write_private_file(path, bytes)
         .map_err(|_| "import_file_write_failed".to_string())
 }
 fn set_private_file(file: &std::fs::File) -> Result<(), String> {

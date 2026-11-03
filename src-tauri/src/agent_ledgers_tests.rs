@@ -2394,6 +2394,60 @@ mod through_the_tool {
                 cause,
                 "{response}"
             );
+            assert_eq!(error["failed_request"], "ledger_count", "{response}");
+        }
+    }
+
+    /// One code and one cause cover every request of this read, so the refusal names the one that
+    /// failed (#2265). Each case cuts one request, and nothing is sent after it.
+    #[tokio::test]
+    async fn a_failed_ledger_read_names_the_request_that_failed() {
+        let rows = generated(&[("Sundry Debtors", 2)]);
+        let all = rows.iter().collect::<Vec<_>>();
+        let (masters, balances) = (generated_masters(&all), generated_balances(&all));
+        let to_masters = marked_compliance_plans(100, Vec::new(), None);
+        let to_the_source = |reads: Vec<String>| marked_compliance_plans(100, reads, None);
+        // The bracket's identity, company row and extent go before the currency read; that read,
+        // the rest of its bracket and the profile probe before the source's own opening extent.
+        let before_currency = identity_plans().len() + 5;
+        let before_opening_extent = before_currency + 12;
+        let cases = [
+            (to_masters[..before_currency].to_vec(), "base_currency"),
+            (to_masters[..before_opening_extent].to_vec(), "book_extent"),
+            (
+                marked_compliance_plans(6_000, Vec::new(), None),
+                "ledger_catalogue",
+            ),
+            (
+                marked_compliance_plans(102_161, Vec::new(), None),
+                "ledger_count",
+            ),
+            (to_masters.clone(), "ledger_master"),
+            (to_the_source(vec![masters.clone()]), "ledger_balance"),
+            (
+                to_the_source(vec![masters.clone(), balances.clone()]),
+                "groups",
+            ),
+            (
+                to_the_source(vec![masters.clone(), balances.clone(), groups()]),
+                "book_extent",
+            ),
+        ];
+        for (mut plans, request) in cases {
+            plans.push(
+                xml(String::new())
+                    .with_delivery(tally_protocol_simulator::Delivery::ResetBeforeBody),
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "{request}: {response}");
+            let error = refusal(&response);
+            assert_eq!(
+                error["code"], "party_ledger_master_read_failed",
+                "{response}"
+            );
+            assert_eq!(error["failed_request"], request, "{response}");
         }
     }
 
@@ -6044,6 +6098,57 @@ mod through_the_tool {
             let with = compliance_master_ledgers_per_read(ComplianceRead::WithGstDetails);
             assert!(with < standard);
             assert!(std::hint::black_box(MARK) > standard);
+        }
+
+        /// A book too large for one read, read without balances on one Currency
+        /// master (#2265): each part is its master pair alone, joined and
+        /// covered as a read with balances is, and no other request is sent.
+        #[tokio::test]
+        async fn a_read_in_parts_without_balances_sends_no_balance_pair() {
+            let rows = book(compliance_master_ledgers_per_read(ComplianceRead::Standard) + 1);
+            let all = rows.iter().collect::<Vec<_>>();
+            let reads = vec![
+                generated_catalogue(&all),
+                generated_masters(&under(&rows, &[BIG])),
+                generated_masters(&under(&rows, &[OTHER])),
+                groups(),
+            ];
+            let mut plans =
+                marked_compliance_plans(MARK, reads, Some(extent_with_master_mark(MARK)));
+            let plans = plans.split_off(identity_plans().len());
+            let total = plans.len();
+
+            let companies =
+                crate::tally::xml_parser::parse_companies_from_collection(&companies()).unwrap();
+            let row = companies
+                .iter()
+                .find(|row| row.guid.as_deref() == Some(GUID))
+                .unwrap();
+            let identity = crate::tally::VerifiedCompanyIdentity::from_observed_companies(
+                row.name.clone(),
+                crate::tally::test_company_guid(GUID),
+                row.company_number.clone().unwrap(),
+                row.books_from.clone().unwrap(),
+                &companies,
+            )
+            .unwrap();
+            let simulator = SequenceSimulator::spawn(plans).unwrap();
+            let listing = crate::tally::runtime::TallyRuntime::default()
+                .fetch_agent_party_ledger_masters_with_evidence(
+                    crate::tally::TallyConfig {
+                        host: "127.0.0.1".into(),
+                        port: simulator.address().port(),
+                    },
+                    &identity,
+                    TallyDate::parse("20990101").unwrap(),
+                    ComplianceRead::WithoutBalances,
+                )
+                .await
+                .unwrap();
+            let observed = simulator.finish().unwrap();
+            assert_eq!(observed.len(), total);
+            assert_eq!(listing.records.len(), rows.len());
+            assert!(listing.mixed_currency_ledgers_excluded.is_empty());
         }
 
         /// A book one ledger over what a details read holds is one whole read

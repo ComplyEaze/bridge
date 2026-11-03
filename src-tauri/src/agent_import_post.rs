@@ -88,7 +88,8 @@ pub(super) enum Step {
 
 /// What an agent post's approval steps need to know about the post they serve,
 /// whichever kind it is: the tool a caller is told to call again, the batch,
-/// the company, and how many vouchers (one for a master) it would send.
+/// the company, and how many vouchers it would send (for a master batch, its
+/// ledgers).
 pub(super) struct ApprovalTarget<'a> {
     pub(super) tool: &'a str,
     pub(super) batch_id: &'a str,
@@ -843,6 +844,9 @@ impl Server {
             if line.on_account_approved.is_none() {
                 return Err(super::bill_wise::BILL_WISE_NOT_RECORDED.to_string().into());
             }
+            // Nor while a Store package's copy of the data folder keeps a
+            // second journal this one cannot see (#2233): before any dialog.
+            super::split_journal::admit(&self.settings.data_dir)?;
             // A dialog or approval an earlier call left for this batch (#725).
             // The desktop waits for its dialog in one call, as before.
             let (redeeming, form) = match scope {
@@ -971,19 +975,30 @@ impl Server {
             // A ledger that now folds equal to another live ledger could be
             // taken for it by Tally's import lookup (bridge#626). Refused as the
             // build refuses it, including for a batch built before the twin
-            // appeared or before the build checked for one.
-            if !folded_twins(
-                &requested_ledger_names(&payload),
+            // appeared or before the build checked for one. A pair that differs
+            // only by a trailing line break goes on, on the shape it was measured
+            // on, for the dialog to name; the desktop's review does not name one,
+            // so it refuses that too.
+            let requested = requested_ledger_names(&payload);
+            let twins = folded_twins(
+                &requested,
                 catalogue_identities.catalog().parents(),
                 catalogue_identities.catalog().aliases(),
-            )
-            .is_empty()
+            );
+            let line_break_twins = twins
+                .iter()
+                .filter_map(|twins| {
+                    twins.admitted_pair(&requested, &payload.vouchers, &catalogue_identities)
+                })
+                .collect::<Vec<_>>();
+            if line_break_twins.len() < twins.len()
+                || (scope == PostScope::JournalOnly && !twins.is_empty())
             {
                 return Err("ledger_has_folded_twin".to_string().into());
             }
             let ledger_binding = catalogue_identities
                 .catalog()
-                .bind_selected(requested_ledger_names(&payload))
+                .bind_selected(requested.clone())
                 .map_err(|_| "import_masters_changed".to_string())?;
             // The same ledgers must still carry the GUIDs the build bound them
             // to (#239): a name alone cannot tell a ledger renamed and replaced
@@ -1001,6 +1016,28 @@ impl Server {
                     ToolFailure::from(refusal.code().to_string())
                 },
             )?;
+            // The other ledger of each shown pair joins the binding, so the
+            // approval and the queue's GUID check hold it too, and the queue
+            // refuses a twin this dialog did not name.
+            let (ledger_binding, preview, preview_lists_vouchers) = if line_break_twins.is_empty() {
+                (ledger_binding, preview, preview_lists_vouchers)
+            } else {
+                let shown = review_preview_with_twins(
+                    &line,
+                    &self.settings.endpoint,
+                    form,
+                    &line_break_twins,
+                )?;
+                let others = line_break_twins.iter().map(|twin| twin.other.clone());
+                (
+                    catalogue_identities
+                        .catalog()
+                        .bind_selected(requested.iter().cloned().chain(others))
+                        .map_err(|_| "import_masters_changed".to_string())?,
+                    shown.text,
+                    shown.lists_vouchers,
+                )
+            };
             // A ledger switched to bill-wise since the build would take an entry
             // On Account unseen: only the ledgers the person approved may be
             // bill-wise now. Judged after the identity binding, so a ledger
@@ -1316,6 +1353,14 @@ impl Server {
                                 UnderLockRefusal::CompanyStopped,
                             ));
                         }
+                        // A second journal in a Store package's copy of the data
+                        // folder (#2233) may have been made while the dialog stood
+                        // open: asked again here, under the lock.
+                        super::split_journal::admit(&self.settings.data_dir).map_err(|split| {
+                            BeforeDispatchError::Refused(UnderLockRefusal::JournalSplit(
+                                split.cause(),
+                            ))
+                        })?;
                         // The transfer records again, between the check before the
                         // dialog and the intent: the approval is withdrawn and the
                         // next call gives the whole reason before asking.
@@ -1450,11 +1495,18 @@ impl Server {
                         .downcast_ref::<crate::tally::runtime::CurrencyAdmissionRefusal>()
                         .map(|refusal| refusal.0)
                 });
+                // What the split-journal check found under the lock (#2233).
+                let split_cause = error.chain().find_map(|cause| {
+                    match cause.downcast_ref::<UnderLockRefusal>() {
+                        Some(UnderLockRefusal::JournalSplit(cause)) => Some(*cause),
+                        _ => None,
+                    }
+                });
                 let mut failure = ToolFailure::from_runtime(code, error);
                 if failure.cause.is_none() {
                     failure.cause = refusal_cause(
                         &failure.code,
-                        group.or(invoice_field).or(currency_cause),
+                        group.or(invoice_field).or(currency_cause).or(split_cause),
                         transport,
                     );
                 }
@@ -1631,6 +1683,17 @@ impl Server {
                     if self.settings.max_bytes >= crate::agent::REMEDIATION_MIN_RESPONSE_BUDGET {
                         outcome.payload["result"]["error"]["cause"] = json!(cause);
                     }
+                }
+                // A second journal (#2233) refuses every post from this copy, so the
+                // message says what to do next, by what the check found, rather than
+                // to review the error. The cause is the failure's: the payload's own
+                // is dropped under the budget rule above.
+                if outcome.payload["result"]["error"]["code"]
+                    == super::split_journal::IMPORT_JOURNAL_SPLIT
+                    && attempted == Some(false)
+                {
+                    outcome.payload["result"]["error"]["message"] =
+                        json!(super::split_journal::refused_message(cause));
                 }
                 // The code's next step, under the same rule, and only when the
                 // journal shows nothing was sent (#1573).
@@ -2084,7 +2147,7 @@ const BUSY_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally's port wa
 
 /// The same, when Tally was still busy with an earlier request cut for time
 /// (#2142): nothing was posted, and the approval has lapsed.
-const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that was stopped for time. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
+const DRAINING_BEFORE_ATTEMPT_NEXT_STEP: &str = "Nothing was posted: Tally was still busy with an earlier request that did not finish. Call post_import with this same batch again after retry_after_s seconds; this clears by itself within 10 minutes of the earlier request. Any approval already given has lapsed, so the person is asked to approve it again. Do not rebuild the batch.";
 
 /// What a caller does when the port was busy and whether the post was sent
 /// could not be observed.
@@ -2106,8 +2169,9 @@ const TEXT_REFUSED_MESSAGE: &str = "Nothing was sent. This saved batch has a nar
 /// What a caller is told when the approval window for a saved batch was too
 /// large to show whole, by the batch's length or for the screen it would open
 /// on, before any attempt (#1780). The desktop's Journal screen shows the
-/// message alone.
-const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
+/// message alone. A Mac measures its window against the screen before it opens
+/// it, so the screen's remedies are named for both.
+const REVIEW_TOO_LARGE_MESSAGE: &str = "Nothing was sent. The approval window for this saved batch is too large to show whole, either because of its length or because of the screen it would open on, so it was not shown. A larger or less magnified screen may help; on a Mac, so may moving the Dock to the side or hiding it. If the window listed the batch's vouchers one line each, asking again soon shows its totals only, which is smaller. If the length is the cause, a batch can be split into parts; a single voucher this long cannot be posted from here.";
 
 fn name_blocking_batch(payload: &mut Value, blocking: Option<&str>) {
     let Some(id) = blocking else { return };
@@ -2577,6 +2641,7 @@ fn recheck_import_admission(
     let parents = catalogue.catalog();
     // Nor can the binding see a ledger added since approval that folds equal to
     // a named one, which Tally's import lookup could take for it (bridge#626).
+    // Only the pair the dialog named goes on: its other ledger is in the binding.
     let named = line
         .vouchers
         .iter()
@@ -2585,7 +2650,19 @@ fn recheck_import_admission(
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
-    if !folded_twins(&named, parents.parents(), parents.aliases()).is_empty() {
+    let shown = |twins: &FoldedTwins| {
+        twins
+            .admitted_pair(&named, &line.vouchers, &catalogue)
+            .is_some_and(|twin| {
+                ledger_binding
+                    .pairs()
+                    .any(|(name, _)| name == twin.other.as_str())
+            })
+    };
+    if !folded_twins(&named, parents.parents(), parents.aliases())
+        .iter()
+        .all(shown)
+    {
         return Err(ApprovedImportAdmissionError::LedgerFoldedTwin.into());
     }
     // A ledger switched to bill-wise since the build would take an entry On
@@ -3214,6 +3291,25 @@ pub(super) fn review_preview_for_form(
             })
         }
     }
+}
+
+/// [`review_preview_for_form`] of a post whose ledgers have line-break twins,
+/// which only the post's own catalogue read finds.
+fn review_preview_with_twins(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    form: PreviewForm,
+    twins: &[super::LineBreakTwin],
+) -> Result<ShownPreview, String> {
+    let footer = line_break_twin_lines(twins)
+        .map_err(ReviewTextRefusal::import_code)?
+        .into_iter()
+        .chain(agent_post_timing_lines())
+        .collect::<Vec<_>>();
+    review_text(line, endpoint, &footer, form).map(|shown| ShownPreview {
+        lists_vouchers: shown.lists_vouchers(),
+        text: shown.into_string(),
+    })
 }
 
 /// A preview and whether it lists the batch's vouchers one line each: what the
@@ -4147,6 +4243,39 @@ pub(super) fn line_break_note(names: &[ReviewLedgerName<'_>]) -> Option<&'static
         .iter()
         .any(|name| name.ends_in_line_break())
         .then_some(LINE_BREAK_NOTE)
+}
+
+/// The lines that name both ledgers of each pair and say which one is used.
+/// The name is written without its line break and the words say which has it,
+/// so the only marked name in a text is one the voucher lines show.
+fn line_break_twin_lines(twins: &[super::LineBreakTwin]) -> Result<Vec<String>, ReviewTextRefusal> {
+    let mut lines = Vec::with_capacity(twins.len() * 2);
+    for twin in twins {
+        let name = super::without_trailing_crlf(&twin.named);
+        if let Some(refusal) = [name, &twin.named_group, &twin.other_group]
+            .into_iter()
+            .filter_map(ReviewTextRefusal::of)
+            .min()
+        {
+            return Err(refusal);
+        }
+        let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+        let (used, not_used) = if twin.named.ends_with("\r\n") {
+            ("line break at its end", "no line break at its end")
+        } else {
+            ("no line break at its end", "line break at its end")
+        };
+        let name = quoted(name);
+        lines.push(format!(
+            "Used: {name}, {used}, group {}",
+            quoted(&twin.named_group)
+        ));
+        lines.push(format!(
+            "Not used: {name}, {not_used}, group {}",
+            quoted(&twin.other_group)
+        ));
+    }
+    Ok(lines)
 }
 
 /// Checks every value a dialog shows: `text` under the plain rules and

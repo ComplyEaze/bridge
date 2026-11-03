@@ -772,7 +772,7 @@ fn the_admitted_inputs_parse_to_exactly_their_typed_items() {
             },
             items: vec![stored],
         };
-        assert_eq!(item_from_batch(&batch).unwrap(), original);
+        assert_eq!(creates_from_batch(&batch).unwrap(), original.into());
     }
 }
 
@@ -791,27 +791,41 @@ fn a_stored_batch_that_is_not_one_admitted_ledger_is_refused() {
         items,
     };
     let good = stored_from_item(&item(LEDGER));
-    assert!(item_from_batch(&base(vec![good.clone()])).is_ok());
+    assert!(creates_from_batch(&base(vec![good.clone()])).is_ok());
     assert_eq!(
-        item_from_batch(&base(vec![])),
+        creates_from_batch(&base(vec![])),
         Err("master_batch_invalid".to_string())
     );
     assert_eq!(
-        item_from_batch(&base(vec![good.clone(), good.clone()])),
+        creates_from_batch(&base(vec![good.clone(), good.clone()])),
         Err("master_batch_invalid".to_string())
+    );
+    // More ledgers than a request may carry answer their own code.
+    let eleven = (0..11)
+        .map(|index| stored_from_item(&item(&format!("Stored Suspense {index:02}"))))
+        .collect();
+    assert_eq!(
+        creates_from_batch(&base(eleven)),
+        Err("master_batch_too_large".to_string())
+    );
+    // Two ledgers Tally would keep apart are one admitted batch.
+    let second = stored_from_item(&item("Second Suspense Ledger"));
+    assert_eq!(
+        creates_from_batch(&base(vec![good.clone(), second])).map(|batch| batch.len()),
+        Ok(2)
     );
     let mut bad = good.clone();
     bad.name = "Caf\u{e9}".into();
-    assert!(item_from_batch(&base(vec![bad])).is_err());
+    assert!(creates_from_batch(&base(vec![bad])).is_err());
     // A duty head the build does not admit.
     let mut duty = good.clone();
     duty.kind = StoredLedgerKind::GstDuty;
     duty.gst_duty_head = Some("CGST".into());
-    assert!(item_from_batch(&base(vec![duty])).is_err());
+    assert!(creates_from_batch(&base(vec![duty])).is_err());
     // A suspense ledger that carries a GSTIN is not what the item stores back.
     let mut stray = good;
     stray.party_gstin = Some(LAB_GSTIN.into());
-    assert!(item_from_batch(&base(vec![stray])).is_err());
+    assert!(creates_from_batch(&base(vec![stray])).is_err());
 }
 
 // --- prepare ---------------------------------------------------------------
@@ -854,7 +868,7 @@ async fn under_mask_parties_the_preview_a_prepare_returns_names_the_ledger_maske
     let preview = result(&response)["preview"].as_str().unwrap();
     assert_eq!(
         preview,
-        super::super::master_review::masked_review_text(&item(LEDGER), &identity(), &origin)
+        super::super::master_review::masked_review_text(&item(LEDGER).into(), &identity(), &origin)
             .unwrap()
     );
     assert!(!response.to_string().contains(LEDGER), "{response}");
@@ -877,7 +891,7 @@ async fn prepare_saves_the_batch_and_returns_the_preview_the_person_will_be_show
     let batch_id = result(&response)["batch_id"].as_str().unwrap().to_string();
     assert!(valid_batch_id(&batch_id));
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
-    let expected = master_review_text(&item(LEDGER), &identity(), &origin).unwrap();
+    let expected = master_review_text(&item(LEDGER).into(), &identity(), &origin).unwrap();
     assert_eq!(result(&response)["preview"], expected.as_str());
     assert_eq!(result(&response)["parent"], "Suspense A/c");
     assert!(result(&response)["next_step"]
@@ -892,6 +906,96 @@ async fn prepare_saves_the_batch_and_returns_the_preview_the_person_will_be_show
         state.batch.batch_sha256,
         MasterPostRequest::render(item(LEDGER), &identity()).sha256()
     );
+}
+
+#[tokio::test]
+async fn prepare_saves_a_batch_of_ledgers_in_order_under_one_preview() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let names = [LEDGER, "Second Suspense Ledger", "Third Suspense Ledger"];
+    let args = json!({
+        "company_guid": GUID,
+        "ledgers": names.map(|name| json!({"name": name, "kind": "suspense"})),
+    });
+    let response = TEST_LEDGER_INDEX
+        .scope(book(), server.call_tool("prepare_ledger_creates", args))
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(observed.len(), before_approval().len(), "{response}");
+    let batch_id = result(&response)["batch_id"].as_str().unwrap().to_string();
+    assert_eq!(result(&response)["ledger_count"], 3);
+    assert_eq!(result(&response)["parent"], "Suspense A/c");
+    let creates = LedgerCreateBatch::new(names.map(item).to_vec()).unwrap();
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    assert_eq!(
+        result(&response)["preview"],
+        master_review_text(&creates, &identity(), &origin)
+            .unwrap()
+            .as_str()
+    );
+    let state = state_of(directory.path(), &batch_id);
+    assert_eq!(
+        state.batch.items,
+        creates
+            .items()
+            .iter()
+            .map(stored_from_item)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(
+        state.batch.batch_sha256,
+        MasterPostRequest::render(creates, &identity()).sha256()
+    );
+}
+
+#[tokio::test]
+async fn prepare_refuses_a_batch_it_cannot_admit_and_saves_nothing() {
+    let suspense = json!({"name": LEDGER, "kind": "suspense"});
+    let eleven = (0..11)
+        .map(|index| json!({"name": format!("Batch Ledger {index:02}"), "kind": "suspense"}))
+        .collect::<Vec<_>>();
+    let cases = [
+        (
+            "eleven ledgers, one more than a request may carry",
+            json!({"company_guid": GUID, "ledgers": eleven}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "a list of one, under the published minimum of two",
+            json!({"company_guid": GUID, "ledgers": [suspense]}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "ledger and ledgers",
+            json!({"company_guid": GUID, "ledger": suspense, "ledgers": [suspense, {"name": "Other Ledger", "kind": "suspense"}]}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "two parents",
+            json!({"company_guid": GUID, "ledgers": [suspense, {"name": "Other Creditor", "kind": "party", "side": "sundry_creditors"}]}),
+            "master_batch_mixed_parents",
+        ),
+        (
+            "an item with a field the ledger object does not publish",
+            json!({"company_guid": GUID, "ledgers": [suspense, {"name": "Other Ledger", "kind": "suspense", "opening_balance": "1.00"}]}),
+            "argument_invalid:ledgers",
+        ),
+        (
+            "one name twice, differing in case",
+            json!({"company_guid": GUID, "ledgers": [suspense, {"name": LEDGER.to_uppercase(), "kind": "suspense"}]}),
+            "master_batch_names_may_be_one_master",
+        ),
+    ];
+    for (case, args, code) in cases {
+        let directory = tempfile::tempdir().unwrap();
+        let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let response = server.call_tool("prepare_ledger_creates", args).await;
+        sent(simulator);
+        assert_eq!(error_code(&response), code, "{case}: {response}");
+        assert!(!journal_path(directory.path()).exists(), "{case}");
+    }
 }
 
 #[tokio::test]
@@ -1029,7 +1133,7 @@ async fn an_approved_post_sends_exactly_the_bytes_its_intent_recorded() {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     assert_eq!(
         scripted.masters(),
-        [master_review_text(&item(LEDGER), &identity(), &origin).unwrap()]
+        [master_review_text(&item(LEDGER).into(), &identity(), &origin).unwrap()]
     );
     assert!(
         scripted.previews().is_empty(),
@@ -1178,29 +1282,42 @@ async fn a_sent_batch_whose_company_is_not_loaded_says_to_load_the_same_companie
 }
 
 /// One row of the table of next steps: the step a path gives, the one it should
-/// give, and whether it may tell the person to create the ledger by hand or must
-/// tell them to create nothing by hand meanwhile.
+/// give, and whether it must tell the person to create nothing by hand meanwhile.
 struct StepRow {
     path: String,
     given: String,
     expected: String,
-    may_key_by_hand: bool,
     keys_nothing: bool,
+}
+
+/// Whether a step asks the person to create, alter or key a ledger by hand. The
+/// steps that tell them not to are taken out first.
+fn asks_for_hand_work(step: &str) -> bool {
+    let step = step
+        .to_lowercase()
+        .replace("do not create the ledger in tally by hand", "")
+        .replace("do not create this ledger in tally by hand", "")
+        .replace("do not create it by hand", "")
+        .replace("create nothing in tally by hand", "");
+    ["by hand", "key the ledger", "alter the ledger"]
+        .iter()
+        .any(|ask| step.contains(ask))
 }
 
 /// Every state and path an answer can take after a send, with its next step:
 /// the verdicts judged and recorded, the verdicts judged and not recorded (with
 /// and without Tally's answer on file), a book that was not read back, the
 /// fallback after Tally answered, the failure answers, and the refusals for a
-/// held name. Only the row marked may be the step that creates by hand; the
-/// rows marked say to create nothing by hand meanwhile do say so.
+/// held name. No step asks for a ledger to be made by hand, and the rows marked
+/// say to create nothing by hand meanwhile do say so.
 #[test]
-fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand() {
+fn every_next_step_is_the_expected_one_and_none_asks_for_hand_work() {
     use super::verdict::{Checks, Judgement};
     use super::verify::unrecorded_next_step;
     use MasterVerdictState::{
-        ConfirmedAbsent, MasterWriteLocatedElsewhere, MastersAfterPostUnconfirmed,
-        PostedIntoExistingMaster, PostedVerified, ReconciliationRequired,
+        ConfirmedAbsent, ConfirmedAbsentAfterChange, MasterWriteLocatedElsewhere,
+        MastersAfterPostUnconfirmed, PostedIntoExistingMaster, PostedUnattributed, PostedVerified,
+        ReconciliationRequired,
     };
     let judgement = |state: MasterVerdictState, found: bool, scope: bool, absent: bool| {
         Judgement::for_test(
@@ -1216,12 +1333,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         )
     };
     let mut rows: Vec<StepRow> = Vec::new();
-    let mut row = |path: &str, given: String, expected: &str, may: bool, nothing: bool| {
+    let mut row = |path: &str, given: String, expected: &str, nothing: bool| {
         rows.push(StepRow {
             path: path.to_string(),
             given,
             expected: expected.to_string(),
-            may_key_by_hand: may,
             keys_nothing: nothing,
         });
     };
@@ -1234,13 +1350,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         judged(&judgement(PostedVerified, true, false, false), p),
         verify::NEXT_VERIFIED,
         false,
-        false,
     );
     row(
         "into existing",
         judged(&judgement(PostedIntoExistingMaster, false, false, false), r),
         verify::NEXT_INTO_EXISTING,
-        false,
         false,
     );
     row(
@@ -1251,13 +1365,46 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         ),
         verify::NEXT_ELSEWHERE,
         false,
-        false,
     );
     row(
         "confirmed absent",
         judged(&judgement(ConfirmedAbsent, false, false, true), r),
         verify::NEXT_ABSENT,
         false,
+    );
+    row(
+        "confirmed absent after a change",
+        judged(
+            &judgement(ConfirmedAbsentAfterChange, false, false, true),
+            r,
+        ),
+        verify::NEXT_ABSENT_AFTER_CHANGE,
+        false,
+    );
+    row(
+        "unattributed",
+        judged(&judgement(PostedUnattributed, true, false, false), r),
+        verify::NEXT_UNATTRIBUTED,
+        false,
+    );
+    let not_measured = |reasons: Vec<&'static str>| {
+        let judgement =
+            Judgement::for_test(ReconciliationRequired, None, Checks::none(), reasons, true);
+        judged(&judgement, r)
+    };
+    row(
+        "name absent, order not measured",
+        not_measured(vec!["absent_not_measured_on_this_release"]),
+        verify::NEXT_ABSENT_UNCOVERED,
+        false,
+    );
+    row(
+        "elsewhere, order not measured",
+        not_measured(vec![
+            "other_company_mark_moved",
+            "absent_not_measured_on_this_release",
+        ]),
+        verify::NEXT_ELSEWHERE_UNCOVERED,
         false,
     );
     row(
@@ -1267,14 +1414,12 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             r,
         ),
         verify::NEXT_UNCONFIRMED,
-        false,
         true,
     );
     row(
         "scope changed",
         judged(&judgement(ReconciliationRequired, false, true, true), r),
         verify::NEXT_LOAD_SAME_COMPANIES,
-        false,
         true,
     );
     row(
@@ -1282,34 +1427,74 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         judged(&judgement(ReconciliationRequired, false, false, true), r),
         verify::NEXT_ABSENT_NOT_SETTLED,
         false,
-        false,
     );
     row(
         "reconcile, ledger present",
         judged(&judgement(ReconciliationRequired, true, false, false), r),
         verify::NEXT_PRESENT_NOT_VERIFIED,
         false,
+    );
+    row(
+        "reconcile, batch partly present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![Some(NEW_GUID.to_string()), None],
+                Checks::none(),
+                vec!["counters_unavailable"],
+                false,
+            ),
+            r,
+        ),
+        verify::NEXT_PARTLY_PRESENT,
+        true,
+    );
+    row(
+        "reconcile, batch all present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![Some(NEW_GUID.to_string()), Some(NEW_GUID.to_string())],
+                Checks::none(),
+                vec!["counters_unavailable"],
+                false,
+            ),
+            r,
+        ),
+        verify::NEXT_ALL_PRESENT_NOT_VERIFIED,
         false,
+    );
+    row(
+        "just posted, batch partly present",
+        judged(
+            &Judgement::for_test_batch(
+                ReconciliationRequired,
+                vec![None, Some(NEW_GUID.to_string())],
+                Checks::none(),
+                vec!["ledger_absent_after_post"],
+                false,
+            ),
+            p,
+        ),
+        verify::NEXT_PARTLY_PRESENT,
+        true,
     );
     row(
         "just posted, present",
         judged(&judgement(ReconciliationRequired, true, false, false), p),
         verify::NEXT_PRESENT_NOT_VERIFIED,
         false,
-        false,
     );
     row(
         "just posted, name absent",
         judged(&judgement(ReconciliationRequired, false, false, true), p),
         verify::NEXT_RECONCILE,
-        false,
         true,
     );
     row(
         "reconcile, index not usable",
         judged(&judgement(ReconciliationRequired, false, false, false), r),
         verify::NEXT_RECONCILE,
-        false,
         true,
     );
     // Judged and not recorded: the quiet final states say only that the verdict
@@ -1321,13 +1506,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         unrecorded(&judgement(PostedVerified, true, false, false), p, true),
         not_recorded,
         false,
-        false,
     );
     row(
         "unrecorded confirmed absent",
         unrecorded(&judgement(ConfirmedAbsent, false, false, true), r, true),
         not_recorded,
-        false,
         false,
     );
     row(
@@ -1339,7 +1522,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         ),
         &format!("{} {not_recorded}", verify::NEXT_INTO_EXISTING),
         false,
-        false,
     );
     row(
         "unrecorded unconfirmed",
@@ -1349,7 +1531,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             true,
         ),
         &format!("{} {not_recorded}", verify::NEXT_UNCONFIRMED),
-        false,
         true,
     );
     row(
@@ -1360,7 +1541,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             false,
         ),
         &format!("{} {not_recorded}", verify::NEXT_ABSENT_NOT_SETTLED),
-        false,
         false,
     );
     row(
@@ -1375,7 +1555,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             verify::NEXT_UNCONFIRMED,
             verify::NEXT_ANSWER_NOT_RECORDED
         ),
-        false,
         true,
     );
     // The book was not read back.
@@ -1383,7 +1562,6 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "not read back, company",
         not_read_back_next_step("company_identity_not_found").to_string(),
         verify::NEXT_LOAD_SAME_COMPANIES,
-        false,
         true,
     );
     row(
@@ -1391,13 +1569,11 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         not_read_back_next_step("master_batch_invalid").to_string(),
         verify::NEXT_RECORD_NOT_READABLE,
         false,
-        false,
     );
     row(
         "not read back, tally",
         not_read_back_next_step("tally_endpoint_busy").to_string(),
         verify::NEXT_UNCONFIRMED,
-        false,
         true,
     );
     // Tally answered and the call went no further.
@@ -1405,14 +1581,12 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "fallback, answer on file",
         fallback_next_step(true),
         NEXT_NOT_READ_BACK_AFTER_ANSWER,
-        false,
         true,
     );
     row(
         "fallback, answer not on file",
         fallback_next_step(false),
         &format!("{NEXT_NOT_READ_BACK_AFTER_ANSWER}{NEXT_ANSWER_NOT_RECORDED}"),
-        false,
         true,
     );
     // The failure answers.
@@ -1433,21 +1607,18 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         "failure, may have been sent",
         failure(Some(true)),
         NEXT_UNCONFIRMED,
-        false,
         true,
     );
     row(
         "failure, journal unread",
         failure(None),
         "Call post_ledger_creates with this batch_id again. If a send of this batch was recorded, that call only reads the book back and sends nothing; if none was, it asks for approval again before anything is sent; if ComplyEaze Bridge holds no such batch, it is refused as master_batch_not_found and nothing is sent. Do not create the ledger in Tally by hand meanwhile: a create that has not run yet would overwrite it.",
-        false,
         true,
     );
     row(
         "failure, nothing sent",
         failure(Some(false)),
         NOTHING_RECORDED_STEP,
-        false,
         false,
     );
     // An approval box that closed unanswered, or was declined: nothing was sent,
@@ -1470,15 +1641,30 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         unanswered("master_approval_timed_out"),
         "Nothing was sent: the approval box closed unanswered when its time ran out. To create the ledger, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         false,
-        false,
     );
     row(
         "approval declined",
         unanswered("master_approval_declined"),
         "Nothing was sent: the approval was declined. If the ledger should still be created, call post_ledger_creates with this batch_id again; that call opens a new approval box.",
         false,
+    );
+    row(
+        "a read before the create cut for time",
+        master_unanswered_next_step("request_deadline_exceeded")
+            .unwrap()
+            .to_string(),
+        NEXT_TALLY_BUSY,
         false,
     );
+    for code in [
+        "master_ledger_invalid",
+        "master_review_too_large",
+        "tally_endpoint_draining",
+        "master_pre_image_remove_failed",
+    ] {
+        let step = master_next_step(code).unwrap();
+        row(code, unanswered(code), step, false);
+    }
     // The refusals for a held name.
     let one = BlockingBatch {
         batch_id: "bridge-0001".into(),
@@ -1537,7 +1723,7 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             true,
         ),
     ] {
-        row(path, overlap_next_step(&view), &expected, false, keys);
+        row(path, overlap_next_step(&view), &expected, keys);
         // The step is what the answer carries.
         let carried = overlap_refusal_outcome("bridge-x", GUID, empty_evidence(), &view).payload
             ["result"]["error"]["next_step"]
@@ -1572,32 +1758,24 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
         path: "journal report, settled".into(),
         given: report_step(&settled_state, None),
         expected: verify::NEXT_ABSENT.into(),
-        may_key_by_hand: false,
         keys_nothing: false,
     });
     rows.push(StepRow {
         path: "journal report, company not loaded".into(),
         given: report_step(&open_state, Some("company_identity_not_found")),
         expected: verify::NEXT_LOAD_SAME_COMPANIES.into(),
-        may_key_by_hand: false,
         keys_nothing: true,
     });
     rows.push(StepRow {
         path: "journal report, no verdict, nothing stopped it".into(),
         given: report_step(&open_state, None),
         expected: String::new(),
-        may_key_by_hand: false,
         keys_nothing: false,
     });
-    assert!(rows.len() >= 34, "{} rows", rows.len());
+    assert!(rows.len() >= 43, "{} rows", rows.len());
     for row in &rows {
         assert_eq!(row.given, row.expected, "{}", row.path);
-        assert_eq!(
-            row.given.contains("create it in Tally by hand"),
-            row.may_key_by_hand,
-            "{}",
-            row.path
-        );
+        assert!(!asks_for_hand_work(&row.given), "{}", row.path);
         assert_eq!(
             row.given
                 .contains("Do not create the ledger in Tally by hand meanwhile"),
@@ -1606,7 +1784,9 @@ fn every_next_step_after_a_send_is_the_expected_one_and_only_one_creates_by_hand
             row.path
         );
     }
-    assert_eq!(rows.iter().filter(|row| row.may_key_by_hand).count(), 0);
+    assert!(asks_for_hand_work(
+        "Create the ledger in Tally by hand, then call again."
+    ));
 }
 
 /// The README carries the corrected sentences about `post_ledger_creates`,
@@ -1697,7 +1877,7 @@ fn the_guide_and_the_tool_description_say_only_what_the_read_back_checks() {
         "When the check before the dialog finds a send of this batch recorded since the call began by another call, and when a held-name refusal finds it in the journal read that follows, the answer is import_already_attempted with error.hold send_of_this_batch_recorded_since",
         "The check under the journal's lock answers the same code without the hold field, as an outcome that may have been sent",
         // A company whose set of loaded companies changed is read and judged.
-        "A book whose set of loaded companies changed is read and judged: the answer is reconciliation_required with company_scope_changed among its reasons, and it says to load the same companies and call again; a read that shows a changed existing master or another company's mark moved keeps the state for that.",
+        "A book whose set of loaded companies changed is read and judged: the answer is reconciliation_required with company_scope_changed among its reasons, and it says to load the same companies and call again; a read that shows a changed existing master or another company's mark moved keeps the state for that, unless the limit above holds the batch open.",
         // What posted_verified checks.
         "bill-wise is not read back",
         "no ledger or group that existed before changed",
@@ -1851,7 +2031,11 @@ fn a_book_that_was_not_read_back_is_told_what_to_do_by_what_stopped_it() {
             "{code}"
         );
     }
-    for code in ["master_batch_invalid", "master_intent_missing"] {
+    for code in [
+        "master_batch_invalid",
+        "master_batch_too_large",
+        "master_intent_missing",
+    ] {
         assert_eq!(
             not_read_back_next_step(code),
             verify::NEXT_RECORD_NOT_READABLE,
@@ -2077,11 +2261,56 @@ async fn a_declined_approval_records_nothing_and_sends_nothing() {
         "the reads before the dialog, no POST"
     );
     assert_eq!(scripted.masters().len(), 1);
+    assert_eq!(scripted.master_counts(), vec![1]);
     assert_eq!(journal_bytes(directory.path()), before);
     assert!(!directory
         .path()
         .join(format!("master-pre-image-{}.json", batch.batch_id))
         .exists());
+}
+
+/// The dialog for a batch is asked about the batch's own count, so a box for
+/// three ledgers says three, and its preview lists all three.
+#[tokio::test]
+async fn the_dialog_for_a_batch_is_asked_about_its_count() {
+    let directory = tempfile::tempdir().unwrap();
+    let names = [LEDGER, "Second Suspense Ledger", "Third Suspense Ledger"];
+    let prepare = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let server = server_at(prepare.address(), directory.path());
+    let prepared = TEST_LEDGER_INDEX
+        .scope(
+            book(),
+            server.call_tool(
+                "prepare_ledger_creates",
+                json!({
+                    "company_guid": GUID,
+                    "ledgers": names.map(|name| json!({"name": name, "kind": "suspense"})),
+                }),
+            ),
+        )
+        .await;
+    sent(prepare);
+    let batch_id = result(&prepared)["batch_id"].as_str().unwrap().to_string();
+    let post = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
+    let server = server_at(post.address(), directory.path());
+    let scripted = ScriptedApproval::declining();
+    let response = posting(
+        &scripted,
+        server.call_tool("post_ledger_creates", json!({"batch_id": batch_id})),
+    )
+    .await;
+    sent(post);
+    assert_eq!(
+        error_code(&response),
+        "master_approval_declined",
+        "{response}"
+    );
+    assert_eq!(scripted.master_counts(), vec![3]);
+    let shown = scripted.masters();
+    assert!(shown[0].starts_with("Create 3 ledgers in"), "{}", shown[0]);
+    for name in names {
+        assert!(shown[0].contains(name), "{name}");
+    }
 }
 
 #[tokio::test]
@@ -4453,7 +4682,7 @@ async fn a_call_for_a_batch_the_masters_journal_lacks_leaves_the_approval_slot_a
                 "a".repeat(64).as_str(),
                 "http://127.0.0.1:9",
                 &identity,
-                &item,
+                &item.clone().into(),
                 "p",
             ),
             ApprovedImport::approved_masters_for_test(item.clone(), &identity, marks),
@@ -4703,7 +4932,12 @@ async fn an_unknown_outcome_then_a_reconcile_that_finds_nothing_is_confirmed_abs
 /// here, for both absent states, with the reason and a step that says so.
 #[tokio::test]
 async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
-    for target in [7, 8] {
+    for (target, other, next_step) in [
+        (7, 3, verify::NEXT_ABSENT_UNCOVERED),
+        (8, 3, verify::NEXT_ABSENT_UNCOVERED),
+        // Another company's mark moved too: the same hold, with the alert.
+        (7, 4, verify::NEXT_ELSEWHERE_UNCOVERED),
+    ] {
         let plans = through_post(xml(created_one()).with_delivery(
             Delivery::ResetAfterRequestProcessed {
                 delay: Duration::from_millis(0),
@@ -4720,7 +4954,7 @@ async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
         .await;
         sent(simulator);
         let reads =
-            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, 3, None))).unwrap();
+            SequenceSimulator::spawn(with_sentinel(reconcile_reads(target, other, None))).unwrap();
         let later = server_at(reads.address(), directory.path());
         // No coverage seam: the read-back reads the release from the answer.
         let response = SCRIPTED_APPROVAL
@@ -4746,9 +4980,13 @@ async fn an_absent_name_on_an_unmeasured_release_stays_open_and_says_why() {
                 .contains(&json!("absent_not_measured_on_this_release")),
             "{target}: {response}"
         );
+        assert_eq!(result(&response)["next_step"], next_step, "{target}");
         assert_eq!(
-            result(&response)["next_step"],
-            verify::NEXT_ABSENT_UNCOVERED,
+            result(&response)["alert"],
+            json!(
+                settled_alert(MasterVerdictState::MasterWriteLocatedElsewhere)
+                    .filter(|_| other == 4)
+            ),
             "{target}"
         );
         assert_eq!(result(&response)["verification"]["settled"], false);

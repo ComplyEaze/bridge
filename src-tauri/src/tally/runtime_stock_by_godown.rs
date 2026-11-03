@@ -93,8 +93,13 @@ fn own(error: StockSummaryReadError) -> StockByGodownReadError {
         }
         StockSummaryReadError::EducationUnqualified => StockByGodownReadError::EducationUnqualified,
         StockSummaryReadError::PeriodNotHonoured => StockByGodownReadError::PeriodNotHonoured,
-        // Raised by the stock summary's flags read, which this read does not send.
-        StockSummaryReadError::NotEnabled => {
+        // Raised by the stock summary's flags read and its censuses, which this read does not
+        // send.
+        StockSummaryReadError::NotEnabled
+        | StockSummaryReadError::TooManyItems { .. }
+        | StockSummaryReadError::ReportTooLarge { .. }
+        | StockSummaryReadError::ItemCountCompanyHigher { .. }
+        | StockSummaryReadError::CensusRefused(_) => {
             StockByGodownReadError::PremiseViolated("stock_by_godown_refusal_unexpected")
         }
     }

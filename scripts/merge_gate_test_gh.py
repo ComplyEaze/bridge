@@ -218,6 +218,31 @@ def with_ack(s, text, status="added"):
         | {ln[len("removed-pin: "):] for ln in text.splitlines() if ln.startswith("removed-pin: ")}))}]
 
 
+# The reads a "<read>-flaky-<kind>" scenario makes fail first: the key in contents_flaky, then the
+# failures before a success and gh's own error line.
+FLAKY_READS = {"head-surface": HEAD, "base-surface": BASE_TIP, "merge-base-surface": BEHIND_MERGE_BASE, "ack": ACK_PATH}
+FLAKY_KINDS = {
+    "502-once": (1, "gh: Server Error (HTTP 502)"),
+    "502-always": (99, "gh: Server Error (HTTP 502)"),
+    "404-once": (1, "gh: Not Found (HTTP 404)"),
+}
+
+
+def flaky_read(key):
+    """Fail a read in contents_flaky while it has failures left, counting every read of it in $GATE_STATE."""
+    if key not in S["contents_flaky"]:
+        return
+    failures, message = S["contents_flaky"][key]
+    state = os.environ.get("GATE_STATE")
+    if not state:
+        fail("a flaky scenario needs GATE_STATE, the file that counts its calls")
+    calls = int(open(state).read() or "0") if os.path.exists(state) else 0
+    with open(state, "w") as handle:
+        handle.write(str(calls + 1))
+    if calls < failures:
+        fail(message)
+
+
 def state():
     global scenario  # a carry-rec-* scenario continues as the scenario it names
     s = {
@@ -233,7 +258,8 @@ def state():
         "surface_merge_base": None,      # None: the merge base is the base tip
         "surface_at": {},                # commit sha -> surface served at that ref (branch history)
         "surface_at_fail": set(),        # commit shas whose pin list cannot be read
-        "surface_at_flaky": {},          # commit sha -> (failures before a success, gh's error line); counted in $GATE_STATE
+        "contents_flaky": {},            # a commit sha (its pin list) or ACK_PATH (the head's ack) -> (failures before
+                                         # a success, gh's error line); every read of it is counted in $GATE_STATE
         "merge_base_fail": False,
         "ack_text": None,
         "ack_fail": False,
@@ -557,6 +583,19 @@ def state():
     elif scenario == "surface-malformed":
         s["surface_head_malformed"] = True
 
+    # -- A contents read other than the branch history's that fails first (#2179) --
+    elif "-flaky-" in scenario and scenario.rsplit("-flaky-", 1)[0] in FLAKY_READS and scenario.rsplit("-flaky-", 1)[1] in FLAKY_KINDS:
+        read, kind = scenario.rsplit("-flaky-", 1)
+        if read == "merge-base-surface":
+            # As behind-a-pin-adding-master-commit, which passes and reads the merge base.
+            s["surface_base"] = schema3(DEFAULT_PINS + ["src/added-on-master.rs"])
+            s["surface_merge_base"] = schema3(DEFAULT_PINS)
+        elif read == "ack":
+            # As ack-exact, which passes and reads the acknowledgement.
+            set_changes(s, ("modified", "src/example.rs"))
+            with_ack(s, ack_text(["src/example.rs"]))
+        s["contents_flaky"] = {FLAKY_READS[read]: FLAKY_KINDS[kind]}
+
     # -- Surface schema -----------------------------------------------------
     elif scenario == "surface-head-schema3-extra-key":
         # Schema 3 stores no hashes: a `sha256` on a row, or a top-level digest, is refused.
@@ -753,7 +792,7 @@ def state():
             with_ack(s, ack_text(["src/example.rs"]))
             if scenario in flaky:
                 sha, failures, message = flaky[scenario]
-                s["surface_at_flaky"] = {sha: (failures, message)}
+                s["contents_flaky"] = {sha: (failures, message)}
         elif scenario in flaky:
             # As history-pin-kept-at-the-head, which passes, with one commit's read failing first.
             s["commits"] = [commit_at(c1, [BASE_TIP]), commit_at(HEAD, [c1])]
@@ -762,7 +801,7 @@ def state():
             set_changes(s, ("modified", "src/example.rs"), ("modified", SURFACE_PATH))
             with_ack(s, ack_text(["src/example.rs", own]))
             sha, failures, message = flaky[scenario]
-            s["surface_at_flaky"] = {sha: (failures, message)}
+            s["contents_flaky"] = {sha: (failures, message)}
         else:
             s["commits"] = [commit_at(c1, [BASE_TIP]), commit_at(HEAD, [c1])]
             s["surface_at"] = {c1: with_own}
@@ -1395,18 +1434,10 @@ elif args and args[0] == "api":
             if history_ref is not None:
                 if history_ref in S["surface_at_fail"]:
                     fail("controlled history surface read failure")
-                if history_ref in S["surface_at_flaky"]:
-                    failures, message = S["surface_at_flaky"][history_ref]
-                    state = os.environ.get("GATE_STATE")
-                    if not state:
-                        fail("a flaky scenario needs GATE_STATE, the file that counts its calls")
-                    calls = int(open(state).read() or "0") if os.path.exists(state) else 0
-                    with open(state, "w") as handle:
-                        handle.write(str(calls + 1))
-                    if calls < failures:
-                        fail(message)
+                flaky_read(history_ref)
                 emit({"encoding": "base64", "content": b64(S["surface_at"][history_ref])})
             elif f"ref={HEAD}" in joined:
+                flaky_read(HEAD)
                 if S["surface_head_fail"]:
                     fail("controlled surface read failure")
                 if S["surface_head_malformed"]:
@@ -1414,10 +1445,13 @@ elif args and args[0] == "api":
                 else:
                     emit({"encoding": "base64", "content": b64(S["surface_head"])})
             elif f"ref={BEHIND_MERGE_BASE}" in joined:
+                flaky_read(BEHIND_MERGE_BASE)
                 emit({"encoding": "base64", "content": b64(S["surface_merge_base"])})
             else:
+                flaky_read(BASE_TIP if f"ref={BASE_TIP}" in joined else None)
                 emit({"encoding": "base64", "content": b64(S["surface_base"])})
         elif f"/contents/{ACK_PATH}?ref={HEAD}" in joined:
+            flaky_read(ACK_PATH)
             if S["ack_text"] is None or S["ack_fail"]:
                 fail("controlled acknowledgement read failure")
             emit({"encoding": "base64", "content": b64(S["ack_text"])})

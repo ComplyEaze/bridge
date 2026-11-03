@@ -1433,12 +1433,10 @@ fn every_amount_consuming_parse_still_refuses_the_composite_window() {
     );
 }
 
-/// The 7.2 layout of a composite (the foreign symbol against its digits) is read as a ledger's
-/// balance, not as a voucher's amount: no 7.2 voucher answer is committed, so a voucher entry that
-/// holds one is not withheld and its window refuses, as it did before that layout was known
-/// (#683, #2071). The same entry in the captured 7.1 layout is withheld.
+/// The 7.2 layout of a composite (the foreign symbol against its digits) on a voucher entry is
+/// withheld at the parse as the 7.1 layout is, until the book's base can read it (#683, #2071).
 #[test]
-fn a_72_layout_composite_on_a_voucher_entry_still_refuses_the_window() {
+fn a_72_layout_composite_on_a_voucher_entry_withholds_its_voucher() {
     let captured = captured_forex_composite_vouchers();
     let composite = "-$ 100.00 @ I\u{20b9} 86/$  = -I\u{20b9} 8600.00";
     let at = captured.find(composite).unwrap();
@@ -1452,10 +1450,274 @@ fn a_72_layout_composite_on_a_voucher_entry_still_refuses_the_window() {
             "-$100.00 @ \u{20b9} 86/$ = -\u{20b9} 8600.00"
         )
     );
-    assert_eq!(
-        parse_agent_rows_withholding(&unspaced, FOREX_COMPANY_GUID).unwrap_err(),
-        "voucher_amount_invalid"
+    let rows = parse_agent_rows_withholding(&unspaced, FOREX_COMPANY_GUID).unwrap();
+    assert!(rows.iter().all(VoucherRow::is_withheld));
+}
+
+use bridge_tally_protocol::native_outstandings::{
+    parse_company_currency_name, parse_currency_master_list,
+};
+
+const FOREX_72_COMPANY_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+
+fn decoded_utf16le(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The 7.2 lab book's answer of one day: eleven vouchers, eight with composites
+/// (fixtures/agent/vouchers-forex-unspaced-20250401.PROVENANCE.md).
+fn captured_72_vouchers() -> String {
+    decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml"
+    ))
+}
+
+/// That book's base and masters, from its own captured currency reads.
+fn captured_72_book() -> IdentifiedBaseCurrency {
+    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml"
+    )))
+    .unwrap();
+    let company = parse_company_currency_name(
+        &decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+    )
+    .unwrap();
+    masters.identify_base(Some(&company)).unwrap()
+}
+
+fn read_under_the_72_book(xml: &str) -> Vec<VoucherRow> {
+    parse_agent_rows_withholding(xml, FOREX_72_COMPANY_GUID)
+        .unwrap()
+        .into_iter()
+        .map(|row| row.read_under(&captured_72_book()))
+        .collect()
+}
+
+#[test]
+fn a_captured_72_window_is_read_as_rupee_amounts_with_the_foreign_amount_apart() {
+    let captured = captured_72_vouchers();
+    let withheld = parse_agent_rows_withholding(&captured, FOREX_72_COMPANY_GUID).unwrap();
+    assert_eq!(withheld.iter().filter(|row| row.is_withheld()).count(), 8);
+    assert_eq!(withheld.len(), 11);
+
+    let rows = read_under_the_72_book(&captured)
+        .into_iter()
+        .map(|row| match row {
+            VoucherRow::Read(row) => row,
+            VoucherRow::Withheld(_) => panic!("every composite here is readable"),
+        })
+        .collect::<Vec<_>>();
+    let with_rate = |rate: &str| {
+        rows.iter()
+            .flat_map(|row| row["amounts"].as_array().unwrap())
+            .filter(|entry| entry["foreign"]["rate"] == rate)
+            .collect::<Vec<_>>()
+    };
+    let decimal_rate = with_rate("86.4125");
+    assert_eq!(decimal_rate.len(), 2);
+    for (entry, (amount, foreign)) in decimal_rate
+        .into_iter()
+        .zip([("-8641.25", "-100.00"), ("8641.25", "100.00")])
+    {
+        assert_eq!(entry["amount"], amount);
+        assert_eq!(
+            entry["foreign"],
+            json!({"currency": "$", "amount": foreign, "rate": "86.4125"})
+        );
+    }
+    let allocations = rows
+        .iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+        .flat_map(|entry| entry["bill_allocations"].as_array().unwrap())
+        .collect::<Vec<_>>();
+    assert!(allocations
+        .iter()
+        .any(|allocation| allocation["foreign"]["currency"] == "$"));
+    for allocation in allocations {
+        let amount = allocation["amount"].as_str().unwrap();
+        assert!(ExactDecimal::parse(amount.to_string()).is_ok(), "{amount}");
+    }
+    // A plain voucher of the same window comes through as it was.
+    let plain = rows
+        .iter()
+        .filter(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|entry| entry.get("foreign").is_none())
+        })
+        .count();
+    assert_eq!(plain, 3);
+}
+
+#[test]
+fn a_captured_71_voucher_is_read_under_its_own_base_symbol() {
+    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/currency_originalname_forex_live.utf16le.xml"
+    )))
+    .unwrap();
+    let book = masters.identify_base(Some("\u{20b9}")).unwrap();
+    let rows =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert_eq!(rows.len(), 1);
+    let row = match rows.into_iter().next().unwrap().read_under(&book) {
+        VoucherRow::Read(row) => row,
+        VoucherRow::Withheld(_) => panic!("the captured composite is readable"),
+    };
+    assert_eq!(row["amounts"][0]["amount"], "-8600.00");
+    assert_eq!(row["amounts"][0]["foreign"]["rate"], "86");
+    // The same voucher in the 7.2 book's terms: its base symbol is not this book's.
+    let other =
+        parse_agent_rows_withholding(&captured_forex_composite_vouchers(), FOREX_COMPANY_GUID)
+            .unwrap();
+    assert!(other
+        .into_iter()
+        .all(|row| row.read_under(&captured_72_book()).is_withheld()));
+}
+
+/// A read composite carries the polarity flag a plain entry does, whichever way it disagrees.
+#[test]
+fn a_read_composite_says_when_its_polarity_disagrees_with_its_amount() {
+    let entries = |xml: &str| {
+        read_under_the_72_book(xml)
+            .into_iter()
+            .flat_map(|row| match row {
+                VoucherRow::Read(row) => row["amounts"].as_array().unwrap().clone(),
+                VoucherRow::Withheld(_) => panic!("every composite here is readable"),
+            })
+            .filter(|entry| entry.get("foreign").is_some())
+            .collect::<Vec<_>>()
+    };
+    let captured = captured_72_vouchers();
+    assert!(entries(&captured)
+        .iter()
+        .all(|entry| entry.get("polarity_disagrees_with_amount").is_none()));
+
+    let flipped = captured
+        .replace(">Yes</ISDEEMEDPOSITIVE>", ">Was</ISDEEMEDPOSITIVE>")
+        .replace(">No</ISDEEMEDPOSITIVE>", ">Yes</ISDEEMEDPOSITIVE>")
+        .replace(">Was</ISDEEMEDPOSITIVE>", ">No</ISDEEMEDPOSITIVE>");
+    let entries = entries(&flipped);
+    for negative in [true, false] {
+        let side = entries
+            .iter()
+            .filter(|entry| entry["amount"].as_str().unwrap().starts_with('-') == negative)
+            .collect::<Vec<_>>();
+        assert!(!side.is_empty());
+        assert!(side
+            .iter()
+            .all(|entry| entry["polarity_disagrees_with_amount"] == true));
+    }
+}
+
+/// Plain and composite entries on one voucher read side by side, and net in rupees.
+#[test]
+fn a_voucher_mixing_plain_and_composite_entries_is_read() {
+    let mixed = captured_72_vouchers().replace(
+        "-$100.00 @ \u{20b9} 86.4125/$ = -\u{20b9} 8641.25",
+        "-8641.25",
     );
+    let rows = read_under_the_72_book(&mixed);
+    assert!(rows.iter().all(|row| !row.is_withheld()));
+    let voucher = rows
+        .iter()
+        .map(|row| match row {
+            VoucherRow::Read(row) => row,
+            VoucherRow::Withheld(_) => unreachable!("none is withheld"),
+        })
+        .find(|row| {
+            row["amounts"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["foreign"]["rate"] == "86.4125")
+        })
+        .unwrap();
+    let amounts = voucher["amounts"].as_array().unwrap();
+    assert_eq!(amounts.len(), 2);
+    let plain = amounts
+        .iter()
+        .find(|entry| entry.get("foreign").is_none())
+        .unwrap();
+    assert_eq!(plain["amount"], "-8641.25");
+    let composite = amounts
+        .iter()
+        .find(|entry| entry.get("foreign").is_some())
+        .unwrap();
+    assert_eq!(composite["amount"], "8641.25");
+}
+
+/// The first bill allocation that holds a composite, its amount changed. Its entry still reads.
+fn with_first_composite_allocation(captured: &str, amount: &str) -> String {
+    let (mut from, open) = (0, "<BILLALLOCATIONS.LIST>");
+    loop {
+        let list = from + captured[from..].find(open).unwrap();
+        let start = list + captured[list..].find("<AMOUNT>").unwrap() + "<AMOUNT>".len();
+        let end = start + captured[start..].find("</AMOUNT>").unwrap();
+        if captured[start..end].contains(" @ ") {
+            return format!("{}{amount}{}", &captured[..start], &captured[end..]);
+        }
+        from = end;
+    }
+}
+
+#[test]
+fn a_bill_allocation_that_will_not_read_withholds_its_voucher() {
+    let captured = captured_72_vouchers();
+    for (name, amount) in [
+        (
+            "unknown",
+            "-\u{20ac}100.00 @ \u{20b9} 86/\u{20ac} = -\u{20b9} 8600.00",
+        ),
+        ("zero", "$0.00 @ \u{20b9} /$ = \u{20b9} 0.00"),
+    ] {
+        let rows = read_under_the_72_book(&with_first_composite_allocation(&captured, amount));
+        assert_eq!(
+            rows.iter().filter(|row| row.is_withheld()).count(),
+            1,
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_voucher_that_will_not_read_stays_withheld_and_shows_no_amount() {
+    let captured = captured_72_vouchers();
+    // One side's base moved a paisa, so the entries no longer net to zero.
+    let unbalanced = captured.replace("= -\u{20b9} 8641.25", "= -\u{20b9} 8641.26");
+    // A symbol that is no master of this book.
+    let unknown = captured.replace(
+        "-$100.00 @ \u{20b9} 86.4125/$",
+        "-\u{20ac}100.00 @ \u{20b9} 86.4125/\u{20ac}",
+    );
+    // A shape the parse refuses, which the withholding classifier still admits.
+    let empty_rate = captured.replace("\u{20b9} 86.4125/$", "\u{20b9} /$");
+    for (name, xml) in [
+        ("unbalanced", unbalanced),
+        ("unknown", unknown),
+        ("empty_rate", empty_rate),
+    ] {
+        assert_ne!(xml, captured, "{name}");
+        let rows = read_under_the_72_book(&xml);
+        assert_eq!(
+            rows.iter().filter(|row| row.is_withheld()).count(),
+            1,
+            "{name}"
+        );
+        let view = withheld_view(rows.iter().find(|row| row.is_withheld()).unwrap());
+        assert!(view["amounts"][0].get("amount").is_none(), "{name}");
+    }
 }
 
 #[test]
@@ -2050,4 +2312,92 @@ fn a_whitespace_only_or_self_closing_bill_date_is_not_observed() {
     assert!(allocations_of(&rows)
         .iter()
         .any(|allocation| allocation["bill_date"] == "20250627"));
+}
+
+/// The first captured voucher with `elements` added as a labelled edit and made an invoice. Tally's
+/// answers for these three are the lab's (protocol reference §8.2j).
+fn invoice_with(elements: &str) -> String {
+    with_injected_voucher_element(elements).replacen(
+        "<ISINVOICE>No</ISINVOICE>",
+        "<ISINVOICE>Yes</ISINVOICE>",
+        1,
+    )
+}
+
+fn e_invoice_of(xml: &str) -> Value {
+    let rows = parse_agent_rows_reading_gst(
+        xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        EInvoiceFields::Asked,
+    )
+    .unwrap();
+    rows[0]["e_invoice"].clone()
+}
+
+const CARRIED: &str = "<IRN TYPE=\"String\">a1b2</IRN>\
+<IRNACKNO TYPE=\"String\">112233</IRNACKNO><IRNACKDATE TYPE=\"Date\">20250403</IRNACKDATE>";
+
+#[test]
+fn an_invoice_says_each_e_invoice_detail_present_absent_or_not_reported() {
+    assert_eq!(
+        e_invoice_of(&invoice_with(CARRIED)),
+        json!({"irn": {"state": "present", "value": "a1b2"},
+            "ack_no": {"state": "present", "value": "112233"},
+            "ack_date": {"state": "present", "value": "20250403"}})
+    );
+    // Tally's answer for the invoice with none: each element there, empty.
+    let none = "<IRN TYPE=\"String\"></IRN><IRNACKNO TYPE=\"String\"/>\
+<IRNACKDATE TYPE=\"Date\"></IRNACKDATE>";
+    let absent = json!({"state": "absent"});
+    assert_eq!(
+        e_invoice_of(&invoice_with(none)),
+        json!({"irn": absent, "ack_no": absent, "ack_date": absent})
+    );
+    // An element not sent is not said to be empty.
+    let said = e_invoice_of(&invoice_with("<IRN>a1b2</IRN>"));
+    assert_eq!(said["irn"]["state"], "present");
+    assert_eq!(said["ack_no"]["state"], "not_reported");
+    assert_eq!(said["ack_date"]["state"], "not_reported");
+}
+
+#[test]
+fn a_voucher_that_is_no_invoice_says_nothing_unless_it_carries_a_detail() {
+    assert!(e_invoice_of(&with_injected_voucher_element("<IRN></IRN>")).is_null());
+    assert!(e_invoice_of(&captured_native_vouchers()).is_null());
+    let said = e_invoice_of(&with_injected_voucher_element("<IRN>a1b2</IRN>"));
+    assert_eq!(said["irn"]["value"], "a1b2");
+    assert_eq!(said["ack_no"]["state"], "not_reported");
+}
+
+#[test]
+fn an_acknowledgement_date_that_is_no_date_refuses_the_read() {
+    let xml = with_injected_voucher_element("<IRNACKDATE>3-Apr-25</IRNACKDATE>");
+    assert_eq!(
+        parse_agent_rows_reading_gst(
+            &xml,
+            CAPTURED_VOUCHER_COMPANY_GUID,
+            GstDetailsShown::Withheld,
+            EInvoiceFields::Asked,
+        ),
+        Err("voucher_irn_ack_date_invalid".to_string())
+    );
+}
+
+/// A read that did not name the three says nothing about them, whatever the voucher holds.
+#[test]
+fn a_read_that_did_not_ask_returns_no_e_invoice_key() {
+    let xml = invoice_with(CARRIED);
+    let rows = parse_agent_rows(&xml, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+    let rows = parse_agent_changed_rows(&xml, CAPTURED_VOUCHER_COMPANY_GUID).unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
+    let rows = parse_agent_rows_reading_gst(
+        &xml,
+        CAPTURED_VOUCHER_COMPANY_GUID,
+        GstDetailsShown::Withheld,
+        EInvoiceFields::NotAsked,
+    )
+    .unwrap();
+    assert!(rows[0].get("e_invoice").is_none());
 }

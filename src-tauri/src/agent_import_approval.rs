@@ -28,7 +28,7 @@ use super::{sha256_hex, write_private, ImportCompanyTuple, ImportLedgerLine};
 use crate::tally::approved_import::{
     Answered, ApprovedImport, PendingPostApproval, PostKind, UnderLockRefusal,
 };
-use crate::tally::ledger_create_item::LedgerCreateItem;
+use crate::tally::ledger_create_item::LedgerCreateBatch;
 use crate::tally::VerifiedCompanyIdentity;
 use bridge_tally_protocol::StandardLedgerCatalogBinding;
 use chrono::{DateTime, SecondsFormat, Utc};
@@ -138,12 +138,12 @@ enum BindingSubject {
         voucher_count: usize,
         ledgers: Vec<(String, String)>,
     },
-    /// One ledger `Create`: the verified company's tuple and the whole item,
-    /// which holds the name, the kind with its side, GSTIN, duty head and
-    /// bill-by-bill flag, and so the parent derived from it.
+    /// One request of ledger `Create`s: the verified company's tuple and the
+    /// whole batch, whose every item holds the name, the kind with its side,
+    /// GSTIN, duty head and bill-by-bill flag, and so the parent derived from it.
     Masters {
         company: MasterCompanyTuple,
-        item: LedgerCreateItem,
+        batch: LedgerCreateBatch,
     },
 }
 
@@ -179,18 +179,18 @@ impl ApprovalBinding {
         }
     }
 
-    /// The binding of one ledger `Create`: the batch digest, the endpoint,
-    /// the verified company tuple, every field of the item, and the preview
-    /// the person was shown.
+    /// The binding of one request of ledger `Create`s: the batch digest, the
+    /// endpoint, the verified company tuple, every field of every item, and
+    /// the preview the person was shown.
     pub(super) fn masters(
         batch_sha256: &str,
         endpoint_origin: &str,
         company: &VerifiedCompanyIdentity,
-        item: &LedgerCreateItem,
+        batch: &LedgerCreateBatch,
         preview: &str,
     ) -> Self {
         Self {
-            // A ledger create has the one form: its box lists the item.
+            // A ledger create has the one form: its box lists every item.
             form: PreviewForm::Listed,
             batch_sha256: batch_sha256.to_string(),
             endpoint_origin: Some(endpoint_origin.to_string()),
@@ -202,7 +202,7 @@ impl ApprovalBinding {
                     company_number: company.company_number().to_string(),
                     books_from: company.books_from_yyyymmdd().to_string(),
                 },
-                item: item.clone(),
+                batch: batch.clone(),
             },
         }
     }

@@ -968,6 +968,18 @@ impl TallyHttpTransport {
         &self,
         xml: String,
     ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
+        self.post_xml_decoded_within(xml, self.policy.xml_response_max_bytes)
+            .await
+    }
+
+    /// [`Self::post_xml_decoded`] with a response limit for this one send, never above the
+    /// policy's: an answer past it refuses as [`TallyTransportError::ResponseTooLarge`] with that
+    /// limit, and is never returned cut short.
+    pub async fn post_xml_decoded_within(
+        &self,
+        xml: String,
+        response_max_bytes: usize,
+    ) -> Result<TallyDecodedHttpResponse, TallyTransportError> {
         // The request is prepared before the lock is taken, so a request that
         // cannot be sent never holds it.
         let prepared = prepare_tally_xml_request(&xml, self.policy.xml_request_max_bytes)?;
@@ -977,7 +989,7 @@ impl TallyHttpTransport {
         self.send_prepared_decoded(
             prepared,
             url,
-            self.policy.xml_response_max_bytes,
+            response_max_bytes.min(self.policy.xml_response_max_bytes),
             &*wire,
             None,
         )

@@ -1,0 +1,20 @@
+[
+{
+"bridge_txn_id": "R-PAY",
+"date": "20260403",
+"voucher_type": "Payment",
+"narration": "Review row payment",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "1.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "1.00",
+"side": "Cr"
+}
+]
+}
+]

@@ -1,0 +1,902 @@
+[
+{
+"bridge_txn_id": "R-001",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 1",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "1.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "1.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-002",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 2",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "2.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "2.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-003",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 3",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "3.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "3.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-004",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 4",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "4.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "4.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-005",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 5",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "5.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "5.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-006",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 6",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "6.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "6.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-007",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 7",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "7.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "7.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-008",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 8",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "8.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "8.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-009",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 9",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "9.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "9.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-010",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 10",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "10.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "10.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-011",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 11",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "11.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "11.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-012",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 12",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "12.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "12.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-013",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 13",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "13.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "13.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-014",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 14",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "14.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "14.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-015",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 15",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "15.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "15.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-016",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 16",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "16.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "16.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-017",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 17",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "17.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "17.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-018",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 18",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "18.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "18.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-019",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 19",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "19.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "19.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-020",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 20",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "20.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "20.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-021",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 21",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "21.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "21.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-022",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 22",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "22.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "22.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-023",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 23",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "23.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "23.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-024",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 24",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "24.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "24.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-025",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 25",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "25.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "25.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-026",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 26",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "26.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "26.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-027",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 27",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "27.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "27.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-028",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 28",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "28.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "28.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-029",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 29",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "29.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "29.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-030",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 30",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "30.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "30.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-031",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 31",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "31.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "31.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-032",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 32",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "32.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "32.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-033",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 33",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "33.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "33.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-034",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 34",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "34.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "34.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-035",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 35",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "35.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "35.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-036",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 36",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "36.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "36.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-037",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 37",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "37.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "37.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-038",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 38",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "38.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "38.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-039",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 39",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "39.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "39.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-040",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 40",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "40.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "40.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-041",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 41",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "41.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "41.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-042",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 42",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "42.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "42.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-043",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 43",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "43.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "43.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-044",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 44",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "44.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "44.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-045",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 45",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "45.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "45.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-046",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 46",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "46.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "46.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-047",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 47",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "47.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "47.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-048",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 48",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "48.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "48.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-049",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 49",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "49.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "49.00",
+"side": "Cr"
+}
+]
+},
+{
+"bridge_txn_id": "R-050",
+"date": "20260401",
+"voucher_type": "Journal",
+"narration": "Review row 50",
+"entries": [
+{
+"ledger": "Test Expense B",
+"amount": "50.00",
+"side": "Dr"
+},
+{
+"ledger": "Cash",
+"amount": "50.00",
+"side": "Cr"
+}
+]
+}
+]

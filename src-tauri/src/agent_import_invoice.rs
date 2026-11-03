@@ -872,9 +872,17 @@ pub(super) fn classify_sales_invoice(
             }
             // A New Ref is written exactly when the party is bill-wise and never
             // otherwise (an allocation on a non-bill-wise ledger is dropped
-            // silently). So the flag must be known, but either value admits.
-            if fact.bill_wise.is_none() {
-                refusals.push(refuse_ledger("invoice_party_bill_wise_unknown", name));
+            // silently). So the flag must be known, and only a party that is
+            // not bill-wise admits: Tally applies a New Ref to a bill of the
+            // same name the customer already holds, settled ones included, and
+            // the build does not read those bills (voucher-writes reference
+            // §9.16, "A bill of the same name").
+            match fact.bill_wise {
+                None => refusals.push(refuse_ledger("invoice_party_bill_wise_unknown", name)),
+                Some(true) => {
+                    refusals.push(refuse_ledger("invoice_party_bill_wise_not_supported", name))
+                }
+                Some(false) => {}
             }
         }
     }

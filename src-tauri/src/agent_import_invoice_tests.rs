@@ -146,7 +146,7 @@ fn good_facts() -> BTreeMap<String, LedgerFacts> {
     let party = facts.get_mut("Customer A").unwrap();
     party.gstin = GstinEvidence::InForce(GSTIN_RJ.to_string());
     party.registration_type = Some("Regular".to_string());
-    party.bill_wise = Some(true);
+    party.bill_wise = Some(false);
     // The 18 percent of the fixture invoice: 9 and 9, IGST 18.
     facts.get_mut("Sales").unwrap().rates = Some(sales_rates("9", "18"));
     set_tax_rates(&mut facts, "9");
@@ -348,11 +348,23 @@ fn expect_static(code: &str) -> &'static str {
     Box::leak(code.to_string().into_boxed_str())
 }
 
+/// Only a party that is not bill-wise admits. A bill-wise one is refused with
+/// its own code, alone, before any write: the build does not read the
+/// customer's bills, and Tally applies the invoice to one of the same name
+/// (voucher-writes reference §9.16, "A bill of the same name").
 #[test]
-fn a_party_that_is_not_bill_wise_is_admitted() {
+fn a_bill_wise_party_is_refused_and_one_that_is_not_is_admitted() {
     let mut facts = good_facts();
     facts.get_mut("Customer A").unwrap().bill_wise = Some(false);
     assert!(classify_sales_invoice(&voucher(), &facts, RAJ, AS_OF).is_ok());
+    facts.get_mut("Customer A").unwrap().bill_wise = Some(true);
+    assert_eq!(
+        classify_sales_invoice(&voucher(), &facts, RAJ, AS_OF),
+        Err(vec![InvoiceRefusal {
+            code: "invoice_party_bill_wise_not_supported",
+            detail: RefusalDetail::Ledger("Customer A".into()),
+        }])
+    );
 }
 
 #[test]

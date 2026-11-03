@@ -85,6 +85,16 @@ Read-backs of four invoices, each imported raw as the build renders it for a bil
 | `pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml` | 95,836 | `6496dd460ac6064968e475cd2cc721c8c625db1f2297f5222d85d7a5ea0fe6a3` | `answers/a-s6r-R-0049.xml` | the read-back of `BP/26-27/0049` to a customer whose bill of that name a Receipt had settled: an Agst Ref of that name at -1051.00, the settled bill reopened |
 | `pilot-lab-invoice-readback-bill-wise-opening-bill.utf16le.xml` | 95,940 | `ac53ba5f4a3f188fa286d22731ce66f142a65fd5f559971a52276b0bc0cbf364` | `answers/a-s7r-R-0050.xml` | the read-back of `BP/26-27/0050` to a customer whose opening bill, dated 31 Mar 2026, had that name: an Agst Ref of that name at -1051.00 |
 
+## A number already in use, in another spelling (2026-11-03, #2162)
+
+Answers of row S4 on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, sent with curl, not through a build, and published on `lab/2162-s4-answers` at 3651c746 (the request files on `lab/2162-s4-sheet` at c5f69f97). Each file here is byte-equal to the file there. The invoice `BP/26-27/0051` they meet was seeded by direct XML to set the row up and is not evidence here. The book was restored from its backup afterwards. The answers are UTF-16LE with no byte order mark, as received. A test compares the SHA-256 of each number read the code renders with the request file the lab sent.
+
+| Fixture | Bytes | SHA-256 | Published as | What it is |
+| --- | ---: | --- | --- | --- |
+| `pilot-lab-number-in-use-lower-case.utf16le.xml` | 5,608 | `cf5d48ac2e3466a86b1b85c7fedc65d87662d6bbc77ce42115e1c911785e8839` | `answers/a-s4-N-lc0051.xml` | the number read for `bp/26-27/0051`: one row, `BP/26-27/0051`, Sales class. Byte-equal to the read for `BP/26-27/0051` at the same point |
+| `pilot-lab-number-dropped-zero.utf16le.xml` | 3,024 | `a36e6e43961ffe12722b224ef53fa046835dccf3d9090cba3a5d52d315e91d36` | `answers/a-s4-N-z051.xml` | the number read for `BP/26-27/051`, with `BP/26-27/0051` in the book: no row |
+| `pilot-lab-invoice-post-duplicate-declined.utf16le.xml` | 538 | `09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874` | `answers/a-s5-I-0051b.xml` | the answer to an invoice numbered `BP/26-27/0051` sent to that book: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, `LASTVCHID` 0, no `LINEERROR`. The invoice numbered `bp/26-27/0051` was answered with the same bytes |
+
 ## The parent-filter round (2026-10-10, #1331)
 
 Four read-only requests sent by the same contributor on the same company, the same way (one at a time, each answer written straight to a file with `curl.exe -o`, once each; curl exit 0 and HTTP 200 for all). The requests are on `lab/1331-capture-requests` (commit `5876c342`), the answers on `lab/1331-capture-answers` (commit `b5c0ff86`); each file here is byte-equal to the file there and its SHA-256 equals the one in that branch's hash table. The book is the one after the later #1342 rounds: fifteen ledgers, so these answers are not paired with the invoice round's answers above, which describe eleven. `pilot-lab-ledger-catalogue-v2-10oct` and the two scoped answers are one coherent set: the catalogue, and the rates request filtered to the parents of the lab invoices' legs.

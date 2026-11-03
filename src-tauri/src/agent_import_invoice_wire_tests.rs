@@ -196,6 +196,55 @@ fn date(text: &str) -> TallyDate {
     TallyDate::parse(text).expect("a calendar date")
 }
 
+/// The number read the code renders is, for each spelling row S4 sent (3 Nov
+/// 2026, #2162), the request the lab sent, by the SHA-256 of its file (which
+/// begins with the byte order mark the request is sent with).
+#[test]
+fn the_number_read_is_the_one_the_lab_answered_for_each_spelling() {
+    let (from, to) = (date("20260401"), date("20270331"));
+    for (text, sha256) in [
+        (
+            "BP/26-27/0051",
+            "216f6eb3563034e22d848d050a91ddff3d95693117c51554322bc294bf248e78",
+        ),
+        (
+            "bp/26-27/0051",
+            "7c4e42f37643a06872e3e725671cb161d939fb79f1160b6ec7724c2b4c9f7ae7",
+        ),
+        (
+            "BP/26-27/051",
+            "c4e19dfbaae315e436af22a12ac7fc097a35da7248529b5fc5de23a5d195e34d",
+        ),
+    ] {
+        let rendered =
+            render_invoice_number_request("BRIDGE PILOT LAB", &number(text), (&from, &to));
+        let sent = [0xFF, 0xFE]
+            .into_iter()
+            .chain(rendered.encode_utf16().flat_map(u16::to_le_bytes))
+            .collect::<Vec<u8>>();
+        assert_eq!(crate::agent::sha256_hex(&sent), sha256, "{text}");
+    }
+}
+
+/// Tally's answer when a Sales type that prevents duplicates is sent an
+/// invoice whose number is already in use (3 Nov 2026, #2162 row S4): nothing
+/// created, one exception, no `LINEERROR`, in the answer and with no dialog.
+/// The same bytes answered the number in lower case.
+#[test]
+fn a_number_the_sales_guard_declines_is_answered_in_band_with_nothing_created() {
+    let outcome = bridge_tally_protocol::parse_import_outcome(&captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-duplicate-declined.utf16le.xml"
+    )))
+    .unwrap();
+    assert_eq!(outcome.counters().created, 0);
+    assert_eq!(outcome.counters().altered, 0);
+    assert_eq!(outcome.counters().errors, 0);
+    assert_eq!(outcome.counters().exceptions, 1);
+    assert!(outcome.exceptions_were_reported());
+    assert!(outcome.tally_line_errors().is_empty());
+    assert_eq!(outcome.last_vch_id(), Some(0));
+}
+
 #[test]
 fn the_number_read_is_dated_by_literals_and_leaves_the_class_to_the_reader() {
     let (from, to) = (date("20250401"), date("20260331"));
@@ -601,9 +650,28 @@ fn the_pilot_labs_voucher_types_resolve_its_manual_type_and_refuse_the_automatic
 /// Sales-class count from a count of every row:
 /// `only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate` is the
 /// test that does.
+///
+/// Two more answers come from a book holding `BP/26-27/0051` (3 Nov 2026,
+/// #2162 row S4). Asked for `bp/26-27/0051`, Tally's filter ignores case and
+/// returns that invoice, so the build refuses the number. Asked for
+/// `BP/26-27/051`, it returns no row: a dropped leading zero is another number
+/// to this read, and to Tally's own duplicate guard, which then created that
+/// invoice. Whether GST counts the two as one number is open (§9.16).
 #[test]
 fn the_captured_number_answers_count_their_rows_not_their_header() {
     for (name, xml, vouchers, sales) in [
+        (
+            "number-in-use-lower-case",
+            captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml")),
+            1,
+            1,
+        ),
+        (
+            "number-dropped-zero",
+            captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-dropped-zero.utf16le.xml")),
+            0,
+            0,
+        ),
         (
             "number-in-use",
             captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml")),

@@ -3387,6 +3387,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         PILOT_LAB_READBACK,
     ),
     (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-dropped-zero.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-duplicate-declined.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml",
         PILOT_LAB_PARENT_FILTER,
     ),

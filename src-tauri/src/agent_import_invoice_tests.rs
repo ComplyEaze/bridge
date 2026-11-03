@@ -1440,7 +1440,8 @@ const BILL_WISE_JOURNAL_BILL: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-journal-bill.utf16le.xml"
 );
 /// `BP/26-27/0049` to `BRIDGE Walk-in BS`, whose bill of that name a Receipt had
-/// settled: an Agst Ref, and the settled bill reopened (b2).
+/// settled: an Agst Ref of that name on the party leg (b2; that the settled bill
+/// reopened is the lab's read of the customer's bills, §9.16).
 const BILL_WISE_SETTLED_BILL: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml"
 );
@@ -1454,8 +1455,9 @@ const BILL_WISE_OPENING_BILL: &[u8] = include_bytes!(
 /// its New Ref. Where the customer already held a bill of that name, from a
 /// Journal, a settled bill or an opening balance, Tally stored an Agst Ref
 /// against that bill instead, and the read-back names it `bill_allocation`.
-/// The difference is read after the post: by then the existing bill holds the
-/// invoice's amount, so it fails closed for the verdict, not for the books.
+/// The difference is read after the post: by then, by the lab's read of the
+/// customer's bills (§9.16), Tally has applied the invoice to the existing
+/// bill, so it fails closed for the verdict, not for the books.
 #[test]
 fn a_bill_wise_invoice_reads_back_as_built_only_where_tally_stored_its_new_ref() {
     assert_eq!(

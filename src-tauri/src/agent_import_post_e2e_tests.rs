@@ -7908,6 +7908,130 @@ async fn pilot_post_changed_in(order: &str, changes: &[Changed]) -> PilotRun {
     }
 }
 
+// ---- The oldest release that reads a Sales line (#2162 item 4) ----
+//
+// Sales keeps the one import journal (ADR 0004, the slice 4 amendment), and
+// every record in it denies fields it does not know, so one line a release
+// cannot read refuses the whole journal there. The release notes name
+// `mcp-v0.7.0` as the oldest release that reads a Sales line once Sales is on.
+
+/// Every field path of the Sales line `mcp-v0.7.0` wrote for this replay
+/// (`pilot_post_changed(&[])`, the line in `journal_after_build`), run on that
+/// tag (`fcfb5ff6`) on 3 Nov 2026 and taken from the line by
+/// [`journal_line_fields`]. The line itself is not kept: its batch id is a
+/// random identifier.
+const MCP_V0_7_0_SALES_LINE_FIELDS: &[&str] = &[
+    "/batch_id",
+    "/built_at",
+    "/cash_in_hand_ledgers",
+    "/company",
+    "/company/books_from",
+    "/company/company_number",
+    "/company/guid",
+    "/company/name",
+    "/company_guid",
+    "/date_from",
+    "/date_to",
+    "/endpoint_origin",
+    "/identity_scheme",
+    "/identity_scheme=batch_v1",
+    "/ledger_identities_3",
+    "/ledger_identities_3[]/guid",
+    "/ledger_identities_3[]/name",
+    "/on_account_approved",
+    "/pre_import_mark",
+    "/pre_import_mark/kind",
+    "/pre_import_mark/master_value",
+    "/pre_import_mark/value",
+    "/sha256",
+    "/status",
+    "/txn_ids",
+    "/vouchers",
+    "/vouchers[]/bridge_txn_id",
+    "/vouchers[]/date",
+    "/vouchers[]/entries",
+    "/vouchers[]/entries[]/amount",
+    "/vouchers[]/entries[]/ledger",
+    "/vouchers[]/entries[]/side",
+    "/vouchers[]/entries[]/side=Cr",
+    "/vouchers[]/entries[]/side=Dr",
+    "/vouchers[]/invoice",
+    "/vouchers[]/invoice/observed",
+    "/vouchers[]/invoice/observed/company_state",
+    "/vouchers[]/invoice/observed/party_bill_wise",
+    "/vouchers[]/invoice/observed/party_registration_type",
+    "/vouchers[]/invoice/observed/party_state",
+    "/vouchers[]/invoice/observed/sales_ledgers",
+    "/vouchers[]/invoice/observed/voucher_type_guid",
+    "/vouchers[]/invoice/place_of_supply",
+    "/vouchers[]/invoice/round_off_ledger",
+    "/vouchers[]/invoice/voucher_type_name",
+    "/vouchers[]/narration",
+    "/vouchers[]/reference",
+    "/vouchers[]/voucher_number",
+    "/vouchers[]/voucher_type",
+    "/vouchers[]/voucher_type=Sales",
+];
+
+/// The string fields of a batch line that are enums in the journal's types,
+/// where a value the release does not know is refused as an unknown field is.
+const JOURNAL_LINE_ENUM_FIELDS: [&str; 3] = [
+    "/identity_scheme",
+    "/vouchers[]/voucher_type",
+    "/vouchers[]/entries[]/side",
+];
+
+/// Each member's path in `value`, an array's items under `[]`, and each enum
+/// field's value as `path=value`.
+fn journal_line_fields(value: &Value, at: &str, fields: &mut std::collections::BTreeSet<String>) {
+    match value {
+        Value::Object(members) => {
+            for (key, member) in members {
+                let path = format!("{at}/{key}");
+                fields.insert(path.clone());
+                journal_line_fields(member, &path, fields);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                journal_line_fields(item, &format!("{at}[]"), fields);
+            }
+        }
+        Value::String(text) if JOURNAL_LINE_ENUM_FIELDS.contains(&at) => {
+            fields.insert(format!("{at}={text}"));
+        }
+        _ => {}
+    }
+}
+
+/// The Sales line this build writes for the pilot lab's invoice holds no field
+/// and no enum value that `mcp-v0.7.0` did not write for the same invoice, so
+/// that release reads it. A field added to the line fails this: leave it out
+/// when it is empty, or raise the release ADR 0004 and the release notes name.
+/// The line holds `sales_ledgers`, which `mcp-v0.6.0` and `mcp-v0.6.1` do not
+/// know, so no earlier release reads it.
+#[tokio::test]
+async fn the_sales_line_this_build_writes_is_read_by_mcp_v0_7_0() {
+    let run = pilot_post_changed(&[]).await;
+    let journal = String::from_utf8(run.journal_after_build).unwrap();
+    let lines: Vec<&str> = journal.lines().collect();
+    assert_eq!(lines.len(), 1, "the build writes one line: {journal}");
+    let line: Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(line["vouchers"][0]["voucher_type"], "Sales");
+    let mut written = std::collections::BTreeSet::new();
+    journal_line_fields(&line, "", &mut written);
+    let released: std::collections::BTreeSet<String> = MCP_V0_7_0_SALES_LINE_FIELDS
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
+    let unknown: Vec<&String> = written.difference(&released).collect();
+    assert!(
+        unknown.is_empty(),
+        "fields mcp-v0.7.0 never wrote, so it refuses the journal: {unknown:?}"
+    );
+    assert!(written.contains("/vouchers[]/invoice/observed/sales_ledgers"));
+}
+
 /// The post was refused in the queue, loud and before anything was recorded or
 /// sent: exactly `requests` requests were made and the write was not, no
 /// dispatch intent was journaled, and the only record added is the one

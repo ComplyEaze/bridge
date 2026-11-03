@@ -1,6 +1,6 @@
 # Row 852-C1: a 50-voucher bank batch posted twice behind a capture relay, on a book of about 30,000 vouchers
 
-Not for merge. Part of #852. Lines below are at master e12b0ab9. Confidence of everything here until the row runs: unverified.
+Not for merge. Part of #852. Lines below are at master 838242cb, the build's head. Confidence of everything here until the row runs: unverified.
 
 ## Question
 When a 50-voucher bank batch goes through `post_import` on a book of about 30,000 vouchers, how long does the import exchange take, how long does the whole call take against a host limit of about 60 s, and does Bridge keep Tally's reply?
@@ -20,7 +20,7 @@ Not on the PC: restore BKL-B. Neither: stop, the row has no book.
 Last opened on 7.1. Any prompt when 7.2 opens it: press no key, screenshot, stop and report its words.
 
 ## Build
-The Windows bundle of master at or after e12b0ab9: D66 names the run. Record `bridge_mcp.exe` sha256 before and after.
+The Windows bundle of the newest green master run that built one: CI run 41597505434, a push of master at 838242cb (`838242cb54a720baa2cf397cf8d0980e1c47ba45`), artifact `unsigned-bundle-smoke-windows-latest`, id 13213581672, digest `sha256:a865654b1fc3c2b5a9dcd5bc4f8c555605fbcb180f1b8f7d66a196fea91c01e4`. Check the zip's digest first: another digest is a stop. Record `bridge_mcp.exe` sha256 before and after.
 
 Over stdio: `BRIDGE_AGENT_ENABLE_WRITES=true`, `BRIDGE_TERMS_ACCEPTED=true`, `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9002`, one new `BRIDGE_AGENT_DATA_DIR` for the whole row, `BRIDGE_AGENT_ENABLE_BATCH_POST` absent, `BRIDGE_AGENT_REDACTION` unset.
 
@@ -29,7 +29,7 @@ Over stdio: `BRIDGE_AGENT_ENABLE_WRITES=true`, `BRIDGE_TERMS_ACCEPTED=true`, `BR
 ## Kit
 | file | what |
 |---|---|
-| `relay.py` | FX1's relay of `lab/2176-r0`, without its drop mode, plus exchange times, every import kept, and `reply_lost` |
+| `relay.py` | the relay of `lab/2176-r0`, without its drop mode, plus exchange times, every import kept, and `reply_lost` |
 | `check-relay.py` | 20 checks on a stand-in; `python -I check-relay.py relay.py`, all pass here on macOS |
 | `seed-bank-ledger.xml` | one ledger, `Lab Vol Bank` under Bank Accounts, the shape of `lab/demo-traders-book`, UTF-8 |
 | `batches/c50a.json`, `c50b.json` | 24 Receipts, 20 Payments, 6 Contras each, numberless; a on 11 to 20 Oct 2026, b on 21 to 30 Oct |
@@ -93,15 +93,26 @@ Any dialog on Tally's screen. Any refusal before an attempt is recorded. Any cal
 - The batch mix is chosen, not the client's. Its split of types was not recorded.
 - Two posts only. A 10-day span was chosen to stay near the failing call's read size, from the bytes per voucher of other rows: inference.
 
-## Code admits the trigger (master e12b0ab9)
-- 50 is the batch cap: `MAX_BATCH_POST_VOUCHERS`, agent_import_ledger.rs:14; `post_voucher_limit` agent_import_post.rs:432 gives it once posting is on, set at agent.rs:687; the retired setting at agent.rs:643 is refused at agent.rs:1395.
-- The types: `LIVE_QUALIFIED_VOUCHER_TYPES` agent_import.rs:390; `PostScope::Vouchers` admits all four, agent_import_post.rs:33.
-- The legs: `Lab Vol Bank` under Bank Accounts satisfies the money leg of a Payment, Receipt and Contra, and `Lab Vol Expense` and `Lab Vol Income` the other leg (agent_import.rs:354, :360, :366).
-- No numbers: a numbered voucher is refused at agent_import_post.rs:3090, so the batches carry none, and numberless needs Automatic with retain, `admit_numbering_for_post` agent_import_post.rs:1140, hence step 3.
-- **Dates:** `validate_dates` agent_import.rs:4682 refuses a date past the host's today (agent.rs:3888). The batches of `lab/1029-large-book-posts` are dated March 2027 and would be refused, so these are new.
-- The call: tool dispatch agent.rs:3307 and :3345, `post_import` agent_import_post.rs:636; a click made in the call's own wait carries the post in that call, and one too late for the post to fit returns `approved` (`ask_and_hold` agent_import_post.rs, `CALL_BUDGET` 40 s, agent_import_approval.rs:46).
-- The send: wire lock runtime.rs:3855, the one import send runtime.rs:3889, under `DEFAULT_REQUEST_TIMEOUT` of 20 s, bridge-tally-transport lib.rs:95. The relay of `lab/2176-r0` saw that limit end a send live.
-- The two endings: `import_dispatch_outcome_unknown` agent_import_post.rs:2100 and `response_missing` :2325.
+## Code admits the trigger (master 838242cb, the build's head)
+- 50 is the batch cap: `MAX_BATCH_POST_VOUCHERS`, agent_import_ledger.rs:14. `post_voucher_limit` (agent_import_post.rs:432) gives it once posting is on, which is set at agent.rs:689. The retired setting (agent.rs:645) is refused at agent.rs:1411.
+- The types: `LIVE_QUALIFIED_VOUCHER_TYPES` agent_import.rs:390; `PostScope::Vouchers` admits all four, agent_import_post.rs:443.
+- The legs: `Lab Vol Bank` under Bank Accounts satisfies the money leg of a Payment, Receipt and Contra, and `Lab Vol Expense` and `Lab Vol Income` the other leg (agent_import.rs:352, :358, :364).
+- No numbers: a numbered voucher is refused by `require_native_numbering`, agent_import_post.rs:3100, so the batches carry none. Numberless needs Automatic with retain (`admit_numbering_for_post`, called at agent_import_post.rs:1140), hence step 3.
+- **Dates:** `validate_dates` (agent_import.rs:4802) refuses a date past the host's today (`tally_host_today`, agent.rs:3916). The batches of `lab/1029-large-book-posts` are dated March 2027 and would be refused, so these are new.
+- The call: tool dispatch agent.rs:3334 (`build_import_xml`) and :3372 (`post_import`); `post_import` agent_import_post.rs:636. A click made in the call's own wait carries the post in that call. One too late for the post to fit returns `approved` (`ask_and_hold` agent_import_post.rs:578, `CALL_BUDGET` 40 s, agent_import_approval.rs:46).
+- The send: wire lock runtime.rs:3865, the one import send `post_probe_xml` runtime.rs:3899, under `DEFAULT_REQUEST_TIMEOUT` of 20 s (bridge-tally-transport lib.rs:95, taken at runtime.rs:276). The relay of `lab/2176-r0` saw that limit end a send live.
+- The two endings: `import_dispatch_outcome_unknown` agent_import_post.rs:2100 and `response_missing` :2325. `finalize_previous_attempt_reconciliation` (:2333) settles only with a clean response on file.
+
+## Who sends each EXPECT's request, and what each count counts (838242cb)
+| step | request | sent by | decided by | the count |
+|---|---|---|---|---|
+| 0, 2, 7, 9 | marks, raw | the operator's curl on 9001, not Bridge | the step itself | one COMPANY row; V is that company's voucher mark (ALTVCHID), so +50 is 50 vouchers created and no other voucher change |
+| 2 | `seed-bank-ledger.xml` | the operator's curl on 9001 | the step itself | `CREATED` counts masters Tally created: the one ledger |
+| 3 | voucher types | `masters`, agent.rs:3360; kind arm `"voucher_types"`, runtime_masters.rs:27; sent at tally/connector.rs:263 with `render_native_voucher_type_export_request` (request.rs:411) | `kind=voucher_types` in the call | none |
+| 4 | the company list | `list_companies`, agent.rs:3346 | always sent by that call | one company with this GUID |
+| 5 | the build's reads | `build_import_xml`, agent.rs:3334, then agent_import.rs:1193 | the call itself | none |
+| 6 | reads, then the one import | `post_import`, agent.rs:3372, then agent_import_post.rs:636; the import at runtime.rs:3899 | reached only after the approval's redemption (agent_import_post.rs:1255), inside the endpoint's dispatch lease (:1259), through `post_approved_import` (:1288, runtime.rs:3493), which records the intent before any import bytes (runtime.rs:3491) | Tally's `CREATED` counts vouchers created: 50 |
+| 7 | the verification reads | `verify_import`, agent.rs:3398, then agent_import.rs:2069 | the call itself | `posted_verified` counts vouchers found by their markers: 50 of 50 |
 
 ## Keep
 On `lab/852-capture-answers` with `SHA256.txt`: `relay.jsonl` of both folders, every `import-N.request` and `.answer`, every tool answer whole, call times, marks, BK's name, size and sha256, seed answer, screens by name and hash. Screens stay local. A results file with the table above. Send the sha.

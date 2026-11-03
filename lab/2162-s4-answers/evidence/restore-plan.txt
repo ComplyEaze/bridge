@@ -1,0 +1,7 @@
+Restores of BK (2162-S4), 3 Nov 2026: one after b3 created a voucher (as the sheet says), one at step 9.
+Folder: <backup folder>, holding this one file only
+File: TDBK1800_<company number>.001, 90,051 B, sha256 d7a801e57f92fa9103e3c2c5a943b018cf6c034314a0ca297c2547ff74a7c622, taken 03-11-2026 14:23 local
+Company: BRIDGE PILOT LAB
+Restore Data Path: Tally's data folder
+Prompts expected and the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace" = Replace
+After each: M-marks byte-identical to s1's (8a0c4268...)

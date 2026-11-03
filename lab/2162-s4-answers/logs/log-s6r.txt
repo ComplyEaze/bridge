@@ -1,0 +1,5 @@
+14:24:37	R-0051.xml	a-s6r-R-0051.xml	curl 0
+14:24:37	R-lc0051.xml	a-s6r-R-lc0051.xml	curl 0
+14:24:37	N-0051.xml	a-s6r-N-0051.xml	curl 0
+14:24:37	N-lc0051.xml	a-s6r-N-lc0051.xml	curl 0
+14:24:37	M-marks.xml	a-s6r-M-marks.xml	curl 0

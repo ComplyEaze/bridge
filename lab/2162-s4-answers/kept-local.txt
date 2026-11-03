@@ -1,0 +1,18 @@
+Stay on the lab PC: the backup, the screens and the folder listings. sha256, bytes, file.
+de4b1776e7bed3e680156aab8af61d3cfafb498fe2e14b748196bc3ec3e9ac24  337  <lab folder>/evidence/bk-after.txt
+c65a9e8cb8972c1d162851da658b3fe23c70d76b0fdcb8f123d5449ca9eeab06  280  <lab folder>/evidence/bk-before.txt
+18fe98e1134ff6c5aae6e091bf2f1b1f18a1857c2861193d19be1bb9eedfb75f  1679  <lab folder>/evidence/datafolder-after-restore1.txt
+2c41051775b48bfc20af90dcb26b536890ed8d60179248c74c93541b0310e2dc  1679  <lab folder>/evidence/datafolder-after-restore2.txt
+b273438123bd92e175160eccdfa07d84f5dd470a1ff06377b077541a1bc91f63  1744  <lab folder>/evidence/datafolder-before-restore1.txt
+ca0b7aa810988bb456c5e30c5d585dde159f0cb490748c585cab88924df448a1  1743  <lab folder>/evidence/datafolder-before-restore2.txt
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a  46676  <lab folder>/shots/after-s3-2.png
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a  46676  <lab folder>/shots/after-s3.png
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a  46676  <lab folder>/shots/after-s5.png
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a  46676  <lab folder>/shots/after-s6.png
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a  46676  <lab folder>/shots/after-s7.png
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a  46676  <lab folder>/shots/after-s8.png
+0db010f4b210ec616f5fc29c84acf29eae63d04897be548d72c42b5abe101525  50999  <lab folder>/shots/bk-before-accept.png
+ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a  46676  <lab folder>/shots/gateway-ref.png
+5732a3d085473fc6d6614a53aa7f857f6fbafefc27684a64854446e4d260ba63  34805  <lab folder>/shots/restore1-before-accept.png
+5732a3d085473fc6d6614a53aa7f857f6fbafefc27684a64854446e4d260ba63  34805  <lab folder>/shots/restore2-before-accept.png
+d7a801e57f92fa9103e3c2c5a943b018cf6c034314a0ca297c2547ff74a7c622  90051  <backup folder>/TDBK1800_<company number>.001

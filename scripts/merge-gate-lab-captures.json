@@ -4032,6 +4032,46 @@
       "size": 3022
     },
     {
+      "blob": "45e05bb2805d7b65f24d783df7dfa8f663cc1688",
+      "capture_id": "stock_movement_mixed_window_stock_lines_shape_lab_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-lines-answers at 186c39d60158",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_mixed_window_stock_lines_shape_lab_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "0385b11ab2fc9a079ffa0cc119bd5ed6e4955d853eb0ab5631f3a26698f6a08a",
+      "size": 370470
+    },
+    {
+      "blob": "df8707ae5698e3230abfb992c3ea8a8475480637",
+      "capture_id": "stock_movement_mixed_window_stock_lines_shape_lab_request.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2016-stock-lines-answers at 186c39d60158",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/stock_movement_mixed_window_stock_lines_shape_lab_request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see STOCK_MOVEMENT_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "df30b272695f5ce6170d41f05730b8dac0ecdd7c514c8c598c7d42e8e5835cd1",
+      "size": 3122
+    },
+    {
+      "blob": "f4f1ea50bb71535b5ef02e58b2af865c914ed19d",
+      "capture_id": "masters_voucher_types_shape_lab_first_read_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2160-l1-answers at 77eb8850",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_first_read_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see MASTERS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1410f760ace55cf257ee17ab2bd7f2c969163e0ec21e2e52c5bf6896a41cb918",
+      "size": 48456
+    },
+    {
+      "blob": "0a02b5b47113b4ecf9fb4d0042ee60f175a95362",
+      "capture_id": "masters_voucher_types_shape_lab_second_read_live.utf16le.xml",
+      "company": "BRIDGE SHAPE LAB",
+      "lab_ref": "branch lab/2160-l1-answers at 77eb8850",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/masters_voucher_types_shape_lab_second_read_live.utf16le.xml",
+      "seed_basis": "synthetic lab book; see MASTERS_CAPTURE_PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2220d9abde2e459a4bb6b8af749123c6ecbf853573d6f76d7c0db0eddab9af20",
+      "size": 48648
+    },
+    {
       "blob": "fae78f1e34d25f3f1bd6a7c44affaa2063eeaa64",
       "capture_id": "alt-a-05-stock-query-alt-unit-probe-b.answer.utf16le.xml",
       "company": "BRIDGE SHAPE LAB",

@@ -2749,6 +2749,10 @@ fn status_fields_that_did_not_come_back_are_one_difference_never_a_pass() {
         ["gst_status_not_reported"]
     );
     assert_eq!(
+        status_codes(&without(&included, "ISPOSTDATED")),
+        ["gst_status_not_reported"]
+    );
+    assert_eq!(
         status_codes(&without(&included, "VCHGSTSTATUSISUNCERTAIN")),
         ["gst_status_unreadable"]
     );

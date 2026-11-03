@@ -12692,8 +12692,8 @@
   "by": "author",
   "what": "clause44: the no-supplier ledgers are not bound",
   "file": "src/binding.rs",
-  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`",
-  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].narration_payee_ledgers`"
+  "from": "            Some(lbinder.bind_list(&names_at(value, location)?, location)?)\n        }\n    };\n    // `[roles].rcm_tax_ledgers`",
+  "to": "            Some(names_at(value, location)?)\n        }\n    };\n    // `[roles].rcm_tax_ledgers`"
  },
  {
   "id": "CL44-46",
@@ -14278,5 +14278,461 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "G3B-01",
+  "by": "author",
+  "what": "classify: a Sales voucher is input",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "\"Sales\" => Category::Output,",
+  "to": "\"Sales\" => Category::Input,"
+ },
+ {
+  "id": "G3B-02",
+  "by": "author",
+  "what": "classify: a Purchase voucher is output",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "\"Purchase\" => Category::Input,",
+  "to": "\"Purchase\" => Category::Output,"
+ },
+ {
+  "id": "G3B-03",
+  "by": "author",
+  "what": "classify: a sales-side note is other",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "(true, false) => Category::Output,",
+  "to": "(true, false) => Category::Other,"
+ },
+ {
+  "id": "G3B-04",
+  "by": "author",
+  "what": "classify: a purchase-side note is output",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "(false, true) => Category::Input,",
+  "to": "(false, true) => Category::Output,"
+ },
+ {
+  "id": "G3B-05",
+  "by": "author",
+  "what": "classify: a note with both or neither group is input",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "                _ => Category::Other,\n",
+  "to": "                _ => Category::Input,\n"
+ },
+ {
+  "id": "G3B-06",
+  "by": "author",
+  "what": "classify: a note's group is read from its nonzero lines only",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "let sales = v.lines.iter().any(|l| under(&l.ledger, SALES_GROUP));",
+  "to": "let sales = v.lines.iter().any(|l| l.amount_paise != 0 && under(&l.ledger, SALES_GROUP));"
+ },
+ {
+  "id": "G3B-07",
+  "by": "author",
+  "what": "classify: a note's group is the ledger's parent, not its chain",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "book.ledgers.get(name).is_some_and(|l| l.under(group));",
+  "to": "book.ledgers.get(name).is_some_and(|l| l.parent == group);"
+ },
+ {
+  "id": "G3B-08",
+  "by": "author",
+  "what": "classify: a Receipt is other",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "\"Payment\" | \"Receipt\" => Category::Payment,",
+  "to": "\"Payment\" => Category::Payment,"
+ },
+ {
+  "id": "G3B-09",
+  "by": "author",
+  "what": "classify: a journal onto a payable ledger is input",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "inputs.payable_ledgers.contains(&l.ledger) || under(&l.ledger, DUTIES_GROUP)",
+  "to": "under(&l.ledger, DUTIES_GROUP)"
+ },
+ {
+  "id": "G3B-10",
+  "by": "author",
+  "what": "classify: a journal onto a Duties & Taxes ledger is input",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "inputs.payable_ledgers.contains(&l.ledger) || under(&l.ledger, DUTIES_GROUP)",
+  "to": "inputs.payable_ledgers.contains(&l.ledger)"
+ },
+ {
+  "id": "G3B-11",
+  "by": "author",
+  "what": "classify: a journal's nil lines off the tax ledgers are ignored",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": ".filter(|l| !inputs.tax_ledgers.contains_key(&l.ledger))",
+  "to": ".filter(|l| l.amount_paise != 0 && !inputs.tax_ledgers.contains_key(&l.ledger))"
+ },
+ {
+  "id": "G3B-12",
+  "by": "author",
+  "what": "classify: a Contra is payment",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "        _ => Category::Other,\n    }\n}",
+  "to": "        _ => Category::Payment,\n    }\n}"
+ },
+ {
+  "id": "G3B-13",
+  "by": "author",
+  "what": "heads: a payment line lands in other",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "Category::Payment => d.payment += amount,",
+  "to": "Category::Payment => d.other += amount,"
+ },
+ {
+  "id": "G3B-14",
+  "by": "author",
+  "what": "heads: the closing sums the opening",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "d.closing += i128::from(tb.closing_paise);",
+  "to": "d.closing += i128::from(tb.opening_paise);"
+ },
+ {
+  "id": "G3B-15",
+  "by": "author",
+  "what": "heads: output tax shown in the ledger's own sign",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "(\"output_tax_paise\", -d.output,",
+  "to": "(\"output_tax_paise\", d.output,"
+ },
+ {
+  "id": "G3B-16",
+  "by": "author",
+  "what": "heads: the residual leaves out other",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "(d.output + d.input + d.payment + d.other)",
+  "to": "(d.output + d.input + d.payment)"
+ },
+ {
+  "id": "G3B-17",
+  "by": "author",
+  "what": "heads: the electronic-ledger finding raised with no head",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    if !heads.is_empty() {\n",
+  "to": "    if true {\n"
+ },
+ {
+  "id": "G3B-18",
+  "by": "author",
+  "what": "months: January follows December as February",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "(y + 1, 1)",
+  "to": "(y + 1, 2)"
+ },
+ {
+  "id": "G3B-19",
+  "by": "author",
+  "what": "taxable: the Sales ledgers' movement kept in its own sign",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "*taxable_by_month.entry(m.clone()).or_default() -= amt;",
+  "to": "*taxable_by_month.entry(m.clone()).or_default() += amt;"
+ },
+ {
+  "id": "G3B-20",
+  "by": "author",
+  "what": "output tax: read on every voucher but other",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "&& classify_voucher(v, book, inputs) == Category::Output",
+  "to": "&& classify_voucher(v, book, inputs) != Category::Other"
+ },
+ {
+  "id": "G3B-21",
+  "by": "author",
+  "what": "residual: the annual figure sums the period's months only",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "paise(residual_by_month.values().sum())?",
+  "to": "paise(months.iter().map(|m| at(&residual_by_month, m)).sum())?"
+ },
+ {
+  "id": "G3B-22",
+  "by": "author",
+  "what": "rcm: a voucher whose RCM lines net to nil is cited",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "        if amt != 0 {\n            let slot",
+  "to": "        if true {\n            let slot"
+ },
+ {
+  "id": "G3B-23",
+  "by": "author",
+  "what": "rcm: the books figure emitted with no RCM ledger",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "let books_read = !inputs.rcm_tax_ledgers.is_empty();",
+  "to": "let books_read = true;"
+ },
+ {
+  "id": "G3B-24",
+  "by": "author",
+  "what": "rcm: the annual figure counts the last month only",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "annual_rcm += b;",
+  "to": "annual_rcm = b;"
+ },
+ {
+  "id": "G3B-25",
+  "by": "author",
+  "what": "reasons: no month counted as no 3B",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "if reason == NO_3B { months.len() } else { 0 }",
+  "to": "if reason == UNCLASSIFIED { months.len() } else { 0 }"
+ },
+ {
+  "id": "G3B-26",
+  "by": "author",
+  "what": "gta: a configured tax line does not make the voucher dutied",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "        inputs.tax_ledgers.contains_key(name)\n            || inputs",
+  "to": "        false\n            || inputs"
+ },
+ {
+  "id": "G3B-27",
+  "by": "author",
+  "what": "gta: an RCM line does not make the voucher dutied",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "            || inputs.rcm_tax_ledgers.contains(name)\n",
+  "to": ""
+ },
+ {
+  "id": "G3B-28",
+  "by": "author",
+  "what": "gta: an unconfigured Duties & Taxes line does not make the voucher dutied",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": ".is_some_and(|l| l.under(DUTIES_GROUP))\n    };",
+  "to": ".is_some_and(|_| false)\n    };"
+ },
+ {
+  "id": "G3B-29",
+  "by": "author",
+  "what": "gta: a credit on the ledger counts as a debit",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "goods.contains(&l.ledger) && l.amount_paise > 0",
+  "to": "goods.contains(&l.ledger) && l.amount_paise != 0"
+ },
+ {
+  "id": "G3B-30",
+  "by": "author",
+  "what": "gta: only nonzero duties lines exclude a voucher",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "!v.lines.iter().any(|l| is_duty(&l.ledger))",
+  "to": "!v.lines.iter().any(|l| l.amount_paise != 0 && is_duty(&l.ledger))"
+ },
+ {
+  "id": "G3B-31",
+  "by": "author",
+  "what": "gta: the question asked with nothing listed",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    if bare.is_empty() {\n        return Ok(());\n    }\n",
+  "to": ""
+ },
+ {
+  "id": "G3B-32",
+  "by": "author",
+  "what": "gta: the RCM limit read the other way round",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "            if inputs.rcm_tax_ledgers.is_empty() {\n",
+  "to": "            if !inputs.rcm_tax_ledgers.is_empty() {\n"
+ },
+ {
+  "id": "G3B-33",
+  "by": "author",
+  "what": "LEDGER-1: the opening never compared",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "        if opening != tb_opening {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "G3B-34",
+  "by": "author",
+  "what": "LEDGER-1: the closing never compared",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "        if closing != tb_closing {\n",
+  "to": "        if false {\n"
+ },
+ {
+  "id": "G3B-35",
+  "by": "author",
+  "what": "LEDGER-1: a residual of Re 1 fires",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "if residual.abs() > TOL_PAISE {",
+  "to": "if residual.abs() >= TOL_PAISE {"
+ },
+ {
+  "id": "G3B-36",
+  "by": "author",
+  "what": "LEDGER-1: a missing figure passes",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "            out.push(format!(\n                \"LEDGER-1: head '{head}' is missing one or more required figures\"\n            ));\n",
+  "to": ""
+ },
+ {
+  "id": "G3B-37",
+  "by": "author",
+  "what": "LEDGER-2: a series with no month checked",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "if month_count > 0 && total",
+  "to": "if total"
+ },
+ {
+  "id": "G3B-38",
+  "by": "author",
+  "what": "LEDGER-3: never fires",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": ".filter(|n| *n != 0)",
+  "to": ".filter(|_| false)"
+ },
+ {
+  "id": "G3B-39",
+  "by": "author",
+  "what": "outward rows: a tax line read as revenue",
+  "file": "src/gst_outward_books.rs",
+  "from": "            if sales_tax_ledgers.contains(&l.ledger) {\n",
+  "to": "            if false {\n"
+ },
+ {
+  "id": "G3B-40",
+  "by": "author",
+  "what": "outward rows: a round-off line read as revenue",
+  "file": "src/gst_outward_books.rs",
+  "from": "            } else if round_off_ledgers.contains(&l.ledger) {\n",
+  "to": "            } else if false {\n"
+ },
+ {
+  "id": "G3B-41",
+  "by": "author",
+  "what": "outward rows: the party's line read as revenue",
+  "file": "src/gst_outward_books.rs",
+  "from": ".filter(|l| v.party_field.is_empty() || l.ledger != v.party_field)",
+  "to": ".filter(|_| true)"
+ },
+ {
+  "id": "G3B-42",
+  "by": "author",
+  "what": "outward rows: a voucher of tax and round-off only is a row",
+  "file": "src/gst_outward_books.rs",
+  "from": "        if other.is_empty() {\n            excluded.push(v);\n            continue;\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "G3B-43",
+  "by": "author",
+  "what": "outward rows: purchases read too",
+  "file": "src/gst_outward_books.rs",
+  "from": "\"Sales\" | \"Credit Note\" | \"Debit Note\")",
+  "to": "\"Sales\" | \"Credit Note\" | \"Debit Note\" | \"Purchase\")"
+ },
+ {
+  "id": "G3B-44",
+  "by": "author",
+  "what": "gst inputs: round_off_ledgers not required",
+  "file": "src/lib.rs",
+  "from": "    if !roles.is_some_and(|r| r.contains_key(\"round_off_ledgers\")) {\n        return Err(missing(\"round_off_ledgers\"));\n    }\n",
+  "to": ""
+ },
+ {
+  "id": "G3B-45",
+  "by": "author",
+  "what": "gst refusal: a named GSTR-3B accepted",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    if named || caller.holds_gstr3b() {\n",
+  "to": "    if caller.holds_gstr3b() {\n"
+ },
+ {
+  "id": "G3B-46",
+  "by": "author",
+  "what": "gst refusal: a GSTR-3B the caller holds accepted",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    if named || caller.holds_gstr3b() {\n",
+  "to": "    if named {\n"
+ },
+ {
+  "id": "G3B-47",
+  "by": "author",
+  "what": "gst refusal: an empty GSTR-3B name refused",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": ".is_some_and(|v| v.as_str() != Some(\"\")),",
+  "to": ".is_some(),"
+ },
+ {
+  "id": "G3B-48",
+  "by": "author",
+  "what": "gst inputs: goods-carriage ledgers dropped",
+  "file": "src/lib.rs",
+  "from": "Some(tds) => tds_payees::goods_carriage_ledgers(tds)?.clone(),",
+  "to": "Some(_) => BTreeSet::new(),"
+ },
+ {
+  "id": "G3B-49",
+  "by": "author",
+  "what": "binding: payable_ledgers never bound",
+  "file": "src/binding.rs",
+  "from": "    let payable_ledgers = bind_role_list(&mut lbinder, roles, \"payable_ledgers\")?;\n",
+  "to": "    let payable_ledgers = None;\n"
+ },
+ {
+  "id": "G3B-50",
+  "by": "author",
+  "what": "binding: rcm_tax_ledgers never bound",
+  "file": "src/binding.rs",
+  "from": "    let rcm_tax_ledgers = bind_role_list(&mut lbinder, roles, \"rcm_tax_ledgers\")?;\n",
+  "to": "    let rcm_tax_ledgers = None;\n"
+ },
+ {
+  "id": "G3B-51",
+  "by": "author",
+  "what": "registry: a GSTR-3B named as loaded is not held",
+  "file": "src/registry.rs",
+  "from": "        self.named_documents.contains(&CallerNamedDocument::Gstr3b)\n            || self",
+  "to": "        false\n            || self"
+ },
+ {
+  "id": "G3B-52",
+  "by": "author",
+  "what": "registry: a GSTR-3B comparison turnover is not held",
+  "file": "src/registry.rs",
+  "from": "            || self.turnover_inputs.gstr3b.is_some()\n",
+  "to": "            || false\n"
+ },
+ {
+  "id": "G3B-53",
+  "by": "author",
+  "what": "months: the period's last month dropped",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "    while (y, m) <= end {\n",
+  "to": "    while (y, m) < end {\n"
+ },
+ {
+  "id": "G3B-54",
+  "by": "author",
+  "what": "heads: the Trial Balance row looked up by head, not ledger",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "if let Some(tb) = book.tb.get(name) {",
+  "to": "if let Some(tb) = book.tb.get(head) {"
+ },
+ {
+  "id": "G3B-55",
+  "by": "author",
+  "what": "rcm: the books figure cites no voucher",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "                voucher_refs(vs),\n",
+  "to": "                Vec::new(),\n"
+ },
+ {
+  "id": "G3B-56",
+  "by": "author",
+  "what": "tax ledgers: a ledger under two heads keeps the later",
+  "file": "src/lib.rs",
+  "from": "                if other != *head {\n",
+  "to": "                if false {\n"
+ },
+ {
+  "id": "G3B-57",
+  "by": "author",
+  "what": "gst refusal: a [documents] that is not a table read as no document",
+  "file": "src/gst_ledgers_3b.rs",
+  "from": "        Some(_) => {\n            return Err(AuditError::Config(\n                \"client config [documents] is not a table\".to_string(),\n            ))\n        }\n",
+  "to": "        Some(_) => false,\n"
  }
 ]

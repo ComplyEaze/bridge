@@ -33,7 +33,7 @@ use bridge_tax_audit::tds_payees::DeductorActivity;
 use bridge_tax_audit::{
     applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined,
     cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements,
+    creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements, gst_ledgers_3b,
     high_value_register, knock_off_candidates, ledger_scrutiny, loans_interest, narration_payees,
     partners_40b_194t, party_identity, party_monthly, questionnaire_cl13, read_scope,
     related_parties_cl23, specified_persons_40a2b, stale_balances_41_1, statutory_dues_43b, stock,
@@ -644,6 +644,31 @@ fn clause44_inputs(s: &Value) -> clause44::Inputs {
     }
 }
 
+/// `gst_ledgers_3b`'s inputs from the spec's `gst_ledgers_3b` table, as `parity/edge_golden.py`
+/// passes them: every key optional and empty when absent, `tax_ledgers` flattened to ledger -> head.
+/// `gstr1`, the rows of a named GSTR-1 the reference is given, is not read: the crate's test takes no
+/// GSTR-1 (`a_named_gstr1_leaves_the_no_gstr3b_dump_unchanged`).
+fn gst_ledgers_3b_inputs(s: &Value) -> gst_ledgers_3b::Inputs {
+    let g = &s["gst_ledgers_3b"];
+    let set = |k: &str| strs(&g[k]).into_iter().collect();
+    let mut tax_ledgers = BTreeMap::new();
+    for (head, ledgers) in g["tax_ledgers"].as_object().into_iter().flatten() {
+        for ledger in strs(ledgers) {
+            assert!(
+                tax_ledgers.insert(ledger, head.clone()).is_none(),
+                "an edge book lists a ledger under one GST head only"
+            );
+        }
+    }
+    gst_ledgers_3b::Inputs {
+        tax_ledgers,
+        payable_ledgers: set("payable_ledgers"),
+        rcm_tax_ledgers: set("rcm_tax_ledgers"),
+        round_off_ledgers: set("round_off_ledgers"),
+        goods_carriage_ledgers: set("goods_carriage_ledgers"),
+    }
+}
+
 /// `book_keeping_quality`'s inputs from the spec's `book_keeping_quality` table, as
 /// `parity/edge_golden.py` passes them: every key optional and empty when absent, `tax_ledgers`
 /// flattened to ledger -> head.
@@ -818,6 +843,22 @@ fn check(name: &str) {
                 )));
                 assert_eq!(order, want, "{name}: trial_balance row order");
                 let c = trial_balance::check_invariants(&book, &r).unwrap();
+                (r, c)
+            }
+            "gst_ledgers_3b" => {
+                let inputs = gst_ledgers_3b_inputs(&s);
+                // An engagement with no [documents] and a caller with no document: the proof that
+                // no GSTR-3B reaches the test, as the edge books carry none.
+                let e = bridge_tax_audit::Engagement::from_toml_for_read(
+                    "[client]\nlabel = \"E\"\nassessment_year = \"2026-27\"\n[period]\n\
+                     start = \"2025-04-01\"\nend = \"2026-03-31\"\n[roles]\ncash_groups = []\n\
+                     bank_groups = []\n",
+                )
+                .unwrap();
+                let caller = bridge_tax_audit::registry::CallerData::default();
+                let none = gst_ledgers_3b::no_gstr3b(&e, &caller).unwrap();
+                let r = gst_ledgers_3b::run(&book, &rules, &period(&s), &inputs, none).unwrap();
+                let c = gst_ledgers_3b::check_invariants(&book, &r).unwrap();
                 (r, c)
             }
             "clause44" => {
@@ -1304,7 +1345,7 @@ fn check(name: &str) {
 
 /// The tests an edge book may name: the arms of `check` above, and exactly the keys of
 /// `parity/edge_golden.py`'s `runners` (`edge_runners_agree_across_the_two_sides`).
-const EDGE_TESTS: [&str; 31] = [
+const EDGE_TESTS: [&str; 32] = [
     "applicability_44ab",
     "bank_reconciliation",
     "book_keeping_quality",
@@ -1318,6 +1359,7 @@ const EDGE_TESTS: [&str; 31] = [
     "depreciation",
     "entity_269st_gap",
     "financial_statements",
+    "gst_ledgers_3b",
     "high_value_register",
     "knock_off_candidates",
     "ledger_scrutiny",
@@ -1373,6 +1415,28 @@ fn every_edge_book_matches_the_reference() {
         })
         .collect();
     assert!(failed.is_empty(), "{}", failed.join("\n\n"));
+}
+
+/// With no GSTR-3B, a named GSTR-1 leaves the reference's `gst_ledgers_3b` dump unchanged:
+/// `g3b_gstr1` is `g3b_classify`'s book with GSTR-1 rows given to the reference, and the reference's
+/// golden for it is `g3b_classify`'s byte for byte. The crate's test, which takes no GSTR-1, is
+/// compared with both goldens by `every_edge_book_matches_the_reference`.
+#[test]
+fn a_named_gstr1_leaves_the_no_gstr3b_dump_unchanged() {
+    let strip = |mut s: Value| {
+        let rows = s["gst_ledgers_3b"].as_object_mut().unwrap().remove("gstr1");
+        s.as_object_mut().unwrap().remove("comment");
+        (s, rows.map_or(0, |r| r.as_array().unwrap().len()))
+    };
+    let (named, rows) = strip(spec("g3b_gstr1"));
+    let (plain, none) = strip(spec("g3b_classify"));
+    assert_eq!((rows, none), (8, 0));
+    assert_eq!(named, plain, "the two books differ beyond the GSTR-1 rows");
+    let golden = |name: &str| {
+        let file = format!("golden/edge.{name}.gst_ledgers_3b.json");
+        std::fs::read(common::fixtures().join(file)).unwrap()
+    };
+    assert!(golden("g3b_gstr1") == golden("g3b_classify"));
 }
 
 /// Every edge golden belongs to a book that names its test, and every test a book names has its

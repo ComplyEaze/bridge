@@ -87,7 +87,12 @@ a negative one from the end, which the Rust `usize` cannot express, so both side
 reference's own `tae.config.depreciation_config` requires it, and `put_to_use_by_voucher` ({voucher GUID: ISO date},
 default none: the reference's pack passes none, but `run()` takes them); and for
 `narration_payees`: `narration_payee_ledgers` (a list of text, default []), `bank` (also passed to the
-module invariant) and the keys `tds_payees` reads, whose result gives the 194C ledgers it adds.
+module invariant) and the keys `tds_payees` reads, whose result gives the 194C ledgers it adds; and for
+`gst_ledgers_3b`: `gst_ledgers_3b` ({tax_ledgers?: {head: [ledger, ...]}, round_off_ledgers?, payable_ledgers?,
+rcm_tax_ledgers?, goods_carriage_ledgers?, gstr1?}, each default empty, the four roles read through the reference's own
+`tae.config` readers, as for `clause44`), with no GSTR-3B rows: the crate ports that case only. `gstr1` is the rows of
+a named GSTR-1 ([{section, counterparty_gstin, doc_no, doc_date (ISO or null), taxable_paise, tax_paise}]), passed as
+the pack passes them; `tests/edge_books.rs` does not read it, as the crate's test takes no GSTR-1.
 """
 from __future__ import annotations
 
@@ -110,7 +115,7 @@ def main() -> int:
     from tae.adapters.tally_stock import StockItemMaster, StockSnapshot, StockSnapshotRow
     from tae.adapters.traces_documents import AisRow, TisRow
     from tae.audit_tests import (applicability_44ab, bank_reconciliation, book_keeping_quality, books_examined, cash_book_integrity, cash_payments_40a3, clause21a_candidates, clause44, counter_cheques_40a3,
-                                 creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
+                                 creditor_ageing_43bh, depreciation, entity_269st_gap, financial_statements, gst_ledgers_3b, high_value_register, ledger_scrutiny, loans_interest, partners_40b_194t, party_monthly, read_scope, related_parties_cl23, specified_persons_40a2b, stale_balances_41_1,
                                  statutory_dues_43b, stock, tds_payees, tds_tcs_26as, trial_balance, twentysixas_receipts)
     from tae.model import Form26ASRow
     from tae.config import load_rules, related_parties_config
@@ -231,6 +236,34 @@ def main() -> int:
             eng, rules, tc.depreciation_config(cfg)[2], tc.gst_registration_type_by_ledger(cfg), tc.tax_ledgers_by_head(cfg),
             tc.role_ledger_set(cfg, "no_supplier_expense_ledgers"), tc.role_ledger_set(cfg, "round_off_ledgers"),
             tc.clause44_money_category_by_ledger(cfg))
+
+    def gst_ledgers_3b_run():
+        # As tae/pack.py passes them for an engagement with no GSTR-3B document, each role through the reference's own
+        # reader from a client config built out of the spec's keys (each default empty), and the goods-carriage ledgers
+        # as given; no GSTR-3B rows. The GSTR-1 rows are the spec's `gstr1` (default none), set on the engagement and
+        # passed as the pack passes a named GSTR-1's rows, with gstr1_not_supplied left at its default (a GSTR-1 named).
+        from tae import config as tc
+        from tae.model import Gstr1Row
+        g = spec.get("gst_ledgers_3b", {})
+        cfg = {"roles": {"tax_ledgers": g.get("tax_ledgers", {}),
+                         **{k: g.get(k, []) for k in ("round_off_ledgers", "payable_ledgers", "rcm_tax_ledgers")}}}
+        text, paise = (lambda x: isinstance(x, str)), (lambda x: isinstance(x, int) and not isinstance(x, bool))
+        gstr1 = []
+        for i, t in enumerate(g.get("gstr1", [])):
+            for key, ok, what in (("section", text, "text"), ("counterparty_gstin", text, "text"),
+                                  ("doc_no", text, "text"), ("taxable_paise", paise, "integer paise"),
+                                  ("tax_paise", paise, "integer paise")):
+                if not ok(t.get(key)):
+                    raise SystemExit(f"{spec_path.name}: gstr1[{i}].{key} must be {what}, got {t.get(key)!r}")
+            gstr1.append(Gstr1Row(doc=f"gstr1:{name}", row=i + 1, section=t["section"],
+                                  counterparty_gstin=t["counterparty_gstin"], doc_no=t["doc_no"],
+                                  doc_date=day(t.get("doc_date")), taxable_paise=t["taxable_paise"],
+                                  tax_paise=t["tax_paise"]))
+        eng.gstr1 = gstr1
+        return gst_ledgers_3b, gst_ledgers_3b.run(
+            eng, rules, tc.tax_ledgers_by_head(cfg), tc.role_ledger_set(cfg, "payable_ledgers"),
+            tc.role_ledger_set(cfg, "rcm_tax_ledgers"), tc.role_ledger_set(cfg, "round_off_ledgers"), [], [], gstr1,
+            goods_carriage_ledgers=frozenset(g.get("goods_carriage_ledgers", [])))
 
     def loans_interest_run():
         # The switch is a module global the reference's run() and check_invariants() both read; the
@@ -480,6 +513,7 @@ def main() -> int:
             round_off_ledgers=frozenset(spec.get("round_off_ledgers", [])))),
         # As tests/edge_books.rs runs it: no partners' interest ledgers and no report totals.
         "financial_statements": lambda: (financial_statements, financial_statements.run(eng, rules)),
+        "gst_ledgers_3b": gst_ledgers_3b_run,
         "high_value_register": high_value_register_run,
         "knock_off_candidates": knock_off_candidates_run,
         "ledger_scrutiny": lambda: (ledger_scrutiny, ledger_scrutiny.run(eng, rules, cash)),

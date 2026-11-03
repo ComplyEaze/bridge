@@ -42,6 +42,10 @@ tax_ledgers = {}
 # clause44 only: REQUIRED by the reference engine (role_ledger_set); no ledger of this invented book
 # lacks a GST supplier by nature.
 no_supplier_expense_ledgers = []
+# gst_ledgers_3b only: REQUIRED by the reference engine (role_ledger_set); no ledger of this invented book is a
+# GST payable or reverse-charge tax ledger.
+payable_ledgers = []
+rcm_tax_ledgers = []
 
 # cash_payments_40a3 only: [loans.loan_ledgers.<ledger>] names a ledger the client has already
 # configured for the (not yet ported) loans_interest test; "Sunrise NBFC Loan" is covered here,

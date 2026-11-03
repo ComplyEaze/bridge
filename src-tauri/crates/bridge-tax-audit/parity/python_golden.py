@@ -46,6 +46,9 @@ it. `statutory_dues_43b` reads the optional `[statutory_dues]` table (`nature_by
 popped out, as the reference's `partners_config` returns it. `books_examined` reads nothing beyond the
 book; the names of the documents the reference's pack loaded with the read are caller data:
 `--documents-read FILE` reads them from a JSON list of text, in the pack's order (none without it).
+`gst_ledgers_3b` reads `[roles].tax_ledgers`, `.round_off_ledgers`, `.payable_ledgers` and `.rcm_tax_ledgers` (all
+REQUIRED, as the reference's pack reads them) and the optional `[tds].goods_carriage_ledgers`, and refuses an
+engagement whose `[documents].gstr3b` is set: the crate ports the test without a GSTR-3B only.
 `clause21a_candidates` reads the optional `[clause21a].extra_terms` through the reference's own reader and the
 `[partners]` interest and remuneration ledgers, as the reference's pack passes them, and runs on the crate's
 vendored keyword table (`rules/clause21a_keywords.toml`), refused unless it is the reference's own file byte for
@@ -145,6 +148,27 @@ def _specified_persons_40a2b(c):
     mod = SimpleNamespace(TEST_ID=specified_persons_40a2b.TEST_ID, check_invariants=lambda e, res:
                           specified_persons_40a2b.check_invariants(e, c.rules, rp, cl23, res))
     return mod, specified_persons_40a2b.run(c.eng, c.rules, rp, cl23)
+
+
+def _gst_ledgers_3b(c):
+    """As tae/pack.py calls it, for an engagement with no GSTR-3B document, the only one the crate runs (it refuses an
+    engagement whose [documents].gstr3b is set, and so does this runner): tax_ledgers, round_off_ledgers and
+    payable_ledgers as the pack reads them before any test, then rcm_tax_ledgers, no GSTR-3B rows and
+    [tds].goods_carriage_ledgers, each through the reference's own reader. No GSTR-1 rows are passed: with no GSTR-3B
+    row they reach no figure or finding (gst_ledgers_3b.py:355-357, :699-716)."""
+    from tae.audit_tests import gst_ledgers_3b
+    from tae.config import (gstr1_document, optional_document_path, role_ledger_set, tax_ledgers_by_head,
+                            tds_goods_carriage_ledgers)
+    tax_ledgers = tax_ledgers_by_head(c.cfg)
+    round_off_ledgers = role_ledger_set(c.cfg, "round_off_ledgers")
+    payable_ledgers = role_ledger_set(c.cfg, "payable_ledgers")
+    rcm_tax_ledgers = role_ledger_set(c.cfg, "rcm_tax_ledgers")
+    if optional_document_path(c.cfg, c.path.parent, "gstr3b") is not None:
+        raise SystemExit("gst_ledgers_3b: [documents].gstr3b is set; only the test without a GSTR-3B is ported")
+    return gst_ledgers_3b, gst_ledgers_3b.run(
+        c.eng, c.rules, tax_ledgers, payable_ledgers, rcm_tax_ledgers, round_off_ledgers, [], [], [],
+        gstr1_not_supplied=gstr1_document(c.cfg, c.path.parent) is None,
+        goods_carriage_ledgers=tds_goods_carriage_ledgers(c.cfg))
 
 
 def _trial_balance(c):
@@ -532,6 +556,7 @@ RUNNERS = {
     "depreciation": _depreciation,
     "entity_269st_gap": _entity_269st_gap,
     "financial_statements": _financial_statements,
+    "gst_ledgers_3b": _gst_ledgers_3b,
     "high_value_register": _high_value_register,
     "knock_off_candidates": _knock_off_candidates,
     "ledger_scrutiny": _ledger_scrutiny,

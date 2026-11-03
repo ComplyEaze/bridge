@@ -89,7 +89,7 @@ Read-backs of four invoices, each imported raw as the build renders it for a bil
 
 ## A number already in use, in another spelling (2026-11-03, #2162)
 
-Answers of row S4 on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, sent with curl, not through a build, and published on `lab/2162-s4-answers` at 3651c746 (the request files on `lab/2162-s4-sheet` at c5f69f97). Each file here is byte-equal to the file there. The invoice `BP/26-27/0051` they meet was seeded by direct XML to set the row up and is not evidence here. The book was restored from its backup afterwards. The answers are UTF-16LE with no byte order mark, as received. A test compares the SHA-256 of each number read the code renders with the request file the lab sent.
+Answers of row S4 on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, sent with curl, not through a build, and published on `lab/2162-s4-answers` at 3651c746 (the request files on `lab/2162-s4-sheet` at c5f69f97). Each file here is byte-equal to the file there. The invoice `BP/26-27/0051` they meet was seeded by direct XML to set the row up and is not evidence here. The book was restored from its backup afterwards. The answers are UTF-16LE with no byte order mark, as received. A test compares the SHA-256 of each number read the code renders, less the `, IRN, IRNACKNO, IRNACKDATE` it now adds to the fetch list (#2162 item 8), with the request file the lab sent.
 
 | Fixture | Bytes | SHA-256 | Published as | What it is |
 | --- | ---: | --- | --- | --- |

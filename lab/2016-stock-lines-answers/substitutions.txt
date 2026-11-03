@@ -1,0 +1,4 @@
+raw/step3-window-answer.utf16le.xml is the step 3 answer exactly as Tally sent it. Elsewhere the company number is X at equal length in raw files and bodies/ (whose names stay the sha256 of the originals), so sizes stand; company_number values go first in tool answers, by a JSON parser. Other replacements in text files, with counts:
+<company number>: 9
+<lab folder>: 4
+<lab root>: 1

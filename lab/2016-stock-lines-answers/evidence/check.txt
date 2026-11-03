@@ -1,0 +1,45 @@
+relay open 1 errors 0 requests 128
+== Tally requests per call (by time window; a call that starts within a second of the last may share)
+000-tools list 4 {'BridgeCompanyExtent': 2, 'status': 2}
+001-companies list_companies 8 {'BridgeCompanyExtent': 4, 'status': 4}
+002-s2 vouchers 26 {'BridgeCompanyExtent': 10, 'status': 10, 'Bridge Agent Company High Water': 2, 'Bridge Agent Voucher Census': 2, 'Bridge Agent Vouchers': 2}
+003-s3 vouchers 25 {'Bridge Agent Vouchers': 3, 'status': 9, 'BridgeCompanyExtent': 9, 'Bridge Agent Company High Water': 2, 'Bridge Agent Voucher Census': 2}
+004-s4 vouchers 26 {'BridgeCompanyExtent': 10, 'status': 10, 'Bridge Agent Company High Water': 2, 'Bridge Agent Voucher Census': 2, 'Bridge Agent Vouchers': 2}
+005-s5 vouchers 13 {'Bridge Agent Vouchers': 2, 'status': 6, 'BridgeCompanyExtent': 5}
+006-s6 vouchers 32 {'BridgeCompanyExtent': 12, 'status': 12, 'Bridge Agent Company High Water': 4, 'Bridge Agent Voucher Census': 2, 'Bridge Agent Vouchers': 2}
+007-s7a vouchers 29 {'Bridge Agent Vouchers': 3, 'status': 11, 'BridgeCompanyExtent': 11, 'Bridge Agent Company High Water': 2, 'Bridge Agent Voucher Census': 2}
+008-s7b vouchers 10 {'BridgeCompanyExtent': 4, 'status': 4, 'Bridge Agent Company High Water': 2}
+009-egress egress_log 0 {}
+== window requests
+35ede0fa4e090047 sends 2 bytes 1740 | FETCH ['DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE'] | equals the sheet False | COMPUTE [] | answers [466226] ['b09431f6b849']
+df30b272695f5ce6 sends 8 bytes 3122 | FETCH ['DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLINVENTORYENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE'] | equals the sheet True | COMPUTE ['BRIDGEVCHTYPEGUID:$GUID:VoucherType:$VoucherTypeName', 'BRIDGEVCHRESERVEDNAME:$ReservedName:VoucherType:$VoucherTypeName', 'BRIDGEVCHISSALES:$$IsSales:$VoucherTypeName', 'BRIDGEVCHISPURCHASE:$$IsPurchase:$VoucherTypeName', 'BRIDGEVCHISPAYMENT:$$IsPayment:$VoucherTypeName', 'BRIDGEVCHISRECEIPT:$$IsReceipt:$VoucherTypeName', 'BRIDGEVCHISCONTRA:$$IsContra:$VoucherTypeName', 'BRIDGEVCHISJOURNAL:$$IsJournal:$VoucherTypeName', 'BRIDGEVCHISDEBITNOTE:$$IsDebitNote:$VoucherTypeName', 'BRIDGEVCHISCREDITNOTE:$$IsCreditNote:$VoucherTypeName'] | answers [370470] ['0385b11ab2fc']
+== rows: step 2 12 step 3 12 | same date, number, type, GUID in order True
+step 2 carries any stock key: False
+  Stock Journal 1 alter 113 | reserved 'Stock Journal' | class None | cancelled False optional False | lines 2
+       in Hydrochloric Acid 33pc 2.000 Kgs 2.000 Kgs rate empty amount empty | batches [('Factory Floor', 'H-2504-A', '2.000 Kgs', 'empty')]
+       out Hydrochloric Acid 33pc 2.000 Kgs 2.000 Kgs rate 30.00/Kgs amount 60.00 | batches [('Main Location', 'H-2504-A', '2.000 Kgs', '60.00')]
+  Delivery Note 1 alter 114 | reserved 'Delivery Note' | class None | cancelled False optional False | lines 1
+       out Hydrochloric Acid 33pc 1.000 Kgs 1.000 Kgs rate 30.00/Kgs amount 30.00 | batches [('Main Location', 'H-2504-A', '1.000 Kgs', '30.00')]
+  Receipt Note 1 alter 115 | reserved 'Receipt Note' | class None | cancelled False optional False | lines 1
+       in Hydrochloric Acid 33pc 1.000 Kgs 1.000 Kgs rate 30.00/Kgs amount -30.00 | batches [('Factory Floor', 'H-2504-B', '1.000 Kgs', '-30.00')]
+  Credit Note 1 alter 116 | reserved 'Credit Note' | class 'Credit Note' | cancelled False optional False | lines 1
+       in Hydrochloric Acid 33pc 1.000 Kgs 1.000 Kgs rate 30.00/Kgs amount -30.00 | batches [('Main Location', 'H-2504-A', '1.000 Kgs', '-30.00')]
+  Lab Own DN 1 alter 117 | reserved '' | class None | cancelled False optional False | not_read
+  Lab Own CN 1 alter 118 | reserved '' | class 'Credit Note' | cancelled False optional False | not_read
+  Credit Note 2 alter 119 | reserved 'Credit Note' | class 'Credit Note' | cancelled False optional False | lines 0
+  Delivery Note 2 alter 125 | reserved 'Delivery Note' | class None | cancelled True optional False | unreadable stock_line_missing
+  Delivery Note 3 alter 121 | reserved 'Delivery Note' | class None | cancelled False optional True | lines 1
+       out Hydrochloric Acid 33pc 1.000 Kgs 1.000 Kgs rate 30.00/Kgs amount 30.00 | batches [('Main Location', 'H-2504-A', '1.000 Kgs', '30.00')]
+  Sales 1 alter 122 | reserved 'Sales' | class 'Sales' | cancelled False optional False | not_read
+  Purchase 2 alter 123 | reserved 'Purchase' | class 'Purchase' | cancelled False optional False | not_read
+  Debit Note 1 alter 124 | reserved 'Debit Note' | class 'Debit Note' | cancelled False optional False | not_read
+kinds_not_read [{"voucher_type": "Debit Note", "vouchers": 1}, {"voucher_type": "Lab Own CN", "vouchers": 1}, {"voucher_type": "Lab Own DN", "vouchers": 1}, {"voucher_type": "Purchase", "vouchers": 1}, {"voucher_type": "Sales", "vouchers": 1}] | tie not_compared
+step 4 equals step 3 apart from read time, timings and snapshot id: True
+   differs /evidence/duration_ms 2293 | 2251
+   differs /evidence/read_at 2026-11-03T03:06:56.781Z | 2026-11-03T03:07:12.374Z
+   differs /read_at 2026-11-03T03:06:54.488Z | 2026-11-03T03:07:10.123Z
+   differs /result/snapshot/id 59218c76-2778-4756-a823-46604a058142 | 580c7d0f-01eb-4d06-afd0-5b49bddae432
+   differs /result/snapshot/read_at 2026-11-03T03:06:56.780Z | 2026-11-03T03:07:12.373Z
+   differs /result/window/census/ms 710 | 673
+   differs /result/window/marks/ms 596 | 601
+   differs /result/window/parts[0]/ms 901 | 908

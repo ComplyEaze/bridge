@@ -1,0 +1,14 @@
+step 3 window request 3122 B, answer 370470 B on the wire, UTF-16LE; answer sha256 0385b11ab2fc9a079ffa0cc119bd5ed6e4955d853eb0ab5631f3a26698f6a08a
+Stock Journal 1 bytes 35152 stock lines 2 per line 17576
+Delivery Note 1 bytes 35604 stock lines 1 per line 35604
+Receipt Note 1 bytes 36210 stock lines 1 per line 36210
+Credit Note 1 bytes 35602 stock lines 1 per line 35602
+Lab Own DN 1 bytes 35578 stock lines 1 per line 35578
+Lab Own CN 1 bytes 35588 stock lines 1 per line 35588
+Credit Note 2 bytes 5066 stock lines 1 per line 5066
+Delivery Note 2 bytes 4878 stock lines 1 per line 4878
+Delivery Note 3 bytes 35624 stock lines 1 per line 35624
+Sales 1 bytes 35570 stock lines 1 per line 35570
+Purchase 2 bytes 36202 stock lines 1 per line 36202
+Debit Note 1 bytes 36212 stock lines 1 per line 36212
+vouchers 12 voucher bytes 367286 of 370470 stock lines 13 header and the rest 3184

@@ -1,0 +1,16 @@
+2026-11-03T03:06:36Z exe sha256 0521ed8ac29d82d5e3f95f2ad9525c61eadaa851758f014da10e75089a268400 ok; launch-env.json sha256 6e7b6054a754a4820fd178c7e346b1e9fbeb382f5070a8642510d6aac278379a; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-03T03:06:36Z launched pid 15004; stderr to server-stderr-20261103T030636Z.log
+2026-11-03T03:06:36Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-03T03:06:48Z 000-tools.json tool=list secs=0.009 isError=None error=None saved_sha256=42869e38182864c6790f439cfb4cf7ac82cdf3a61190df8c0cc566178e923c54
+2026-11-03T03:06:49Z 001-companies.json tool=list_companies secs=0.161 isError=False error=None saved_sha256=0c9f811b23dae3bb1d61517f5f25a4193eac1baab251384b4221a2c322bfb013
+2026-11-03T03:06:53Z 002-s2.json tool=vouchers secs=2.619 isError=False error=None saved_sha256=b0c2c23688c43f2383e8783afa03ff3a0416e24ca3080b8f08a80251208f0843
+2026-11-03T03:06:56Z 003-s3.json tool=vouchers secs=2.388 isError=False error=None saved_sha256=797292fb0d847be316a6f4980599dd2d0084ef25f10d9fcbbb919ca70991236f
+2026-11-03T03:07:12Z 004-s4.json tool=vouchers secs=2.297 isError=False error=None saved_sha256=9e40ea569257bbb18b6756b94f9c4b47b59a38c3617dec92a8f8b0377e719f9b
+2026-11-03T03:07:13Z 005-s5.json tool=vouchers secs=0.089 isError=True error=None saved_sha256=92c0ee2a6c8db12ed829595939c2a7af245536c12399cb9f9c929c64e0d1c991
+2026-11-03T03:07:17Z 006-s6.json tool=vouchers secs=2.656 isError=False error=None saved_sha256=8d834897db99d13afa7bdc3a737a634aaa551fec6740d8e50f529853f543dfdb
+2026-11-03T03:07:20Z 007-s7a.json tool=vouchers secs=2.388 isError=False error=None saved_sha256=2d662a6ab11444e17d07f29e48fcbebcbec60433cf7be2a1d0ba33fc2721a326
+2026-11-03T03:07:22Z 008-s7b.json tool=vouchers secs=0.691 isError=False error=None saved_sha256=dcca33e45a3204daacd16d8a9eba821d21fdaca7158b6af5b152b548d6fcb407
+2026-11-03T03:07:34Z 009-egress.json tool=egress_log secs=0.140 isError=False error=None saved_sha256=7ca22dad8d5fab7f6c30b7c84fe46bfc7e6e342280e7011dec9e4606a1fb95db
+2026-11-03T03:09:07Z 010-ss-before.json tool=stock_summary secs=1.499 isError=False error=None saved_sha256=60a0373bd28801c57b1299e97810f5be83a7d72656c2021250bdc7f59cf28455
+2026-11-03T03:09:11Z 011-ss-after.json tool=stock_summary secs=1.133 isError=False error=None saved_sha256=06be7f76de758e3a841dbd8f14d533b4a8b3edbf6d3bd756cd2041437e693415
+2026-11-03T03:10:31Z session ended; server pid 15004 exit code 0

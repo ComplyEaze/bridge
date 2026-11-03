@@ -52,10 +52,10 @@ tests of a review whose read finishes the masters check now read the census row'
 whose census was spanned and sent (`REVIEW_LAB_CAPTURE_PROVENANCE.md`), and so does the review that binds all fifty
 vouchers, which #2145 had dropped.
 
-`a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown` still replays this capture, its census a
-stand-in. Its premise is vouchers matched by Bridge's narration marker beside an unmarked copy. The census row's batch
-was posted natively, and Tally's read-back of it carries no marker, so all 50 read as content matches and the batch is
-unverified with or without the copy; that capture cannot stand for this test.
+`a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown` replayed this capture too, its census a
+stand-in and its unmarked copy of D3-005 derived in memory. It now reads the hand-import row's capture on the census
+row's book, a batch imported from its saved file with an unmarked copy entered beside it in Tally, its census spanned
+and sent (`REVIEW_LAB_CAPTURE_PROVENANCE.md`). No test serves this capture's census for the spanned request now.
 
 The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026 (`lab/2145-spanned-census-captures-answers`
 at `993d96bc`), after the book had moved on: its voucher mark read 1829. Three of the capture's vouchers now carry ALTERIDs

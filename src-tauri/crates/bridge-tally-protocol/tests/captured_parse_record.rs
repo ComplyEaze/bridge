@@ -839,6 +839,18 @@ const ROWS: &[Row] = &[
         parse: |_, text| gateway(text),
     },
     Row {
+        fixture: "tests/fixtures/agent/review-hand-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/review-hand-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
         fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
         source: Source::Captured,
         parser: "parse_companies_from_collection",
@@ -3490,6 +3502,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/review-lab-batch-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/review-lab-payment-import.xml", IMPORT_REQUEST),
+    ("tests/fixtures/agent/review-hand-batch-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/l1-reentry-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/post-span-import.xml", IMPORT_REQUEST),
     (
@@ -3529,6 +3542,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/review-lab-company-high-water.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/review-hand-company-high-water.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (
@@ -3734,6 +3751,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_CENSUS,
     ),
     (
+        "tests/fixtures/agent/review-hand-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
         "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
         APP_CENSUS,
     ),
@@ -3836,6 +3857,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/review-lab-payment-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/review-hand-import-verification.utf16le.xml",
         APP_VERIFICATION,
     ),
     (

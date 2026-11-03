@@ -41,9 +41,35 @@ payment reading back whole and matched (`D3_BATCH_CAPTURE_PROVENANCE.md`, `WA1_P
   lab's per-call split in `evidence/check.txt` files the payment post's last status probe and extent read under the
   batch's call, which it lists as 38).
 - Tally's read-back of a native post carries no Bridge marker in a narration, and holds each voucher's own GUID as its
-  `REMOTEID`. So it cannot stand for a batch imported by hand from the saved file, whose narrations keep the marker:
-  `a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown` stays on the D3 capture.
+  `REMOTEID`. So it cannot stand for a batch imported by hand from the saved file, whose narrations keep the marker;
+  the hand-import row below captures that case.
 - Tally returns the Payment's debit as `-1.00`, which the review must show as the post dialog did, `Dr 1.00` (#730).
+
+## The hand-import row (`review-hand-*`)
+
+- **The #2210 hand-import row, 3 Nov 2026,** on the same book as the census row left it, voucher mark 251. Run sheet
+  `lab/2210-hand-import-sheet` at `102635bf`; evidence `lab/2210-hand-import-answers` at `42ac2167` (`RESULTS.md`,
+  `out/relay.jsonl`, `out/bodies/`, `evidence/check.txt`, `copied/`). The same build, behind the same relay in pass mode;
+  88 requests over two connections, no relay error. Posting was off.
+- **The batch.** `build_import_xml` of 50 Journals, `H-001` to `H-050`, dated 6 April 2026, amounts 1.00 to 50.00, Test
+  Expense B Dr and Cash Cr. Bridge did not post it: the saved file was sent to Tally with curl, as a person's import of
+  that file sends it, and Tally reported creating 50 at ALTERIDs 252 to 301. One voucher with H-005's date, type and
+  entries and no marker, narration `Hand row 5`, was then sent the same way and created at ALTERID 302.
+- **The reads.** Each fixture is the answer to that batch's one `verify_import`, on the second connection, with the
+  marks at 302: the company extent (`9df2a53f`), the marks (`388c28bc`), the census spanned `(0, 302]` for 6 April
+  (`99e8415e`, 51 rows) and the verification read (`849fc936`, 51 rows). The call sent 30 exchanges, in the order
+  `SEESESEHSHSEECSCSEEVSVSEEVSVSE`, the D3 batch's order with no dispatch record. Each request sent twice in a row
+  was answered alike.
+- **What Tally kept.** Fifty narrations end in the batch's `[BRIDGE:…]` tag; the copy's has none. Every row's `REMOTEID`
+  is its own `GUID`: Tally kept none of the saved file's REMOTEIDs, so the tags survive only in the narrations.
+- **The company number** is restored in the extent fixture and the journal as for the census row; the extent fixture's
+  SHA-256 equals the answer's as received, and the journal's equals the lab's copy before masking
+  (`evidence/copied-dst.sha`).
+- **The journal and saved file** are the data folder's, copied untouched by the lab: the build record, then the
+  verification record the call wrote. The test keeps the build record alone, the journal as the call read it.
+- **What it establishes.** `verify_import` of a batch imported by hand reads its 50 vouchers verified by their markers
+  and reports the unmarked copy as an `accounting_fingerprint` duplicate of H-005 (voucher ids ending `-00000100` and
+  `-0000012e`), so the batch is `verification_incomplete`, with no `dispatch` key. One book, one sitting: PARTIAL.
 
 ## What it does not establish
 
@@ -63,3 +89,9 @@ payment reading back whole and matched (`D3_BATCH_CAPTURE_PROVENANCE.md`, `WA1_P
 | `agent/review-lab-journal.jsonl` | 26244 | `37d3db93d18979e965ca0a99b190859d0a12fdf2714c098f86630f7a8c01a4ad` |
 | `agent/review-lab-batch-import.xml` | 31103 | `5af715f8ae796a68a6bd9368810c24eb2d59737dd76ed37b58d8ba0e8f72cdab` |
 | `agent/review-lab-payment-import.xml` | 1037 | `d736c66b4fa875c740920e8425f6901f5adde668660de34eccf788be1990cab2` |
+| `agent/review-hand-company-extent.utf16le.xml` | 4014 | `f08b3b1085c3bf2dbfa46b9fb24d3b1e04877f6bef318cac3fa556e5d130d1a8` |
+| `agent/review-hand-company-high-water.utf16le.xml` | 3408 | `065a943b4a041996c4c4ed40d2b169b0825f574b479e7e57ed33df6072d29fbc` |
+| `agent/review-hand-voucher-census.utf16le.xml` | 126760 | `435884cb4c02071d439539534a5132d5a0fcdd7940e40e4dbfd54de4452ea30b` |
+| `agent/review-hand-import-verification.utf16le.xml` | 258392 | `9477e8a435c7b70e6fc75e7c0b89c5c9bb421c3b3d1a18bdb1958a499cece2f6` |
+| `agent/review-hand-journal.jsonl` | 14005 | `b60688ccab55ab0f3083380b9f82185d64b5260baf2b75e310d0863136a8a208` |
+| `agent/review-hand-batch-import.xml` | 31003 | `02434e30e7e383cfd04edcf0969cea63db6da6283686fe858ecb89a89fc34425` |

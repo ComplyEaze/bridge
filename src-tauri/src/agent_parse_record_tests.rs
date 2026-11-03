@@ -246,6 +246,10 @@ fn rows() -> Vec<Row> {
         REVIEW_LAB
     ));
     rows.extend(high_water_rows!(
+        "agent/review-hand-company-high-water.utf16le.xml",
+        REVIEW_LAB
+    ));
+    rows.extend(high_water_rows!(
         "agent/post-span-company-high-water-after.utf16le.xml",
         IMPORT_LAB
     ));
@@ -423,6 +427,11 @@ fn rows() -> Vec<Row> {
         |_, t| census_span(t, ("20260404", "20260404"), (0, 251))
     ));
     rows.push(row!(
+        "agent/review-hand-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260406, (0, 302])",
+        |_, t| census_span(t, ("20260406", "20260406"), (0, 302))
+    ));
+    rows.push(row!(
         "agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
         "parse_voucher_census(20260804 to 20260805, (0, 68])",
         |_, t| census_span(t, ("20260804", "20260805"), (0, 68))
@@ -561,6 +570,11 @@ fn rows() -> Vec<Row> {
     ));
     rows.push(row!(
         "agent/review-lab-payment-import-verification.utf16le.xml",
+        "parse_import_verification_rows(REVIEW_LAB)",
+        |_, t| verification(t, REVIEW_LAB)
+    ));
+    rows.push(row!(
+        "agent/review-hand-import-verification.utf16le.xml",
         "parse_import_verification_rows(REVIEW_LAB)",
         |_, t| verification(t, REVIEW_LAB)
     ));

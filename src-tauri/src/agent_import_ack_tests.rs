@@ -1881,88 +1881,83 @@ async fn a_cancelled_voucher_entered_again_by_hand_is_reported_not_attributed() 
     }
 }
 
-/// Add a synthetic, unmarked voucher to one captured response: a copy of
-/// D3-005 under a new GUID, MASTERID and AlterID, with Bridge's marker removed
-/// from its narration. It is not live evidence. Its IDs are arbitrary, chosen
-/// only to be unused in the capture: AlterID 1419 with MASTERID 1998 is not a
-/// pair Tally would produce for a voucher entered again by hand. The outcome
-/// does not depend on them, since D3-005 itself matches by its marker.
-fn with_d3_005_copy(bytes: &[u8]) -> Vec<u8> {
-    let text = captured(bytes);
-    let guid = "<GUID>17a10910-773c-42c6-bd66-7bba9a392536-00000552</GUID>";
-    assert_eq!(text.matches(guid).count(), 1);
-    let start = text[..text.find(guid).unwrap()].rfind("<VOUCHER ").unwrap();
-    let end = start + text[start..].find("</VOUCHER>").unwrap() + "</VOUCHER>".len();
-    let original = &text[start..end];
-    let mut copy = original
-        .replace("-00000552", "-000009f5")
-        .replace(
-            "<MASTERID TYPE=\"Number\"> 1362</MASTERID>",
-            "<MASTERID TYPE=\"Number\"> 1998</MASTERID>",
-        )
-        .replace(
-            "<ALTERID TYPE=\"Number\"> 1424</ALTERID>",
-            "<ALTERID TYPE=\"Number\"> 1419</ALTERID>",
-        );
-    if let Some(marker) = copy.find(" [BRIDGE:") {
-        let close = marker + copy[marker..].find(']').unwrap() + 1;
-        copy.replace_range(marker..close, "");
-    }
-    for field in ["-000009f5", "1998</MASTERID>", "1419</ALTERID>"] {
-        assert!(copy.contains(field), "{field}: {copy}");
-    }
-    assert!(!copy.contains("[BRIDGE:"), "{copy}");
-    format!("{}\n    {copy}{}", &text[..end], &text[end..])
-        .encode_utf16()
-        .flat_map(u16::to_le_bytes)
+/// The #2210 hand-import row on the census row's book: a batch of 50 Journals,
+/// H-001 to H-050 dated 6 April 2026, that Bridge built and did not post,
+/// imported from its saved file without Bridge at AlterIDs 252 to 301, then a
+/// copy of H-005 entered with no marker at 302 (fixtures `review-hand-*`,
+/// `REVIEW_LAB_CAPTURE_PROVENANCE.md`).
+const HAND_BATCH: &str = "bridge-c3160d0e-9fc0-48e5-8e5c-48ba0d502f94";
+
+/// The sha256 of each request of the batch's `verify_import`, as sent; `None`
+/// for the status probe. Its census is spanned `(0, 302]`, the voucher mark
+/// read.
+fn hand_requests() -> Vec<Option<&'static str>> {
+    D3_ORDER
+        .chars()
+        .map(|step| match step {
+            'S' => None,
+            'E' => Some(REVIEW_EXTENT_REQUEST),
+            'H' => Some("388c28bc5c531be5ed8b16d7519b7221daa28d9a6d7f180f95643f249b62abbe"),
+            'C' => Some("99e8415efb6fd4442b96767078241f93da9d1189e518c23a8617c35226e8afdd"),
+            _ => Some("849fc93697350bae4799ad01b8f653c17f7a7aff748dfedb7ce041dd6a9d8770"),
+        })
         .collect()
 }
 
-/// A batch the accountant imported by hand (the D3 journal with its dispatch
-/// records left out), read back with all 50 vouchers matching and a synthetic
-/// unmarked copy of D3-005 beside them. The JSON says verification_incomplete
-/// for the duplicate. The Markdown proof must say so too, and must not read as
-/// a clean post (bridge#804).
+/// A batch the accountant imported by hand from its saved file, read back
+/// with all 50 vouchers matched by their markers and an unmarked copy of H-005
+/// beside them, as Tally returned it. With no dispatch record the call reads
+/// in the order D3's did. The JSON says verification_incomplete for the
+/// duplicate. The Markdown proof must say so too, and must not read as a clean
+/// post (bridge#804).
 #[tokio::test]
 async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown() {
-    let census = with_d3_005_copy(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-voucher-census.utf16le.xml"
-    ));
-    let readback = with_d3_005_copy(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-import-verification.utf16le.xml"
-    ));
     let simulator = SequenceSimulator::spawn(with_sentinel(d3_readback_of([
         include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-extent.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-company-extent.utf16le.xml"
         ),
         include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/d3-batch-company-high-water.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-company-high-water.utf16le.xml"
         ),
-        &census,
-        &readback,
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-voucher-census.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-import-verification.utf16le.xml"
+        ),
     ])))
     .unwrap();
     let directory = tempfile::tempdir().unwrap();
-    let server = d3_server(&simulator, directory.path());
-    // Keep only the built batch and its first verification: no dispatch.
-    let journal = directory.path().join("agent-import-ledger.jsonl");
-    let lines = fs::read_to_string(&journal).unwrap();
-    let kept = lines
-        .lines()
-        .filter(|line| !line.contains("\"record_type\":\"dispatch_"))
-        .take(2)
-        .collect::<Vec<_>>();
-    assert_eq!(kept.len(), 2);
-    assert!(
-        !kept.iter().any(|line| line.contains("dispatch")),
-        "{kept:?}"
+    let server = server_at(simulator.address(), directory.path());
+    let origin =
+        super::super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    // The journal as the call read it: the build record alone, before the
+    // verification record the call wrote.
+    let journal = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-journal.jsonl"
     );
-    fs::write(&journal, format!("{}\n", kept.join("\n"))).unwrap();
+    let built = journal.lines().next().unwrap();
+    assert!(!journal.contains("dispatch"), "{journal}");
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        format!("{}\n", built.replace("http://127.0.0.1:9002", &origin)),
+    )
+    .unwrap();
+    fs::write(
+        server
+            .imports_dir()
+            .unwrap()
+            .join(format!("{HAND_BATCH}.xml")),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml"
+        ),
+    )
+    .unwrap();
 
     let verified = server
         .call_tool(
             "verify_import",
-            json!({"company_guid":D3_GUID,"batch_id":D3_BATCH}),
+            json!({"company_guid":REVIEW_GUID,"batch_id":HAND_BATCH}),
         )
         .await;
     let result = &verified["structuredContent"]["result"];
@@ -1975,10 +1970,18 @@ async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown
         "{verified}"
     );
     assert_eq!(
+        duplicates[0]["voucher_ids"],
+        json!([
+            format!("guid:{REVIEW_GUID}-00000100"),
+            format!("guid:{REVIEW_GUID}-0000012e"),
+        ]),
+        "{verified}"
+    );
+    assert_eq!(
         result["verification_status"], "verification_incomplete",
         "{verified}"
     );
-    let markdown = fs::read_to_string(&server.current_proof_paths(D3_BATCH)[1]).unwrap();
+    let markdown = fs::read_to_string(&server.current_proof_paths(HAND_BATCH)[1]).unwrap();
     assert!(
         markdown.contains("this report does not confirm posting"),
         "{markdown}"
@@ -1991,11 +1994,17 @@ async fn a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown
         markdown.contains("- Duplicates in this batch: 1"),
         "{markdown}"
     );
-    let fingerprint = duplicates[0]["fingerprint_sha256"].as_str().unwrap();
+    // The fingerprint the lab's call reported.
+    let fingerprint = "42e7c32dcf54b1d2ce660091aacd1d096720b0b569c3561a1b1ef121a78cfba8";
+    assert_eq!(
+        duplicates[0]["fingerprint_sha256"], fingerprint,
+        "{verified}"
+    );
     assert!(
         markdown.contains(&format!("| accounting_fingerprint | `{fingerprint}` | 2 |")),
         "{markdown}"
     );
+    assert_captured_requests(&sent(simulator), &hand_requests());
 }
 
 /// The same capture with D3-004 read as cancelled too, derived in memory: its

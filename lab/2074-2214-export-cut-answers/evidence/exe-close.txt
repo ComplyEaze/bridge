@@ -1,1 +1,1 @@
-0345e74beff3c44ff874fdb45d31306dfb8d7eb694ab0f8db66537ad6857b1bd */d/labbuilds/master-a6c64b8b/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe
+0345e74beff3c44ff874fdb45d31306dfb8d7eb694ab0f8db66537ad6857b1bd *<build folder>/master-a6c64b8b/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe

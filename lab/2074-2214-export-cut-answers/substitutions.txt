@@ -5,3 +5,4 @@ The company number is X at equal length in raw files, bodies/ (whose names stay 
 <lab folder>: 13
 <lab root>: 2
 stop: 4
+<build folder>: the build folder in the two exe hash files, written in the shell's /d/ form, replaced after the first push (forward fix).

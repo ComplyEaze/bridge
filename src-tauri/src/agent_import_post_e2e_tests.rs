@@ -7910,16 +7910,21 @@ async fn pilot_post_changed_in(order: &str, changes: &[Changed]) -> PilotRun {
 
 // ---- The oldest release that reads a Sales line (#2162 item 4) ----
 //
-// Sales keeps the one import journal (ADR 0004, the slice 4 amendment), and
-// every record in it denies fields it does not know, so one line a release
-// cannot read refuses the whole journal there. The release notes name
-// `mcp-v0.7.0` as the oldest release that reads a Sales line once Sales is on.
+// Sales keeps the one import journal (ADR 0004, the slice 4 amendment). Every
+// voucher of a batch line denies fields it does not know (the line itself does
+// not), so one line a release cannot read refuses the whole journal there. The
+// release notes name `mcp-v0.7.0` as the oldest release to install once Sales
+// is on: `mcp-v0.6.1` reads the line, but refuses the content review and the
+// person's settlement a Sales batch can gain. The tests below compare every
+// path, the line's own members included, so they hold a stricter bar than that
+// release's reader.
 
-/// Every field path of the Sales line `mcp-v0.7.0` wrote for this replay
-/// (`pilot_post_changed(&[])`, the line in `journal_after_build`), run on that
-/// tag (`fcfb5ff6`) on 3 Nov 2026 and taken from the line by
-/// [`journal_line_fields`]. The line itself is not kept: its batch id is a
-/// random identifier.
+/// Every field path of the Sales line `mcp-v0.7.0` wrote for this replay, run
+/// on that tag (`fcfb5ff6`) on 3 Nov 2026: [`journal_line_fields`] and a test
+/// that wrote `pilot_post_changed(&[])`'s `journal_after_build` to a file were
+/// added to this file on a checkout of the tag, that test run alone, and the
+/// written line's paths taken by [`journal_line_fields`]. The line itself is
+/// not kept: its batch id is a random identifier.
 const MCP_V0_7_0_SALES_LINE_FIELDS: &[&str] = &[
     "/batch_id",
     "/built_at",
@@ -7973,12 +7978,43 @@ const MCP_V0_7_0_SALES_LINE_FIELDS: &[&str] = &[
     "/vouchers[]/voucher_type=Sales",
 ];
 
+/// The paths the replay never writes: its party is unregistered, with no HSN
+/// warning, no cash-in-hand answer and no approval. These are read from the
+/// tag's types at `fcfb5ff6`, not from a run: `InvoiceObserved`
+/// (`agent_import_invoice.rs:62`), `HsnWarning`, `HsnWarningCode` and
+/// `HsnLevel` (`agent_import_invoice_hsn.rs:324`, `:286`, `:91`),
+/// `CashInHandLedger` (`agent_import.rs:532`) and `OnAccountApproved`
+/// (`agent_import_bill_wise.rs:311`).
+const MCP_V0_7_0_FILLED_LINE_FIELDS: &[&str] = &[
+    "/cash_in_hand_ledgers[]/bridge_txn_id",
+    "/cash_in_hand_ledgers[]/ledger",
+    "/on_account_approved[]/ledger",
+    "/on_account_approved[]/party_digest",
+    "/vouchers[]/invoice/observed/hsn_warnings",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/characters",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_not_a_sac_for_services",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_not_digits",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_not_six_digits",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_sac_for_goods",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_type_of_supply_not_judged",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/ledger",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level/group",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level=company",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level=ledger",
+    "/vouchers[]/invoice/observed/party_gstin",
+];
+
 /// The string fields of a batch line that are enums in the journal's types,
 /// where a value the release does not know is refused as an unknown field is.
-const JOURNAL_LINE_ENUM_FIELDS: [&str; 3] = [
+/// A value is checked only when a line here writes it.
+const JOURNAL_LINE_ENUM_FIELDS: [&str; 5] = [
     "/identity_scheme",
     "/vouchers[]/voucher_type",
     "/vouchers[]/entries[]/side",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level",
 ];
 
 /// Each member's path in `value`, an array's items under `[]`, and each enum
@@ -8008,8 +8044,12 @@ fn journal_line_fields(value: &Value, at: &str, fields: &mut std::collections::B
 /// and no enum value that `mcp-v0.7.0` did not write for the same invoice, so
 /// that release reads it. A field added to the line fails this: leave it out
 /// when it is empty, or raise the release ADR 0004 and the release notes name.
-/// The line holds `sales_ledgers`, which `mcp-v0.6.0` and `mcp-v0.6.1` do not
-/// know, so no earlier release reads it.
+/// `mcp-v0.6.0` does not know `sales_ledgers`, which the line holds.
+///
+/// The same line is then given what the replay never writes: a party GSTIN,
+/// one HSN warning of each code and level, and one item in each of the
+/// cash-in-hand and approval lists. It is read and written again by this
+/// build's own types, so a member added under any of them shows.
 #[tokio::test]
 async fn the_sales_line_this_build_writes_is_read_by_mcp_v0_7_0() {
     let run = pilot_post_changed(&[]).await;
@@ -8020,7 +8060,7 @@ async fn the_sales_line_this_build_writes_is_read_by_mcp_v0_7_0() {
     assert_eq!(line["vouchers"][0]["voucher_type"], "Sales");
     let mut written = std::collections::BTreeSet::new();
     journal_line_fields(&line, "", &mut written);
-    let released: std::collections::BTreeSet<String> = MCP_V0_7_0_SALES_LINE_FIELDS
+    let mut released: std::collections::BTreeSet<String> = MCP_V0_7_0_SALES_LINE_FIELDS
         .iter()
         .map(|field| field.to_string())
         .collect();
@@ -8030,6 +8070,41 @@ async fn the_sales_line_this_build_writes_is_read_by_mcp_v0_7_0() {
         "fields mcp-v0.7.0 never wrote, so it refuses the journal: {unknown:?}"
     );
     assert!(written.contains("/vouchers[]/invoice/observed/sales_ledgers"));
+
+    let mut filled = line.clone();
+    let warning = |code: &str, level: Value| json!({"code": code, "ledger": "Sales", "level": level, "characters": 4});
+    let observed = &mut filled["vouchers"][0]["invoice"]["observed"];
+    observed["party_gstin"] = json!("registered");
+    observed["hsn_warnings"] = json!([
+        warning("hsn_warning_not_digits", json!("ledger")),
+        warning("hsn_warning_not_six_digits", json!("company")),
+        warning(
+            "hsn_warning_not_a_sac_for_services",
+            json!({"group": "Sales Sub"})
+        ),
+        warning("hsn_warning_sac_for_goods", json!("ledger")),
+        warning("hsn_warning_type_of_supply_not_judged", json!("ledger")),
+    ]);
+    filled["cash_in_hand_ledgers"] = json!([{
+        "bridge_txn_id": line["vouchers"][0]["bridge_txn_id"],
+        "ledger": "Cash",
+    }]);
+    filled["on_account_approved"] = json!([{"ledger": "Walk-in", "party_digest": "digest"}]);
+    let typed: ImportLedgerLine = serde_json::from_value(filled).unwrap();
+    let mut written = std::collections::BTreeSet::new();
+    journal_line_fields(&serde_json::to_value(&typed).unwrap(), "", &mut written);
+    let filled_fields: std::collections::BTreeSet<String> = MCP_V0_7_0_FILLED_LINE_FIELDS
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
+    let unwritten: Vec<&String> = filled_fields.difference(&written).collect();
+    assert!(unwritten.is_empty(), "the filled line lost: {unwritten:?}");
+    released.extend(filled_fields);
+    let unknown: Vec<&String> = written.difference(&released).collect();
+    assert!(
+        unknown.is_empty(),
+        "fields mcp-v0.7.0 does not know, so it refuses the journal: {unknown:?}"
+    );
 }
 
 /// The post was refused in the queue, loud and before anything was recorded or

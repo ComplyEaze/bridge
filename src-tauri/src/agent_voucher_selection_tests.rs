@@ -1340,6 +1340,41 @@ async fn vouchers_returns_e_invoice_details_only_when_asked() {
     assert!(!plain.to_string().contains("e_invoice"), "{plain}");
 }
 
+/// Through the whole tool: `include_gst_details` also reads each voucher's own GST and note
+/// details (#2027); without it no row carries the key.
+#[tokio::test]
+async fn vouchers_returns_voucher_gst_details_only_when_asked() {
+    let window = || {
+        window_with_entry_gst_details().replacen(
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+            "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED><PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>\
+<GSTNATUREOFRETURN/>",
+            1,
+        )
+    };
+    let asked = call_vouchers_with(
+        vouchers_plans(window()),
+        json!({"include_gst_details": true}),
+    )
+    .await;
+    let details = asked["structuredContent"]["result"]["items"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find_map(|item| item.get("voucher_gst"))
+        .cloned()
+        .expect("a row with details");
+    assert_eq!(
+        details["place_of_supply"],
+        json!({"state": "present", "value": "Maharashtra"})
+    );
+    assert_eq!(details["note_reason"], json!({"state": "absent"}));
+    assert_eq!(details["party_note_date"], json!({"state": "not_reported"}));
+    let plain = call_vouchers_with(vouchers_plans(window()), json!({})).await;
+    assert_eq!(plain["isError"], false, "{plain}");
+    assert!(!plain.to_string().contains("voucher_gst"), "{plain}");
+}
+
 /// Through the whole tool: with `include_gst_details` the entry carries its details as sent;
 /// without it no entry carries the key.
 #[tokio::test]

@@ -2571,7 +2571,8 @@ fn captured_shape_lab_catalogue() -> String {
 }
 
 /// The captured catalogue with `Chem Supplier 4` renamed `CRLF Supplier`, so
-/// the captured CR LF ledger gains a twin that folds equal to it. This is a
+/// the captured CR LF ledger gains a twin that differs from it only by that
+/// line break. This is a
 /// test-local rewrite of captured bytes: it exercises Bridge's own refusal, and
 /// is no evidence of what Tally does with such a pair.
 fn shape_lab_catalogue_with_folded_twin() -> String {
@@ -2584,6 +2585,73 @@ fn shape_lab_catalogue_with_folded_twin() -> String {
     let twinned = captured.replace("Chem Supplier 4", "CRLF Supplier");
     assert_eq!(twinned.matches("CRLF Supplier").count(), 4);
     twinned
+}
+
+/// #626, P1: a pair is admitted only on the shape it was posted on (§9.4e): a
+/// Payment with the ledger on its debit side alone and off bill-wise. The rest
+/// keeps the refusal, for either spelling of the pair.
+#[test]
+fn a_line_break_pair_is_admitted_on_the_measured_shape_alone() {
+    const COMPANY: &str = "BRIDGE SHAPE LAB";
+    let catalogue_of = |xml: String| {
+        crate::tally::standard_ledger_catalog::parse_import_ledger_catalog_response(
+            &xml,
+            COMPANY,
+            SHAPE_LAB_GUID,
+        )
+        .unwrap()
+    };
+    let flat = catalogue_of(shape_lab_catalogue_with_folded_twin());
+    let bill_wise = catalogue_of(crate::agent::agent_import::tests::with_bill_wise_flags(
+        &shape_lab_catalogue_with_folded_twin(),
+        &["CRLF Supplier", "CRLF Supplier\r\n"],
+    ));
+    for pair in ["CRLF Supplier", "CRLF Supplier\r\n"] {
+        let requested = vec![pair.to_string(), "Cash".to_string()];
+        let admitted =
+            |batch: &ImportPayload, catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2| {
+                let twins = folded_twins(
+                    &requested,
+                    catalogue.catalog().parents(),
+                    catalogue.catalog().aliases(),
+                );
+                assert_eq!(twins.len(), 1, "{pair:?}");
+                twins[0]
+                    .admitted_pair(&requested, &batch.vouchers, catalogue)
+                    .is_some()
+            };
+        let debit = [(pair, "1.00", "Dr"), ("Cash", "1.00", "Cr")];
+        let credit = [("Cash", "1.00", "Dr"), (pair, "1.00", "Cr")];
+        assert!(admitted(&multi_entry_batch("Payment", &debit), &flat));
+        // The party of a Receipt, and the money leg of a Payment.
+        assert!(!admitted(&multi_entry_batch("Receipt", &credit), &flat));
+        assert!(!admitted(&multi_entry_batch("Payment", &credit), &flat));
+        // Both sides of one Payment.
+        let both = [
+            (pair, "1.00", "Dr"),
+            (pair, "1.00", "Cr"),
+            ("Cash", "1.00", "Cr"),
+            ("Cash", "1.00", "Dr"),
+        ];
+        assert!(!admitted(&multi_entry_batch("Payment", &both), &flat));
+        for voucher_type in ["Journal", "Contra", "Receipt"] {
+            assert!(
+                !admitted(&multi_entry_batch(voucher_type, &debit), &flat),
+                "{voucher_type}"
+            );
+        }
+        // A bill-wise line.
+        assert!(!admitted(&multi_entry_batch("Payment", &debit), &bill_wise));
+        // A batch of which one voucher is unmeasured.
+        let mut mixed = multi_entry_batch("Payment", &debit);
+        mixed
+            .vouchers
+            .extend(multi_entry_batch("Receipt", &credit).vouchers);
+        assert!(!admitted(&mixed, &flat));
+        // Named only outside the vouchers, as a statement's facts can.
+        let elsewhere = multi_entry_batch("Payment", &[("Cash", "1.00", "Dr")]);
+        assert!(!admitted(&elsewhere, &flat));
+    }
 }
 
 /// The paired identity read, then the bracketed paired catalogue read, for
@@ -2674,12 +2742,34 @@ async fn validate_masters_marks_both_spellings_of_a_folded_twin_unimportable() {
     assert_eq!(simulator.finish().unwrap().len(), plans.len());
 }
 
+/// #626: a request that names one ledger of a line-break pair by its exact
+/// bytes is importable; `validate_masters_marks_both_spellings` is the same
+/// pair named together.
+#[tokio::test]
+async fn validate_masters_admits_one_exact_ledger_of_a_line_break_pair() {
+    for ledger in ["CRLF Supplier\r\n", "CRLF Supplier"] {
+        let plans = shape_lab_catalogue_plans(&shape_lab_catalogue_with_folded_twin());
+        let simulator = SequenceSimulator::spawn(plans).expect("shape lab plan");
+        let directory = tempfile::tempdir().unwrap();
+        let server = bank_server(directory.path(), simulator.address().port());
+        let outcome = server
+            .validate_masters(&json!({"company_guid":SHAPE_LAB_GUID,"ledgers":[ledger]}))
+            .await
+            .unwrap();
+        let master = &outcome.payload["result"]["masters"][0];
+        assert_eq!(master["importable"], true, "{master}");
+        assert!(master.get("folded_twins").is_none(), "{master}");
+    }
+}
+
 #[tokio::test]
 async fn a_build_naming_either_spelling_of_a_folded_twin_is_refused_without_a_file() {
-    for ledger in ["CRLF Supplier\r\n", "CRLF Supplier"] {
+    // Differs by more than the line break, so no pair is admitted.
+    let catalogue = captured_shape_lab_catalogue().replace("Chem Supplier 4", "crlf supplier");
+    for ledger in ["CRLF Supplier\r\n", "crlf supplier"] {
         let plans = [
             mode_tests::licensed_import_probe(),
-            shape_lab_catalogue_plans(&shape_lab_catalogue_with_folded_twin()),
+            shape_lab_catalogue_plans(&catalogue),
         ]
         .concat();
         let simulator = SequenceSimulator::spawn(plans.clone()).expect("shape lab plan");

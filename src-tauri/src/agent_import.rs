@@ -551,13 +551,132 @@ pub(super) struct CashInHandLedger {
 /// so one whose alias folds equal to the name is in the family too (#1688).
 /// Tally's import lookup also matches names loosely (§9.4d), and which of two
 /// such ledgers it would post to is not established, so a build naming either
-/// is refused.
+/// is refused, except for a [`LineBreakTwin`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct FoldedTwins {
     requested: String,
     live: Vec<(String, Option<String>)>,
     /// For a live ledger in the family only through an alias of it: that alias.
     through_alias: BTreeMap<String, String>,
+    /// Whether any ledger of the family has an alias that folds equal to it.
+    has_alias: bool,
+}
+
+/// A ledger named by its exact bytes whose one twin differs from it only by a
+/// trailing CR LF, in another row of the book. Tally posted to the ledger whose
+/// bytes were sent, in both creation orders (protocol reference §9.4e), so the
+/// pair is not refused on the shape that was measured, and the dialog names both
+/// (bridge#626).
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LineBreakTwin {
+    named: String,
+    named_group: String,
+    other: String,
+    other_group: String,
+}
+
+impl LineBreakTwin {
+    /// Whether every voucher naming this ledger is the one shape a pair was
+    /// posted on (protocol reference §9.4e), and at least one does: a Payment,
+    /// which carries no invoice, with the ledger off bill-wise and on the debit
+    /// side alone. That is the leg Bridge writes as the party, which Tally read
+    /// back as the credit ledger, never a pair. Every other shape is unmeasured
+    /// and refused.
+    fn on_the_measured_shape(
+        &self,
+        vouchers: &[ImportVoucher],
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> bool {
+        let off_bill_wise = catalogue.bill_wise_flags().any(|(name, _, flag)| {
+            name == self.named && flag == bridge_tally_protocol::BillWiseFlag::Off
+        });
+        let mut naming = vouchers
+            .iter()
+            .filter(|voucher| {
+                voucher
+                    .entries
+                    .iter()
+                    .any(|entry| entry.ledger == self.named)
+            })
+            .peekable();
+        off_bill_wise
+            && naming.peek().is_some()
+            && naming.all(|voucher| {
+                matches!(voucher.voucher_type, VoucherType::Payment)
+                    && voucher
+                        .entries
+                        .iter()
+                        .filter(|entry| entry.ledger == self.named)
+                        .all(|entry| entry.side == EntrySide::Dr)
+            })
+    }
+}
+
+impl FoldedTwins {
+    /// This family as a [`LineBreakTwin`], when it is exactly such a pair and
+    /// the batch's `requested` names do not take both of it. Every other family
+    /// is refused: a name that only folds, case or spacing twins, a third
+    /// ledger, and any alias.
+    fn line_break_twin(&self, requested: &[String]) -> Option<LineBreakTwin> {
+        let [first, second] = self.live.as_slice() else {
+            return None;
+        };
+        if self.has_alias {
+            return None;
+        }
+        let (named, other) = if first.0 == self.requested {
+            (first, second)
+        } else if second.0 == self.requested {
+            (second, first)
+        } else {
+            return None;
+        };
+        let (plain, broken) = if named.0.ends_with("\r\n") {
+            (&other.0, &named.0)
+        } else {
+            (&named.0, &other.0)
+        };
+        if plain.contains(['\r', '\n'])
+            || broken.strip_suffix("\r\n") != Some(plain.as_str())
+            || requested.contains(&other.0)
+        {
+            return None;
+        }
+        let group = |parent: &Option<String>| {
+            parent
+                .as_deref()
+                .map(|parent| bridge_tally_protocol::tally_root_as_sent(parent).to_string())
+        };
+        Some(LineBreakTwin {
+            named: named.0.clone(),
+            named_group: group(&named.1)?,
+            other: other.0.clone(),
+            other_group: group(&other.1)?,
+        })
+    }
+}
+
+impl FoldedTwins {
+    /// This family as a [`LineBreakTwin`] a batch may post: the pair, on the
+    /// shape it was measured on. Any other family is refused.
+    fn admitted_pair(
+        &self,
+        requested: &[String],
+        vouchers: &[ImportVoucher],
+        catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+    ) -> Option<LineBreakTwin> {
+        self.line_break_twin(requested)
+            .filter(|twin| twin.on_the_measured_shape(vouchers, catalogue))
+    }
+}
+
+/// The families of `twins` a list of `requested` names, with no voucher to
+/// judge, does not hold as a pair.
+fn refused_twins(twins: Vec<FoldedTwins>, requested: &[String]) -> Vec<FoldedTwins> {
+    twins
+        .into_iter()
+        .filter(|twins| twins.line_break_twin(requested).is_none())
+        .collect()
 }
 
 /// The requested names that fold equal to two or more live ledgers, in the
@@ -615,6 +734,7 @@ fn folded_twins<'a>(
                 .filter(|(index, _)| !family.contains(*index))
                 .map(|(index, alias)| (catalogue[*index].0.to_string(), alias.to_string()))
                 .collect::<BTreeMap<_, _>>();
+            let has_alias = !aliased.is_empty();
             family.extend(aliased.keys().copied());
             (family.len() > 1).then(|| FoldedTwins {
                 requested: name.clone(),
@@ -626,6 +746,7 @@ fn folded_twins<'a>(
                     })
                     .collect(),
                 through_alias,
+                has_alias,
             })
         })
         .collect()
@@ -657,7 +778,7 @@ fn annotate_folded_twins<'a>(
     catalogue: impl Iterator<Item = (&'a str, Option<&'a str>)>,
     aliases: impl Iterator<Item = (&'a str, &'a str)>,
 ) {
-    let twins = folded_twins(requested, catalogue, aliases);
+    let twins = refused_twins(folded_twins(requested, catalogue, aliases), requested);
     for (entry, name) in report.iter_mut().zip(requested) {
         if let Some(found) = twins.iter().find(|twins| &twins.requested == name) {
             entry["folded_twins"] = folded_live_ledgers_json(found);
@@ -4732,7 +4853,14 @@ fn unbindable_masters(
             requested_names,
             ledger_masters.catalog().parents(),
             ledger_masters.catalog().aliases(),
-        ),
+        )
+        .into_iter()
+        .filter(|twins| {
+            twins
+                .admitted_pair(requested_names, vouchers, ledger_masters)
+                .is_none()
+        })
+        .collect(),
         vouchers,
         |twins| twins.requested.as_str(),
     );

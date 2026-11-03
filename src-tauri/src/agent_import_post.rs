@@ -975,19 +975,30 @@ impl Server {
             // A ledger that now folds equal to another live ledger could be
             // taken for it by Tally's import lookup (bridge#626). Refused as the
             // build refuses it, including for a batch built before the twin
-            // appeared or before the build checked for one.
-            if !folded_twins(
-                &requested_ledger_names(&payload),
+            // appeared or before the build checked for one. A pair that differs
+            // only by a trailing line break goes on, on the shape it was measured
+            // on, for the dialog to name; the desktop's review does not name one,
+            // so it refuses that too.
+            let requested = requested_ledger_names(&payload);
+            let twins = folded_twins(
+                &requested,
                 catalogue_identities.catalog().parents(),
                 catalogue_identities.catalog().aliases(),
-            )
-            .is_empty()
+            );
+            let line_break_twins = twins
+                .iter()
+                .filter_map(|twins| {
+                    twins.admitted_pair(&requested, &payload.vouchers, &catalogue_identities)
+                })
+                .collect::<Vec<_>>();
+            if line_break_twins.len() < twins.len()
+                || (scope == PostScope::JournalOnly && !twins.is_empty())
             {
                 return Err("ledger_has_folded_twin".to_string().into());
             }
             let ledger_binding = catalogue_identities
                 .catalog()
-                .bind_selected(requested_ledger_names(&payload))
+                .bind_selected(requested.clone())
                 .map_err(|_| "import_masters_changed".to_string())?;
             // The same ledgers must still carry the GUIDs the build bound them
             // to (#239): a name alone cannot tell a ledger renamed and replaced
@@ -1005,6 +1016,28 @@ impl Server {
                     ToolFailure::from(refusal.code().to_string())
                 },
             )?;
+            // The other ledger of each shown pair joins the binding, so the
+            // approval and the queue's GUID check hold it too, and the queue
+            // refuses a twin this dialog did not name.
+            let (ledger_binding, preview, preview_lists_vouchers) = if line_break_twins.is_empty() {
+                (ledger_binding, preview, preview_lists_vouchers)
+            } else {
+                let shown = review_preview_with_twins(
+                    &line,
+                    &self.settings.endpoint,
+                    form,
+                    &line_break_twins,
+                )?;
+                let others = line_break_twins.iter().map(|twin| twin.other.clone());
+                (
+                    catalogue_identities
+                        .catalog()
+                        .bind_selected(requested.iter().cloned().chain(others))
+                        .map_err(|_| "import_masters_changed".to_string())?,
+                    shown.text,
+                    shown.lists_vouchers,
+                )
+            };
             // A ledger switched to bill-wise since the build would take an entry
             // On Account unseen: only the ledgers the person approved may be
             // bill-wise now. Judged after the identity binding, so a ledger
@@ -2608,6 +2641,7 @@ fn recheck_import_admission(
     let parents = catalogue.catalog();
     // Nor can the binding see a ledger added since approval that folds equal to
     // a named one, which Tally's import lookup could take for it (bridge#626).
+    // Only the pair the dialog named goes on: its other ledger is in the binding.
     let named = line
         .vouchers
         .iter()
@@ -2616,7 +2650,19 @@ fn recheck_import_admission(
         .collect::<std::collections::BTreeSet<_>>()
         .into_iter()
         .collect::<Vec<_>>();
-    if !folded_twins(&named, parents.parents(), parents.aliases()).is_empty() {
+    let shown = |twins: &FoldedTwins| {
+        twins
+            .admitted_pair(&named, &line.vouchers, &catalogue)
+            .is_some_and(|twin| {
+                ledger_binding
+                    .pairs()
+                    .any(|(name, _)| name == twin.other.as_str())
+            })
+    };
+    if !folded_twins(&named, parents.parents(), parents.aliases())
+        .iter()
+        .all(shown)
+    {
         return Err(ApprovedImportAdmissionError::LedgerFoldedTwin.into());
     }
     // A ledger switched to bill-wise since the build would take an entry On
@@ -3245,6 +3291,25 @@ pub(super) fn review_preview_for_form(
             })
         }
     }
+}
+
+/// [`review_preview_for_form`] of a post whose ledgers have line-break twins,
+/// which only the post's own catalogue read finds.
+fn review_preview_with_twins(
+    line: &ImportLedgerLine,
+    endpoint: &super::super::TallyEndpointConfig,
+    form: PreviewForm,
+    twins: &[super::LineBreakTwin],
+) -> Result<ShownPreview, String> {
+    let footer = line_break_twin_lines(twins)
+        .map_err(ReviewTextRefusal::import_code)?
+        .into_iter()
+        .chain(agent_post_timing_lines())
+        .collect::<Vec<_>>();
+    review_text(line, endpoint, &footer, form).map(|shown| ShownPreview {
+        lists_vouchers: shown.lists_vouchers(),
+        text: shown.into_string(),
+    })
 }
 
 /// A preview and whether it lists the batch's vouchers one line each: what the
@@ -4178,6 +4243,39 @@ pub(super) fn line_break_note(names: &[ReviewLedgerName<'_>]) -> Option<&'static
         .iter()
         .any(|name| name.ends_in_line_break())
         .then_some(LINE_BREAK_NOTE)
+}
+
+/// The lines that name both ledgers of each pair and say which one is used.
+/// The name is written without its line break and the words say which has it,
+/// so the only marked name in a text is one the voucher lines show.
+fn line_break_twin_lines(twins: &[super::LineBreakTwin]) -> Result<Vec<String>, ReviewTextRefusal> {
+    let mut lines = Vec::with_capacity(twins.len() * 2);
+    for twin in twins {
+        let name = super::without_trailing_crlf(&twin.named);
+        if let Some(refusal) = [name, &twin.named_group, &twin.other_group]
+            .into_iter()
+            .filter_map(ReviewTextRefusal::of)
+            .min()
+        {
+            return Err(refusal);
+        }
+        let quoted = |text: &str| serde_json::to_string(text).expect("string serialization");
+        let (used, not_used) = if twin.named.ends_with("\r\n") {
+            ("line break at its end", "no line break at its end")
+        } else {
+            ("no line break at its end", "line break at its end")
+        };
+        let name = quoted(name);
+        lines.push(format!(
+            "Used: {name}, {used}, group {}",
+            quoted(&twin.named_group)
+        ));
+        lines.push(format!(
+            "Not used: {name}, {not_used}, group {}",
+            quoted(&twin.other_group)
+        ));
+    }
+    Ok(lines)
 }
 
 /// Checks every value a dialog shows: `text` under the plain rules and

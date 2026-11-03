@@ -681,7 +681,10 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         } else {
             VoucherReadShape::EntryWildcard
         }
-        .asking(e_invoice);
+        .asking(NamedVoucherFields {
+            e_invoice,
+            gst: VoucherGstFields::following(shown.2),
+        });
         let read = server
             .read_entry_window_rows(
                 &identity,
@@ -1411,12 +1414,15 @@ async fn read_entry_window_rows_reading_gst<R: WindowReader>(
                 xml,
                 identity.company_guid(),
                 gst,
-                shape.e_invoice(),
+                shape.named_fields(),
             ),
-            VoucherComposites::Refuse => {
-                parse_agent_rows_reading_gst(xml, identity.company_guid(), gst, shape.e_invoice())
-                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect())
-            }
+            VoucherComposites::Refuse => parse_agent_rows_reading_gst(
+                xml,
+                identity.company_guid(),
+                gst,
+                shape.named_fields(),
+            )
+            .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
         },
     )
     .await

@@ -49,13 +49,14 @@ pub(super) const AGENT_VOUCHER_FETCH: &str =
 GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
 REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
 
-/// [`AGENT_VOUCHER_FETCH`] with a voucher's e-invoice details, sent only when a `vouchers` call
-/// asks for them (#1378), so every other read's request stays the one the lab sent (protocol
-/// reference §8.2j).
-const AGENT_VOUCHER_E_INVOICE_FETCH: &str =
-    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
-GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
-REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE,IRN,IRNACKNO,IRNACKDATE";
+/// A voucher's e-invoice details, added to [`AGENT_VOUCHER_FETCH`] only when a `vouchers` call asks
+/// for them (#1378), so every other read's request stays the one the lab sent (protocol reference
+/// §8.2j).
+const AGENT_VOUCHER_E_INVOICE_WORDS: &str = ",IRN,IRNACKNO,IRNACKDATE";
+
+/// A voucher's GST and note details, added the same way (#2027, protocol reference §8.2k).
+const AGENT_VOUCHER_GST_WORDS: &str = ",PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,\
+GSTNATUREOFRETURN,VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE";
 
 /// The window read's list without `REFERENCEDATE`: the list every ledger-scoped window read the lab
 /// sent carried (the bill trail's, #1356, on two books), and the book-wide window reads it was
@@ -161,20 +162,28 @@ pub(super) fn render_agent_class_vouchers_in_span(
 }
 
 /// [`render_agent_vouchers_in_span`] or, with `classes`, [`render_agent_class_vouchers_in_span`],
-/// naming the e-invoice details as well.
-pub(super) fn render_agent_e_invoice_vouchers_in_span(
+/// naming `fields` as well, after the plain list and in one order.
+pub(super) fn render_agent_named_vouchers_in_span(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
     span: Option<AlterIdSpan>,
+    fields: NamedVoucherFields,
     classes: bool,
 ) -> Result<String, String> {
+    let mut fetch = AGENT_VOUCHER_FETCH.to_string();
+    if fields.e_invoice == EInvoiceFields::Asked {
+        fetch.push_str(AGENT_VOUCHER_E_INVOICE_WORDS);
+    }
+    if fields.gst == VoucherGstFields::Asked {
+        fetch.push_str(AGENT_VOUCHER_GST_WORDS);
+    }
     render_windowed_vouchers(
         company,
         from,
         to,
         &span.map(AlterIdSpan::filter).unwrap_or_default(),
-        AGENT_VOUCHER_E_INVOICE_FETCH,
+        &fetch,
         &if classes {
             voucher_type_class_computes()
         } else {
@@ -840,13 +849,17 @@ mod sealed_read_tests {
             )
             .unwrap(),
         ];
+        let named = NamedVoucherFields {
+            e_invoice: EInvoiceFields::Asked,
+            gst: VoucherGstFields::Asked,
+        };
         for shape in [
             super::super::voucher_window::VoucherReadShape::ImportVerification,
             super::super::voucher_window::VoucherReadShape::Movement,
             super::super::voucher_window::VoucherReadShape::EntryWildcard,
             super::super::voucher_window::VoucherReadShape::ClassEntryWildcard,
-            super::super::voucher_window::VoucherReadShape::EInvoiceEntryWildcard,
-            super::super::voucher_window::VoucherReadShape::EInvoiceClassEntryWildcard,
+            super::super::voucher_window::VoucherReadShape::EntryWildcard.asking(named),
+            super::super::voucher_window::VoucherReadShape::ClassEntryWildcard.asking(named),
         ] {
             for part_span in [None, Some(span)] {
                 reads

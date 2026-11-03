@@ -69,27 +69,30 @@ pub(super) enum VoucherReadShape {
     /// `render_agent_class_vouchers_in_span`: the entry wildcard plus each
     /// row's voucher type resolved by Tally (bridge#625).
     ClassEntryWildcard,
-    /// [`Self::EntryWildcard`] naming the e-invoice details (#1378).
-    EInvoiceEntryWildcard,
-    /// [`Self::ClassEntryWildcard`] naming the e-invoice details (#1378).
-    EInvoiceClassEntryWildcard,
+    /// [`Self::EntryWildcard`] naming fields the plain list leaves out (#1378, #2027).
+    NamedEntryWildcard(NamedVoucherFields),
+    /// [`Self::ClassEntryWildcard`] naming them.
+    NamedClassEntryWildcard(NamedVoucherFields),
 }
 
 impl VoucherReadShape {
-    /// This shape as a read that `e_invoice` says asked for the details.
-    pub(super) const fn asking(self, e_invoice: EInvoiceFields) -> Self {
-        match (self, e_invoice) {
-            (Self::EntryWildcard, EInvoiceFields::Asked) => Self::EInvoiceEntryWildcard,
-            (Self::ClassEntryWildcard, EInvoiceFields::Asked) => Self::EInvoiceClassEntryWildcard,
-            (shape, _) => shape,
+    /// This shape as a read that names `fields`, the same shape when `fields` names none.
+    pub(super) const fn asking(self, fields: NamedVoucherFields) -> Self {
+        if !fields.names_any() {
+            return self;
+        }
+        match self {
+            Self::EntryWildcard => Self::NamedEntryWildcard(fields),
+            Self::ClassEntryWildcard => Self::NamedClassEntryWildcard(fields),
+            shape => shape,
         }
     }
 
-    /// Whether this shape's request named the e-invoice details.
-    pub(super) const fn e_invoice(self) -> EInvoiceFields {
+    /// The fields this shape's request named beyond the plain list.
+    pub(super) const fn named_fields(self) -> NamedVoucherFields {
         match self {
-            Self::EInvoiceEntryWildcard | Self::EInvoiceClassEntryWildcard => EInvoiceFields::Asked,
-            _ => EInvoiceFields::NotAsked,
+            Self::NamedEntryWildcard(fields) | Self::NamedClassEntryWildcard(fields) => fields,
+            _ => NamedVoucherFields::NOT_ASKED,
         }
     }
 
@@ -110,8 +113,8 @@ impl VoucherReadShape {
             // well inside the margin above the 256 KB measured.
             Self::EntryWildcard
             | Self::ClassEntryWildcard
-            | Self::EInvoiceEntryWildcard
-            | Self::EInvoiceClassEntryWildcard => 384 * 1024,
+            | Self::NamedEntryWildcard(_)
+            | Self::NamedClassEntryWildcard(_) => 384 * 1024,
         }
     }
 
@@ -131,8 +134,8 @@ impl VoucherReadShape {
             Self::Movement
             | Self::EntryWildcard
             | Self::ClassEntryWildcard
-            | Self::EInvoiceEntryWildcard
-            | Self::EInvoiceClassEntryWildcard => "voucher_window_day_not_readable",
+            | Self::NamedEntryWildcard(_)
+            | Self::NamedClassEntryWildcard(_) => "voucher_window_day_not_readable",
         }
     }
 
@@ -164,11 +167,11 @@ impl VoucherReadShape {
             (Self::ClassEntryWildcard, _) => {
                 render_agent_class_vouchers_in_span(company, from, to, span)
             }
-            (Self::EInvoiceEntryWildcard, _) => {
-                render_agent_e_invoice_vouchers_in_span(company, from, to, span, false)
+            (Self::NamedEntryWildcard(fields), _) => {
+                render_agent_named_vouchers_in_span(company, from, to, span, fields, false)
             }
-            (Self::EInvoiceClassEntryWildcard, _) => {
-                render_agent_e_invoice_vouchers_in_span(company, from, to, span, true)
+            (Self::NamedClassEntryWildcard(fields), _) => {
+                render_agent_named_vouchers_in_span(company, from, to, span, fields, true)
             }
         }
     }

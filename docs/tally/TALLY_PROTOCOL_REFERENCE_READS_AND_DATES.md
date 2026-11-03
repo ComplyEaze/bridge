@@ -825,6 +825,15 @@ sends (`ALLLEDGERENTRIES.*` in the `FETCH` list, §8.2c).
 - **Keyed by hand, with no portal.** The three take typed values on the voucher's `Statutory Details` sub-screen. Tally then lists the invoice under `IRN Generated` in its e-Invoice report and does not offer to generate one on save; the invoice without details drew that offer. Whether Tally checks their form was not tried.
 - **Not measured.** An import that sets them, which is why Bridge never sends them; a voucher the portal issued, which may set `IRNQRCODE` and others that stayed empty here; another release.
 
+### 8.2k A voucher's GST and note details on the voucher `FETCH` — **PARTIAL 2026-10-28; TallyPrime 7.2, one synthetic book**
+
+**Scope: TallyPrime 7.2 Silver, licensed; synthetic company `BRIDGE NOTES LAB`; a Sales, a Credit Note, a Debit Note and a Purchase of one registered party, keyed by hand, one voucher of each. Captures: `fixtures/agent/gst-note-fields-lab`.**
+
+- **Where they sit.** On a native read of the voucher, `PLACEOFSUPPLY`, `STATENAME`, `GSTREGISTRATIONTYPE`, `GSTNATUREOFRETURN`, `VATPARTYTRANSRETURNNUMBER` and `VATPARTYTRANSRETURNDATE` (`YYYYMMDD`) are direct children of `VOUCHER`. The window read the shipped build sent returned none of them. Naming fifteen further lists on the native read changed nothing, so none needs them.
+- **Which field is which.** On a note the reason is `GSTNATUREOFRETURN` (`01-Sales Return`, `04-Correction in Invoice`), empty on the Sales and the Purchase, and `VATPARTYTRANSRETURNNUMBER` and its date are the party's own note. A note's original invoice is in `REFERENCE` and `REFERENCEDATE`, which every window read already names; `ORIGINALVCHNUMBER` and `ORIGINALVCHDATE` stayed empty. Place of supply was not keyed: Tally took it from the party, and it equalled the company's own state.
+- **Partial, and what is unverified.** The six words on the window `FETCH` are a candidate of #2027: the form above comes from the native answer, and that request has not been sent to a book on this date. Bridge names them only for a `vouchers` call with `include_gst_details`. A window answer that omits an element says `not_reported`, never that the voucher lacks it.
+- **Not measured.** Unregistered parties, exports, a note without an original invoice, another release.
+
 ### 8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**
 
 **Scope: TallyPrime 7.1 Silver, licensed, one company, 28 ledger masters (2026-09-12) and 36 (2026-09-30).** Captured from

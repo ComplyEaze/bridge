@@ -2495,6 +2495,16 @@ fn present_txn_ids(result: &Value) -> Vec<String> {
         .collect()
 }
 
+/// The batch's rows the book already holds, by the post's own rule: the ids
+/// `post_import` would name in `import_preexisting_identity` for this read, or
+/// `None` when it would not refuse. A result that disagrees with itself (a count
+/// that is not the row count) is refused there with no row to name, and says
+/// nothing here: the post decides, never a guess.
+pub(super) fn rows_already_in_book(result: &Value, voucher_count: usize) -> Option<Vec<String>> {
+    require_absent_verification_result(result, voucher_count).err()?;
+    Some(present_txn_ids(result)).filter(|ids| !ids.is_empty())
+}
+
 /// What to do when a batch's rows are already in the book, or look like rows
 /// that are (#901). It names no amount, ledger or narration.
 const PREEXISTING_ROWS_NEXT_STEP: &str = "Nothing was sent. The rows listed in error.preexisting_txn_ids each look like a voucher already in the book that this batch did not post: an earlier batch's, or one entered by hand. Rows with the same date, type, ledgers, amounts and sides match the same voucher, so no more of them are in the book than Tally holds vouchers: count them in Tally. Open the matching voucher and confirm it is a regular voucher (if it is optional or post-dated, ask the user what it should be, and leave the row out until then) and the same bank row as the statement's. If it is, the row is in the book: leave it out. If you cannot find the voucher, do not enter the row by hand: build the batch again and ComplyEaze Bridge checks the book again; if the voucher is there it refuses again, and if no voucher with that fingerprint is there it can go on to approval. If it is refused again and you still cannot find the voucher, ask the user, and never change a row (its date, ledger, type or amount) to get it past this check. For a genuinely different transaction (the statement has more rows with this date, ledgers and amount than Tally holds vouchers) that shares the fingerprint of a voucher you have opened and confirmed, ComplyEaze Bridge cannot post the extra row yet: leave it out of this batch and tell the user so. Then build the other rows again without it so those post; a rebuilt batch can be refused again, naming rows this answer did not list. Cut inline batches on whole days, so same-day rows of one amount are not split across batches.";

@@ -4947,6 +4947,50 @@ fn before_approval_on_a_book_holding_a_twin() -> Vec<ScenarioPlan> {
     plans
 }
 
+/// The reads up to the absence check, on the captured book: it holds the
+/// captured Journal, which a batch of the same row under another batch id
+/// matches by content.
+fn before_approval_on_the_captured_book() -> Vec<ScenarioPlan> {
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(probe());
+    plans
+}
+
+/// #2152: the post of the captured row under a batch id of its own names the
+/// transaction id that the build's test pins (`rebuild_warning_tests::TXN`, the
+/// one constant both read), on the same captured window. One server cannot build
+/// and then post here: the build harness and this one serve different company
+/// listings, and the post of a built batch is refused as
+/// `company_identity_mismatch` before it reads the book.
+#[tokio::test]
+async fn the_post_of_a_rebuilt_row_names_the_id_the_build_test_pins() {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(before_approval_on_the_captured_book())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let rebuilt = "bridge-00000000-0000-4000-8000-000000002152";
+    saved_captured_line_edited(&server, |line| line.batch_id = rebuilt.into());
+    let refused = server
+        .call_tool(
+            "post_import",
+            json!({"company_guid":GUID,"batch_id":rebuilt}),
+        )
+        .await;
+    let _ = sent(simulator);
+    let error = &refused["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
+    assert_eq!(
+        error["preexisting_txn_ids"],
+        json!([crate::agent::agent_import::tests::rebuild_warning_tests::TXN]),
+        "{refused}"
+    );
+}
+
 /// A batch one of whose rows the book already holds is refused before the dialog
 /// and names that row, with the way on (#901). Before, the answer was a bare
 /// code an agent could not act on.

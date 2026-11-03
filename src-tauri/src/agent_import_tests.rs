@@ -3998,10 +3998,13 @@ mod verify_mode_tests;
 mod identity_tests;
 
 #[path = "agent_import_amend_tests.rs"]
-mod amend_tests;
+pub(super) mod amend_tests;
 
 #[path = "agent_import_text_tests.rs"]
 mod text_tests;
+
+#[path = "agent_import_rebuild_warning_tests.rs"]
+pub(super) mod rebuild_warning_tests;
 
 #[tokio::test]
 async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads() {

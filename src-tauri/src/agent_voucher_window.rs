@@ -119,6 +119,9 @@ impl VoucherReadShape {
             // The class COMPUTEs add about 1.2 KB of UTF-16 per voucher
             // (ten elements at ~120 bytes, measured one at a time on 7.1),
             // well inside the margin above the 256 KB measured.
+            // The stock-line shape measured 35.2 to 36.2 KB of UTF-16 per voucher with one or
+            // two lines on one synthetic book (§11c.1), about 33 KiB a line: a voucher of more
+            // than about ten lines passes this default, which sizes only the first part.
             Self::EntryWildcard
             | Self::ClassEntryWildcard
             | Self::EInvoiceEntryWildcard

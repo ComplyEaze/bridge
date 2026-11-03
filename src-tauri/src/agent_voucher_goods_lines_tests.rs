@@ -625,7 +625,7 @@ fn a_kind_no_capture_covers_is_named_and_its_lines_are_not_read() {
         assert_eq!(row["stock_lines_not_read"], true, "{row}");
         assert!(row.get("stock_lines").is_none(), "{row}");
     }
-    // A child of Credit Note answers its class, but no capture holds one.
+    // A child of Credit Note answers its class; the reserved name decides, as on the live row.
     let child = one_note(CREDIT_NOTE, "", Some(ReservedVoucherClass::CreditNote));
     assert_eq!(child["stock_lines_not_read"], true, "{child}");
     assert!(child.get("stock_lines").is_none(), "{child}");
@@ -652,6 +652,15 @@ fn a_voucher_that_only_moves_stock_and_answers_no_line_is_unreadable() {
         assert_eq!(row["stock_lines_unreadable"], "stock_line_missing", "{row}");
         assert!(row.get("stock_lines").is_none(), "{row}");
     }
+    // A cancelled one keeps no line, as the live row's cancelled Delivery Note answered.
+    let cancelled = without_lines(DELIVERY_NOTE, "Delivery Note", None).replacen(
+        "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+        "<ISCANCELLED TYPE=\"Logical\">Yes</ISCANCELLED>",
+        1,
+    );
+    let row = stock_rows(&cancelled).remove(0);
+    assert_eq!(row["cancelled"], true, "{row}");
+    assert_eq!(row["stock_lines"], json!([]), "{row}");
 }
 
 #[test]
@@ -705,19 +714,15 @@ fn a_line_that_cannot_be_read_gives_its_reason_and_no_lines() {
 }
 
 #[test]
-fn the_stock_line_request_is_the_captured_one_with_the_class_elements() {
+fn the_stock_line_request_is_the_one_the_live_row_sent() {
     let request = utf16(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_stock_journal_inventory_shape_lab_request.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_mixed_window_stock_lines_shape_lab_request.utf16le.xml"
     ));
-    let day = bridge_tally_core::TallyDate::parse("20260511").unwrap();
+    let day = bridge_tally_core::TallyDate::parse("20260520").unwrap();
     let rendered = super::super::voucher_window::VoucherReadShape::ClassInventoryWildcard
         .render("BRIDGE SHAPE LAB", &day, &day, None)
         .unwrap();
-    assert_eq!(
-        rendered.replace(&voucher_type_class_computes(), ""),
-        request.trim_start_matches('\u{feff}')
-    );
-    assert!(rendered.contains(&voucher_type_class_computes()));
+    assert_eq!(rendered, request.trim_start_matches('\u{feff}'));
 }
 
 #[test]

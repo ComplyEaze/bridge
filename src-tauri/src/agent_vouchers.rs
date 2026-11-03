@@ -343,7 +343,7 @@ pub(super) fn summary_failure(code: String) -> ToolFailure {
 }
 
 /// Why stock lines are not compared with the Stock Summary (protocol reference §8.2i).
-const STOCK_TIE_NOT_COMPARED: &str = "no read returns the Stock Summary's inward and outward quantities, and whether a Delivery Note or Receipt Note moves it is not established. Do not sum lines across kinds: a note and its invoice can be the same goods";
+const STOCK_TIE_NOT_COMPARED: &str = "no read returns the Stock Summary's inward and outward quantities; on one book a Delivery Note moved its item's closing quantity there and no value. Do not sum lines across kinds: a note and its invoice can be the same goods";
 
 /// What a stock-line read says of the whole window, on every page: the kinds whose lines it did
 /// not read, with how many vouchers of each, and that nothing was compared.

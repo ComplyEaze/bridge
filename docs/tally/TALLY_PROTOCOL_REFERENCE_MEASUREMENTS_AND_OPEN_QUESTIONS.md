@@ -186,6 +186,7 @@ unless marked; Bridge's wire is UTF-16LE (§1.2), which costs exactly twice as m
   | Inventory-heavy trading book, whole year (16,367 vouchers, 587 MB) | named ledger-entry fields | **35.0 KB** mean |
   | Same book, one day (41 vouchers) | named ledger-entry fields | 28 KB |
   | Same book, one day | `ALLLEDGERENTRIES.*` entry wildcard | ~128 KB |
+  | Synthetic inventory book, one day (12 vouchers, 2026-11-03) | `ALLINVENTORYENTRIES.*` with the class COMPUTEs (`stock_lines`, §8.2i) | 17.6–18.1 KB with one or two lines; 2.4–2.5 KB with an empty list |
 
 - **A one-day probe understated the year on that book** (28 KB against a 35.0 KB mean). A single
   small sample is not a reliable estimator on its own.

@@ -3098,9 +3098,10 @@ const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slic
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
 const APP_STOCK_LINE_ROWS: &str = "recorded by the app crate's record (#1198 slice 2): \
-     parse_agent_rows_reading_gst asked for stock lines (#2016); this answer names no voucher \
-     type class, so its record shows the row withheld, and agent_voucher_goods_lines_tests.rs \
-     reads its lines with the class inserted";
+     parse_agent_rows_reading_gst asked for stock lines (#2016); the four answers of 28 Oct name no \
+     voucher type class, so their records show each row withheld (agent_voucher_goods_lines_tests.rs \
+     reads their lines with the class inserted), and the twelve-voucher answer of 3 Nov names one \
+     for every row";
 const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
@@ -4012,6 +4013,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
+        APP_STOCK_LINE_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_mixed_window_stock_lines_shape_lab_live.utf16le.xml",
         APP_STOCK_LINE_ROWS,
     ),
     (

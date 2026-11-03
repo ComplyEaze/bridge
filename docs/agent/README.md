@@ -2400,8 +2400,8 @@ Delivery Note, Receipt Note and Credit Note. For a Stock Journal this is the onl
 `direction`. Any other row carries `stock_lines_not_read`, and `kinds_not_read` counts them by voucher type, including a type
 made under a note or Credit Note. A Stock Journal, Delivery Note or Receipt Note that answers no line reads as
 `stock_lines_unreadable` with `stock_line_missing`. A Credit Note can be accounts only, so its `stock_lines` may be `[]`, which
-says only that this read returned no line, not that no stock moved. What Tally sends for a cancelled or optional voucher is
-not established; each is read like any other. `ledger`, `amount`, `suspense_tagged`, `summarise_by`,
+says only that this read returned no line, not that no stock moved. On one book a cancelled Delivery Note answered an empty
+list, so a cancelled voucher's `stock_lines` may be `[]` beside `cancelled: true`; an optional one answered its line. `ledger`, `amount`, `suspense_tagged`, `summarise_by`,
 `bank_allocations`, `goods_lines`, `include_gst_details` and `include_e_invoice` need ledger entries, and each is refused as
 `voucher_stock_lines_excludes_<argument>`. `stock_summary_tie` is always `not_compared`, with the reason beside it. No totals
 are given (protocol reference 8.2i).

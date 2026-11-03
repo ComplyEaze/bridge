@@ -368,9 +368,11 @@ impl StockLines {
     }
 
     /// Whether a voucher of `kind`, read here, must hold a line: one that exists only to move
-    /// stock and answers none is a read that failed, never a voucher that moved nothing.
-    fn needs_a_line(kind: Option<&ResolvedVoucherType>) -> bool {
-        kind.is_some_and(|kind| kind.reserved_name != CREDIT_NOTE_RESERVED_TYPE)
+    /// stock and answers none is a read that failed, never a voucher that moved nothing. A
+    /// cancelled one keeps no line: the live row's cancelled Delivery Note answered an empty
+    /// list (protocol reference §8.2i).
+    fn needs_a_line(kind: Option<&ResolvedVoucherType>, cancelled: bool) -> bool {
+        !cancelled && kind.is_some_and(|kind| kind.reserved_name != CREDIT_NOTE_RESERVED_TYPE)
     }
 }
 
@@ -1045,6 +1047,7 @@ fn parse_voucher_rows(
                         // Present only when the read asked Tally to resolve the
                         // row's voucher type (bridge#625).
                         let kind = resolve_row_voucher_type(&row, company_guid)?;
+                        let cancelled = required_tally_bool(row.get("ISCANCELLED"))?;
                         if read_stock {
                             if !StockLines::covers(kind.as_ref()) {
                                 parsed["stock_lines_not_read"] = Value::Bool(true);
@@ -1052,7 +1055,10 @@ fn parse_voucher_rows(
                                 match stock_lines.finish() {
                                     Ok(lines)
                                         if lines.is_empty()
-                                            && StockLines::needs_a_line(kind.as_ref()) =>
+                                            && StockLines::needs_a_line(
+                                                kind.as_ref(),
+                                                cancelled,
+                                            ) =>
                                     {
                                         parsed["stock_lines_unreadable"] =
                                             json!(GoodsLineProblem::StockLineMissing.reason());
@@ -1087,8 +1093,7 @@ fn parse_voucher_rows(
                                 parsed["effective_date"] = json!(effective);
                             }
                         }
-                        parsed["cancelled"] =
-                            Value::Bool(required_tally_bool(row.get("ISCANCELLED"))?);
+                        parsed["cancelled"] = Value::Bool(cancelled);
                         parsed["optional"] =
                             Value::Bool(required_tally_bool(row.get("ISOPTIONAL"))?);
                         // Unlike ISCANCELLED/ISOPTIONAL, ISPOSTDATED is left out by a source

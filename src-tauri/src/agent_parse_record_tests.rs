@@ -802,6 +802,11 @@ fn rows() -> Vec<Row> {
         |_, t| stock_line_rows(t, SHAPE_LAB)
     ));
     rows.push(row!(
+        "stock_movement_mixed_window_stock_lines_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
         "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
         "parse_agent_rows(BANKREF_LAB)",
         |_, t| agent_rows(t, BANKREF_LAB)

@@ -3900,6 +3900,36 @@
       "seed_basis": "synthetic lab book; see agent/gst-note-fields-lab/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "83f00cdb6dbf9f54e9d800247017a8e4e3a4962cfaeeea7ffc96d010b6797912",
       "size": 51938
+    },
+    {
+      "blob": "4deeee7f289a97a30b989d710266ae2b0fcd77fb",
+      "capture_id": "pilot-lab-invoice-readback-post-dated-no.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-s1-answers at 20ed166c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "af9cd7808856b196c9690be20541ebd88cec8dd7dd575a89530fd4a376c1af6c",
+      "size": 94474
+    },
+    {
+      "blob": "29146e668b570e6e0c4ef5e3d4ef14dfc79e2564",
+      "capture_id": "pilot-lab-invoice-readback-post-dated-yes.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-s1-answers at 20ed166c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-yes.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8da0e010b508ce6ffb9f86ccffe80d5a8abbbb92bd9620fed8996228df88f672",
+      "size": 65050
+    },
+    {
+      "blob": "c9900f609a47468e5e295c802a79bae2a666d944",
+      "capture_id": "pilot-lab-invoice-readback-post-dated.request.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "branch lab/2162-s1-sheet at 413f8b92",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21",
+      "size": 2278
     }
   ]
 }

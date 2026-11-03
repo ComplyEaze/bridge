@@ -1,0 +1,15 @@
+lines 441 open 1 close 1 tally_closed or relay_error 0 requests 438
+006-verify-batch requests 36 kinds SEESESEHSHSEEVSVSEEVSVSEEHSHSESEESES | equals the sheet False
+   voucher mark read by this call [52]
+   kind E distinct requests 1 each repeat one answer True
+   kind H distinct requests 1 each repeat one answer True
+   kind S distinct requests 1 each repeat one answer True
+   kind V distinct requests 1 each repeat one answer True
+   import verification VOUCHER rows 51 answer bytes 253468
+007-verify-pay requests 36 kinds EHSHSESEESESEHSHSEEVSVSEEVSVSEEHSHSE | equals the sheet False
+   voucher mark read by this call [52]
+   kind E distinct requests 1 each repeat one answer True
+   kind H distinct requests 1 each repeat one answer True
+   kind S distinct requests 1 each repeat one answer True
+   kind V distinct requests 1 each repeat one answer True
+   import verification VOUCHER rows 1 answer bytes 7950

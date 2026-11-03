@@ -1,0 +1,12 @@
+2026-11-03T02:42:13Z exe sha256 bb8454bc6b52fe800a61ba7faf553427ebae1948a25771a787ed0dad77ba195f ok; launch-env.json sha256 c5d4f6bb2e613f377e14a1be262aa605b365bbe2895f8bab8acf6548d941e6ea; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-03T02:42:13Z launched pid 13728; stderr to server-stderr-20261103T024213Z.log
+2026-11-03T02:42:13Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-03T02:42:18Z 000-companies.json tool=list_companies secs=0.096 isError=False error=None saved_sha256=bfe8194e19815934ab6d8518221d87a6ab3c7c2d8550b371ecd18677f39edda3
+2026-11-03T02:42:18Z 001-status.json tool=tally_status secs=0.060 isError=False error=None saved_sha256=09a48f8c4072d654fc27379f4fefc84e08cd7be5f558a5c482be4e17106095a8
+2026-11-03T02:42:23Z 002-batch-build.json tool=build_import_xml secs=4.417 isError=False error=None saved_sha256=7f8c0c24728ffe7d36418d0bf7b570f53d9e27799397c8fbcabb00ad7fb66c78
+2026-11-03T02:43:04Z 003-batch-post.json tool=post_import secs=22.477 isError=False error=None saved_sha256=d1378c81938ff64686b426768d523782d411458f1c5c8761a62d4660e861778b
+2026-11-03T02:43:34Z 004-pay-build.json tool=build_import_xml secs=5.367 isError=False error=None saved_sha256=6979e3ed31d593d9f0320ad0f26bab510089442822b40c02dfa7638c18ae58c1
+2026-11-03T02:44:02Z 005-pay-post.json tool=post_import secs=21.803 isError=False error=None saved_sha256=deea350bfb2494317c47bc90f6e3d05c5d4c08377d5c540e73a0c1eebc03fbb4
+2026-11-03T02:44:15Z 006-verify-batch.json tool=verify_import secs=3.538 isError=False error=None saved_sha256=9d27c04aa47ae0c43ea13131e5a91fe4ee6d275a3ab36c208ca9772c8d31dad3
+2026-11-03T02:44:19Z 007-verify-pay.json tool=verify_import secs=3.317 isError=False error=None saved_sha256=dcd782324b53470702079fb9b9d3fa65e69968513d9c07e14fe10c0a4bd3c4fb
+2026-11-03T02:44:30Z session ended; server pid 13728 exit code 0

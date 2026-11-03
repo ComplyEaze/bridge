@@ -1,0 +1,1 @@
+The company number: company_number values replaced by a JSON parser, then 1 more occurrence, inside the answer's text block, replaced by <company number> (run/answers/000-status.json). Lab folder and build folder paths replaced in run/client-log.txt, run/launch-env.json and scripts/. Responses and headers under evidence/ are unedited: they hold no company number.

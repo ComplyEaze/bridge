@@ -1,0 +1,5 @@
+2026-11-03T04:03:48Z exe sha256 0345e74beff3c44ff874fdb45d31306dfb8d7eb694ab0f8db66537ad6857b1bd ok; launch-env.json sha256 09675863fe710d08a65f07bf463dd5cdf069e488c46de01da3de51bce8de1d39; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-03T04:03:48Z launched pid 16448; stderr to server-stderr-20261103T040348Z.log
+2026-11-03T04:03:48Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-03T04:03:53Z 000-status.json tool=tally_status secs=0.061 isError=False error=None saved_sha256=fbfb2575c996b546f5a6f88b02362b9ed027be1c01d95786302f044d778f6b8f
+2026-11-03T04:03:54Z session ended; server pid 16448 exit code 0

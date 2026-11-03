@@ -1,0 +1,32 @@
+m1: 3400 B sha256 174d6672e4ce1d1ec2efec5dd1d0793b152cdc76d4626f27f3e3e521797c6b2e
+m2: 3400 B sha256 174d6672e4ce1d1ec2efec5dd1d0793b152cdc76d4626f27f3e3e521797c6b2e
+d12-c2: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974; voucher objects 0
+    differs from 2 Nov (d12-c, 3026 B): first differing byte offset 348; 2 Nov voucher objects 0
+d13-c2: 5432 B sha256 084d21a00b19d82b5b9717b41cf4ee56a7820ad23a9984722b491f68551b431a; voucher objects 1
+    GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000006 ALTERID 8 DATE 20260413 TYPE Contra NUMBER 6
+    differs from 2 Nov (d13-c, 5436 B): first differing byte offset 348; 2 Nov voucher objects 1
+      2 Nov: GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000006 ALTERID 8 DATE 20260413 TYPE Contra NUMBER 6
+d14-c2: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974; voucher objects 0
+    differs from 2 Nov (d14-c, 3026 B): first differing byte offset 348; 2 Nov voucher objects 0
+d19-c2: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974; voucher objects 0
+    differs from 2 Nov (d19-c, 3026 B): first differing byte offset 348; 2 Nov voucher objects 0
+d20-c2: 5432 B sha256 a556f23d90095f959444e9d2df5e29b32054eb1a7e098b92c286203352c4465b; voucher objects 1
+    GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000007 ALTERID 9 DATE 20260420 TYPE Contra NUMBER 7
+    differs from 2 Nov (d20-c, 5436 B): first differing byte offset 348; 2 Nov voucher objects 1
+      2 Nov: GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000007 ALTERID 9 DATE 20260420 TYPE Contra NUMBER 7
+d21-c2: 5434 B sha256 68de428ebfa199e402b0d7ab2ef9645ee6c6c056705e17e6dc6ad266255c66e2; voucher objects 1
+    GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000008 ALTERID 10 DATE 20260421 TYPE Contra NUMBER 8
+    differs from 2 Nov (d21-c, 5438 B): first differing byte offset 348; 2 Nov voucher objects 1
+      2 Nov: GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000008 ALTERID 10 DATE 20260421 TYPE Contra NUMBER 8
+d26-c2: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974; voucher objects 0
+    differs from 2 Nov (d26-c, 3026 B): first differing byte offset 348; 2 Nov voucher objects 0
+d27-c2: 5436 B sha256 c73299e524679e21c329ae35f3bc87462167f940537ef335fdd029f5fab117f8; voucher objects 1
+    GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000009 ALTERID 11 DATE 20260427 TYPE Payment NUMBER 1
+    differs from 2 Nov (d27-c, 5440 B): first differing byte offset 348; 2 Nov voucher objects 1
+      2 Nov: GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-00000009 ALTERID 11 DATE 20260427 TYPE Payment NUMBER 1
+d28-c2: 5438 B sha256 2a9f0aa0a65ffb486a96ebfdf9fd8d46375044f8388306bd61c920736cf09ffe; voucher objects 1
+    GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-0000000a ALTERID 12 DATE 20260428 TYPE Receipt NUMBER 1
+    differs from 2 Nov (d28-c, 5442 B): first differing byte offset 348; 2 Nov voucher objects 1
+      2 Nov: GUID d6e4c24f-8c7a-4797-93ec-e44bdff60bc9-0000000a ALTERID 12 DATE 20260428 TYPE Receipt NUMBER 1
+d29-c2: 3022 B sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974; voucher objects 0
+    differs from 2 Nov (d29-c, 3026 B): first differing byte offset 348; 2 Nov voucher objects 0

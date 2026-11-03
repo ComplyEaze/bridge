@@ -2439,6 +2439,11 @@ fn notes_lab_shipped_answer() -> String {
     ))
 }
 
+/// The answers to the window request with the six words (the 30 Oct captures of that file).
+fn notes_lab_window_answer(capture: &[u8]) -> Vec<Value> {
+    voucher_gst_of(&captured_notes_lab(capture)).unwrap()
+}
+
 fn voucher_gst_of(xml: &str) -> Result<Vec<Value>, String> {
     Ok(parse_agent_rows_reading_gst(
         xml,
@@ -2486,6 +2491,39 @@ fn each_captured_voucher_says_its_gst_and_note_details() {
             ),
             details(absent(), absent(), absent()),
         ]
+    );
+}
+
+/// The window request's own answers: a note's details, and on an inter-state Sales a keyed place of
+/// supply apart from the party's state, with each unset note field an empty element that says absent.
+#[test]
+fn each_window_answer_says_its_details_and_an_empty_note_field_says_absent() {
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/window-read-credit-note.utf16le.xml"
+        )),
+        vec![json!({
+            "place_of_supply": present("Maharashtra"),
+            "party_state": present("Maharashtra"),
+            "registration_type": present("Regular"),
+            "note_reason": present("01-Sales Return"),
+            "party_note_number": present("SYN-NOTE-1"),
+            "party_note_date": present("20250513"),
+        })]
+    );
+    let absent = json!({"state": "absent"});
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml"
+        )),
+        vec![json!({
+            "place_of_supply": present("Karnataka"),
+            "party_state": present("Maharashtra"),
+            "registration_type": present("Regular"),
+            "note_reason": absent,
+            "party_note_number": absent,
+            "party_note_date": absent,
+        })]
     );
 }
 

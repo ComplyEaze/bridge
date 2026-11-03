@@ -110,16 +110,16 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
     }
 }
 
-/// A tax ledger as the on-screen ledgers of the lab read: its own rate, no rounding.
-fn tax_rates(half: &str) -> wire::LedgerRateRow {
-    wire::LedgerRateRow {
-        gst_rows: Vec::new(),
-        rate_of_tax_calculation: Some(half.to_string()),
-        rounding_method: Some("Not Applicable".to_string()),
-        rounding_limit: Some("0".to_string()),
-        hsn: Ok(None),
-        supply: wire::SupplyType::NotJudged,
-    }
+/// One ledger's row of the lab's rate listing, read as the build reads it.
+fn lab_row(name: &str) -> wire::LedgerRateRow {
+    lab_rates(&[name]).remove(name).unwrap()
+}
+
+/// The invoice's two tax ledgers as the lab's own pair at `half` percent a
+/// head read: `BRIDGE CGST 2.5%` and its SGST for 2.5, the same at 9.
+fn set_tax_rates(facts: &mut BTreeMap<String, LedgerFacts>, half: &str) {
+    facts.get_mut("Output CGST").unwrap().rates = Some(lab_row(&format!("BRIDGE CGST {half}%")));
+    facts.get_mut("Output SGST").unwrap().rates = Some(lab_row(&format!("BRIDGE SGST {half}%")));
 }
 
 fn good_facts() -> BTreeMap<String, LedgerFacts> {
@@ -148,9 +148,7 @@ fn good_facts() -> BTreeMap<String, LedgerFacts> {
     party.bill_wise = Some(true);
     // The 18 percent of the fixture invoice: 9 and 9, IGST 18.
     facts.get_mut("Sales").unwrap().rates = Some(sales_rates("9", "18"));
-    for tax in ["Output CGST", "Output SGST"] {
-        facts.get_mut(tax).unwrap().rates = Some(tax_rates("9"));
-    }
+    set_tax_rates(&mut facts, "9");
     // The round-off ledger's empty GST row, as the lab's read.
     facts.get_mut("Round Off").unwrap().rates =
         lab_rates(&["BRIDGE Round Off"]).remove("BRIDGE Round Off");
@@ -1718,8 +1716,10 @@ fn each_rate_is_admitted_on_the_ledgers_own_rate_and_no_other() {
     let at = |ledger_half: &str, ledger_igst: &str, leg: &str, total: &str| {
         let mut facts = good_facts();
         facts.get_mut("Sales").unwrap().rates = Some(sales_rates(ledger_half, ledger_igst));
-        for tax in ["Output CGST", "Output SGST"] {
-            facts.get_mut(tax).unwrap().rates = Some(tax_rates(ledger_half));
+        // A slab the lab did not measure stops at the sales ledger, before
+        // a tax ledger is read, and no captured tax ledger stands at one.
+        if matches!(ledger_half, "2.5" | "9") {
+            set_tax_rates(&mut facts, ledger_half);
         }
         let mut v = voucher();
         v.entries[2].amount = leg.to_string();
@@ -1828,9 +1828,7 @@ fn the_rule_admits_what_tallys_gstr_1_included_and_refuses_what_it_flagged() {
     for name in ["Sales", "Sales B"] {
         facts.get_mut(name).unwrap().rates = Some(sales_rates("2.5", "5"));
     }
-    for tax in ["Output CGST", "Output SGST"] {
-        facts.get_mut(tax).unwrap().rates = Some(tax_rates("2.5"));
-    }
+    set_tax_rates(&mut facts, "2.5");
     let cents = |text: &str| -> i128 {
         let negative = text.starts_with('-');
         let (whole, fraction) = text.trim_start_matches('-').split_once('.').unwrap();
@@ -2340,24 +2338,45 @@ fn only_the_measured_rates_are_admitted_and_each_other_slab_is_refused_as_unmeas
     );
 }
 
+/// The lab's four tax ledgers stand at their own rate and at no other, and the
+/// imported one reads rate 0 and no rounding method (the `pilot-lab` rate
+/// listing): their dated GST row, or their empty one, carries no rate.
+#[test]
+fn the_labs_tax_ledgers_are_admitted_at_their_own_rate_and_refused_at_another() {
+    let check = |name: &str, half_milli| tax_ledger_refusal(&lab_row(name), half_milli);
+    for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
+        assert_eq!(check(name, 2_500), None, "{name}");
+        assert_eq!(
+            check(name, 9_000),
+            Some("invoice_tax_ledger_rate_mismatch"),
+            "{name}"
+        );
+    }
+    for name in ["BRIDGE CGST 9%", "BRIDGE SGST 9%"] {
+        assert_eq!(check(name, 9_000), None, "{name}");
+        assert_eq!(
+            check(name, 2_500),
+            Some("invoice_tax_ledger_rate_mismatch"),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        check("BRIDGE Output CGST XML", 2_500),
+        Some("invoice_tax_ledger_rate_mismatch")
+    );
+}
+
+/// Each changed on a captured row, since no captured tax ledger at its rate
+/// reads these: no own rate at all, and any rounding but the lab's.
 #[test]
 fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
     let check = |change: &dyn Fn(&mut wire::LedgerRateRow)| {
-        let mut row = tax_rates("2.50");
+        let mut row = lab_row("BRIDGE CGST 2.5%");
         change(&mut row);
         tax_ledger_refusal(&row, 2_500)
     };
-    assert_eq!(check(&|_| {}), None);
-    assert_eq!(
-        check(&|r| r.rate_of_tax_calculation = Some("0".into())),
-        Some("invoice_tax_ledger_rate_mismatch")
-    );
     assert_eq!(
         check(&|r| r.rate_of_tax_calculation = None),
-        Some("invoice_tax_ledger_rate_mismatch")
-    );
-    assert_eq!(
-        check(&|r| r.rate_of_tax_calculation = Some("9".into())),
         Some("invoice_tax_ledger_rate_mismatch")
     );
     assert_eq!(
@@ -2376,6 +2395,45 @@ fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
         check(&|r| r.rounding_limit = None),
         Some("invoice_tax_ledger_rounding_unsupported")
     );
+}
+
+/// Where a ledger's first GST row stands in the lab's listing.
+fn lab_gst_row_span(answer: &str, name: &str) -> std::ops::Range<usize> {
+    const CLOSE: &str = "</GSTDETAILS.LIST>";
+    let ledger = answer.find(&format!("NAME=\"{name}\"")).unwrap();
+    let start = answer[ledger..].find("<GSTDETAILS.LIST>").unwrap() + ledger;
+    start..answer[start..].find(CLOSE).unwrap() + start + CLOSE.len()
+}
+
+/// No captured tax ledger has a GST row that carries a rate, so a tax ledger
+/// that has one is refused, its own rate and rounding being right: here the
+/// row is the one a sales ledger of the lab carries, rates and all. So is a
+/// row with something the lab's rows did not hold, here a slab-rate entry,
+/// which may be a rate read another way.
+#[test]
+fn a_tax_ledger_whose_gst_row_carries_a_rate_is_refused() {
+    let answer = lab_rates_answer();
+    let sales_row = &answer[lab_gst_row_span(&answer, "BRIDGE Svc 998313 5%")];
+    assert!(sales_row.contains("<GSTRATE"));
+    let slab_row = answer[lab_gst_row_span(&answer, "BRIDGE CGST 2.5%")].replace(
+        "<GSTSLABRATES.LIST>       </GSTSLABRATES.LIST>",
+        "<GSTSLABRATES.LIST><FROMVALUE>1</FROMVALUE></GSTSLABRATES.LIST>",
+    );
+    assert!(slab_row.contains("FROMVALUE"));
+    for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
+        for row in [sales_row, slab_row.as_str()] {
+            let mut edited = answer.clone();
+            edited.replace_range(lab_gst_row_span(&answer, name), row);
+            let rates =
+                wire::parse_ledger_rates(&edited, "6b43e498-430c-4d5c-bfef-d32e2ab93c85", &[name])
+                    .unwrap();
+            assert_eq!(
+                tax_ledger_refusal(&rates[name], 2_500),
+                Some("invoice_tax_ledger_gst_rate_unmeasured"),
+                "{name}"
+            );
+        }
+    }
 }
 
 /// The refusals of an invoice's tax that come from its ledgers, through the
@@ -2433,12 +2491,32 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
     );
     // A tax ledger that was returned with another rate.
     assert_eq!(
-        refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(tax_rates("2.5"))),
+        refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(lab_row("BRIDGE CGST 2.5%"))),
         vec![refuse_ledger(
             "invoice_tax_ledger_rate_mismatch",
             "Output CGST"
         )]
     );
+    // The lab's own 5 percent sales ledger with its 9 percent pair: both are
+    // named. Its 2.5 percent pair, the same invoice, is admitted.
+    let lab_five_percent = |half: &str| {
+        let mut facts = good_facts();
+        facts.get_mut("Sales").unwrap().rates = Some(lab_row("BRIDGE Svc 998313 5%"));
+        set_tax_rates(&mut facts, half);
+        let mut v = voucher();
+        v.entries[2].amount = "250.00".to_string();
+        v.entries[3].amount = "250.00".to_string();
+        v.entries[0].amount = "10500.00".to_string();
+        classify_sales_invoice(&v, &facts, RAJ, AS_OF_AUG)
+    };
+    assert_eq!(
+        lab_five_percent("9").unwrap_err(),
+        vec![
+            refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output CGST"),
+            refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output SGST"),
+        ]
+    );
+    assert!(lab_five_percent("2.5").is_ok());
     // Two sales ledgers at two rates: one tax pair cannot carry both.
     let mut two = voucher();
     two.entries.truncate(1);

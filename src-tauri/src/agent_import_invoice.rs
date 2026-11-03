@@ -490,9 +490,12 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
 }
 
 /// What a tax ledger must say for the invoice to be checked against its rate:
-/// its own rate of tax is the one the sales ledgers give, and it rounds
-/// nothing (the measured ledgers read "Not Applicable" and 0). A ledger that
-/// reads anything else, or nothing, was not measured.
+/// its own rate of tax is the one the sales ledgers give, it rounds nothing
+/// (the measured ledgers read "Not Applicable" and 0), and its GST rows carry
+/// no rate. No tax ledger in a capture has a rate in those rows, so how Tally
+/// reads one beside the ledger's own rate is not known; a row of elements the
+/// lab did not read could hold one. A ledger that reads anything else, or
+/// nothing, was not measured.
 fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'static str> {
     let own = row.rate_of_tax_calculation.as_deref().and_then(rate_milli);
     if own != Some(half_milli) {
@@ -502,6 +505,17 @@ fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'s
         || row.rounding_limit.as_deref() != Some("0")
     {
         return Some("invoice_tax_ledger_rounding_unsupported");
+    }
+    let rated = |gst: &wire::GstRow| {
+        gst.unmeasured
+            || gst
+                .states
+                .iter()
+                .flat_map(|state| &state.heads)
+                .any(|head| head.rate.is_some())
+    };
+    if row.gst_rows.iter().any(rated) {
+        return Some("invoice_tax_ledger_gst_rate_unmeasured");
     }
     None
 }

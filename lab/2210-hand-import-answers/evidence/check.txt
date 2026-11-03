@@ -1,0 +1,76 @@
+relay events {'listening': 1, 'open': 2, 'close': 2} requests 88 | relay_error or tally_closed: 0
+== per call: request order (S status, E extent, B book extent, H marks, C census, V import verification, L ledgers, T voucher types, U currencies, G groups)
+000-companies list_companies 6 ESESSE
+001-status tally_status 5 SESSE
+002-batch-build build_import_xml 52 SEESESELSLSEEHSHSESEETSTSTSTSESEELSLSEECSCSEEVSVSESE
+   04:22:24 conn 1 req 20 H sent 388c28bc5c53 answer 3398 320848b556ba | marks ['251'] | rows 0 dates {}
+   04:22:24 conn 1 req 22 H sent 388c28bc5c53 answer 3398 320848b556ba | marks ['251'] | rows 0 dates {}
+   04:22:26 conn 1 req 46 C sent a6cfa6c096aa answer 3022 947fbf369d0f | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" AND $AlterID > 0 AND $AlterID <= 251 | rows 0 dates {}
+   04:22:26 conn 1 req 48 C sent a6cfa6c096aa answer 3022 947fbf369d0f | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" AND $AlterID > 0 AND $AlterID <= 251 | rows 0 dates {}
+   04:22:26 conn 1 req 52 V sent 849fc9369735 answer 3022 947fbf369d0f | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" | rows 0 dates {}
+   04:22:26 conn 1 req 54 V sent 849fc9369735 answer 3022 947fbf369d0f | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" | rows 0 dates {}
+003-verify verify_import 30 SEESESEHSHSEECSCSEEVSVSEEVSVSE
+   04:24:19 conn 2 req 8 H sent 388c28bc5c53 answer 3408 065a943b4a04 | marks ['302'] | rows 0 dates {}
+   04:24:19 conn 2 req 10 H sent 388c28bc5c53 answer 3408 065a943b4a04 | marks ['302'] | rows 0 dates {}
+   04:24:19 conn 2 req 14 C sent 99e8415efb6f answer 126760 435884cb4c02 | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" AND $AlterID > 0 AND $AlterID <= 302 | rows 51 dates {'20260406': 51}
+   04:24:20 conn 2 req 16 C sent 99e8415efb6f answer 126760 435884cb4c02 | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" AND $AlterID > 0 AND $AlterID <= 302 | rows 51 dates {'20260406': 51}
+   04:24:20 conn 2 req 20 V sent 849fc9369735 answer 258392 9477e8a435c7 | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" | rows 51 dates {'20260406': 51}
+   04:24:20 conn 2 req 22 V sent 849fc9369735 answer 258392 9477e8a435c7 | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" | rows 51 dates {'20260406': 51}
+   04:24:21 conn 2 req 26 V sent 849fc9369735 answer 258392 9477e8a435c7 | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" | rows 51 dates {'20260406': 51}
+   04:24:21 conn 2 req 28 V sent 849fc9369735 answer 258392 9477e8a435c7 | $Date >= $$Date:"20260406" AND $Date <= $$Date:"20260406" | rows 51 dates {'20260406': 51}
+== requests sent twice in a row with differing answers
+   differs 1 58 2
+   pairs differing: 1
+== the verify V answer 9477e8a435c7 rows 51 | saved file REMOTEIDs 50
+   20260406 Journal no 250 ALTERID 252 | narration 'Hand row 1 [BRIDGE:229380e6-cd98-89fd-83' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fc | equals GUID True | in saved file False
+   20260406 Journal no 251 ALTERID 253 | narration 'Hand row 2 [BRIDGE:5ef73ea4-030d-8803-90' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fd | equals GUID True | in saved file False
+   20260406 Journal no 252 ALTERID 254 | narration 'Hand row 3 [BRIDGE:e0fa4c24-6135-8c6d-be' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fe | equals GUID True | in saved file False
+   20260406 Journal no 253 ALTERID 255 | narration 'Hand row 4 [BRIDGE:4ed550f7-d5f9-80ad-a4' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000ff | equals GUID True | in saved file False
+   20260406 Journal no 254 ALTERID 256 | narration 'Hand row 5 [BRIDGE:a0638ccb-4ec8-8b09-94' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000100 | equals GUID True | in saved file False
+   20260406 Journal no 255 ALTERID 257 | narration 'Hand row 6 [BRIDGE:1d845f66-e6c5-865d-86' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000101 | equals GUID True | in saved file False
+   20260406 Journal no 256 ALTERID 258 | narration 'Hand row 7 [BRIDGE:aa91f08d-e5cb-8683-b6' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000102 | equals GUID True | in saved file False
+   20260406 Journal no 257 ALTERID 259 | narration 'Hand row 8 [BRIDGE:7d149406-6e64-82ba-83' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000103 | equals GUID True | in saved file False
+   20260406 Journal no 258 ALTERID 260 | narration 'Hand row 9 [BRIDGE:fb7acdba-cf03-8986-9a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000104 | equals GUID True | in saved file False
+   20260406 Journal no 259 ALTERID 261 | narration 'Hand row 10 [BRIDGE:afd0725d-960f-86b6-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000105 | equals GUID True | in saved file False
+   20260406 Journal no 260 ALTERID 262 | narration 'Hand row 11 [BRIDGE:8e18d334-d663-86ba-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000106 | equals GUID True | in saved file False
+   20260406 Journal no 261 ALTERID 263 | narration 'Hand row 12 [BRIDGE:244e58f0-6800-8a1b-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000107 | equals GUID True | in saved file False
+   20260406 Journal no 262 ALTERID 264 | narration 'Hand row 13 [BRIDGE:7133fa2d-4879-8dbd-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000108 | equals GUID True | in saved file False
+   20260406 Journal no 263 ALTERID 265 | narration 'Hand row 14 [BRIDGE:37c1de72-9da0-850c-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000109 | equals GUID True | in saved file False
+   20260406 Journal no 264 ALTERID 266 | narration 'Hand row 15 [BRIDGE:faa9c68f-8120-8d1c-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010a | equals GUID True | in saved file False
+   20260406 Journal no 265 ALTERID 267 | narration 'Hand row 16 [BRIDGE:79e8a367-c041-8dd1-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010b | equals GUID True | in saved file False
+   20260406 Journal no 266 ALTERID 268 | narration 'Hand row 17 [BRIDGE:5f8b2a8a-8783-829d-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010c | equals GUID True | in saved file False
+   20260406 Journal no 267 ALTERID 269 | narration 'Hand row 18 [BRIDGE:d8bcf5a4-4ef0-8831-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010d | equals GUID True | in saved file False
+   20260406 Journal no 268 ALTERID 270 | narration 'Hand row 19 [BRIDGE:38e9da4e-ad00-83fc-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010e | equals GUID True | in saved file False
+   20260406 Journal no 269 ALTERID 271 | narration 'Hand row 20 [BRIDGE:d6b25f03-e05f-8e9d-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010f | equals GUID True | in saved file False
+   20260406 Journal no 270 ALTERID 272 | narration 'Hand row 21 [BRIDGE:9ef36880-fe3e-8ae7-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000110 | equals GUID True | in saved file False
+   20260406 Journal no 271 ALTERID 273 | narration 'Hand row 22 [BRIDGE:755797d5-67a2-8d7f-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000111 | equals GUID True | in saved file False
+   20260406 Journal no 272 ALTERID 274 | narration 'Hand row 23 [BRIDGE:9b97627a-362f-8ba7-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000112 | equals GUID True | in saved file False
+   20260406 Journal no 273 ALTERID 275 | narration 'Hand row 24 [BRIDGE:b0ed00be-31e4-8ebf-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000113 | equals GUID True | in saved file False
+   20260406 Journal no 274 ALTERID 276 | narration 'Hand row 25 [BRIDGE:a7afe1f7-e1a2-8e51-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000114 | equals GUID True | in saved file False
+   20260406 Journal no 275 ALTERID 277 | narration 'Hand row 26 [BRIDGE:da9bd53e-c0ae-8805-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000115 | equals GUID True | in saved file False
+   20260406 Journal no 276 ALTERID 278 | narration 'Hand row 27 [BRIDGE:699709eb-571f-8e67-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000116 | equals GUID True | in saved file False
+   20260406 Journal no 277 ALTERID 279 | narration 'Hand row 28 [BRIDGE:245be088-fa34-8d01-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000117 | equals GUID True | in saved file False
+   20260406 Journal no 278 ALTERID 280 | narration 'Hand row 29 [BRIDGE:d907d9da-be97-88fd-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000118 | equals GUID True | in saved file False
+   20260406 Journal no 279 ALTERID 281 | narration 'Hand row 30 [BRIDGE:e63c8ebb-ceff-89be-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000119 | equals GUID True | in saved file False
+   20260406 Journal no 280 ALTERID 282 | narration 'Hand row 31 [BRIDGE:eb5391bd-42a2-8d36-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011a | equals GUID True | in saved file False
+   20260406 Journal no 281 ALTERID 283 | narration 'Hand row 32 [BRIDGE:365a3850-7447-84c5-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011b | equals GUID True | in saved file False
+   20260406 Journal no 282 ALTERID 284 | narration 'Hand row 33 [BRIDGE:3d20177f-5b0d-8a73-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011c | equals GUID True | in saved file False
+   20260406 Journal no 283 ALTERID 285 | narration 'Hand row 34 [BRIDGE:5572f085-4436-8cdf-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011d | equals GUID True | in saved file False
+   20260406 Journal no 284 ALTERID 286 | narration 'Hand row 35 [BRIDGE:c09c7ba6-755a-8674-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011e | equals GUID True | in saved file False
+   20260406 Journal no 285 ALTERID 287 | narration 'Hand row 36 [BRIDGE:1fa0ee30-0b73-86d7-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011f | equals GUID True | in saved file False
+   20260406 Journal no 286 ALTERID 288 | narration 'Hand row 37 [BRIDGE:98e9dea2-8aac-854b-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000120 | equals GUID True | in saved file False
+   20260406 Journal no 287 ALTERID 289 | narration 'Hand row 38 [BRIDGE:6ec2025d-17b9-8660-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000121 | equals GUID True | in saved file False
+   20260406 Journal no 288 ALTERID 290 | narration 'Hand row 39 [BRIDGE:2d21b083-bf19-8ba2-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000122 | equals GUID True | in saved file False
+   20260406 Journal no 289 ALTERID 291 | narration 'Hand row 40 [BRIDGE:f71c5229-be47-8bec-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000123 | equals GUID True | in saved file False
+   20260406 Journal no 290 ALTERID 292 | narration 'Hand row 41 [BRIDGE:885fd468-fbdb-8e38-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000124 | equals GUID True | in saved file False
+   20260406 Journal no 291 ALTERID 293 | narration 'Hand row 42 [BRIDGE:a2b21284-3151-8958-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000125 | equals GUID True | in saved file False
+   20260406 Journal no 292 ALTERID 294 | narration 'Hand row 43 [BRIDGE:022d8538-d687-8bab-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000126 | equals GUID True | in saved file False
+   20260406 Journal no 293 ALTERID 295 | narration 'Hand row 44 [BRIDGE:16d1dd0a-2511-8def-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000127 | equals GUID True | in saved file False
+   20260406 Journal no 294 ALTERID 296 | narration 'Hand row 45 [BRIDGE:09de4fec-ed33-8a22-a' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000128 | equals GUID True | in saved file False
+   20260406 Journal no 295 ALTERID 297 | narration 'Hand row 46 [BRIDGE:4da0f1db-3918-87e4-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000129 | equals GUID True | in saved file False
+   20260406 Journal no 296 ALTERID 298 | narration 'Hand row 47 [BRIDGE:2ddd5e84-b121-829e-b' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012a | equals GUID True | in saved file False
+   20260406 Journal no 297 ALTERID 299 | narration 'Hand row 48 [BRIDGE:894ad5f5-b3a0-8766-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012b | equals GUID True | in saved file False
+   20260406 Journal no 298 ALTERID 300 | narration 'Hand row 49 [BRIDGE:e7f445bf-e8b2-8e2c-8' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012c | equals GUID True | in saved file False
+   20260406 Journal no 299 ALTERID 301 | narration 'Hand row 50 [BRIDGE:17ea9e25-b215-8c97-9' tag True | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012d | equals GUID True | in saved file False
+   20260406 Journal no 300 ALTERID 302 | narration 'Hand row 5' tag False | REMOTEID 63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012e | equals GUID True | in saved file False
+   tagged 50 untagged 1 | untagged narrations ['Hand row 5']

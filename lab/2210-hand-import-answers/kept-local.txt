@@ -1,0 +1,9 @@
+Originals stay on the lab PC, with the window captures. sha256, bytes, file.
+804b4359ce161c1a723321a231aeaf1e2f5ef71bd42768d2b13f6d134c2cbbbb  1566  run/answers/000-companies.json
+63bd8b7bc3ce474a90a4f091d494bc24f4ff1195513541d08068c7582238eb76  1818  run/answers/001-status.json
+97e39ad7e549ebbeddce1bae24082b718d014739b05dad2290fc77e51dd4f24c  22837  run/answers/002-batch-build.json
+30ca9947680b1ad626b4f7ebe8463c6f114589a8ca53080b5afadade0adfc0d1  28169  run/answers/003-verify.json
+09b7f7c60a4c9e63d829fbd294c45bdb80aa9fea3091e2c521199c80d5bb228c  4004  out/bodies/09b7f7c60a4c9e63d829fbd294c45bdb80aa9fea3091e2c521199c80d5bb228c
+f08b3b1085c3bf2dbfa46b9fb24d3b1e04877f6bef318cac3fa556e5d130d1a8  4014  out/bodies/f08b3b1085c3bf2dbfa46b9fb24d3b1e04877f6bef318cac3fa556e5d130d1a8
+b60688ccab55ab0f3083380b9f82185d64b5260baf2b75e310d0863136a8a208  14005  copied/agent-import-ledger.jsonl
+6c09e087f909bcf0ae4b5c261b657fe5a00073154339a3ce4dff10aabf5671f5  15590  copied/imports/bridge-c3160d0e-9fc0-48e5-8e5c-48ba0d502f94.proof.20261103T042421485Z.6c09e087f909bcf0ae4b5c261b657fe5a00073154339a3ce4dff10aabf5671f5.json

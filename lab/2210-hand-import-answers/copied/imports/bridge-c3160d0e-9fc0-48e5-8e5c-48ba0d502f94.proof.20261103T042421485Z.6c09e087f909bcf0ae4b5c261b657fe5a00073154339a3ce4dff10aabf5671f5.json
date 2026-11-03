@@ -1,0 +1,536 @@
+{
+  "alter_id_delta": {
+    "after_seen": 302,
+    "before": 251,
+    "delta": 51,
+    "from": "build_mark"
+  },
+  "batch_id": "bridge-c3160d0e-9fc0-48e5-8e5c-48ba0d502f94",
+  "batch_sha256": "02434e30e7e383cfd04edcf0969cea63db6da6283686fe858ecb89a89fc34425",
+  "built_at": "2026-11-03T04:22:23.504Z",
+  "company": {
+    "books_from": "20260401",
+    "company_number": "XXXXXX",
+    "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff",
+    "identity_state": "verified_tuple",
+    "missing_field": null,
+    "name": "BRIDGE REVIEW LAB"
+  },
+  "counts": {
+    "bound_not_in_window": 0,
+    "cancelled_with_effective_copy": 0,
+    "duplicate_fingerprint": 0,
+    "matching_content_observed": 0,
+    "not_attributable": 0,
+    "not_found": 0,
+    "posted_divergent": 0,
+    "posted_not_effective": 0,
+    "posted_verified": 50
+  },
+  "dispatch_response": null,
+  "duplicates": [
+    {
+      "fingerprint_sha256": "42e7c32dcf54b1d2ce660091aacd1d096720b0b569c3561a1b1ef121a78cfba8",
+      "kind": "accounting_fingerprint",
+      "remote_ids": [
+        "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000100",
+        "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012e"
+      ],
+      "voucher_ids": [
+        "guid:63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000100",
+        "guid:63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012e"
+      ]
+    }
+  ],
+  "evidence": {
+    "company": {
+      "bytes": 8028,
+      "request_sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "response_sha256": "f08b3b1085c3bf2dbfa46b9fb24d3b1e04877f6bef318cac3fa556e5d130d1a8",
+      "state": "complete"
+    },
+    "mode_closing": null,
+    "mode_opening": {
+      "bytes": 4065,
+      "request_sha256": "08553f864e24068d545afb217c89b88f63c7f380d8ca74454ff2f9af2704f1b8",
+      "response_sha256": "01b9b48b7676231d278dbca60ffa007c1ec2e5b7126ff42ce28978b5ff801a92",
+      "state": "complete"
+    },
+    "voucher_read": {
+      "bytes": 516784,
+      "request_sha256": "849fc93697350bae4799ad01b8f653c17f7a7aff748dfedb7ce041dd6a9d8770",
+      "response_sha256": "9477e8a435c7b70e6fc75e7c0b89c5c9bb421c3b3d1a18bdb1958a499cece2f6",
+      "state": "complete"
+    },
+    "voucher_read_corroboration": {
+      "bytes": 516784,
+      "request_sha256": "849fc93697350bae4799ad01b8f653c17f7a7aff748dfedb7ce041dd6a9d8770",
+      "response_sha256": "9477e8a435c7b70e6fc75e7c0b89c5c9bb421c3b3d1a18bdb1958a499cece2f6",
+      "state": "complete"
+    },
+    "voucher_read_sha256": "9477e8a435c7b70e6fc75e7c0b89c5c9bb421c3b3d1a18bdb1958a499cece2f6"
+  },
+  "post_span_binding": {
+    "state": "not_applicable"
+  },
+  "pre_import_mark": {
+    "kind": "company_high_water",
+    "master_value": 207,
+    "value": 251
+  },
+  "unrelated_duplicates_in_window": [],
+  "verification_status": "verification_incomplete",
+  "verified_at": "2026-11-03T04:24:21.484Z",
+  "vouchers": [
+    {
+      "alter_id": 252,
+      "bridge_txn_id": "H-001",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fc",
+      "marker": "narration_tag",
+      "master_id": "252",
+      "status": "posted_verified",
+      "voucher_number": "250"
+    },
+    {
+      "alter_id": 253,
+      "bridge_txn_id": "H-002",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fd",
+      "marker": "narration_tag",
+      "master_id": "253",
+      "status": "posted_verified",
+      "voucher_number": "251"
+    },
+    {
+      "alter_id": 254,
+      "bridge_txn_id": "H-003",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fe",
+      "marker": "narration_tag",
+      "master_id": "254",
+      "status": "posted_verified",
+      "voucher_number": "252"
+    },
+    {
+      "alter_id": 255,
+      "bridge_txn_id": "H-004",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000ff",
+      "marker": "narration_tag",
+      "master_id": "255",
+      "status": "posted_verified",
+      "voucher_number": "253"
+    },
+    {
+      "alter_id": 256,
+      "bridge_txn_id": "H-005",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000100",
+      "marker": "narration_tag",
+      "master_id": "256",
+      "status": "posted_verified",
+      "voucher_number": "254"
+    },
+    {
+      "alter_id": 257,
+      "bridge_txn_id": "H-006",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000101",
+      "marker": "narration_tag",
+      "master_id": "257",
+      "status": "posted_verified",
+      "voucher_number": "255"
+    },
+    {
+      "alter_id": 258,
+      "bridge_txn_id": "H-007",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000102",
+      "marker": "narration_tag",
+      "master_id": "258",
+      "status": "posted_verified",
+      "voucher_number": "256"
+    },
+    {
+      "alter_id": 259,
+      "bridge_txn_id": "H-008",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000103",
+      "marker": "narration_tag",
+      "master_id": "259",
+      "status": "posted_verified",
+      "voucher_number": "257"
+    },
+    {
+      "alter_id": 260,
+      "bridge_txn_id": "H-009",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000104",
+      "marker": "narration_tag",
+      "master_id": "260",
+      "status": "posted_verified",
+      "voucher_number": "258"
+    },
+    {
+      "alter_id": 261,
+      "bridge_txn_id": "H-010",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000105",
+      "marker": "narration_tag",
+      "master_id": "261",
+      "status": "posted_verified",
+      "voucher_number": "259"
+    },
+    {
+      "alter_id": 262,
+      "bridge_txn_id": "H-011",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000106",
+      "marker": "narration_tag",
+      "master_id": "262",
+      "status": "posted_verified",
+      "voucher_number": "260"
+    },
+    {
+      "alter_id": 263,
+      "bridge_txn_id": "H-012",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000107",
+      "marker": "narration_tag",
+      "master_id": "263",
+      "status": "posted_verified",
+      "voucher_number": "261"
+    },
+    {
+      "alter_id": 264,
+      "bridge_txn_id": "H-013",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000108",
+      "marker": "narration_tag",
+      "master_id": "264",
+      "status": "posted_verified",
+      "voucher_number": "262"
+    },
+    {
+      "alter_id": 265,
+      "bridge_txn_id": "H-014",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000109",
+      "marker": "narration_tag",
+      "master_id": "265",
+      "status": "posted_verified",
+      "voucher_number": "263"
+    },
+    {
+      "alter_id": 266,
+      "bridge_txn_id": "H-015",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010a",
+      "marker": "narration_tag",
+      "master_id": "266",
+      "status": "posted_verified",
+      "voucher_number": "264"
+    },
+    {
+      "alter_id": 267,
+      "bridge_txn_id": "H-016",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010b",
+      "marker": "narration_tag",
+      "master_id": "267",
+      "status": "posted_verified",
+      "voucher_number": "265"
+    },
+    {
+      "alter_id": 268,
+      "bridge_txn_id": "H-017",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010c",
+      "marker": "narration_tag",
+      "master_id": "268",
+      "status": "posted_verified",
+      "voucher_number": "266"
+    },
+    {
+      "alter_id": 269,
+      "bridge_txn_id": "H-018",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010d",
+      "marker": "narration_tag",
+      "master_id": "269",
+      "status": "posted_verified",
+      "voucher_number": "267"
+    },
+    {
+      "alter_id": 270,
+      "bridge_txn_id": "H-019",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010e",
+      "marker": "narration_tag",
+      "master_id": "270",
+      "status": "posted_verified",
+      "voucher_number": "268"
+    },
+    {
+      "alter_id": 271,
+      "bridge_txn_id": "H-020",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000010f",
+      "marker": "narration_tag",
+      "master_id": "271",
+      "status": "posted_verified",
+      "voucher_number": "269"
+    },
+    {
+      "alter_id": 272,
+      "bridge_txn_id": "H-021",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000110",
+      "marker": "narration_tag",
+      "master_id": "272",
+      "status": "posted_verified",
+      "voucher_number": "270"
+    },
+    {
+      "alter_id": 273,
+      "bridge_txn_id": "H-022",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000111",
+      "marker": "narration_tag",
+      "master_id": "273",
+      "status": "posted_verified",
+      "voucher_number": "271"
+    },
+    {
+      "alter_id": 274,
+      "bridge_txn_id": "H-023",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000112",
+      "marker": "narration_tag",
+      "master_id": "274",
+      "status": "posted_verified",
+      "voucher_number": "272"
+    },
+    {
+      "alter_id": 275,
+      "bridge_txn_id": "H-024",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000113",
+      "marker": "narration_tag",
+      "master_id": "275",
+      "status": "posted_verified",
+      "voucher_number": "273"
+    },
+    {
+      "alter_id": 276,
+      "bridge_txn_id": "H-025",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000114",
+      "marker": "narration_tag",
+      "master_id": "276",
+      "status": "posted_verified",
+      "voucher_number": "274"
+    },
+    {
+      "alter_id": 277,
+      "bridge_txn_id": "H-026",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000115",
+      "marker": "narration_tag",
+      "master_id": "277",
+      "status": "posted_verified",
+      "voucher_number": "275"
+    },
+    {
+      "alter_id": 278,
+      "bridge_txn_id": "H-027",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000116",
+      "marker": "narration_tag",
+      "master_id": "278",
+      "status": "posted_verified",
+      "voucher_number": "276"
+    },
+    {
+      "alter_id": 279,
+      "bridge_txn_id": "H-028",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000117",
+      "marker": "narration_tag",
+      "master_id": "279",
+      "status": "posted_verified",
+      "voucher_number": "277"
+    },
+    {
+      "alter_id": 280,
+      "bridge_txn_id": "H-029",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000118",
+      "marker": "narration_tag",
+      "master_id": "280",
+      "status": "posted_verified",
+      "voucher_number": "278"
+    },
+    {
+      "alter_id": 281,
+      "bridge_txn_id": "H-030",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000119",
+      "marker": "narration_tag",
+      "master_id": "281",
+      "status": "posted_verified",
+      "voucher_number": "279"
+    },
+    {
+      "alter_id": 282,
+      "bridge_txn_id": "H-031",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011a",
+      "marker": "narration_tag",
+      "master_id": "282",
+      "status": "posted_verified",
+      "voucher_number": "280"
+    },
+    {
+      "alter_id": 283,
+      "bridge_txn_id": "H-032",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011b",
+      "marker": "narration_tag",
+      "master_id": "283",
+      "status": "posted_verified",
+      "voucher_number": "281"
+    },
+    {
+      "alter_id": 284,
+      "bridge_txn_id": "H-033",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011c",
+      "marker": "narration_tag",
+      "master_id": "284",
+      "status": "posted_verified",
+      "voucher_number": "282"
+    },
+    {
+      "alter_id": 285,
+      "bridge_txn_id": "H-034",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011d",
+      "marker": "narration_tag",
+      "master_id": "285",
+      "status": "posted_verified",
+      "voucher_number": "283"
+    },
+    {
+      "alter_id": 286,
+      "bridge_txn_id": "H-035",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011e",
+      "marker": "narration_tag",
+      "master_id": "286",
+      "status": "posted_verified",
+      "voucher_number": "284"
+    },
+    {
+      "alter_id": 287,
+      "bridge_txn_id": "H-036",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000011f",
+      "marker": "narration_tag",
+      "master_id": "287",
+      "status": "posted_verified",
+      "voucher_number": "285"
+    },
+    {
+      "alter_id": 288,
+      "bridge_txn_id": "H-037",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000120",
+      "marker": "narration_tag",
+      "master_id": "288",
+      "status": "posted_verified",
+      "voucher_number": "286"
+    },
+    {
+      "alter_id": 289,
+      "bridge_txn_id": "H-038",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000121",
+      "marker": "narration_tag",
+      "master_id": "289",
+      "status": "posted_verified",
+      "voucher_number": "287"
+    },
+    {
+      "alter_id": 290,
+      "bridge_txn_id": "H-039",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000122",
+      "marker": "narration_tag",
+      "master_id": "290",
+      "status": "posted_verified",
+      "voucher_number": "288"
+    },
+    {
+      "alter_id": 291,
+      "bridge_txn_id": "H-040",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000123",
+      "marker": "narration_tag",
+      "master_id": "291",
+      "status": "posted_verified",
+      "voucher_number": "289"
+    },
+    {
+      "alter_id": 292,
+      "bridge_txn_id": "H-041",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000124",
+      "marker": "narration_tag",
+      "master_id": "292",
+      "status": "posted_verified",
+      "voucher_number": "290"
+    },
+    {
+      "alter_id": 293,
+      "bridge_txn_id": "H-042",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000125",
+      "marker": "narration_tag",
+      "master_id": "293",
+      "status": "posted_verified",
+      "voucher_number": "291"
+    },
+    {
+      "alter_id": 294,
+      "bridge_txn_id": "H-043",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000126",
+      "marker": "narration_tag",
+      "master_id": "294",
+      "status": "posted_verified",
+      "voucher_number": "292"
+    },
+    {
+      "alter_id": 295,
+      "bridge_txn_id": "H-044",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000127",
+      "marker": "narration_tag",
+      "master_id": "295",
+      "status": "posted_verified",
+      "voucher_number": "293"
+    },
+    {
+      "alter_id": 296,
+      "bridge_txn_id": "H-045",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000128",
+      "marker": "narration_tag",
+      "master_id": "296",
+      "status": "posted_verified",
+      "voucher_number": "294"
+    },
+    {
+      "alter_id": 297,
+      "bridge_txn_id": "H-046",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-00000129",
+      "marker": "narration_tag",
+      "master_id": "297",
+      "status": "posted_verified",
+      "voucher_number": "295"
+    },
+    {
+      "alter_id": 298,
+      "bridge_txn_id": "H-047",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012a",
+      "marker": "narration_tag",
+      "master_id": "298",
+      "status": "posted_verified",
+      "voucher_number": "296"
+    },
+    {
+      "alter_id": 299,
+      "bridge_txn_id": "H-048",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012b",
+      "marker": "narration_tag",
+      "master_id": "299",
+      "status": "posted_verified",
+      "voucher_number": "297"
+    },
+    {
+      "alter_id": 300,
+      "bridge_txn_id": "H-049",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012c",
+      "marker": "narration_tag",
+      "master_id": "300",
+      "status": "posted_verified",
+      "voucher_number": "298"
+    },
+    {
+      "alter_id": 301,
+      "bridge_txn_id": "H-050",
+      "guid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-0000012d",
+      "marker": "narration_tag",
+      "master_id": "301",
+      "status": "posted_verified",
+      "voucher_number": "299"
+    }
+  ]
+}

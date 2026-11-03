@@ -4350,6 +4350,66 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row S4)",
       "sha256": "09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874",
       "size": 538
+    },
+    {
+      "blob": "51acf6f00227a80e1677a73f88daaaea3ed04156",
+      "capture_id": "forex-register-extent.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-register-answers at 32f896c7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-extent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4d633cf38f2c16b20bb4d6a3e7d2f34795c3a54c8e75a4ef36f5eaf64b26eaeb",
+      "size": 4022
+    },
+    {
+      "blob": "03f4fad246383140a070195b4b811f6c338d2da1",
+      "capture_id": "forex-register-book-extent.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-register-answers at 32f896c7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-book-extent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "76911fc5b7b0fdebbace31d0d7721225a86ac3af70a2ca2120b6e975014b562d",
+      "size": 3858
+    },
+    {
+      "blob": "ee4fb553e62146942ad098146715b9cd68606e09",
+      "capture_id": "forex-register-ledgers-master.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-register-answers at 32f896c7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-ledgers-master.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "3460bd62e2db1ae65d90d1e1bc178bf61a926eeed55202fe0d9c7d4f153aa7d8",
+      "size": 19456
+    },
+    {
+      "blob": "4884338436ca9fd29fb75e418d172c19b5e2b2df",
+      "capture_id": "forex-register-census.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-register-answers at 32f896c7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "817075d4b105ce5fe2879f4f9a50037f9977ce9e5c4b857db11065d34e786472",
+      "size": 29456
+    },
+    {
+      "blob": "58cc4286131a372cb471222ff5f594bf8ffe8d91",
+      "capture_id": "forex-register-window.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-register-answers at 32f896c7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-window.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c87866eb0db4d4b1622caf2d69d6a24e03efc1f6f80afef499852fd78cd7d771",
+      "size": 404502
+    },
+    {
+      "blob": "75d51f7a340aa53959d43b4c8adc767658986a11",
+      "capture_id": "forex-register-marks.utf16le.xml",
+      "company": "BRIDGE FOREXGROUP LAB",
+      "lab_ref": "branch lab/683-register-answers at 32f896c7",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/forex-register-marks.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "3d75dd1a8fb7252b93f55f9a492ddf449e2be3814feaa781685437f2548dafba",
+      "size": 3404
     }
   ]
 }

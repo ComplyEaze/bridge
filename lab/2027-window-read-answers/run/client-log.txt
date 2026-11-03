@@ -1,0 +1,10 @@
+2026-11-03T02:27:22Z exe sha256 d3c5b87ab3b2b0388bf6b88ddd20e33ea4967e7eb50fc57d15e213da3f05872e ok; launch-env.json sha256 7efac5d0f6efe1a301fb1fad2dc4b242735c271ce736434f4d8dd9881bb25d73; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-03T02:27:22Z launched pid 9600; stderr to server-stderr-20261103T022722Z.log
+2026-11-03T02:27:22Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-03T02:27:28Z 000-companies.json tool=list_companies secs=0.142 isError=False error=None saved_sha256=2569272fcade03281c704e6d76d2aa64089569a4bbf41a467dc51cf10950adba
+2026-11-03T02:27:32Z 001-s1.json tool=vouchers secs=2.334 isError=False error=None saved_sha256=fdbbb696758bc0e590d92d7183c1e2b44149b0d0a9f08e7dedb800bda61df01d
+2026-11-03T02:27:44Z 002-s2.json tool=vouchers secs=2.202 isError=False error=None saved_sha256=bca247f20fbdbc596fb2121ec35f0280fb0acd30cda301f78a78f24c20c64e66
+2026-11-03T02:27:54Z 003-s3.json tool=vouchers secs=2.174 isError=False error=None saved_sha256=a6ed20c685a62c56a9ddb80f5d3f5450e92ed12f865075c084ddab8a012170a7
+2026-11-03T02:28:07Z 004-s4.json tool=vouchers secs=2.278 isError=False error=None saved_sha256=f36d356175fe37b02afbb172cb467425f064655223ed850c44e56beba19e4c96
+2026-11-03T02:29:09Z 005-s5.json tool=vouchers secs=2.253 isError=False error=None saved_sha256=c295ec92fd957ea0816a64e2ed258fd067101cedddf3baf91fc8b9336b993603
+2026-11-03T02:31:49Z session ended; server pid 9600 exit code 0

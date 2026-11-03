@@ -1,0 +1,6 @@
+Restore plan, row 2027-R1. On Tally screen, never by a request.
+Folder: D:k2027r1
+File: TDBK1800_<company number>.001, 38,476 B, sha256 0556093acf3c5cb77df55779610c2efc91e9270515a4e5ca76169122313fce64, taken 3 Nov 2026 07:54 local.
+Company: BRIDGE NOTES LAB, number <company number>.
+Prompts expected: Accept, then Replace.
+Check after: marks, extent, catalogue, native window read for 3 to 6 June, each byte-identical to its b- read.

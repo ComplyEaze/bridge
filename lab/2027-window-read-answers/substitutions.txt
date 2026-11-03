@@ -1,0 +1,5 @@
+The four invented GSTINs are 15 X everywhere here, and the company number X at equal length in raw files, so sizes stand; sha256 in the logs and in check.txt are of the originals. company_number values go first in tool answers, by a JSON parser. Other replacements in text files, with counts:
+<company number>: 10
+<lab folder>: 7
+<lab root>: 4
+GSTIN 15 X: 46

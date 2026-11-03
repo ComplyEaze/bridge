@@ -1,0 +1,4 @@
+catalogue byte-identical True 11842 11842
+extent byte-identical True 2926 2926
+native byte-identical True 3022 3022
+marks byte-identical True 3392 3392

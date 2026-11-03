@@ -1,0 +1,75 @@
+== window requests: sha256, bytes, sends, FETCH
+1b1f6ffa1f4728a0 1740 ['1-0022', '1-0024', '2-0022', '2-0024'] | DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE | filter ['$Date &gt;= $$Date:"20250603" AND $Date &lt;= $$Date:"20250606"']
+f3235899e787e93e 1964 ['1-0044', '1-0046', '1-0088', '1-0090'] | DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE,PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,GSTNATUREOFRETURN,VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE | filter ['$Date &gt;= $$Date:"20250603" AND $Date &lt;= $$Date:"20250606"']
+7f85c77e9a23d5f9 2012 ['1-0066', '1-0068'] | DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE,IRN,IRNACKNO,IRNACKDATE,PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,GSTNATUREOFRETURN,VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE | filter ['$Date &gt;= $$Date:"20250603" AND $Date &lt;= $$Date:"20250606"']
+1e0d7a69fe38922d 3388 ['1-0110', '1-0112'] | DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE,IRN,IRNACKNO,IRNACKDATE,PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,GSTNATUREOFRETURN,VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE | filter ['$Date &gt;= $$Date:"20250607" AND $Date &lt;= $$Date:"20250607"']
+step 1 request byte-identical to the 0.7.0 release build: True 1-0022 2-0022
+step 2 request minus the six words equals step 1: True | words added 112 characters
+step 3 request minus the six words equals the e-invoice request shape: True
+== window answers: bytes, sha256, VOUCHER rows
+step 1 1-0022 248914 ea60400bfce4fcaa rows 4
+step 1 1-0024 248914 ea60400bfce4fcaa rows 4
+step 2 and 4 1-0044 252224 9a702ebd1050b748 rows 4
+step 2 and 4 1-0046 252224 9a702ebd1050b748 rows 4
+step 2 and 4 1-0088 252224 9a702ebd1050b748 rows 4
+step 2 and 4 1-0090 252224 9a702ebd1050b748 rows 4
+step 3 1-0066 253168 e8e3327430afbca5 rows 4
+step 3 1-0068 253168 e8e3327430afbca5 rows 4
+step 5 1-0110 53430 34ff7027f166459c rows 1
+step 5 1-0112 53430 34ff7027f166459c rows 1
+0.7.0 release 2-0022 248916 8bb0d64cae6238d7 rows 4
+0.7.0 release 2-0024 248916 8bb0d64cae6238d7 rows 4
+== per voucher, step 2 window answer: each of the six as a direct child: count, TYPE, text
+('Sales', '20250603') {"PLACEOFSUPPLY": [["String", "Maharashtra"]], "STATENAME": [["String", "Maharashtra"]], "GSTREGISTRATIONTYPE": [["String", "Regular"]], "GSTNATUREOFRETURN": [["String", null]], "VATPARTYTRANSRETURNNUMBER": [["String", null]], "VATPARTYTRANSRETURNDATE": [["Date", null]]}
+('Credit Note', '20250604') {"PLACEOFSUPPLY": [["String", "Maharashtra"]], "STATENAME": [["String", "Maharashtra"]], "GSTREGISTRATIONTYPE": [["String", "Regular"]], "GSTNATUREOFRETURN": [["String", "01-Sales Return"]], "VATPARTYTRANSRETURNNUMBER": [["String", "SYN-NOTE-1"]], "VATPARTYTRANSRETURNDATE": [["Date", "20250513"]]}
+('Debit Note', '20250605') {"PLACEOFSUPPLY": [["String", "Maharashtra"]], "STATENAME": [["String", "Maharashtra"]], "GSTREGISTRATIONTYPE": [["String", "Regular"]], "GSTNATUREOFRETURN": [["String", "04-Correction in Invoice"]], "VATPARTYTRANSRETURNNUMBER": [["String", "SYN-NOTE-2"]], "VATPARTYTRANSRETURNDATE": [["Date", "20250515"]]}
+('Purchase', '20250606') {"PLACEOFSUPPLY": [["String", "Maharashtra"]], "STATENAME": [["String", "Maharashtra"]], "GSTREGISTRATIONTYPE": [["String", "Regular"]], "GSTNATUREOFRETURN": [["String", null]], "VATPARTYTRANSRETURNNUMBER": [["String", null]], "VATPARTYTRANSRETURNDATE": [["Date", null]]}
+== against the native read-back of the seeded vouchers (texts):
+('Sales', '20250603') texts equal {'PLACEOFSUPPLY': True, 'STATENAME': True, 'GSTREGISTRATIONTYPE': True, 'GSTNATUREOFRETURN': True, 'VATPARTYTRANSRETURNNUMBER': True, 'VATPARTYTRANSRETURNDATE': True} | native TYPEs {'PLACEOFSUPPLY': [None], 'STATENAME': [None], 'GSTREGISTRATIONTYPE': [None], 'GSTNATUREOFRETURN': [None], 'VATPARTYTRANSRETURNNUMBER': [None], 'VATPARTYTRANSRETURNDATE': [None]}
+('Credit Note', '20250604') texts equal {'PLACEOFSUPPLY': True, 'STATENAME': True, 'GSTREGISTRATIONTYPE': True, 'GSTNATUREOFRETURN': True, 'VATPARTYTRANSRETURNNUMBER': True, 'VATPARTYTRANSRETURNDATE': True} | native TYPEs {'PLACEOFSUPPLY': [None], 'STATENAME': [None], 'GSTREGISTRATIONTYPE': [None], 'GSTNATUREOFRETURN': [None], 'VATPARTYTRANSRETURNNUMBER': [None], 'VATPARTYTRANSRETURNDATE': [None]}
+('Debit Note', '20250605') texts equal {'PLACEOFSUPPLY': True, 'STATENAME': True, 'GSTREGISTRATIONTYPE': True, 'GSTNATUREOFRETURN': True, 'VATPARTYTRANSRETURNNUMBER': True, 'VATPARTYTRANSRETURNDATE': True} | native TYPEs {'PLACEOFSUPPLY': [None], 'STATENAME': [None], 'GSTREGISTRATIONTYPE': [None], 'GSTNATUREOFRETURN': [None], 'VATPARTYTRANSRETURNNUMBER': [None], 'VATPARTYTRANSRETURNDATE': [None]}
+('Purchase', '20250606') texts equal {'PLACEOFSUPPLY': True, 'STATENAME': True, 'GSTREGISTRATIONTYPE': True, 'GSTNATUREOFRETURN': True, 'VATPARTYTRANSRETURNNUMBER': True, 'VATPARTYTRANSRETURNDATE': True} | native TYPEs {'PLACEOFSUPPLY': [None], 'STATENAME': [None], 'GSTREGISTRATIONTYPE': [None], 'GSTNATUREOFRETURN': [None], 'VATPARTYTRANSRETURNNUMBER': [None], 'VATPARTYTRANSRETURNDATE': [None]}
+step 2 answer with the six cut equals step 1 answer (parsed, CMPINFO cleared): True
+step 2 and step 4 answers byte-equal (every pair): True ['1-0044', '1-0046', '1-0088', '1-0090']
+step 3 voucher six equal step 2: True | IRN fields per voucher [[('IRN', 1), ('IRNACKNO', 1), ('IRNACKDATE', 1)]]
+== against the 30 Oct candidates (lab/2027-voucher-gst-fields-fetch-answers at 67039e2b)
+('Sales', '20250603') six equal to 30 Oct, TYPE and text: True 
+('Credit Note', '20250604') six equal to 30 Oct, TYPE and text: True 
+('Debit Note', '20250605') six equal to 30 Oct, TYPE and text: True 
+('Purchase', '20250606') six equal to 30 Oct, TYPE and text: True 
+== tool answers: voucher_gst per item
+001-s1.json isError False seconds 2.334 state complete total 4 bytes 10061
+    Sales 20250603 no voucher_gst 
+    Credit Note 20250604 no voucher_gst 
+    Debit Note 20250605 no voucher_gst 
+    Purchase 20250606 no voucher_gst 
+002-s2.json isError False seconds 2.202 state complete total 4 bytes 25276
+    Sales 20250603 {"note_reason": ["absent", null], "party_note_date": ["absent", null], "party_note_number": ["absent", null], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+    Credit Note 20250604 {"note_reason": ["present", "01-Sales Return"], "party_note_date": ["present", "20250513"], "party_note_number": ["present", "SYN-NOTE-1"], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+    Debit Note 20250605 {"note_reason": ["present", "04-Correction in Invoice"], "party_note_date": ["present", "20250515"], "party_note_number": ["present", "SYN-NOTE-2"], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+    Purchase 20250606 {"note_reason": ["absent", null], "party_note_date": ["absent", null], "party_note_number": ["absent", null], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+003-s3.json isError False seconds 2.174 state complete total 4 bytes 26199
+    Sales 20250603 {"note_reason": ["absent", null], "party_note_date": ["absent", null], "party_note_number": ["absent", null], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} | e_invoice
+    Credit Note 20250604 {"note_reason": ["present", "01-Sales Return"], "party_note_date": ["present", "20250513"], "party_note_number": ["present", "SYN-NOTE-1"], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} | e_invoice
+    Debit Note 20250605 {"note_reason": ["present", "04-Correction in Invoice"], "party_note_date": ["present", "20250515"], "party_note_number": ["present", "SYN-NOTE-2"], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} | e_invoice
+    Purchase 20250606 {"note_reason": ["absent", null], "party_note_date": ["absent", null], "party_note_number": ["absent", null], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} | e_invoice
+004-s4.json isError False seconds 2.278 state complete total 4 bytes 25276
+    Sales 20250603 {"note_reason": ["absent", null], "party_note_date": ["absent", null], "party_note_number": ["absent", null], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+    Credit Note 20250604 {"note_reason": ["present", "01-Sales Return"], "party_note_date": ["present", "20250513"], "party_note_number": ["present", "SYN-NOTE-1"], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+    Debit Note 20250605 {"note_reason": ["present", "04-Correction in Invoice"], "party_note_date": ["present", "20250515"], "party_note_number": ["present", "SYN-NOTE-2"], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+    Purchase 20250606 {"note_reason": ["absent", null], "party_note_date": ["absent", null], "party_note_number": ["absent", null], "party_state": ["present", "Maharashtra"], "place_of_supply": ["present", "Maharashtra"], "registration_type": ["present", "Regular"]} 
+005-s5.json isError False seconds 2.253 state complete total 1 bytes 8889
+    Sales 20250607 {"note_reason": ["absent", null], "party_note_date": ["absent", null], "party_note_number": ["absent", null], "party_state": ["present", "Karnataka"], "place_of_supply": ["present", "Karnataka"], "registration_type": ["present", "Regular"]} | e_invoice
+001-s1-shipped.json isError False seconds 2.12 state complete total 4 bytes 10060
+    Sales 20250603 no voucher_gst 
+    Credit Note 20250604 no voucher_gst 
+    Debit Note 20250605 no voucher_gst 
+    Purchase 20250606 no voucher_gst 
+marks m0 [('ALTVCHID', '4'), ('ALTMSTID', '215')]
+marks m1 [('ALTVCHID', '4'), ('ALTMSTID', '215')]
+marks m3 [('ALTVCHID', '8'), ('ALTMSTID', '215')]
+marks m-s1 [('ALTVCHID', '8'), ('ALTMSTID', '215')]
+marks m-s4 [('ALTVCHID', '8'), ('ALTMSTID', '215')]
+marks m5 [('ALTVCHID', '9'), ('ALTMSTID', '217')]
+marks m6 [('ALTVCHID', '9'), ('ALTMSTID', '217')]
+marks m7 [('ALTVCHID', '9'), ('ALTMSTID', '217')]

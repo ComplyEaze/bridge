@@ -3832,6 +3832,206 @@
       "size": 3404
     },
     {
+      "blob": "5fb522c9f355bc163157e96fc591ad2461afa521",
+      "capture_id": "d12-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c60a9f1d0bfe8820c5b940c75e0856e375d8d19cec594dedc5ddbd016fa29811",
+      "size": 1526
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "d12-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
+      "blob": "797739a0b46cba702d2ece65bb3ef54267687650",
+      "capture_id": "d13-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "548c9f004054305257c6788d9c9bb4d7eb7a51e34d1b3218b82d42f5dabc18dd",
+      "size": 1526
+    },
+    {
+      "blob": "783a9d8a80502bf332b1e011671e9d9ccb3a4fb0",
+      "capture_id": "d13-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "084d21a00b19d82b5b9717b41cf4ee56a7820ad23a9984722b491f68551b431a",
+      "size": 5432
+    },
+    {
+      "blob": "84b14f7388aa0f2fc6f04b2ffa96a6f347b5988f",
+      "capture_id": "d14-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6472c003ab25e12009350f80278bee4cf3c3d84510e4848fd2939067a10949d4",
+      "size": 1526
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "d14-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
+      "blob": "1b82a23e7ba7f2e58e250c94707996c05d394aa5",
+      "capture_id": "d19-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6a555f985ab65bd7f11f89073f329fb0a320c35be0959f9aa0f8dd608627633d",
+      "size": 1526
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "d19-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
+      "blob": "da53f64e1ab7b88218044a3271ae322bb9ad2428",
+      "capture_id": "d20-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2883bb5e74ac4e0ec234d0a58ccfc09c3e30393fcb74276e292e2a1359d29845",
+      "size": 1526
+    },
+    {
+      "blob": "3e13563e161f43bd1f953cf88c44108a2ff84e83",
+      "capture_id": "d20-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a556f23d90095f959444e9d2df5e29b32054eb1a7e098b92c286203352c4465b",
+      "size": 5432
+    },
+    {
+      "blob": "fb8c1572d70639cc191f5ffd9e3b9c7e5d509fa8",
+      "capture_id": "d21-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "675f447e20e609e4162d43059bc15da94d4e55cf476e4dfb64fdbed13c22eec7",
+      "size": 1526
+    },
+    {
+      "blob": "74a7016e9c17fdd8688c504bb97e0cc011cd143b",
+      "capture_id": "d21-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "68de428ebfa199e402b0d7ab2ef9645ee6c6c056705e17e6dc6ad266255c66e2",
+      "size": 5434
+    },
+    {
+      "blob": "d0fd0624a955363d6c271a3a2dea3f9a658ab7f8",
+      "capture_id": "d26-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "e8da4bcb139a857486776317625874f189067d2e6c4d1e273e5e88dc1d623a8d",
+      "size": 1526
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "d26-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
+      "blob": "d3fe681196c40a4f6f2b6ef241fa4a5a00bef7b0",
+      "capture_id": "d27-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1b5146b16c9a51d057dcfa9ea22a5ea5536f34e6a148992d67e2e9e82a8c49fb",
+      "size": 1526
+    },
+    {
+      "blob": "0e5e53986d9a47e9df5aea5451774f1bc0564b02",
+      "capture_id": "d27-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "c73299e524679e21c329ae35f3bc87462167f940537ef335fdd029f5fab117f8",
+      "size": 5436
+    },
+    {
+      "blob": "a5d905dd307f8535f515cc7be863a6b91222d35e",
+      "capture_id": "d28-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "cf2cc4c5c1d89e41de69128552761278e7ca30f0c0f9660b1c7696f6eddcc12d",
+      "size": 1526
+    },
+    {
+      "blob": "5acf732900ea3ad79983a6539803b7426c8c3590",
+      "capture_id": "d28-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2a9f0aa0a65ffb486a96ebfdf9fd8d46375044f8388306bd61c920736cf09ffe",
+      "size": 5438
+    },
+    {
+      "blob": "338f715e1ffd1a307769262b58580fe4c68381a7",
+      "capture_id": "d29-c2.request.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-c2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ad68e914574c3e6a05cd3b55328097cbd718b7a04e1edbf4cd61e2cc273fac3c",
+      "size": 1526
+    },
+    {
+      "blob": "380eafea32b6f6fa0230adc5c37777a70bf90ab7",
+      "capture_id": "d29-c2.utf16le.xml",
+      "company": "BRIDGE TRANSFER LAB",
+      "lab_ref": "branch lab/1392-spanned-census-answers at a8714009",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-c2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/transfer-days-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974",
+      "size": 3022
+    },
+    {
       "blob": "fae78f1e34d25f3f1bd6a7c44affaa2063eeaa64",
       "capture_id": "alt-a-05-stock-query-alt-unit-probe-b.answer.utf16le.xml",
       "company": "BRIDGE SHAPE LAB",

@@ -2,6 +2,7 @@
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::TallyDate;
+use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
 use std::collections::BTreeSet;
 
 impl Server {
@@ -1333,29 +1334,38 @@ impl Server {
     }
 
     /// The window's rows, each voucher withheld for a composite read under the book's classified
-    /// base where that can be done (#683). The base is read only for a window that holds one, and
-    /// a book whose base is not established leaves them withheld.
-    pub(super) async fn read_withheld_composites(
+    /// base where that can be done (#683). A book whose base is not established, or whose base
+    /// read fails, leaves them withheld.
+    async fn read_withheld_composites(
         &self,
         identity: &VerifiedCompanyIdentity,
         rows: Vec<VoucherRow>,
         accumulated: &mut Option<Evidence>,
     ) -> Vec<VoucherRow> {
-        if !rows.iter().any(VoucherRow::is_withheld) {
-            return rows;
+        match self.composite_base(identity, &rows, accumulated).await {
+            Ok(Some(book)) => rows.into_iter().map(|row| row.read_under(&book)).collect(),
+            _ => rows,
         }
-        let Ok(currency) = self
+    }
+
+    /// The book's INR base to read the window's composites under (#683), read only for a window
+    /// that holds a withheld voucher: `None` for one that holds none, or for a book whose base is
+    /// not established as INR.
+    pub(super) async fn composite_base(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        rows: &[VoucherRow],
+        accumulated: &mut Option<Evidence>,
+    ) -> anyhow::Result<Option<IdentifiedBaseCurrency>> {
+        if !rows.iter().any(VoucherRow::is_withheld) {
+            return Ok(None);
+        }
+        let currency = self
             .runtime
             .detect_classified_base_currency_with_extent(self.tally_config(), identity)
-            .await
-        else {
-            return rows;
-        };
+            .await?;
         accumulate_evidence(accumulated, evidence_from_runtime_read(currency.evidence()));
-        let Some(book) = currency.inr_base() else {
-            return rows;
-        };
-        rows.into_iter().map(|row| row.read_under(&book)).collect()
+        Ok(currency.inr_base())
     }
 
     /// A bounded read of the voucher window (`render_agent_vouchers`) in either entry-wildcard

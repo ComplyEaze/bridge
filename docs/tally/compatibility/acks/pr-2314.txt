@@ -1,3 +1,4 @@
+scripts/ledger-entries-ui.test.mjs
 src-tauri/src/agent_presence.rs
 src-tauri/src/agent_presence_tests.rs
 src-tauri/src/agent_voucher_parse.rs

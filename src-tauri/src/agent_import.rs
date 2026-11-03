@@ -1771,6 +1771,7 @@ impl Server {
                     return Err(invoice_route_refusal(code).into());
                 }
             }
+            let rows_in_book = rows_in_book_of_build(&line, &preflight, amendment.is_some());
             let imports = self.imports_dir()?;
             let path = imports.join(format!("{batch_id}.xml"));
             let folder_left = match persistence::persist_build(&imports, &line, xml.as_bytes(), || {
@@ -1834,6 +1835,15 @@ impl Server {
                         list.insert(0, json!(AMENDMENT_WARNING));
                     }
                     AMENDMENT_NEXT_STEP
+                }
+                None => next_step,
+            };
+            let next_step = match rows_in_book {
+                Some(ids) => {
+                    if let Some(list) = warnings.as_array_mut() {
+                        list.insert(0, json!(rows_in_book_warning(&ids, line.vouchers.len())));
+                    }
+                    ROWS_IN_BOOK_NEXT_STEP
                 }
                 None => next_step,
             };
@@ -3649,6 +3659,53 @@ impl Server {
 // that omits REFERENCE keeps the stored value, VERIFIED) and on
 // `Lineage::admit_proposal`, which refuses any reference change (#1941).
 const AMENDMENT_WARNING: &str = "This file amends an earlier batch. Each voucher carries that batch's REMOTEID, so importing it alters the vouchers already in the book in place instead of creating new ones: Tally should report them as altered, not created. ComplyEaze Bridge compared those vouchers with what it built only as the book stood during this build, and only these fields: the date, a bank voucher's effective date when Tally returned one, the voucher type, the voucher number when the batch set one, each entry's ledger, amount and side, and the narration. It did not compare a voucher's reference, its bill-wise or cost-centre allocations, or which ledger Tally records as its party, because the verification read does not fetch them; instead it refused any voucher whose ALTERID has moved since ComplyEaze Bridge first verified it, which catches an edit to those fields made after that verification, provided a Tally edit advances the voucher's ALTERID (measured over the gateway; on Tally's own screens, saving a voucher unchanged and cancelling it moved it, and so did changing a bill allocation's reference, adding a cost-centre allocation and setting a bank-reconciliation date, each seen in one run). An edit made before that first verification is not caught, so verify right after every import. An in-place alteration replaces a voucher's entries rather than merging them (measured over the gateway), and this file's entries carry no allocations, so allocations made in Tally, including those ComplyEaze Bridge advises adding after an import, are expected to be lost; that loss was not measured directly. An amendment never changes a voucher's reference, and an import that leaves the reference out keeps the one stored (measured over the gateway). An edit made in Tally between this build and the import is overwritten without warning. Import promptly, and build the amendment again if anyone may have changed these vouchers. Import and verify each amendment before building the next one for the same voucher: two amendments built from the same state overwrite each other, and the later import wins. In-place alteration with changed content was measured over the XML gateway on licensed TallyPrime 7.1 Silver for Journal, Payment, Receipt and Contra, with requests that copy this file's shape; an import through Tally's own Import menu was not measured.";
+
+/// The rows of a build the book already holds (#2152), by the post's own rule
+/// over the read the build made: the same request over the same window as the
+/// post's own read before its approval. Not for an amendment, which alters
+/// vouchers that are meant to be in the book, nor for an invoice, whose identity
+/// also reads the journal's unsettled twin. Advisory: a read that cannot be
+/// matched says nothing here, and the post decides.
+fn rows_in_book_of_build(
+    line: &ImportLedgerLine,
+    preflight: &ImportReadSource,
+    is_amendment: bool,
+) -> Option<Vec<String>> {
+    if is_amendment || holds_an_invoice(line) {
+        return None;
+    }
+    let result =
+        verify_batch_as(line, preflight, Attribution::Tag, InvoiceIdentity::ByNumber).ok()?;
+    post::rows_already_in_book(&result, line.vouchers.len())
+}
+
+/// How many of a rebuild's rows are listed by id; the count is exact (#2152).
+const ROWS_IN_BOOK_LISTED: usize = 10;
+
+/// What a build says when the book it just read already holds rows of the batch
+/// (#2152): that `post_import` would refuse it for them, and that no check of
+/// ComplyEaze Bridge stands between an import of this file and the book. Names
+/// the rows by `bridge_txn_id`, as the refusal does, and no amount, ledger or
+/// narration. That a repeated import would book them twice is not measured, so
+/// it is not said.
+fn rows_in_book_warning(ids: &[String], voucher_count: usize) -> String {
+    let listed = ids
+        .iter()
+        .take(ROWS_IN_BOOK_LISTED)
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let more = match ids.len().saturating_sub(ROWS_IN_BOOK_LISTED) {
+        0 => String::new(),
+        more => format!(", and {more} more"),
+    };
+    format!(
+        "{} of {voucher_count} rows of this batch already match vouchers in the book as this build read it (bridge_txn_id: {listed}{more}). With Allow voucher posting on, post_import would refuse this batch as import_preexisting_identity before any approval, if the book is unchanged. Nothing in ComplyEaze Bridge checks an import of this file against the book either, so do not import it. Rows with the same date, type, ledgers and amounts match the same voucher: count the vouchers in Tally.",
+        ids.len()
+    )
+}
+
+const ROWS_IN_BOOK_NEXT_STEP: &str = "Do not post or import this batch yet: the vouchers named in the first warning are already in the book. Open them in Tally and confirm they are regular vouchers and the same transactions as these rows. If they are, leave those rows out and build the rest again. Never change a row's date, ledger, type or amount to get past this check.";
 
 /// Whether a batch holds an invoice: the one gate for every read of the journal's
 /// unsettled batches, so a bank batch never takes its lock for the number rule.

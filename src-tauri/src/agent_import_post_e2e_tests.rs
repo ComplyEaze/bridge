@@ -4947,6 +4947,46 @@ fn before_approval_on_a_book_holding_a_twin() -> Vec<ScenarioPlan> {
     plans
 }
 
+/// The reads up to the absence check, on the captured book: it holds the
+/// captured Journal, which a batch of the same row under another batch id
+/// matches by content.
+fn before_approval_on_the_captured_book() -> Vec<ScenarioPlan> {
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(probe());
+    plans
+}
+
+/// #2152: the post of a rebuilt row names the row the build warned of
+/// (`rebuild_warning_tests`, which reads the same captured window).
+#[tokio::test]
+async fn the_post_of_a_rebuilt_row_names_the_row_the_build_named() {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(before_approval_on_the_captured_book())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let rebuilt = "bridge-00000000-0000-4000-8000-000000002152";
+    saved_captured_line_edited(&server, |line| line.batch_id = rebuilt.into());
+    let refused = server
+        .call_tool(
+            "post_import",
+            json!({"company_guid":GUID,"batch_id":rebuilt}),
+        )
+        .await;
+    let _ = sent(simulator);
+    let error = &refused["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
+    assert_eq!(
+        error["preexisting_txn_ids"],
+        json!(["BRIDGE_MCP_LIVE_20260906_A1"]),
+        "{refused}"
+    );
+}
+
 /// A batch one of whose rows the book already holds is refused before the dialog
 /// and names that row, with the way on (#901). Before, the answer was a bare
 /// code an agent could not act on.

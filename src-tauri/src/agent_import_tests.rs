@@ -4003,6 +4003,9 @@ mod amend_tests;
 #[path = "agent_import_text_tests.rs"]
 mod text_tests;
 
+#[path = "agent_import_rebuild_warning_tests.rs"]
+mod rebuild_warning_tests;
+
 #[tokio::test]
 async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("loopback listener");

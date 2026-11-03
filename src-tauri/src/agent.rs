@@ -2278,13 +2278,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              written. Build once more; if the refusal repeats, tell the user this invoice has to \
              be entered in Tally itself.",
         ),
-        "import_invoice_figures_unreadable" => Some(
-            "An invoice of this batch has an amount or a date ComplyEaze Bridge cannot read, so \
-             it cannot check that invoice against the other batches this computer has sent. This \
-             can come before a post or while verifying a batch that may already be in Tally, so \
-             do not build or send it again on this answer alone: look for the invoice in Tally \
-             first, and if it is not there, tell the user this invoice has to be entered in \
-             Tally itself.",
+        // Given by the journal reader for any line it cannot read (#1872); the local data report
+        // names that line. The skip-only file's reader wraps it as `skip_file_unreadable`, and the
+        // master journal's maps it to its own error, so neither shows this text.
+        "import_ledger_invalid" => Some(
+            "ComplyEaze Bridge cannot read its import journal, so the import tools are stopped \
+             for every company on this computer until that is put right. Do not edit or delete \
+             the file, and do not build, post or verify again on this answer: a wrong edit can \
+             lose the record of a batch that was already sent. Tell the user to run the local \
+             data report, which names the line of the journal that cannot be read, and to send \
+             the journal file and that report to support.",
         ),
         // A date argument a caller can correct. `TallyDate` admits years 0001
         // to 9999, and the edge codes come from widening an empty window past

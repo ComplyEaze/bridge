@@ -159,7 +159,7 @@ batches with no recorded dispatch that were never found posted
 deletion may rest on it), and interrupted-write folders that Bridge must recover
 before it builds or reads. A journal it could not read is reported as
 `journal_unreadable` (could not be opened), `journal_read_failed` or
-`journal_invalid` (refused twice, 100 ms apart), never as absent. It reads the
+`journal_invalid` (refused twice, 100 ms apart; the report then names the 1-based `line` of the journal that was refused), never as absent. It reads the
 journal without the admission lock, names no file path (the command line adds the
 folder paths, where their files are, the journal's location and any package
 copy of the folder only with `--show-paths`), and does not cover files outside this

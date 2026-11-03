@@ -194,7 +194,7 @@ fn invoice_number(voucher: &ImportVoucher) -> Option<String> {
 }
 
 fn entries_match(expected: &ImportVoucher, matched: &ReadVoucher) -> bool {
-    expected_entry_fingerprint(expected) == actual_entry_fingerprint(matched)
+    canonical_entry_fingerprint(expected) == actual_entry_fingerprint(matched)
 }
 
 #[derive(Default)]
@@ -217,13 +217,12 @@ impl VerificationCandidates {
     }
 }
 
-/// A batch voucher's date, type and entries. `voucher` must carry canonical
-/// amounts, as `verify_batch_as`'s comparison copy does.
+/// A batch voucher's date, type and entries, the amounts in canonical form.
 fn expected_content(voucher: &ImportVoucher) -> VerificationFingerprint {
     VerificationFingerprint::Content(
         Some(voucher.date.as_str().to_owned()),
         Some(voucher.filed_type_name().to_string()),
-        expected_entry_fingerprint(voucher),
+        canonical_entry_fingerprint(voucher),
     )
 }
 
@@ -328,21 +327,13 @@ pub(super) fn verify_batch_as(
         Attribution::Tag => (None, true),
         Attribution::Span(bindings) => (bindings, false),
     };
-    // Normalize only the comparison copies. Persisted batches and generated XML
-    // retain their original amount lexemes and remain backward compatible.
-    let mut comparison_line = line.clone();
-    for entry in comparison_line
-        .vouchers
-        .iter_mut()
-        .flat_map(|v| &mut v.entries)
-    {
-        entry.amount = canonical_verification_amount(&entry.amount)?;
-    }
+    // Only the book's side is normalised here. A batch's amounts are compared in the canonical
+    // form their type holds (`canonical_entry_fingerprint`); the batch and the XML written
+    // from it keep the lexeme, so a saved batch stays bound to its bytes.
     let mut comparison_observed = observed.rows.clone();
     for entry in comparison_observed.iter_mut().flat_map(|v| &mut v.entries) {
         entry.amount = canonical_verification_amount(&entry.amount)?;
     }
-    let line = &comparison_line;
     let observed = comparison_observed.as_slice();
     let observed_identities = observed
         .iter()
@@ -1352,7 +1343,7 @@ pub(super) fn voucher_diffs(
             .entries
             .iter()
             .map(|entry| {
-                json!({"ledger":party_name(&entry.ledger), "amount":entry.amount, "side":entry.side,
+                json!({"ledger":party_name(&entry.ledger), "amount":entry.amount.canonical(), "side":entry.side,
                 "is_deemed_positive":entry.side.tally_positive()})
             })
             .collect::<Vec<_>>();
@@ -1369,7 +1360,25 @@ pub(super) fn voucher_diffs(
     diffs
 }
 
+/// What a batch voucher's entries are matched by: each ledger, the signed amount in canonical
+/// form (`0012.50` is `-12.5` as a debit) and the deemed-positive mark. The book's side of
+/// the comparison is `actual_entry_fingerprint`, over amounts the reads canonicalise.
+pub(super) fn canonical_entry_fingerprint(voucher: &ImportVoucher) -> Vec<String> {
+    entry_fingerprint(voucher, ImportAmount::signed_canonical)
+}
+
+/// [`canonical_entry_fingerprint`] over the amounts as they were received. No comparison
+/// uses this form; it is kept so a test can hold the received form apart from the canonical
+/// one (#1872).
+#[cfg(test)]
 pub(super) fn expected_entry_fingerprint(voucher: &ImportVoucher) -> Vec<String> {
+    entry_fingerprint(voucher, ImportAmount::signed_lexeme)
+}
+
+fn entry_fingerprint(
+    voucher: &ImportVoucher,
+    signed: fn(&ImportAmount, &EntrySide) -> String,
+) -> Vec<String> {
     let mut result = voucher
         .entries
         .iter()
@@ -1377,10 +1386,7 @@ pub(super) fn expected_entry_fingerprint(voucher: &ImportVoucher) -> Vec<String>
             format!(
                 "{}|{}|{}",
                 entry.ledger,
-                match entry.side {
-                    EntrySide::Dr => format!("-{}", entry.amount),
-                    EntrySide::Cr => entry.amount.clone(),
-                },
+                signed(&entry.amount, &entry.side),
                 entry.side.tally_positive()
             )
         })

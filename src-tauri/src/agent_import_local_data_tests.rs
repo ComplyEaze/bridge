@@ -19,8 +19,8 @@ pub(in crate::agent::agent_import) fn journal(sent: bool) -> Vec<u8> {
         "pre_import_mark":{"kind":"company_high_water","value":1,"master_value":1},
         "vouchers":[{"bridge_txn_id":"txn","date":"20260901","voucher_type":"Journal",
             "narration":"n","reference":null,"voucher_number":null,"entries":[
-                {"ledger":"Cash","amount":"1","side":"Dr"},
-                {"ledger":"Synthetic Ledger","amount":"1","side":"Cr"}]}]
+                {"ledger":"Cash","amount":"1.00","side":"Dr"},
+                {"ledger":"Synthetic Ledger","amount":"1.00","side":"Cr"}]}]
     }))
     .unwrap();
     let mut bytes = serde_json::to_vec(&line).unwrap();
@@ -904,6 +904,70 @@ fn a_half_written_last_line_is_read_again_once() {
         Journal::Read(_)
     ));
     assert!(!waited);
+}
+
+/// A line whose amount is not an import amount (#1872) is a line the report cannot read: the
+/// journal is shown as invalid, as for any other record the build refuses, and it is read twice
+/// before it is said.
+#[test]
+fn a_journal_line_with_a_signed_amount_is_shown_as_invalid() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let whole = String::from_utf8(journal(true)).unwrap();
+    assert_eq!(whole.matches("\"amount\":\"1.00\"").count(), 2, "{whole}");
+    write(
+        &path,
+        whole
+            .replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1)
+            .as_bytes(),
+    );
+    let mut waited = false;
+    assert_eq!(
+        read_journal(directory.path(), || waited = true),
+        Journal::NotRead(JOURNAL_INVALID)
+    );
+    assert!(waited);
+}
+
+/// The report names the line it refused, and only the report does (#1872). A bad amount sits
+/// between two good lines; the field is the 1-based line, and a journal that reads has none.
+/// A half-written last line is named too: it is the line after the last whole one.
+#[test]
+fn the_report_names_the_line_of_a_bad_amount_between_two_good_ones() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let first = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| first.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    let bad = with_id("b2").replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1);
+    write(&path, format!("{first}{bad}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert_eq!(report.journal, Journal::NotRead(JOURNAL_INVALID));
+    assert_eq!(report.journal_line, Some(2));
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(shown["journal"]["state"], "not_read");
+    assert_eq!(shown["journal"]["reason"], "journal_invalid");
+    assert_eq!(shown["journal"]["line"], 2);
+    // Without the bad line the journal reads and names no line.
+    write(&path, format!("{first}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert!(matches!(report.journal, Journal::Read(_)), "{report:?}");
+    assert_eq!(report.journal_line, None);
+    assert!(to_json(&report, SystemTime::now(), None)["journal"]["line"].is_null());
+    // A half-written last line is the line after the last whole one.
+    let mut cut = format!("{first}{}", with_id("b3")).into_bytes();
+    cut.extend_from_slice(b"{\"record_type\":\"dispat");
+    write(&path, &cut);
+    assert_eq!(
+        read_journal_at(directory.path(), || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(3))
+    );
+    // Another reason a journal is not read names no line.
+    let missing = tempfile::tempdir().unwrap();
+    assert_eq!(
+        read_journal_at(missing.path(), || {}),
+        (Journal::Absent, None)
+    );
 }
 
 /// A folder that exists but cannot be listed is named, not read as empty. A file

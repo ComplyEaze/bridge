@@ -893,7 +893,16 @@ pub(super) struct Settlement {
 }
 
 /// Validate the whole journal and count its batches by settlement (#local-data).
+#[cfg(test)]
 pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
+    settlement_at(reader, &std::cell::Cell::new(0))
+}
+
+/// [`settlement`], with the line it was reading left in `line` (see [`scan_records_at`]).
+pub(super) fn settlement_at(
+    reader: impl BufRead,
+    line: &std::cell::Cell<usize>,
+) -> Result<Settlement, String> {
     #[derive(Default)]
     struct Progress {
         dispatched: bool,
@@ -930,7 +939,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
     let mut settlements = PersonSettlements::default();
     let mut rollbacks = RollbackFacts::empty();
     let mut released = BTreeSet::new();
-    scan_records(reader, |record, VerificationGeneration(at)| {
+    scan_records_at(reader, line, |record, VerificationGeneration(at)| {
         reviews.feed(&record);
         settlements.feed(&record);
         rollbacks.feed(&record, at);
@@ -1026,23 +1035,22 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
 
 /// A voucher's date and its entries as (amount, is debit), sorted, so two
 /// vouchers compare equal whatever order their ledgers were listed in and
-/// whichever ledgers they name. `None` when an amount cannot be read, which a
-/// caller treats as a match.
+/// whichever ledgers they name. The amounts are in canonical form.
 type RowShape = (bridge_tally_core::TallyDate, Vec<(String, bool)>);
 
-fn row_shape(voucher: &ImportVoucher) -> Option<RowShape> {
+fn row_shape(voucher: &ImportVoucher) -> RowShape {
     let mut entries = voucher
         .entries
         .iter()
         .map(|entry| {
-            Some((
-                super::verification::canonical_verification_amount(&entry.amount).ok()?,
+            (
+                entry.amount.canonical().to_string(),
                 matches!(entry.side, EntrySide::Dr),
-            ))
+            )
         })
-        .collect::<Option<Vec<_>>>()?;
+        .collect::<Vec<_>>();
     entries.sort();
-    Some((voucher.date.clone(), entries))
+    (voucher.date.clone(), entries)
 }
 
 /// The id of another batch of the same company that Bridge sent to Tally (a
@@ -1074,10 +1082,6 @@ pub(super) fn rows_already_posted(
 enum InvoiceFigures {
     /// Not an invoice: the guard reads nothing of it.
     NotInvoice,
-    /// An invoice whose amount cannot be read (its date is a `TallyDate`, so
-    /// always readable). The guard never takes this for "no figures": on a
-    /// saved batch it counts as a match.
-    Unreadable,
     Of((String, String, Vec<String>)),
 }
 
@@ -1085,17 +1089,10 @@ fn invoice_figures(voucher: &ImportVoucher) -> InvoiceFigures {
     if !voucher.voucher_type.is_invoice() {
         return InvoiceFigures::NotInvoice;
     }
-    let mut canonical = voucher.clone();
-    for entry in &mut canonical.entries {
-        match super::verification::canonical_verification_amount(&entry.amount) {
-            Ok(amount) => entry.amount = amount,
-            Err(_) => return InvoiceFigures::Unreadable,
-        }
-    }
     InvoiceFigures::Of((
         voucher.date.as_str().to_string(),
         voucher.filed_type_name().to_string(),
-        super::verification::expected_entry_fingerprint(&canonical),
+        super::verification::canonical_entry_fingerprint(voucher),
     ))
 }
 
@@ -1119,7 +1116,6 @@ pub(super) fn unsettled_invoice_twin(
     for figures in batch.vouchers.iter().map(invoice_figures) {
         match figures {
             InvoiceFigures::NotInvoice => {}
-            InvoiceFigures::Unreadable => return Err("import_invoice_figures_unreadable".into()),
             InvoiceFigures::Of(figures) => wanted.push(figures),
         }
     }
@@ -1142,7 +1138,6 @@ pub(super) fn unsettled_invoice_twin(
                     .map(invoice_figures)
                     .any(|figures| match figures {
                         InvoiceFigures::NotInvoice => false,
-                        InvoiceFigures::Unreadable => true,
                         InvoiceFigures::Of(figures) => wanted.contains(&figures),
                     });
             if twin {
@@ -1365,7 +1360,7 @@ pub(super) fn vouchers_already_posted(
     own_batch_id: Option<&str>,
     vouchers: &[ImportVoucher],
 ) -> Result<Option<String>, String> {
-    let mut wanted: BTreeMap<&str, Vec<Option<RowShape>>> = BTreeMap::new();
+    let mut wanted: BTreeMap<&str, Vec<RowShape>> = BTreeMap::new();
     for voucher in vouchers {
         wanted
             .entry(voucher.bridge_txn_id.as_str())
@@ -1385,11 +1380,7 @@ pub(super) fn vouchers_already_posted(
                         .is_some_and(|shapes| {
                             bridge_bank_statement::proposals::is_statement_txn_id(
                                 &voucher.bridge_txn_id,
-                            ) || row_shape(voucher).is_none_or(|shape| {
-                                shapes
-                                    .iter()
-                                    .any(|wanted| wanted.as_ref().is_none_or(|w| *w == shape))
-                            })
+                            ) || shapes.contains(&row_shape(voucher))
                         })
                 });
             if same_row {
@@ -1512,7 +1503,18 @@ pub(super) fn transfer_facts(
 }
 
 fn scan_records(
+    reader: impl BufRead,
+    visit: impl FnMut(Record, VerificationGeneration),
+) -> Result<(), String> {
+    scan_records_at(reader, &std::cell::Cell::new(0), visit)
+}
+
+/// [`scan_records`], leaving in `line` the 1-based line of the record it is reading, so a
+/// caller that wants to say where a refusal came from can ask. Every other reader calls
+/// `scan_records` and gets the bare code, as before.
+fn scan_records_at(
     mut reader: impl BufRead,
+    line_read: &std::cell::Cell<usize>,
     mut visit: impl FnMut(Record, VerificationGeneration),
 ) -> Result<(), String> {
     // Compact records must be checked even for unrelated batches. Retain only
@@ -1550,6 +1552,7 @@ fn scan_records(
     let mut released: BTreeSet<String> = BTreeSet::new();
     let mut line = Vec::new();
     let mut ordinal = 0_usize;
+    line_read.set(1);
     while read_record(&mut reader, &mut line)? {
         let text =
             std::str::from_utf8(&line).map_err(|_| "import_ledger_unavailable".to_string())?;
@@ -1834,6 +1837,7 @@ fn scan_records(
         ordinal = ordinal
             .checked_add(1)
             .ok_or_else(|| "import_ledger_invalid".to_string())?;
+        line_read.set(ordinal.saturating_add(1));
     }
     Ok(())
 }

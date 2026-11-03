@@ -1,5 +1,6 @@
 use super::*;
 use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
+use crate::agent::agent_import::ImportAmount;
 use crate::agent::agent_import::VoucherAction;
 use crate::agent::agent_import::VoucherType;
 use serde_json::json;
@@ -22,7 +23,7 @@ const GSTIN_RJ: &str = "08ZZZZZ0000Z1ZQ";
 fn entry(ledger: &str, amount: &str, side: EntrySide) -> ImportEntry {
     ImportEntry {
         ledger: ledger.to_string(),
-        amount: amount.to_string(),
+        amount: ImportAmount::parse(amount).unwrap(),
         side,
     }
 }
@@ -358,11 +359,11 @@ fn a_party_that_is_not_bill_wise_is_admitted() {
 fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     let refused = |v: &ImportVoucher| codes(classify_sales_invoice(v, &good_facts(), RAJ, AS_OF));
     let mut v = voucher();
-    v.entries[0].amount = "11801.00".to_string();
+    v.entries[0].amount = ImportAmount::parse("11801.00").unwrap();
     assert_eq!(refused(&v), vec!["invoice_party_amount_does_not_close"]);
     // One head off by a rupee: that head is named, with the figure Tally expects.
     let mut v = voucher();
-    v.entries[2].amount = "1000.00".to_string();
+    v.entries[2].amount = ImportAmount::parse("1000.00").unwrap();
     let got = classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).unwrap_err();
     assert_eq!(
         got,
@@ -373,10 +374,10 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     );
     // 9 percent a head of 10.00 is 0.90: 0.01 is no tolerance.
     let mut v = voucher();
-    v.entries[0].amount = "10.02".to_string();
-    v.entries[1].amount = "10.00".to_string();
-    v.entries[2].amount = "0.01".to_string();
-    v.entries[3].amount = "0.01".to_string();
+    v.entries[0].amount = ImportAmount::parse("10.02").unwrap();
+    v.entries[1].amount = ImportAmount::parse("10.00").unwrap();
+    v.entries[2].amount = ImportAmount::parse("0.01").unwrap();
+    v.entries[3].amount = ImportAmount::parse("0.01").unwrap();
     assert_eq!(
         refused(&v),
         vec!["invoice_tax_head_not_expected"; 2],
@@ -389,8 +390,8 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
         ("900.01", "900.01"),
     ] {
         let mut v = voucher();
-        v.entries[2].amount = cgst.to_string();
-        v.entries[3].amount = state.to_string();
+        v.entries[2].amount = ImportAmount::parse(cgst).unwrap();
+        v.entries[3].amount = ImportAmount::parse(state).unwrap();
         assert!(
             codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF))
                 .contains(&"invoice_tax_head_not_expected"),
@@ -399,17 +400,17 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     }
     // 9 percent a head of 10,001.00 is 900.09, a whole paisa: both heads are the figure.
     let mut v = voucher();
-    v.entries[1].amount = "10001.00".to_string();
-    v.entries[2].amount = "900.09".to_string();
-    v.entries[3].amount = "900.09".to_string();
-    v.entries[0].amount = "11801.18".to_string();
+    v.entries[1].amount = ImportAmount::parse("10001.00").unwrap();
+    v.entries[2].amount = ImportAmount::parse("900.09").unwrap();
+    v.entries[3].amount = ImportAmount::parse("900.09").unwrap();
+    v.entries[0].amount = ImportAmount::parse("11801.18").unwrap();
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
     // The figure is worked out on the ledger's rate, not on the tax typed: the
     // ledger says 18 percent, so heads of a 5 percent invoice are refused.
     let mut v = voucher();
-    v.entries[2].amount = "250.00".to_string();
-    v.entries[3].amount = "250.00".to_string();
-    v.entries[0].amount = "10500.00".to_string();
+    v.entries[2].amount = ImportAmount::parse("250.00").unwrap();
+    v.entries[3].amount = ImportAmount::parse("250.00").unwrap();
+    v.entries[0].amount = ImportAmount::parse("10500.00").unwrap();
     assert_eq!(refused(&v), vec!["invoice_tax_head_not_expected"; 2]);
 }
 
@@ -419,10 +420,10 @@ fn a_line_whose_tax_is_not_a_whole_paisa_at_another_rate_than_two_and_a_half_per
     // lab measured the rounding of inexact figures at 2.5 percent only.
     for (line, party) in [("0.50", "0.80"), ("100.10", "100.40")] {
         let mut v = voucher();
-        v.entries[0].amount = party.to_string();
-        v.entries[1].amount = line.to_string();
-        v.entries[2].amount = "0.15".to_string();
-        v.entries[3].amount = "0.15".to_string();
+        v.entries[0].amount = ImportAmount::parse(party).unwrap();
+        v.entries[1].amount = ImportAmount::parse(line).unwrap();
+        v.entries[2].amount = ImportAmount::parse("0.15").unwrap();
+        v.entries[3].amount = ImportAmount::parse("0.15").unwrap();
         assert_eq!(
             codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
             vec!["invoice_tax_rounding_unmeasured"],
@@ -431,10 +432,10 @@ fn a_line_whose_tax_is_not_a_whole_paisa_at_another_rate_than_two_and_a_half_per
     }
     // A line whose tax is whole is admitted at that rate.
     let mut v = voucher();
-    v.entries[0].amount = "118.00".to_string();
-    v.entries[1].amount = "100.00".to_string();
-    v.entries[2].amount = "9.00".to_string();
-    v.entries[3].amount = "9.00".to_string();
+    v.entries[0].amount = ImportAmount::parse("118.00").unwrap();
+    v.entries[1].amount = ImportAmount::parse("100.00").unwrap();
+    v.entries[2].amount = ImportAmount::parse("9.00").unwrap();
+    v.entries[3].amount = ImportAmount::parse("9.00").unwrap();
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
 }
 
@@ -443,7 +444,7 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     // Customer owes 11,800.40: a credit round off of 0.40.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     assert_eq!(validate_invoice_voucher(&v), Ok(()));
     assert_eq!(
@@ -455,13 +456,13 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     // Owes 11,799.60: a debit round off of 0.40.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11799.60".to_string();
+    v.entries[0].amount = ImportAmount::parse("11799.60").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Dr));
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
     // Wrong direction does not close.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Dr));
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -470,7 +471,7 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     // A round off of a rupee or more is refused.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11801.00".to_string();
+    v.entries[0].amount = ImportAmount::parse("11801.00").unwrap();
     v.entries.push(entry("Round Off", "1.00", EntrySide::Cr));
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -481,7 +482,7 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     facts.get_mut("Round Off").unwrap().reserved_groups = vec!["Current Assets".into()];
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     assert!(codes(classify_sales_invoice(&v, &facts, RAJ, AS_OF))
         .contains(&"invoice_round_off_ledger_group"));
@@ -525,7 +526,7 @@ fn a_round_off_ledger_is_admitted_only_with_the_empty_gst_row_the_lab_read() {
         facts.get_mut("Round Off").unwrap().rates = rates;
         let mut v = voucher();
         v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-        v.entries[0].amount = "11800.40".to_string();
+        v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
         v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
         classify_sales_invoice(&v, &facts, RAJ, AS_OF).map(|roles| roles.round_off)
     };
@@ -576,7 +577,7 @@ fn round_off_with(rates: wire::LedgerRateRow) -> Result<Option<usize>, Vec<Invoi
     facts.get_mut("Round Off").unwrap().rates = Some(rates);
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     classify_sales_invoice(&v, &facts, RAJ, AS_OF).map(|roles| roles.round_off)
 }
@@ -740,8 +741,8 @@ fn the_invoice_renderer_writes_each_edge_amount_as_written() {
     {
         let mut v = voucher();
         v.invoice.as_mut().unwrap().observed = Some(observed());
-        v.entries[0].amount = amount.clone();
-        v.entries[1].amount = amount.clone();
+        v.entries[0].amount = ImportAmount::parse(&amount).unwrap();
+        v.entries[1].amount = ImportAmount::parse(&amount).unwrap();
         let xml = render_sales_invoice_xml(
             &v,
             sentinel_uuid(0x1a),
@@ -1503,7 +1504,7 @@ fn an_amount_too_large_to_add_or_multiply_is_refused_instead_of_overflowing() {
     let mut v = voucher();
     let huge = "9".repeat(36) + ".00";
     for entry in &mut v.entries {
-        entry.amount = huge.clone();
+        entry.amount = ImportAmount::parse(&huge).unwrap();
     }
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -1511,10 +1512,12 @@ fn an_amount_too_large_to_add_or_multiply_is_refused_instead_of_overflowing() {
     );
     // The sum fits and the tax's multiplication does not: refused, never wrapped.
     let mut v = voucher();
-    v.entries[1].amount = "1".to_string() + &"0".repeat(35) + ".00";
-    v.entries[2].amount = "1.00".to_string();
-    v.entries[3].amount = "1.00".to_string();
-    v.entries[0].amount = "1".to_string() + &"0".repeat(34) + "2.00";
+    v.entries[1].amount =
+        ImportAmount::parse(&("1".to_string() + &"0".repeat(35) + ".00")).unwrap();
+    v.entries[2].amount = ImportAmount::parse("1.00").unwrap();
+    v.entries[3].amount = ImportAmount::parse("1.00").unwrap();
+    v.entries[0].amount =
+        ImportAmount::parse(&("1".to_string() + &"0".repeat(34) + "2.00")).unwrap();
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
         vec!["invoice_amount_invalid"]
@@ -1803,9 +1806,9 @@ fn each_rate_is_admitted_on_the_ledgers_own_rate_and_no_other() {
             set_tax_rates(&mut facts, ledger_half);
         }
         let mut v = voucher();
-        v.entries[2].amount = leg.to_string();
-        v.entries[3].amount = leg.to_string();
-        v.entries[0].amount = total.to_string();
+        v.entries[2].amount = ImportAmount::parse(leg).unwrap();
+        v.entries[3].amount = ImportAmount::parse(leg).unwrap();
+        v.entries[0].amount = ImportAmount::parse(total).unwrap();
         classify_sales_invoice(&v, &facts, RAJ, AS_OF).map_err(|refusals| refusals[0].code)
     };
     for (half, igst, leg, total) in [
@@ -2163,11 +2166,11 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
         vec!["invoice_tax_head_not_expected"; 2]
     );
     // 9 percent of 3,999.00 is 359.91 and of 6,000.00 is 540.00: 899.91 a head.
-    short.entries[3].amount = "899.91".into();
-    short.entries[4].amount = "899.91".into();
-    short.entries[0].amount = "11798.82".into();
+    short.entries[3].amount = ImportAmount::parse("899.91").unwrap();
+    short.entries[4].amount = ImportAmount::parse("899.91").unwrap();
+    short.entries[0].amount = ImportAmount::parse("11798.82").unwrap();
     assert!(classify_sales_invoice(&short, &facts(), RAJ, AS_OF).is_ok());
-    short.entries[0].amount = "11800.00".into();
+    short.entries[0].amount = ImportAmount::parse("11800.00").unwrap();
     assert_eq!(
         codes(classify_sales_invoice(&short, &facts(), RAJ, AS_OF)),
         vec!["invoice_party_amount_does_not_close"]
@@ -2585,9 +2588,9 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
         facts.get_mut("Sales").unwrap().rates = Some(lab_row("BRIDGE Svc 998313 5%"));
         set_tax_rates(&mut facts, half);
         let mut v = voucher();
-        v.entries[2].amount = "250.00".to_string();
-        v.entries[3].amount = "250.00".to_string();
-        v.entries[0].amount = "10500.00".to_string();
+        v.entries[2].amount = ImportAmount::parse("250.00").unwrap();
+        v.entries[3].amount = ImportAmount::parse("250.00").unwrap();
+        v.entries[0].amount = ImportAmount::parse("10500.00").unwrap();
         classify_sales_invoice(&v, &facts, RAJ, AS_OF_AUG)
     };
     assert_eq!(

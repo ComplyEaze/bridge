@@ -381,7 +381,12 @@ fn rendered(voucher_type: &str, dr: &str, cr: &str) -> String {
     }))
     .expect("voucher");
     let date = normalized_date(&voucher.date).unwrap();
-    render_import_xml("Synthetic Book", &[voucher.dated(date)], "batch-render")
+    let entries = voucher.parsed_entries().expect("an import amount");
+    render_import_xml(
+        "Synthetic Book",
+        &[voucher.admitted(date, entries)],
+        "batch-render",
+    )
 }
 
 #[test]
@@ -435,7 +440,8 @@ fn a_bank_voucher_renders_its_debit_first_whatever_order_the_caller_used() {
     }))
     .expect("voucher");
     let date = normalized_date(&credit_first.date).unwrap();
-    let credit_first = credit_first.dated(date);
+    let entries = credit_first.parsed_entries().expect("an import amount");
+    let credit_first = credit_first.admitted(date, entries);
     let xml = render_import_xml(
         "Synthetic Book",
         std::slice::from_ref(&credit_first),
@@ -1460,10 +1466,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
             .iter()
             .map(|entry| ReadEntry {
                 ledger: entry.ledger.clone(),
-                amount: match entry.side {
-                    EntrySide::Dr => format!("-{}", entry.amount),
-                    EntrySide::Cr => entry.amount.clone(),
-                },
+                amount: entry.amount.signed_lexeme(&entry.side),
                 is_deemed_positive: entry.side.tally_positive().into(),
             })
             .collect::<Vec<_>>();

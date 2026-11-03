@@ -136,7 +136,7 @@ const OTHER_FIGURES: &[(&str, &str, &str)] = &[
 
 /// A saved batch of one invoice with `INVOICE`'s figures, under `number`.
 fn invoice_batch(number: &str) -> ImportLedgerLine {
-    let mut line = payment_batch("unused", "1");
+    let mut line = payment_batch("unused", "1.00");
     line.vouchers[0] = serde_json::from_value(json!({
         "bridge_txn_id":"p-1", "date":"20260311", "voucher_type":"Sales",
         "narration":null, "reference":null, "voucher_number":number,
@@ -491,11 +491,11 @@ fn an_unsettled_twin_is_found_whatever_lexeme_its_figures_were_written_in() {
     let mut earlier = invoice_batch("INV/26-27/011");
     earlier.batch_id = sentinel_batch_id(0xb);
     for entry in &mut earlier.vouchers[0].entries {
-        entry.amount = format!("000{}", entry.amount);
+        entry.amount = ImportAmount::parse(&format!("000{}", entry.amount)).unwrap();
     }
     let invoice = invoice_batch("INV/26-27/002");
     let mut other = invoice_batch("INV/26-27/003");
-    other.vouchers[0].entries[0].amount = "1181.01".into();
+    other.vouchers[0].entries[0].amount = ImportAmount::parse("1181.01").unwrap();
     server.append_import_ledger(&earlier).expect("saved batch");
     let held = server.lock_import_admission().expect("admission lock");
     server

@@ -4410,6 +4410,26 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/forex-register/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "3d75dd1a8fb7252b93f55f9a492ddf449e2be3814feaa781685437f2548dafba",
       "size": 3404
+    },
+    {
+      "blob": "62206ecc1a43e58867a37ecb83382fbf77477f19",
+      "capture_id": "number-read-irn-1.utf16le.xml",
+      "company": "BRIDGE EINVOICE LAB",
+      "lab_ref": "branch lab/2162-irn-read-answers at 4ded3a06",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "bc0a594d61ebc09c170f2f9a4cca9987b7f506d1baa5f1b22c31e59badbead0a",
+      "size": 8734
+    },
+    {
+      "blob": "c3d0782a3c305cd8030087c997f53c3708f49be8",
+      "capture_id": "number-read-irn-2.utf16le.xml",
+      "company": "BRIDGE EINVOICE LAB",
+      "lab_ref": "branch lab/2162-irn-read-answers at 4ded3a06",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "87ede2a7617036b876bb3972a7eef4fc0c2cb7e9673faf16db2945d5292454f2",
+      "size": 5794
     }
   ]
 }

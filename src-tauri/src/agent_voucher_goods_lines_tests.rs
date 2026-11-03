@@ -625,9 +625,41 @@ fn a_kind_no_capture_covers_is_named_and_its_lines_are_not_read() {
         assert_eq!(row["stock_lines_not_read"], true, "{row}");
         assert!(row.get("stock_lines").is_none(), "{row}");
     }
-    // The class says what a child of Credit Note is, whatever it is called.
+    // A child of Credit Note answers its class, but no capture holds one.
     let child = one_note(CREDIT_NOTE, "", Some(ReservedVoucherClass::CreditNote));
-    assert_eq!(child["stock_lines"].as_array().unwrap().len(), 1);
+    assert_eq!(child["stock_lines_not_read"], true, "{child}");
+    assert!(child.get("stock_lines").is_none(), "{child}");
+}
+
+/// The capture with its stock lines cut out, as the Stock Journal answered a childless list on
+/// the shipped read.
+fn without_lines(capture: &[u8], reserved: &str, class: Option<ReservedVoucherClass>) -> String {
+    let xml = resolved(capture, reserved, class);
+    let from = xml.find("<ALLINVENTORYENTRIES.LIST>").expect("a line");
+    let end = "</ALLINVENTORYENTRIES.LIST>";
+    let to = xml.rfind(end).expect("a line") + end.len();
+    format!("{}{}", &xml[..from], &xml[to..])
+}
+
+#[test]
+fn a_voucher_that_only_moves_stock_and_answers_no_line_is_unreadable() {
+    for (capture, reserved) in [
+        (STOCK_JOURNAL, "Stock Journal"),
+        (DELIVERY_NOTE, "Delivery Note"),
+        (RECEIPT_NOTE, "Receipt Note"),
+    ] {
+        let row = stock_rows(&without_lines(capture, reserved, None)).remove(0);
+        assert_eq!(row["stock_lines_unreadable"], "stock_line_missing", "{row}");
+        assert!(row.get("stock_lines").is_none(), "{row}");
+    }
+}
+
+#[test]
+fn a_credit_note_may_answer_no_line() {
+    let class = Some(ReservedVoucherClass::CreditNote);
+    let row = stock_rows(&without_lines(CREDIT_NOTE, "Credit Note", class)).remove(0);
+    assert_eq!(row["stock_lines"], json!([]), "{row}");
+    assert!(row.get("stock_lines_unreadable").is_none(), "{row}");
 }
 
 #[test]

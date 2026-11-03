@@ -2396,8 +2396,12 @@ With `stock_lines: true`, `vouchers` sends a request that returns each voucher's
 `amounts` is empty. A row holds `stock_lines`, each line with `direction` (`in` or `out`), `stock_item`, the two quantities,
 `rate`, `amount` and `batches`, each field `absent`, `empty` or a value as in `goods_lines`; or `stock_lines_unreadable` with
 the reason. An empty amount is not zero: the captured Stock Journal's in side has none. Lines are read for a Stock Journal,
-Delivery Note, Receipt Note and Credit Note. Any other row carries `stock_lines_not_read`, and `kinds_not_read` counts them
-by voucher type, including a type made under a note. `ledger`, `amount`, `suspense_tagged`, `summarise_by`,
+Delivery Note, Receipt Note and Credit Note. For a Stock Journal this is the only read of its stock; for the notes it adds
+`direction`. Any other row carries `stock_lines_not_read`, and `kinds_not_read` counts them by voucher type, including a type
+made under a note or Credit Note. A Stock Journal, Delivery Note or Receipt Note that answers no line reads as
+`stock_lines_unreadable` with `stock_line_missing`. A Credit Note can be accounts only, so its `stock_lines` may be `[]`, which
+says only that this read returned no line, not that no stock moved. What Tally sends for a cancelled or optional voucher is
+not established; each is read like any other. `ledger`, `amount`, `suspense_tagged`, `summarise_by`,
 `bank_allocations`, `goods_lines`, `include_gst_details` and `include_e_invoice` need ledger entries, and each is refused as
 `voucher_stock_lines_excludes_<argument>`. `stock_summary_tie` is always `not_compared`, with the reason beside it. No totals
 are given (protocol reference 8.2i).
@@ -2479,8 +2483,9 @@ its ledger entry. Without the argument, and in every other answer that returns a
 key is not there; the parse reads the lines either way.
 
 - **Invoice vouchers.** In the captures Tally sent a goods line under a ledger entry only on an invoice-mode voucher; the read does not test the voucher's invoice flag and shows the lines of any entry that carries them. A Stock
-  Journal, Delivery Note or Receipt Note has no goods line in this read (`stock_lines` reads those), and a Physical Stock
-  or Manufacturing Journal is not captured, so an entry or a voucher without the key may still have moved stock.
+  Journal has no goods line in this read, and a captured Delivery Note, Receipt Note or Credit Note has one but with no
+  direction; `stock_lines` reads all four. A Physical Stock or Manufacturing Journal is not captured, so an entry or a
+  voucher without the key may still have moved stock.
 - **Held pages.** The goods lines are parsed on every voucher read, so they count toward the 64 MiB of a held window
   (see "What is held" above) whether or not the argument is given: a window rich in goods lines may not be held, and a
   later page then reads it again.

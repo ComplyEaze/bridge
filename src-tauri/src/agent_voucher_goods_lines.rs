@@ -54,6 +54,8 @@ pub(in crate::agent) enum GoodsLineProblem {
     ShapeUnrecognised,
     /// A stock line whose `ISDEEMEDPOSITIVE` is neither `Yes` nor `No`.
     DirectionUnreadable,
+    /// A voucher that exists only to move stock, answered with no stock line.
+    StockLineMissing,
 }
 
 impl GoodsLineProblem {
@@ -67,6 +69,7 @@ impl GoodsLineProblem {
             Self::TooMany => "goods_lines_too_many",
             Self::ShapeUnrecognised => "goods_line_shape_unrecognised",
             Self::DirectionUnreadable => "goods_line_direction_unreadable",
+            Self::StockLineMissing => "stock_line_missing",
         }
     }
 }

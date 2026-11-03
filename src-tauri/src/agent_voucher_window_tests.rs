@@ -9151,6 +9151,29 @@ async fn a_page_asking_for_e_invoice_details_is_not_served_from_a_window_held_wi
     assert_eq!(one.requests(), total);
 }
 
+/// #2016: a later page served from the held window still says what the whole window did not read.
+#[tokio::test]
+async fn a_later_stock_line_page_names_the_kinds_not_read() {
+    let mut plans = counted_vouchers_plans(three_vouchers(), three_vouchers());
+    plans.extend(marks_page_plans(counted_marks()));
+    let total = plans.len();
+    let one = OneServer::spawn(plans);
+    let first = one.call(json!({"limit": 1, "stock_lines": true})).await;
+    let id = page_snapshot(&first)["id"].as_str().unwrap().to_string();
+    let second = one
+        .call(json!({"offset": 1, "limit": 1, "snapshot_id": id, "stock_lines": true}))
+        .await;
+    let [first, second] = [&first, &second].map(|page| &page["structuredContent"]["result"]);
+    assert_eq!(
+        first["kinds_not_read"], second["kinds_not_read"],
+        "{second}"
+    );
+    assert_eq!(second["kinds_not_read"][0]["vouchers"], 3, "{second}");
+    assert_eq!(second["stock_summary_tie"], "not_compared", "{second}");
+    assert_eq!(second["snapshot"]["reused"], true, "{second}");
+    assert_eq!(one.requests(), total);
+}
+
 /// #2016: a window held without stock lines does not serve a page that asks for them.
 #[tokio::test]
 async fn a_page_asking_for_stock_lines_is_not_served_from_a_window_held_without_them() {

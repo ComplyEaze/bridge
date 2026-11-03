@@ -874,6 +874,7 @@ mod sealed_read_tests {
             super::super::voucher_window::VoucherReadShape::ClassEntryWildcard,
             super::super::voucher_window::VoucherReadShape::EInvoiceEntryWildcard,
             super::super::voucher_window::VoucherReadShape::EInvoiceClassEntryWildcard,
+            super::super::voucher_window::VoucherReadShape::ClassInventoryWildcard,
         ] {
             for part_span in [None, Some(span)] {
                 reads

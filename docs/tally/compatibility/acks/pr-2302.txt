@@ -1,4 +1,5 @@
 docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md
+scripts/ledger-entries-ui.test.mjs
 src-tauri/src/agent.rs
 src-tauri/src/agent_catalog.rs
 src-tauri/src/agent_read_profiles.rs

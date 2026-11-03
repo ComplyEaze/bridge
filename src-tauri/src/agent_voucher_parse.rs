@@ -20,7 +20,7 @@ use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
 use cost_centres::CostCentreCollector;
 pub(super) use cost_centres::CostCentreProblem;
 use entry_gst::EntryGstCollector;
-use goods_lines::{GoodsLineCollector, GoodsLineList, STOCK_LINE_LIST};
+use goods_lines::{GoodsLineCollector, GoodsLineList, GoodsLineProblem, STOCK_LINE_LIST};
 pub(super) use scalars::*;
 
 /// Shares the native collection boundary used by the protocol crate: CMPINFO
@@ -337,7 +337,14 @@ const NEEDS_LEDGER_ENTRIES: [&str; 8] = [
 
 /// The voucher types whose stock lines were captured on this request (protocol reference §8.2i).
 /// A type the user made under one has no reserved name, so it is not among them.
-const STOCK_LINE_RESERVED_TYPES: [&str; 3] = ["Stock Journal", "Delivery Note", "Receipt Note"];
+const STOCK_LINE_RESERVED_TYPES: [&str; 4] = [
+    "Stock Journal",
+    "Delivery Note",
+    "Receipt Note",
+    CREDIT_NOTE_RESERVED_TYPE,
+];
+/// The one read type that can be accounts only, so it alone may answer no stock line.
+const CREDIT_NOTE_RESERVED_TYPE: &str = "Credit Note";
 
 impl StockLines {
     /// From the `stock_lines` argument: absent or false does not ask.
@@ -357,10 +364,13 @@ impl StockLines {
     /// Whether this request's lines are read for a voucher of `kind`, resolved by Tally in the
     /// same response. A kind no capture covers is named, never read on trust.
     fn covers(kind: Option<&ResolvedVoucherType>) -> bool {
-        kind.is_some_and(|kind| {
-            kind.class == Some(ReservedVoucherClass::CreditNote)
-                || STOCK_LINE_RESERVED_TYPES.contains(&kind.reserved_name.as_str())
-        })
+        kind.is_some_and(|kind| STOCK_LINE_RESERVED_TYPES.contains(&kind.reserved_name.as_str()))
+    }
+
+    /// Whether a voucher of `kind`, read here, must hold a line: one that exists only to move
+    /// stock and answers none is a read that failed, never a voucher that moved nothing.
+    fn needs_a_line(kind: Option<&ResolvedVoucherType>) -> bool {
+        kind.is_some_and(|kind| kind.reserved_name != CREDIT_NOTE_RESERVED_TYPE)
     }
 }
 
@@ -1040,6 +1050,13 @@ fn parse_voucher_rows(
                                 parsed["stock_lines_not_read"] = Value::Bool(true);
                             } else {
                                 match stock_lines.finish() {
+                                    Ok(lines)
+                                        if lines.is_empty()
+                                            && StockLines::needs_a_line(kind.as_ref()) =>
+                                    {
+                                        parsed["stock_lines_unreadable"] =
+                                            json!(GoodsLineProblem::StockLineMissing.reason());
+                                    }
                                     Ok(lines) => parsed["stock_lines"] = Value::Array(lines),
                                     Err(problem) => {
                                         parsed["stock_lines_unreadable"] = json!(problem.reason());

@@ -1393,7 +1393,11 @@ async fn vouchers_returns_stock_lines_and_names_the_kinds_not_read() {
     let items = result["items"].as_array().unwrap();
     assert_eq!(items[0]["stock_lines"][0]["direction"], "out", "{asked}");
     assert_eq!(items[1]["stock_lines_not_read"], true, "{asked}");
-    assert_eq!(result["kinds_not_read"][0]["vouchers"], 2, "{asked}");
+    assert_eq!(
+        result["kinds_not_read"],
+        json!([{"voucher_type": items[1]["voucher_type"], "vouchers": 2}]),
+        "{asked}"
+    );
     assert_eq!(result["stock_summary_tie"], "not_compared");
     let plain = call_vouchers_with(vouchers_plans(window_with_stock_lines()), json!({})).await;
     assert_eq!(plain["isError"], false, "{plain}");

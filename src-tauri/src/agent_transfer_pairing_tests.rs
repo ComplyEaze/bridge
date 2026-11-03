@@ -2167,6 +2167,48 @@ pub(crate) mod whole_day {
     const T29_V: &[u8] = include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-v.utf16le.xml"
     );
+    // The same days' census read again on 3 November 2026, spanned (0, 12] as
+    // the code sends it since #2199 (`dNN-c2`); one literal path each.
+    const T12_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-c2.request.utf16le.xml");
+    const T12_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d12-c2.utf16le.xml"
+    );
+    const T13_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-c2.request.utf16le.xml");
+    const T13_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d13-c2.utf16le.xml"
+    );
+    const T14_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-c2.request.utf16le.xml");
+    const T14_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d14-c2.utf16le.xml"
+    );
+    const T19_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-c2.request.utf16le.xml");
+    const T19_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d19-c2.utf16le.xml"
+    );
+    const T20_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-c2.request.utf16le.xml");
+    const T20_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d20-c2.utf16le.xml"
+    );
+    const T21_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-c2.request.utf16le.xml");
+    const T21_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d21-c2.utf16le.xml"
+    );
+    const T26_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-c2.request.utf16le.xml");
+    const T26_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d26-c2.utf16le.xml"
+    );
+    const T27_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-c2.request.utf16le.xml");
+    const T27_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d27-c2.utf16le.xml"
+    );
+    const T28_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-c2.request.utf16le.xml");
+    const T28_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d28-c2.utf16le.xml"
+    );
+    const T29_C2_REQ: &[u8] = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-c2.request.utf16le.xml");
+    const T29_C2: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/transfer-days-lab/d29-c2.utf16le.xml"
+    );
     // A captured marks answer that holds no row of the lab company: BRIDGE
     // OUTSTANDINGS LAB's, read on 26 October 2026 with only that book loaded.
     const O_M1: &[u8] = include_bytes!(
@@ -2798,19 +2840,21 @@ pub(crate) mod whole_day {
         vec![(M_REQ, T_M2), (c_req, c), (v_req, v)]
     }
 
-    /// The reads of one day of the run, in the order the code sends them.
+    /// The reads of one day of the run, in the order the code sends them: the
+    /// marks and the day's vouchers of 2 November, and the census spanned as the
+    /// lab read it on 3 November, with the voucher mark unchanged at 12.
     pub(crate) fn run_day(day: u32) -> Vec<Exchange> {
         match day {
-            12 => day_of_run(T12_C_REQ, T12_C, T12_V_REQ, T12_V),
-            13 => day_of_run(T13_C_REQ, T13_C, T13_V_REQ, T13_V),
-            14 => day_of_run(T14_C_REQ, T14_C, T14_V_REQ, T14_V),
-            19 => day_of_run(T19_C_REQ, T19_C, T19_V_REQ, T19_V),
-            20 => day_of_run(T20_C_REQ, T20_C, T20_V_REQ, T20_V),
-            21 => day_of_run(T21_C_REQ, T21_C, T21_V_REQ, T21_V),
-            26 => day_of_run(T26_C_REQ, T26_C, T26_V_REQ, T26_V),
-            27 => day_of_run(T27_C_REQ, T27_C, T27_V_REQ, T27_V),
-            28 => day_of_run(T28_C_REQ, T28_C, T28_V_REQ, T28_V),
-            29 => day_of_run(T29_C_REQ, T29_C, T29_V_REQ, T29_V),
+            12 => day_of_run(T12_C2_REQ, T12_C2, T12_V_REQ, T12_V),
+            13 => day_of_run(T13_C2_REQ, T13_C2, T13_V_REQ, T13_V),
+            14 => day_of_run(T14_C2_REQ, T14_C2, T14_V_REQ, T14_V),
+            19 => day_of_run(T19_C2_REQ, T19_C2, T19_V_REQ, T19_V),
+            20 => day_of_run(T20_C2_REQ, T20_C2, T20_V_REQ, T20_V),
+            21 => day_of_run(T21_C2_REQ, T21_C2, T21_V_REQ, T21_V),
+            26 => day_of_run(T26_C2_REQ, T26_C2, T26_V_REQ, T26_V),
+            27 => day_of_run(T27_C2_REQ, T27_C2, T27_V_REQ, T27_V),
+            28 => day_of_run(T28_C2_REQ, T28_C2, T28_V_REQ, T28_V),
+            29 => day_of_run(T29_C2_REQ, T29_C2, T29_V_REQ, T29_V),
             _ => panic!("no capture of {day} April"),
         }
     }
@@ -2818,6 +2862,46 @@ pub(crate) mod whole_day {
     /// The reads of these days, in the order given (newest first, as planned).
     pub(crate) fn run_days(days: &[u32]) -> Vec<Exchange> {
         days.iter().flat_map(|day| run_day(*day)).collect()
+    }
+
+    /// Each spanned census request is its day's request of 2 November with the
+    /// span added and nothing else changed, and its answer of 3 November holds the
+    /// same vouchers. The answers are not byte-equal: Tally's header counts moved,
+    /// and they are not rows, so the vouchers are compared as the census parses
+    /// them.
+    #[test]
+    fn each_spanned_census_holds_the_vouchers_of_the_days_first_read() {
+        let span = crate::agent::voucher_window::AlterIdSpan {
+            after: 0,
+            through: 12,
+        };
+        for (day, c_req, c, c2_req, c2, vouchers) in [
+            (12, T12_C_REQ, T12_C, T12_C2_REQ, T12_C2, 0),
+            (13, T13_C_REQ, T13_C, T13_C2_REQ, T13_C2, 1),
+            (14, T14_C_REQ, T14_C, T14_C2_REQ, T14_C2, 0),
+            (19, T19_C_REQ, T19_C, T19_C2_REQ, T19_C2, 0),
+            (20, T20_C_REQ, T20_C, T20_C2_REQ, T20_C2, 1),
+            (21, T21_C_REQ, T21_C, T21_C2_REQ, T21_C2, 1),
+            (26, T26_C_REQ, T26_C, T26_C2_REQ, T26_C2, 0),
+            (27, T27_C_REQ, T27_C, T27_C2_REQ, T27_C2, 1),
+            (28, T28_C_REQ, T28_C, T28_C2_REQ, T28_C2, 1),
+            (29, T29_C_REQ, T29_C, T29_C2_REQ, T29_C2, 0),
+        ] {
+            assert_eq!(
+                utf16(c2_req),
+                utf16(c_req).replace(
+                    "</SYSTEM>",
+                    " AND $AlterID &gt; 0 AND $AlterID &lt;= 12</SYSTEM>"
+                ),
+                "{day} April"
+            );
+            let date = chrono::NaiveDate::from_ymd_opt(2026, 4, day).unwrap();
+            let first = parse_voucher_census(&utf16(c), (date, date), None).unwrap();
+            let spanned = parse_voucher_census(&utf16(c2), (date, date), Some(span)).unwrap();
+            assert_eq!(spanned, first, "{day} April");
+            assert_eq!(spanned.len(), vouchers, "{day} April");
+            assert_ne!(c2, c, "{day} April: the header counts moved");
+        }
     }
 
     /// A captured catalogue's ledgers, as the build reads them.

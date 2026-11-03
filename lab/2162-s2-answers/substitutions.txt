@@ -1,0 +1,4 @@
+Answers are as Tally sent them. Replacements in text files, with counts:
+<backup folder>: 2
+<company number>: 1
+<lab folder>: 7

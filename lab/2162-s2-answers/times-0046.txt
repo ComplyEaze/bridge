@@ -1,0 +1,4 @@
+I-0046.xml	a-import-0046.xml	sent +-3.984s	returned +0.000s	curl 0
+R-0046.xml	a-readback-0046-00s.xml	sent +0.000s	returned +0.375s	curl 0
+R-0046.xml	a-readback-0046-05s.xml	sent +5.016s	returned +5.266s	curl 0
+R-0046.xml	a-readback-0046-60s.xml	sent +60.000s	returned +60.157s	curl 0

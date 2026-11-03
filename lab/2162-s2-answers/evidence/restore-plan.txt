@@ -1,0 +1,7 @@
+Restore BK (2162-S2), 3 Nov 2026.
+Folder: <backup folder>, holding this one file only
+File: TDBK1800_<company number>.001, 90,051 B, sha256 7415004dc955c85742b82d1e0e2413c57294f482ee151f204fddf5385cfe1d5e, taken 03-11-2026 09:43 local
+Company: BRIDGE PILOT LAB
+Restore Data Path: Tally's data folder
+Prompts expected and the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace" = Replace
+After: MARKS byte-identical to step 1's (8a0c4268...)

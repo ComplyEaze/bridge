@@ -1,0 +1,8 @@
+Stay on the lab PC: the backup, the screens and the folder listings. sha256, bytes, file.
+deadddcecc3ec9674dd04e287fd33623283b7a4a2a8160657a8e3e8f061ddb1e  337  <lab folder>/evidence/bk-after.txt
+bcac27e426b89790be7b270d10dc26d6e32d7f351c1c75e2ed0deeb19100a448  280  <lab folder>/evidence/bk-before.txt
+b996758687af3baad42dbcaa22aa3c0bd5c9bc26fadc640dd9091349081f6a9e  1679  <lab folder>/evidence/datafolder-after-restore.txt
+6437bffbeab17b4082e1efa8b3b04242deef0bb4a9162890570ad2187cb43743  1743  <lab folder>/evidence/datafolder-before-restore.txt
+51899c5d65572369afd7ba85d30fccfcbf5d52bb889d0fab9066c008dabeab17  50859  <lab folder>/shots/bk-before-accept.png
+b77df6a268afee1825d8f7574eacb56fa55b026833cb73b25c31f64ca31b4ec9  34931  <lab folder>/shots/restore-before-accept.png
+7415004dc955c85742b82d1e0e2413c57294f482ee151f204fddf5385cfe1d5e  90051  <backup folder>/TDBK1800_<company number>.001

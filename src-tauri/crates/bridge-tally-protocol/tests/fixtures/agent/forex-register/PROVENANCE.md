@@ -35,14 +35,14 @@ run sent (#683).
   `native/group_snapshot_forexgroup_lab`). Their requests' sha256 are `df262192…`, `0f10c96e…`,
   `8f620533…`, `71e429b8…` and `205458f1…`.
 
-| file | exchange | bytes | sha256 | request sha256 |
+| file | bytes | sha256 | exchange | request sha256 |
 |---|---|---|---|---|
-| `forex-register-extent.utf16le.xml` | 49 | 4022 | `4d633cf38f2c16b20bb4d6a3e7d2f34795c3a54c8e75a4ef36f5eaf64b26eaeb` | `9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8` |
-| `forex-register-book-extent.utf16le.xml` | 54 | 3858 | `76911fc5b7b0fdebbace31d0d7721225a86ac3af70a2ca2120b6e975014b562d` | `017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62` |
-| `forex-register-ledgers-master.utf16le.xml` | 82 | 19456 | `3460bd62e2db1ae65d90d1e1bc178bf61a926eeed55202fe0d9c7d4f153aa7d8` | `b20e80b785c040a31c70051dab8ded0af0a7e5bdcff479a0ed78e8e5c3d2abb4` |
-| `forex-register-census.utf16le.xml` | 102 | 29456 | `817075d4b105ce5fe2879f4f9a50037f9977ce9e5c4b857db11065d34e786472` | `12e97cc3a11334e443568e1d5a956718d429f1afce590246dc0cb0b1f3bf853c` |
-| `forex-register-window.utf16le.xml` | 108 | 404502 | `c87866eb0db4d4b1622caf2d69d6a24e03efc1f6f80afef499852fd78cd7d771` | `ab78fbe5afeb6734a3ec36a940dc098371560faf0a1210ca7e511927ee3dd2f5` |
-| `forex-register-marks.utf16le.xml` | 10 | 3404 | `3d75dd1a8fb7252b93f55f9a492ddf449e2be3814feaa781685437f2548dafba` | `5b447d03d63414bb46753503faee9b105347e13c28cac548bfd51d6fdb9fb4b7` |
+| `forex-register-extent.utf16le.xml` | 4022 | `4d633cf38f2c16b20bb4d6a3e7d2f34795c3a54c8e75a4ef36f5eaf64b26eaeb` | 49 | `9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8` |
+| `forex-register-book-extent.utf16le.xml` | 3858 | `76911fc5b7b0fdebbace31d0d7721225a86ac3af70a2ca2120b6e975014b562d` | 54 | `017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62` |
+| `forex-register-ledgers-master.utf16le.xml` | 19456 | `3460bd62e2db1ae65d90d1e1bc178bf61a926eeed55202fe0d9c7d4f153aa7d8` | 82 | `b20e80b785c040a31c70051dab8ded0af0a7e5bdcff479a0ed78e8e5c3d2abb4` |
+| `forex-register-census.utf16le.xml` | 29456 | `817075d4b105ce5fe2879f4f9a50037f9977ce9e5c4b857db11065d34e786472` | 102 | `12e97cc3a11334e443568e1d5a956718d429f1afce590246dc0cb0b1f3bf853c` |
+| `forex-register-window.utf16le.xml` | 404502 | `c87866eb0db4d4b1622caf2d69d6a24e03efc1f6f80afef499852fd78cd7d771` | 108 | `ab78fbe5afeb6734a3ec36a940dc098371560faf0a1210ca7e511927ee3dd2f5` |
+| `forex-register-marks.utf16le.xml` | 3404 | `3d75dd1a8fb7252b93f55f9a492ddf449e2be3814feaa781685437f2548dafba` | 10 | `5b447d03d63414bb46753503faee9b105347e13c28cac548bfd51d6fdb9fb4b7` |
 
 ## What it establishes
 

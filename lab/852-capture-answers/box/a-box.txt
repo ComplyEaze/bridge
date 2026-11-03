@@ -1,0 +1,40 @@
+﻿2026-11-03T09:08:09.441Z watch start: tally window 0xa826a4; see within 120 s; answer by 70 s
+2026-11-03T09:08:27.357Z BOX SEEN 0x1520444 pid 16624 title 'ComplyEaze Bridge — post 50 vouchers?' class #32770
+2026-11-03T09:08:27.659Z rect 686,162,1252,945 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-03T09:08:27.718Z foreground 0x1520444 pid 16624 bridge_mcp title 'ComplyEaze Bridge — post 50 vouchers?'
+2026-11-03T09:08:27.740Z child Button rect 901,889,1001,922 text: &Yes
+2026-11-03T09:08:27.758Z child Button rect 1011,889,1111,922 text: &No
+2026-11-03T09:08:27.773Z child Button rect 1121,889,1221,922 text: Cancel
+2026-11-03T09:08:27.789Z child Static rect 723,233,763,273 text: 
+2026-11-03T09:08:27.838Z child Static rect 773,233,1203,843 text: Press Y (or click Yes) to post these 50 vouchers into Tally. Press N (or click No) to cancel.
+Nothing is posted until you answer.
+
+Create 50 vouchers in "BRIDGE LARGE LAB"
+Company number: <company number>  Books from: 1-Apr-2026
+Types: 6 Contra, 20 Payment, 24 Receipt
+Dates: 11-Oct-2026 to 20-Oct-2026  Voucher numbers: Tally assigns them
+Total debit: 333168  Total credit: 333168
+Money in by Receipt vouchers: 16368
+Money out by Payment vouchers: 13180
+Contra: moves between cash/bank ledgers, net zero
+Company GUID: 2ba6df28-d1e3-4e81-b6d2-eb50f0a693ab
+Tally: http://127.0.0.1:9002
+Per-voucher lines are not shown: this batch has over 10 vouchers.
+
+Dr 317736  Cr 15432  50 entries  "Lab Vol Bank"
+Dr 2252  Cr 301368  6 entries  "Lab Vol Cash"
+Dr 13180  Cr 0  20 entries  "Lab Vol Expense"
+Dr 0  Cr 16368  24 entries  "Lab Vol Income"
+
+Batch: bridge-ae5034d3-c28d-427a-9251-c9b6718d0dac
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+2026-11-03T09:08:28.331Z capture a-open.png 1920x1080 398676 B sha256 5c53c919cca8eca088136fd4e3109e314d381a7649c9cd64c32a142b088b1977
+2026-11-03T09:08:28.358Z WAITING for <lab folder>\box\a.answer
+2026-11-03T09:08:28.729Z before click: foreground 0x1520444 pid 16624 bridge_mcp title 'ComplyEaze Bridge — post 50 vouchers?'
+2026-11-03T09:08:28.890Z CLICKED Yes at 951,906 (physical) 2026-11-03T09:08:28.812Z; seen-to-click 1.5 s
+2026-11-03T09:08:29.920Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

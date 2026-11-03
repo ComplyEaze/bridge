@@ -1,0 +1,7 @@
+Relay logs, import requests and answers, and raw reads are as sent and received. Tool answers: company_number values replaced by a JSON parser first. Replacements in text files and tool answers, with counts:
+<backup folder>: 1
+<build folder>: 2
+<company number>: 16
+<desktop client>: 4
+<lab folder>: 21
+<lab root>: 1

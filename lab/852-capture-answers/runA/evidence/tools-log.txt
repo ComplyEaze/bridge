@@ -1,0 +1,10 @@
+2026-11-03T09:07:08.066Z 000-companies.json list_companies secs 0.193 bytes 1563 isError False
+2026-11-03T09:07:21.746Z 001-build-a.json build_import_xml secs 18.06 bytes 22899 isError False
+2026-11-03T09:08:10.502Z 002-post-a-1.json post_import secs 49.365 bytes 32891 isError False
+2026-11-03T09:09:14.201Z 003-verify-a.json verify_import secs 16.064 bytes 32381 isError False
+2026-11-03T09:09:31.130Z 004-egress-a.json egress_log secs 0.057 bytes 49189 isError False
+2026-11-03T09:09:59.810Z 005-companies-b.json list_companies secs 0.126 bytes 1563 isError False
+2026-11-03T09:10:03.651Z 006-build-b.json build_import_xml secs 20.821 bytes 22900 isError False
+2026-11-03T09:10:45.785Z 007-post-b-1.json post_import secs 49.691 bytes 32933 isError False
+2026-11-03T09:11:47.501Z 008-verify-b.json verify_import secs 15.936 bytes 32424 isError False
+2026-11-03T09:12:04.554Z 009-egress-b.json egress_log secs 0.093 bytes 49196 isError False

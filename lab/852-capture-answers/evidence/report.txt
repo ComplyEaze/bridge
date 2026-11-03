@@ -1,0 +1,16 @@
+== batch a: relay events ['listening', 'open', 'sent']; requests 394; reply_lost/tally_closed/relay_error: 0
+   post_import call: start 2026-11-03T09:08:10.502Z end 2026-11-03T09:08:59.867Z seconds 49.365
+   in the call: requests before the import 144, sent bytes 188108, answered bytes 29199413, summed answer_s 12.281
+   the import line: utc 2026-11-03T09:08:45.537Z sent 66616 answered 548 first_byte_s 6.593 answer_s 6.593 bridge_left_s None | import-1.request file 66733 B (HTTP headers and body) | import lines 1
+   Tally counters (import-1.answer): {'CREATED': ['50'], 'ALTERED': ['0'], 'DELETED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['29980'], 'LINEERROR': []}
+   in the call: requests after the import 73, sent bytes 96756, answered bytes 13039675, summed answer_s 6.139
+   whole log: requests 394, max answer_s 6.593, any bridge_left_s set: []
+   result: state posted_verified created 50 response_state response_clean attempt_recorded None code None
+== batch b: relay events ['listening', 'open', 'sent']; requests 394; reply_lost/tally_closed/relay_error: 0
+   post_import call: start 2026-11-03T09:10:45.785Z end 2026-11-03T09:11:35.476Z seconds 49.691
+   in the call: requests before the import 144, sent bytes 188108, answered bytes 29200521, summed answer_s 13.081
+   the import line: utc 2026-11-03T09:11:20.760Z sent 66616 answered 548 first_byte_s 6.547 answer_s 6.547 bridge_left_s None | import-1.request file 66733 B (HTTP headers and body) | import lines 1
+   Tally counters (import-1.answer): {'CREATED': ['50'], 'ALTERED': ['0'], 'DELETED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['30030'], 'LINEERROR': []}
+   in the call: requests after the import 73, sent bytes 96756, answered bytes 13040595, summed answer_s 6.264
+   whole log: requests 394, max answer_s 6.547, any bridge_left_s set: []
+   result: state posted_verified created 50 response_state response_clean attempt_recorded None code None

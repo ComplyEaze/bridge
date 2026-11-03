@@ -1,0 +1,1 @@
+eb2c5b088b1b9662f9a5e26832dbf9535133e4a677fb755859ec317f9465408e *<build folder>/master-838242cb/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe

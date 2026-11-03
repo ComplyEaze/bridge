@@ -1,0 +1,12 @@
+Stay on the lab PC: the backup, the screens, the box captures and the folder listings. sha256, bytes, file.
+5c53c919cca8eca088136fd4e3109e314d381a7649c9cd64c32a142b088b1977  398676  <lab folder>/box/a-open.png
+eff9ffaf71174607e9b973fb59a6870855c61a4bcc2174cb085717d5cf5219ca  362291  <lab folder>/box/b-open.png
+3b5b0bde2e13534bb01f594b3c9fbee9abcac166db20ac8ecab456b41dee0409  336  <lab folder>/evidence/bk-after.txt
+90f7ed62b3ec2fd37d8358994172d2eed5e0722cc12bb28272722616b30e3fcc  279  <lab folder>/evidence/bk-before.txt
+473b18200d1060121c378061be96c03be823cfe09de2f27f374cae952458f86b  45033  <lab folder>/shots/a-step5-gateway.png
+d7fe82a0fa3fab52686f4779129e3f94671e02f12e48efe12e2c852288bb5177  43965  <lab folder>/shots/a-step7.png
+d7fe82a0fa3fab52686f4779129e3f94671e02f12e48efe12e2c852288bb5177  43965  <lab folder>/shots/b-step5-gateway.png
+d7fe82a0fa3fab52686f4779129e3f94671e02f12e48efe12e2c852288bb5177  43965  <lab folder>/shots/b-step7.png
+f08842b93f68d2d72ad2c2157d77da6c0145976b761ab495f3484775fdaa7f4d  50872  <lab folder>/shots/bk-before-accept.png
+473b18200d1060121c378061be96c03be823cfe09de2f27f374cae952458f86b  45033  <lab folder>/shots/step0-gateway.png
+21fa4777b948be272c6738f53a0c793a6f068cca865c062e8c61c18fd5e5d4bb  9047800  <backup folder>/TDBK1800_<company number>.001

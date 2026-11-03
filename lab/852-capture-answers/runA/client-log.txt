@@ -1,0 +1,14 @@
+2026-11-03T09:07:03Z exe sha256 eb2c5b088b1b9662f9a5e26832dbf9535133e4a677fb755859ec317f9465408e ok; launch-env.json sha256 b440d17a4c62236c4cc774def098e924af976e28935c0057887d71b599a18942; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-03T09:07:04Z launched pid 19032; stderr to server-stderr-20261103T090703Z.log
+2026-11-03T09:07:04Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-03T09:07:08Z 000-companies.json tool=list_companies secs=0.193 isError=False error=None saved_sha256=a0736a5d3543da9e3e7ec9d189db657ca5c6e4bc9cfdbee70f706d22f69f30bc
+2026-11-03T09:07:40Z 001-build-a.json tool=build_import_xml secs=18.060 isError=False error=None saved_sha256=c6bb48bcff74798ae479adfb5970e6d98f906d682fdc619ffbf329ae5125e534
+2026-11-03T09:09:00Z 002-post-a-1.json tool=post_import secs=49.365 isError=False error=None saved_sha256=3106bfa331cc45f5fc58d97fd550126a44f43efd793e63fa4a5cb72af8a0f30f
+2026-11-03T09:09:30Z 003-verify-a.json tool=verify_import secs=16.064 isError=False error=None saved_sha256=14eeb5ce6581504f985e5831061c68d152f676b7d8cb5dcfea7cc5f5e6b38008
+2026-11-03T09:09:31Z 004-egress-a.json tool=egress_log secs=0.057 isError=False error=None saved_sha256=937ced0d9ad39032e53fa2ab0e3eedc97fd8e099f59ce93dd5b67a6fb84b368d
+2026-11-03T09:10:00Z 005-companies-b.json tool=list_companies secs=0.126 isError=False error=None saved_sha256=30f0949ffb431114cdb0e98f3d63c962f879c9201c0db9fd5622131f1ddfbb14
+2026-11-03T09:10:24Z 006-build-b.json tool=build_import_xml secs=20.821 isError=False error=None saved_sha256=9c45c0f8ed9112c12d5b06be84eed7e92a4ecd13531c65e8209d8a2e5654eeb0
+2026-11-03T09:11:35Z 007-post-b-1.json tool=post_import secs=49.691 isError=False error=None saved_sha256=027aedff639f859a7eb635ca6d093ee6538ee2da5e4f0268d306934b8894b8d2
+2026-11-03T09:12:03Z 008-verify-b.json tool=verify_import secs=15.936 isError=False error=None saved_sha256=15489fd32b570065cdeeaff8e5e1c510202384537f7a5a7c448b2234790ca57d
+2026-11-03T09:12:05Z 009-egress-b.json tool=egress_log secs=0.093 isError=False error=None saved_sha256=bf2e610774fcf9bc68c202cfce04af54b3d3e618b157db8a516688854e1c623c
+2026-11-03T09:12:15Z session ended; server pid 19032 exit code 0

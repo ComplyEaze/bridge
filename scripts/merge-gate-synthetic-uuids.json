@@ -456,6 +456,10 @@
     {
       "uuid": "4e4af679-b48b-48ac-b9ca-71f3ea6a507d",
       "note": "batch identifier, written by ComplyEaze Bridge's own build, of the synthetic lab company BRIDGE AMEND LAB: the captured batch l1-reentry-journal.jsonl and l1-reentry-import.xml under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/, public on master."
+    },
+    {
+      "uuid": "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0",
+      "note": "company identifier of the synthetic lab company BRIDGE NOTES LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/ (pull request 2301; lab branches lab/2027-gst-note-fields-capture-answers at 07e3bc34, lab/2027-voucher-gst-fields-fetch-answers at 67039e2b and lab/2027-window-read-answers at 307427aa); the voucher identifiers in those captures and their parse records are this value with a suffix"
     }
   ]
 }

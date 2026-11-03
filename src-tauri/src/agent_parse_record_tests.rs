@@ -43,6 +43,7 @@ const MISMATCHES_SHOWN: usize = 20;
 /// The companies the reading tests name, each the GUID its capture carries.
 const WR2_LAB: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const NOTES_LAB: &str = "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0";
 const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
@@ -144,12 +145,12 @@ fn agent_rows(text: &str, guid: &str) -> String {
 }
 
 fn stock_line_rows(text: &str, guid: &str) -> String {
-    use super::voucher_parse::{parse_agent_rows_reading_gst, EInvoiceFields, StockLines};
+    use super::voucher_parse::{parse_agent_rows_reading_gst, NamedVoucherFields, StockLines};
     coded(parse_agent_rows_reading_gst(
         text,
         guid,
         super::GstDetailsShown::Withheld,
-        EInvoiceFields::NotAsked,
+        NamedVoucherFields::NOT_ASKED,
         StockLines::Asked,
     ))
 }
@@ -595,6 +596,31 @@ fn rows() -> Vec<Row> {
         "agent/native-namespaced-journal.utf16le.xml",
         "parse_agent_rows(WR2_LAB)",
         |_, t| agent_rows(t, WR2_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/native-four-vouchers.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/shipped-read-credit-note.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
     ));
     rows.push(row!(
         "agent/native-three-vouchers.utf16le.xml",

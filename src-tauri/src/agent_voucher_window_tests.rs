@@ -9100,35 +9100,53 @@ mod ledger_window {
     }
 }
 
-/// #1378: the shapes that name the e-invoice details are the window request and nothing else
-/// changed, and neither the plain nor the class request names them.
+/// #1378, #2027: a shape that names more fields is the window request with those words and
+/// nothing else changed, and neither the plain nor the class request names them.
 #[test]
-fn only_a_read_that_asks_names_the_e_invoice_details() {
+fn only_a_read_that_asks_names_the_e_invoice_and_voucher_gst_details() {
+    const E_INVOICE: &str = ",IRN,IRNACKNO,IRNACKDATE";
+    const GST: &str = ",PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,GSTNATUREOFRETURN,\
+VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE";
     let day = TallyDate::parse("20250401").unwrap();
     let render = |shape: VoucherReadShape| shape.render("Lab", &day, &day, None).unwrap();
-    for (plain, asking) in [
-        (
-            VoucherReadShape::EntryWildcard,
-            VoucherReadShape::EInvoiceEntryWildcard,
-        ),
-        (
-            VoucherReadShape::ClassEntryWildcard,
-            VoucherReadShape::EInvoiceClassEntryWildcard,
-        ),
+    let fields = |e_invoice, gst| NamedVoucherFields { e_invoice, gst };
+    for plain in [
+        VoucherReadShape::EntryWildcard,
+        VoucherReadShape::ClassEntryWildcard,
     ] {
-        assert_eq!(plain.asking(EInvoiceFields::NotAsked), plain);
-        assert_eq!(plain.asking(EInvoiceFields::Asked), asking);
-        assert_eq!(plain.e_invoice(), EInvoiceFields::NotAsked);
-        assert_eq!(asking.e_invoice(), EInvoiceFields::Asked);
-        assert!(!render(plain).contains("IRN"));
-        assert_eq!(
-            render(asking).replace(",IRN,IRNACKNO,IRNACKDATE", ""),
-            render(plain)
-        );
+        assert_eq!(plain.asking(NamedVoucherFields::NOT_ASKED), plain);
+        assert_eq!(plain.named_fields(), NamedVoucherFields::NOT_ASKED);
+        let plain_request = render(plain);
+        assert!(!plain_request.contains("IRN"));
+        assert!(!plain_request.contains("PLACEOFSUPPLY"));
+        for (asked, words) in [
+            (
+                fields(EInvoiceFields::Asked, VoucherGstFields::NotAsked),
+                E_INVOICE.to_string(),
+            ),
+            (
+                fields(EInvoiceFields::NotAsked, VoucherGstFields::Asked),
+                GST.to_string(),
+            ),
+            (
+                fields(EInvoiceFields::Asked, VoucherGstFields::Asked),
+                format!("{E_INVOICE}{GST}"),
+            ),
+        ] {
+            let asking = plain.asking(asked);
+            assert_eq!(asking.named_fields(), asked);
+            let request = render(asking);
+            assert!(
+                request.contains(&format!("REFERENCEDATE{words}")),
+                "{request}"
+            );
+            assert_eq!(request.replace(&words, ""), plain_request);
+        }
     }
     // A shape outside the `vouchers` tool is never asked.
+    let both = fields(EInvoiceFields::Asked, VoucherGstFields::Asked);
     assert_eq!(
-        VoucherReadShape::Movement.asking(EInvoiceFields::Asked),
+        VoucherReadShape::Movement.asking(both),
         VoucherReadShape::Movement
     );
 }

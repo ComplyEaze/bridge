@@ -155,7 +155,7 @@ pub(super) fn parse_import_verification_rows(
         company_guid,
         CompositePolicy::Refuse,
         GstDetailsShown::Withheld,
-        (EInvoiceFields::NotAsked, StockLines::NotAsked),
+        (NamedVoucherFields::NOT_ASKED, StockLines::NotAsked),
     )?)
 }
 
@@ -171,7 +171,7 @@ pub(super) fn parse_agent_rows_with_accounting_state(
         company_guid,
         CompositePolicy::Refuse,
         GstDetailsShown::Withheld,
-        (EInvoiceFields::NotAsked, StockLines::NotAsked),
+        (NamedVoucherFields::NOT_ASKED, StockLines::NotAsked),
     )?)
 }
 
@@ -181,7 +181,7 @@ pub(super) fn parse_agent_rows_reading_gst(
     xml: &str,
     company_guid: &str,
     gst: GstDetailsShown,
-    e_invoice: EInvoiceFields,
+    named: NamedVoucherFields,
     stock: StockLines,
 ) -> Result<Vec<Value>, String> {
     refused_composites(parse_voucher_rows(
@@ -191,7 +191,7 @@ pub(super) fn parse_agent_rows_reading_gst(
         company_guid,
         CompositePolicy::Refuse,
         gst,
-        (e_invoice, stock),
+        (named, stock),
     )?)
 }
 
@@ -209,7 +209,7 @@ pub(super) fn parse_agent_rows_withholding(
         xml,
         company_guid,
         GstDetailsShown::Withheld,
-        EInvoiceFields::NotAsked,
+        NamedVoucherFields::NOT_ASKED,
         StockLines::NotAsked,
     )
 }
@@ -220,7 +220,7 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
     xml: &str,
     company_guid: &str,
     gst: GstDetailsShown,
-    e_invoice: EInvoiceFields,
+    named: NamedVoucherFields,
     stock: StockLines,
 ) -> Result<Vec<VoucherRow>, String> {
     Ok(parse_voucher_rows(
@@ -230,7 +230,7 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
         company_guid,
         CompositePolicy::Withhold,
         gst,
-        (e_invoice, stock),
+        (named, stock),
     )?
     .into_iter()
     .map(|(row, withheld)| {
@@ -243,8 +243,8 @@ pub(super) fn parse_agent_rows_withholding_reading_gst(
     .collect())
 }
 
-/// One e-invoice detail of a voucher, as a read that asked for it found it.
-enum EInvoiceField<'row> {
+/// One detail of a voucher that its read named, as that read found it.
+enum VoucherDetail<'row> {
     Present(&'row str),
     /// Tally sent the element, empty: the voucher does not carry this detail.
     Absent,
@@ -252,13 +252,22 @@ enum EInvoiceField<'row> {
     NotReported,
 }
 
-impl<'row> EInvoiceField<'row> {
+impl<'row> VoucherDetail<'row> {
     fn of(row: &'row BTreeMap<String, String>, element: &str) -> Self {
         match row.get(element).map(|value| value.trim()) {
             None => Self::NotReported,
             Some("") => Self::Absent,
             Some(value) => Self::Present(value),
         }
+    }
+
+    /// A present value of an element Tally types as a date must be one, or the read is refused.
+    fn require_date(&self, refusal: &str) -> Result<(), String> {
+        if let Self::Present(date) = self {
+            bridge_tally_core::TallyDate::parse((*date).to_string())
+                .map_err(|_| refusal.to_string())?;
+        }
+        Ok(())
     }
 
     fn to_json(&self) -> Value {
@@ -268,6 +277,14 @@ impl<'row> EInvoiceField<'row> {
             Self::NotReported => json!({"state": "not_reported"}),
         }
     }
+}
+
+/// A row says named details only for an invoice, or a voucher that carries one of them.
+fn row_says_details(row: &BTreeMap<String, String>, details: &[&VoucherDetail]) -> bool {
+    details
+        .iter()
+        .any(|detail| matches!(detail, VoucherDetail::Present(_)))
+        || row.get("ISINVOICE").map(|value| value.trim()) == Some("Yes")
 }
 
 /// Whether a read's fetch list named the e-invoice details (#1378). Absent is said only when they
@@ -287,23 +304,16 @@ impl EInvoiceFields {
         })
     }
 
-    /// An invoice's details, or a voucher's if it carries any (protocol reference §8.2j). Tally's
-    /// `IRNACKDATE` is `TYPE="Date"`: a present value must be a date, or the read is refused.
+    /// An invoice's details, or a voucher's if it carries any (protocol reference §8.2j).
     fn details(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
         if self == Self::NotAsked {
             return Ok(None);
         }
-        let irn = EInvoiceField::of(row, "IRN");
-        let ack_no = EInvoiceField::of(row, "IRNACKNO");
-        let ack_date = EInvoiceField::of(row, "IRNACKDATE");
-        if let EInvoiceField::Present(date) = ack_date {
-            bridge_tally_core::TallyDate::parse(date.to_string())
-                .map_err(|_| "voucher_irn_ack_date_invalid".to_string())?;
-        }
-        let carried = [&irn, &ack_no, &ack_date]
-            .iter()
-            .any(|field| matches!(field, EInvoiceField::Present(_)));
-        if !carried && row.get("ISINVOICE").map(|value| value.trim()) != Some("Yes") {
+        let irn = VoucherDetail::of(row, "IRN");
+        let ack_no = VoucherDetail::of(row, "IRNACKNO");
+        let ack_date = VoucherDetail::of(row, "IRNACKDATE");
+        ack_date.require_date("voucher_irn_ack_date_invalid")?;
+        if !row_says_details(row, &[&irn, &ack_no, &ack_date]) {
             return Ok(None);
         }
         Ok(Some(json!({
@@ -373,6 +383,77 @@ impl StockLines {
     /// (protocol reference §8.2i); a cancelled Stock Journal or Receipt Note is unverified.
     fn needs_a_line(kind: Option<&ResolvedVoucherType>, cancelled: bool) -> bool {
         !cancelled && kind.is_some_and(|kind| kind.reserved_name != CREDIT_NOTE_RESERVED_TYPE)
+    }
+}
+
+/// Whether a read's fetch list named a voucher's GST and note details (#2027). Absent is said only
+/// when they were asked for, as for [`EInvoiceFields`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum VoucherGstFields {
+    Asked,
+    NotAsked,
+}
+
+impl VoucherGstFields {
+    /// A call that shows each entry's GST details asks for these as well.
+    pub(super) const fn following(shown: GstDetailsShown) -> Self {
+        match shown {
+            GstDetailsShown::Shown => Self::Asked,
+            GstDetailsShown::Withheld => Self::NotAsked,
+        }
+    }
+
+    /// An invoice's details, or a voucher's if it carries any (protocol reference §8.2k).
+    fn details(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
+        if self == Self::NotAsked {
+            return Ok(None);
+        }
+        let place_of_supply = VoucherDetail::of(row, "PLACEOFSUPPLY");
+        let party_state = VoucherDetail::of(row, "STATENAME");
+        let registration_type = VoucherDetail::of(row, "GSTREGISTRATIONTYPE");
+        let note_reason = VoucherDetail::of(row, "GSTNATUREOFRETURN");
+        let party_note_number = VoucherDetail::of(row, "VATPARTYTRANSRETURNNUMBER");
+        let party_note_date = VoucherDetail::of(row, "VATPARTYTRANSRETURNDATE");
+        party_note_date.require_date("voucher_party_note_date_invalid")?;
+        let details = [
+            &place_of_supply,
+            &party_state,
+            &registration_type,
+            &note_reason,
+            &party_note_number,
+            &party_note_date,
+        ];
+        if !row_says_details(row, &details) {
+            return Ok(None);
+        }
+        Ok(Some(json!({
+            "place_of_supply": place_of_supply.to_json(),
+            "party_state": party_state.to_json(),
+            "registration_type": registration_type.to_json(),
+            "note_reason": note_reason.to_json(),
+            "party_note_number": party_note_number.to_json(),
+            "party_note_date": party_note_date.to_json(),
+        })))
+    }
+}
+
+/// The voucher fields a read's fetch list names beyond the plain list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct NamedVoucherFields {
+    pub(super) e_invoice: EInvoiceFields,
+    pub(super) gst: VoucherGstFields,
+}
+
+impl NamedVoucherFields {
+    pub(super) const NOT_ASKED: Self = Self {
+        e_invoice: EInvoiceFields::NotAsked,
+        gst: VoucherGstFields::NotAsked,
+    };
+
+    /// Whether the list names anything: a const `self != Self::NOT_ASKED`.
+    pub(super) const fn names_any(self) -> bool {
+        matches!(self.e_invoice, EInvoiceFields::Asked)
+            || matches!(self.gst, VoucherGstFields::Asked)
     }
 }
 
@@ -593,7 +674,7 @@ fn parse_voucher_rows(
     company_guid: &str,
     composites: CompositePolicy,
     gst_details: GstDetailsShown,
-    (e_invoice, stock): (EInvoiceFields, StockLines),
+    (named, stock): (NamedVoucherFields, StockLines),
 ) -> Result<Vec<(Value, bool)>, String> {
     // An entry's GST details are read only for a call that shows them (#2027): a read that does
     // not ask holds, sizes and returns exactly the rows it did before.
@@ -1182,8 +1263,11 @@ fn parse_voucher_rows(
                         {
                             parsed["party_gstin"] = json!(party_gstin);
                         }
-                        if let Some(details) = e_invoice.details(&row)? {
+                        if let Some(details) = named.e_invoice.details(&row)? {
                             parsed["e_invoice"] = details;
+                        }
+                        if let Some(details) = named.gst.details(&row)? {
+                            parsed["voucher_gst"] = details;
                         }
                         rows.push((parsed, withheld));
                     }

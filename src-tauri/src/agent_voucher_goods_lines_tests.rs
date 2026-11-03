@@ -539,7 +539,7 @@ fn stock_rows(xml: &str) -> Vec<Value> {
         xml,
         SHAPE_LAB,
         GstDetailsShown::Withheld,
-        EInvoiceFields::NotAsked,
+        NamedVoucherFields::NOT_ASKED,
         StockLines::Asked,
     )
     .expect("the read succeeds")

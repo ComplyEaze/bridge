@@ -2407,6 +2407,16 @@ Receipt Note or Credit Note the same way, which is unverified. An optional Deliv
 `voucher_stock_lines_excludes_<argument>`. `stock_summary_tie` is always `not_compared`, with the reason beside it. No totals
 are given (protocol reference 8.2i).
 
+### GST and note details in `vouchers` (#2027)
+
+With `include_gst_details: true`, a row of `vouchers` for an invoice, or for any voucher that carries a detail, also holds
+`voucher_gst`: `place_of_supply`, `party_state`, `registration_type`, `note_reason`, `party_note_number` and `party_note_date`,
+each stated as `e_invoice` states its details. `party_note_date` is `YYYYMMDD`; one that is not a date refuses the read
+(`voucher_party_note_date_invalid`). A note's original invoice is its `reference` and `reference_date`, and the party's own note is
+`party_note_number` and `party_note_date`. Reads without this argument or `include_e_invoice` send the request they did before.
+Measured on one synthetic book, one voucher of each kind, with one party in another state: not unregistered parties, exports
+or a note without an original invoice (protocol reference 8.2k).
+
 ### Cost-centre allocations in voucher reads
 
 Each ledger entry that carries cost-centre allocations has `cost_centre_allocations`, a list of
@@ -3254,8 +3264,10 @@ Both absent states rest on the order Tally serves requests in: the read that fin
 the name absent is sent after the create's send ended, and Tally has been seen to
 serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection and with the
-create, the read or both on a reused connection, behind a long read, and with every
-request on a new connection behind a long import (#2176). Their answers carry
+create, the read or both on a reused connection, behind a long read, and behind a
+long import with every request on a new connection or with the create on a reused
+connection and the read on a new one (#2176). That last pattern is the one seen from
+ComplyEaze Bridge's own post and reconcile. The answers of both states carry
 `verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
 absent state only when the read-back's Tally reports TallyPrime 7.2, licensed,
 Silver or Gold: Gold is the same product with multi-user access, so the edition

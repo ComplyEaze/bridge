@@ -2324,12 +2324,17 @@ fn invoice_with(elements: &str) -> String {
     )
 }
 
+const ASKING_E_INVOICE: NamedVoucherFields = NamedVoucherFields {
+    e_invoice: EInvoiceFields::Asked,
+    ..NamedVoucherFields::NOT_ASKED
+};
+
 fn e_invoice_of(xml: &str) -> Value {
     let rows = parse_agent_rows_reading_gst(
         xml,
         CAPTURED_VOUCHER_COMPANY_GUID,
         GstDetailsShown::Withheld,
-        EInvoiceFields::Asked,
+        ASKING_E_INVOICE,
         StockLines::NotAsked,
     )
     .unwrap();
@@ -2379,7 +2384,7 @@ fn an_acknowledgement_date_that_is_no_date_refuses_the_read() {
             &xml,
             CAPTURED_VOUCHER_COMPANY_GUID,
             GstDetailsShown::Withheld,
-            EInvoiceFields::Asked,
+            ASKING_E_INVOICE,
             StockLines::NotAsked,
         ),
         Err("voucher_irn_ack_date_invalid".to_string())
@@ -2398,9 +2403,236 @@ fn a_read_that_did_not_ask_returns_no_e_invoice_key() {
         &xml,
         CAPTURED_VOUCHER_COMPANY_GUID,
         GstDetailsShown::Withheld,
-        EInvoiceFields::NotAsked,
+        NamedVoucherFields::NOT_ASKED,
         StockLines::NotAsked,
     )
     .unwrap();
     assert!(rows[0].get("e_invoice").is_none());
+}
+
+const NOTES_LAB_COMPANY_GUID: &str = "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0";
+
+const ASKING_VOUCHER_GST: NamedVoucherFields = NamedVoucherFields {
+    gst: VoucherGstFields::Asked,
+    ..NamedVoucherFields::NOT_ASKED
+};
+
+fn captured_notes_lab(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The native read of the four vouchers (`fixtures/agent/gst-note-fields-lab/PROVENANCE.md`): the
+/// elements as Tally writes them, in an answer to another request than the one `vouchers` sends.
+fn notes_lab_native_answer() -> String {
+    captured_notes_lab(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/native-four-vouchers.utf16le.xml"
+    ))
+}
+
+/// The answer on the same book to the request `vouchers` sends without the six words.
+fn notes_lab_shipped_answer() -> String {
+    captured_notes_lab(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/shipped-read-credit-note.utf16le.xml"
+    ))
+}
+
+/// The answers to the window request with the six words (the 30 Oct captures of that file).
+fn notes_lab_window_answer(capture: &[u8]) -> Vec<Value> {
+    voucher_gst_of(&captured_notes_lab(capture)).unwrap()
+}
+
+fn voucher_gst_of(xml: &str) -> Result<Vec<Value>, String> {
+    Ok(parse_agent_rows_reading_gst(
+        xml,
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )?
+    .into_iter()
+    .map(|mut row| row["voucher_gst"].take())
+    .collect())
+}
+
+fn present(value: &str) -> Value {
+    json!({"state": "present", "value": value})
+}
+
+/// What the lab's four vouchers say: a note its reason and the party's own note number and date,
+/// and the Sales and the Purchase that those are absent.
+fn four_vouchers_details() -> Vec<Value> {
+    let details = |reason: Value, number: Value, date: Value| {
+        json!({
+            "place_of_supply": present("Maharashtra"),
+            "party_state": present("Maharashtra"),
+            "registration_type": present("Regular"),
+            "note_reason": reason,
+            "party_note_number": number,
+            "party_note_date": date,
+        })
+    };
+    let absent = || json!({"state": "absent"});
+    vec![
+        details(absent(), absent(), absent()),
+        details(
+            present("01-Sales Return"),
+            present("SYN-NOTE-1"),
+            present("20250513"),
+        ),
+        details(
+            present("04-Correction in Invoice"),
+            present("SYN-NOTE-2"),
+            present("20250515"),
+        ),
+        details(absent(), absent(), absent()),
+    ]
+}
+
+/// #2027, measured on the lab's four vouchers by a native read.
+#[test]
+fn each_captured_voucher_says_its_gst_and_note_details() {
+    assert_eq!(
+        voucher_gst_of(&notes_lab_native_answer()).unwrap(),
+        four_vouchers_details()
+    );
+}
+
+/// The window request's own answers: the build's read of the four vouchers says what the native
+/// read does, with each unset note field an empty element that says absent; a keyed place of supply
+/// reads apart from the party's state, and a party in another state reads as that state.
+#[test]
+fn each_window_answer_says_its_details_and_an_empty_note_field_says_absent() {
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml"
+        )),
+        four_vouchers_details()
+    );
+    let absent = json!({"state": "absent"});
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml"
+        )),
+        vec![json!({
+            "place_of_supply": present("Karnataka"),
+            "party_state": present("Karnataka"),
+            "registration_type": present("Regular"),
+            "note_reason": absent,
+            "party_note_number": absent,
+            "party_note_date": absent,
+        })]
+    );
+    assert_eq!(
+        notes_lab_window_answer(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml"
+        )),
+        vec![json!({
+            "place_of_supply": present("Karnataka"),
+            "party_state": present("Maharashtra"),
+            "registration_type": present("Regular"),
+            "note_reason": absent,
+            "party_note_number": absent,
+            "party_note_date": absent,
+        })]
+    );
+}
+
+/// A read whose answer holds none of the six says so, and never that the voucher lacks them.
+#[test]
+fn an_answer_without_the_elements_says_not_reported() {
+    let said = voucher_gst_of(&notes_lab_shipped_answer()).unwrap();
+    let not_reported = json!({"state": "not_reported"});
+    assert_eq!(
+        said,
+        vec![json!({
+            "place_of_supply": not_reported,
+            "party_state": not_reported,
+            "registration_type": not_reported,
+            "note_reason": not_reported,
+            "party_note_number": not_reported,
+            "party_note_date": not_reported,
+        })]
+    );
+}
+
+#[test]
+fn a_read_that_did_not_ask_returns_no_voucher_gst_key() {
+    let xml = notes_lab_native_answer();
+    let rows = parse_agent_rows_reading_gst(
+        &xml,
+        NOTES_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 4);
+    assert!(rows.iter().all(|row| row.get("voucher_gst").is_none()));
+}
+
+#[test]
+fn a_voucher_that_is_no_invoice_says_voucher_gst_only_when_it_carries_a_detail() {
+    let said = |xml: &str| {
+        let rows = parse_agent_rows_reading_gst(
+            xml,
+            CAPTURED_VOUCHER_COMPANY_GUID,
+            GstDetailsShown::Withheld,
+            ASKING_VOUCHER_GST,
+            StockLines::NotAsked,
+        )
+        .unwrap();
+        rows[0]["voucher_gst"].clone()
+    };
+    assert!(said(&captured_native_vouchers()).is_null());
+    assert!(said(&with_injected_voucher_element("<PLACEOFSUPPLY/>")).is_null());
+    let carried = said(&with_injected_voucher_element(
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>",
+    ));
+    assert_eq!(carried["place_of_supply"], present("Maharashtra"));
+    assert_eq!(carried["party_state"]["state"], "not_reported");
+}
+
+#[test]
+fn a_party_note_date_that_is_no_date_refuses_the_read() {
+    let xml = notes_lab_native_answer().replacen(
+        "<VATPARTYTRANSRETURNDATE>20250513<",
+        "<VATPARTYTRANSRETURNDATE>13-May-25<",
+        1,
+    );
+    assert_eq!(
+        voucher_gst_of(&xml),
+        Err("voucher_party_note_date_invalid".to_string())
+    );
+}
+
+/// The six are read at the voucher's own level only, and once: the captured siblings that end in
+/// the same words stay unread, and a repeated element is refused as any voucher field is.
+#[test]
+fn voucher_gst_elements_are_read_once_at_the_voucher_level() {
+    let xml = notes_lab_native_answer();
+    assert!(xml.contains("<CONSIGNEESTATENAME>") && xml.contains("<PLACEOFSUPPLYSTATE"));
+    let nested = xml.replacen(
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>",
+        "<PLACEOFSUPPLY/><SOMEWHERE.LIST><PLACEOFSUPPLY>Elsewhere</PLACEOFSUPPLY></SOMEWHERE.LIST>",
+        1,
+    );
+    assert_eq!(
+        voucher_gst_of(&nested).unwrap()[0]["place_of_supply"],
+        json!({"state": "absent"})
+    );
+    let repeated = xml.replacen(
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY>",
+        "<PLACEOFSUPPLY>Maharashtra</PLACEOFSUPPLY><PLACEOFSUPPLY>Goa</PLACEOFSUPPLY>",
+        1,
+    );
+    assert_eq!(
+        voucher_gst_of(&repeated),
+        Err("agent_read_protocol_invalid".to_string())
+    );
 }

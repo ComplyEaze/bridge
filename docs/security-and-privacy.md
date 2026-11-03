@@ -190,6 +190,11 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       direction, item, quantities, rate, amount, godown and batch) are sent only
       for a call that asks. Item, godown and batch names are masked under
       `mask_parties`, as a goods line's are.
+    - A voucher's GST and note details (the `voucher_gst` field `vouchers` adds
+      with `include_gst_details`: its place of supply, the party's state and
+      registration type, a note's reason, and the party's own note number and
+      date) are sent as the book has them under every setting, as `reference`
+      and `party_gstin` are.
     - The cost centre and cost category lists (two new kinds of the masters
       read) send each one's name, its parent (a cost centre's parent is another
       cost centre or the top level), its category for a cost centre, three

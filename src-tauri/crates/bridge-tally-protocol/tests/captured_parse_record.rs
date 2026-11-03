@@ -1847,6 +1847,22 @@ const ROWS: &[Row] = &[
         parser: "parse_native_masters(VoucherTypes)",
         parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
     },
+    // The same book's voucher types as its first and its second read after a company load
+    // answered them (2 November 2026, #2160): the first leaves one element out of two rows. The
+    // two records are equal below the header, which is the proof that the parser reads the
+    // element in neither.
+    Row {
+        fixture: "tests/fixtures/masters_voucher_types_shape_lab_first_read_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(VoucherTypes)",
+        parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_voucher_types_shape_lab_second_read_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(VoucherTypes)",
+        parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
+    },
     // Series-level numbering: src/native_voucher_type_numbering_tests.rs (a Windows synthetic book).
     Row {
         fixture: "tests/fixtures/voucher_type_numbering_series_live.utf16le.xml",

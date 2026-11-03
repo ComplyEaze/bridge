@@ -486,6 +486,9 @@ base revision.
 <a id="12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost"></a>
 
 [12a.24 The Godown Summary gives godown totals, and the exploded Stock Summary values a root item per godown at that godown's own cost](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost)
+<a id="12a25-the-first-voucher-types-read-after-a-company-load-leaves-one-element-out-of-two-rows-the-second-read-has-it-partial"></a>
+
+[12a.25 The first voucher-types read after a company load leaves one element out of two rows; the second read has it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a25-the-first-voucher-types-read-after-a-company-load-leaves-one-element-out-of-two-rows-the-second-read-has-it-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

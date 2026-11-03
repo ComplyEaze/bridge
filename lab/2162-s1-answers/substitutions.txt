@@ -1,0 +1,3 @@
+The company number is X at equal length in the raw answers, so sizes stand; sha256 in the logs and in check.txt are of the originals. Other replacements in text files, with counts:
+<company number>: 2
+<lab folder>: 3

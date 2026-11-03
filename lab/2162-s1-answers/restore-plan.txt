@@ -1,0 +1,6 @@
+Restore plan, row 2162-S1. On Tally screen, never by a request.
+Folder: D:k2162s1
+File: TDBK1800_<company number>.001, 90,051 B, sha256 1374df00e1249da14071cd93c965cffb6b0ed9d32e033638f876430f686b5ca0, taken 3 Nov 2026 08:22 local.
+Company: BRIDGE PILOT LAB, number <company number>.
+Prompts expected: Accept, then Replace.
+Check after: marks byte-identical to marks-0; current date set back to 15-Sep-2026.

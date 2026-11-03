@@ -1,0 +1,5 @@
+Originals stay on the lab PC, with the screens and the backup. sha256, bytes, file.
+a705a2d70944463d7e089d8299ade44abcd5542ac7f88f09b9f1a398daac02c6  98  evidence/bk.txt
+78ccd6c05aa3350bae0190a1e9dc06ab18e90a1941eeaab63249206a68fccfc4  59996  shots/before-save.jpg
+6dd24979955f0a9402d42b66dd43c01c0a59808a0e7adc97f00f0a70cb09c217  107157  shots/bp0001.jpg
+0983be03de8a91394f5580f256b92fd8f8ad3459cd81202f4f007e37eddc45f7  112646  shots/gateway-start.jpg

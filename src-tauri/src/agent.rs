@@ -285,10 +285,14 @@ fn mark_entry_party_names(entry: &mut Value) {
             mark_party_field(allocation, "category");
         }
     }
-    // A goods line's item, godown and batch, for the reason the masters tool masks item and
-    // godown names: a supplier-named item or a job-work godown can carry a party's name, and
-    // a batch name is whatever text was typed (#2015).
-    if let Some(lines) = entry.get_mut("goods_lines").and_then(Value::as_array_mut) {
+    mark_goods_line_party_names(entry, "goods_lines");
+}
+
+/// A goods line's item, godown and batch, for the reason the masters tool masks item and
+/// godown names: a supplier-named item or a job-work godown can carry a party's name, and
+/// a batch name is whatever text was typed (#2015).
+fn mark_goods_line_party_names(holder: &mut Value, list: &str) {
+    if let Some(lines) = holder.get_mut(list).and_then(Value::as_array_mut) {
         for line in lines {
             mark_party_field(line, "stock_item");
             if let Some(batches) = line.get_mut("batches").and_then(Value::as_array_mut) {
@@ -423,6 +427,7 @@ fn mark_voucher_party_names(mut voucher: Value) -> Value {
             mark_entry_party_names(entry);
         }
     }
+    mark_goods_line_party_names(&mut voucher, "stock_lines");
     voucher
 }
 

@@ -73,6 +73,9 @@ pub(super) enum VoucherReadShape {
     NamedEntryWildcard(NamedVoucherFields),
     /// [`Self::ClassEntryWildcard`] naming them.
     NamedClassEntryWildcard(NamedVoucherFields),
+    /// `render_agent_stock_line_vouchers_in_span`: `ALLINVENTORYENTRIES.*` in place of the entry
+    /// wildcard, with each row's voucher type resolved by Tally (#2016).
+    ClassInventoryWildcard,
 }
 
 impl VoucherReadShape {
@@ -96,6 +99,14 @@ impl VoucherReadShape {
         }
     }
 
+    /// Whether this shape's request returns stock lines in place of ledger entries.
+    pub(super) const fn stock_lines(self) -> StockLines {
+        match self {
+            Self::ClassInventoryWildcard => StockLines::Asked,
+            _ => StockLines::NotAsked,
+        }
+    }
+
     /// Encoded bytes per voucher to assume before anything has been measured.
     ///
     /// Set above the heaviest figure measured for each shape (§11c): named entry
@@ -111,10 +122,14 @@ impl VoucherReadShape {
             // The class COMPUTEs add about 1.2 KB of UTF-16 per voucher
             // (ten elements at ~120 bytes, measured one at a time on 7.1),
             // well inside the margin above the 256 KB measured.
+            // The stock-line shape measured 35.2 to 36.2 KB of UTF-16 per voucher with one or
+            // two lines on one synthetic book (§11c.1), about 33 KiB a line: a voucher of more
+            // than about ten lines passes this default, which sizes only the first part.
             Self::EntryWildcard
             | Self::ClassEntryWildcard
             | Self::NamedEntryWildcard(_)
-            | Self::NamedClassEntryWildcard(_) => 384 * 1024,
+            | Self::NamedClassEntryWildcard(_)
+            | Self::ClassInventoryWildcard => 384 * 1024,
         }
     }
 
@@ -135,7 +150,8 @@ impl VoucherReadShape {
             | Self::EntryWildcard
             | Self::ClassEntryWildcard
             | Self::NamedEntryWildcard(_)
-            | Self::NamedClassEntryWildcard(_) => "voucher_window_day_not_readable",
+            | Self::NamedClassEntryWildcard(_)
+            | Self::ClassInventoryWildcard => "voucher_window_day_not_readable",
         }
     }
 
@@ -172,6 +188,9 @@ impl VoucherReadShape {
             }
             (Self::NamedClassEntryWildcard(fields), _) => {
                 render_agent_named_vouchers_in_span(company, from, to, span, fields, true)
+            }
+            (Self::ClassInventoryWildcard, _) => {
+                render_agent_stock_line_vouchers_in_span(company, from, to, span)
             }
         }
     }

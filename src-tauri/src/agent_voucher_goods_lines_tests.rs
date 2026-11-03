@@ -501,3 +501,269 @@ fn a_register_row_never_carries_goods_lines() {
         );
     }
 }
+
+// -- #2016: a voucher's own stock lines, on the four captures of the inventory request. Each
+// capture holds one voucher and, sent before the class COMPUTEs joined it, no resolved type, so
+// `resolved` adds those elements; the live row of the whole request is the PR's evidence. --
+
+const STOCK_JOURNAL: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml"
+);
+const DELIVERY_NOTE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml"
+);
+const RECEIPT_NOTE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml"
+);
+const CREDIT_NOTE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml"
+);
+
+/// The capture as the class request answers it: its type's own reserved name and class.
+fn resolved(capture: &[u8], reserved: &str, class: Option<ReservedVoucherClass>) -> String {
+    let mut elements = format!(
+        "<{VOUCHER_TYPE_GUID_TAG}>{SHAPE_LAB}-00000099</{VOUCHER_TYPE_GUID_TAG}>\
+         <{VOUCHER_TYPE_RESERVED_NAME_TAG}>{reserved}</{VOUCHER_TYPE_RESERVED_NAME_TAG}>"
+    );
+    for each in ReservedVoucherClass::ALL {
+        let answer = if class == Some(each) { "Yes" } else { "No" };
+        elements.push_str(&format!("<{0}>{answer}</{0}>", each.tag()));
+    }
+    let xml = utf16(capture);
+    let at = xml.find("</VOUCHERTYPENAME>").expect("a voucher") + "</VOUCHERTYPENAME>".len();
+    format!("{}{elements}{}", &xml[..at], &xml[at..])
+}
+
+fn stock_rows(xml: &str) -> Vec<Value> {
+    parse_agent_rows_reading_gst(
+        xml,
+        SHAPE_LAB,
+        GstDetailsShown::Withheld,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::Asked,
+    )
+    .expect("the read succeeds")
+}
+
+fn one_note(capture: &[u8], reserved: &str, class: Option<ReservedVoucherClass>) -> Value {
+    let rows = stock_rows(&resolved(capture, reserved, class));
+    assert_eq!(rows.len(), 1);
+    rows[0].clone()
+}
+
+#[test]
+fn a_stock_journal_gives_both_sides_once_with_each_ones_own_godown() {
+    let row = one_note(STOCK_JOURNAL, "Stock Journal", None);
+    let lines = row["stock_lines"].as_array().unwrap();
+    // Two lines, not four: the journal's in and out lists repeat them without godowns.
+    assert_eq!(lines.len(), 2, "{row}");
+    assert_eq!(lines[0]["direction"], "in");
+    assert_eq!(lines[1]["direction"], "out");
+    assert_eq!(lines[0]["stock_item"], "Hydrochloric Acid 33pc");
+    assert_eq!(lines[0]["actual_quantity"], value("10.000 Kgs"));
+    assert_eq!(lines[0]["batches"][0]["godown"], value("Factory Floor"));
+    assert_eq!(lines[0]["batches"][0]["batch"], value("H-2504-A"));
+    assert_eq!(lines[1]["batches"][0]["godown"], value("Main Location"));
+    // The in side carries no value in this capture: not zero, and not borrowed from the out side.
+    assert_eq!(lines[0]["amount"], json!({"state": "empty"}));
+    assert_eq!(lines[0]["rate"], json!({"state": "empty"}));
+    assert_eq!(lines[1]["amount"], value("300.00"));
+    assert!(lines
+        .iter()
+        .all(|line| line.get("deemed_positive").is_none()));
+    assert_eq!(row["amounts"], json!([]));
+}
+
+#[test]
+fn each_note_says_which_way_its_goods_moved() {
+    for (capture, reserved, class, direction, amount, godown) in [
+        (
+            DELIVERY_NOTE,
+            "Delivery Note",
+            None,
+            "out",
+            "30.00",
+            "Main Location",
+        ),
+        (
+            RECEIPT_NOTE,
+            "Receipt Note",
+            None,
+            "in",
+            "-30.00",
+            "Factory Floor",
+        ),
+        (
+            CREDIT_NOTE,
+            "Credit Note",
+            Some(ReservedVoucherClass::CreditNote),
+            "in",
+            "-30.00",
+            "Main Location",
+        ),
+    ] {
+        let row = one_note(capture, reserved, class);
+        let lines = row["stock_lines"].as_array().unwrap();
+        assert_eq!(lines.len(), 1, "{row}");
+        assert_eq!(lines[0]["direction"], direction, "{row}");
+        assert_eq!(lines[0]["amount"], value(amount), "{row}");
+        assert_eq!(lines[0]["batches"][0]["godown"], value(godown), "{row}");
+    }
+}
+
+#[test]
+fn a_kind_no_capture_covers_is_named_and_its_lines_are_not_read() {
+    for (reserved, class) in [
+        ("Sales", Some(ReservedVoucherClass::Sales)),
+        ("Purchase", Some(ReservedVoucherClass::Purchase)),
+        ("Debit Note", Some(ReservedVoucherClass::DebitNote)),
+        ("Physical Stock", None),
+        // A type the user made has no reserved name, and no measured class says Delivery Note.
+        ("", None),
+    ] {
+        let row = one_note(DELIVERY_NOTE, reserved, class);
+        assert_eq!(row["stock_lines_not_read"], true, "{row}");
+        assert!(row.get("stock_lines").is_none(), "{row}");
+    }
+    // A child of Credit Note answers its class; the reserved name decides, as on the live row.
+    let child = one_note(CREDIT_NOTE, "", Some(ReservedVoucherClass::CreditNote));
+    assert_eq!(child["stock_lines_not_read"], true, "{child}");
+    assert!(child.get("stock_lines").is_none(), "{child}");
+}
+
+/// The capture with its stock lines cut out, as the Stock Journal answered a childless list on
+/// the shipped read.
+fn without_lines(capture: &[u8], reserved: &str, class: Option<ReservedVoucherClass>) -> String {
+    let xml = resolved(capture, reserved, class);
+    let from = xml.find("<ALLINVENTORYENTRIES.LIST>").expect("a line");
+    let end = "</ALLINVENTORYENTRIES.LIST>";
+    let to = xml.rfind(end).expect("a line") + end.len();
+    format!("{}{}", &xml[..from], &xml[to..])
+}
+
+#[test]
+fn a_voucher_that_only_moves_stock_and_answers_no_line_is_unreadable() {
+    for (capture, reserved) in [
+        (STOCK_JOURNAL, "Stock Journal"),
+        (DELIVERY_NOTE, "Delivery Note"),
+        (RECEIPT_NOTE, "Receipt Note"),
+    ] {
+        let row = stock_rows(&without_lines(capture, reserved, None)).remove(0);
+        assert_eq!(row["stock_lines_unreadable"], "stock_line_missing", "{row}");
+        assert!(row.get("stock_lines").is_none(), "{row}");
+    }
+    // A cancelled one keeps no line, as the live row's cancelled Delivery Note answered.
+    let cancelled = without_lines(DELIVERY_NOTE, "Delivery Note", None).replacen(
+        "<ISCANCELLED TYPE=\"Logical\">No</ISCANCELLED>",
+        "<ISCANCELLED TYPE=\"Logical\">Yes</ISCANCELLED>",
+        1,
+    );
+    let row = stock_rows(&cancelled).remove(0);
+    assert_eq!(row["cancelled"], true, "{row}");
+    assert_eq!(row["stock_lines"], json!([]), "{row}");
+}
+
+#[test]
+fn a_credit_note_may_answer_no_line() {
+    let class = Some(ReservedVoucherClass::CreditNote);
+    let row = stock_rows(&without_lines(CREDIT_NOTE, "Credit Note", class)).remove(0);
+    assert_eq!(row["stock_lines"], json!([]), "{row}");
+    assert!(row.get("stock_lines_unreadable").is_none(), "{row}");
+}
+
+#[test]
+fn a_row_with_no_resolved_type_is_not_read() {
+    let rows = stock_rows(&utf16(DELIVERY_NOTE));
+    assert_eq!(rows[0]["stock_lines_not_read"], true);
+}
+
+#[test]
+fn a_read_that_does_not_ask_carries_no_stock_key() {
+    let row = parse(&resolved(STOCK_JOURNAL, "Stock Journal", None)).remove(0);
+    for key in [
+        "stock_lines",
+        "stock_lines_not_read",
+        "stock_lines_unreadable",
+    ] {
+        assert!(row.get(key).is_none(), "{row}");
+    }
+}
+
+#[test]
+fn a_line_that_cannot_be_read_gives_its_reason_and_no_lines() {
+    let delivery = || resolved(DELIVERY_NOTE, "Delivery Note", None);
+    let foreign = "$1.00 @ ? 30.00/$ = ? 30.00";
+    for (old, new, reason) in [
+        (
+            "<ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>",
+            "<ISDEEMEDPOSITIVE>Maybe</ISDEEMEDPOSITIVE>",
+            "goods_line_direction_unreadable",
+        ),
+        (
+            "<AMOUNT>30.00</AMOUNT>",
+            &format!("<AMOUNT>{foreign}</AMOUNT>"),
+            "goods_line_amount_unparsable",
+        ),
+    ] {
+        let xml = delivery().replacen(old, new, 1);
+        assert_ne!(xml, delivery(), "{old}");
+        let row = stock_rows(&xml).remove(0);
+        assert_eq!(row["stock_lines_unreadable"], reason, "{row}");
+        assert!(row.get("stock_lines").is_none(), "{row}");
+    }
+}
+
+#[test]
+fn the_stock_line_request_is_the_one_the_live_row_sent() {
+    let request = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_mixed_window_stock_lines_shape_lab_request.utf16le.xml"
+    ));
+    let day = bridge_tally_core::TallyDate::parse("20260520").unwrap();
+    let rendered = super::super::voucher_window::VoucherReadShape::ClassInventoryWildcard
+        .render("BRIDGE SHAPE LAB", &day, &day, None)
+        .unwrap();
+    assert_eq!(rendered, request.trim_start_matches('\u{feff}'));
+}
+
+#[test]
+fn stock_lines_refuse_what_needs_ledger_entries_and_nothing_else() {
+    assert_eq!(StockLines::from_args(&json!({})), Ok(StockLines::NotAsked));
+    assert_eq!(
+        StockLines::from_args(&json!({"stock_lines": false, "ledger": "Cash"})),
+        Ok(StockLines::NotAsked)
+    );
+    assert_eq!(
+        StockLines::from_args(&json!({
+            "stock_lines": true, "goods_lines": false, "voucher_type": "Stock Journal",
+            "narration_contains": "x", "ledger": null,
+        })),
+        Ok(StockLines::Asked)
+    );
+    for (name, given) in [
+        ("ledger", json!("Cash")),
+        ("amount", json!("30.00")),
+        ("suspense_tagged", json!(true)),
+        ("summarise_by", json!("ledger")),
+        ("bank_allocations", json!(true)),
+        ("goods_lines", json!(true)),
+        ("include_gst_details", json!(true)),
+        ("include_e_invoice", json!(true)),
+    ] {
+        let mut args = json!({"stock_lines": true});
+        args[name] = given;
+        assert_eq!(
+            StockLines::from_args(&args),
+            Err(format!("voucher_stock_lines_excludes_{name}"))
+        );
+    }
+}
+
+#[test]
+fn under_mask_parties_no_stock_line_name_is_left() {
+    let row = mark_voucher_party_names(one_note(DELIVERY_NOTE, "Delivery Note", None));
+    let masked = redact_value(row, Redaction::MaskParties).to_string();
+    for name in ["Hydrochloric Acid 33pc", "Main Location", "H-2504-A"] {
+        assert!(!masked.contains(name), "{name} left in {masked}");
+    }
+    assert!(masked.contains("1.000 Kgs") && masked.contains("30.00"));
+}

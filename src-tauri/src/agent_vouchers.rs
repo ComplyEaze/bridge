@@ -31,6 +31,8 @@ pub(super) struct VoucherPageKey {
     gst_details: GstDetailsShown,
     /// Whether the window was read naming the e-invoice details (#1378), held apart as above.
     e_invoice: EInvoiceFields,
+    /// Whether the window was read for stock lines (#2016), which holds no ledger entries.
+    stock_lines: StockLines,
 }
 
 impl VoucherPageKey {
@@ -52,6 +54,7 @@ impl VoucherPageKey {
             summary: None,
             gst_details: GstDetailsShown::Withheld,
             e_invoice: EInvoiceFields::NotAsked,
+            stock_lines: StockLines::NotAsked,
         }
     }
 
@@ -64,6 +67,12 @@ impl VoucherPageKey {
     /// The same question asked with or without the e-invoice details.
     pub(super) fn with_e_invoice(mut self, e_invoice: EInvoiceFields) -> Self {
         self.e_invoice = e_invoice;
+        self
+    }
+
+    /// The same question asked for stock lines.
+    pub(super) fn with_stock_lines(mut self, stock_lines: StockLines) -> Self {
+        self.stock_lines = stock_lines;
         self
     }
 
@@ -333,6 +342,33 @@ pub(super) fn summary_failure(code: String) -> ToolFailure {
     }
 }
 
+/// Why stock lines are not compared with the Stock Summary (protocol reference §8.2i).
+const STOCK_TIE_NOT_COMPARED: &str = "no read returns the Stock Summary's inward and outward quantities; on one book a Delivery Note moved its item's closing quantity there and no value. Do not sum lines across kinds: a note and its invoice can be the same goods";
+
+/// What a stock-line read says of the whole window, on every page: the kinds whose lines it did
+/// not read, with how many vouchers of each, and that nothing was compared.
+fn stock_line_extra(rows: &[Value]) -> Vec<(&'static str, Value)> {
+    let mut not_read = std::collections::BTreeMap::<String, usize>::new();
+    for row in rows
+        .iter()
+        .filter(|row| row["stock_lines_not_read"] == true)
+    {
+        let kind = row["voucher_type"].as_str().unwrap_or_default().to_string();
+        *not_read.entry(kind).or_default() += 1;
+    }
+    vec![
+        (
+            "kinds_not_read",
+            not_read
+                .into_iter()
+                .map(|(kind, vouchers)| json!({"voucher_type": kind, "vouchers": vouchers}))
+                .collect(),
+        ),
+        ("stock_summary_tie", json!("not_compared")),
+        ("stock_summary_tie_reason", json!(STOCK_TIE_NOT_COMPARED)),
+    ]
+}
+
 /// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
 /// buckets (#1230), and the fields only the second carries.
 pub(super) struct PageBody {
@@ -352,6 +388,7 @@ pub(super) fn render_page_body(
     summary: Option<&SummaryRequest>,
     (offset, limit): (usize, usize),
     shown: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
+    stock_lines: StockLines,
 ) -> Result<PageBody, ToolFailure> {
     let Some(request) = summary else {
         let items = page_items(server, rows, (offset, limit), shown);
@@ -361,7 +398,10 @@ pub(super) fn render_page_body(
             truncated: offset.saturating_add(items.len()) < rows.len(),
             items,
             total: rows.len(),
-            extra: Vec::new(),
+            extra: match stock_lines {
+                StockLines::Asked => stock_line_extra(rows),
+                StockLines::NotAsked => Vec::new(),
+            },
         });
     };
     let summary = voucher_summary::summarise(rows, request).map_err(summary_failure)?;
@@ -558,6 +598,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             GstDetailsShown::from_args(args)?,
         );
         let e_invoice = EInvoiceFields::from_args(args)?;
+        let stock_lines = StockLines::from_args(args)?;
         // A type GUID that is not this company's cannot name any of its
         // types: refused rather than answered with an empty selection.
         if let Some(VoucherTypeSelector::Guid(type_guid)) = &type_selector {
@@ -587,6 +628,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             .with_summary(summary_group)
             .with_gst_details(shown.2)
             .with_e_invoice(e_invoice)
+            .with_stock_lines(stock_lines)
         });
         let mut earlier_snapshot = None;
         if let Some(key) = &page_key {
@@ -676,7 +718,9 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         };
         // A type filter asks Tally to resolve each row's type in the same
         // response (bridge#625); every other call sends the request unchanged.
-        let shape = if type_selector.is_some() {
+        let shape = if stock_lines == StockLines::Asked {
+            VoucherReadShape::ClassInventoryWildcard
+        } else if type_selector.is_some() {
             VoucherReadShape::ClassEntryWildcard
         } else {
             VoucherReadShape::EntryWildcard
@@ -861,7 +905,14 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             selected_ledger: selected_ledger.clone(),
             placements: placements.clone(),
         });
-        let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit), shown)?;
+        let body = render_page_body(
+            server,
+            &rows,
+            summary.as_ref(),
+            (offset, limit),
+            shown,
+            stock_lines,
+        )?;
         let (mut payload, truncated) = voucher_page_payload(
             &company,
             result_state,
@@ -1030,6 +1081,7 @@ impl Server {
             summary.as_ref(),
             (offset, limit),
             shown,
+            key.stock_lines,
         )?;
         if let (Some(reason), Some(evidence)) = (snapshot.reason, accumulated.as_mut()) {
             evidence.reason_code = Some(reason.to_string());
@@ -1415,12 +1467,14 @@ async fn read_entry_window_rows_reading_gst<R: WindowReader>(
                 identity.company_guid(),
                 gst,
                 shape.named_fields(),
+                shape.stock_lines(),
             ),
             VoucherComposites::Refuse => parse_agent_rows_reading_gst(
                 xml,
                 identity.company_guid(),
                 gst,
                 shape.named_fields(),
+                shape.stock_lines(),
             )
             .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
         },

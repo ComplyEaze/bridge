@@ -186,6 +186,10 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
     - An invoice's e-invoice details (the `e_invoice` field `vouchers` adds with
       `include_e_invoice`: the IRN, the acknowledgement number and its date) are
       sent as the book has them under every setting.
+    - A voucher's stock lines (the `stock_lines` field `vouchers` adds when asked:
+      direction, item, quantities, rate, amount, godown and batch) are sent only
+      for a call that asks. Item, godown and batch names are masked under
+      `mask_parties`, as a goods line's are.
     - A voucher's GST and note details (the `voucher_gst` field `vouchers` adds
       with `include_gst_details`: its place of supply, the party's state and
       registration type, a note's reason, and the party's own note number and

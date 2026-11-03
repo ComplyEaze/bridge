@@ -24,7 +24,7 @@ Each request is a committed template with only the company and the day changed (
 - **Encoding:** the answers are BOM-less UTF-16LE, exactly as received; the requests are UTF-16LE with a BOM, as sent. `.gitattributes` marks this tree `-text`.
 - **Destination godown:** `DESTINATIONGODOWNNAME` appears on every batch row, not only on a transfer: CN1, DN1 and RN1 carry it equal to their own godown, so its presence does not mark a transfer.
 - **Direction:** on every stock line the direction is `ISDEEMEDPOSITIVE` (Yes into stock, No out of it), in both requests. Counted with an XML parser.
-- **Not established:** a Stock Journal with several items or one side only; Sales, Purchase or Debit Note with an item in the inventory request on 7.2; Physical Stock or a Manufacturing Journal; a voucher type created under these; optional, cancelled or post-dated stock vouchers; whether a Delivery or Receipt Note moves Tally's Stock Summary (the two notes moved the same item 1 Kgs out and 1 Kgs in); other releases and Gold; the field-by-field ALLINVENTORYENTRIES / INVENTORYENTRIES{IN,OUT} paths of `AUDIT_VOUCHER_FETCH`, which `xml_read_profiles.rs` calls unmeasured, as these captures are the first live view of those lists through the wildcard.
+- **Not established:** a Stock Journal with several items or one side only; Sales, Purchase or Debit Note with an item in the inventory request on 7.2 in these two sittings (the section below holds one of each); Physical Stock or a Manufacturing Journal; a voucher type created under these and an optional or cancelled stock voucher in these two sittings (the section below holds one of each on the `stock_lines` read); a post-dated stock voucher; whether a Delivery or Receipt Note moves Tally's Stock Summary (the two notes moved the same item 1 Kgs out and 1 Kgs in); other releases and Gold; the field-by-field ALLINVENTORYENTRIES / INVENTORYENTRIES{IN,OUT} paths of `AUDIT_VOUCHER_FETCH`, which `xml_read_profiles.rs` calls unmeasured, as these captures are the first live view of those lists through the wildcard.
 
 | file | bytes | sha256 | content |
 |---|---|---|---|
@@ -44,3 +44,19 @@ Each request is a committed template with only the company and the day changed (
 | `stock_movement_receipt_note_vouchers_shape_lab_live.utf16le.xml` | 50542 | `f1b52ec8d70b6039ef27ebeead0bf6de85734e8f55fca4b38b93164aed56e2a0` | its answer, 13 May 2026: the Receipt Note RN1, its item nested under a ledger entry (ISDEEMEDPOSITIVE Yes, 1 Kgs at 30.00, Factory Floor / H-2504-B) |
 | `stock_movement_receipt_note_inventory_shape_lab_request.utf16le.xml` | 1746 | `ef0c7878a490a80b9bde3f48c8029cd736a53d9242a6c59409536d408c2fce90` | the lab's inventory request for that day: the vouchers request with `ALLLEDGERENTRIES.*` replaced by `ALLINVENTORYENTRIES.*`, nothing else changed on `BRIDGE SHAPE LAB` (UTF-16LE with a BOM) |
 | `stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml` | 37964 | `f0506eb7b2ccb1dc832b9f5dee0ae0a07d875051d449d7330c35e2ce9d3db364` | its answer: RN1's item as an `ALLINVENTORYENTRIES.LIST` (ISDEEMEDPOSITIVE Yes), no IN/OUT lists |
+
+## The `stock_lines` read over twelve kinds
+
+The first live run of the request `vouchers` sends with `stock_lines: true`: the inventory request above with the voucher type COMPUTEs of §8.2e, built by `render_agent_stock_line_vouchers_in_span` and sent through Bridge's own dispatch.
+
+- **Host / gateway:** TallyPrime **7.2**, Silver, licensed, a lab instance on Windows, the build of `fix/2016-stock-lines` at `1348b37d`. Bridge sent the request through a loopback relay that recorded each request and answer and changed nothing.
+- **Date:** 2026-11-03, one sitting, on `BRIDGE SHAPE LAB` as above, loaded alone.
+- **Set-up:** twelve vouchers on 20 May 2026 seeded by direct XML, one item each unless named: a Stock Journal (2 Kgs, Main Location to Factory Floor, batch H-2504-A), a Delivery Note, a Receipt Note, a Credit Note, one voucher each of a type made under Delivery Note and one made under Credit Note, an accounts-only Credit Note, a Delivery Note then cancelled on Tally's screen, an optional Delivery Note, a Sales, a Purchase and a Debit Note. The seed sets the read up; it is not evidence of its own shape.
+- **Source:** the lab branch `lab/2016-stock-lines-answers` at `186c39d6`, `raw/step3-window-request.utf16le.xml` and `raw/step3-window-answer.utf16le.xml`, copied byte for byte; both are listed with this sha256 in that branch's `SHA256.txt`.
+- **Encoding:** the answer is BOM-less UTF-16LE, exactly as received; the request is UTF-16LE with a BOM, as Bridge sent it.
+- **What it shows:** one answer holding all twelve, each with its type's resolved reserved name and class words; the two types made under a note answer an empty reserved name; the cancelled Delivery Note and the accounts-only Credit Note hold only an empty `ALLINVENTORYENTRIES.LIST`. Counted with an XML parser.
+
+| file | bytes | sha256 | content |
+|---|---|---|---|
+| `stock_movement_mixed_window_stock_lines_shape_lab_request.utf16le.xml` | 3122 | `df30b272695f5ce6170d41f05730b8dac0ecdd7c514c8c598c7d42e8e5835cd1` | the `stock_lines` request for 20 May 2026 on `BRIDGE SHAPE LAB`, as Bridge sent it |
+| `stock_movement_mixed_window_stock_lines_shape_lab_live.utf16le.xml` | 370470 | `0385b11ab2fc9a079ffa0cc119bd5ed6e4955d853eb0ab5631f3a26698f6a08a` | its answer: the twelve vouchers above in one collection |

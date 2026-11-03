@@ -2335,6 +2335,7 @@ fn e_invoice_of(xml: &str) -> Value {
         CAPTURED_VOUCHER_COMPANY_GUID,
         GstDetailsShown::Withheld,
         ASKING_E_INVOICE,
+        StockLines::NotAsked,
     )
     .unwrap();
     rows[0]["e_invoice"].clone()
@@ -2384,6 +2385,7 @@ fn an_acknowledgement_date_that_is_no_date_refuses_the_read() {
             CAPTURED_VOUCHER_COMPANY_GUID,
             GstDetailsShown::Withheld,
             ASKING_E_INVOICE,
+            StockLines::NotAsked,
         ),
         Err("voucher_irn_ack_date_invalid".to_string())
     );
@@ -2402,6 +2404,7 @@ fn a_read_that_did_not_ask_returns_no_e_invoice_key() {
         CAPTURED_VOUCHER_COMPANY_GUID,
         GstDetailsShown::Withheld,
         NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
     )
     .unwrap();
     assert!(rows[0].get("e_invoice").is_none());
@@ -2450,6 +2453,7 @@ fn voucher_gst_of(xml: &str) -> Result<Vec<Value>, String> {
         NOTES_LAB_COMPANY_GUID,
         GstDetailsShown::Shown,
         ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
     )?
     .into_iter()
     .map(|mut row| row["voucher_gst"].take())
@@ -2565,6 +2569,7 @@ fn a_read_that_did_not_ask_returns_no_voucher_gst_key() {
         NOTES_LAB_COMPANY_GUID,
         GstDetailsShown::Shown,
         NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
     )
     .unwrap();
     assert_eq!(rows.len(), 4);
@@ -2579,6 +2584,7 @@ fn a_voucher_that_is_no_invoice_says_voucher_gst_only_when_it_carries_a_detail()
             CAPTURED_VOUCHER_COMPANY_GUID,
             GstDetailsShown::Withheld,
             ASKING_VOUCHER_GST,
+            StockLines::NotAsked,
         )
         .unwrap();
         rows[0]["voucher_gst"].clone()

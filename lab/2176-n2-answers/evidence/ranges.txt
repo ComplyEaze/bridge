@@ -1,0 +1,1 @@
+printed 200 134537626 75.529155 N1 control 105100 to 107799 found 2700 ids found 54600 lowest 0 highest 107799 inside 107800 to 113199: 0

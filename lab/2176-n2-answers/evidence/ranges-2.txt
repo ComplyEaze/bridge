@@ -1,0 +1,1 @@
+printed 200 147864858 31.210671 indexes 60000 distinct 60000 highest 113199 control 107800 to 113199 found 5400 inside 113200 to 115899: 0

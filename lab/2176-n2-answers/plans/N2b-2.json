@@ -1,0 +1,42 @@
+{
+ "host": "127.0.0.1",
+ "port": 9001,
+ "conns": {
+  "K1": {
+   "warm": "<earlier lab folder>/earlier/lab/1713-abandoned-ledger-create/requests/marks.xml",
+   "sha256": "0464f624a2f7205a4f03668b2f6da7703589fe7bd590b4d22f2ec50c3a32542b"
+  }
+ },
+ "steps": [
+  {
+   "name": "A",
+   "at": 1.0,
+   "conn": "new",
+   "file": "<lab folder>/seed/N2b-2.xml",
+   "sha256": "17140bb66b18306d9ee340b2a91d2375f50e2bb99f8c7d035693c27da1e3396e",
+   "limit": null,
+   "write": true,
+   "max_bytes": 2000000
+  },
+  {
+   "name": "B",
+   "at": 5.0,
+   "conn": "K1",
+   "file": "<lab folder>/plans/N2b-2-create.xml",
+   "sha256": "1f6c233782c30f35246d77544e066ac091777b839eccf5b4cc2e9612bd6993fd",
+   "limit": 20,
+   "write": true,
+   "max_bytes": 2000000
+  },
+  {
+   "name": "C",
+   "at": 26.0,
+   "conn": "new",
+   "file": "<earlier lab folder>/earlier/lab/1713-abandoned-ledger-create/requests/ledgers.xml",
+   "sha256": "3eb31c35d3b911421742005af98e5e87453fbfc7dbc0d812ac1856761a3f280b",
+   "limit": null,
+   "write": false,
+   "max_bytes": 2000000
+  }
+ ]
+}

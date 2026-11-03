@@ -1,0 +1,6 @@
+The company number is X at equal length in the raw answers, so sizes stand; their .sha256 files and the logs are of the originals. Replaced in text files here, with counts:
+<N1 folder>: 5
+<earlier lab folder>: 35
+<lab folder>: 15
+stop: 18
+stop-all: 5

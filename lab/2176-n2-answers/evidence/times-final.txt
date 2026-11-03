@@ -1,0 +1,3 @@
+N2a: D 58.672 s; B abandoned; C present; observations ['present', 'present', 'present', 'present']; marks before ('54600', '233'), after [('57300', '234'), ('57300', '234'), ('57300', '234'), ('57300', '234')]; PASS-present
+N2b: D 54.359 s; B abandoned; C present; observations ['present', 'present', 'present', 'present']; marks before ('57300', '234'), after [('60000', '235'), ('60000', '235'), ('60000', '235'), ('60000', '235')]; VOID (D 54.359 under 55)
+N2b-2: D 55.344 s; B abandoned; C present; observations ['present', 'present', 'present', 'present']; marks before ('60000', '235'), after [('62700', '236'), ('62700', '236'), ('62700', '236'), ('62700', '236')]; PASS-present

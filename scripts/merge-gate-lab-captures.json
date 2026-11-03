@@ -4280,6 +4280,76 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 (the hand-import row)",
       "sha256": "9477e8a435c7b70e6fc75e7c0b89c5c9bb421c3b3d1a18bdb1958a499cece2f6",
       "size": 258392
+    },
+    {
+      "blob": "44d1f48732eb68e52ed137e9b04e3ec6316ebb5a",
+      "capture_id": "pilot-lab-invoice-readback-bill-wise-new.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-s3a-answers at 4dff8215",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-new.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 item 3)",
+      "sha256": "e8a4c19130200c082abac2f389137192cf64268ee259639ed5d893d24c5a9aa8",
+      "size": 95834
+    },
+    {
+      "blob": "590df226796c655a21ca72635d704cd0433014c5",
+      "capture_id": "pilot-lab-invoice-readback-bill-wise-journal-bill.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-s3b-answers at 7fd14241",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-journal-bill.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 item 3)",
+      "sha256": "0e01dbf4588315ab27721e4309aa54950a227c0c64940718e7727d99705dcdcf",
+      "size": 95836
+    },
+    {
+      "blob": "f0e2f84221dc8d5de8f65c4d4c4d13fe53387f33",
+      "capture_id": "pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-s3b-answers at 7fd14241",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 item 3)",
+      "sha256": "6496dd460ac6064968e475cd2cc721c8c625db1f2297f5222d85d7a5ea0fe6a3",
+      "size": 95836
+    },
+    {
+      "blob": "b900895eda3149a65a5e3014705a81670557af7c",
+      "capture_id": "pilot-lab-invoice-readback-bill-wise-opening-bill.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-s3b-answers at 7fd14241",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-opening-bill.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 item 3)",
+      "sha256": "ac53ba5f4a3f188fa286d22731ce66f142a65fd5f559971a52276b0bc0cbf364",
+      "size": 95940
+    },
+    {
+      "blob": "dc5818482666f8528bceb49e5977fc7126236ad7",
+      "capture_id": "pilot-lab-number-in-use-lower-case.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-s4-answers at 3651c746",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row S4)",
+      "sha256": "cf5d48ac2e3466a86b1b85c7fedc65d87662d6bbc77ce42115e1c911785e8839",
+      "size": 5608
+    },
+    {
+      "blob": "3526de4aa490e88d23442ca86b751cf23e76bd93",
+      "capture_id": "pilot-lab-number-dropped-zero.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-s4-answers at 3651c746",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-dropped-zero.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row S4)",
+      "sha256": "a36e6e43961ffe12722b224ef53fa046835dccf3d9090cba3a5d52d315e91d36",
+      "size": 3024
+    },
+    {
+      "blob": "618661e6a514b5d123984f50d10ee803f9008cfd",
+      "capture_id": "pilot-lab-invoice-post-duplicate-declined.utf16le.xml",
+      "company": "BRIDGE PILOT LAB",
+      "lab_ref": "lab branch lab/2162-s4-answers at 3651c746",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-duplicate-declined.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/PROVENANCE.md in the pull request that adds the capture (#2162 row S4)",
+      "sha256": "09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874",
+      "size": 538
     }
   ]
 }

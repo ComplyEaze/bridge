@@ -1416,6 +1416,49 @@ pub(super) fn required_tally_bool(value: Option<&String>) -> Result<bool, String
     }
 }
 
+#[cfg(test)]
+pub(super) const FOREX_72_COMPANY_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+
+#[cfg(test)]
+pub(super) fn decoded_utf16le(bytes: &[u8]) -> String {
+    String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap()
+}
+
+/// The 7.2 lab book's answer of one day: eleven vouchers, eight with composites
+/// (fixtures/agent/vouchers-forex-unspaced-20250401.PROVENANCE.md).
+#[cfg(test)]
+pub(super) fn captured_72_vouchers() -> String {
+    decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml"
+    ))
+}
+
+/// That book's base and masters, from its own captured currency reads.
+#[cfg(test)]
+pub(super) fn captured_72_book() -> IdentifiedBaseCurrency {
+    use bridge_tally_protocol::native_outstandings::{
+        parse_company_currency_name, parse_currency_master_list,
+    };
+    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml"
+    )))
+    .unwrap();
+    let company = parse_company_currency_name(
+        &decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml"
+        )),
+        FOREX_72_COMPANY_GUID,
+    )
+    .unwrap();
+    masters.identify_base(Some(&company)).unwrap()
+}
+
 /// Synthetic mutation for tests (#674): the captured three-voucher window
 /// (`native-three-vouchers`) with the first `count` vouchers' amounts replaced
 /// by the composites a live read of the several-currency book captured

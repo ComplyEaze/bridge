@@ -290,6 +290,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 0
         })
     );
@@ -305,6 +306,7 @@ fn the_journal_is_absent_unreadable_or_counted() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 1
         })
     );
@@ -325,6 +327,7 @@ fn a_refused_binding_is_its_own_class_of_unsettled_batch() {
         unsettled_reviewed: 0,
         unsettled_restored: 0,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -1310,6 +1313,7 @@ fn a_reviewed_batch_is_its_own_class_of_unsettled_batch() {
         unsettled_reviewed: 1,
         unsettled_restored: 0,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -1335,6 +1339,7 @@ fn restored_posts_are_their_own_class_of_unsettled_batch() {
         unsettled_reviewed: 0,
         unsettled_restored: 2,
         settled_by_person: 0,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
@@ -1359,10 +1364,37 @@ fn a_settled_batch_is_reported_outside_not_settled() {
         unsettled_reviewed: 0,
         unsettled_restored: 0,
         settled_by_person: 2,
+        released_by_person: 0,
         no_dispatch_never_verified: 0,
     });
     let journal = &to_json(&report, SystemTime::now(), None)["journal"];
     assert_eq!(journal["not_settled"], 3);
     assert_eq!(journal["settled_by_person"], 2);
+    assert_eq!(journal["not_settled_not_verified"], 1);
+}
+
+/// A restored batch whose rows a person released is reported in its own
+/// count, outside `not_settled` and `not_settled_restored` (#1038).
+#[test]
+fn a_released_batch_is_reported_outside_not_settled() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut report = build(directory.path(), &[]);
+    report.journal = Journal::Read(super::super::ledger::Settlement {
+        batches: 4,
+        sent_or_found: 4,
+        unsettled: 2,
+        unsettled_no_response: 0,
+        unsettled_binding_refused: 0,
+        unsettled_reviewed: 0,
+        unsettled_restored: 1,
+        settled_by_person: 0,
+        released_by_person: 2,
+        no_dispatch_never_verified: 0,
+    });
+    let journal = &to_json(&report, SystemTime::now(), None)["journal"];
+    assert_eq!(journal["not_settled"], 2);
+    assert_eq!(journal["not_settled_restored"], 1);
+    assert_eq!(journal["released_by_person"], 2);
+    assert_eq!(journal["settled_by_person"], 0);
     assert_eq!(journal["not_settled_not_verified"], 1);
 }

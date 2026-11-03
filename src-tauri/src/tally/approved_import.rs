@@ -41,6 +41,10 @@ const RELEASE_BUTTON: &str = "Release the stop";
 /// same Yes/No/Cancel box as the review.
 #[cfg(not(windows))]
 const SETTLE_BUTTON: &str = "Close the batch";
+/// The row release dialog's positive button on a Mac (#1038). Windows shows
+/// the same Yes/No/Cancel box as the review.
+#[cfg(not(windows))]
+const RELEASE_ROWS_BUTTON: &str = "Release the rows";
 /// What the review dialog's subprocess prints, followed by the nonce it was
 /// given, when and only when the person chose the positive button.
 const REVIEW_TOKEN_PREFIX: &str = "bridge-review-acknowledged:";
@@ -82,6 +86,8 @@ fn masters_words(count: VoucherCount) -> Option<(String, String)> {
 const RELEASE_TOKEN_PREFIX: &str = "bridge-stop-release-acknowledged:";
 /// The same for the settle dialog (#1709), distinct from every other.
 const SETTLE_TOKEN_PREFIX: &str = "bridge-batch-settle-acknowledged:";
+/// The same for the row release dialog (#1038), distinct from every other.
+const RELEASE_ROWS_TOKEN_PREFIX: &str = "bridge-row-release-acknowledged:";
 
 /// How many vouchers a dialog asks about, so that its title and button say so
 /// (#746). Never zero: a dialog about no voucher approves nothing.
@@ -2380,6 +2386,7 @@ enum Shown {
     Review,
     StopRelease,
     Settle,
+    RowRelease,
     /// The ledger dialog: one ledger, or a batch by its count.
     Masters,
 }
@@ -2395,6 +2402,9 @@ pub(crate) enum ReviewKind {
     /// A person's settlement of a batch Tally answered as creating none of
     /// its vouchers (#1709).
     Settle,
+    /// A person's release of the rows of a batch whose book was rolled back
+    /// (#1038).
+    RowRelease,
 }
 
 impl ReviewKind {
@@ -2403,6 +2413,7 @@ impl ReviewKind {
             Self::Review => Shown::Review,
             Self::StopRelease => Shown::StopRelease,
             Self::Settle => Shown::Settle,
+            Self::RowRelease => Shown::RowRelease,
         }
     }
 
@@ -2413,6 +2424,7 @@ impl ReviewKind {
             Self::Review => ("--confirm-review", REVIEW_TOKEN_PREFIX),
             Self::StopRelease => ("--confirm-release", RELEASE_TOKEN_PREFIX),
             Self::Settle => ("--confirm-settle", SETTLE_TOKEN_PREFIX),
+            Self::RowRelease => ("--confirm-row-release", RELEASE_ROWS_TOKEN_PREFIX),
         }
     }
 }
@@ -2450,6 +2462,12 @@ fn answer_effect(shown: Shown, count: VoucherCount) -> (String, &'static str) {
             ),
             "Nothing is closed until you answer.",
         ),
+        Shown::RowRelease => (
+            "release this batch's rows in ComplyEaze Bridge, so that they can be built and posted \
+             again"
+                .into(),
+            "Nothing is released until you answer.",
+        ),
         Shown::Masters => (
             match count.batch() {
                 None => "create this ledger in Tally".into(),
@@ -2479,6 +2497,7 @@ fn answer_text(shown: Shown, count: VoucherCount) -> String {
         Shown::Review => REVIEW_BUTTON.to_string(),
         Shown::StopRelease => RELEASE_BUTTON.to_string(),
         Shown::Settle => SETTLE_BUTTON.to_string(),
+        Shown::RowRelease => RELEASE_ROWS_BUTTON.to_string(),
         Shown::Masters => masters_words(count).map_or_else(String::new, |words| words.1),
     };
     wrapped(
@@ -2512,6 +2531,23 @@ pub(crate) fn wrapped(text: &str, limit: usize) -> String {
         }
     }
     lines
+}
+
+/// `text`, a line of a review box, broken at spaces into lines of at most 100
+/// characters, then any word longer than a line broken where it reaches the
+/// limit, so a name without spaces cannot make the box refuse.
+pub(crate) fn wrapped_to_fit(text: String) -> String {
+    wrapped(&text, 100)
+        .lines()
+        .flat_map(|line| {
+            line.chars()
+                .collect::<Vec<_>>()
+                .chunks(100)
+                .map(|part| part.iter().collect::<String>())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// What the native box holds of a post or review text (#1780): the lines and
@@ -2849,6 +2885,18 @@ pub fn run_settle_confirmation() -> bool {
     )
 }
 
+/// Entry point for the row release dialog's subprocess (#1038), under the
+/// same rules: its own window title and token, so a release of rows is never
+/// titled a review.
+pub fn run_release_rows_confirmation() -> bool {
+    answer_with_token(
+        RELEASE_ROWS_TOKEN_PREFIX,
+        show_release_rows_acknowledgement,
+        std::io::stdin(),
+        std::io::stdout(),
+    )
+}
+
 /// Read the parent's nonce line, count line and preview from `input`, show
 /// `dialog` with that count and preview, and
 /// write the token for that nonce to `output` only when it returns true. The
@@ -3118,6 +3166,30 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
         == rfd::MessageDialogResult::Custom(SETTLE_BUTTON.into())
 }
 
+/// The row release window's title: it releases a batch's rows and reviews no
+/// voucher, so it names neither a review nor a post (#1038).
+#[cfg(not(windows))]
+fn rows_title() -> String {
+    "ComplyEaze Bridge — release this batch's rows".into()
+}
+
+/// The row release dialog: the acknowledgement dialog with its own title and
+/// button. It posts nothing either.
+#[cfg(not(windows))]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    exit_unless_the_alert_fits(preview);
+    rfd::MessageDialog::new()
+        .set_title(rows_title())
+        .set_description(preview)
+        .set_level(rfd::MessageLevel::Warning)
+        .set_buttons(rfd::MessageButtons::OkCancelCustom(
+            "Cancel".into(),
+            RELEASE_ROWS_BUTTON.into(),
+        ))
+        .show()
+        == rfd::MessageDialogResult::Custom(RELEASE_ROWS_BUTTON.into())
+}
+
 /// The Windows acknowledgement dialog's title. Its Yes/No/Cancel box has no
 /// custom labels, so the title asks the question, with the count for a batch
 /// (#746).
@@ -3225,6 +3297,47 @@ fn show_settle_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
     };
     let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
     let title: Vec<u16> = settle_question().encode_utf16().chain(Some(0)).collect();
+    // As for `show_review`: measured when it opens, and never returning if it
+    // is not wholly on the screen (#1832).
+    let answer = super::box_fit::guarded(|owner| {
+        // SAFETY: as for `show_review`: both buffers are NUL-terminated and
+        // live for the synchronous dialog, and the owner is `guarded`'s hidden
+        // window, alive until the box returns.
+        unsafe {
+            MessageBoxW(
+                owner,
+                text.as_ptr(),
+                title.as_ptr(),
+                // As for the review's box: topmost with MB_SYSTEMMODAL, taking
+                // the foreground when Windows lets it, with No as the default
+                // button (#1589, #1780).
+                MB_YESNOCANCEL
+                    | MB_DEFBUTTON2
+                    | MB_ICONWARNING
+                    | MB_SETFOREGROUND
+                    | MB_TOPMOST
+                    | MB_SYSTEMMODAL,
+            )
+        }
+    });
+    answer == IDYES
+}
+
+/// The Windows row release box's title, a question as the review's is (#1038).
+#[cfg(windows)]
+fn rows_question() -> String {
+    "ComplyEaze Bridge — release this batch's rows to be built again?".into()
+}
+
+/// The Windows row release box: the review's box with its own title.
+#[cfg(windows)]
+fn show_release_rows_acknowledgement(_count: VoucherCount, preview: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONWARNING, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+        MB_TOPMOST, MB_YESNOCANCEL,
+    };
+    let text: Vec<u16> = preview.encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = rows_question().encode_utf16().chain(Some(0)).collect();
     // As for `show_review`: measured when it opens, and never returning if it
     // is not wholly on the screen (#1832).
     let answer = super::box_fit::guarded(|owner| {

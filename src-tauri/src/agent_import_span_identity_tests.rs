@@ -1150,9 +1150,10 @@ fn a_padded_amount_binds_against_the_row_tally_holds() {
 /// What the amount type does with the 256-byte amount here (#1872): nothing. A debit is
 /// compared signed, and the signed text of the longest amount is 257 bytes, one over what
 /// `ExactDecimal` holds, so the comparison errors and is read as a difference in the entries,
-/// as it was before the type. The book's row below holds that very amount, so the refusal is
-/// the 257-byte limit and not a different figure. The row is built here from the sixth captured
-/// one with its amounts replaced; no Tally capture holds such a voucher.
+/// as it was before the type. The book's row holds that amount too, and its debit is also 257
+/// bytes signed, so the read side fails on its own: this test cannot tell which side refused,
+/// and the outcome is the same either way. The row is built here from the sixth captured one
+/// with its amounts replaced; no Tally capture holds such a voucher.
 #[test]
 fn a_256_byte_debit_cannot_be_matched_because_its_signed_text_is_257_bytes() {
     let span = span();
@@ -1185,6 +1186,73 @@ fn a_256_byte_debit_cannot_be_matched_because_its_signed_text_is_257_bytes() {
             .signed_lexeme(&EntrySide::Dr)
             .len(),
         257
+    );
+    assert_eq!(
+        refusal(bind(&span, COMPANY_GUID, &long, &read, &BTreeSet::new())),
+        SpanRefusal::Content {
+            position: 5,
+            fields: vec!["entries"]
+        }
+    );
+}
+
+/// A padded debit that is 256 bytes (`000…12.50`) signs to 257 bytes, so it cannot bind by span,
+/// where its canonical form (`12.5`) would, and a book row holding `-12.50` is the same figure.
+/// That is how it was before the type (#1872), because the sign goes on the text as received.
+/// The same row binds the plain `12.50`, which shows the row is the right one. This guards a
+/// later change of the span identity to `signed_canonical`.
+#[test]
+fn a_padded_256_byte_debit_cannot_bind_although_its_canonical_form_would() {
+    let span = span();
+    let padded = format!("{}12.50", "0".repeat(251));
+    assert_eq!(padded.len(), 256);
+    let mut rows = parse_import_voucher_rows(&captured(SPAN_READ), COMPANY_GUID).unwrap();
+    let position = rows
+        .iter()
+        .position(|row| {
+            row.entries
+                .iter()
+                .any(|entry| entry.amount.ends_with("3450.50"))
+        })
+        .expect("the sixth captured voucher");
+    for entry in &mut rows[position].entries {
+        entry.amount = if entry.is_deemed_positive == "Yes" {
+            "-12.50".to_string()
+        } else {
+            "12.50".to_string()
+        };
+    }
+    let read = ImportReadSource::admit(rows).unwrap();
+    let with_amount = |text: &str| {
+        let mut sent = sent();
+        for entry in &mut sent[5].entries {
+            entry.amount = ImportAmount::parse(text).unwrap();
+        }
+        sent
+    };
+    assert_eq!(
+        bind(
+            &span,
+            COMPANY_GUID,
+            &with_amount("12.50"),
+            &read,
+            &BTreeSet::new()
+        )
+        .unwrap()
+        .len(),
+        10
+    );
+    let long = with_amount(&padded);
+    assert_eq!(
+        long[5].entries[0]
+            .amount
+            .signed_lexeme(&EntrySide::Dr)
+            .len(),
+        257
+    );
+    assert_eq!(
+        long[5].entries[0].amount.signed_canonical(&EntrySide::Dr),
+        "-12.5"
     );
     assert_eq!(
         refusal(bind(&span, COMPANY_GUID, &long, &read, &BTreeSet::new())),

@@ -2278,6 +2278,17 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              written. Build once more; if the refusal repeats, tell the user this invoice has to \
              be entered in Tally itself.",
         ),
+        // Given by the journal reader for any line it cannot read (#1872); the local data report
+        // names that line. The skip-only file's reader wraps it as `skip_file_unreadable`, and the
+        // master journal's maps it to its own error, so neither shows this text.
+        "import_ledger_invalid" => Some(
+            "ComplyEaze Bridge cannot read its import journal, so the import tools are stopped \
+             for every company on this computer until that is put right. Do not edit or delete \
+             the file, and do not build, post or verify again on this answer: a wrong edit can \
+             lose the record of a batch that was already sent. Tell the user to run the local \
+             data report, which names the line of the journal that cannot be read, and to send \
+             the journal file and that report to support.",
+        ),
         // A date argument a caller can correct. `TallyDate` admits years 0001
         // to 9999, and the edge codes come from widening an empty window past
         // either end of that (#1268).

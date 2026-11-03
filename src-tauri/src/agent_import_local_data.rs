@@ -67,6 +67,9 @@ pub(super) struct Report {
     /// A folder held more entries than the report will list.
     pub(super) entry_cap_reached: bool,
     pub(super) journal: Journal,
+    /// The line of the journal that was refused, when it was refused as invalid (#1872). Said
+    /// here and nowhere else: the readers that return the bare code do not carry it.
+    pub(super) journal_line: Option<usize>,
     pub(super) master_journal: MasterJournal,
 }
 
@@ -273,6 +276,7 @@ pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
         folders_not_read: Vec::new(),
         entry_cap_reached: false,
         journal: Journal::Absent,
+        journal_line: None,
         master_journal: MasterJournal::Absent,
     };
     match fs::read_dir(root) {
@@ -341,7 +345,8 @@ pub(super) fn build(root: &Path, coordination: &[&Path]) -> Report {
         }
     }
     scan_leases(&mut report, root, coordination);
-    report.journal = read_journal(root, || std::thread::sleep(Duration::from_millis(100)));
+    (report.journal, report.journal_line) =
+        read_journal_at(root, || std::thread::sleep(Duration::from_millis(100)));
     report.master_journal =
         read_master_journal(root, || std::thread::sleep(Duration::from_millis(100)));
     report
@@ -561,16 +566,19 @@ const JOURNAL_READ_FAILED: &str = "journal_read_failed";
 /// in progress would have finished by then.
 const JOURNAL_INVALID: &str = "journal_invalid";
 
-fn read_journal_once(path: &Path) -> Journal {
+fn read_journal_once(path: &Path) -> (Journal, Option<usize>) {
     let file = match super::super::local_file::open_local_file(path, false) {
         Ok(file) => file,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Journal::Absent,
-        Err(_) => return Journal::NotRead(JOURNAL_UNREADABLE),
+        Err(error) if error.kind() == ErrorKind::NotFound => return (Journal::Absent, None),
+        Err(_) => return (Journal::NotRead(JOURNAL_UNREADABLE), None),
     };
-    match super::ledger::settlement(std::io::BufReader::new(file)) {
-        Ok(settlement) => Journal::Read(settlement),
-        Err(reason) if reason == "import_ledger_invalid" => Journal::NotRead(JOURNAL_INVALID),
-        Err(_) => Journal::NotRead(JOURNAL_READ_FAILED),
+    let line = std::cell::Cell::new(0);
+    match super::ledger::settlement_at(std::io::BufReader::new(file), &line) {
+        Ok(settlement) => (Journal::Read(settlement), None),
+        Err(reason) if reason == "import_ledger_invalid" => {
+            (Journal::NotRead(JOURNAL_INVALID), Some(line.get()))
+        }
+        Err(_) => (Journal::NotRead(JOURNAL_READ_FAILED), None),
     }
 }
 
@@ -581,10 +589,15 @@ fn read_journal_once(path: &Path) -> Journal {
 /// report) before it is reported. A record rolled back after a failed append may
 /// be counted once: this is a report.
 pub(super) fn read_journal(root: &Path, between: impl FnOnce()) -> Journal {
+    read_journal_at(root, between).0
+}
+
+/// [`read_journal`], with the line of the journal that was refused as invalid, when it was.
+pub(super) fn read_journal_at(root: &Path, between: impl FnOnce()) -> (Journal, Option<usize>) {
     let path = root.join(JOURNAL_FILE);
     let first = read_journal_once(&path);
     if matches!(
-        first,
+        first.0,
         Journal::NotRead(JOURNAL_INVALID | JOURNAL_READ_FAILED)
     ) {
         between();
@@ -677,7 +690,14 @@ fn to_json_resolving(
         .collect::<serde_json::Map<_, _>>();
     let journal = match &report.journal {
         Journal::Absent => json!({"state": "absent"}),
-        Journal::NotRead(why) => json!({"state": "not_read", "reason": why}),
+        // A journal refused as invalid names the line, so the person can send it to support
+        // without opening the file.
+        Journal::NotRead(why) => match report.journal_line {
+            Some(line) if *why == JOURNAL_INVALID => {
+                json!({"state": "not_read", "reason": why, "line": line})
+            }
+            _ => json!({"state": "not_read", "reason": why}),
+        },
         Journal::Read(settlement) => json!({
             "state": "read",
             "batches": settlement.batches,

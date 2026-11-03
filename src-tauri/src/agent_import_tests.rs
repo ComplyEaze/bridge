@@ -1928,6 +1928,42 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let result = verify_observed_batch(&line, &[divergent]).expect("numeric divergence");
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
     assert_eq!(result["vouchers"][0]["alter_id"], 11);
+    // The entry differences show the batch's amount in canonical form, as the book's side is
+    // (#1872): `0012.50` is `12.5` there, not the text it was saved with.
+    let diffs = result["vouchers"][0]["diffs"].as_array().unwrap();
+    let entries = diffs
+        .iter()
+        .find_map(|diff| diff.get("entries"))
+        .expect("the entries differ");
+    assert_eq!(entries["expected"][0]["amount"], "12.5");
+    assert_eq!(entries["expected"][1]["amount"], "12.5");
+}
+
+/// The fingerprint production matches by is the canonical one (#1872): a batch voucher saved
+/// with `0012.50` is `12.5`, signed as a debit `-12.5`, and equals the same voucher saved as
+/// `12.50`. The pin in `agent_import_amount_pin_tests.rs` holds the received-text function
+/// beside it.
+#[test]
+fn a_batch_voucher_is_matched_by_the_canonical_form_of_its_amounts() {
+    let voucher = |amount: &str| {
+        let mut voucher = admitted_payload().vouchers[0].clone();
+        for entry in &mut voucher.entries {
+            entry.amount = ImportAmount::parse(amount).unwrap();
+        }
+        voucher
+    };
+    assert_eq!(
+        canonical_entry_fingerprint(&voucher("0012.50")),
+        ["Bank|12.5|No", "Expense|-12.5|Yes"]
+    );
+    assert_eq!(
+        canonical_entry_fingerprint(&voucher("0012.50")),
+        canonical_entry_fingerprint(&voucher("12.50"))
+    );
+    assert_ne!(
+        canonical_entry_fingerprint(&voucher("12.50")),
+        canonical_entry_fingerprint(&voucher("12.51"))
+    );
 }
 
 #[test]

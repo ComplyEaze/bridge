@@ -926,6 +926,47 @@ fn a_journal_line_with_a_signed_amount_is_shown_as_invalid() {
     assert!(waited);
 }
 
+/// The report names the line it refused, and only the report does (#1872). A bad amount sits
+/// between two good lines; the field is the 1-based line, and a journal that reads has none.
+/// A half-written last line is named too: it is the line after the last whole one.
+#[test]
+fn the_report_names_the_line_of_a_bad_amount_between_two_good_ones() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let first = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| first.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    let bad = with_id("b2").replacen("\"amount\":\"1.00\"", "\"amount\":\"-1.00\"", 1);
+    write(&path, format!("{first}{bad}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert_eq!(report.journal, Journal::NotRead(JOURNAL_INVALID));
+    assert_eq!(report.journal_line, Some(2));
+    let shown = to_json(&report, SystemTime::now(), None);
+    assert_eq!(shown["journal"]["state"], "not_read");
+    assert_eq!(shown["journal"]["reason"], "journal_invalid");
+    assert_eq!(shown["journal"]["line"], 2);
+    // Without the bad line the journal reads and names no line.
+    write(&path, format!("{first}{}", with_id("b3")).as_bytes());
+    let report = build(directory.path(), &[]);
+    assert!(matches!(report.journal, Journal::Read(_)), "{report:?}");
+    assert_eq!(report.journal_line, None);
+    assert!(to_json(&report, SystemTime::now(), None)["journal"]["line"].is_null());
+    // A half-written last line is the line after the last whole one.
+    let mut cut = format!("{first}{}", with_id("b3")).into_bytes();
+    cut.extend_from_slice(b"{\"record_type\":\"dispat");
+    write(&path, &cut);
+    assert_eq!(
+        read_journal_at(directory.path(), || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(3))
+    );
+    // Another reason a journal is not read names no line.
+    let missing = tempfile::tempdir().unwrap();
+    assert_eq!(
+        read_journal_at(missing.path(), || {}),
+        (Journal::Absent, None)
+    );
+}
+
 /// A folder that exists but cannot be listed is named, not read as empty. A file
 /// where the folder should be fails the listing on any user.
 #[cfg(unix)]

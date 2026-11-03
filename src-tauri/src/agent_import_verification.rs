@@ -1343,7 +1343,7 @@ pub(super) fn voucher_diffs(
             .entries
             .iter()
             .map(|entry| {
-                json!({"ledger":party_name(&entry.ledger), "amount":entry.amount, "side":entry.side,
+                json!({"ledger":party_name(&entry.ledger), "amount":entry.amount.canonical(), "side":entry.side,
                 "is_deemed_positive":entry.side.tally_positive()})
             })
             .collect::<Vec<_>>();

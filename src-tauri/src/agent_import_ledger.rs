@@ -814,6 +814,14 @@ pub(super) struct Settlement {
 
 /// Validate the whole journal and count its batches by settlement (#local-data).
 pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
+    settlement_at(reader, &std::cell::Cell::new(0))
+}
+
+/// [`settlement`], with the line it was reading left in `line` (see [`scan_records_at`]).
+pub(super) fn settlement_at(
+    reader: impl BufRead,
+    line: &std::cell::Cell<usize>,
+) -> Result<Settlement, String> {
     #[derive(Default)]
     struct Progress {
         dispatched: bool,
@@ -849,7 +857,7 @@ pub(super) fn settlement(reader: impl BufRead) -> Result<Settlement, String> {
     let mut reviews = ContentReviews::default();
     let mut settlements = PersonSettlements::default();
     let mut rollbacks = RollbackFacts::empty();
-    scan_records(reader, |record, VerificationGeneration(at)| {
+    scan_records_at(reader, line, |record, VerificationGeneration(at)| {
         reviews.feed(&record);
         settlements.feed(&record);
         rollbacks.feed(&record, at);
@@ -1396,7 +1404,18 @@ pub(super) fn transfer_facts(
 }
 
 fn scan_records(
+    reader: impl BufRead,
+    visit: impl FnMut(Record, VerificationGeneration),
+) -> Result<(), String> {
+    scan_records_at(reader, &std::cell::Cell::new(0), visit)
+}
+
+/// [`scan_records`], leaving in `line` the 1-based line of the record it is reading, so a
+/// caller that wants to say where a refusal came from can ask. Every other reader calls
+/// `scan_records` and gets the bare code, as before.
+fn scan_records_at(
     mut reader: impl BufRead,
+    line_read: &std::cell::Cell<usize>,
     mut visit: impl FnMut(Record, VerificationGeneration),
 ) -> Result<(), String> {
     // Compact records must be checked even for unrelated batches. Retain only
@@ -1432,6 +1451,7 @@ fn scan_records(
     let mut settled: BTreeSet<String> = BTreeSet::new();
     let mut line = Vec::new();
     let mut ordinal = 0_usize;
+    line_read.set(1);
     while read_record(&mut reader, &mut line)? {
         let text =
             std::str::from_utf8(&line).map_err(|_| "import_ledger_unavailable".to_string())?;
@@ -1696,6 +1716,7 @@ fn scan_records(
         ordinal = ordinal
             .checked_add(1)
             .ok_or_else(|| "import_ledger_invalid".to_string())?;
+        line_read.set(ordinal.saturating_add(1));
     }
     Ok(())
 }

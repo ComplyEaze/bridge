@@ -774,6 +774,10 @@ fn a_line_whose_amount_is_not_an_import_amount_refuses_the_whole_journal() {
     let candidate = plain("new", "t1", BANK_TO_B);
     let invoice = invoice_batch("second", 'b', ("INV/2", "Sales Manual"), SALE);
     let refused = Some("import_ledger_invalid".to_string());
+    // The refusal says what to do, and not to edit or delete the file (#1872).
+    let step = crate::agent::refusal_remediation("import_ledger_invalid").expect("a next step");
+    assert!(step.contains("local data report"), "{step}");
+    assert!(step.contains("Do not edit or delete"), "{step}");
     for bad in ["not-a-number", "-13.00", "+13.00", "0.00", "13", "13.5", ""] {
         let line = plain("old", "t1", BANK_TO_A);
         let mut value = serde_json::to_value(&line).unwrap();

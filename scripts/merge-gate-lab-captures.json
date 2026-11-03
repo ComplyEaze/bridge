@@ -4000,6 +4000,46 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 head 94bf10d8",
       "sha256": "652e419a35ccf772d05adb25a3e36bca6b8fc9a966d3243b9dcf4d09623c9338",
       "size": 6658
+    },
+    {
+      "blob": "062e537491ea24d5417e7bcaadad1a1a06cee37f",
+      "capture_id": "review-hand-company-extent.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-hand-import-answers at 42ac2167",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-company-extent.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 (the hand-import row)",
+      "sha256": "f08b3b1085c3bf2dbfa46b9fb24d3b1e04877f6bef318cac3fa556e5d130d1a8",
+      "size": 4014
+    },
+    {
+      "blob": "4b4faa868616de5fe251f6dc136f913ad9bb81c7",
+      "capture_id": "review-hand-company-high-water.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-hand-import-answers at 42ac2167",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-company-high-water.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 (the hand-import row)",
+      "sha256": "065a943b4a041996c4c4ed40d2b169b0825f574b479e7e57ed33df6072d29fbc",
+      "size": 3408
+    },
+    {
+      "blob": "83b3bbb9cf17d080b00aae95aa7378335273e014",
+      "capture_id": "review-hand-voucher-census.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-hand-import-answers at 42ac2167",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-voucher-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 (the hand-import row)",
+      "sha256": "435884cb4c02071d439539534a5132d5a0fcdd7940e40e4dbfd54de4452ea30b",
+      "size": 126760
+    },
+    {
+      "blob": "1ccceadac9e836b63ad7a71fc1063fd165c9305a",
+      "capture_id": "review-hand-import-verification.utf16le.xml",
+      "company": "BRIDGE REVIEW LAB",
+      "lab_ref": "lab branch lab/2210-hand-import-answers at 42ac2167",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-import-verification.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/REVIEW_LAB_CAPTURE_PROVENANCE.md at pull request 2308 (the hand-import row)",
+      "sha256": "9477e8a435c7b70e6fc75e7c0b89c5c9bb421c3b3d1a18bdb1958a499cece2f6",
+      "size": 258392
     }
   ]
 }

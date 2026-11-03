@@ -10,8 +10,8 @@ payment reading back whole and matched (`D3_BATCH_CAPTURE_PROVENANCE.md`, `WA1_P
 
 - **The #2210 census row, 3 Nov 2026.** Run sheet `lab/2210-census-sheet` at `1a381f08`; evidence
   `lab/2210-census-answers` at `b52cd5ec` (`RESULTS.md`, `out/relay.jsonl`, `out/bodies/`, `evidence/check.txt`,
-  `copied/`). TallyPrime 7.2 Silver (licensed), `BRIDGE REVIEW LAB` (GUID `63292d7c-d541-42e5-aa9d-2ab5f8b993ff`) loaded
-  alone. One `bridge_mcp` process built from master `8520f071`, behind the sheet's relay in pass mode, which kept every
+  `copied/`), with its fix-forward at `8ce3397b` (the order of each call and the narrations below). TallyPrime 7.2
+  Silver (licensed), `BRIDGE REVIEW LAB` (GUID `63292d7c-d541-42e5-aa9d-2ab5f8b993ff`) loaded alone. One `bridge_mcp` process built from master `8520f071`, behind the sheet's relay in pass mode, which kept every
   request and answer as sent. 486 requests over two connections; no relay error.
 - **The book.** It stood at voucher mark 52. A set-up import of 148 Journals dated 1 April 2026, sent once with curl,
   raised it to 200. No set-up Journal falls in either window below.

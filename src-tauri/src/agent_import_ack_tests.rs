@@ -1354,7 +1354,7 @@ fn review_requests(census: &'static str, verification: &'static str) -> Vec<Opti
         .chars()
         .map(|step| match step {
             'S' => None,
-            'E' => Some("9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8"),
+            'E' => Some(REVIEW_EXTENT_REQUEST),
             'H' => Some("388c28bc5c531be5ed8b16d7519b7221daa28d9a6d7f180f95643f249b62abbe"),
             'C' => Some(census),
             _ => Some(verification),
@@ -1375,6 +1375,10 @@ fn review_payment_requests() -> Vec<Option<&'static str>> {
         "a3c8f4352a3041efe50d26fbcdc8a0e94759d68b57a9017afe69754bae5c7d46",
     )
 }
+
+/// The company extent request each review read brackets its reads with.
+const REVIEW_EXTENT_REQUEST: &str =
+    "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8";
 
 /// Asserts each of `requests` is the one the capture answered.
 fn assert_captured_requests(
@@ -2127,12 +2131,12 @@ fn review_catalogue_read(catalogue: String) -> Vec<ScenarioPlan> {
 const REVIEW_CATALOGUE_REQUEST: &str =
     "215735dac6142fb181ece3d979135b5e6dab0012fb628ca2349fc7dfb5664802";
 
-/// How many of `observed` are that catalogue request.
-fn catalogue_requests(observed: &[tally_protocol_simulator::ObservedRequest]) -> usize {
-    observed
-        .iter()
-        .filter(|request| request.request_body_sha256 == REVIEW_CATALOGUE_REQUEST)
-        .count()
+/// The requests [`review_catalogue_read`] answers, in order; `None` for the
+/// status probe.
+fn review_catalogue_requests() -> Vec<Option<&'static str>> {
+    let extent = Some(REVIEW_EXTENT_REQUEST);
+    let catalogue = Some(REVIEW_CATALOGUE_REQUEST);
+    vec![extent, catalogue, None, catalogue, None, extent]
 }
 
 fn review_catalogue() -> String {
@@ -2177,7 +2181,8 @@ fn review_step_doubt_beside_a_pending_check(server: &Server) {
 async fn an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt() {
     let mut plans = review_batch_readback();
     plans.extend(review_catalogue_read(review_catalogue_with_cash_replaced()));
-    let scripted = plans.len();
+    let mut expected = review_batch_requests();
+    expected.extend(review_catalogue_requests());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = review_server(&simulator, directory.path());
@@ -2204,9 +2209,7 @@ async fn an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt() {
     assert!(imports
         .join(format!("{REVIEW_BATCH}.masters_doubt.json"))
         .is_file());
-    let observed = sent(simulator);
-    assert_eq!(observed.len(), scripted, "{response}");
-    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+    assert_captured_requests(&sent(simulator), &expected);
 }
 
 /// The control: the same read finishes the check as unchanged, the step doubt
@@ -2216,7 +2219,9 @@ async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged
     let mut plans = review_batch_readback();
     plans.extend(review_catalogue_read(review_catalogue()));
     plans.extend(review_batch_readback());
-    let scripted = plans.len();
+    let mut expected = review_batch_requests();
+    expected.extend(review_catalogue_requests());
+    expected.extend(review_batch_requests());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = review_server(&simulator, directory.path());
@@ -2246,9 +2251,7 @@ async fn an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged
         masters_check_of(&server, REVIEW_BATCH)["state"],
         "unchanged"
     );
-    let observed = sent(simulator);
-    assert_eq!(observed.len(), scripted, "{response}");
-    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+    assert_captured_requests(&sent(simulator), &expected);
 }
 
 /// The catalogue read refused, as Tally answers when the company cannot be
@@ -2275,7 +2278,10 @@ async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_dou
     plans.extend(review_catalogue_refused());
     plans.extend(review_batch_readback());
     plans.extend(review_catalogue_read(review_catalogue_with_cash_replaced()));
-    let scripted = plans.len();
+    let mut expected = review_batch_requests();
+    expected.extend(review_catalogue_requests());
+    expected.extend(review_batch_requests());
+    expected.extend(review_catalogue_requests());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = review_server(&simulator, directory.path());
@@ -2306,9 +2312,7 @@ async fn an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_dou
         .join(format!("{REVIEW_BATCH}.masters_doubt.json"))
         .is_file());
     // Both reads ran in full, the refused catalogue pair included.
-    let observed = sent(simulator);
-    assert_eq!(observed.len(), scripted, "{response}");
-    assert_eq!(catalogue_requests(&observed), 4, "{response}");
+    assert_captured_requests(&sent(simulator), &expected);
 }
 
 /// A review NAMING the step doubt goes ahead when its first read finishes the
@@ -2320,7 +2324,9 @@ async fn a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt() {
     let mut plans = review_batch_readback();
     plans.extend(review_catalogue_read(review_catalogue_with_cash_replaced()));
     plans.extend(review_batch_readback());
-    let scripted = plans.len();
+    let mut expected = review_batch_requests();
+    expected.extend(review_catalogue_requests());
+    expected.extend(review_batch_requests());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = review_server(&simulator, directory.path());
@@ -2349,9 +2355,7 @@ async fn a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt() {
     assert!(!imports
         .join(format!("{REVIEW_BATCH}.masters_ack.json"))
         .exists());
-    let observed = sent(simulator);
-    assert_eq!(observed.len(), scripted, "{response}");
-    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+    assert_captured_requests(&sent(simulator), &expected);
 }
 
 /// A review on file answers "already recorded" only for the doubt it covers
@@ -2414,11 +2418,12 @@ async fn a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finis
 /// and whose review record covers `doubt_sha256`, while its read finishes the
 /// check as a doubt. Returns the refusal code and the doubt the read wrote,
 /// after checking that no dialog was shown, the record is unchanged, and
-/// every scripted request was sent.
+/// every request sent was the one its capture answered.
 async fn review_beside_a_pending_check(doubt_sha256: &str) -> (String, Vec<u8>) {
     let mut plans = review_batch_readback();
     plans.extend(review_catalogue_read(review_catalogue_with_cash_replaced()));
-    let scripted = plans.len();
+    let mut expected = review_batch_requests();
+    expected.extend(review_catalogue_requests());
     let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = review_server(&simulator, directory.path());
@@ -2438,9 +2443,7 @@ async fn review_beside_a_pending_check(doubt_sha256: &str) -> (String, Vec<u8>) 
     assert_eq!(fs::read(&record_path).unwrap(), record);
     // The read did finish the check as a doubt: that is what was compared.
     let finished = fs::read(imports.join(format!("{REVIEW_BATCH}.masters_doubt.json"))).unwrap();
-    let observed = sent(simulator);
-    assert_eq!(observed.len(), scripted, "{response}");
-    assert_eq!(catalogue_requests(&observed), 2, "{response}");
+    assert_captured_requests(&sent(simulator), &expected);
     let code = response["structuredContent"]["result"]["error"]["code"]
         .as_str()
         .unwrap_or_default()

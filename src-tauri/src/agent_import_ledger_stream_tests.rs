@@ -511,6 +511,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 1
         }
     );
@@ -525,6 +526,7 @@ fn settlement_counts_sent_and_unsettled_batches() {
             unsettled_reviewed: 0,
             unsettled_restored: 0,
             settled_by_person: 0,
+            released_by_person: 0,
             no_dispatch_never_verified: 0
         }
     );
@@ -2455,4 +2457,230 @@ fn a_settlement_voided_by_a_verified_read_can_be_made_again() {
     open.status = "reconciliation_required".into();
     let by_record = [standing, vec![record(&full), record(&open), settled(&p1)]].concat();
     assert_eq!(settlement_of(&by_record, "p1"), Ok(true));
+}
+
+/// A native post a rollback record covers: P1 answered, then a read of the
+/// mark below its floor (#1038).
+fn covered_post(line: &ImportLedgerLine) -> Vec<Vec<u8>> {
+    let mut journal = vec![record(line), intent(line, Some(1)), answered(line)];
+    let read = journal.len() as u64;
+    journal.push(seen(line, 1, read));
+    journal
+}
+
+/// The release a person would record for `line` on the journal's cover.
+fn release_on(journal: &[Vec<u8>], line: &ImportLedgerLine) -> StatusRecord {
+    let cover = cover(journal, &line.batch_id).covered_by.unwrap();
+    StatusRecord::row_release(line, &cover)
+}
+
+fn release_after(journal: &[Vec<u8>], release: &StatusRecord) -> Result<bool, String> {
+    row_release_after(Cursor::new(journal.concat()), release)
+}
+
+/// A row release (#1038) carries the cover it rests on and the batch's
+/// company and endpoint, sets no status, and the writer's check admits it only
+/// while that cover still stands for that company and endpoint, with no
+/// release standing.
+#[test]
+fn a_row_release_is_admitted_only_while_its_cover_stands() {
+    assert!(captured_outcome().counters().created > 0);
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let release = release_on(&journal, &p1);
+    let shape = serde_json::to_value(&release).unwrap();
+    assert_eq!(shape["record_type"], "row_release");
+    assert_eq!(shape["status"], "rows_released");
+    assert_eq!(shape["mark_read"], 1);
+    assert_eq!(shape["seen_by"], "p1");
+    assert_eq!(shape["company"]["name"], "BRIDGE RELEASE LAB");
+    assert_eq!(shape["endpoint_origin"], PLACE_ENDPOINT);
+    assert!(shape.get("records_before_read").is_none());
+    assert_eq!(release_after(&journal, &release), Ok(true));
+    assert_eq!(row_release(Cursor::new(journal.concat()), "p1"), Ok(false));
+
+    let mut released = journal.clone();
+    released.push(record(&release));
+    assert_eq!(row_release(Cursor::new(released.concat()), "p1"), Ok(true));
+    let snapshot = read_snapshot(Cursor::new(released.concat()), Some("p1"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.batch.status, "response_received");
+    // A second release is refused, by the writer's check and by the journal.
+    assert!(release_after(&released, &release).is_err());
+    let mut twice = released.clone();
+    twice.push(record(&release));
+    assert!(row_release(Cursor::new(twice.concat()), "p1").is_err());
+    assert!(settlement(Cursor::new(twice.concat())).is_err());
+
+    // Not covered: no rollback record, or none whose mark is below the floor.
+    let uncovered = journal[..3].to_vec();
+    assert_eq!(release_after(&uncovered, &release), Ok(false));
+    // Covered for another company field, another endpoint, or by another cover.
+    let renamed = placed("p1", "BRIDGE RELEASE LAB OLD", Some(PLACE_ENDPOINT));
+    let cover_now = cover(&journal, "p1").covered_by.unwrap();
+    assert_eq!(
+        release_after(&journal, &StatusRecord::row_release(&renamed, &cover_now)),
+        Ok(false)
+    );
+    let moved = placed("p1", "BRIDGE RELEASE LAB", Some("http://127.0.0.1:9002"));
+    assert_eq!(
+        release_after(&journal, &StatusRecord::row_release(&moved, &cover_now)),
+        Ok(false)
+    );
+    let other_cover = RollbackCover {
+        mark_read: 0,
+        seen_by: "p1".into(),
+    };
+    assert_eq!(
+        release_after(&journal, &StatusRecord::row_release(&p1, &other_cover)),
+        Ok(false)
+    );
+    // A lower restore recorded since the dialog's read moves the cover.
+    let mut lower = journal.clone();
+    lower.push(seen(&p1, 0, journal.len() as u64));
+    assert_eq!(release_after(&lower, &release), Ok(false));
+    // Only a row release is admitted by this check.
+    assert_eq!(
+        release_after(&journal, &StatusRecord::person_settlement(&p1)),
+        Ok(false)
+    );
+}
+
+/// The journal admits a row release only in its one shape: after a native
+/// intent with a pre-POST mark, while the batch does not read verified (an
+/// extra guard: a covered batch never does), with every field it names, and
+/// none of them on another kind.
+#[test]
+fn a_row_release_is_admitted_only_in_its_one_shape() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let release = serde_json::to_value(release_on(&journal, &p1)).unwrap();
+    let refused = |more: Vec<Vec<u8>>| {
+        let whole = [journal.clone(), more].concat();
+        row_release(Cursor::new(whole.concat()), "p1").is_err()
+            && settlement(Cursor::new(whole.concat())).is_err()
+    };
+    assert!(!refused(vec![record(&release)]));
+    for field in ["mark_read", "seen_by", "company", "endpoint_origin"] {
+        let mut changed = release.clone();
+        changed.as_object_mut().unwrap().remove(field);
+        assert!(refused(vec![record(&changed)]), "{field}");
+    }
+    let mut counted = release.clone();
+    counted["records_before_read"] = json!(1);
+    assert!(refused(vec![record(&counted)]));
+    let mut restated = release.clone();
+    restated["status"] = json!("rollback_seen");
+    assert!(refused(vec![record(&restated)]));
+    assert!(refused(vec![verified(&p1), record(&release)]));
+    // No pre-POST mark: never covered, never released.
+    let unmarked = [record(&p1), intent(&p1, None), record(&release)];
+    assert!(row_release(Cursor::new(unmarked.concat()), "p1").is_err());
+    // Its fields on another kind, and a mark on any kind but these two.
+    let carrier = json!({
+        "record_type":"verification_status","batch_id":p1.batch_id,
+        "batch_sha256":p1.sha256,"status":"reconciliation_required"
+    });
+    assert!(!refused(vec![record(&carrier)]));
+    for (field, value) in [
+        ("seen_by", json!("p1")),
+        ("company", release["company"].clone()),
+        ("endpoint_origin", json!(PLACE_ENDPOINT)),
+        ("mark_read", json!(1)),
+    ] {
+        let mut stray = carrier.clone();
+        stray[field] = value;
+        assert!(refused(vec![record(&stray)]), "{field}");
+    }
+}
+
+/// A build that does not know the kind refuses the whole journal holding it,
+/// as an older build does this one.
+#[test]
+fn a_row_release_kind_the_build_does_not_know_refuses_the_whole_journal() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let mut changed = serde_json::to_value(release_on(&journal, &p1)).unwrap();
+    changed["record_type"] = json!("row_release_v2");
+    let whole = [journal, vec![record(&changed)]].concat();
+    assert!(row_release(Cursor::new(whole.concat()), "p1").is_err());
+    assert!(settlement(Cursor::new(whole.concat())).is_err());
+    assert!(rollback_cover(Cursor::new(whole.concat()), "p1").is_err());
+}
+
+/// A released batch holds none of its rows for the lookup every build and
+/// post reads; another batch holding the same row still does, and is named.
+/// The transfer skips' own scan is unchanged: a skip of a released row is
+/// still held.
+#[test]
+fn a_released_batch_no_longer_holds_its_rows() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let held = |journal: &[Vec<u8>]| {
+        vouchers_already_posted(
+            Cursor::new(journal.concat()),
+            &p1.company_guid,
+            None,
+            &p1.vouchers,
+        )
+        .unwrap()
+    };
+    assert_eq!(held(&journal).as_deref(), Some("p1"));
+    let mut released = journal.clone();
+    released.push(record(&release_on(&journal, &p1)));
+    assert_eq!(held(&released), None);
+    let rows = std::collections::BTreeSet::from(["txn".to_string()]);
+    assert_eq!(
+        rows_held_as_vouchers(
+            Cursor::new(released.concat()),
+            &p1.company_guid,
+            None,
+            &rows
+        )
+        .unwrap()
+        .map(|(batch_id, _)| batch_id)
+        .as_deref(),
+        Some("p1")
+    );
+    // A second batch sent with the same row is still its blocker.
+    let p2 = placed("p2", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let mut both = released.clone();
+    both.push(record(&p2));
+    both.push(intent(&p2, Some(9)));
+    assert_eq!(held(&both).as_deref(), Some("p2"));
+}
+
+/// A released batch leaves `not_settled_restored` and every other part of
+/// `unsettled` for `released_by_person`; its history stays (#1038).
+#[test]
+fn a_released_batch_moves_from_restored_to_released_by_person() {
+    let p1 = placed("p1", "BRIDGE RELEASE LAB", Some(PLACE_ENDPOINT));
+    let journal = covered_post(&p1);
+    let before = settlement(Cursor::new(journal.concat())).unwrap();
+    assert_eq!(
+        (
+            before.unsettled,
+            before.unsettled_restored,
+            before.released_by_person
+        ),
+        (1, 1, 0),
+        "{before:?}"
+    );
+    let mut released = journal.clone();
+    released.push(record(&release_on(&journal, &p1)));
+    let after = settlement(Cursor::new(released.concat())).unwrap();
+    assert_eq!(
+        (
+            after.unsettled,
+            after.unsettled_restored,
+            after.released_by_person
+        ),
+        (0, 0, 1),
+        "{after:?}"
+    );
+    assert_eq!(after.settled_by_person, 0, "{after:?}");
+    assert_eq!(after.sent_or_found, 1, "{after:?}");
+    // The cover stays: the batch still reads rolled back.
+    assert!(cover(&released, "p1").covered_by.is_some());
 }

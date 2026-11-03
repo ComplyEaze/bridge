@@ -1845,9 +1845,13 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// tree they measure 207,634, 233,527, 236,036 and 241,413, over by 134, 27, 36 and 413. Each
 /// budget went up by 1,400. The e-invoice argument (#1378) and the review of a twin ledger (#626)
 /// add 362 bytes between them, leaving margins of 904, 1,011, 1,002 and 625 once all have landed.
+/// The release of a rolled-back batch's rows (#1038) adds the `rolled_back` doubt to
+/// `acknowledge_post_review`: on 3 Nov 2026 the lists measure 208,571, 234,676, 237,185 and
+/// 242,562, the last over by 162. That budget went up by 500, leaving margins of 329, 224, 215
+/// and 338.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [208_900, 234_900, 237_400, 242_400];
+const TOOL_LIST_BUDGETS: [usize; 4] = [208_900, 234_900, 237_400, 242_900];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

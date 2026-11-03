@@ -4733,6 +4733,8 @@ fn a_pending_mark_never_erases_a_doubt() {
 mod ack_tests;
 #[path = "agent_import_approval_tests.rs"]
 mod approval_tests;
+#[path = "agent_import_release_tests.rs"]
+mod release_tests;
 #[path = "agent_import_settle_tests.rs"]
 mod settle_tests;
 #[path = "agent_import_stop_tests.rs"]
@@ -8149,6 +8151,118 @@ async fn the_sales_line_this_build_writes_is_read_by_mcp_v0_7_0() {
         unknown.is_empty(),
         "fields mcp-v0.7.0 does not know, so it refuses the journal: {unknown:?}"
     );
+}
+
+/// The status record kinds `mcp-v0.7.0` reads, from its `StatusKind` at the
+/// tag (`fcfb5ff6`, `agent_import_ledger.rs`). A record of any other kind
+/// refuses the whole journal there.
+const MCP_V0_7_0_STATUS_KINDS: [&str; 8] = [
+    "verification_status",
+    "dispatch_intent",
+    "dispatch_response",
+    "post_span_verdict",
+    "stop_release",
+    "rollback_seen",
+    "content_review",
+    "person_settlement",
+];
+
+/// The whole release flow (#1038): a post read back verified, the restore
+/// seen by the release's own read, the release, then a fresh batch of the
+/// released row posted. The one record it writes that `mcp-v0.7.0` cannot
+/// read is the release itself, which refuses the journal there (ADR 0018,
+/// the #1038 amendment). The fresh batch's lines hold no field and no enum
+/// value beyond those that release wrote for the Sales replay, with a
+/// Journal's `voucher_type`, which its `VoucherType` at the tag holds. A kind
+/// or field added to this flow fails this: leave it out when it is empty, or
+/// raise the release the notes name.
+#[tokio::test]
+async fn a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads() {
+    let release_tests::Restored {
+        directory,
+        server,
+        simulator: _simulator,
+        line,
+    } = release_tests::posted_then_read(release_tests::rolled_back_reads(1)).await;
+    let released = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool(
+                "acknowledge_post_review",
+                json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"rolled_back"}),
+            ),
+        )
+        .await;
+    assert_eq!(
+        released["structuredContent"]["result"]["state"], "rows_released",
+        "{released}"
+    );
+
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    plans.extend(probe());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = release_tests::moved_to(&server, simulator.address(), directory.path());
+    let fresh = saved_line_as(
+        &server,
+        &format!("bridge-{}", Uuid::new_v4()),
+        "BRIDGE_MCP_LIVE_20260906_A1",
+    );
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool(
+                "post_import",
+                json!({"company_guid":GUID,"batch_id":fresh.batch_id}),
+            ),
+        )
+        .await;
+    let _ = sent(simulator);
+    let records: Vec<Value> = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect();
+    assert!(
+        records.iter().any(|record| {
+            record["record_type"] == "dispatch_response" && record["batch_id"] == fresh.batch_id
+        }),
+        "the fresh batch was sent and answered: {posted}"
+    );
+
+    let kinds: std::collections::BTreeSet<&str> = records
+        .iter()
+        .filter_map(|record| record["record_type"].as_str())
+        .collect();
+    let unknown: Vec<&&str> = kinds
+        .iter()
+        .filter(|kind| !MCP_V0_7_0_STATUS_KINDS.contains(*kind))
+        .collect();
+    assert_eq!(unknown, [&"row_release"], "{kinds:?}");
+
+    let mut known: std::collections::BTreeSet<String> = MCP_V0_7_0_SALES_LINE_FIELDS
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
+    known.insert("/vouchers[]/voucher_type=Journal".into());
+    let lines: Vec<&Value> = records
+        .iter()
+        .filter(|record| {
+            record.get("record_type").is_none() && record["batch_id"] == fresh.batch_id
+        })
+        .collect();
+    assert!(!lines.is_empty(), "{records:?}");
+    for line in lines {
+        let mut written = std::collections::BTreeSet::new();
+        journal_line_fields(line, "", &mut written);
+        let unknown: Vec<&String> = written.difference(&known).collect();
+        assert!(
+            unknown.is_empty(),
+            "fields mcp-v0.7.0 never wrote, so it refuses the journal: {unknown:?}"
+        );
+    }
 }
 
 /// The post was refused in the queue, loud and before anything was recorded or

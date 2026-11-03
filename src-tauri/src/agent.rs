@@ -10,8 +10,8 @@ use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 #[path = "agent_import.rs"]
 mod agent_import;
 pub use crate::tally::approved_import::{
-    run_confirmation, run_masters_confirmation, run_release_confirmation, run_review_confirmation,
-    run_settle_confirmation,
+    run_confirmation, run_masters_confirmation, run_release_confirmation,
+    run_release_rows_confirmation, run_review_confirmation, run_settle_confirmation,
 };
 pub(crate) use agent_import::desktop_journal_review as desktop_journal;
 

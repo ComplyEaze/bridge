@@ -1,0 +1,13 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md
+src-tauri/src/agent.rs
+src-tauri/src/agent_gst_by_ledger.rs
+src-tauri/src/agent_register.rs
+src-tauri/src/agent_register_tests.rs
+src-tauri/src/agent_vouchers.rs
+src-tauri/src/reports/party_ledger_master.rs
+src-tauri/src/reports/party_ledger_master_tests.rs
+src-tauri/src/reports/party_ledger_master_xlsx_tests.rs
+src-tauri/src/reports/schedule_iii_tests.rs
+src-tauri/src/tally/connection.rs
+src-tauri/src/tally/runtime.rs
+reviewer: lamemustafa

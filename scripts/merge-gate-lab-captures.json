@@ -4430,6 +4430,26 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "87ede2a7617036b876bb3972a7eef4fc0c2cb7e9673faf16db2945d5292454f2",
       "size": 5794
+    },
+    {
+      "blob": "c49794d2ae687ce6739cb742cdc5712d49179b9f",
+      "capture_id": "window-read-dispatch-keyed.utf16le.xml",
+      "company": "BRIDGE EINVOICE LAB",
+      "lab_ref": "branch lab/2027-dispatch-answers at 6981790c",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-dispatch-keyed.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "95bfd65fcaf939d85b9055dfab691c7bb1faec4750489d4d61e4519d17cba47a",
+      "size": 229048
+    },
+    {
+      "blob": "16929ab673a10a095ea02a90555c7d37fdb9a4fb",
+      "capture_id": "window-read-class-e-invoice-dispatch.utf16le.xml",
+      "company": "BRIDGE EINVOICE LAB",
+      "lab_ref": "branch lab/2027-d2-answers at f3645218",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "920de15ec49f2412c6045f56a04e514fc1fdbb3af52d2ea72571e46a9d129104",
+      "size": 136934
     }
   ]
 }

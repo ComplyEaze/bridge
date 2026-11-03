@@ -2694,6 +2694,124 @@ fn under_mask_parties_the_carrier_and_vehicle_number_are_masked_and_the_rest_sta
     assert_eq!(plain[0]["dispatch"]["vehicle_no"], present("KA01AB1234"));
 }
 
+const EINVOICE_LAB_COMPANY_GUID: &str = "eb2f5190-292e-4ed8-bfd3-eace839fe699";
+
+const ASKING_E_INVOICE_AND_VOUCHER_GST: NamedVoucherFields = NamedVoucherFields {
+    e_invoice: EInvoiceFields::Asked,
+    gst: VoucherGstFields::Asked,
+};
+
+/// An answer of `fixtures/agent/einvoice-lab-dispatch/PROVENANCE.md`, read as `vouchers` reads it.
+fn einvoice_lab_rows(capture: &[u8], fields: NamedVoucherFields) -> Vec<Value> {
+    parse_agent_rows_reading_gst(
+        &captured_notes_lab(capture),
+        EINVOICE_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        fields,
+        StockLines::NotAsked,
+    )
+    .unwrap()
+}
+
+fn einvoice_lab_keyed_rows() -> Vec<Value> {
+    einvoice_lab_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-dispatch-keyed.utf16le.xml"
+        ),
+        ASKING_VOUCHER_GST,
+    )
+}
+
+fn voucher<'a>(rows: &'a [Value], voucher_type: &str, number: &str) -> &'a Value {
+    rows.iter()
+        .find(|row| row["voucher_type"] == voucher_type && row["voucher_number"] == number)
+        .unwrap_or_else(|| panic!("no {voucher_type} {number}"))
+}
+
+/// #2027: the window request's own answer, with dispatch details keyed on a Sales invoice and a
+/// Credit Note: each says them present with its value, the book's earlier invoices say each absent,
+/// and its Payment says none.
+#[test]
+fn the_captured_keyed_invoice_and_note_say_each_dispatch_detail() {
+    let rows = einvoice_lab_keyed_rows();
+    assert_eq!(rows.len(), 5);
+    let keyed = json!({
+        "doc_no": present("DD-72"),
+        "dispatched_through": present("ROADWAY"),
+        "destination": present("Mysuru"),
+        "carrier": present("CARRIER-73"),
+        "lading_no": present("LR-74"),
+        "lading_date": present("20250403"),
+        "vehicle_no": present("KA-75"),
+    });
+    for (voucher_type, number) in [("Sales", "3"), ("Credit Note", "1")] {
+        assert_eq!(voucher(&rows, voucher_type, number)["dispatch"], keyed);
+    }
+    for number in ["1", "2"] {
+        assert_eq!(
+            voucher(&rows, "Sales", number)["dispatch"],
+            every_dispatch_detail(json!({"state": "absent"}))
+        );
+    }
+    assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
+}
+
+/// #2027: in the captured answer, `mask_parties` masks the keyed carrier and vehicle number and
+/// leaves the other details as the book has them.
+#[test]
+fn under_mask_parties_the_captured_carrier_and_vehicle_number_are_masked() {
+    let marked: Vec<Value> = einvoice_lab_keyed_rows()
+        .into_iter()
+        .map(mark_voucher_party_names)
+        .collect();
+    let masked = redact_value(Value::Array(marked), Redaction::MaskParties);
+    let text = masked.to_string();
+    assert!(
+        !text.contains("CARRIER-73") && !text.contains("KA-75"),
+        "{text}"
+    );
+    let rows = masked.as_array().unwrap();
+    for (voucher_type, number) in [("Sales", "3"), ("Credit Note", "1")] {
+        let dispatch = &voucher(rows, voucher_type, number)["dispatch"];
+        assert_eq!(dispatch["carrier"]["state"], "present");
+        assert_eq!(dispatch["vehicle_no"]["state"], "present");
+        assert_eq!(dispatch["doc_no"], present("DD-72"));
+        assert_eq!(dispatch["destination"], present("Mysuru"));
+        assert_eq!(dispatch["lading_no"], present("LR-74"));
+    }
+}
+
+/// #2027: the widest read `vouchers` sends with these words, a voucher type with the e-invoice and
+/// GST words, captured: both invoices say each dispatch detail absent beside their e-invoice and
+/// GST details, and the Payment says none.
+#[test]
+fn the_captured_class_read_with_e_invoice_says_dispatch_beside_both() {
+    let rows = einvoice_lab_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml"
+        ),
+        ASKING_E_INVOICE_AND_VOUCHER_GST,
+    );
+    assert_eq!(rows.len(), 3);
+    for number in ["1", "2"] {
+        let sale = voucher(&rows, "Sales", number);
+        assert_eq!(
+            sale["dispatch"],
+            every_dispatch_detail(json!({"state": "absent"}))
+        );
+        assert_eq!(sale["voucher_gst"]["place_of_supply"], present("Karnataka"));
+    }
+    assert_eq!(
+        voucher(&rows, "Sales", "1")["e_invoice"]["irn"]["state"],
+        "present"
+    );
+    assert_eq!(
+        voucher(&rows, "Sales", "2")["e_invoice"]["irn"]["state"],
+        "absent"
+    );
+    assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
+}
+
 #[test]
 fn a_lading_date_that_is_no_date_refuses_the_read() {
     let xml = notes_lab_native_answer().replacen(

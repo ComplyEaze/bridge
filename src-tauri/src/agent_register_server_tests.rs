@@ -365,38 +365,27 @@ fn plans_with_composite_opening_on(ledger: &str) -> Vec<ScenarioPlan> {
 }
 
 /// With no balance read, a composite opening on a book of one Currency master still sets its
-/// ledger aside: a window that does not touch it answers, and one that does refuses as a
-/// set-aside ledger, with no row (#2265).
+/// ledger's balance aside (#2265), and the register classifies the ledger by its master all the
+/// same (#683): a window that touches it answers as one that does not.
 #[tokio::test]
-async fn a_composite_master_opening_with_no_balance_read_is_still_set_aside() {
-    let (response, requests) = run(
-        plans_with_composite_opening_on("Cash"),
-        ("20260804", "20260805"),
-    )
-    .await;
-    assert_eq!(response["isError"], false, "{response}");
-    assert_eq!(requests, RECORDED_ORDER.len());
-    assert_eq!(
-        response["structuredContent"]["result"]["items"]
-            .as_array()
-            .unwrap()
-            .len(),
-        2,
-        "{response}"
-    );
-
-    let (response, _) = run(
-        plans_with_composite_opening_on("BRIDGE CGST 2.5%"),
-        ("20260804", "20260805"),
-    )
-    .await;
-    assert_eq!(response["isError"], true, "{response}");
-    let result = &response["structuredContent"]["result"];
-    assert_eq!(
-        result["error"]["code"], "register_ledger_currency_excluded",
-        "{response}"
-    );
-    assert!(result.get("items").is_none(), "{response}");
+async fn a_composite_master_opening_with_no_balance_read_is_classified_by_its_master() {
+    for ledger in ["Cash", "BRIDGE CGST 2.5%"] {
+        let (response, requests) = run(
+            plans_with_composite_opening_on(ledger),
+            ("20260804", "20260805"),
+        )
+        .await;
+        assert_eq!(response["isError"], false, "{ledger}: {response}");
+        assert_eq!(requests, RECORDED_ORDER.len());
+        assert_eq!(
+            response["structuredContent"]["result"]["items"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2,
+            "{ledger}: {response}"
+        );
+    }
 }
 
 #[tokio::test]
@@ -1136,4 +1125,270 @@ async fn an_empty_window_whose_voucher_mark_moved_during_the_corroboration_is_re
         "voucher_window_changed_during_read",
         "{response}"
     );
+}
+
+// #683: the registers on a book with two Currency masters, BRIDGE FOREXGROUP LAB (synthetic), on
+// 1 Apr 2025, where eight of the day's eleven vouchers carry foreign-currency composites in
+// their entry and bill-allocation amounts. Every answer is Tally's own, kept by the relay of
+// `lab/683-register-answers` at 32f896c7 (`forex-register/PROVENANCE.md`).
+
+const FOREX_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
+
+const FIXTURES: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/crates/bridge-tally-protocol/tests/fixtures"
+);
+
+/// One register call on that book, in the letters of [`RECORDED_ORDER`] and three more: C the
+/// currencies read that also asks for each master's original name, k the base currency and B
+/// the balance listing. To the window's last leg it is the order the lab's sales_register call
+/// sent (exchanges 49 to 112; purchase_register and gst_by_counter_ledger sent the same), which
+/// refused there. After it come the base read for the window's composites (the lab's `vouchers`
+/// call sent these legs after its window), then the marks and the masters again, in the order
+/// of the PILOT LAB record with this book's currency and balance legs.
+const FOREX_HEAD: &str = "esesebsbscscsCsCsksksbsbseseebsbsLsLsBsBsgsgsbsbseseensnseewswse";
+const FOREX_BASE: &str = "ebsbscscsCsCsksksbsbse";
+const FOREX_TAIL: &str = "emsmseebsbscscsCsCsksksbsbseseebsbsLsLsBsBsgsgsbsbsese";
+
+/// Each letter's answer file and the fingerprint of the request the lab sent for it. Five of the
+/// answers are byte-identical to ones committed from the same book before, and are read from
+/// there.
+fn forex_leg(letter: char) -> (Option<&'static str>, &'static str) {
+    match letter {
+        's' => (None, STATUS_SHA256),
+        'e' => (
+            Some("agent/forex-register/forex-register-extent"),
+            "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+        ),
+        'b' => (
+            Some("agent/forex-register/forex-register-book-extent"),
+            "017dd78479ff02e4aae52d7c372da34f061ceb676b7272c0f34a44f72248cd62",
+        ),
+        'c' => (
+            Some("native/currency_masters_forex_72"),
+            "df26219283f66347545cb3b93261014a2448719cc04778b40b734ebb799769cb",
+        ),
+        'C' => (
+            Some("native/currency_masters_originalname_forex_72"),
+            "0f10c96e7a00445ab6655dd915cb7ff50f9e1adbacef99bc42167a1d43a4c1bd",
+        ),
+        'k' => (
+            Some("native/company_base_currency_forex_72"),
+            "8f6205332f84a0b8bf3df5f55d9869dd79a0bd551d2e51b37a4fa6552a4b1fe0",
+        ),
+        'L' => (
+            Some("agent/forex-register/forex-register-ledgers-master"),
+            "b20e80b785c040a31c70051dab8ded0af0a7e5bdcff479a0ed78e8e5c3d2abb4",
+        ),
+        'B' => (
+            Some("native/ledger_snapshot_forex_decimal_rate"),
+            "71e429b8c54e890e08152b37b5844932f653b89743462719b16eac4c4100de7b",
+        ),
+        'g' => (
+            Some("native/group_snapshot_forexgroup_lab"),
+            "205458f1ef405f132ff4e87703f258f7cae16f6aadbafda2ea12943d434ec0e8",
+        ),
+        'n' => (
+            Some("agent/forex-register/forex-register-census"),
+            "12e97cc3a11334e443568e1d5a956718d429f1afce590246dc0cb0b1f3bf853c",
+        ),
+        'w' => (
+            Some("agent/forex-register/forex-register-window"),
+            "ab78fbe5afeb6734a3ec36a940dc098371560faf0a1210ca7e511927ee3dd2f5",
+        ),
+        'm' => (
+            Some("agent/forex-register/forex-register-marks"),
+            "5b447d03d63414bb46753503faee9b105347e13c28cac548bfd51d6fdb9fb4b7",
+        ),
+        other => panic!("unknown leg {other}"),
+    }
+}
+
+/// The company number the replay gives this book in place of `redacted`: the lab's copy of the
+/// extent and book-extent answers (exchanges 49 and 54) replaced it, and Bridge reads the field,
+/// so the replay puts back a short synthetic number, the one #2314's test gives this book.
+const FOREX_COMPANY_NUMBER: &str = " 1";
+
+/// A captured answer as the replay serves it: as committed, but for an extent answer's
+/// redacted company number, which [`FOREX_COMPANY_NUMBER`] takes.
+fn with_synthetic_company_number(name: &str, answer: String) -> String {
+    const REDACTED: &str = ">redacted</COMPANYNUMBER>";
+    if !name.ends_with("extent") {
+        return answer;
+    }
+    assert_eq!(answer.matches(REDACTED).count(), 1, "{name}");
+    answer.replace(
+        REDACTED,
+        &format!(">{FOREX_COMPANY_NUMBER}</COMPANYNUMBER>"),
+    )
+}
+
+fn forex_plan(letter: char) -> ScenarioPlan {
+    match forex_leg(letter).0 {
+        None => plan(Kind::Status, String::new()),
+        Some(name) => plan(
+            Kind::Window,
+            with_synthetic_company_number(
+                name,
+                utf16(&recorded_file(FIXTURES, &format!("{name}.utf16le.xml"))),
+            ),
+        ),
+    }
+}
+
+/// Calls `tool` for the day against `plans`, and checks the server sent exactly the requests
+/// `order` names, each the one the lab sent.
+async fn replay_forex(tool: &str, order: &str, plans: Vec<ScenarioPlan>) -> Value {
+    let simulator = SequenceSimulator::spawn(plans).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_for(&simulator, directory.path(), Redaction::None);
+    let response = server
+        .call_tool(
+            tool,
+            json!({"company_guid": FOREX_GUID, "from": "20250401", "to": "20250401"}),
+        )
+        .await;
+    let received = simulator.received();
+    if received != order.len() {
+        simulator.cancel();
+        panic!(
+            "{tool}: {received} requests sent, {} expected: {response}",
+            order.len()
+        );
+    }
+    let observed = simulator.finish().unwrap();
+    for (position, (request, letter)) in observed.iter().zip(order.chars()).enumerate() {
+        assert_eq!(
+            request.request_body_sha256,
+            forex_leg(letter).1,
+            "{tool}: request {position} ({letter}) is not the one the lab sent"
+        );
+    }
+    response
+}
+
+const FOREX_TOOLS: [&str; 3] = [
+    "sales_register",
+    "purchase_register",
+    "gst_by_counter_ledger",
+];
+
+/// The bill-allocation composites that refused all three tools in the lab (as
+/// `bill_allocation_amount_invalid`) are read at their rupee figure with the foreign amount
+/// apart, as `vouchers` reads them, and the window is complete. The book keeps no GST ledger, so
+/// no voucher is a register row: each is counted, and all eight ledgers classify, the six whose
+/// balances the compliance read sets aside among them.
+#[tokio::test]
+async fn a_window_of_foreign_currency_composites_is_read_at_its_rupee_figures_by_all_three_tools() {
+    let order = format!("{FOREX_HEAD}{FOREX_BASE}{FOREX_TAIL}");
+    for tool in FOREX_TOOLS {
+        let response = replay_forex(tool, &order, order.chars().map(forex_plan).collect()).await;
+        assert_eq!(response["isError"], false, "{tool}: {response}");
+        let result = &response["structuredContent"]["result"];
+        assert_eq!(result["state"], "complete", "{tool}: {response}");
+        assert!(result.get("withheld_total").is_none(), "{tool}: {response}");
+        assert_eq!(result["vouchers_observed"], 11, "{tool}: {response}");
+        assert_eq!(result["ledger_masters_observed"], 8, "{tool}: {response}");
+        let (list, counted) = match tool {
+            "sales_register" => ("sales_vouchers_without_duties_taxes_entry", 3),
+            "purchase_register" => ("purchase_vouchers_without_duties_taxes_entry", 2),
+            _ => {
+                assert_eq!(result["vouchers_without_gst_entry"], 11, "{response}");
+                continue;
+            }
+        };
+        assert_eq!(result["total"], 0, "{tool}: {response}");
+        assert_eq!(result[list]["total"], counted, "{tool}: {response}");
+    }
+}
+
+/// Where the base read for the composites fails, each of the eight composite vouchers is withheld
+/// and named: a register answers `partial` with what it could read, its reason naming the failed
+/// read rather than the amounts, and gst_by_counter_ledger, which totals only a whole window,
+/// refuses with its typed code.
+#[tokio::test]
+async fn a_window_whose_composites_cannot_be_read_withholds_and_names_them_in_all_three_tools() {
+    // The base read's first leg fails, so none of its other legs is sent.
+    let order = format!("{FOREX_HEAD}e{FOREX_TAIL}");
+    for tool in FOREX_TOOLS {
+        let mut plans: Vec<ScenarioPlan> = order.chars().map(forex_plan).collect();
+        plans[FOREX_HEAD.len()] = forex_plan('e').with_http_status(500);
+        let response = replay_forex(tool, &order, plans).await;
+        let result = &response["structuredContent"]["result"];
+        if tool == "gst_by_counter_ledger" {
+            assert_eq!(response["isError"], true, "{response}");
+            assert_eq!(
+                result["error"]["code"], "gst_by_ledger_window_partial",
+                "{response}"
+            );
+            continue;
+        }
+        assert_eq!(response["isError"], false, "{tool}: {response}");
+        assert_eq!(result["state"], "partial", "{tool}: {response}");
+        assert_eq!(
+            result["reason"], "company_currency_probe_failed",
+            "{tool}: {response}"
+        );
+        assert_eq!(result["withheld_total"], 8, "{tool}: {response}");
+        let listed = result["withheld_vouchers"].as_array().unwrap();
+        assert_eq!(listed.len(), 8, "{tool}: {response}");
+        for voucher in listed {
+            assert_eq!(
+                voucher["cause"], WITHHELD_FOREIGN_CURRENCY,
+                "{tool}: {response}"
+            );
+            assert!(voucher["guid"].is_string(), "{tool}: {response}");
+        }
+    }
+}
+
+/// The lab's refusal and its end, on the captured class-entry window itself. Under the parse every
+/// register used before #683 it refuses at a typed bill allocation, which closes inside its entry
+/// before the entry's own amount is judged. Read as the registers read it now, under the book's
+/// own captured base and masters, every voucher is read, and each of the eight composite bill
+/// allocations carries its rupee figure with the foreign amount apart.
+#[test]
+fn the_class_entry_window_refused_at_a_bill_allocation_and_now_reads_each_at_its_rupee_figure() {
+    use crate::agent::voucher_parse::captured_72_book;
+    let window = utf16(&recorded_file(
+        FIXTURES,
+        "agent/forex-register/forex-register-window.utf16le.xml",
+    ));
+    assert_eq!(
+        parse_agent_rows(&window, FOREX_GUID).err().as_deref(),
+        Some("bill_allocation_amount_invalid")
+    );
+    let shape = VoucherReadShape::ClassEntryWildcard;
+    let rows = parse_agent_rows_withholding_reading_gst(
+        &window,
+        FOREX_GUID,
+        GstDetailsShown::Withheld,
+        shape.named_fields(),
+        shape.stock_lines(),
+    )
+    .unwrap();
+    assert_eq!(rows.iter().filter(|row| row.is_withheld()).count(), 8);
+    let book = captured_72_book();
+    let rows: Vec<Value> = rows
+        .into_iter()
+        .map(|row| row.read_under(&book))
+        .inspect(|row| assert!(!row.is_withheld(), "{row:?}"))
+        .map(VoucherRow::into_filter_row)
+        .collect();
+    assert_eq!(rows.len(), 11);
+    let read: Vec<&Value> = rows
+        .iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+        .flat_map(|entry| entry["bill_allocations"].as_array().unwrap())
+        .filter(|allocation| allocation.get("foreign").is_some())
+        .collect();
+    assert_eq!(read.len(), 8);
+    for allocation in read {
+        let amount = allocation["amount"].as_str().unwrap().to_string();
+        assert!(
+            bridge_tally_core::ExactDecimal::parse(amount).is_ok(),
+            "{allocation}"
+        );
+        assert_eq!(allocation["foreign"]["currency"], "$", "{allocation}");
+    }
 }

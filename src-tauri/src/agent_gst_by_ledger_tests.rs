@@ -35,7 +35,7 @@ fn captured_index() -> MasterIndex {
     let groups = GroupIndex::build(
         parse_native_group_snapshot(&groups, COMPANY_GUID).expect("the live group capture parses"),
     );
-    MasterIndex::build(records.iter(), &groups, Vec::new()).expect("masters index")
+    MasterIndex::build(records.iter(), &groups).expect("masters index")
 }
 
 /// The one voucher of each captured day, in day order: V1, V4, V5, V6, V7, V4b, V8, V9, V10,
@@ -378,6 +378,7 @@ fn a_partial_window_has_no_totals() {
     let window = RegisterWindow {
         index: captured_index(),
         rows: captured_rows(),
+        withheld: Vec::new(),
         state: "partial",
         reason: Some("nonempty_window_unqualified"),
     };

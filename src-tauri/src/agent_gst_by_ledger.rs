@@ -189,13 +189,10 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
         balance = balance
             .checked_add(&amount)
             .map_err(|_| "voucher_amount_invalid".to_string())?;
-        let ledger = index.by_name.get(name).ok_or_else(|| {
-            if index.excluded.contains(name) {
-                "register_ledger_currency_excluded".to_string()
-            } else {
-                "ledger_snapshot_drifted".to_string()
-            }
-        })?;
+        let ledger = index
+            .by_name
+            .get(name)
+            .ok_or_else(|| "ledger_snapshot_drifted".to_string())?;
         match (ledger.group, &ledger.head) {
             (LedgerGroup::DutiesAndTaxes, GstDutyHeadObservation::Recognized { head, .. }) => {
                 any_gst = true;

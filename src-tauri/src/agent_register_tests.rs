@@ -55,8 +55,7 @@ fn captured_rows() -> Vec<Value> {
 }
 
 fn captured_index() -> MasterIndex {
-    MasterIndex::build(captured_masters().iter(), &captured_groups(), Vec::new())
-        .expect("masters index")
+    MasterIndex::build(captured_masters().iter(), &captured_groups()).expect("masters index")
 }
 
 fn row_on<'a>(rows: &'a [Value], date: &str) -> &'a Value {
@@ -253,7 +252,7 @@ fn a_ledger_whose_head_and_tax_type_disagree_makes_the_voucher_a_head_conflict()
         tax_type: "Others".to_string(),
         raw: "CGST".to_string(),
     };
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     assert_eq!(row["status"], "head_conflict");
@@ -277,12 +276,7 @@ fn a_ledger_whose_group_cannot_be_resolved_is_named_not_classified() {
         .into_iter()
         .filter(|group| group.name != "Duties & Taxes")
         .collect();
-    let index = MasterIndex::build(
-        captured_masters().iter(),
-        &GroupIndex::build(groups),
-        Vec::new(),
-    )
-    .unwrap();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     // No ledger is placed under Duties & Taxes, so nothing is in the register, and the
     // vouchers that touch the unplaced ledgers are named rather than silently absent.
@@ -343,7 +337,7 @@ fn two_listings_of_the_same_masters_are_equal_and_a_changed_head_is_not() {
         .unwrap()
         .fields
         .gst_duty_head = GstDutyHeadObservation::Absent;
-    let changed = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let changed = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     assert_ne!(first, changed, "a re-headed ledger is drift");
 
     let mut reparented = captured_masters();
@@ -355,7 +349,7 @@ fn two_listings_of_the_same_masters_are_equal_and_a_changed_head_is_not() {
         .parent = bridge_tally_protocol::PartyLedgerMasterFieldObservation::Returned(
         "Indirect Expenses".to_string(),
     );
-    let moved = MasterIndex::build(reparented.iter(), &captured_groups(), Vec::new()).unwrap();
+    let moved = MasterIndex::build(reparented.iter(), &captured_groups()).unwrap();
     assert_ne!(first, moved, "a re-parented ledger is drift");
 }
 
@@ -364,31 +358,20 @@ fn a_repeated_ledger_name_refuses_as_drift() {
     let mut masters = captured_masters();
     masters.push(masters[0].clone());
     assert_eq!(
-        MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()),
+        MasterIndex::build(masters.iter(), &captured_groups()),
         Err("ledger_snapshot_drifted".to_string())
     );
 }
 
 #[test]
-fn a_voucher_touching_a_ledger_the_compliance_read_set_aside_refuses_with_its_own_code() {
-    // The compliance read leaves out ledgers kept in another currency; a voucher that names
-    // one cannot be classified and must not fall into "drift" or "other".
+fn a_voucher_touching_a_ledger_the_masters_do_not_list_refuses_as_drift() {
+    // A ledger set aside for its currency is in the index (#683), so the only ledger a voucher
+    // can name that the index lacks is one the masters do not list.
     let masters: Vec<_> = captured_masters()
         .into_iter()
         .filter(|record| record.ledger.name != "Input CGST")
         .collect();
-    let index = MasterIndex::build(
-        masters.iter(),
-        &captured_groups(),
-        vec!["Input CGST".to_string()],
-    )
-    .unwrap();
-    assert_eq!(
-        classify_register(&index, &captured_rows()),
-        Err("register_ledger_currency_excluded".to_string())
-    );
-    // Without the exclusion the same absence is drift.
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     assert_eq!(
         classify_register(&index, &captured_rows()),
         Err("ledger_snapshot_drifted".to_string())
@@ -446,12 +429,7 @@ fn a_register_voucher_with_an_unplaced_purchase_ledger_is_returned_flagged_not_c
         .into_iter()
         .filter(|group| group.name != "Purchase Accounts")
         .collect();
-    let index = MasterIndex::build(
-        captured_masters().iter(),
-        &GroupIndex::build(groups),
-        Vec::new(),
-    )
-    .unwrap();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     assert_eq!(row["status"], "has_unresolved_group");
@@ -550,7 +528,7 @@ fn masters_read_again_must_match_in_classification_and_marks() {
         .unwrap()
         .fields
         .gst_duty_head = GstDutyHeadObservation::Absent;
-    let rehead = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let rehead = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     assert_eq!(
         masters_drifted(&first, &masters_read(PINNED, rehead)),
         Some("ledger_snapshot_drifted")
@@ -659,7 +637,7 @@ fn an_entry_on_a_ledger_with_no_head_and_a_gst_tax_type_says_so() {
         .unwrap()
         .fields
         .gst_duty_head = GstDutyHeadObservation::Absent;
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     let entry = &row["duties_taxes_entries_without_gst_head"][0];
@@ -683,12 +661,7 @@ fn no_party_name_survives_redaction_in_any_list_of_the_real_response() {
         .into_iter()
         .filter(|group| group.name != "Sundry Creditors")
         .collect();
-    let index = MasterIndex::build(
-        captured_masters().iter(),
-        &GroupIndex::build(groups),
-        Vec::new(),
-    )
-    .unwrap();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
     let mut rows = captured_rows();
     // A voucher whose only tax-free ledgers are unplaced lands in the unplaced side list.
     rows[0]["amounts"].as_array_mut().unwrap().retain(|entry| {
@@ -888,7 +861,7 @@ fn an_unrecognised_head_sits_only_in_the_unrecognised_list() {
         .gst_duty_head = GstDutyHeadObservation::Unrecognized {
         raw: "Central Tax".to_string(),
     };
-    let index = MasterIndex::build(masters.iter(), &captured_groups(), Vec::new()).unwrap();
+    let index = MasterIndex::build(masters.iter(), &captured_groups()).unwrap();
     let page = classify_register(&index, &captured_rows()).unwrap();
     let row = row_on(&page.rows, "20250903");
     assert_eq!(row["status"], "has_unrecognised_head");
@@ -1499,12 +1472,7 @@ fn cost_centre_names_in_the_side_list_of_unplaced_ledgers_are_masked_too() {
         .into_iter()
         .filter(|group| group.name != "Sundry Creditors")
         .collect();
-    let index = MasterIndex::build(
-        captured_masters().iter(),
-        &GroupIndex::build(groups),
-        Vec::new(),
-    )
-    .unwrap();
+    let index = MasterIndex::build(captured_masters().iter(), &GroupIndex::build(groups)).unwrap();
     let mut rows = captured_rows();
     // As in the test above: a voucher whose only ledgers outside Duties & Taxes are unplaced
     // lands in the unplaced side list.

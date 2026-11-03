@@ -1742,8 +1742,14 @@ or vouchers.
   delete moves the master mark is unmeasured. A difference refuses as
   `voucher_window_changed_during_read` or `ledger_snapshot_drifted` and releases
   no rows. A voucher that names a ledger the masters do not list refuses the
-  same way; one the compliance read set aside for its currency refuses as
-  `register_ledger_currency_excluded`.
+  same way. A ledger the compliance read set aside for its currency is
+  classified by its master like any other (#683).
+- **Foreign-currency vouchers.** A voucher whose amounts Tally stored as
+  currency composites is read at its rupee figure, as `vouchers` reads it. One
+  that cannot be read (its entries do not net to zero, or its symbol is not one
+  of the book's Currency masters) is listed in `withheld_vouchers` with
+  `withheld_total`, and the window is `partial` with reason
+  `foreign_currency_amount_unparsed`.
 - **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
   in an inventory allocation (`taxable_entries` may be empty for them); books
   with several currencies; any GSTIN, a `REFERENCEDATE` on a sale, or cancelled, optional or

@@ -1230,7 +1230,7 @@ impl Server {
                 &wider_from,
                 &wider_to,
                 known_marks,
-                VoucherReadShape::EntryWildcard,
+                (VoucherReadShape::EntryWildcard, VoucherComposites::Refuse),
                 SmallBooks::Skip,
             )
             .await
@@ -1243,7 +1243,11 @@ impl Server {
             Some(prior) => combine_evidence(prior, wider.all_evidence()),
             None => wider.all_evidence(),
         };
-        let wider_rows = wider.rows;
+        let wider_rows = wider
+            .rows
+            .into_iter()
+            .map(VoucherRow::into_filter_row)
+            .collect();
         let found = validate_then_filter_voucher_rows(
             wider_rows,
             wider_from.as_str(),
@@ -1370,8 +1374,9 @@ impl Server {
 
     /// A bounded read of the voucher window (`render_agent_vouchers`) in either entry-wildcard
     /// shape: plain, or with each row's voucher type resolved (bridge#625). Rows are parsed per
-    /// part and returned in date order; validating them is the caller's job, over the union.
-    /// `small_books` is whether a book that fits one request is counted first (#1029).
+    /// part under `composites` and returned in date order; validating them is the caller's job,
+    /// over the union. `small_books` is whether a book that fits one request is counted first
+    /// (#1029).
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn read_entry_window_shaped(
         &self,
@@ -1380,9 +1385,9 @@ impl Server {
         from: &TallyDate,
         to: &TallyDate,
         known_marks: Option<CompanyMarks>,
-        shape: VoucherReadShape,
+        (shape, composites): (VoucherReadShape, VoucherComposites),
         small_books: SmallBooks,
-    ) -> Result<WindowReadOutcome<Value>, ToolFailure> {
+    ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
         let limits = WindowReadLimits::for_shape(shape);
         let limits = match small_books {
             SmallBooks::Skip => limits,
@@ -1396,7 +1401,17 @@ impl Server {
             shape,
             WindowPlanSource::Estimate { known_marks },
             limits,
-            |xml| parse_agent_rows(xml, identity.company_guid()),
+            |xml| match composites {
+                VoucherComposites::Withhold => parse_agent_rows_withholding_reading_gst(
+                    xml,
+                    identity.company_guid(),
+                    GstDetailsShown::Withheld,
+                    shape.named_fields(),
+                    shape.stock_lines(),
+                ),
+                VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
+                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
+            },
         )
         .await
     }
@@ -1477,7 +1492,7 @@ const MAX_WITHHELD_LISTED: usize = 100;
 /// as `candidates` are bounded. Like theirs, the quarter counts each entry's
 /// serialized bytes, not the MCP text copy of the payload, which repeats them
 /// escaped. `withheld_total` stays exact.
-fn listed_withheld(withheld: &[Value], response_budget_bytes: usize) -> Vec<Value> {
+pub(super) fn listed_withheld(withheld: &[Value], response_budget_bytes: usize) -> Vec<Value> {
     let budget = response_budget_bytes / 4;
     let mut used = 0usize;
     let mut listed = Vec::new();

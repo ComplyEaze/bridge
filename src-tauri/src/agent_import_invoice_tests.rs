@@ -365,6 +365,11 @@ fn a_bill_wise_party_is_refused_and_one_that_is_not_is_admitted() {
             detail: RefusalDetail::Ledger("Customer A".into()),
         }])
     );
+    // Its next step names the way out that needs no read of the customer's bills.
+    assert!(
+        crate::agent::refusal_remediation("invoice_party_bill_wise_not_supported")
+            .is_some_and(|step| step.contains("enter this invoice in Tally"))
+    );
 }
 
 #[test]

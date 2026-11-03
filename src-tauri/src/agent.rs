@@ -2239,6 +2239,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              read as unregistered. Ask the user to check the invoice date and the date the \
              customer's GST registration applies from in Tally. Then build again.",
         ),
+        "invoice_party_bill_wise_not_supported" => Some(
+            "This customer keeps its balance bill by bill in Tally, and ComplyEaze Bridge does not \
+             post an invoice to such a customer: Tally can apply it to a bill of the same name the \
+             customer already holds, even a settled one. Nothing was written to Tally. Ask the \
+             user to enter this invoice in Tally, or, if the customer's bills are not tracked, to \
+             turn off its bill-by-bill setting in Tally and build again.",
+        ),
+        "invoice_party_bill_wise_unknown" => Some(
+            "Tally's ledger list did not name this customer's ledger exactly once, so whether it \
+             keeps its balance bill by bill is not known and the invoice was not built. Nothing \
+             was written to Tally. Check that the customer's ledger name matches Tally's exactly, \
+             then build again.",
+        ),
         "invoice_ledger_parent_unnameable"
         | "invoice_ledger_guid_unnameable"
         | "invoice_ledger_scope_unplannable" => Some(

@@ -1860,6 +1860,10 @@ pub(super) fn party_bill_wise_in(
 /// The party ledger of an invoice that will carry a New Ref. Its entry is
 /// written with a bill allocation, so it does not land On Account and needs
 /// no On Account approval (#1234); every other leg is judged as before.
+/// Since `classify_sales_invoice` refuses a bill-wise party, this, the New Ref
+/// render and the read-back's bill-wise branch serve only batches saved before
+/// that refusal, which the re-judge then refuses; they stay for a later read
+/// of the customer's bills.
 pub(super) fn new_ref_party(voucher: &ImportVoucher) -> Option<&str> {
     // Only an invoice has one, whatever detail another voucher may carry.
     if !voucher.voucher_type.is_invoice() {

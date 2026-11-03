@@ -1,0 +1,20 @@
+[
+ {
+  "bridge_txn_id": "C-PAY",
+  "date": "20260404",
+  "voucher_type": "Payment",
+  "narration": "Census row payment",
+  "entries": [
+   {
+    "ledger": "Test Expense B",
+    "amount": "1.00",
+    "side": "Dr"
+   },
+   {
+    "ledger": "Cash",
+    "amount": "1.00",
+    "side": "Cr"
+   }
+  ]
+ }
+]

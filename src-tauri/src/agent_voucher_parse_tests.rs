@@ -1454,45 +1454,7 @@ fn a_72_layout_composite_on_a_voucher_entry_withholds_its_voucher() {
     assert!(rows.iter().all(VoucherRow::is_withheld));
 }
 
-use bridge_tally_protocol::native_outstandings::{
-    parse_company_currency_name, parse_currency_master_list,
-};
-
-const FOREX_72_COMPANY_GUID: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
-
-fn decoded_utf16le(bytes: &[u8]) -> String {
-    String::from_utf16(
-        &bytes
-            .chunks_exact(2)
-            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-            .collect::<Vec<_>>(),
-    )
-    .unwrap()
-}
-
-/// The 7.2 lab book's answer of one day: eleven vouchers, eight with composites
-/// (fixtures/agent/vouchers-forex-unspaced-20250401.PROVENANCE.md).
-fn captured_72_vouchers() -> String {
-    decoded_utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml"
-    ))
-}
-
-/// That book's base and masters, from its own captured currency reads.
-fn captured_72_book() -> IdentifiedBaseCurrency {
-    let masters = parse_currency_master_list(&decoded_utf16le(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml"
-    )))
-    .unwrap();
-    let company = parse_company_currency_name(
-        &decoded_utf16le(include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml"
-        )),
-        FOREX_72_COMPANY_GUID,
-    )
-    .unwrap();
-    masters.identify_base(Some(&company)).unwrap()
-}
+use bridge_tally_protocol::native_outstandings::parse_currency_master_list;
 
 fn read_under_the_72_book(xml: &str) -> Vec<VoucherRow> {
     parse_agent_rows_withholding(xml, FOREX_72_COMPANY_GUID)

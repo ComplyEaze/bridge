@@ -2338,9 +2338,15 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 an
   decimal nor an exact composite still refuses the whole window. So does a
   composite whose foreign and base amounts carry opposite signs, unless the
   foreign amount is zero: a voucher entry's two amounts share one sign.
+- **`voucher_presence` reads it the same way** and matches proposals on the
+  rupee amount. It sends the same window request as `vouchers`, and the base
+  read only for a window that holds a composite. A voucher it cannot read so
+  refuses the call as `foreign_currency_amount_unparsed`: presence never passes
+  over a voucher whose amounts it could not compare. A base read that fails
+  refuses it as `company_currency_probe_failed`, so a retry can still read it.
 - **Every other voucher reader still refuses such a window** (for example
-  `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
-  voucher screen), because each of them sums, matches or verifies amounts.
+  `ledger_movement`, verify_import and the Bridge app's voucher screen),
+  because each of them sums, matches or verifies amounts.
 
 ### Bill allocations in voucher reads
 
@@ -4107,7 +4113,9 @@ Per tool:
 - `vouchers` (`src-tauri/src/agent_vouchers.rs`):
   1. the company read;
   2. the ledger catalogue (if `ledger`);
-  3. the window read, which always reads the marks;
+  3. the window read, which always reads the marks, then, only when the window holds a
+     foreign-currency composite (#683), the book's base-currency read (22 requests, as for
+     `voucher_presence`); a failure of that read leaves those vouchers withheld;
   4. the corroboration (if no rows);
   5. the ledger catalogue again (if `ledger`);
   6. the voucher-type catalogue (if a named type selected nothing).
@@ -4129,7 +4137,10 @@ Per tool:
      the read's own code, `masters_education_unqualified`). The check reads the numbering as it
      is now, holds for the moment of the read, and does not know how existing vouchers were
      numbered when they were entered;
-  4. the window read;
+  4. the window read, then, only when the window holds a foreign-currency composite (#683), the
+     book's base-currency read (22 requests: identity, the extent pair, the currency masters, the
+     same with `ORIGINALNAME` and the company's `CURRENCYNAME`, each a pair, the extent pair and
+     identity again); a failure of that read refuses the call as `company_currency_probe_failed`;
   5. the corroboration (if empty);
   6. the ledger catalogue again.
 

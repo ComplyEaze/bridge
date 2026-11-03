@@ -1,0 +1,6 @@
+Raw marks answers and headers are as received. Tool answers: company_number values replaced by a JSON parser first. Replacements in text files, journal copies and tool answers, with counts:
+<backup folder>: 1
+<build folder>: 2
+<company number>: 28
+<desktop client>: 6
+<lab folder>: 29

@@ -1,0 +1,5 @@
+2026-11-03T15:26:36Z s0: first GET /status answered 200 but curl could not write (evidence folder not yet made, curl 23); repeated after
+2026-11-03T15:31:53Z s5: the Day Book's F2 date (2-11-2026) moved Tally's current date from 31-Mar-2027 to Monday, 2-Nov-2026 (Gateway after Escape)
+2026-11-03T15:35:20Z s7: both verify_import answers isError true with error.code import_reconciliation_required beside verification_incomplete; every EXPECT item of step 7 met; recorded, not a refusal of a write
+2026-11-03T15:36:56Z s8: Day Book 2-Nov-26 read on three screens (top 17631-17664, mid 17645-17678, end 17679-17712): 82 of the book's own Journals, none of 1038.17/1038.29/1038.41, no 29931-29933. The narrations column is not in this view (no F12 change made). Nothing of the batch found.
+2026-11-03T15:37:15Z s8: leaving the Day Book left Tally's current date at Monday, 2-Nov-2026

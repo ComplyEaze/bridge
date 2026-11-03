@@ -1,0 +1,7 @@
+Restores of BK1 (1038-R1), 3 Nov 2026: step 6 and step 15.
+Folder: <backup folder>, holding this one file only
+File: TDBK1800_<company number>.001, 9,111,833 B, sha256 aecad8f11661e00858ad1de3ffa72df8038ae73ea31685aa54e220cf90fb6ca3, taken 03-11-2026 20:58 local
+Company: BRIDGE LARGE LAB
+Restore Data Path: Tally's data folder
+Prompts expected and the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace" = Replace
+After each: marks read V0 = 30030 with this GUID.

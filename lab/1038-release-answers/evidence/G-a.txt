@@ -1,0 +1,3 @@
+r1038-001 status posted_verified guid 2ba6df28-d1e3-4e81-b6d2-eb50f0a693ab-0000754f master_id 30031 alter_id 30031 voucher_number 29931 guid_shape_ok True
+r1038-002 status posted_verified guid 2ba6df28-d1e3-4e81-b6d2-eb50f0a693ab-00007550 master_id 30032 alter_id 30032 voucher_number 29932 guid_shape_ok True
+r1038-003 status posted_verified guid 2ba6df28-d1e3-4e81-b6d2-eb50f0a693ab-00007551 master_id 30033 alter_id 30033 voucher_number 29933 guid_shape_ok True

@@ -1,0 +1,34 @@
+2026-11-03T15:37:35.660Z watch start: tally window 0xa826a4; see within 120 s; answer by 70 s
+2026-11-03T15:37:43.137Z BOX SEEN 0x251209a pid 17312 title 'ComplyEaze Bridge — release this batch's rows to be built again?' class #32770
+2026-11-03T15:37:43.231Z rect 686,162,1254,945 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-03T15:37:43.287Z foreground 0x251209a pid 17312 bridge_mcp title 'ComplyEaze Bridge — release this batch's rows to be built again?'
+2026-11-03T15:37:43.314Z child Button rect 903,889,1003,922 text: &Yes
+2026-11-03T15:37:43.339Z child Button rect 1013,889,1113,922 text: &No
+2026-11-03T15:37:43.363Z child Button rect 1123,889,1223,922 text: Cancel
+2026-11-03T15:37:43.380Z child Static rect 723,233,763,273 text: 
+2026-11-03T15:37:43.414Z child Static rect 773,233,1205,843 text: Press Y (or click Yes) to release this batch's rows in ComplyEaze Bridge, so that they can be built
+and posted again. Press N (or click No) to cancel. Nothing is released until you answer.
+
+THIS RELEASES THIS BATCH'S ROWS, SO THAT THEY CAN BE BUILT AND POSTED AGAIN.
+It changes nothing in Tally and removes no record. It cannot be undone: a new batch of these rows
+can post them again.
+
+Company: BRIDGE LARGE LAB
+Batch: bridge-06a59be7-4767-43e3-9b30-5388dfeee4d4
+Built 3-Nov-2026 and sent to Tally by ComplyEaze Bridge: 3 vouchers.
+A verification read this company's voucher mark at 30030, below the mark this post left.
+It may read higher now.
+
+Each voucher: type, date, amount, ledger, narration (references not shown):
+Each line ends with its narration, quoted; a cut one is marked … (+N characters).
+Journal 2-Nov-2026  1038.17  Dr "Lab Vol Expense"  Cr "Lab Vol Income"  "r1038 release 1"
+Journal 2-Nov-2026  1038.29  Dr "Lab Vol Expense"  Cr "Lab Vol Income"  "r1038 release 2"
+Journal 2-Nov-2026  1038.41  Dr "Lab Vol Expense"  Cr "Lab Vol Income"  "r1038 release 3"
+
+Confirm only if you have checked in Tally that none of these vouchers is in the book, including any
+keyed again with other figures.
+2026-11-03T15:37:44.163Z capture release-open.png 1920x1080 404417 B sha256 9e7e30d4fad4d8b8a8081fbb1d5082b4893b3d579c1b4d1a003bfdcfab3636ec
+2026-11-03T15:37:44.207Z WAITING for <lab folder>\box\release.answer
+2026-11-03T15:37:59.101Z before click: foreground 0x251209a pid 17312 bridge_mcp title 'ComplyEaze Bridge — release this batch's rows to be built again?'
+2026-11-03T15:37:59.229Z CLICKED Yes at 953,906 (physical) 2026-11-03T15:37:59.139Z; seen-to-click 16 s
+2026-11-03T15:38:00.295Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'

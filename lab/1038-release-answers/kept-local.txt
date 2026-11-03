@@ -1,0 +1,49 @@
+Stay on the lab PC: the screens, the box captures, the backup and the folder listings, then the originals of files staged with replacements. sha256, bytes, file.
+de69331df9ee3baff7f31bfebaaa9db019417456fe859e94d234105e42867450  388904  <lab folder>/box/posta-open.png
+da1bc92698475ea210f7ed74c95285964adac27a81d5639c2144161da034009d  356829  <lab folder>/box/postb-open.png
+9e7e30d4fad4d8b8a8081fbb1d5082b4893b3d579c1b4d1a003bfdcfab3636ec  404417  <lab folder>/box/release-open.png
+8e9c41c84346e106f2e8c96f03436d88b275783c7f8608a6e69365f039aef702  337  <lab folder>/evidence/bk-after.txt
+3737cee201274ec4b66eae0daa54bff381fb7686acdad067cd7fc668947b7fc4  280  <lab folder>/evidence/bk-before.txt
+79cfc1374511aa35981ec4974ae776f4b055109e9d34fce2570a6fdb3f4faf85  1588  <lab folder>/evidence/datafolder-after-restore1.txt
+090f5286361fb67a85cea39af2b0440487dfbfe877b51e771a5b3f9b97ecb441  1588  <lab folder>/evidence/datafolder-after-restore2.txt
+b438a9fe0c5d3f11a852de587ef12d1bf1d8bb2b8f2ed4a848e276de3a54da5b  1791  <lab folder>/evidence/datafolder-before-restore1.txt
+8a4a1b7b896d26a61f2aac27fd50feac3ef5cefadf20efabdf964f967c938c24  1654  <lab folder>/evidence/datafolder-before-restore2.txt
+0adaa32bedc590a52b5f2b10241802cb6279f616e662290d9104397b0b39d02e  50868  <lab folder>/shots/bk1-before-accept.png
+473b18200d1060121c378061be96c03be823cfe09de2f27f374cae952458f86b  45033  <lab folder>/shots/s0-gateway.png
+b7ee61223f87aeaf594a8729e094c05de81969250a3dd1d1f0f71b8b78105e2b  78455  <lab folder>/shots/s13-daybook-2nov.png
+611e14e9c9ec71434fcde229e23ccab524beec3013441e44a316ebb513806c2c  34722  <lab folder>/shots/s15-restore-before-accept.png
+b7ee61223f87aeaf594a8729e094c05de81969250a3dd1d1f0f71b8b78105e2b  78455  <lab folder>/shots/s5-daybook-2nov.png
+473b18200d1060121c378061be96c03be823cfe09de2f27f374cae952458f86b  45033  <lab folder>/shots/s6-after-restore.png
+611e14e9c9ec71434fcde229e23ccab524beec3013441e44a316ebb513806c2c  34722  <lab folder>/shots/s6-restore-before-accept.png
+865c150ed08c11c67a5d88ebeb5b8d56f59490fe759bc8b824d99f13d3b1a8f8  78508  <lab folder>/shots/s8-daybook-2nov-end.png
+c8c6bfd2746e8f772737b1f360e5713280348dccb2fc7cd8440838ade68c782b  77711  <lab folder>/shots/s8-daybook-2nov-mid.png
+6bb66376a17ecf7c94000c413c35a590094db70935641ca93c736c3eaf53fc74  77828  <lab folder>/shots/s8-daybook-2nov-top.png
+aecad8f11661e00858ad1de3ffa72df8038ae73ea31685aa54e220cf90fb6ca3  9111833  <backup folder>/TDBK1800_<company number>.001
+3e9455613c2cbc3023c33d324e0332866a2e1edbe84ad199d8772dd94ef9484a  237382  run/answers/000-tools.json (original)
+d40c8bfe20b8f30db5581a3d9c306999b3933bd08d3ac660586584b7845949bd  1816  run/answers/001-status.json (original)
+3a870e01f4ac25c093794271a5c5d07ad010e57cb8606842655ff2712ee7be7d  1562  run/answers/002-companies.json (original)
+d24c19b6dc2b140903bf568bd2c1d1fe0f52c6b7e2496b0e3d8a48690fb165aa  28936  run/answers/003-vtypes.json (original)
+2bed9e52153cbcafa6d103345d31316e22b58c10e8bc16f9b247c0c83d64101e  9155  run/answers/004-build-a.json (original)
+dd15d00724a3e79ac9edab60f2fbd3a36f24d7432b76a6ee3342fab09c89a5cc  12450  run/answers/005-post-a.json (original)
+e13021dbf576f046fc1b56414d306fe87a8be21c8f044e3aac6d772da67fe885  11941  run/answers/006-verify-a5.json (original)
+a3fe6f27bbf88950fd57f14aad0cf60f7d8b2321c22ad1f47bfcb09ba1493da3  13666  run/answers/007-verify-a7.json (original)
+6e23670537ccce0b87fd88852f886e75183e654e3f27962b3e37246b245653c1  13564  run/answers/008-verify-a7b.json (original)
+882d348249b79e4193313d0c39820e2277536939b2d8a1d0471de15fd7c47c0e  2305  run/answers/009-release.json (original)
+27c79ff7917d1199f37dcbe0fa2b0e2e471c91da6328ee2cc79f697f57c23d4a  14383  run/answers/010-verify-a10.json (original)
+c945a72bcd4bb72685893042fb8262085ba824a64d4397c19a7d14d4606fe938  3801  run/answers/011-ldr10.json (original)
+9b4995a5ce9921cd38910aebffe5a10252ea55fe723eaa436de3b47b6c6e2f7c  9156  run/answers/012-build-b.json (original)
+3ce8fe0230c64d4c1e403a36b8ce4dae717814f382a93c13aa95b172d473a184  12451  run/answers/013-post-b.json (original)
+70c7e4604b3ab67ebfa9d5a68005314b1eead72271aef81ffa0e1518857a00c8  11942  run/answers/014-verify-b13.json (original)
+d40000150965f5f7e35e124f4ff80ad2f1176d8823318c33905f7c03b0f4cedb  14625  run/answers/015-verify-a14.json (original)
+ce8470ca51933998fe49f086bc76ac210786750572d9a313a121ac5c6a9444fc  73989  run/answers/016-egress14.json (original)
+d3a6bb9ac09dd21ed40373327d9288576a4baff30c4119ea5ce871cd8a8736c6  3804  run/answers/017-ldr14.json (original)
+11ae7157c4b8a10d64de934926942d1dc226d8290f6659864ae26ce302ba08a6  189  run/launch-env.json (original; staged copy has replacements)
+1b4358c499a74a494611f7922cc02fc10af2fe51158c6839c55bea1344201a57  10903  journal/ledger-step14.jsonl (original; staged copy has replacements)
+b5ddf6ae2b9e4c8241246e17838c17aa39d260668985a58721bceecea376b722  5186  journal/ledger-step7.jsonl (original; staged copy has replacements)
+62218131f1a3290be74cc0a219560af0186f84a34bdb79fd82a8f7e4122d7c6c  2883  box/posta-box.txt (original; staged copy has replacements)
+22976e62841c441e1ca4ba1ede520b56df33a3435bb8134072e398e2d75eb618  2884  box/postb-box.txt (original; staged copy has replacements)
+81c00ec11962950d7d7226a3a6629bb794d1bb5698fd96eb171189178746328d  2705  box/release-box.txt (original; staged copy has replacements)
+9078490f31dcf87b459dfbfe5b023c052129fb169c1296da2cc0c45118fee399  142  evidence/exe-before.txt (original; staged copy has replacements)
+9078490f31dcf87b459dfbfe5b023c052129fb169c1296da2cc0c45118fee399  142  evidence/exe-after.txt (original; staged copy has replacements)
+edd24fdf4bd706ffabb9e2e631fe8d180a67869be7d0480cc75a260e13dd1453  1682  raw.py (original; staged copy has replacements)
+accc52dd4379e99d0470bf57f809b2b019787511fdbd8f4ba75c3a226ff4346a  1014  boxcheck.py (original; staged copy has replacements)

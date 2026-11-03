@@ -120,15 +120,21 @@ second process sending meanwhile; other reads, books and editions.
 
 **An abandoned ledger create runs, and a read answered after it sees it, with a long read or a
 long import in front. PARTIAL: TallyPrime 7.2 Silver, one synthetic book, 29 to 30 October and
-2 November 2026 (`lab/1713-settle-order-answers`, `lab/2176-n1-answers`).** With the long work
-holding the gateway, a ledger create was abandoned at 20 s, and a ledger read was written before
-the long work's first byte and so answered after it. In all ten rows that counted, that read
-showed the ledger, it stayed present at +1, +5, +15 and +30 minutes, and the master mark moved by
-exactly one. Eight rows had a long read in front, on new and on reused connections. Two had an
-import of 2,700 Journals in front, every request on a new connection, holding the gateway about
-56 s, about 1 s past those rows' 55 s floor. This is the order `confirmed_absent` rests on (#2176).
-Not measured: a create on a reused connection during an import, Gold, other releases, other
-master types, a restart with a create queued.
+2 to 3 November 2026 (`lab/1713-settle-order-answers`, `lab/2176-n1-answers`,
+`lab/2176-n2-answers`).** With the long work holding the gateway, a ledger create was abandoned
+at 20 s, and a ledger read was written before the long work's first byte and so answered after
+it. In all twelve rows that counted, that read showed the ledger, it stayed present at +1, +5,
++15 and +30 minutes, and the master mark moved by exactly one. Eight rows had a long read in
+front, on new and on reused connections. Four had an import of 2,700 Journals in front: two with
+every request on a new connection, holding the gateway about 56 s, and two with the create on a
+warmed, reused connection and the read on a new one, holding it about 59 s and 55 s against those
+rows' 55 s floor. One more row of that pattern fell just under the floor and was repeated, so the
+floor is close at this count. That pattern is the one seen from Bridge's own post and reconcile:
+the create went on a reused connection, the reconcile read on a new one, and two connections were
+never open at once (`lab/2176-r0-answers`, each part seen once). The warmed connection in these
+rows had served one read and sat about 5 s idle, where Bridge's had served about 70 requests;
+these rows do not test whether that differs. This is the order `confirmed_absent` rests on
+(#2176). Not measured: Gold, other releases, other master types, a restart with a create queued.
 
 **Consequences:**
 

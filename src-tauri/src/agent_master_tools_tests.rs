@@ -1979,10 +1979,25 @@ fn the_verified_and_absent_texts_say_what_is_checked_and_what_is_not() {
         for fragment in [
             "no ledger of this name",
             "does not show that Tally will not still run a create that ComplyEaze Bridge stopped waiting for",
-            "new connections",
-            "the create, the read or both on a reused one",
         ] {
             assert!(text.contains(fragment), "{fragment}: {text}");
+        }
+    }
+    // Both absent states say what the order was measured on: the release, the
+    // edition, the master type and each pattern of connections behind each kind
+    // of long work.
+    for state in [
+        MasterVerdictState::ConfirmedAbsent,
+        MasterVerdictState::ConfirmedAbsentAfterChange,
+    ] {
+        for text in [settled_note(state), settled_next_step(state)] {
+            for fragment in [
+                "TallyPrime 7.2 Silver, not on Gold, for ledger creates",
+                "behind a long read, for requests on new connections and with the create, the read or both on a reused one",
+                "behind a long import, for requests on new connections and with the create on a reused one and the read on a new one",
+            ] {
+                assert!(text.contains(fragment), "{fragment}: {text}");
+            }
         }
     }
     assert!(settled_note(MasterVerdictState::ConfirmedAbsentAfterChange)

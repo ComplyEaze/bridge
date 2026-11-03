@@ -1,0 +1,1 @@
+BK-2074-2214: <lab folder>/bk/TDBK1800_<company number>.001, 57180 B, sha256 99b80149a022096661b775a8f547cdb21b5607b373d2631314641fdb4e68f2d7, local 03-11-2026 09:03 (the Restore list read 3-Nov-26 9:03 am); marks after 224/87. Rewritten from the folder listing and the file itself after a shell escape garbled the first copy.

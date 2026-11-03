@@ -1,0 +1,6 @@
+2026-11-03T03:54:33Z exe sha256 0345e74beff3c44ff874fdb45d31306dfb8d7eb694ab0f8db66537ad6857b1bd ok; launch-env.json sha256 4ec9ea8063266b5210bcd842b0000a7d01344806bd7dccb010a4c7d71a726d30; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_MAX_BYTES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-03T03:54:33Z launched pid 28824; stderr to server-stderr-20261103T035433Z.log
+2026-11-03T03:54:33Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-03T03:54:38Z 000-close-basic.json tool=ledger_masters secs=0.830 isError=False error=None saved_sha256=f190a0faeac5ebf266aafaa196258e9cc457f6adae084b01fdfe3cd5c5793242
+2026-11-03T03:54:40Z 001-close-compliance.json tool=ledger_masters secs=1.583 isError=False error=None saved_sha256=7d9b209d89ab0f61ac112a7bd153555da9a5ad6e2baab3d8ea5922e8b49f37c2
+2026-11-03T03:54:48Z session ended; server pid 28824 exit code 0

@@ -1,0 +1,7 @@
+Restore BK-2074-2214 (C6), 3 Nov 2026, on the recorded word.
+Folder: <lab folder>\bk (holds this one file only)
+File: TDBK1800_<company number>.001, 57,180 B, sha256 99b80149a022096661b775a8f547cdb21b5607b373d2631314641fdb4e68f2d7, taken 03-11-2026 09:03 local
+Company: BRIDGE BATCH LAB, number <company number>
+Restore Data Path: Tally's data folder (<Tally data folder>)
+Prompts expected, and the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace will overwrite the existing folder." = Replace
+After: MARKS 224/87, byte-equal to S0's (566be20d...); ledger_masters basic on 9001 with a new server: 11 ledgers.

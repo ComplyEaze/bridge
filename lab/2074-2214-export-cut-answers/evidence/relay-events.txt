@@ -1,0 +1,1 @@
+Counter({'forwarded': 731, 'first_byte': 724, 'request': 724, 'open': 12, 'close': 12, 'bridge_cut': 7, 'front_send': 3, 'front_written': 3, 'front_first_byte': 3, 'front_answered': 3, 'listening': 1})

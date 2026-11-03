@@ -1,0 +1,49 @@
+2026-11-03T03:31:27.450Z p0 step 0: capture 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c
+   a. tasklist exit 1: 2 line(s): ["ERROR: Invalid argument/option - 'eq'.", 'Type "TASKLIST /?" for usage.']
+   b. netstat exit 0: 9001 LISTENING lines 2, PIDs ['1200'], tally PID None, other LISTENING lines 35
+2026-11-03T03:31:31.644Z p0 GET /status | curl 0 "200 51" 
+2026-11-03T03:31:31.701Z p0-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3394"  CL 3394 | answer 3394 B sha256 566be20d6ab91d0faba27f68f4b57bb7e3106c8afd08f6fd19a1181652d2442a | 0.078 s | ok True
+   MARKS p0-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 224 ALTVCHID 87
+2026-11-03T03:31:40.161Z p0b step 0: capture 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c
+   a. tasklist exit 0: 1 line(s): ['"tally.exe","1200","Console","5","2,99,192 K"']
+   b. netstat exit 0: 9001 LISTENING lines 2, PIDs ['1200'], tally PID 1200, other LISTENING lines 35
+2026-11-03T03:31:42.978Z p0b GET /status | curl 0 "200 51" 
+2026-11-03T03:31:43.027Z p0b-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3394"  CL 3394 | answer 3394 B sha256 566be20d6ab91d0faba27f68f4b57bb7e3106c8afd08f6fd19a1181652d2442a | 0.047 s | ok True
+   MARKS p0b-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 224 ALTVCHID 87
+2026-11-03T03:33:36.423Z s0-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3394"  CL 3394 | answer 3394 B sha256 566be20d6ab91d0faba27f68f4b57bb7e3106c8afd08f6fd19a1181652d2442a | 0.047 s | ok True
+   MARKS s0-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 224 ALTVCHID 87
+2026-11-03T03:44:19.794Z f0-marks-before req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3398"  CL 3398 | answer 3398 B sha256 10f610b4b348982a1acea57c71212da6d827b79ed747f140a33667033a4a9260 | 0.063 s | ok True
+   MARKS f0-marks-before: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 385 ALTVCHID 87
+2026-11-03T03:44:20.143Z f0-front-ledgers req front-ledgers.xml sha256 df4bea913566eb3cc10ed5b0ee9314f21262d26e6458044ae53c3b48b6dd6d1b bytes 1380 | curl 0 "200 538"  CL 538 | answer 538 B sha256 9cca0f382ec8c2448cdebb3b2fafb9f6d1aaad12600867ddec73a36a401b7320 | 0.375 s | ok True
+2026-11-03T03:44:20.820Z f0-marks-after req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3398"  CL 3398 | answer 3398 B sha256 7a2f80b75ab7d61d0e0ba80547d86327f83e666c50864534b53a7261e1aff9a7 | 0.047 s | ok True
+   MARKS f0-marks-after: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 87
+2026-11-03T03:44:28Z NOTE: after f0-front-ledgers the MARKS read f0-marks-after went 0.4 s later, before the C3 window capture; the capture f0-after.png was taken after it
+2026-11-03T03:44:37.479Z f0-probe-marks-before req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3398"  CL 3398 | answer 3398 B sha256 7a2f80b75ab7d61d0e0ba80547d86327f83e666c50864534b53a7261e1aff9a7 | 0.047 s | ok True
+   MARKS f0-probe-marks-before: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 87
+2026-11-03T03:44:37.824Z f0-front-probe req front-probe.xml sha256 d79395e8817c93b46723f0c11227574da5d764c08fb19410087a188b8ae9790c bytes 583280 | curl 0 "200 546"  CL 546 | answer 546 B sha256 676c53153ad1064fe238dcbae4641ac6da2f706b44fd3fd364912bd4f4d53970 | 16.922 s | ok True
+2026-11-03T03:45:03.614Z f0-probe-marks-after req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3414"  CL 3414 | answer 3414 B sha256 bbbcbf3ea00d83b3050e326a0f4f5be87d6f244b0a6bab955a421c4b243caf64 | 0.062 s | ok True
+   MARKS f0-probe-marks-after: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 587
+2026-11-03T03:45:21.775Z x1-1-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3414"  CL 3414 | answer 3414 B sha256 bbbcbf3ea00d83b3050e326a0f4f5be87d6f244b0a6bab955a421c4b243caf64 | 0.046 s | ok True
+   MARKS x1-1-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 587
+2026-11-03T03:46:40.869Z x1-7-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3422"  CL 3422 | answer 3422 B sha256 50fbc0c3d5a598355bea7b80ab2e9cd3c9e52f1b8861b97763806b8c231edb8f | 0.062 s | ok True
+   MARKS x1-7-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 2064
+2026-11-03T03:46:59Z X1 done; X2 waits 120 s from X1's end (03:46:40.950Z)
+2026-11-03T03:48:41.365Z x2-1-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3422"  CL 3422 | answer 3422 B sha256 50fbc0c3d5a598355bea7b80ab2e9cd3c9e52f1b8861b97763806b8c231edb8f | 0.047 s | ok True
+   MARKS x2-1-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 2064
+2026-11-03T03:49:59.770Z x2-7-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3422"  CL 3422 | answer 3422 B sha256 786191be0bf92547132d0dff2f1228a661c042fff5506c0c49bdbc5873ded3e3 | 0.047 s | ok True
+   MARKS x2-7-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 3541
+2026-11-03T03:50:14.555Z x3-1-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3422"  CL 3422 | answer 3422 B sha256 786191be0bf92547132d0dff2f1228a661c042fff5506c0c49bdbc5873ded3e3 | 0.063 s | ok True
+   MARKS x3-1-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 3541
+2026-11-03T03:50:59.477Z x3-7-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3422"  CL 3422 | answer 3422 B sha256 2654b3e2e3cc67fc9c0c689837b24d06568420a6c04f8f50588af7d9d45af4ec | 0.063 s | ok True
+   MARKS x3-7-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 387 ALTVCHID 4043
+inputs re-hashed 11 bad 0
+2026-11-03T03:54:05.915Z c6 step 0: capture 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c
+   a. tasklist exit 0: 1 line(s): ['"tally.exe","1200","Console","5","5,47,340 K"']
+   b. netstat exit 0: 9001 LISTENING lines 2, PIDs ['1200'], tally PID 1200, other LISTENING lines 35
+2026-11-03T03:54:08.877Z c6 GET /status | curl 0 "200 51" 
+2026-11-03T03:54:08.926Z c6-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3394"  CL 3394 | answer 3394 B sha256 566be20d6ab91d0faba27f68f4b57bb7e3106c8afd08f6fd19a1181652d2442a | 0.047 s | ok True
+   MARKS c6-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 224 ALTVCHID 87
+2026-11-03T03:55:15.356Z c10 after Shut Company (Alt+K, Shut, Enter on BRIDGE BATCH LAB): capture 555c2c10165d4ae1bd19d3f8b8e6e3841a6ccd1e083ccc83e462ce8a64b64de9
+   a. tasklist exit 0: ['"tally.exe","1200","Console","5","5,47,352 K"']
+   b. netstat exit 0: 9001 LISTENING lines 2, PIDs ['1200']; 9002 LISTENING lines 0
+2026-11-03T03:55:18.550Z c10 GET /status | curl 0 "200 51" 

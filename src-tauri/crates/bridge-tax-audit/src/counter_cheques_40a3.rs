@@ -342,7 +342,7 @@ the payee."
     Ok(r)
 }
 
-/// CCQ-1 to CCQ-3, checked on the result alone, without calling [`compute_rows`]: the over-limit
+/// CCQ-1 to CCQ-3, checked on the result alone, without calling `compute_rows`: the over-limit
 /// total equals the sum of the row-amount figures, the over-limit count equals the number of
 /// findings, and (when the `cash_payments_40a3` result is given) no voucher is evidence on a finding
 /// of both tests. [`run`] always emits the total and the count as integers, so an absent or

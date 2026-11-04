@@ -74,6 +74,8 @@ enum SetAside {
     NoCreditorParty,
     NoCounterLedger,
     SeveralCounterLedgers,
+    /// Decided across the window, after every other reason: see [`settle_repeated_bills`].
+    BillAlreadyOpened,
 }
 
 impl SetAside {
@@ -93,6 +95,7 @@ impl SetAside {
             Self::NoCreditorParty => "no_creditor_party",
             Self::NoCounterLedger => "no_counter_ledger",
             Self::SeveralCounterLedgers => "several_counter_ledgers",
+            Self::BillAlreadyOpened => "bill_already_opened",
         }
     }
 }
@@ -283,13 +286,7 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
     Ok(match found.first() {
         Some(&reason) => Disposition::SetAside {
             reason,
-            identity: json!({
-                "date": row.get("date"),
-                "voucher_number": row.get("voucher_number"),
-                "voucher_type": row.get("voucher_type"),
-                "voucher_class": class,
-                "guid": row.get("guid"),
-            }),
+            identity: identity(row),
             debit,
             credit,
         },
@@ -301,6 +298,177 @@ fn dispose(index: &MasterIndex, row: &Value) -> Result<Disposition, String> {
             credit,
         },
     })
+}
+
+/// How a voucher is listed in the answer.
+fn identity(row: &Value) -> Value {
+    json!({
+        "date": row.get("date"),
+        "voucher_number": row.get("voucher_number"),
+        "voucher_type": row.get("voucher_type"),
+        "voucher_class": row.get("voucher_class"),
+        "guid": row.get("guid"),
+    })
+}
+
+/// A bill as one party's ledger holds it: the Sundry Creditors ledger an allocation is on, and
+/// the bill's name.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct PartyBill {
+    party: String,
+    bill: String,
+}
+
+/// The named bills a Purchase's Sundry Creditors entries open (`New Ref`) and settle against
+/// (`Agst Ref`). Any other bill type (On Account, Advance) is neither.
+#[derive(Debug, Default)]
+struct PurchaseBills {
+    opened: Vec<PartyBill>,
+    against: Vec<PartyBill>,
+}
+
+fn purchase_bills(index: &MasterIndex, row: &Value) -> PurchaseBills {
+    let mut bills = PurchaseBills::default();
+    let entries = row.get("amounts").and_then(Value::as_array);
+    for entry in entries.into_iter().flatten() {
+        let Some(party) = entry.get("ledger").and_then(Value::as_str) else {
+            continue;
+        };
+        let creditor = index
+            .by_name
+            .get(party)
+            .is_some_and(|ledger| ledger.reserved.as_deref() == Some(SUNDRY_CREDITORS));
+        if !creditor {
+            continue;
+        }
+        let allocations = entry.get("bill_allocations").and_then(Value::as_array);
+        for allocation in allocations.into_iter().flatten() {
+            let Some(bill) = allocation["reference"]["name"].as_str() else {
+                continue;
+            };
+            let side = match allocation["bill_type"].as_str().map(str::trim) {
+                Some("New Ref") => &mut bills.opened,
+                Some("Agst Ref") => &mut bills.against,
+                _ => continue,
+            };
+            side.push(PartyBill {
+                party: party.to_string(),
+                bill: bill.to_string(),
+            });
+        }
+    }
+    bills
+}
+
+/// What two copies of one invoice share: the amount on the counter ledger and the tax per head.
+#[derive(Debug, PartialEq)]
+struct InvoiceFigures {
+    taxable: ExactDecimal,
+    debit: HeadTotals,
+    credit: HeadTotals,
+}
+
+fn invoice_figures(
+    row: &Value,
+    ledger: &str,
+    debit: &HeadTotals,
+    credit: &HeadTotals,
+) -> Result<InvoiceFigures, String> {
+    let mut taxable = ExactDecimal::zero();
+    let entries = row.get("amounts").and_then(Value::as_array);
+    for entry in entries.into_iter().flatten() {
+        if entry.get("ledger").and_then(Value::as_str) != Some(ledger) {
+            continue;
+        }
+        // `dispose` has parsed every amount already; summing from zero prints them alike.
+        let amount = entry
+            .get("amount")
+            .and_then(Value::as_str)
+            .and_then(|amount| ExactDecimal::parse(amount.to_string()).ok())
+            .ok_or_else(|| "voucher_amount_invalid".to_string())?;
+        taxable = taxable
+            .checked_add(&amount)
+            .map_err(|_| "voucher_amount_invalid".to_string())?;
+    }
+    Ok(InvoiceFigures {
+        taxable,
+        debit: debit.clone(),
+        credit: credit.clone(),
+    })
+}
+
+/// A supplier invoice keyed twice in Tally (#2069): the second copy is a Purchase whose Sundry
+/// Creditors entry is `Agst Ref` to a bill another Purchase of this window opened on the same
+/// party ledger. It is set aside as `bill_already_opened` when both are attributed and its
+/// counter-ledger amount and every tax head equal the opener's; the opener stays attributed. One
+/// that also opens a bill of its own is never taken as a copy, so an opener is never set aside by
+/// this and a pair can never set each other aside. Any other attributed Purchase that is
+/// `Agst Ref` (a supplementary invoice, or a bill opened before the window) stays counted and is
+/// returned, to be listed as `agst_ref_purchase`. Debit notes and journals against a bill are
+/// neither.
+fn settle_repeated_bills(
+    index: &MasterIndex,
+    rows: &[Value],
+    dispositions: &mut [Disposition],
+) -> Result<Vec<Value>, String> {
+    let mut purchases = Vec::with_capacity(rows.len());
+    for (row, disposition) in rows.iter().zip(dispositions.iter()) {
+        let purchase = match disposition {
+            Disposition::Attributed {
+                ledger,
+                debit,
+                credit,
+            } if row.get("voucher_class").and_then(Value::as_str) == Some("Purchase") => Some((
+                purchase_bills(index, row),
+                invoice_figures(row, ledger, debit, credit)?,
+            )),
+            _ => None,
+        };
+        purchases.push(purchase);
+    }
+    let mut openers = BTreeMap::<&PartyBill, Vec<usize>>::new();
+    for (position, purchase) in purchases.iter().enumerate() {
+        for bill in purchase.iter().flat_map(|(bills, _)| &bills.opened) {
+            openers.entry(bill).or_default().push(position);
+        }
+    }
+    let mut repeats = Vec::new();
+    let mut agst_ref = Vec::new();
+    for (position, purchase) in purchases.iter().enumerate() {
+        let Some((bills, figures)) = purchase else {
+            continue;
+        };
+        if bills.against.is_empty() {
+            continue;
+        }
+        let repeat = bills.opened.is_empty()
+            && bills.against.iter().any(|bill| {
+                openers.get(bill).into_iter().flatten().any(|&opener| {
+                    opener != position
+                        && purchases[opener]
+                            .as_ref()
+                            .is_some_and(|(_, opened)| opened == figures)
+                })
+            });
+        if repeat {
+            repeats.push(position);
+        } else {
+            agst_ref.push(identity(&rows[position]));
+        }
+    }
+    for position in repeats {
+        if let Disposition::Attributed { debit, credit, .. } =
+            std::mem::replace(&mut dispositions[position], Disposition::NotInBooks)
+        {
+            dispositions[position] = Disposition::SetAside {
+                reason: SetAside::BillAlreadyOpened,
+                identity: identity(&rows[position]),
+                debit,
+                credit,
+            };
+        }
+    }
+    Ok(agst_ref)
 }
 
 #[derive(Debug, Default)]
@@ -319,15 +487,22 @@ struct GstByLedger {
     not_in_books: usize,
     without_gst_entry: usize,
     observed: usize,
+    /// Attributed Purchases that are `Agst Ref` to a bill, counted in `ledgers` as well.
+    agst_ref_purchases: Vec<Value>,
 }
 
 fn fold(index: &MasterIndex, rows: &[Value]) -> Result<GstByLedger, String> {
+    let mut dispositions = rows
+        .iter()
+        .map(|row| dispose(index, row))
+        .collect::<Result<Vec<_>, _>>()?;
     let mut out = GstByLedger {
         observed: rows.len(),
+        agst_ref_purchases: settle_repeated_bills(index, rows, &mut dispositions)?,
         ..GstByLedger::default()
     };
-    for row in rows {
-        let (bucket, debit, credit) = match dispose(index, row)? {
+    for disposition in dispositions {
+        let (bucket, debit, credit) = match disposition {
             Disposition::NotInBooks => {
                 out.not_in_books += 1;
                 continue;
@@ -432,6 +607,7 @@ fn gst_by_ledger_result(index: &MasterIndex, totals: &GstByLedger, redaction: Re
             "profile": "agent_gst_by_counter_ledger_v1",
             "counter_ledgers": counter_ledgers,
             "set_aside": set_aside,
+            "agst_ref_purchase": bounded_list(&totals.agst_ref_purchases),
             "vouchers_observed": totals.observed,
             "vouchers_without_gst_entry": totals.without_gst_entry,
             "vouchers_cancelled_optional_or_post_dated": totals.not_in_books,
@@ -442,10 +618,10 @@ fn gst_by_ledger_result(index: &MasterIndex, totals: &GstByLedger, redaction: Re
     )
 }
 
-const COVERAGE: &str = "GST booked in the books, not a return figure: per voucher, the entries on Duties & Taxes ledgers whose master carries a recognised GST duty head, totalled against the one ledger on that voucher under Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets (groups a live capture has shown on a purchase), only on a Purchase, Debit Note, Journal or Payment that has a Sundry Creditors ledger on it; debit_side_tax is negative as the books state it and credit_side_tax positive, never netted; a voucher with no such single ledger, or one these rules cannot read with certainty, is set aside under its reason with its own totals; nothing is apportioned; GST booked to a ledger outside Duties & Taxes, or to a ledger with no recognised head, is not attributed; eligibility, availment, input versus output and any return table are not decided";
+const COVERAGE: &str = "GST booked in the books, not a return figure: per voucher, the entries on Duties & Taxes ledgers whose master carries a recognised GST duty head, totalled against the one ledger on that voucher under Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets (groups a live capture has shown on a purchase), only on a Purchase, Debit Note, Journal or Payment that has a Sundry Creditors ledger on it; debit_side_tax is negative as the books state it and credit_side_tax positive, never netted; a voucher with no such single ledger, or one these rules cannot read with certainty, is set aside under its reason with its own totals; nothing is apportioned; a Purchase Agst Ref to a bill another attributed Purchase of the window opened for the same party, with equal counter-ledger amount and tax, is set aside as a copy, and any other attributed Purchase Agst Ref to a bill is counted and listed; GST booked to a ledger outside Duties & Taxes, or to a ledger with no recognised head, is not attributed; eligibility, availment, input versus output and any return table are not decided";
 
 /// The tool's description, without the receipt sentence the catalogue appends to every read.
-pub(in crate::agent) const DESCRIPTION: &str = "Read-only: the GST the books record, totalled per counter ledger, for a date window; not a return figure. It does not decide input tax credit eligibility, blocked credit, what was availed, input versus output, or which row of any return a ledger belongs in, and matches nothing against any portal. It reads what purchase_register and sales_register read (the ledger masters twice, the full voucher window, the same drift checks and refusals) and, for every voucher with an entry on a ledger under Duties & Taxes whose master carries a recognised GST duty head, takes that tax per head and attributes it to the voucher's one ledger under Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets, only when the voucher is a Purchase, Debit Note, Journal or Payment with a ledger under Sundry Creditors on it, has exactly one such counter ledger (a round-off ledger under Indirect Expenses counts as one), and nothing besides but the party, cash, bank and TDS or TCS ledgers: a duty head does not say input or output, so a sale, a credit note or a tax payment with no supplier on it is never attributed. `counter_ledgers` lists each such ledger with its `ledger_guid` (Tally's GUID of the ledger, which trial_balance returns as the ledger's `guid`; its movement there covers every voucher on it, set-aside ones included, so it is never a base for this tax), its predefined `group`, its `parent` (masked like a ledger name when it is a group the book named), `vouchers`, `debit_side_tax` (negative, as the books state it) and `credit_side_tax` (positive: tax booked back, which can be a reversal or output tax on an asset or goods returned or sold to a supplier; the tool does not tell them apart), per head (cgst, igst, state_tax, sgst_utgst, ut_tax, cess; state_tax and sgst_utgst are both state-side and kept apart), never netted. Every other voucher with GST is set aside in `set_aside` under the first reason that applies, with its count, its own tax totals and at most 100 vouchers listed: class_not_admitted (any class but Purchase, Debit Note, Journal and Payment: sales, credit notes, memoranda), head_conflict, unrecognised_head, head_absent (a Duties & Taxes ledger that may be GST has no head), duty_ledger_without_gst_type (a Duties & Taxes ledger typed neither GST nor TDS or TCS, such as Others, which may be a GST ledger left untyped), unresolved_group (a ledger whose group does not resolve, which may be a GST ledger), sign_and_flag_disagree, entries_do_not_balance (a ledger sits where this read does not look, such as an item invoice of a shape not measured whose purchase ledger is in an inventory allocation), sales_ledger_present (sales and credit notes), gst_on_both_sides (reverse-charge and set-off journals), other_ledgers_present (a ledger under any other group, such as Current Assets or Stock-in-Hand), no_creditor_party (no ledger under Sundry Creditors, such as a GST challan payment), no_counter_ledger and several_counter_ledgers. Nothing is apportioned. Cancelled, optional and post-dated vouchers are counted, not totalled (`vouchers_cancelled_optional_or_post_dated`); `vouchers_without_gst_entry` counts the vouchers with no Duties & Taxes entry of any kind but TDS or TCS, and `vouchers_observed` every voucher of the window. A window that is not complete is refused (gst_by_ledger_window_partial). Ledger names are masked like vouchers masks them. Measured on one synthetic book of TallyPrime 7.2 Silver: fourteen vouchers typed on Tally's screen, read one day at a time and, by the build before Direct Expenses and Fixed Assets were admitted, as one month of 64 vouchers that the window read in two parts (purchases on Indirect Expenses, Direct Expenses and Fixed Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries, one with freight, journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no supplier, a debit note, two tax payments, one also paying interest, and a credit note with output tax). A registered book was read once, by an earlier build: none of December's six vouchers was set aside, and a supplier invoice entered twice was totalled twice, so a duplicate is not detected. Not measured: vouchers created by import, Gold and other releases, a registered book on this build, other item-invoice shapes, more than 64 vouchers in a window. A year on a large book may be refused as too large by the window read: use shorter windows.";
+pub(in crate::agent) const DESCRIPTION: &str = "Read-only: the GST the books record, totalled per counter ledger, for a date window; not a return figure. It does not decide input tax credit eligibility, blocked credit, what was availed, input versus output, or which row of any return a ledger belongs in, and matches nothing against any portal. It reads what purchase_register and sales_register read (the ledger masters twice, the full voucher window, the same drift checks and refusals) and, for every voucher with an entry on a ledger under Duties & Taxes whose master carries a recognised GST duty head, takes that tax per head and attributes it to the voucher's one ledger under Purchase Accounts, Direct Expenses, Indirect Expenses or Fixed Assets, only when the voucher is a Purchase, Debit Note, Journal or Payment with a ledger under Sundry Creditors on it, has exactly one such counter ledger (a round-off ledger under Indirect Expenses counts as one), and nothing besides but the party, cash, bank and TDS or TCS ledgers: a duty head does not say input or output, so a sale, a credit note or a tax payment with no supplier on it is never attributed. `counter_ledgers` lists each such ledger with its `ledger_guid` (Tally's GUID of the ledger, which trial_balance returns as the ledger's `guid`; its movement there covers every voucher on it, set-aside ones included, so it is never a base for this tax), its predefined `group`, its `parent` (masked like a ledger name when it is a group the book named), `vouchers`, `debit_side_tax` (negative, as the books state it) and `credit_side_tax` (positive: tax booked back, which can be a reversal or output tax on an asset or goods returned or sold to a supplier; the tool does not tell them apart), per head (cgst, igst, state_tax, sgst_utgst, ut_tax, cess; state_tax and sgst_utgst are both state-side and kept apart), never netted. Every other voucher with GST is set aside in `set_aside` under the first reason that applies, with its count, its own tax totals and at most 100 vouchers listed: class_not_admitted (any class but Purchase, Debit Note, Journal and Payment: sales, credit notes, memoranda), head_conflict, unrecognised_head, head_absent (a Duties & Taxes ledger that may be GST has no head), duty_ledger_without_gst_type (a Duties & Taxes ledger typed neither GST nor TDS or TCS, such as Others, which may be a GST ledger left untyped), unresolved_group (a ledger whose group does not resolve, which may be a GST ledger), sign_and_flag_disagree, entries_do_not_balance (a ledger sits where this read does not look, such as an item invoice of a shape not measured whose purchase ledger is in an inventory allocation), sales_ledger_present (sales and credit notes), gst_on_both_sides (reverse-charge and set-off journals), other_ledgers_present (a ledger under any other group, such as Current Assets or Stock-in-Hand), no_creditor_party (no ledger under Sundry Creditors, such as a GST challan payment), no_counter_ledger, several_counter_ledgers and bill_already_opened (a Purchase Agst Ref to a bill another counted Purchase of the window opened for that party, with equal figures: a copy). `agst_ref_purchase` lists each other counted Agst Ref Purchase. Nothing is apportioned. Cancelled, optional and post-dated vouchers are counted, not totalled (`vouchers_cancelled_optional_or_post_dated`); `vouchers_without_gst_entry` counts the vouchers with no Duties & Taxes entry of any kind but TDS or TCS, and `vouchers_observed` every voucher of the window. A window that is not complete is refused (gst_by_ledger_window_partial). Ledger names are masked like vouchers masks them. Measured on one synthetic book of TallyPrime 7.2 Silver: fourteen vouchers typed on Tally's screen, read one day at a time and, by the build before Direct Expenses and Fixed Assets were admitted, as one month of 64 vouchers that the window read in two parts (purchases on Indirect Expenses, Direct Expenses and Fixed Assets ledgers and on two expense ledgers at once, two item invoices whose purchase ledger was among their entries, one with freight, journals with input IGST, with a TDS ledger typed Others, a set-off and a reversal with no supplier, a debit note, two tax payments, one also paying interest, and a credit note with output tax). Not measured: vouchers created by import, Gold and other releases, a registered book on this build, other item-invoice shapes, more than 64 vouchers in a window. A year on a large book may be refused as too large by the window read: use shorter windows.";
 
 impl Server {
     pub(in crate::agent) async fn gst_by_counter_ledger(

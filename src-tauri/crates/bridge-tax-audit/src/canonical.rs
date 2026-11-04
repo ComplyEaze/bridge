@@ -147,7 +147,7 @@ fn module_report(test_id: &str, module_check: Option<Vec<String>>) -> (Json, Jso
 
 /// The full canonical dump for one test result on one book. `module_check` is this test's own
 /// `check_invariants` output, or `None` for a test with no module-level invariant function yet
-/// (see [`module_report`]).
+/// (see `module_report`).
 pub fn canonical_test_result(
     book: &Book,
     result: &TestResult,

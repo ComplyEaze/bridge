@@ -1,9 +1,8 @@
 Pushed copies that differ from the files kept on the lab PC, with what changed:
-evidence/bills-ref.txt: original 53 B sha256 f50447add6aaca8e96d2f172e16347b95238c05fbff030452be19b1120d34e7d (kept on the lab PC); 1 amount(s) of 10+ digits grouped by commas (the same figure)
 evidence/s0-c2-netstat.txt: original 8823 B sha256 95b7d9569ba6c96a70d0e21152002377525486a69ba725cbb479bab49869f37f (kept on the lab PC); only the port-9001 LISTENING lines kept
 evidence/s7-c2-netstat.txt: original 9893 B sha256 d569db37b0e7449bc381dc5c1badd8606f9d5c9e9a884812a6257fde32ff8b84 (kept on the lab PC); only the port-9001 LISTENING lines kept
-notes.txt: original 5643 B sha256 f60fb50551c0c3147aced6a516d609394fd14549d1111a56af6a9ef42db7f4fa (kept on the lab PC); 1 x -> p1; 1 amount(s) of 10+ digits grouped by commas (the same figure)
-RESULTS.md: original 4892 B sha256 4f0d8e5264779947b4990df7de6fadc4895a261dd6e22e62a1266cccab8fdebf (kept on the lab PC); 1 x -> stop; 1 amount(s) of 10+ digits grouped by commas (the same figure)
+notes.txt: original 5844 B sha256 d4927614dfbb68939397eb08b3f918a9bbbc608e844c16dbec7e44663fa2d0c7 (kept on the lab PC); 1 x -> p1; 1 amount(s) of 10+ digits grouped by commas (the same figure)
+RESULTS.md: original 5074 B sha256 0b82eef3e51b215590670300810f3f382b734109c0b27a8f2dc4f55f0feb710c (kept on the lab PC); 1 x -> stop
 scripts/c3-send-t.ps1: original 2091 B sha256 ab8f0099b30f0bdda83c66b4ffc90d08c35c25c701201ba8de486bc4864d10c0 (kept on the lab PC); 3 x -> stop
 scripts/c2.py: original 1279 B sha256 3b24d81c6084e3cefcb0aecbcde2e1bfeb19be00a0f0f93c928ab0ba5d168d59 (kept on the lab PC); 1 x -> <LAB_DIR>
 scripts/cap.py: original 782 B sha256 95efd667c2880c8037f8b20d528a0ff547c2bbe06477288c41826c7f156aaf8e (kept on the lab PC); 2 x -> <LAB_DIR>

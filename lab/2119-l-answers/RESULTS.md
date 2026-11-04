@@ -1,6 +1,6 @@
 # Row 2119-L: Ledger Outstandings for one party against the Bills Receivable report, BRIDGE CORPUS DENSE, 31 March 2026, by curl: results
 
-**First line: no stop and no dialog. One EXPECT was not met: the Receivable report took 45.19 s against the expected "about 33 to 42 s" (recorded, not a stop rule). p1's Ledger Outstandings answer ties to the report bill for bill (248 matched, 248 equal, differ 0, only_ref 0, only_lo_debit 0, no credit bill, no On Account). Its total and ten printed rows equal Tally's screen. The two sends are byte-equal, at 1.667 s and 1.586 s. This meets the sheet's first "What it decides" row: a read by party is admitted for the design note.** (verified)
+**First line: no stop and no dialog. FINDING: the Receivable report took 45.19 s against the expected "about 33 to 42 s" (an EXPECT not met; no cause is given; not a stop rule). p1's Ledger Outstandings answer ties to the report bill for bill (248 matched, 248 equal, differ 0, only_ref 0, only_lo_debit 0, no credit bill, no On Account). Its total and ten printed rows equal Tally's screen. The two sends are byte-equal, at 1.667 s and 1.586 s. This meets the sheet's first "What it decides" row: a read by party is admitted for the design note.** (verified)
 
 Sheet `lab/2119-l/ROW.md` at 9145f6cd (SHA256.txt 4 of 4, by sha256 and size). Every step and stamp is in `notes.txt` (UTC). The C3 lines with their times are in `evidence/send-log.txt`. The answers stay on the lab PC by size and sha256 (`kept-local.txt`).
 
@@ -28,7 +28,7 @@ Note, a hypothesis: every amount is negative in the report's sum and in the answ
 marks.utf16le.xml 982 040ac47754c40a4e2e736f8be2b3f37cac924213ea66c8c4f0074222f9a00280
 ref-receivable.utf16le.xml 770 6520d94ec6d013e3e44d9af62ee9c9830a65085b4cb5b54710340df0d03c750f
 ```
-`ref`:
+`ref` (the captured file `evidence/bills-ref.txt` stays on the lab PC by size and sha256, unaltered, since its sum is a 10+ digit run; quoted here with the digits grouped):
 ```
 ref ok bytes 13679490 rows 29900 sum -1,425,845,144.50
 ```

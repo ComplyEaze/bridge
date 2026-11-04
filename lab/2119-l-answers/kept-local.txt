@@ -6,4 +6,5 @@ answers/s4-lo-p1-2.xml 205336 B 76e1b3e5e1ac8617e352ae3b8228af6f0b34c5a61b7a1782
 answers/s6-marks.xml 3406 B fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
 lo/lo-p1.utf16le.xml 1196 B 87b020a84e143bcb1d769f2d478d2d3925f76333364de3e794da9fd16779a37c
 lo/party.txt 18 B 078b01c5dedf292fb5ddaa99be3cf344406fd8b88b427b1acc785494e3099b60
-stage-2119l.py (this stage script) 5342 B 9dcf786d78b97d01028500c5cc0239616fc9f0bd862012840126e6c2e09563a3
+evidence/bills-ref.txt (bills.py ref, captured; its sum is a 10+ digit run, so it stays here unaltered; quoted grouped in RESULTS.md) 53 B f50447add6aaca8e96d2f172e16347b95238c05fbff030452be19b1120d34e7d
+stage-2119l.py (this stage script) 5593 B 993da13074855cb58439ce6404923b01be327ff6773b21557a522de297aadc3b

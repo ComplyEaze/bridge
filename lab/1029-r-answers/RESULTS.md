@@ -86,10 +86,19 @@ No captured byte is altered. A captured file is pushed whole unless it holds the
   - Each is JSON with top-level keys arguments, call_sent_utc, response, round_trip_seconds, server_info, server_pid and tool. The result keys are in `evidence/kept-structure.txt`.
   - Every field the Record table quotes was read from these files by the lab's `fields.py` (pushed).
   - Each `post_import` and `verify_import` result member is also hashed in `evidence/kept-canonical.txt`, which gives its size and sha256. The hash is taken as `json.dumps(obj, sort_keys=True, separators=(",",":"), ensure_ascii=False).encode("utf-8")`, leaving out company, evidence, read_at and truncated. Those bytes are written to no file.
-- **The five `egress_log` answers, the tools list, `initialize`, the marks reads** (with their headers) and **the data folder's `agent-egress.jsonl` and `terms-acceptance.jsonl`** hold neither the company number nor a 10+ digit run. They are pushed whole.
+- **The r03, r10 and r25 `egress_log` answers, the tools list, `initialize`, the marks reads** (with their headers) and **the data folder's `terms-acceptance.jsonl`** hold neither the company number nor a 10+ digit run. They are pushed whole.
+- **The r50a and r50b `egress_log` answers** (`run/answers/019-…`, `023-…`) and **the data folder's `agent-egress.jsonl`** stay local. Each holds a receipt_id whose last UUID group ends in a run of 10 digits after one hex letter.
+  - The two answers are JSON whose result keys are omitted_for_size, order and records[25].
+  - The data-folder log has 46 JSON lines: 23 response_prepared and 23 stdio_write_completed.
+  - The Record table's egress rows for r50a and r50b were read from those answers by the lab's `batch.sh` before they were kept.
 - **The data folder's import ledger** (`agent/agent-import-ledger.jsonl`): 35 lines, made up of 15 verification_status, 5 dispatch_intent, 5 dispatch_response, 5 post_span_verdict and 5 build records. It carries the company number.
 - **The 15 saved proofs** (`agent/imports/*.proof.*.json`, three per batch) carry the company number, so they stay local. Their markdown twins and the other batch files without it are pushed.
-- **Two saved import files** (`agent/imports/bridge-ed60d374-….xml` and `bridge-a8705431-….xml`; r50a's and r50b's): XML with ENVELOPE/HEADER/TALLYREQUEST and ENVELOPE/BODY/IMPORTDATA. Each holds a voucher REMOTEID whose last UUID group is all digits (12), and that run appears again in a narration marker, outside VOUCHERKEY.
+- **Four saved import files** (`agent/imports/bridge-27187d2c-….xml`, `bridge-53c11cc1-….xml`, `bridge-ed60d374-….xml` and `bridge-a8705431-….xml`; r10's, r25's, r50a's and r50b's). Each is XML with ENVELOPE/HEADER/TALLYREQUEST and ENVELOPE/BODY/IMPORTDATA.
+  - In each, a voucher REMOTEID's last UUID group holds a run of 10 or more digits: all digits (12) in r50a's and r50b's, and 10 or 11 digits after one hex letter in r10's and r25's.
+  - The same run appears again in that voucher's narration marker, outside VOUCHERKEY.
+  - r03's saved file holds no such run and is pushed.
+
+From the second commit on, any run of 10 or more digits counts, even with a hex letter next to it, so r10's and r25's files and the three egress files went local in that commit. A run inside a whole 64-hex sha256 value is not counted. (verified)
 - **The five box logs** (`box/<batch>-p1-box.txt`, 40 to 51 lines each) carry the box's "Company number" line. The checks `box/<batch>-p1-check.out` (title, Create line, GUID, batch, types) and the answer files are pushed.
 
 ## The book now

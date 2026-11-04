@@ -1,5 +1,5 @@
 Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
-notes.txt: original 9105 B sha256 5e516c108900b4026a4594d930a667eb78a515f4769d50f06ea905d300419e4c (kept on the lab PC); 1 x -> <BK folder>; 1 x -> stop
+notes.txt: original 9488 B sha256 293157106b280d7124061b4cd9fdf52d33cad594a539414396ca6f9e4cb63498 (kept on the lab PC); 1 x -> <BK folder>; 1 x -> stop
 evidence/s0-c2-netstat.txt: original 9352 B sha256 0c1554d577807b997f20dee9ddf0e1c74a1c0844fa3fd76600b6ae0661b5d090 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
 evidence/s4-c2-netstat.txt: original 9490 B sha256 ac7ef8f8660a4111bcbe12061281f8dc1fd4d5cad6bffbecbdc27826e4112a8c (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
 run/launch-env.json: original 188 B sha256 e695f157b75ef79fcc569b9d02f3c830fb1464d05be095089f3030e4ea3b453e (kept on the lab PC); 1 x -> <LAB_DIR>

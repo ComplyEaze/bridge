@@ -5,12 +5,18 @@
 #   C- catalogue, Q- rates: the LEDGER rows, and for the ledger named by --ledger (default BRIDGE Customer RJ): how many
 #      rows carry that name, then PARENT and ISBILLWISEON (C), or PARENT, PARTYGSTIN, STATENAME and every
 #      LEDGSTREGDETAILS.LIST that holds anything, with each child (Q).
-#   N- number read: the VOUCHER rows, each VOUCHERNUMBER and BRIDGEVCHISSALES.
+#   N- number read: every VOUCHER row, how many carry a VOUCHERNUMBER and how many do not, and each
+#      VOUCHERNUMBER with BRIDGEVCHISSALES.
+# Every read answer (all but I) prints its HEADER/STATUS and every LINEERROR first. An answer with no
+# BODY/DATA/COLLECTION, or an import answer with no counters, is a failed request: count.py prints STOP and exits
+# non-zero, and never reports it as 0 rows.
 #   I- import: every counter Tally returned and every LINEERROR.
 #   R- read-back: the VOUCHER rows; for each, the header fields and each ALLLEDGERENTRIES.LIST's LEDGERNAME,
 #      ISDEEMEDPOSITIVE and AMOUNT.
 # count.py --diff A B: two read-back answers, one VOUCHER row each: every header field and leg field whose value
 #   differs between them, and every one present in one only. ROW.md says which differences each sub-row expects.
+# count.py --before-write S1 M: M holds exactly one COMPANY row, with the GUID of S1's one row; else STOP.
+# count.py --same-row S1 M: as --before-write, and ALTVCHID and ALTMSTID also equal S1's; else STOP.
 # An element absent is printed <absent>, one present and empty is printed ''. Names are not trimmed: repr shows a
 # trailing line break. Numbers, dates and flags are trimmed.
 # Example: python3 -I count.py a-s1-M-marks.xml
@@ -32,9 +38,19 @@ def parse(path):
     text = re.sub(r"^\s*<\?xml[^>]*\?>", "", text)
     return ET.fromstring(text)
 
+def status(root):
+    # Every read answer's HEADER/STATUS and every LINEERROR, printed before any count.
+    found = root.find("HEADER/STATUS")
+    print("  STATUS", "<absent>" if found is None else repr((found.text or "").strip()))
+    for error in root.iter("LINEERROR"):
+        print("  LINEERROR", repr("".join(error.itertext())))
+
 def rows(root, tag):
+    # An answer with no COLLECTION is a failed read, never "0 rows" (AGENTS.md P5): stop.
     collection = root.find("BODY/DATA/COLLECTION")
-    return [] if collection is None else [child for child in collection if child.tag == tag]
+    if collection is None:
+        raise SystemExit("STOP: no BODY/DATA/COLLECTION in the answer; the request failed, it did not find nothing")
+    return [child for child in collection if child.tag == tag]
 
 def value(node, tag):
     found = [child for child in node if child.tag == tag]
@@ -56,6 +72,8 @@ def legs(voucher):
 def report(path, ledger):
     root, kind = parse(path), path.name.split("-", 2)[-1][:1]
     print(f"== {path.name}: {path.stat().st_size} bytes")
+    if kind != "I":
+        status(root)
     if kind == "M":
         for company in rows(root, "COMPANY"):
             print("  COMPANY", value(company, "GUID"), "ALTVCHID", value(company, "ALTVCHID"), "ALTMSTID",
@@ -75,14 +93,20 @@ def report(path, ledger):
                 print("   LEDGSTREGDETAILS.LIST elements:", sum(d.tag == "LEDGSTREGDETAILS.LIST" for d in row),
                       "of which non-empty:", sum(d.tag == "LEDGSTREGDETAILS.LIST" and len(d) > 0 for d in row))
     elif kind == "N":
-        found = [row for row in rows(root, "VOUCHER") if any(c.tag == "VOUCHERNUMBER" for c in row)]
-        print("  VOUCHER rows:", len(found))
+        every = rows(root, "VOUCHER")
+        found = [row for row in every if any(c.tag == "VOUCHERNUMBER" for c in row)]
+        print("  VOUCHER rows:", len(every), "of which with a VOUCHERNUMBER:", len(found),
+              "without one:", len(every) - len(found))
         for row in found:
             print("  ", value(row, "VOUCHERNUMBER"), "BRIDGEVCHISSALES", value(row, "BRIDGEVCHISSALES"))
     elif kind == "I":
         # Tally 7.2 answered S4's imports with a bare RESPONSE holding the counters; an IMPORTRESULT is read too.
         result = root if root.tag == "RESPONSE" else root.find(".//IMPORTRESULT")
         print("  root", root.tag)
+        if result is None:
+            for error in root.iter("LINEERROR"):
+                print("  LINEERROR", repr("".join(error.itertext())))
+            raise SystemExit("STOP: no import counters in the answer; the request failed")
         for tag in COUNTERS:
             print(f"  {tag} {value(result, tag) if result is not None else '<no counters>'}")
         for error in root.iter("LINEERROR"):
@@ -116,8 +140,28 @@ def diff(a, b):
         if x != y:
             print(f"   leg {index + 1}: {x} -> {y}")
 
+def company_row(path):
+    found = rows(parse(path), "COMPANY")
+    if len(found) != 1:
+        raise SystemExit(f"STOP: {path.name} holds {len(found)} COMPANY rows, not one")
+    return tuple(value(found[0], tag) for tag in ("GUID", "ALTVCHID", "ALTMSTID"))
+
+def same_company(first, later, marks):
+    # --before-write: the marks read just before a write holds one COMPANY row, with s1's GUID (LAB-COMMON C3).
+    # --same-row: after the restore and reload, the COMPANY row equals s1's: GUID, ALTVCHID and ALTMSTID. The
+    # answer's bytes are not compared, since its CMPINFO counters are per load.
+    a, b = company_row(first), company_row(later)
+    width = 3 if marks else 1
+    print(f"== {later.name} against {first.name}: GUID, ALTVCHID, ALTMSTID {b} against {a}")
+    if a[:width] != b[:width]:
+        raise SystemExit("STOP: the COMPANY row differs")
+    print("  equal" if marks else "  one COMPANY row, the same GUID: the write may be sent")
+
 args = sys.argv[1:]
 ledger = "BRIDGE Customer RJ"
+if args[:1] in (["--before-write"], ["--same-row"]):
+    same_company(pathlib.Path(args[1]), pathlib.Path(args[2]), args[0] == "--same-row")
+    raise SystemExit(0)
 if args[:1] == ["--ledger"]:
     ledger, args = args[1], args[2:]
 if args[:1] == ["--diff"]:

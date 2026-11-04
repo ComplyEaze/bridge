@@ -1,0 +1,9 @@
+Step 2: Data > Configuration. The screen titled "Data Configuration" opened a list titled "List of Configurations" (shots/s2-data-configuration.png; its end, shots/s2-data-configuration-end-of-list.png). In the screen's own words and order, each with its value as shown:
+(button at the top right) Show More
+General
+  Company Data Path                    : a path, not recorded
+  Backup Data Path                     : a path, not recorded
+  Schedule Backup Data Path            : a path, not recorded (a backup location)
+Migration
+  Allow working on data during migration : No
+The Down arrow, one press at a time, moved the highlight Company Data Path > Backup Data Path > Schedule Backup Data Path > Migration > Allow working on data during migration, and one more press left it there: the list holds nothing more. No entry's own label names vouchers, voucher entry, invoices or accounting, so none was opened. 'Show More' names none of them and was not opened.

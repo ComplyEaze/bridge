@@ -1,0 +1,22 @@
+Step 4: F12 (Configure) on the Purchase voucher screen, with nothing typed. The screen titled "Voucher Configuration" opened (shots/s4-voucher-configuration.png). Every option with its value, in the screen's own words and order:
+Configuration
+  Show more configurations : No
+General Details
+  Provide Supplier details : Yes   (the cursor on it as the screen opened)
+  Provide Receipt Note, Order, and Import details : Yes
+    Provide Order details : No
+    Provide Import details : No
+  Select common Ledger Account for Item Allocation : Yes
+  Use default Bill-wise details for Bill Allocation : No
+  Show list of Bills for selection : Yes
+    Show Final Balances for each Bill : Yes
+  Provide Additional Descriptions for Ledgers : No
+  Provide Additional Descriptions for Stock Items : No
+  Warn on negative Stock Balance : Yes
+  Provide Supplier Invoice details : Yes
+  Modify all fields during voucher entry : No
+  (applicable to non-taxation fields)
+  Enable Stripe View : No
+GST Details
+  Modify GST & HSN/SAC related details : No
+The whole list was in view (no marker of more lines below), so no Down press was needed. No option was opened, and no key was pressed on any. 'Show more configurations' (No) says more options exist that this screen does not show; it was not changed.

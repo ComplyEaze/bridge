@@ -1,0 +1,10 @@
+Step 2: the Data menu (Alt+Y from the Gateway of Tally), as shown (shots/s2-data-menu.png). Headings and entries, in the screen's own words and order:
+COMPANY DATA
+  Backup & Restore   (has a sub-menu, shown by a right arrow)
+  Split              (has a sub-menu, shown by a right arrow)
+TROUBLESHOOTING
+  RepAir
+  Migrate
+  All Exceptions     (shown greyed)
+CONFIGURE
+  Configuration

@@ -1,0 +1,4 @@
+command: tasklist /FI "IMAGENAME eq tally.exe" /FO CSV /NH 2>&1
+time: 2026-11-04T11:58:46.609Z
+exit: 0
+"tally.exe","1200","Console","5","2,76,520 K"

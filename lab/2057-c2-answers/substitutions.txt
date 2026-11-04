@@ -1,0 +1,9 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/s0-c2-netstat.txt: original 9356 B sha256 0ea159957c82bed13b1220226d5e883f7bc9cb14a48635ee4b178cb6b3f8a879 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s6-c2-netstat.txt: original 9271 B sha256 0554c5bca6fb720a19e8d4e26c5dee77469cfe2dc906fdcd753e8853fa6c032d (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+srv/launch-env.json: original 157 B sha256 7ea0797b07cb5b8663df16f5f1c4e3dea5be54870de79cda6b9b22538e8f399c (kept on the lab PC); 1 x -> <LAB_DIR>
+call.py: original 1883 B sha256 3113df2155b14ebee8325c5fffbc169660be74e22b492f32fed0c10f01df5bb1 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+c2.py: original 1287 B sha256 81cb0e0f614eb912c9cd3b44fb27bc7fd7fcd0ddedde6fe008742a875c79a297 (kept on the lab PC); 1 x -> <LAB_DIR>
+cap.py: original 784 B sha256 880d42cc27dd07fd9506c1d6a5d93440bbc6dadb53db33c5ee50bb63533a07e7 (kept on the lab PC); 2 x -> <LAB_DIR>
+marks.py: original 469 B sha256 1aa1b726929442ae421f4f78283dcc5405a9a0be013cd35d38287b2055eba728 (kept on the lab PC); 1 x -> <LAB_DIR>
+srv/run-client.py: original 5014 B sha256 57007c3f4a7bdd704861c8ab54787214bc08ab4680248672f2b7b1d0901e6c19 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <CI build>

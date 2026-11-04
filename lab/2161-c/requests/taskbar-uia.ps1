@@ -1,9 +1,12 @@
-# taskbar-uia.ps1 (row 2161-C v2) - the taskbar's buttons as UI Automation lists them, read through the COM client in
+# taskbar-uia.ps1 (row 2161-C v3) - the taskbar's buttons as UI Automation lists them, read through the COM client in
 # UIAutomationCore.dll (CUIAutomation8, else CUIAutomation; IUIAutomation), not the managed System.Windows.Automation client.
 # In v1 the managed client read buttons=0 and in_task_list=0 on the lab's Windows 10 while PrintWindow showed 6 running
-# programs' buttons; that the COM client reaches them is unverified, and B2 checks it before any cell runs.
+# programs' buttons; that the COM client reaches them is unverified, and check-taskbar.ps1 checks it before the row is queued.
+# v3: the client is created, walked and dropped inside one C# method, TUia.Read, which returns strings only. In v2's B2,
+# PowerShell held the client as a System.__ComObject and could not convert it to IUIAutomation when passing it back to C#
+# (MethodArgumentConversionInvalidCastArgument at the Buttons call); the lines and the query are v2's.
 # Read-only: it changes no window, sends no key or click, invokes no pattern, ends nothing and sends nothing to Tally.
-# Written on a Mac and NOT RUN anywhere; its C# part was compiled there with Mono's mcs (no errors or warnings), the
+# Written on a Mac; v3 has NOT RUN anywhere. Its C# part was compiled there with Mono's mcs (no errors or warnings), the
 # PowerShell around it was not run. Every slot it calls, and every GUID, was checked against Wine's uiautomationclient.idl.
 # Per-monitor DPI aware (SetProcessDpiAwarenessContext(-4)), so every rectangle is in physical pixels.
 # Writes to -Out (a new file each time; it refuses one that exists), one line each:
@@ -72,7 +75,7 @@ public static class TUia {
     }
 
     // client: "com8" when CUIAutomation8 was created, else "com" (CUIAutomation).
-    public static IUIAutomation Create(out string client) {
+    static IUIAutomation Create(out string client) {
         Type t = Type.GetTypeFromCLSID(new Guid("e22ad333-b25f-460c-83d0-0581107395c9"), false);
         object o = null;
         try { if (t != null) { o = Activator.CreateInstance(t); } } catch (COMException) { o = null; }
@@ -84,7 +87,17 @@ public static class TUia {
         return (IUIAutomation)o;
     }
 
-    public static List<string> Buttons(IUIAutomation uia, IntPtr tray) {
+    // The E line, then every B line and the Z line. The COM client never leaves this method, so PowerShell gets strings.
+    public static List<string> Read(IntPtr tray, string dpi) {
+        string client;
+        IUIAutomation uia = Create(out client);
+        var lines = new List<string>();
+        lines.Add(string.Format("E {0} dpi_context={1} tray=0x{2} client={3}", Stamp(), dpi, tray.ToInt64().ToString("x"), client));
+        lines.AddRange(Buttons(uia, tray));
+        return lines;
+    }
+
+    static List<string> Buttons(IUIAutomation uia, IntPtr tray) {
         var lines = new List<string>();
         IUIAutomationElement root = uia.ElementFromHandle(tray);
         IUIAutomationCondition cond = uia.CreatePropertyCondition(ControlType, ButtonControlType);
@@ -114,13 +127,8 @@ public static class TUia {
 }
 "@
 $dpi = if ([TUia]::MakeAware()) { 'ok' } else { 'refused' }
-function Stamp { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }
-$lines = New-Object System.Collections.Generic.List[string]
 $tray = [TUia]::FindWindow('Shell_TrayWnd', $null)
 if ($tray -eq [IntPtr]::Zero) { throw 'no Shell_TrayWnd' }
-$client = ''
-$uia = [TUia]::Create([ref]$client)
-$lines.Add("E $(Stamp) dpi_context=$dpi tray=0x$($tray.ToInt64().ToString('x')) client=$client")
-foreach ($l in [TUia]::Buttons($uia, $tray)) { $lines.Add($l) }
+$lines = [TUia]::Read($tray, $dpi)
 [System.IO.File]::WriteAllText($Out, ($lines -join "`r`n") + "`r`n", [System.Text.Encoding]::UTF8)
 $lines

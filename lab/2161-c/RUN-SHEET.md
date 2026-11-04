@@ -1,4 +1,4 @@
-# Windows item 2161-C v2: on master's Windows bundle, does the product's approval box get a taskbar button, and is it listed in Alt+Tab? Read three ways, with one Alt+Tab per cell, every box answered No by mouse. (Part of #2161)
+# Windows item 2161-C v3: on master's Windows bundle, does the product's approval box get a taskbar button, and is it listed in Alt+Tab? Read three ways, with one Alt+Tab per cell, every box answered No by mouse. (Part of #2161)
 
 WRITES to the book: NONE. **No ComplyEaze Bridge server is launched.**
 
@@ -50,6 +50,11 @@ Every box comes from the product's own dialog child, fed a fixed text, so with n
   - the switcher's tiles by UI Automation: `L` lines, one per ListItem, or `D` lines (every named element, at most 40) when there is none, or a `U` line if the read fails.
 
   When the switcher goes, it writes a `G` line with the foreground at that poll, and an `F` line 500 ms later. It also writes an `N` line, once, for each visible top-level window that was not there when it started (at most 100). It sends no key and changes no window. Its C# compiled with Mono; the PowerShell has not run, so cell N checks it first.
+  - **v3 (4 Nov 2026): the client stays inside C#.** v2's B2 stopped before any cell: the script threw at its `Buttons` call with `MethodArgumentConversionInvalidCastArgument`, unable to convert a `System.__ComObject` to `IUIAutomation`. `uia-x0.txt` held only the `E` line, with `client=com8`, so the client was created and the read never ran.
+    - **Why (unverified):** PowerShell held the object that `Create` returned as a plain COM object, and its binder could not cast it to the C# `[ComImport]` parameter when passing it back.
+    - **What changes:** one static method, `TUia.Read`, creates the client, walks, and returns the lines, so PowerShell gets back strings only. The lines, the query and every GUID and slot are v2's. The C# compiled with Mono at C# 5 with no warning; the PowerShell has not run.
+- **New, read-only: `check-taskbar.ps1`, the known-answer check for v3.** `check-taskbar.ps1 -Out <file>` runs `requests/taskbar-uia.ps1` alone, reads back the file it wrote, prints every line, then a `K` line: `verdict=MET` needs one `E` and one `Z` line, a `B` line for each button `Z` counts, and at least one `B` line in the task list whose name contains "Tally". A throw prints `threw=` and `verdict=NOT MET`.
+  - **Queue rule: v3 goes back into the queue only after this check lists Tally's button.** Run it at a break between two rows: Tally open, no company loaded, no box open, read only. The evidence folder must exist and `uia-check.txt` must not, since the read refuses a file that exists (`powershell -NoProfile -ExecutionPolicy Bypass -File C:\bridge-lab\2161c\check-taskbar.ps1 -Out C:\bridge-lab\2161c\evidence\uia-check.txt`). Send the run coordinator its output whole, and the task buttons seen on the taskbar at that moment. Until it prints `verdict=MET` with Tally's button among its `B` lines, the row is not queued.
 - **Folders and company.**
   - Working folder `C:\bridge-lab\2161c\`; evidence in `C:\bridge-lab\2161c\evidence\`; captures and copies in `C:\bridge-lab\2161c\shots\`.
   - THE COMPANY is BRIDGE BATCH LAB, guid `a30f23c3-4819-4334-96ab-ffa6fba70976`, loaded alone, Tally maximised on the Gateway of Tally.

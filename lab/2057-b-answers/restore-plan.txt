@@ -1,0 +1,4 @@
+2057-B step 23 restore plan (C6), on the run lead's explicit RESTORE (corrected word: the backup step 23 names, BK3).
+Source: <LAB_DIR>\backups\bk3\ holding one file TDBK1800_<company number>.001, 24,100 B, sha256 94ba7d114a746c58b869c4b7e628625d8aa12f16c6cba7270daf09d259ed0745 (= step 2's BK3; checked 2026-11-04T04:46:10Z).
+Keys: Company > Shut (Alt+K, Down x4, Enter; THE COMPANY alone; Enter); Data > Backup & Restore > Restore (Alt+Y, Enter, Down x2, Enter); Specify Path (Up x3, Enter); path typed in pieces; Enter on the BK3 row (read first); Enter on End of List; 'Accept ?' Yes; 'already exists ... Replace' Replace; load THE COMPANY by filter.
+After: Gateway capture compared byte for byte with s0-gateway.png; list_companies; marks 213/null; ledger_masters and masters as step 1, equal. Anything else = stop.

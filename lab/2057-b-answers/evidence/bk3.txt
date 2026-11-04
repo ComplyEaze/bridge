@@ -1,0 +1,7 @@
+2026-11-04T04:03:39Z
+listing of backups/bk3 after BK3:
+total 24
+drwxr-xr-x 1 <user> 197609     0 2026-11-04_09:33:25 .
+drwxr-xr-x 1 <user> 197609     0 2026-11-04_09:32:07 ..
+-rw-r--r-- 1 <user> 197609 24100 2026-11-04_09:33:25 TDBK1800_<company number>.001
+94ba7d114a746c58b869c4b7e628625d8aa12f16c6cba7270daf09d259ed0745 *backups/bk3/TDBK1800_<company number>.001

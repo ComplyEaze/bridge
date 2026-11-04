@@ -1,0 +1,5 @@
+2026-11-04T03:59:25Z
+c5b75d6480202ef70a5216f74d369ea0963b4a2eedbb3d4912e4f25b385e943d *<0.7.0 CI build>/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe
+79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118 *<0.7.0 CI build>/mcpb/bin/x86_64-pc-windows-msvc/pdfium.dll
+c127118d327a50f7836118f440a0da9855215ea0b55c50e5f56fd1da91b8a600 *srv/client.py
+3258a49929af0cc1d7aaef8247a86f487d50f3b244b3966e30bd896c89a9b9ff *srv/run-client.py

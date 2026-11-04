@@ -1,0 +1,10 @@
+# sha256  bytes  file  (LAB-COMMON.md, .gitattributes and templates/ byte-equal to lab/2057-item-purchase-class-gst; requests/ from gen_requests.py, the first three byte-equal to that sheet's)
+d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+a039139418764c6a976e9301e12220b03b26893f1933cc727162121d2661fe96  23452  RUN-SHEET.md
+ee0d2af29e7020a4d3c70d8d24bd109791af9dc9d13ec73203ee0581ea893b50  3185  gen_requests.py
+47cf36c300a5cc31297033dba27c6233729e93d3ad6e17d72022e73d28352d9c  1740  templates/a07-vouchers-shape-20250424.xml
+fb40408cab217740697f7125422b81dd7d85d02a81dfaa46d81c54e951c05e84  1758  requests/r-a07-20250610.utf16le.xml
+2f45dbb34e11ee4090d7866672519f651999b3322ab8d082f594c573fbe8de9f  1758  requests/r-a07-20250611.utf16le.xml
+655bfddfb48ef6ae9f32d4af831345515c6833b0cb2203c1d953fb429cfc99ac  1758  requests/r-a07-20250612.utf16le.xml
+560bdfc1c9cd3e8b5d632a5814ffb987a938b1a06e3ad94ee77cde44bd30bd68  1758  requests/r-a07-20250613.utf16le.xml

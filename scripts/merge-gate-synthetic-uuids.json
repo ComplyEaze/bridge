@@ -1092,6 +1092,10 @@
     {
       "uuid": "92a7ef97-dd28-4286-b02c-c059fcb8690e",
       "note": "company identifier of the synthetic lab company BRIDGE CLASS PURCHASE LAB, as TallyPrime 7.2 returned it in the capture under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/ (lab branch lab/2057-b-answers at d9005ab3, in the pull request that adds the capture); the voucher identifier in that capture is this value with a suffix"
+    },
+    {
+      "uuid": "00f0c618-b0df-43bd-bd69-b4c7b92c616f",
+      "note": "company identifier of the synthetic lab company BRIDGE SFT LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab/ (lab branch lab/699-sft-read-answers at 3e7e0e1a, in the pull request that adds the captures); the voucher identifiers in those captures are this value with a suffix"
     }
   ]
 }

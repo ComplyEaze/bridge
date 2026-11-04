@@ -1100,6 +1100,10 @@
     {
       "uuid": "00f0c618-b0df-43bd-bd69-b4c7b92c616f",
       "note": "company identifier of the synthetic lab company BRIDGE SFT LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab/ (lab branch lab/699-sft-read-answers at 3e7e0e1a, in the pull request that adds the captures); the voucher identifiers in those captures are this value with a suffix"
+    },
+    {
+      "uuid": "2b1c9f4e-9d3a-4f71-8c2e-5a6b7c8d9e01",
+      "note": "hand-made batch id of the Rust agent tests: the suffix of the invented batch id bridge-2b1c9f4e-9d3a-4f71-8c2e-5a6b7c8d9e01, its last group counting 5a6b7c8d9e01, written by hand into agent_admission_tests.rs, agent_import_amend_tests.rs, agent_presence_tests.rs and agent_statement_tie_out_tests.rs on master and into the amends_batch_id case of the schema test in agent_import_text_tests.rs added by pull request 2337; it is in no lab answer, capture or fixture"
     }
   ]
 }

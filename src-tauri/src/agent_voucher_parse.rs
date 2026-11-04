@@ -496,10 +496,13 @@ impl VoucherGstFields {
 /// The list a voucher keeps its Delivery Notes in, one entry each.
 const DELIVERY_NOTE_LIST: &str = "INVOICEDELNOTES.LIST";
 
+/// The two children a [`DELIVERY_NOTE_LIST`] entry was measured with: a note's number and its date.
+const DELIVERY_NOTE_FIELDS: [&str; 2] = ["BASICSHIPDELIVERYNOTE", "BASICSHIPPINGDATE"];
+
 /// A voucher's Delivery Notes, read only when the GST details are asked for (#2027). Each entry of
 /// [`DELIVERY_NOTE_LIST`] holds one note's number in `BASICSHIPDELIVERYNOTE` and its date in
-/// `BASICSHIPPINGDATE`, in the order keyed, and a voucher with none sends one empty entry (protocol
-/// reference §8.2l).
+/// `BASICSHIPPINGDATE`, in the order keyed, and a voucher with none sends one entry with no children
+/// (protocol reference §8.2l).
 #[derive(Default)]
 struct DeliveryNoteCollector {
     /// `None` until the voucher sends the list.
@@ -513,10 +516,11 @@ impl DeliveryNoteCollector {
         self.entry = Some(BTreeMap::new());
     }
 
-    /// A child of an entry is read once, as a voucher field is.
+    /// A child of an entry is one of the two measured, read once, as a voucher field is. Any other
+    /// refuses the read, so a note under an unmeasured element is never said to be no note.
     fn start_field(&mut self, tag: &str) -> Result<(), String> {
         match self.entry.as_mut() {
-            Some(entry) if !entry.contains_key(tag) => {
+            Some(entry) if DELIVERY_NOTE_FIELDS.contains(&tag) && !entry.contains_key(tag) => {
                 entry.insert(tag.to_string(), String::new());
                 Ok(())
             }
@@ -530,20 +534,18 @@ impl DeliveryNoteCollector {
         }
     }
 
-    /// An entry that carries neither a number nor a date is the empty one, not a note.
+    /// Only an entry with no children is the empty one; any other is a note, each half stated.
     fn end_entry(&mut self) -> Result<(), String> {
         let entry = self.entry.take().unwrap_or_default();
-        let number = VoucherDetail::of(&entry, "BASICSHIPDELIVERYNOTE");
-        let date = VoucherDetail::of(&entry, "BASICSHIPPINGDATE");
-        date.require_date("voucher_delivery_note_date_invalid")?;
-        if [&number, &date]
-            .iter()
-            .any(|detail| matches!(detail, VoucherDetail::Present(_)))
-        {
-            self.notes
-                .get_or_insert_with(Vec::new)
-                .push(json!({"number": number.to_json(), "date": date.to_json()}));
+        if entry.is_empty() {
+            return Ok(());
         }
+        let number = VoucherDetail::of(&entry, DELIVERY_NOTE_FIELDS[0]);
+        let date = VoucherDetail::of(&entry, DELIVERY_NOTE_FIELDS[1]);
+        date.require_date("voucher_delivery_note_date_invalid")?;
+        self.notes
+            .get_or_insert_with(Vec::new)
+            .push(json!({"number": number.to_json(), "date": date.to_json()}));
         Ok(())
     }
 

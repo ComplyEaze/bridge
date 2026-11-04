@@ -2997,6 +2997,21 @@ fn a_delivery_note_date_that_is_no_date_refuses_the_read() {
     );
 }
 
+/// An entry holds only the number and the date: a note under any other element is refused, not
+/// read as no note.
+#[test]
+fn a_delivery_note_entry_with_an_unmeasured_child_refuses_the_read() {
+    let xml = einvoice_lab_delivery_note_answer().replacen(
+        "<BASICSHIPDELIVERYNOTE>DN-81</BASICSHIPDELIVERYNOTE>",
+        "<DELIVERYNOTENO>DN-81</DELIVERYNOTENO>",
+        1,
+    );
+    assert_eq!(
+        delivery_notes_of(&xml),
+        Err("voucher_delivery_note_invalid".to_string())
+    );
+}
+
 /// An entry's number and date are each read once, and hold text only.
 #[test]
 fn a_repeated_or_nested_delivery_note_element_refuses_the_read() {

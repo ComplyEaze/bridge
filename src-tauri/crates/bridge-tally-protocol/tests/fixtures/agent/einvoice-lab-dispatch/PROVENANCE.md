@@ -18,7 +18,8 @@ value. There is no company number or PAN.
 - 4 Nov 2026, row 2027-DN2: the same book back at its earlier state, with the same two invoices and Delivery Notes keyed again, read
   with a voucher type and `include_e_invoice` as well, with and without the list. Evidence: `lab/2027-dn2-answers` at f748c46e.
 
-The requests were sent by a file, not through a build. Each is byte-equal to the request a build of this change renders for that call.
+The requests were sent by a file, not through a build. The last two are byte-equal to the request a build of this change renders for
+that call; the first two are the requests of the change before it (#2327), without the Delivery Note list.
 One book, one release, one voucher of each keyed kind. Not measured: details filled by an e-Way Bill, an export's shipping details, other
 releases.
 

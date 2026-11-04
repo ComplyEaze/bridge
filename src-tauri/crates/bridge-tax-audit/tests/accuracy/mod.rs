@@ -18,8 +18,8 @@
 //! A score describes one run against one key for one synthetic book, and nothing beyond it.
 //!
 //! The scorer lives under `tests/` because only the crate's tests run it: a module under `src/`
-//! would change `src/lib.rs`, which would select every mutation that targets that file
-//! (`parity/mutations.mjs`).
+//! would change `src/lib.rs`, which would select every mutation that targets that file (the
+//! mutation runner under `parity/`).
 //!
 //! The key format, in TOML:
 //!

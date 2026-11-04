@@ -2,5 +2,6 @@ Kept on the lab PC, by size and sha256 (the company number shown as <company num
 backups/bk3/TDBK1800_<company number>.001 (BK3) 24100 B 94ba7d114a746c58b869c4b7e628625d8aa12f16c6cba7270daf09d259ed0745
 listing-company-after-restore.txt (C6: the company data folder after the restore, names, sizes and times; no listing before was taken) 810 B b95eab3e74cd4cca598d0a2d2b3be07d4eab895a5f4dfe7c14269094da474580
 evidence/bk3-listing-before.txt (the backup folder before step 2: 0 items) 151 B 4446d94c2159a7be393b0b37d255e6b97e14a33ef8f6976b1e6db5d303de6175
+data2/agent-egress.jsonl (the server egress log; one receipt id carries an all-digit group of 12) 138704 B f6ce2e7d149597d69492c9b1c7ce0487899d9218cfb0492aa202701e12892fca
 setup_helpers.py (the run copies of the helpers and client: it spells the lab paths in pieces) 2285 B ad7f2639b10e76f35d146020b17e8e8597d8b4bc7727a6da141e99b6bc0661df
-stage2057b.py (this stage script: its patterns name the lab paths) 8854 B f0c5da86767d43afd5a19002e857fccb230a4efe0e30221a496a24ac9a14554b
+stage2057b.py (this stage script: its patterns name the lab paths) 9194 B 50e26ff26293848c9dad03b15aae7d5d816a6ee5afc13c2f733c39e1116a70a5

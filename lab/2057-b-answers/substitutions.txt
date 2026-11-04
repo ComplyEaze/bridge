@@ -39,7 +39,7 @@ answers/031-marks-s23-after-restore.json: original 3501 B sha256 46822f5ab0e6ab3
 answers/032-s23-ledgers-gst.json: original 17087 B sha256 539c583015b8989f45ccda52304212c0e4c9e8f2a6448be3809e92aebb7a1af7 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
 answers/033-s23-vchtypes.json: original 28954 B sha256 1deae8e54e184b31be7ee6ea0290a1d3244af6463371ef7ce393312f69928f18 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
 evidence/srv-launch-env.json: original 161 B sha256 980f716e0c85374d4c743e026125336a9b1771b2399cef5940978c73cb9d038d (kept on the lab PC); 1 x -> <LAB_DIR>
-notes.txt: original 28363 B sha256 5304ce66f0ed8807d7b9980d9ecc3d5067d093e0cb151e22faacf584faa08d37 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> stopped; 1 x -> <desktop client>; 2 x -> run lead; 1 x -> <CI run id>; 1 x -> <CI artifact id>
+notes.txt: original 29414 B sha256 03764bcf29b8648f0bae53b3b414424c4c5c5e04ded0cbd4fe17e8f15f00c638 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> stopped; 1 x -> <desktop client>; 2 x -> run lead; 1 x -> <CI run id>; 1 x -> <CI artifact id>
 RESULTS.md: original 7808 B sha256 b5d08ff03fac5c826d44fb9b3a7a08f564cc2aa2ae30b6b608655954e53d5e01 (kept on the lab PC); 1 x -> stop; 1 x -> <CI run id>
 restore-plan.txt: original 839 B sha256 2e01f38de14d77eaa510070ae507c49adca949e8df65e0f2da2e3f5caa533807 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop; 1 x -> run lead
 scripts/tm.py: original 1558 B sha256 fb0c9da8b240c8f8586b6c3046c2e8eda0c754b41cac07281b77f9605b723d49 (kept on the lab PC); 1 x -> <LAB_DIR>

@@ -1,0 +1,15 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+notes.txt: original 9105 B sha256 5e516c108900b4026a4594d930a667eb78a515f4769d50f06ea905d300419e4c (kept on the lab PC); 1 x -> <BK folder>; 1 x -> stop
+evidence/s0-c2-netstat.txt: original 9352 B sha256 0c1554d577807b997f20dee9ddf0e1c74a1c0844fa3fd76600b6ae0661b5d090 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s4-c2-netstat.txt: original 9490 B sha256 ac7ef8f8660a4111bcbe12061281f8dc1fd4d5cad6bffbecbdc27826e4112a8c (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+run/launch-env.json: original 188 B sha256 e695f157b75ef79fcc569b9d02f3c830fb1464d05be095089f3030e4ea3b453e (kept on the lab PC); 1 x -> <LAB_DIR>
+cap.py: original 780 B sha256 0a61dabfc18fbd57af0005d8d6ff7ddfd3f0795cfd67e61732051ddd9c10813e (kept on the lab PC); 2 x -> <LAB_DIR>
+c2.py: original 1278 B sha256 f140eeb19f09bebe29a05c76af309d7f777226e76bb8574717b9b0ddf1983cea (kept on the lab PC); 1 x -> <LAB_DIR>
+run/client.py: original 4687 B sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (kept on the lab PC); 3 x -> stop; 1 x -> lab-client
+marks.py: original 2459 B sha256 b086045da6ad1b6308370a18afcdf533c2d2f3cea8312e4876f72cc251f65df2 (kept on the lab PC); 1 x -> <LAB_DIR>
+boxcheck.py: original 2100 B sha256 ddb5e10999bd6d38f5b111bbc64bbb59f3fc99efd091e53ed0338362c983f7d0 (kept on the lab PC); 1 x -> <LAB_DIR>
+bk.py: original 1259 B sha256 ef82d27942f42370239b68d6905004cec754ca4aa33888907d7333d11212f745 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <BK folder>; 1 x -> <Tally data folder>
+step3.sh: original 1715 B sha256 cc83198fc728517c4d5296c82cee9082ec6b51e4a982766c50d026c31ce79b90 (kept on the lab PC); 2 x -> <LAB_DIR>
+batch.sh: original 3608 B sha256 0bcd8e5f52d7bf7ea7f891d5736c9b75d06697c40635d0f80986753e884f6e5f (kept on the lab PC); 1 x -> <LAB_DIR>
+structure.py: original 1883 B sha256 8ece8d523f969364315e5206d3f2c09a918c26c1255fef1411e6609ace5a4a72 (kept on the lab PC); 1 x -> <LAB_DIR>
+canon.py: original 1545 B sha256 310657163c325f4df9e96629865732c91447097f57f99515cd5dc96dce88828c (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>

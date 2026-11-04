@@ -1,0 +1,28 @@
+2026-11-04T07:31:06Z exe sha256 9bda7144f54e5ef68477b5ca30be33a17759de2e1ad756f840785c67bcab2dc0 ok; launch-env.json sha256 e695f157b75ef79fcc569b9d02f3c830fb1464d05be095089f3030e4ea3b453e; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-04T07:31:06Z launched pid 4396; stderr to server-stderr-20261104T073106Z.log
+2026-11-04T07:31:06Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-04T07:31:10Z 000-000-tools.json tool=list secs=0.023 isError=None error=None saved_sha256=1d5f787f843a6e4797752918c6e2d14be879af72d2baa0e8006b86c154fb2b89
+2026-11-04T07:31:11Z 001-s2-list-companies.json tool=list_companies secs=0.148 isError=False error=None saved_sha256=6baed0d039acbbee10f34ac86a8ccf6bb1bf7fbcd6ca5eb001706254f12c5d3e
+2026-11-04T07:31:19Z 002-s2-tally-status.json tool=tally_status secs=0.085 isError=False error=None saved_sha256=f119489e041b4138efb1b354ca4a35d2544f54c205bf802b2fe04e793bbce552
+2026-11-04T07:31:21Z 003-s2-voucher-types.json tool=masters secs=1.069 isError=False error=None saved_sha256=80fbcd54735c0522623fc62533f5078058f3bb3eadf8f881033a146c308e3ca6
+2026-11-04T07:32:54Z 004-r03-build.json tool=build_import_xml secs=11.416 isError=False error=None saved_sha256=97ed789e72552297b3a9c8f5ba3d33749c00fe668e09d6f259e362a6666b2ddf
+2026-11-04T07:33:45Z 005-r03-p1.json tool=post_import secs=31.493 isError=False error=None saved_sha256=00e7c24ad2d0d4763f3822dc2ff85e93e53f39ab5eaf3e19099141e51069b71b
+2026-11-04T07:34:41Z 006-r03-verify.json tool=verify_import secs=9.775 isError=False error=None saved_sha256=67f91696c23cb2584b7a6306b663e5c47785c23cd77f4ac066678c815f1377d9
+2026-11-04T07:34:42Z 007-r03-egress.json tool=egress_log secs=0.069 isError=False error=None saved_sha256=77469d184d82e031a4b18e20e576755a0bee0e8fc00d18c3653c507defaa2b0d
+2026-11-04T07:35:46Z 008-r10-build.json tool=build_import_xml secs=15.044 isError=False error=None saved_sha256=7697b3189c7247071e2c220e07b88d243b03bf5c7f79220e6996828f533c6f6e
+2026-11-04T07:36:46Z 009-r10-p1.json tool=post_import secs=37.634 isError=False error=None saved_sha256=c4dab03bf088d5ca2e0bfcbd1a65486bf33bc3e9feb6199b1457a915f9d7ac54
+2026-11-04T07:37:02Z 010-r10-verify.json tool=verify_import secs=11.357 isError=False error=None saved_sha256=d6cb408eab7a76d4df76dd32995d58d962e6a609dc1df3c80a8bc8cb9db311b7
+2026-11-04T07:37:04Z 011-r10-egress.json tool=egress_log secs=0.079 isError=False error=None saved_sha256=2e43dd98e65cbaa701ae4dfd2c46d4c09ac15bb1c919ef8e35725c01f4337f05
+2026-11-04T07:37:45Z 012-r25-build.json tool=build_import_xml secs=15.509 isError=False error=None saved_sha256=b6445d24b29cd10ccda994205a97e5b19be805d6548af3481c5cd59f1c4f8a5f
+2026-11-04T07:38:33Z 013-r25-p1.json tool=post_import secs=43.305 isError=False error=None saved_sha256=3aabcd92cbad9b7675d5b487e4c2f5be1bd41a0139233958bd5fe30cb5fb7bbf
+2026-11-04T07:38:51Z 014-r25-verify.json tool=verify_import secs=13.087 isError=False error=None saved_sha256=eb1165be85dfb64d7c094d050c25aa787be18c9a2e82f87e33fa77e42df96f84
+2026-11-04T07:38:52Z 015-r25-egress.json tool=egress_log secs=0.101 isError=False error=None saved_sha256=6c0d07b501e4c6ef6fd1d90e7433b8c81cfd91bd806968996a004eeb0f4928be
+2026-11-04T07:39:31Z 016-r50a-build.json tool=build_import_xml secs=14.933 isError=False error=None saved_sha256=161bee93068dcabeb1ad3a790fd970f1aa546905d1ee87cde7ed822d95cbc797
+2026-11-04T07:40:17Z 017-r50a-p1.json tool=post_import secs=41.261 isError=False error=None saved_sha256=c407c3b0a6f97f408a2d8a28041569c2826d21e80f77aa034b4d2ace8685002a
+2026-11-04T07:40:34Z 018-r50a-verify.json tool=verify_import secs=11.576 isError=False error=None saved_sha256=e1e0c7a2bd4dbf6fdf16b2e04140378c4374f07a2b8f767b079494bfd0776295
+2026-11-04T07:40:36Z 019-r50a-egress.json tool=egress_log secs=0.107 isError=False error=None saved_sha256=b912e190a0231a7e185a93316c079208bde4203bcc1a032dce492a37c308d75a
+2026-11-04T07:41:05Z 020-r50b-build.json tool=build_import_xml secs=18.487 isError=False error=None saved_sha256=6b086b79516d7e048e9c90fef3635761ac28469ae146366c7f2aedeabfa2a871
+2026-11-04T07:41:52Z 021-r50b-p1.json tool=post_import secs=42.535 isError=False error=None saved_sha256=a8c73392bd6bf4f6d5869dcf69c501ae66b72513acdbc0ea431b0b7fa5d19591
+2026-11-04T07:42:12Z 022-r50b-verify.json tool=verify_import secs=15.241 isError=False error=None saved_sha256=112010475fc97fe9cb12fa0ebe7d5469e89e0acbdc1f9a5521bb7c64a5f329d5
+2026-11-04T07:42:13Z 023-r50b-egress.json tool=egress_log secs=0.109 isError=False error=None saved_sha256=a45c01fd22c7d3be6656fd51b7e030556143dc9f3543987bf7fb705ca335820c
+2026-11-04T07:42:29Z session ended; server pid 4396 exit code 0

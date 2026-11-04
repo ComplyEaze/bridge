@@ -1,0 +1,15 @@
+2026-11-04T07:36:25.151Z check of r10-p1 for batch bridge-27187d2c-6f8a-4b3a-8790-aa065e519499, 10 vouchers
+PASS box seen
+PASS title names 10 vouchers
+PASS Create 10 vouchers in "BRIDGE LARGE LAB"
+PASS one Create line
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Types: 1 Contra, 4 Payment, 5 Receipt
+  | Dates: 1-Oct-2026 to 7-Oct-2026  Voucher numbers: Tally assigns them
+  | Total debit: 5525  Total credit: 5525
+  | Dr 2745  Cr 2780  10 entries  "Lab Vol Bank"
+  | Dr 2196  Cr 0  4 entries  "Lab Vol Expense"
+  | Dr 0  Cr 2745  5 entries  "Lab Vol Income"
+2026-11-04T07:36:25.152Z answer file written: Yes

@@ -1,0 +1,13 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the Tally window (PrintWindow); box/*-open.png are box.ps1's whole-screen captures when each box showed.
+shots/r03-after.png 67132 B 35bb9ba6efd1feeaf42d6489f62630af8f136b8b9231c54fd9df1688176c521e
+shots/r10-after.png 67132 B 35bb9ba6efd1feeaf42d6489f62630af8f136b8b9231c54fd9df1688176c521e
+shots/r25-after.png 67132 B 35bb9ba6efd1feeaf42d6489f62630af8f136b8b9231c54fd9df1688176c521e
+shots/r50a-after.png 67132 B 35bb9ba6efd1feeaf42d6489f62630af8f136b8b9231c54fd9df1688176c521e
+shots/r50b-after.png 67132 B 35bb9ba6efd1feeaf42d6489f62630af8f136b8b9231c54fd9df1688176c521e
+shots/s0-gateway.png 68438 B 53b15ca7a24df2d0eb29cddbf634d63556f7f49c6609669426fa832f1cc627f3
+shots/s4-shut.png 96778 B eddc4bb237079bd4f5b3fbc340fee757e652a7119b16c634159c1eee5645a8d4
+box/r03-p1-open.png 383727 B 54a34759d87be87d4284252db4a0683055e4b75eaaaba6dd8a99a4ecdefd76ef
+box/r10-p1-open.png 379054 B 9060a7bad1b25ce0f3d5ee8fdfe31f3571f18ffcd7d50ebfcde51cbcd41aac55
+box/r25-p1-open.png 341662 B 61d72ae5bbf2e6a8d64ab2b2d1764bdb7368b76adec82d073c53ab840708cc02
+box/r50a-p1-open.png 338281 B 753ac80ced87a3873f958ecb304c50ecb43634847f38a204da64a98ed985e1e4
+box/r50b-p1-open.png 330914 B 0628202546c86c7689ab94f05306979d2e1b356f7fa607e61f9a682ae0c7db8f

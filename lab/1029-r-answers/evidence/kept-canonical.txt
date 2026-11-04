@@ -1,0 +1,10 @@
+run/answers/005-r03-p1.json: result (canonical JSON, without company, evidence, read_at, truncated) 3393 B sha256 b76b505343bc57b27bae99f1b40087d6560c646bff9086de4768774c315adc99
+run/answers/006-r03-verify.json: result (canonical JSON, without company, evidence, read_at, truncated) 3171 B sha256 591ec2e00758898c7d4fe65715635b7a990bd98845c3d5cbb366bf68b05fec19
+run/answers/009-r10-p1.json: result (canonical JSON, without company, evidence, read_at, truncated) 4830 B sha256 05b2acf7f71e22ddc1ecded7559c35c4be51b3316dd676f0f1bc2e2acf0738a3
+run/answers/010-r10-verify.json: result (canonical JSON, without company, evidence, read_at, truncated) 4606 B sha256 0a2b1771bb5fdda4bdd29addb2d40d08d7dac894795164c7e13ce8981907dece
+run/answers/013-r25-p1.json: result (canonical JSON, without company, evidence, read_at, truncated) 7890 B sha256 d085c649a4364cdeb8a85707398ba11d7d7a69c8e2ffea764ee48fa2d87dc33f
+run/answers/014-r25-verify.json: result (canonical JSON, without company, evidence, read_at, truncated) 7666 B sha256 7efc28a28331b9fa48a8473a10c976805a8bf9639725cb2f0455a610997d557e
+run/answers/017-r50a-p1.json: result (canonical JSON, without company, evidence, read_at, truncated) 13040 B sha256 e68c14a78b00e916e57a7ad807efd8e85642d54b7dcdd4837b484e4362d3a751
+run/answers/018-r50a-verify.json: result (canonical JSON, without company, evidence, read_at, truncated) 12816 B sha256 faa46bdad0bb85ec05a80c2e064a6f09166e232e34bf49222d84075ed24cbbdf
+run/answers/021-r50b-p1.json: result (canonical JSON, without company, evidence, read_at, truncated) 13059 B sha256 083e8551942186c1a037694e6f7be6d17b98aacec7c857bde923c40e0da6e45d
+run/answers/022-r50b-verify.json: result (canonical JSON, without company, evidence, read_at, truncated) 12835 B sha256 a0a86030629e3d72ce53b35e1bcba0d092733a503eea30c7182e501d257b55fc

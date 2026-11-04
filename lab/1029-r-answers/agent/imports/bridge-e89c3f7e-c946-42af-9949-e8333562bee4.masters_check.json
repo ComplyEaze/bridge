@@ -1,0 +1,13 @@
+{
+  "batch_step": {
+    "state": "matched",
+    "target_voucher_step": {
+      "after": 30033,
+      "before": 30030,
+      "matches_created": true,
+      "reported_created": 3,
+      "step": 3
+    }
+  },
+  "state": "check_pending"
+}

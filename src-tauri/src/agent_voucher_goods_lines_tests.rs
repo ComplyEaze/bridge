@@ -1,11 +1,13 @@
 //! Goods lines on a voucher's ledger entries, on the live capture of one day of a synthetic
 //! book whose Purchase splits one line over two godowns and two batches, and on the
-//! committed captures of a Sales and a Purchase item invoice. Each refusal case changes one
+//! committed captures of a Sales and a Purchase item invoice and of a Purchase keyed through a
+//! voucher class. Each refusal case changes one
 //! element of the first capture; none is authored from nothing.
 use super::*;
 
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+const CLASS_PURCHASE_LAB: &str = "92a7ef97-dd28-4286-b02c-c059fcb8690e";
 const FIELD: &str = "goods_lines";
 const UNREADABLE_FIELD: &str = "goods_lines_unreadable";
 
@@ -168,6 +170,66 @@ fn the_request_is_the_one_the_vouchers_read_sends() {
     assert_eq!(
         request.trim_start_matches('\u{feff}'),
         render_agent_vouchers("BRIDGE SHAPE LAB", &day, &day, None).unwrap()
+    );
+}
+
+/// An item Purchase keyed through a voucher class, with both duty ledgers' Tax type set
+/// (protocol reference §8.2m): the item sits in the purchase ledger's own entry, beside the
+/// two tax entries Tally computed.
+#[test]
+fn an_item_purchase_through_a_class_carries_its_line_in_the_purchase_ledger_entry() {
+    let rows = parse_agent_rows(
+        &utf16(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/item-purchase-through-class.utf16le.xml"
+        )),
+        CLASS_PURCHASE_LAB,
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["voucher_type"], "Purchase");
+    assert_eq!(rows[0]["is_invoice"], true);
+    let entries: Vec<_> = rows[0]["amounts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| (entry["ledger"].clone(), entry["amount"].clone()))
+        .collect();
+    assert_eq!(
+        entries,
+        [
+            (json!("Lab Supplier"), json!("590.00")),
+            (json!("Lab Purchases"), json!("-500.00")),
+            (json!("Lab CGST"), json!("-45.00")),
+            (json!("Lab SGST"), json!("-45.00")),
+        ]
+    );
+    let (v, e) = goods_entry(&rows);
+    assert_eq!(rows[v]["amounts"][e]["ledger"], "Lab Purchases");
+    assert_eq!(
+        rows[v]["amounts"][e][FIELD],
+        json!([{
+            "stock_item": "Lab Class Item",
+            "actual_quantity": value("5 Nos"),
+            "billed_quantity": value("5 Nos"),
+            "rate": value("100.00/Nos"),
+            "amount": value("-500.00"),
+            "batches": [batch("Main Location", "Primary Batch", "5 Nos", "-500.00")],
+        }])
+    );
+}
+
+/// The lab sent the shape lab's one-day request with only the company and the day changed.
+#[test]
+fn the_class_purchase_request_is_the_one_the_vouchers_read_sends() {
+    let request = utf16(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_request.utf16le.xml"
+    ))
+    .replace("BRIDGE SHAPE LAB", "BRIDGE CLASS PURCHASE LAB")
+    .replace("20250424", "20250610");
+    let day = bridge_tally_core::TallyDate::parse("20250610".to_string()).unwrap();
+    assert_eq!(
+        request.trim_start_matches('\u{feff}'),
+        render_agent_vouchers("BRIDGE CLASS PURCHASE LAB", &day, &day, None).unwrap()
     );
 }
 

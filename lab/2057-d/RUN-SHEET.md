@@ -1,12 +1,14 @@
-# 2057-C an item purchase whose purchase ledger is taken per item line (#2057): the one shape #2057 has not measured
+# 2057-D an item purchase keyed with the voucher's common ledger turned off (#2057): the one shape #2057 has not measured
 
 Not for merge. About 2 hours.
+
+This sheet is 2057-C's (`lab/2057-c-sheet` at 67b12237), whose steps 3 to 14 were never run, with the option 2057-C2 found named in place of steps 2a to 2c.
 
 This sheet WRITES by hand on Tally's screens:
 - company GST details;
 - two ledgers;
 - one stock item;
-- at most one configuration option;
+- one configuration option, on the Purchase voucher screen's own F12, set and then set back;
 - one Purchase voucher.
 
 It then reads, sets the option back, and restores the book from one backup. ComplyEaze Bridge only reads. `SHA256.txt` lists every file here with its bytes; check it before step 0.
@@ -19,7 +21,13 @@ It then reads, sets the option back, and restores the book from one backup. Comp
 
 **The unmeasured shape:** the goods line at voucher level, with the purchase ledger only in its own accounting allocation.
 
-Which setting on Tally's screens makes the voucher take the purchase ledger per item line, not once for the voucher, is not known. So this row first transcribes the screens where such an option could be (steps 2a and 2b, before any save). It changes one option only if exactly one, by its own label, ties the ledger to the item line. It then keys one plain-type item invoice and reads it two ways:
+**The option.** Two look-only rows searched for the setting that makes the voucher take the purchase ledger per item line:
+- 2057-C (`lab/2057-c-answers`, RESULTS.md) found none on the Gateway's F12 (it opened nothing) or on the Purchase voucher type, and saved nothing after its backup.
+- 2057-C2 (`lab/2057-c2-answers` at 61cfb757, RESULTS.md) found exactly one, on the Purchase voucher screen's own F12 ("Voucher Configuration"), in Item Invoice mode: **"Select common Ledger Account for Item Allocation : Yes"**. Data > Configuration holds none.
+
+By 2057-C's rule for a label that speaks of a common ledger, the value to set is the one that turns the common ledger off: **No**. With Yes, the voucher screen shows one "Purchase ledger" field at its head (2057-C2's `transcriptions/s4-purchase-voucher-screen.txt`).
+
+This row sets that one option to No (step 7), keys one plain-type item invoice, and reads it two ways:
 - with the shipped vouchers request (`ALLLEDGERENTRIES.*`);
 - with the shipped stock-lines request (`ALLINVENTORYENTRIES.*`).
 
@@ -31,7 +39,7 @@ Which setting on Tally's screens makes the voucher take the purchase ledger per 
 
 **Who acts.** On the owner's standing word of 27 and 28 Oct 2026, the lab does every step here, including the keying, on this synthetic company, and records each as LAB-COMMON C11 directs. The final restore waits for the run coordinator's word RESTORE.
 
-**THE COMPANY** is `BRIDGE CLASS PURCHASE LAB` (synthetic), GUID `92a7ef97-dd28-4286-b02c-c059fcb8690e`, as the 2057-B row left it after its restore (`RESULTS.md` there, "Back to the start"):
+**THE COMPANY** is `BRIDGE CLASS PURCHASE LAB` (synthetic), GUID `92a7ef97-dd28-4286-b02c-c059fcb8690e`, as the 2057-B row left it after its restore (`RESULTS.md` there, "Back to the start"), and as 2057-C and 2057-C2 found it, with nothing saved by either:
 - "No Vouchers Entered";
 - the Gateway's Current Date 1-Apr-2025;
 - marks 213 / null;
@@ -57,17 +65,21 @@ Differences from LAB-COMMON (the stricter rule holds everywhere else):
    - An empty envelope, a 0-byte 200 answer or an in-band refusal is a **result**, recorded whole.
 2. **Marks.** M (`ALTMSTID`) and V (`ALTVCHID`) are read with `ledger_masters` (basic, first page, no `snapshot_id`): `snapshot.master_alter_id`, `snapshot.voucher_alter_id` (null was read after the 2057-B restore; record it as read), `snapshot.reused` false.
    - Each master save raises M by at least 1 and leaves V unchanged. Record the exact rise.
-   - A configuration change (step 7) may move M or nothing: record what it does. A V that moves on it = STOP.
+   - A configuration change (steps 7 and 13) may move M or nothing: record what it does. A V that moves on it = STOP.
    - The one voucher Accept raises V by exactly 1.
    - A V that moves on a master save, or by other than 1 on the voucher, = STOP.
-3. **Backup and restore.** BK4 of THE COMPANY alone before the first change (C5), into a new empty folder `C:\bridge-lab\2057-c\backups\bk4\`. At the end, on the word RESTORE, BK4 is restored by C6.
-   - **Fallback, only on the run coordinator's word:** 2057-B's BK3 (24,100 bytes, sha256 `94ba7d114a746c58b869c4b7e628625d8aa12f16c6cba7270daf09d259ed0745`), its hash checked first.
+3. **Backup and restore.** BK5 of THE COMPANY alone before the first change (C5), into a new empty folder `C:\bridge-lab\2057-d\backups\bk5\`. At the end, on the word RESTORE, BK5 is restored by C6.
+   - **Fallback, only on the run coordinator's word:** 2057-C's BK4 (24,100 bytes, sha256 `e08bd0136b05e1a525c642ac1e51d9a1b8c905cbcf06884a5f8033fb9da23041`, taken on the same book with nothing saved after it), its hash checked first.
+   - **Then:** 2057-B's BK3 (24,100 bytes, sha256 `94ba7d114a746c58b869c4b7e628625d8aa12f16c6cba7270daf09d259ed0745`), its hash checked first.
    - **Then:** the 31 Oct BK2 (24,100 bytes, sha256 `8ca808192ec97a4015b73aad7fd83b64d8d60e16e917c3c9b570454cae0d1405`).
 4. **Keys.**
    - Accept with Ctrl+A. Leave a creation, alteration, configuration or voucher screen with ONE Ctrl+Q, only after a screenshot shows its title.
    - **Never Ctrl+Q or Escape at the Gateway of Tally**, never two Ctrl+Q in one call, and never Escape on a master, configuration or voucher screen (C7).
    - A sub-form Tally opens by itself (Receipt Details, Party Details, a GST rate screen, an accounting-details screen on the item line) is accepted as shown unless the step names a field, with a screenshot.
-   - The one dialog answered is the one the 31 Oct and 4 Nov rows met at Create > GST Registration: "GST Registration already exists for the Company. Do you want to alter the existing GST Registration or create a new GST Registration?" Answer **Alter Existing**. Any other dialog = C7.
+   - Two dialogs are answered; any other dialog or prompt, anywhere, = C7: no key, STOP.
+     - The one the 31 Oct and 4 Nov rows met at Create > GST Registration: "GST Registration already exists for the Company. Do you want to alter the existing GST Registration or create a new GST Registration?" Answer **Alter Existing**.
+     - On leaving a blank voucher-creation screen at steps 7, 8 (its re-read), 13 and 14: a prompt whose text asks whether to quit, or to leave without saving, the voucher being created (2057-C2's rule 4). Screenshot it and copy its text exactly. Answer the choice that leaves WITHOUT saving (for example "Yes" to "Quit?"). If the text does not make plain which choice discards the voucher, press no key and STOP. 2057-C2 met none: one Ctrl+Q left a blank voucher with no prompt.
+   - **On a voucher's F12 screen** (steps 7, 8, 13 and 14), move only with the Down arrow, one press at a time, with a screenshot after each. Press Enter on no option and open no sub-screen. Only step 7 and step 13 change a value, and only the one option named; the other steps look and leave.
    - Reach a master or an option by the label read on screen before Enter, not by a count of Up or Down presses.
 5. **Never type a tax amount.** On the voucher, a tax line is left with the amount Tally puts there, or with none. An empty tax line is a result, not an error.
 6. **One Tally.** At step 0 and at the end, as C2 a and b set out, plus `Get-NetTCPConnection -LocalPort 9001 -State Listen`: exactly one `tally.exe`, and it owns port 9001.
@@ -106,27 +118,15 @@ Client: `scripts/client.py` of `lab/2057-item-purchase-class-gst-answers` at a8b
    - Marks: M0, V0. EXPECT 213 / null.
    - `ledger_masters` `fields` `compliance`, `include_gst_details` true: record the rows of the five ledgers whole. EXPECT them equal to 2057-B's `answers/003-s1-ledgers-gst.json` in every field but the snapshot's id and read time.
    - `masters` `kind` `voucher_types`: record the Purchase row whole. EXPECT it equal to 2057-B's `answers/004-s1-vchtypes-call1.json`'s, apart from the snapshot.
-2. **Backup BK4** (rule 3), then the marks: EXPECT M0 and V0.
+2. **Backup BK5** (rule 3), then the marks: EXPECT M0 and V0.
 
-### Where the ledger is asked: a look only, before any save
+### The option, as 2057-C2 found it
 
-These steps change nothing. They come before the GST setup, so that a row which finds no option ends with nothing saved.
-
-2a. **The Gateway's configuration.** At the Gateway of Tally, press F12 (Configure).
-   - Screenshot the screen whole and transcribe every entry it lists.
-   - If one entry's own label names voucher entry (for example "Voucher Entry"), open it with Enter on that label. Screenshot it whole and transcribe every option with its value, in the screen's own words. Move only with the Down arrow, one press at a time, with a screenshot after each, to bring the rest of the list into view. Never press Enter on an option, and never type into one.
-   - Leave each screen with ONE Ctrl+Q after a screenshot of its title. If Tally asks anything on leaving, that is C7: no key, STOP.
-   - Marks: equal to M0 and V0, else record and STOP.
-
-2b. **The Purchase voucher type** (Alter > Voucher Type > `Purchase`):
-   - Screenshot the screen as it opens and transcribe every field with its value.
-   - Change nothing and leave with ONE Ctrl+Q after the screenshot: no Accept, no save, no mark. If Tally asks anything on leaving, that is C7: no key, STOP.
-   - Marks: equal to M0 and V0, else record and STOP.
-
-2c. **Decide, from 2a and 2b only.** These are the only two screens looked at. A voucher screen's own F12 is not opened.
-   - **An option qualifies** only if its own label ties the purchase or sales ledger (or the accounting ledger) to the item line or its allocation. A label such as "Use Common Ledger A/c for Item Allocation" is the kind meant; its exact words are whatever the screen shows.
-   - **If exactly one option qualifies, across 2a and 2b, and its label says which value takes the ledger per item line:** record its screen, its exact label, its value as shown (V-before) and the value step 7 will set, then go on to step 3. For a label that speaks of a common ledger, the value to set is the one that turns the common ledger off.
-   - **Otherwise** (none qualifies, more than one could, or the label does not say which value takes the ledger per item): change nothing. Record the transcriptions and write "C1 not run: none found on the two screens looked at", or "more than one", or "the label does not say", as the case is. Nothing was saved, so no restore is needed: go to step 15 after the marks read M0 and V0 once more.
+2057-C's steps 2a to 2c are not run: 2057-C and 2057-C2 made them. Their result is fixed here, and step 7 uses it:
+- **the screen:** Gateway > Vouchers, the Purchase voucher creation screen in Item Invoice mode, with nothing keyed, then F12 ("Voucher Configuration");
+- **the label:** "Select common Ledger Account for Item Allocation", under General Details;
+- **V-before:** Yes;
+- **the value step 7 sets:** No.
 
 ### The GST setup of 2057-B: one change per save, marks after each
 
@@ -157,20 +157,26 @@ After each of steps 3 to 6 and 6b: the marks (M up, V unchanged; record the rise
 
 The book after step 6b: 2057-B's setup without its class, and Lab CGST with its head. Nothing else.
 
-### The one new change: the option found at step 2c
+### The one new change: the option 2057-C2 found
 
-7. **C1** (only if step 2c found exactly one option):
-   - Go to that screen by the route of step 2a or 2b.
-   - Screenshot it and check that the option still reads V-before. If it reads otherwise, record it and STOP.
-   - Set that option to the value step 2c recorded. Change nothing else.
-   - Screenshot before the Accept, then Accept.
-   - Record the option's exact label, V-before and its value after.
-   - Marks after: record M and V. V moving = STOP.
+7. **C1, on the voucher's own F12:**
+   - Gateway > Vouchers > F9 Purchase. Screenshot the voucher screen as it opens and record its title, its mode and its head fields. If it is not in Item Invoice mode, press Ctrl+H, screenshot the mode list, and press Enter on "Item Invoice" only. Type nothing in any field.
+   - Press F12 (Configure). Screenshot the "Voucher Configuration" screen whole and transcribe every option with its value, in the screen's own words, as 2057-C2's `transcriptions/s4-voucher-configuration.txt` has them. Record any difference from that list.
+   - **Set nothing, and STOP, if:** the screen is not "Voucher Configuration"; the label "Select common Ledger Account for Item Allocation" is not on it in those exact words; or it does not read Yes. Leave as rule 4 says, then read the marks.
+   - Bring the highlight to that label with the Down arrow (rule 4). Set it to **No** by typing `N` on it, and nothing else. Screenshot it reading No. If one `N` does not make it read No, press no further key and STOP.
+   - Change no other option. Screenshot the whole screen, then Accept it (Ctrl+A).
+   - Screenshot the screen Tally returns to. Record its title, its head fields and its columns, and in particular whether the "Purchase ledger" field still shows at the head.
+   - Leave the blank voucher with ONE Ctrl+Q (rule 4's quit prompt holds), and screenshot the screen Tally returns to.
+   - Record the label, V-before Yes and the value after, No.
+   - Marks after: record M and V. **V moving = STOP and report: a voucher may have been saved; do not alter or delete it.** M is recorded, not EXPECTed: whether it moves says whether Tally keeps the option in the company's data.
 
 ### The invoice
 
-8. **C2-C, 15-06-2025, plain Purchase** (only if step 7 changed an option):
-   - Gateway > Vouchers > F9 Purchase, Item Invoice mode. If it opens in another mode, Ctrl+H to Item Invoice, and record the mode it opened in.
+8. **C2-C, 15-06-2025, plain Purchase:**
+   - **The option first.** Gateway > Vouchers > F9 Purchase, Item Invoice mode as in step 7, nothing typed. F12, a screenshot, and record that "Select common Ledger Account for Item Allocation" reads No. Change nothing. Leave the F12 screen with ONE Ctrl+Q back to the voucher screen.
+     - It reads Yes, or is not there: STOP and report, with nothing keyed. Leave the blank voucher as rule 4 says.
+     - A prompt on leaving the F12 screen: rule 4 holds for the voucher's quit prompt; anything else is C7. If that prompt closed the blank voucher, read the marks (equal to step 7's), then open Gateway > Vouchers > F9 Purchase once more, without F12, and key the invoice there.
+   - On the voucher screen, still in Item Invoice mode, key the invoice below. If it opened in another mode, Ctrl+H to Item Invoice, and record the mode it opened in.
    - Supplier Invoice No. `LAB-2057-6`, dated 15-Jun-25; Party A/c `Lab Supplier`. The Party Details sub-form is accepted as shown: record its State, Registration type, GSTIN and Place of Supply.
    - **Where Tally asks for the purchase ledger: record it before keying it.**
      - Record whether a purchase-ledger field shows at the head of the voucher, as on 2057-B's C1-B, and whether a screen or column on the item line asks for a ledger.
@@ -208,7 +214,7 @@ The book after step 8: step 6b's, the option of step 7, and C2-C.
 - **from `purchase_register`:** which list holds C2-C. If `items`: its `status`, `tax_in_books` (ledger, head, raw_head, amount), `taxable_entries`, `has_taxable_entry`, `party_entries` and `other_entries`.
 
 **Answer, from what was recorded:**
-- **(a)** Which option did step 7 change: its exact label, its value before and after, and what the marks did? (Or "C1 not run: none found on the two screens looked at", or the other reason step 2c names.)
+- **(a)** Did step 7 set "Select common Ledger Account for Item Allocation" from Yes to No, and what did the marks do? Did the voucher screen's head fields change, and did step 8 read No again?
 - **(b)** Where did Tally ask for the purchase ledger on C2-C: once for the voucher, on the item line, or both?
 - **(c)** In the a07 answer, is `Lab Purchases` an `ALLLEDGERENTRIES.LIST` of its own? Where is the item? Do the entries' amounts sum to zero?
 - **(d)** In the sl answer, where are the item and `Lab Purchases`?
@@ -216,16 +222,18 @@ The book after step 8: step 6b's, the option of step 7, and C2-C.
 
 ### Back to the start
 
-13. **Set the option back** (only if step 7 changed one):
-    - By the same route, set the option to V-before. Change nothing else. Screenshot before the Accept, then Accept.
-    - Then open it once more, screenshot it, and record that it reads V-before. Leave with ONE Ctrl+Q.
+13. **Set the option back:**
+    - By step 7's route (a blank Purchase voucher in Item Invoice mode, nothing typed, F12), screenshot the screen and check that the option reads No. If it reads otherwise, record it and STOP.
+    - Set it to **Yes** by typing `Y` on it, and nothing else. Screenshot it reading Yes. If one `Y` does not make it read Yes, press no further key and STOP. Change no other option. Screenshot the whole screen, then Accept it (Ctrl+A).
+    - Leave the blank voucher with ONE Ctrl+Q (rule 4).
+    - Then open it once more by the same route, screenshot F12, and record that it reads Yes. Leave F12 with ONE Ctrl+Q, then the blank voucher with ONE Ctrl+Q (rule 4).
     - Marks: record M and V. V moving = STOP.
-14. **Restore** (C6) from BK4, on the run coordinator's explicit RESTORE. Then, in order:
-    - a screenshot of the Gateway (Current Date 1-Apr-2025, "No Vouchers Entered"), compared byte for byte with step 0's;
+14. **Restore** (C6) from BK5, on the run coordinator's explicit RESTORE. Then, in order:
+    - a screenshot of the Gateway (Current Date 1-Apr-2025, "No Vouchers Entered"), compared with step 0's. A difference only in which menu entry is highlighted is recorded, not a stop, as 2057-C2 found after a voucher screen (its step 6). Any other difference = STOP;
     - `list_companies`: exactly THE COMPANY, `verified_tuple`, the same GUID;
-    - marks equal to those after BK4 (M0, V0);
+    - marks equal to those after BK5 (M0, V0);
     - `ledger_masters` and `masters` as in step 1, equal;
-    - if step 7 changed an option: open it by the same route, screenshot, and record that it reads V-before. Leave with ONE Ctrl+Q.
+    - **the option:** open it by step 7's route, screenshot F12, and record its value. Leave F12 with ONE Ctrl+Q, then the blank voucher with ONE Ctrl+Q (rule 4). **If it does not read Yes: STOP and report**, with no key pressed on it.
 
     Anything else = STOP; the fallback is rule 3's.
 15. Hash the exe. LAB-COMMON C10: Company > Shut from the Gateway's menu (never Ctrl+Q at the Gateway); Select Company with none loaded; Tally's current date as step 0 recorded; one tally.exe; 9001 LISTENING; `GET /status` 200.
@@ -238,21 +246,23 @@ LAB-COMMON's, with rules 1 to 6 above. Also:
 - any identifier keyed other than the three of the Identifiers rule;
 - any change to a master other than those of steps 3 to 6 and 6b, and to any option other than the one of step 7;
 - step 6b's STOP cases;
-- an option that does not read V-before after step 13 or after the restore;
-- any prompt not named here (C7).
+- at step 7: the F12 screen not "Voucher Configuration", the label not there in its exact words, or not reading Yes (set nothing);
+- at step 8: the option not reading No before the invoice is keyed (key nothing);
+- the option not reading Yes after step 13, or after the restore (step 14);
+- a V that moves at step 7 or 13, or on leaving a blank voucher;
+- any prompt or dialog not named in rule 4 (C7).
 
 ## What the book holds after each step (C8)
 
 | after | the book |
 |---|---|
-| step 2 | as at step 1 (BK4 taken) |
-| steps 2a to 2c | unchanged (a look only; a "C1 not run" ends the row here, at step 15) |
+| step 2 | as at step 1 (BK5 taken) |
 | steps 3 to 6 | plus each GST change, in turn |
 | step 6b | and Lab CGST's Tax type |
-| step 7 (if run) | and the one option changed (it may be held outside the company's data: record where the screen says it applies) |
+| step 7 | and "Select common Ledger Account for Item Allocation" No (it may be held outside the company's data: step 7's M says which) |
 | step 8 | and C2-C |
-| step 13 | the option back at V-before |
-| step 14 | as at BK4, the book of step 1 |
+| step 13 | the option back at Yes |
+| step 14 | as at BK5, the book of step 1 |
 
 ## What the row decides
 
@@ -260,23 +270,24 @@ LAB-COMMON's, with rules 1 to 6 above. Also:
   - The a07 answer, the sl answer and the tool answers then say what Bridge's reads do with it.
   - The a07 and sl answers are committed as fixtures by the gate's manifest route, and the protocol reference gains an entry with its confidence marker.
   - Any code change waits for a ruling.
-- **C2-C holds `Lab Purchases` as an entry of its own, as on 2057-B:** the option recorded at (a) does not make the shape, on this book and release. The description's "not measured" stays, with this row cited.
-- **C1 not run:** the transcriptions of the two screens looked at are the result, and nothing was saved. It does not show that no such option exists: a voucher screen's own F12 was not opened. Any next row waits for a ruling and a sheet of its own.
+- **C2-C holds `Lab Purchases` as an entry of its own, as on 2057-B:** the option recorded at (a) does not make the shape, on this book and release. The description's "not measured" stays, with this row and 2057-C and C2 cited.
+- **Anything else** (the ledger asked both at the head and on the item line, a refusal on Accept, the option not holding from step 7 to step 8): recorded, and it goes to a ruling.
 - **A read differs from the screen:** stop and report. Any code waits for a ruling.
 
-## What master admits, at f3bdc6d5
+## What master admits, at 5680ba48
 
-- `purchase_register` classifies only from each row's `amounts`, the read's ledger entries: `src-tauri/src/agent_register.rs:316` and `:330`. An entry on a Purchase Accounts ledger is a taxable entry (`:380`), and `has_taxable_entry` is whether there is one (`:501`). The side list for a Purchase with no Duties & Taxes entry is at `:66`, and the description's "not measured" line at `:104`.
-- The vouchers request with `ALLLEDGERENTRIES.*`: `AGENT_VOUCHER_FETCH`, `src-tauri/src/agent_read_profiles.rs:47`. Its committed request is pinned at `src-tauri/src/agent_voucher_goods_lines_tests.rs:167`.
-- The stock-lines request with `ALLINVENTORYENTRIES.*`: `AGENT_VOUCHER_STOCK_LINE_FETCH`, `agent_read_profiles.rs:67`. Its committed request is pinned at `agent_voucher_goods_lines_tests.rs:781`. `vouchers` reads its lines only for four reserved names, not a Purchase (protocol reference §8.2i), so this row sends it raw.
+The build (ae9a1bb5) has the same lines but where noted. Between the two, the read files differ only in the dispatch words and a description wording, and neither reaches the requests this row sends.
+- `purchase_register` classifies only from each row's `amounts`, the read's ledger entries: `src-tauri/src/agent_register.rs:317` and `:330`. An entry on a Purchase Accounts ledger is a taxable entry (`:380`), and `has_taxable_entry` is whether there is one (`:501`). No step checks that the entries net to zero. The side list for a Purchase with no Duties & Taxes entry is at `:66`, and the description's "not measured" line at `:104`.
+- The vouchers request with `ALLLEDGERENTRIES.*`: `AGENT_VOUCHER_FETCH`, `src-tauri/src/agent_read_profiles.rs:47`. Its committed request is pinned at `src-tauri/src/agent_voucher_goods_lines_tests.rs:167` (build `:165`).
+- The stock-lines request with `ALLINVENTORYENTRIES.*`: `AGENT_VOUCHER_STOCK_LINE_FETCH`, `agent_read_profiles.rs:70` (build `:69`). Its committed request is pinned at `agent_voucher_goods_lines_tests.rs:781` (build `:719`). `vouchers` reads its lines only for four reserved names, not a Purchase (protocol reference §8.2i), so this row sends it raw.
 - `vouchers`' `goods_lines` argument: `src-tauri/src/agent.rs:359`. A summary refuses a voucher whose entries do not net to zero: `src-tauri/src/agent_movement.rs:712`.
 - No request here is new. The tool calls are 2057-B's, with this row's day. The raw reads are two committed requests with only the company and the day changed. Every master, option and voucher is keyed by hand on Tally's screens; no Bridge request writes. Bridge has no post path for a Purchase item invoice (#628).
 
 ## What the row records, and what it does not
 
 **Records:**
-- the screens where the option could be, transcribed;
-- at most one option changed and set back;
+- the voucher's F12 screen, transcribed at step 7, and the option's value at steps 7, 8, 13 and 14;
+- the one option changed and set back, with the marks after each;
 - one item invoice on the plain type;
 - what the two shipped vouchers requests, `vouchers` and `purchase_register` return for it, against the screen.
 
@@ -289,13 +300,13 @@ LAB-COMMON's, with rules 1 to 6 above. Also:
 
 ## Evidence
 
-To `lab/2057-c-answers`, after the pre-push scan and the run coordinator's yes:
+To `lab/2057-d-answers`, after the pre-push scan and the run coordinator's yes:
 - `RESULTS.md`: the five answers (a) to (e), and every EXPECT line with PASS or FINDING;
 - `notes.txt`: UTC, one line per step, with each mark;
 - `answers/`: every tool answer, whole;
 - `raw/`: each raw answer with its headers, size, sha256, and a `.parsed.txt` of its structure;
 - `send-log.txt`;
 - `restore-plan.txt`;
-- `SCREENSHOTS.txt`: the captures and BK4 by sha256. They stay on the lab PC.
+- `SCREENSHOTS.txt`: the captures and BK5 by sha256. They stay on the lab PC.
 
 No identifier beyond the three of the Identifiers rule, and no figure beyond the book's own synthetic ones, is recorded. The company's number and data folder are not recorded.

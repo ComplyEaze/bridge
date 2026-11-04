@@ -4470,6 +4470,16 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "1bb93749d8c744f7091c5899a610b4630f5a68964e5775128f405b01e9e3db17",
       "size": 238592
+    },
+    {
+      "blob": "b1ab31776969b7b46e3910e13f80fbb471ed6d0b",
+      "capture_id": "item-purchase-through-class.utf16le.xml",
+      "company": "BRIDGE CLASS PURCHASE LAB",
+      "lab_ref": "branch lab/2057-b-answers at d9005ab3",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/item-purchase-through-class.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8461a8c99624bf11371cd33a4a9a13ef55d8071cffa8b044e3cf0c7c4779efcf",
+      "size": 78110
     }
   ]
 }

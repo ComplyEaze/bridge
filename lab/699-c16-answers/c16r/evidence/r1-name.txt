@@ -1,0 +1,2 @@
+VOUCHER rows in the answer: 12 | NAME hits: 1 | vouchers holding one: 1
+VOUCHERTYPENAME Receipt | VOUCHERNUMBER 27 | DATE 20260205 | list element above the NAME: BANKALLOCATIONS.LIST

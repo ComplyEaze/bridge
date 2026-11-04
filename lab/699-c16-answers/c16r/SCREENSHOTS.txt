@@ -1,0 +1,11 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the Tally window (PrintWindow).
+shots/close-after-shut.png 96583 B d3d433dba42d6f47a5dd1d4009bbe1ad436ab99b01e28079e8fca472e6d5114d
+shots/r0-gateway.png 67450 B 57110951e2d41c5f8a24a224c9cc6e4272029dd11dea9d0ddc1921fcaeba95bc
+shots/r2-bk-screen.png 70754 B 4b3ab5b026ca603084d395d9e53be6147a1d620745239fd0253eb922bbe96a93
+shots/r3-daybook-after.png 53918 B b4d86c4e92bbeecfdb932f15c6fbb158d7a0431176fefaaafa0c37bc008362fc
+shots/r3-daybook-before.png 55850 B 8126dd4ca581a1f33519517ab5dbd40db4606956f9ddda4eb3f6069f3297a5ab
+shots/r3-delete-prompt.png 60756 B fdd8706d56545e21c3ef832467b72d9afbaf88df3eb3dad59a679e52b6b0712a
+shots/r3-receipt27-before-delete.png 58926 B 3bddb2f41e0755c7b2019eb8f8614c35153af3c344ed99b6ac5d1fd751acc6b6
+shots/r4-accept.png 59403 B 1645b35385f6abde65902ec90a23ee7603098c08d828b85f0644cfee15d77e35
+shots/r4-bank-allocations.png 54655 B 4315e65a95912aa365842c48ddca31fa7ed24b93eadf74ea21d0fe439bb3fd9b
+shots/r4-daybook-after.png 55876 B 085cad72e232ea61c73d1be32cc29f8861d10fd0767a275e034dade0d8ed0b92

@@ -1,0 +1,6 @@
+r5/0033 request sha256 26933e853602a146e3fab3bb449b0a45ea8bb14f27782265bc1f3dfa80abe60a (c2/0033 request 26933e85...: equal True)
+r5/0033 answer 428818 B sha256 687bfeb4655a286ee10fdf5d1a8dae72b8126052332bfee90756301b62db327c
+counted runs of 10 or more digits (hash and VOUCHERKEY exempt): 0; elements holding them: []
+stage-c16.py why_local on this answer: the gate word f-r-e-e
+sort of every file of r5 and r5v by the keep rule: Counter({'pushed': 173, 'company number': 36, 'the gate word f-r-e-e': 6})
+kept answers by reason and size: {('company number', 3992): 36, ('the gate word f-r-e-e', 1391682): 3, ('the gate word f-r-e-e', 428818): 3}

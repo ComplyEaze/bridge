@@ -1077,17 +1077,21 @@ batch-of-one, because import counters are unattributable at N>1: a request carry
 objects that returns `CREATED=99` gives no way to identify which one failed.
 
 **On a dense book, one import of 200 outlasts Bridge's 20 s request limit — PARTIAL, 2026-11-04.**
-One run, through Bridge's own post path: a native `post_import` of one saved batch of 200
-Journals, after one approval, on TallyPrime 7.2 Silver, on one synthetic book of about 30,000
-vouchers loaded alone (`lab/725-dense-200-answers` at 596ce464, bridge#725). Tally answered the
-one import request after 23.235 s. Bridge's transport stops waiting at its one 20 s request
-limit; it left at 19.985 s, and the answer was lost. Tally's write stood in full: its answer,
-kept by the relay, read `CREATED=200` and every other counter 0, and `ALTVCHID` rose by 200.
-The post ended `import_dispatch_outcome_unknown`. `verify_import` a minute later found all 200
-by content, none twice, and could not attribute them to the post. The same batch shape took
-5.24 s in one request on a small, quiet TallyPrime 7.1 book (bridge#725, 2026-09-26). An
-import's time therefore grows with the book, and the table above does not bound it on a large
-one. On this measurement Bridge's batch cap stays 50 (`MAX_BATCH_POST_VOUCHERS`). Not
+One run, through Bridge's own post path, in a build that raised the batch cap to 200 for this
+measurement (`fix/725-cap-200` at 9beedca5; master refuses a batch of 200): a native
+`post_import` of one saved batch of 200 Journals, after one approval, on TallyPrime 7.2 Silver,
+on one synthetic book of about 30,000 vouchers loaded alone (`lab/725-dense-200-answers` at
+596ce464, bridge#725). Tally answered the one import request after 23.235 s. Bridge's
+transport stops waiting at its one 20 s request limit; it left at 19.985 s, and the answer was
+lost. Tally's write stood in full: its answer, kept by the relay, read `CREATED=200` and every
+other counter 0, and `ALTVCHID` rose by 200. The post ended `import_dispatch_outcome_unknown`.
+`verify_import`, about 1.6 minutes later, found all 200 by content, none twice, and could not
+attribute them to the post. On 2026-09-26 the import request of one batch of 200 Journals took
+about 5.2 s, on licensed TallyPrime 7.1 Silver, on a synthetic company of unstated size with
+Automatic Journal numbering, while a heavy build ran on the same machine (bridge#725). The time
+grew between the two runs, which differ in book size, release, machine load and build; which of
+those moved it is not established. The table above does not bound an import's time on a large
+book. On this measurement Bridge's batch cap stays 50 (`MAX_BATCH_POST_VOUCHERS`). Not
 measured: TallyPrime 7.1 on a dense book, Payment, Receipt and Contra batches, sizes between 50
 and 200, books between the two sizes, and a second user working during the post.
 

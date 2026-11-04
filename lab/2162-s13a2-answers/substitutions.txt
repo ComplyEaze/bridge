@@ -1,0 +1,11 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/s1-c2-netstat.txt: original 10226 B sha256 969da42f1220cad447bb5c32b23e6f674d21d39ab8ab7a97718c05f0aeae8226 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s7-c2-netstat.txt: original 9501 B sha256 eb94ea19069b05e5026a35af9c998871e9fd78587f737ad62881da041b0c18e6 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+notes.txt: original 12229 B sha256 d1a6bb082ff27e9b80389e17bd4d5538e53e029396b2507d092890d02c0a2f05 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/cap.py: original 897 B sha256 e1aa8368383f4cda59eaafa4bd92b3a3c0fb5d9fba73cca9c8275219e1b14063 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/c2.py: original 1397 B sha256 e8b0745e625327d892368f0b497a4d8e733995c3e472c37fb6af30292bed4403 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/folder-list.py: original 1346 B sha256 87ffc3275974561060520d9a16a3c2a4e370c59923da5ff23c6263f09d387329 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+scripts/step.py: original 2033 B sha256 f32285fa1ab547ad42db39421f2102725afcb0a4defc5b5801d1de565a27314c (kept on the lab PC); 1 x -> <LAB_DIR>; 3 x -> stop
+scripts/chk.py: original 989 B sha256 1eefb06e5045b4851af1bff0108f1e5e28f50749ab30fa6ff052061f107bbdb5 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+scripts/results-tail.py: original 1241 B sha256 bf77483bd28ae69add193579f75358f05d104d847751a5038363491d2f6a9676 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/bk-record.py: original 883 B sha256 0abfa3efce7b89de9e724df594981c38ce9944984ae15d4b4d4c6f4083225d99 (kept on the lab PC); 1 x -> <LAB_DIR>

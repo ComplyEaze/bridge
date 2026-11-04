@@ -1,0 +1,8 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backups/bk/TDBK1800_<company number>.001 90051 B 4e80aa88347bee9d67d7c63a764c286387030a6de3457eafd8c0b6e090a3ba7c (BK)
+evidence/bk-listing-before.txt 83 B 756113bbf2e1fb92cabbadf3fbd76d2ad9b516169163494c2f8008b926c51e86 (a folder listing: names, sizes, times)
+evidence/s6a-folder-list.txt 1097 B 0055dc1806858b2b9c6c5c8ab3fbf36a54872607baa0ac2f0a3c0fb1fed7dbf8 (a folder listing: names, sizes, times)
+evidence/s6b-folder-list.txt 972 B ceae2e7b92aea0f1b448584ccd733ab29daf28f1e154a0f0da9afc959b0bb3b3 (a folder listing: names, sizes, times)
+evidence/s6c-folder-list.txt 796 B d4efa8e9f7fb69f9fe29bd2a93f5f2c4c9e09b8177ebd0856eb415ed9163b267 (a folder listing: names, sizes, times)
+evidence/s4r-diff-control.txt 762 B 2f594878bf7fcffc455c9bd1b85187c7d6d3a8d6128544da917fd7ec315755d2 (10+ digit run)
+stage-2162-s13a2.py 7078 B 7fc500e2301e26f07e58a85fa31dc558e17cb89a760e66794c1cc4ac1ad8896c (this stage script: its patterns name the lab paths)

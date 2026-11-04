@@ -1,0 +1,7 @@
+2026-11-04T18:17:35Z python -I count.py --diff S13-a-s4r-R-0053.xml a-s4r-R-0053.xml
+exit 0
+== --diff S13-a-s4r-R-0053.xml a-s4r-R-0053.xml
+   PARTYGSTIN: '08ZZZZZ0000Z1ZQ' -> '08ZZZZZ0000Z3ZO'
+   VCHGSTSTATUSISINCLUDED: 'No' -> 'Yes'
+   VCHGSTSTATUSISUNCERTAIN: 'Yes' -> 'No'
+   legs: 6 -> 6

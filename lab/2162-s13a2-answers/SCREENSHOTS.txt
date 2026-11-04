@@ -1,0 +1,17 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the whole Tally window (PrintWindow).
+shots/s1-after-bk.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s1-bk-before-accept.png 71972 B bf5adfe0f55d4cb7fdb443d054e47475eb4d75fc0781fede6db1906b375a27f4
+shots/s1-gateway.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s1-tally-window-start.png 95851 B a6a0fec923130e9146d02ed0c866df59bf40e6372012b1b9095162201c506e0d
+shots/s3-after-ledger.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s4-after-import.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s5-1-gstr1-report.png 93312 B e4136118c7297bbf62013994e6399dd4eff8abbe304591596847af343e967615
+shots/s5-2-gstr1-lower-lines.png 93126 B 95de652347509ecc20e705ce9c65f32752e1df0a56044258fe5f5bc4b4094153
+shots/s5-4-b2b-list.png 72826 B 5e98ec869c8309cfd7bc9537311835f6694c01658cec02e19ee07de9cafb5c60
+shots/s5-5-gateway-after-look.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s6-after-restore.png 96570 B b39b4c98fec7313582392b865141522eeba9ac7c85870252220a31add3cc09a9
+shots/s6-after-shut.png 96570 B b39b4c98fec7313582392b865141522eeba9ac7c85870252220a31add3cc09a9
+shots/s6-gateway-after-restore.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s6-restore-accept-prompt.png 45396 B 9312f9dc3eb5a797a0e9b14e63aae4bf783c221344dc631abb74ff8deb18bcdc
+shots/s6-restore-replace-prompt.png 51508 B 464cba6b5a707fba4a07fb751e62d506aca1b7bc919383512ff901659912e19e
+shots/s7-after-shut.png 96583 B d3d433dba42d6f47a5dd1d4009bbe1ad436ab99b01e28079e8fca472e6d5114d

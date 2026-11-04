@@ -1,6 +1,7 @@
-# 699-C16: fifteen vouchers added to BRIDGE SFT LAB for clause 16(a)/(d), and the book's audit read recorded byte for byte. WRITE sitting, then READ-ONLY.
+# 699-C16: eighteen vouchers added to BRIDGE SFT LAB for clause 16(a)/(d), and the book's audit read recorded byte for byte. WRITE sitting, then READ-ONLY.
 
-Not for merge. Part of #699 (clause 16(a)/(d), step 1). Written 4 Nov 2026 at master `1400175e`. `SHA256.txt` lists every file here with its bytes; check it before step A0. Confidence of everything here until the row runs: unverified.
+Not for merge. Part of #699 (clause 16(a)/(d), step 1). Written 4 Nov 2026 at master `1400175e`; C16 to C18 and `Tax Held C16`
+added the same day, before any of it was run. `SHA256.txt` lists every file here with its bytes; check it before step A0. Confidence of everything here until the row runs: unverified.
 
 ## Rules and company
 `LAB-COMMON.md` in this folder applies in full. It is v3, a byte copy of the one on `lab/699-sft-candidates-sheet`, sha256
@@ -19,7 +20,9 @@ Clause 16(a)/(d) of Form 3CD asks for amounts not credited to the profit and los
 the tax-audit crate only after it is checked against a book that Tally itself produced, read by Bridge's own read path (AGENTS.md P1).
 This item adds the book's new shapes and records that read. Each voucher below changes one thing against another voucher of the book:
 - what is credited (a capital, reserve, liability, tax, suspense, income, loan or user-defined head);
-- what is debited on the same voucher (cash, bank, an expense, an asset, a party, an overdraft, the profit and loss account);
+- what is debited on the same voucher (cash, bank, an expense, an asset, a party, an overdraft, the profit and loss account), and
+  a voucher that debits two of these;
+- a tax ledger credited on a sale and on a payment, beside one credited alone;
 - one head credited twice on one voucher.
 
 The book's 34 vouchers stay as they are and are part of the book read.
@@ -56,12 +59,13 @@ A4. Create these ledgers by hand. "Maintain balances bill-by-bill" is No whereve
     | `Provision C16` | Provisions | |
     | `OD C16` | Bank OD A/c | no bank details |
     | `Grant C16` | Grants C16 | |
+    | `Tax Held C16` | Duties & Taxes | Type of Duty/Tax = Others, if Tally asks |
 
     Then **a4 marks**. Record V and M; EXPECT V 34. M is recorded, not predicted.
 
 A5. Key these vouchers by hand, in this order, each exactly as written: one line per ledger named, the amount and side named,
-    nothing else, no bill references. Narration as written. "Receipt", "Payment" and "Journal" are Tally's voucher types of those
-    names; the voucher number is the one Tally offers. Every date lies before Tally's current date.
+    nothing else, no bill references. Narration as written. "Receipt", "Payment", "Journal" and "Sales" are Tally's voucher types of
+    those names; the voucher number is the one Tally offers. Every date lies before Tally's current date.
 
     | # | Type | Date | Debit | Credit | Narration |
     |---|---|---|---|---|---|
@@ -80,7 +84,14 @@ A5. Key these vouchers by hand, in this order, each exactly as written: one line
     | C13 | Receipt | 25-Jan-2026 | `Bank SFT` Rs 15,000 | `Grant C16` Rs 15,000 | Grant received |
     | C14 | Journal | 31-Jan-2026 | `Party Four` Rs 16,000 | `Suspense C16` Rs 16,000 | Claim on customer |
     | C15 | Receipt | 5-Feb-2026 | `Bank SFT` Rs 3,000 | `Capital SFT` Rs 1,000 and `Capital SFT` Rs 2,000 (two lines, one ledger) | Two credits |
+    | C16 | Receipt | 10-Feb-2026 | `Bank SFT` Rs 19,900 and `Expense C16` Rs 100 (two lines) | `Advance SFT` Rs 20,000 | Advance received less bank charges |
+    | C17 | Payment | 15-Feb-2026 | `Creditor C16` Rs 5,000 | `Bank SFT` Rs 4,500 and `Tax Held C16` Rs 500 (two lines) | Paid less tax withheld |
+    | C18 | Sales | 20-Feb-2026 | `Party One` Rs 11,800 | `Sales SFT` Rs 10,000 and `Tax Held C16` Rs 1,800 (two lines) | Sale with tax |
 
+    - C18 is keyed in accounting invoice mode, as S13 was: `Party One` as the party ledger, then `Sales SFT` and `Tax Held C16` as its
+      two lines.
+    - C16, C17 and C18: if Tally will not take a voucher's two lines as written, accept nothing: screenshot, record what it showed,
+      leave the voucher with Ctrl+Q after a screenshot showing the screen's title, record "Cnn not keyed", and go on.
     - C10: if Tally's ledger list on the Journal does not offer `Profit & Loss A/c`, key nothing for C10: Ctrl+Q after a screenshot
       showing the screen's title, record "C10 not keyed: not offered", and go on with C11.
     - C15: if Tally will not take `Capital SFT` on a second line, or joins the two lines into one, accept nothing: screenshot,
@@ -91,8 +102,8 @@ A5. Key these vouchers by hand, in this order, each exactly as written: one line
     and the Group Summary of `Grants C16`.
 
 A6. Record, as a table, each voucher keyed in A5: its number, type, date, every line's ledger, amount and side, and its narration, all
-    as keyed. Mark C10 and C15 as keyed or not keyed. Then **a6 marks**. EXPECT V = 34 plus the number of vouchers A6 records as
-    keyed (49 if all fifteen were). Another V goes to the run coordinator before Phase B (C11). M is recorded.
+    as keyed. Mark C10, C15, C16, C17 and C18 as keyed or not keyed. Then **a6 marks**. EXPECT V = 34 plus the number of vouchers A6
+    records as keyed (52 if all eighteen were). Another V goes to the run coordinator before Phase B (C11). M is recorded.
 
 STOP, in Phase A:
 - on any dialog other than the voucher and master screens' own accept and the prompts C5 quotes (C7);
@@ -133,7 +144,7 @@ Run `python -I lost_answer_relay.py --self-test` before Phase B: EXPECT `self-te
 | a0: V, M, sha256; Tally's release; the dates | |
 | a1: the backup's name, bytes, sha256, time; a1 marks | |
 | a3, a4: each master as created; a4 marks | |
-| A6: the table; C10 and C15 keyed or not; a6 marks | |
+| A6: the table; C10, C15, C16, C17 and C18 keyed or not; a6 marks | |
 | Phase B: everything R1's "What to report" lists, for c1, c2 and c3, and b9 against a6 | |
 
 Read every number from its file, not from the screen. Put any STOP, any refusal and any EXPECT not met in the first line.
@@ -142,7 +153,7 @@ Read every number from its file, not from the screen. Put any STOP, any refusal 
 | what the item shows | reading on #699 |
 |---|---|
 | Phase A as written, and Phase B as R1's "Decides" first row, on this book | `c2`'s exchanges become the fixtures of clause 16(a)/(d)'s tests, measured against the synthetic lab book only |
-| C10 or C15 not keyed | the book lacks that shape; the fixtures stand without it, and the shape is named as not measured |
+| C10, C15, C16, C17 or C18 not keyed | the book lacks that shape; the fixtures stand without it, and the shape is named as not measured |
 | a refusal in Phase B, a `refused` line, a count not as A6 records, or b9 not equal to a6 | as R1's "Decides" says for each: no fixture from this item |
 
 ## Stop rules

@@ -58,7 +58,9 @@ No prompt appeared beyond the six the sheet names. [verified]
 The four Bridge connector servers of the desktop client were left running, and the row did not close them: PIDs 384 and 6668 (started 30 Oct 2026), 26480 and 26180 (started 2 Nov 2026), parent the desktop client. All four are unchanged before and after the sitting (`evidence/bridge-procs-before.txt`, `-after.txt`). No call was made to them from this sitting, and their calls were not measured. [verified as recorded]
 
 ## Kept local
-Every answer (`a-*.xml`), every screen and the backup stay on the lab PC, listed by sha256, bytes and name in `kept-local.txt`. The sheet names `a-r1-GDN.xml` as the fixture to commit afterwards; its content checks passed. It is not added here and waits for its own request.
+Every answer (`a-*.xml`), every screen and the backup stay on the lab PC, listed by sha256, bytes and name in `kept-local.txt`. The exception is `a-r1-GDN.xml`, the fixture the sheet names: its content checks passed, and it is in `answers/` byte for byte.
+
+`a-r1-GDN.xml`: PARTYGSTIN holds the lab's invented all-Z GSTIN; VOUCHERKEY 15-digit runs; kept as captured.
 
 ## The book now
 BRIDGE EINVOICE LAB restored to its state before the sitting: three vouchers, `ALTVCHID` 3, `ALTMSTID` 215. Loaded alone at the Gateway. One tally.exe (PID 1200) on 9001.

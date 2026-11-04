@@ -13,7 +13,7 @@ box/c1-box.txt: original 2509 B sha256 0fe960fa9008bfb5b4d83270d4db83a7732b415c7
 evidence/s0-c2-netstat.txt: original 9269 B sha256 accca5cf3bbd113b327219efb8f668114b594eaa905ed17ca2660919349ed9b3 (kept on the lab PC); only the port-9001 LISTENING lines kept
 evidence/s0c-c2-netstat.txt: original 10015 B sha256 db2acbfa2204368953dc4a4210cbc9fd5e43c4f8f35b969ec67a95c44088c1da (kept on the lab PC); only the port-9001 LISTENING lines kept
 evidence/s10-after-shut-c2-netstat.txt: original 9337 B sha256 c715ebd9a35d7c3026dc4b354e5e6a9189e880e68b31ce7fa974463ca50ae920 (kept on the lab PC); only the port-9001 LISTENING lines kept
-notes.txt: original 12290 B sha256 f5608c2dc851da4992b0ec29351177a39fd9acaa2b69b7d9e5002aaa959d9c54 (kept on the lab PC); 2 x -> <LAB_DIR>; 2 x -> stop; 1 x -> <CI run id>; 1 x -> <CI artifact id>
+notes.txt: original 12532 B sha256 e1a4fe7f3a61eeccfcbf059f634ff9a5826d54c5accfa6e45c3aebcabcaf322b (kept on the lab PC); 2 x -> <LAB_DIR>; 2 x -> stop; 1 x -> <CI run id>; 1 x -> <CI artifact id>
 scripts/marks.py: original 2415 B sha256 331a35bb18b8e10c916bb8fe954f93acdabfffcdfe38f507b5c486a226648f8c (kept on the lab PC); 1 x -> <LAB_DIR>
 scripts/folder-list.py: original 1207 B sha256 af458c99198ff63eea9b6abb8cb60443015a7d6b12e49c3c113d33f56858395d (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>
 scripts/step0.py: original 1616 B sha256 1510181add9f5f46d7827c2eb736d253c5893c6adf6a351dd94b26d2688c7dca (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>; 1 x -> <BK0 folder>

@@ -37,6 +37,16 @@ The Day Book for 1-Apr-26 lists Journals Nos 1 to 200, each Cash Dr and DN Sales
 
 The row is the third case: **the POST ended past 20 s** (`answer_s` 23.235, `bridge_left_s` 19.985, `reply_lost`), the post call ended `import_dispatch_outcome_unknown` and the verify `reconciliation_required`. **The cap stays 50**, as the sheet reads it. Tally's counters (CREATED 200), V +200, the verify's 200 matching vouchers and the Day Book show that Tally's write stood in full. (verified; the reading is the sheet's)
 
+## Kept on the lab PC
+
+Four files stay local by hash; they never go public. Three hold 12-digit runs outside VOUCHERKEY (all-digit last groups of the vouchers' REMOTEID UUIDs), and one shows the company number. All four are also listed in `kept-local.txt`.
+- `a/import-1.request`: the import request Bridge sent. 227,736 B, sha256 aa86e04db15c697b55b9fc4de0805c3143915b9a8a728023f2327ce7236b7e2b.
+- `agent/agent-import-ledger.jsonl`: Bridge's import ledger, holding the same UUIDs. 62,564 B, sha256 64f99425371da5800ca8094ab5b9a384ee2fc800b0be51c7c6628fef562265a3.
+- `agent/imports/bridge-9194ba5b-e79a-482e-8f74-be461c02dfc7.xml`: the saved batch XML, holding the same UUIDs. 123,008 B, sha256 7a83111018016dfab62aab97d7344dcd6948f0a32e3132449c2bda47e6f5279a.
+- `box/c1-open.png`: the capture of Bridge's approval box, which shows the company number. 364,457 B, sha256 8bcc2f780153bac8fe33b011022dc0069ecabc8d37e3d5a8ac2d49cf22cd1da7.
+
+The step-10 observation, that Select Company read the book's period as "1-Apr-25 to 31-Mar-27" after the restore, is recorded as unexplained and was not followed up. (verified)
+
 ## Back to the start
 
 Step 10: `bridge_mcp` stopped (exit 0), then the relay. Company > Shut. Restore of BK1 into Tally's data folder: only prompt 3 ("Accept ?", y) and prompt 4 ("already exists", Replace) were answered. Loaded with no prompt; s9 as above. Shut again: Select Company with none loaded; one tally.exe, 9001 LISTENING, `GET /status` 200. The folder, shut, after the restore held 17 files against step 0's 20 (CmpSchMetaData.1800 and three .TSF absent, TMESSAGE.TSF present); loaded, 23 files with the same names as at step 0, only TCMPSCHMESSAGE.TSF differing in size. Select Company's row for the book read "1-Apr-25 to 31-Mar-27" after the restore against "… to 31-Mar-26" before the post (recorded, not explained). The agent data folder is retired. (verified)

@@ -1392,7 +1392,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         "setting_retired" => Some(
             "BRIDGE_AGENT_ENABLE_BATCH_POST was retired: batch posting now follows the posting \
              setting (BRIDGE_AGENT_ENABLE_WRITES), which covers one voucher or a saved batch of \
-             2 to 50. Remove BRIDGE_AGENT_ENABLE_BATCH_POST from ComplyEaze Bridge's environment \
+             2 to 200. Remove BRIDGE_AGENT_ENABLE_BATCH_POST from ComplyEaze Bridge's environment \
              and start it again. Nothing was sent to Tally.",
         ),
         "terms_not_accepted" => Some(

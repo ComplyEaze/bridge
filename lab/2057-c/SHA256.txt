@@ -1,0 +1,9 @@
+# sha256  bytes  file  (LAB-COMMON.md byte-equal to lab/2057-b-sheet; templates/ byte-equal to the two committed fixtures named in gen_requests.py; requests/ from gen_requests.py)
+d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+71329f87ebbb86536e85a2a85ede3b0d40982219310af7051bf12ff33abc2f93  24345  RUN-SHEET.md
+46adbff1ed7e7e6b8aa081b8cf36b41c0a356d166697fa89791d74172a47e5ab  3672  gen_requests.py
+47cf36c300a5cc31297033dba27c6233729e93d3ad6e17d72022e73d28352d9c  1740  templates/a07-vouchers-shape-20250424.xml
+df30b272695f5ce6170d41f05730b8dac0ecdd7c514c8c598c7d42e8e5835cd1  3122  templates/sl-stock-lines-20260520.xml
+c2c018f0aefe34e3a0e50b71a387ebe90a6a2121eb460ae4b2baf2ddcaafc2ec  1758  requests/r-a07-20250615.utf16le.xml
+1eff1e63ceabd4ab1c8c9949e31f9bae16fb00409d857a1fe10ed369eb97d5eb  3140  requests/r-sl-20250615.utf16le.xml

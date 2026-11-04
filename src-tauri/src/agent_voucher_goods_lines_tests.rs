@@ -233,6 +233,110 @@ fn the_class_purchase_request_is_the_one_the_vouchers_read_sends() {
     );
 }
 
+const COMMON_LEDGER_OFF: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/item-purchase-common-ledger-off.utf16le.xml"
+);
+const COMMON_LEDGER_OFF_STOCK_LINES: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml"
+);
+
+/// Each entry's ledger and amount, and the goods lines of the one entry that carries them.
+fn entries_and_goods(rows: &[Value]) -> (Vec<(Value, Value)>, Value, Value) {
+    let entries = rows[0]["amounts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| (entry["ledger"].clone(), entry["amount"].clone()))
+        .collect();
+    let (v, e) = goods_entry(rows);
+    let entry = &rows[v]["amounts"][e];
+    (entries, entry["ledger"].clone(), entry[FIELD].clone())
+}
+
+/// An item Purchase keyed with the voucher's common ledger off, the purchase ledger asked on the
+/// item line only (protocol reference §8.2m): the vouchers read still carries that ledger as an
+/// entry of its own with the item inside it, as on the invoice keyed through the class.
+#[test]
+fn an_item_purchase_keyed_with_the_common_ledger_off_reads_as_one_keyed_through_the_class() {
+    let off = parse_agent_rows(&utf16(COMMON_LEDGER_OFF), CLASS_PURCHASE_LAB).unwrap();
+    assert_eq!(off.len(), 1);
+    assert_eq!(off[0]["voucher_type"], "Purchase");
+    assert_eq!(off[0]["is_invoice"], true);
+    assert_eq!(off[0]["date"], "20250615");
+    let through_class = parse_agent_rows(
+        &utf16(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/item-purchase-through-class.utf16le.xml"
+        )),
+        CLASS_PURCHASE_LAB,
+    )
+    .unwrap();
+    let (entries, ledger, goods) = entries_and_goods(&off);
+    assert_eq!(
+        entries,
+        [
+            (json!("Lab Supplier"), json!("590.00")),
+            (json!("Lab Purchases"), json!("-500.00")),
+            (json!("Lab CGST"), json!("-45.00")),
+            (json!("Lab SGST"), json!("-45.00")),
+        ]
+    );
+    assert_eq!(ledger, "Lab Purchases");
+    assert_eq!((entries, ledger, goods), entries_and_goods(&through_class));
+}
+
+/// The stock-lines read of the same voucher holds the item at voucher level and the purchase
+/// ledger only in its accounting allocation. Nothing Bridge parses from it says so: a Purchase's
+/// stock lines are not read (§8.2i), and this view's ledger entries are not the entries the
+/// vouchers read parses, so the row has none.
+#[test]
+fn the_stock_lines_read_of_that_purchase_reads_neither_its_line_nor_its_entries() {
+    let rows = parse_agent_rows_reading_gst(
+        &utf16(COMMON_LEDGER_OFF_STOCK_LINES),
+        CLASS_PURCHASE_LAB,
+        GstDetailsShown::Withheld,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::Asked,
+    )
+    .unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["voucher_type"], "Purchase");
+    assert_eq!(rows[0]["stock_lines_not_read"], true, "{}", rows[0]);
+    assert!(rows[0].get("stock_lines").is_none(), "{}", rows[0]);
+    assert_eq!(rows[0]["amounts"], json!([]), "{}", rows[0]);
+}
+
+/// The lab sent the shape lab's two committed requests with only the company and the day changed.
+#[test]
+fn the_common_ledger_off_requests_are_the_ones_the_vouchers_read_sends() {
+    let as_sent = |bytes: &[u8], day: &str| {
+        utf16(bytes)
+            .trim_start_matches('\u{feff}')
+            .replace("BRIDGE SHAPE LAB", "BRIDGE CLASS PURCHASE LAB")
+            .replace(day, "20250615")
+    };
+    let day = bridge_tally_core::TallyDate::parse("20250615").unwrap();
+    assert_eq!(
+        as_sent(
+            include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/voucher_goods_lines_two_godowns_shape_lab_request.utf16le.xml"
+            ),
+            "20250424"
+        ),
+        render_agent_vouchers("BRIDGE CLASS PURCHASE LAB", &day, &day, None).unwrap()
+    );
+    assert_eq!(
+        as_sent(
+            include_bytes!(
+                "../crates/bridge-tally-protocol/tests/fixtures/stock_movement_mixed_window_stock_lines_shape_lab_request.utf16le.xml"
+            ),
+            "20260520"
+        ),
+        super::super::voucher_window::VoucherReadShape::ClassInventoryWildcard
+            .render("BRIDGE CLASS PURCHASE LAB", &day, &day, None)
+            .unwrap()
+    );
+}
+
 #[test]
 fn the_stock_movement_requests_are_the_ones_the_vouchers_read_sends() {
     let requests: [(&[u8], &str); 4] = [

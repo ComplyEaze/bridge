@@ -4450,6 +4450,16 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "920de15ec49f2412c6045f56a04e514fc1fdbb3af52d2ea72571e46a9d129104",
       "size": 136934
+    },
+    {
+      "blob": "1db6942f5e3213d4b1510c3d5b7866c47eded6e8",
+      "capture_id": "window-read-delivery-notes.utf16le.xml",
+      "company": "BRIDGE EINVOICE LAB",
+      "lab_ref": "branch lab/2027-dn-answers at 81c551da",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a18e5ef5b435aadc4c5b0f2d7f220a5a267dd99539722e6122159395c58fe74b",
+      "size": 230202
     }
   ]
 }

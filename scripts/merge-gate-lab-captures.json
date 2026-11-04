@@ -4680,6 +4680,26 @@
       "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab/PROVENANCE.md at that head",
       "sha256": "5f2a8876b77cc6347b46b1a8b5e84e4381aa1ada41afe6523ce6602257e31ca7",
       "size": 1103236
+    },
+    {
+      "blob": "fbdb5b1c55cd49cc44a94e8747a02685c5c52911",
+      "capture_id": "item-purchase-common-ledger-off.utf16le.xml",
+      "company": "BRIDGE CLASS PURCHASE LAB",
+      "lab_ref": "branch lab/2057-d-answers at 02ef29ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/item-purchase-common-ledger-off.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "68343f4296ca2c18a7f1937d18ffedba8e359b7bf1a5d924fe63f0da831107e7",
+      "size": 77918
+    },
+    {
+      "blob": "e5a2a53ec7c77c8bb79aa4b71c737ae77bd4a92e",
+      "capture_id": "item-purchase-common-ledger-off-stock-lines.utf16le.xml",
+      "company": "BRIDGE CLASS PURCHASE LAB",
+      "lab_ref": "branch lab/2057-d-answers at 02ef29ec",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml",
+      "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2f791622cb1abb7bb13a46719cccc63abfecac09c3b5be4dd84f15acdf880d5b",
+      "size": 40164
     }
   ]
 }

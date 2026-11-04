@@ -1838,6 +1838,18 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    Row {
+        fixture: "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-company-object.utf16le.xml",
+        source: Source::Captured,
+        parser: "admit_audit_company_part(BRIDGE SFT LAB)",
+        parse: |_, text| {
+            typed(admit_audit_company_part(
+                text,
+                "00f0c618-b0df-43bd-bd69-b4c7b92c616f",
+                "20250401",
+            ))
+        },
+    },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production
     // (src/agent_vouchers.rs) as a voucher-type collection.
@@ -3222,6 +3234,11 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
+const AUDIT_READ_SFT_LIVE: &str = "an answer of the audit read of BRIDGE SFT LAB through a \
+     recording relay (699-R1, 4 Nov 2026, #699), with no row here: the app crate's audit read \
+     (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
+     (live_sft_lab) serves it in the reader's order, each request checked byte for byte, and pins \
+     the book admitted from it; agent/audit-read-sft-lab/PROVENANCE.md says what each file is";
 const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
      (26 Oct 2026, #1392), with no row here: the app crate's day reader \
      (src/agent_transfer_pairing.rs) parses it, and the whole_day tests in \
@@ -3316,6 +3333,35 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml",
         AUDIT_READ_LIVE,
+    ),
+    // The audit read's live answers on BRIDGE SFT LAB (the company object has a row).
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-census.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-groups.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-ledgers.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-marks.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-trial-balance.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-voucher-types.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-vouchers.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
     ),
     (
         "tests/fixtures/builtin_sales_register_probe_b_fy_live.utf16le.xml",

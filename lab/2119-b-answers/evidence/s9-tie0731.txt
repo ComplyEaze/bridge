@@ -1,0 +1,4 @@
+lo debit 3 (sum -35000.00), credit 1 (sum 3000.00), on_account 1 (sum -5000.00)
+ledgers rows 6; the party: CLOSINGBALANCE -37000.00
+tie closing_vs_lo_total equal (-37000.00)
+tie residual_vs_on_account equal (-5000.00)

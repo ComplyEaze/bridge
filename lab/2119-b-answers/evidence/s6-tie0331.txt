@@ -1,0 +1,6 @@
+party rows: receivable 3 (sum -25000.00), payable 2 (sum 3600.00); lo debit 3 (sum -25000.00), credit 2 (sum 3600.00), on_account 1 (sum -4600.00)
+ledgers rows 6; the party: CLOSINGBALANCE -26000.00 ISBILLWISEON Yes
+debit_vs_receivable matched 3 equal 3 opposite_sign 0 differ 0 only_report 0 only_lo 0 repeated_keys 0
+credit_vs_payable matched 2 equal 2 opposite_sign 0 differ 0 only_report 0 only_lo 0 repeated_keys 0
+tie closing_vs_lo_total equal (-26000.00)
+tie residual_vs_on_account equal (-4600.00)

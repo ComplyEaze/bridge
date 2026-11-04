@@ -1,0 +1,1 @@
+lo ok bytes 3926 rows 5 sum -37000.00 voucher_lines 5

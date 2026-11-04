@@ -1,0 +1,1 @@
+report ok bytes 1378 rows 3 sum -25000.00; the party's rows 3 sum -25000.00

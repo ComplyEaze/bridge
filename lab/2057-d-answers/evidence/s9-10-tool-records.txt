@@ -1,0 +1,15 @@
+vouchers: {'state': 'complete', 'total': 1, 'reason': None}
+  Purchase 1 20250615 amounts [('Lab Supplier', '590.00'), ('Lab Purchases', '-500.00'), ('Lab CGST', '-45.00'), ('Lab SGST', '-45.00')]
+   goods_lines null | goods_lines_unreadable None | state None
+purchase_register: {'state': 'complete', 'total': 1, 'vouchers_observed': 1}
+  list items 1
+  list register_classes 2
+  item 1 20250615 status complete has_taxable_entry True
+   tax_in_books [{"amount": "-45.00", "bill_allocations": [], "head": "cgst", "is_deemed_positive": "Yes", "ledger": "Lab CGST", "raw_head": "CGST"}, {"amount": "-45.00", "bill_allocations": [], "head": "state_tax", "is_deemed_positive": "Yes", "ledger": "Lab SGST", "raw_head": "State Tax"}]
+   taxable_entries [{"amount": "-500.00", "bill_allocations": [], "is_deemed_positive": "Yes", "ledger": "Lab Purchases"}] | party_entries [{"amount": "590.00", "bill_allocations": [{"amount": "590.00", "bill_date": "20250615", "bill_type": "New Ref", "reference": {"kind": "named", "name": "LAB-2057-6"}}], "is_deemed_positive": "No", "le | other_entries []
+['alter_id', 'amounts', 'cancelled', 'date', 'guid', 'is_invoice', 'master_id', 'narration', 'optional', 'party', 'party_gstin', 'post_dated', 'reference', 'reference_date', 'voucher_number', 'voucher_type']
+result keys ['items', 'offset', 'profile', 'reason', 'snapshot', 'state', 'total', 'window']
+Lab Supplier ['amount', 'bill_allocations', 'is_deemed_positive', 'ledger'] {"bill_allocations": [{"amount": "590.00", "bill_date": "20250615", "bill_type": "New Ref", "reference": {"kind": "named", "name": "LAB-2057-6"}}], "is_deemed_positive": "No"}
+Lab Purchases ['amount', 'bill_allocations', 'goods_lines', 'is_deemed_positive', 'ledger'] {"bill_allocations": [], "goods_lines": [{"actual_quantity": {"state": "value", "value": "5 Nos"}, "amount": {"state": "value", "value": "-500.00"}, "batches": [{"actual_quantity": {"state": "value", "value": "5 Nos"}, "amount": {"state": "value", "value": "-500.00"}, "batch": {"state": "value", "value": "Primary Batch"}, "billed_quantity": {"state": "value", "value": "5 Nos"}, "godown": {"state":
+Lab CGST ['amount', 'bill_allocations', 'is_deemed_positive', 'ledger'] {"bill_allocations": [], "is_deemed_positive": "Yes"}
+Lab SGST ['amount', 'bill_allocations', 'is_deemed_positive', 'ledger'] {"bill_allocations": [], "is_deemed_positive": "Yes"}

@@ -1,0 +1,4 @@
+2026-11-04T12:55:40.939Z req=r-a07-20250615.utf16le.xml req_sha256=c2c018f0aefe34e3a0e50b71a387ebe90a6a2121eb460ae4b2baf2ddcaafc2ec curl_exit=0 printed='200 77918' content_length=77918 bytes=77918 sha256=68343f4296ca2c18a7f1937d18ffedba8e359b7bf1a5d924fe63f0da831107e7
+2026-11-04T12:55:41.376Z answered r-a07-20250615 as r9-r-a07-20250615.xml exit=0
+2026-11-04T12:55:46.168Z req=r-sl-20250615.utf16le.xml req_sha256=1eff1e63ceabd4ab1c8c9949e31f9bae16fb00409d857a1fe10ed369eb97d5eb curl_exit=0 printed='200 40164' content_length=40164 bytes=40164 sha256=2f791622cb1abb7bb13a46719cccc63abfecac09c3b5be4dd84f15acdf880d5b
+2026-11-04T12:55:46.635Z answered r-sl-20250615 as r9-r-sl-20250615.xml exit=0

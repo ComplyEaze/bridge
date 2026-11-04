@@ -1,0 +1,8 @@
+restore-plan.txt (2057-D step 14, LAB-COMMON C6), written before the restore.
+Source folder: <LAB_DIR>/backups/bk5 (holds 1 file).
+File: TDBK1800_<company number>.001, 24100 B, sha256 86e9a9af45776ee53a847d77473a546db81e09de4e7fb3285f71f4adf4b9045a (= step 2's BK5: True).
+Company: BRIDGE CLASS PURCHASE LAB, number <company number> (the Restore list must show this book with its number and the date and time 4-Nov-26, 6.08 pm local).
+Restore Data Path: <Tally data folder>.
+Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace will overwrite the existing folder." = Replace.
+Before: shut THE COMPANY by Company > Shut; listing of <Tally data folder>/<company number> (evidence/s14-listing-before.txt). After: the same listing (evidence/s14-listing-after.txt), THE COMPANY loaded alone, the Gateway screenshot compared with step 0's, then list_companies, the marks (M0/V0), ledger_masters and masters as in step 1, and the option by step 7's route.
+Fallbacks, only on the run lead's word: 2057-C's BK4 (24,100 B, e08bd013...), then 2057-B's BK3, then the 31 Oct BK2.

@@ -1,0 +1,5 @@
+['ancestry', 'compliance', 'gstin_sources_disagree', 'name', 'opening_balance', 'opening_balance_as_of', 'parent', 'party_gstin', 'party_gstin_as_of', 'party_gstin_flat', 'party_gstin_registration_type', 'party_gstin_status']
+== Lab CGST
+.compliance.gst_duty_head {"head": "cgst", "observation": "recognized", "raw": "CGST"}
+== Lab SGST
+.compliance.gst_duty_head {"head": "state_tax", "observation": "recognized", "raw": "State Tax"}

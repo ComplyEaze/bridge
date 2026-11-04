@@ -1,0 +1,14 @@
+2057-D step 14: each answer after the restore against step 1's, read_at, snapshot and evidence left out
+022-s14-list-companies.json vs 001-list-companies.json: equal
+023-marks-s14-after-restore.json vs 002-marks-s1-M0V0.json: equal
+  snapshot master_alter_id: now 213 step 1 213
+  snapshot voucher_alter_id: now None step 1 None
+  snapshot reused: now False step 1 False
+024-s14-ledgers-gst.json vs 003-s1-ledgers-gst.json: equal
+  snapshot master_alter_id: now 213 step 1 213
+  snapshot voucher_alter_id: now None step 1 None
+  snapshot reused: now False step 1 False
+025-s14-vchtypes.json vs 004-s1-vchtypes.json: equal
+  snapshot master_alter_id: now 213 step 1 213
+  snapshot voucher_alter_id: now None step 1 None
+  snapshot reused: now False step 1 False

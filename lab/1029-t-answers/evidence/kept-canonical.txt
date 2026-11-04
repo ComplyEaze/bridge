@@ -1,0 +1,1 @@
+run/answers/003-s3-voucher-types-p0.json: result (canonical JSON, without company, evidence, read_at, truncated) 12836 B sha256 074569b236247acd2fa526a86691a351a502942de22b9d49d6cd3d51cb029f9e

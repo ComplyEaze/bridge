@@ -1,0 +1,3 @@
+run/answers/001-s2-list-companies.json: 1569 B; JSON; top-level keys arguments, call_sent_utc, response, round_trip_seconds, server_info, server_pid, tool; result keys companies[1]
+run/answers/002-s2-tally-status.json: 1823 B; JSON; top-level keys arguments, call_sent_utc, response, round_trip_seconds, server_info, server_pid, tool; result keys education_mode, endpoint, license_tier, loaded_companies[1], product, refusal_reason, release, today
+run/answers/003-s3-voucher-types-p0.json: 28943 B; JSON; top-level keys arguments, call_sent_utc, response, round_trip_seconds, server_info, server_pid, tool; result keys basis, company_guid, kind, limitations[14], masters[24], next_offset, offset, snapshot, state, total, verification

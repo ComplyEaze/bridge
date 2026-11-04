@@ -1,0 +1,5 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+run/answers/001-s2-list-companies.json 1569 B f227980f59fb379817f3c7a2c05bf8cca7d1843a23105cae64f3f28ffcc130b4 (company number)
+run/answers/002-s2-tally-status.json 1823 B 5d9efa29d58011741e4530a18bbb3d8fffb1be8b731e99e598fe10c91995a1bd (company number)
+run/answers/003-s3-voucher-types-p0.json 28943 B 5d16d5fe44bc32ef57b7e901cf0244c60aa16552d817e67c3ba9fe5343896dd9 (company number)
+stage-1029t.py 7667 B b352d9f5a84730c52544c9cc248f3d750ef3577fb747297a3c6b483ea684a906 (this stage script: its patterns name the lab paths)

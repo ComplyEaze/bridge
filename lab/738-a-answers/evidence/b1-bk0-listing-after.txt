@@ -1,0 +1,2 @@
+2026-11-04T08:14:22Z listing AFTER of <LAB_DIR>/backups/bk0 (cmd dir, names withheld here; bk.py names the file):
+               1 File(s)         23,662 bytes

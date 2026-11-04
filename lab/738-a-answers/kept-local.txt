@@ -1,0 +1,9 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+run/answers/001-a1-list-companies.json 1571 B 22a40e01ef4ee9db5403fda90fa7bcb8c88d9ace35cf8adf3c44cfa826cb986c (company number)
+run/answers/002-a1-tally-status.json 1823 B 84ebbec09807d518fb625d6ee47d9d5a01f22028ac79293855d7959399fbedc5 (company number)
+run/answers/003-a3-trial-balance-p0.json 5817 B 3e3a3df51cea1e2a7b2a415191a17ddc8d6fdffb7317de6228213db99f14d1e6 (company number)
+run/answers/004-b4-trial-balance-p0.json 14647 B 0cdfa5bef5e6c9ca81947e61cbc11970d317ed760f7171b4e37476615391ed9a (company number)
+run-l/answers/001-b6-list-companies.json 1568 B 12587aa4a92f902d733f9b4a644a57b2218425e0094e6f70db86a4b6bd0c5d5b (company number)
+run-l/answers/002-b6-audit-test-run.json 7278 B f2cc561f4fda1930ecb9bb8c9bbd31e866314e142321e601ce7b21905ff0028e (company number)
+run-l/answers/004-b8-audit-test-run.json 7278 B ace438f520fd957f8337315412a43069356f0f55bcf6ba2de9e5c808ca774c74 (company number)
+stage-738a.py 8134 B 19554c7be8a9531b6209a1dfc45aef7933837fb0564f96e26d93209f6884fec9 (this stage script: its patterns name the lab paths)

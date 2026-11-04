@@ -1,0 +1,37 @@
+b8: <data dir>/lab holds 19 files
+lab-manifest.jsonl  512  108e0e51ee3c1c2627f492702bfc36a30620ecb3f2a4251cc3156e73db42db8a
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/manifest.json  5080  07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/company_object.xml  4228  e362da7b7c64eec37885e8ac87b8df99b019e828f93f2f04e044b024fd919291
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/groups.xml  54282  6a3c0cc9ea90ae3bdcd251c45fe7d437e6b872dd41adc364d924ab316d7804a9
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/high_water_after.xml  3400  76c516bbbafa2d7c78bc523c4dd7c0a56383523eaa84a8067ec9da1274e2399e
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/high_water_before.xml  3400  76c516bbbafa2d7c78bc523c4dd7c0a56383523eaa84a8067ec9da1274e2399e
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/ledgers.xml  22206  87c0462d53e6a5ea9b8ecd9173e6a7e40f26fc52bbb36061cec5091855da2354
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/trial_balance.xml  22876  b2fb48e29188743fe62765e230202b491c1a3fda587cc5f54a435c3647575ced
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/voucher_types.xml  33030  425c61a53d2aa29ee608a8dee05825777ed51d39df64cfb7db42f3b026d6f66b
+audit-reads/07eb38a479393e777cfd910b7c2cab96e01f6bfc01fa9b25cbb09577e22a1fb0/parts/vouchers-2025-04-01.xml  185202  1acf723b6d4d5e2e58227f069919f9d53559749ffbc7f1221544ed77ebaeab99
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/manifest.json  5080  0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/company_object.xml  4228  e362da7b7c64eec37885e8ac87b8df99b019e828f93f2f04e044b024fd919291
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/groups.xml  54282  6a3c0cc9ea90ae3bdcd251c45fe7d437e6b872dd41adc364d924ab316d7804a9
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/high_water_after.xml  3400  76c516bbbafa2d7c78bc523c4dd7c0a56383523eaa84a8067ec9da1274e2399e
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/high_water_before.xml  3400  76c516bbbafa2d7c78bc523c4dd7c0a56383523eaa84a8067ec9da1274e2399e
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/ledgers.xml  22206  87c0462d53e6a5ea9b8ecd9173e6a7e40f26fc52bbb36061cec5091855da2354
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/trial_balance.xml  22876  b2fb48e29188743fe62765e230202b491c1a3fda587cc5f54a435c3647575ced
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/voucher_types.xml  33030  425c61a53d2aa29ee608a8dee05825777ed51d39df64cfb7db42f3b026d6f66b
+audit-reads/0faacfff87c485d290ed9f5f896cda70c1d5abc1b6097e83ea1cff2a327a7b3b/parts/vouchers-2025-04-01.xml  185202  1acf723b6d4d5e2e58227f069919f9d53559749ffbc7f1221544ed77ebaeab99
+top level of <data dir>/lab: ['audit-reads', 'lab-manifest.jsonl']
+PASS 2 folder(s) under audit-reads
+PASS 07eb38a47939.. named by a 64-hex sha256
+PASS 07eb38a47939.. holds manifest.json and parts/ only
+PASS 07eb38a47939.. parts/ holds plain files only (8)
+PASS 07eb38a47939.. manifest.json sha256 equals the folder name
+PASS 0faacfff87c4.. named by a 64-hex sha256
+PASS 0faacfff87c4.. holds manifest.json and parts/ only
+PASS 0faacfff87c4.. parts/ holds plain files only (8)
+PASS 0faacfff87c4.. manifest.json sha256 equals the folder name
+PASS lab-manifest.jsonl has 2 line(s)
+PASS each line names THE COMPANY's company_guid
+PASS each line's manifest_sha256 is one of the folders
+PASS manifest.json files differ only in created_at and read_at (they differ in: ['created_at', 'read_at'])
+PASS the two parts/ folders hold the same names (8 and 8)
+PASS each part byte-equal to its namesake (differing: [])
+PASS the first folder's files unchanged since B7 (changed or gone: [])

@@ -1,0 +1,2 @@
+2026-11-04T08:16:32Z listing BEFORE of <LAB_DIR>/backups/bk1 (cmd dir):
+               0 File(s)              0 bytes

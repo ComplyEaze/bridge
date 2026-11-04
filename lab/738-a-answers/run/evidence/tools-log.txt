@@ -1,0 +1,5 @@
+2026-11-04T08:09:04.552Z 000-tools.json list secs 0.019 bytes 170841 isError None
+2026-11-04T08:09:07.076Z 001-a1-list-companies.json list_companies secs 0.235 bytes 1571 isError False
+2026-11-04T08:09:08.321Z 002-a1-tally-status.json tally_status secs 0.164 bytes 1823 isError False
+2026-11-04T08:10:15.817Z 003-a3-trial-balance-p0.json trial_balance secs 2.667 bytes 5817 isError False
+2026-11-04T08:16:06.661Z 004-b4-trial-balance-p0.json trial_balance secs 1.829 bytes 14647 isError False

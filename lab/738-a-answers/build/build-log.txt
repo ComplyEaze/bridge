@@ -1,0 +1,447 @@
+start 2026-11-04T08:00:09Z
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling serde_core v1.0.229
+   Compiling windows-link v0.2.1
+   Compiling cfg-if v1.0.4
+   Compiling icu_properties_data v2.3.0
+   Compiling windows_x86_64_msvc v0.52.6
+   Compiling memchr v2.8.3
+   Compiling parking_lot_core v0.9.12
+   Compiling syn v2.0.119
+   Compiling syn v3.0.3
+   Compiling synstructure v0.13.2
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling serde_derive v1.0.229
+   Compiling zerovec-derive v0.11.4
+   Compiling displaydoc v0.2.7
+   Compiling thiserror v2.0.21
+   Compiling icu_normalizer_data v2.3.0
+   Compiling thiserror-impl v2.0.21
+   Compiling serde v1.0.229
+   Compiling zerofrom v0.1.8
+   Compiling stable_deref_trait v1.2.1
+   Compiling siphasher v1.0.3
+   Compiling yoke v0.8.3
+   Compiling fastrand v2.5.0
+   Compiling phf_shared v0.13.1
+   Compiling zmij v1.0.23
+   Compiling phf_generator v0.13.1
+   Compiling zerovec v0.11.7
+   Compiling getrandom v0.4.3
+   Compiling smallvec v1.15.2
+   Compiling version_check v0.9.5
+   Compiling log v0.4.33
+   Compiling writeable v0.6.4
+   Compiling litemap v0.8.3
+   Compiling zerotrie v0.2.5
+   Compiling libc v0.2.190
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling autocfg v1.5.1
+   Compiling utf8_iter v1.0.4
+   Compiling icu_locale_core v2.3.0
+   Compiling icu_collections v2.3.0
+   Compiling windows-sys v0.61.2
+   Compiling find-msvc-tools v0.1.10
+   Compiling shlex v2.0.1
+   Compiling bytes v1.12.1
+   Compiling cc v1.4.2
+   Compiling icu_provider v2.3.0
+   Compiling pin-project-lite v0.2.17
+   Compiling icu_properties v2.3.0
+   Compiling phf_macros v0.13.1
+   Compiling typeid v1.0.3
+   Compiling itoa v1.0.18
+   Compiling scopeguard v1.2.0
+   Compiling windows-targets v0.52.6
+   Compiling lock_api v0.4.14
+   Compiling num-conv v0.2.2
+   Compiling anyhow v1.0.104
+   Compiling time-core v0.1.9
+   Compiling typenum v1.20.1
+   Compiling generic-array v0.14.7
+   Compiling phf_codegen v0.13.1
+   Compiling once_cell v1.21.4
+   Compiling ident_case v1.0.1
+   Compiling erased-serde v0.4.10
+   Compiling futures-core v0.3.34
+   Compiling strsim v0.11.1
+   Compiling darling_core v0.23.0
+   Compiling darling_macro v0.23.0
+   Compiling parking_lot v0.12.5
+   Compiling new_debug_unreachable v1.0.6
+   Compiling crc32fast v1.5.0
+   Compiling icu_normalizer v2.3.0
+   Compiling darling v0.23.0
+   Compiling phf v0.13.1
+   Compiling string_cache_codegen v0.6.1
+   Compiling serde_json v1.0.151
+   Compiling percent-encoding v2.3.2
+   Compiling precomputed-hash v0.1.1
+   Compiling web_atoms v0.2.6
+   Compiling serde_with_macros v3.22.0
+   Compiling idna_adapter v1.2.2
+   Compiling semver v1.0.28
+   Compiling winnow v1.0.4
+   Compiling futures-sink v0.3.34
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling string_cache v0.9.0
+   Compiling idna v1.1.0
+   Compiling form_urlencoded v1.2.2
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling serde_spanned v1.1.1
+   Compiling tokio-macros v2.7.2
+   Compiling dtoa v1.0.11
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling equivalent v1.0.2
+   Compiling tokio v1.54.1
+   Compiling dtoa-short v0.3.5
+   Compiling toml v1.1.6+spec-1.1.0
+   Compiling url v2.5.8
+   Compiling uuid v1.27.0
+   Compiling tendril v0.5.1
+   Compiling tracing-core v0.1.36
+   Compiling selectors v0.38.0
+   Compiling windows-sys v0.52.0
+   Compiling http v1.5.0
+   Compiling aho-corasick v1.1.5
+   Compiling indexmap v1.9.3
+   Compiling cssparser-macros v0.7.1
+   Compiling windows-interface v0.59.3
+   Compiling windows-implement v0.60.2
+   Compiling derive_more-impl v2.1.1
+   Compiling windows-result v0.4.1
+   Compiling windows-strings v0.5.1
+   Compiling camino v1.2.5
+   Compiling regex-syntax v0.8.11
+   Compiling bitflags v2.13.1
+   Compiling alloc-no-stdlib v3.0.0
+   Compiling regex-automata v0.4.18
+   Compiling alloc-stdlib v0.3.0
+   Compiling derive_more v2.1.1
+   Compiling windows-core v0.62.2
+   Compiling winapi-util v0.1.11
+   Compiling cssparser v0.37.0
+   Compiling markup5ever v0.39.0
+   Compiling windows-sys v0.59.0
+   Compiling vswhom-sys v0.1.3
+   Compiling servo_arc v0.4.3
+   Compiling tracing-attributes v0.1.31
+   Compiling serde_derive_internals v0.29.1
+   Compiling bit-vec v0.8.0
+   Compiling deranged v0.5.8
+   Compiling fnv v1.0.7
+   Compiling hashbrown v0.17.1
+   Compiling rustc-hash v2.1.3
+   Compiling base64 v0.22.1
+   Compiling schemars v0.8.22
+   Compiling web-time v1.1.0
+   Compiling hashbrown v0.12.3
+   Compiling crossbeam-utils v0.8.22
+   Compiling powerfmt v0.2.0
+   Compiling time v0.3.55
+   Compiling cfb v0.14.0
+   Compiling indexmap v2.14.0
+   Compiling tracing v0.1.44
+   Compiling bit-set v0.8.0
+   Compiling schemars_derive v0.8.22
+   Compiling html5ever v0.39.0
+   Compiling same-file v1.0.6
+   Compiling regex v1.13.1
+   Compiling brotli-decompressor v6.0.1
+   Compiling jsonptr v0.7.1
+   Compiling hybrid-array v0.4.14
+   Compiling cargo-platform v0.1.9
+   Compiling quick-xml v0.41.0
+   Compiling dyn-clone v1.0.20
+   Compiling futures-task v0.3.34
+   Compiling slab v0.4.12
+   Compiling foldhash v0.2.0
+   Compiling sha1_smol v1.0.1
+   Compiling simd-adler32 v0.3.10
+   Compiling futures-io v0.3.34
+   Compiling dunce v1.0.5
+   Compiling futures-util v0.3.34
+   Compiling plist v1.10.0
+   Compiling dom_query v0.28.0
+   Compiling cargo_metadata v0.19.2
+   Compiling json-patch v4.2.0
+   Compiling brotli v9.0.0
+   Compiling urlpattern v0.6.0
+   Compiling serde-untagged v0.1.9
+   Compiling walkdir v2.5.0
+   Compiling infer v0.22.0
+   Compiling serde_with v3.22.0
+   Compiling num-traits v0.2.19
+   Compiling windows-threading v0.2.1
+   Compiling pkg-config v0.3.33
+   Compiling glob v0.3.4
+   Compiling adler2 v2.0.1
+   Compiling ctor v1.0.13
+   Compiling vcpkg v0.2.15
+   Compiling windows-future v0.3.2
+   Compiling vswhom v0.1.0
+   Compiling block-buffer v0.12.1
+   Compiling crypto-common v0.2.2
+   Compiling winreg v0.55.0
+   Compiling windows-numerics v0.3.1
+   Compiling windows-collections v0.3.2
+   Compiling tauri-utils v2.10.1
+   Compiling rustc_version v0.4.1
+   Compiling time-macros v0.2.32
+   Compiling openssl-src v300.6.1+3.6.3
+   Compiling const-oid v0.10.2
+   Compiling raw-window-handle v0.6.2
+   Compiling option-ext v0.2.0
+   Compiling digest v0.11.3
+   Compiling dirs-sys v0.5.0
+   Compiling openssl-sys v0.9.117
+   Compiling embed-resource v3.0.11
+   Compiling windows v0.62.2
+   Compiling miniz_oxide v0.9.1
+   Compiling webview2-com-sys v0.39.1
+   Compiling cpufeatures v0.3.0
+   Compiling heck v0.5.0
+   Compiling flate2 v1.1.10
+   Compiling tauri-winres v0.3.6
+   Compiling dirs v7.0.0
+   Compiling miniz_oxide v0.8.9
+   Compiling fdeflate v0.3.7
+   Compiling http-body v1.1.0
+   Compiling cargo_toml v1.0.1
+   Compiling futures-channel v0.3.34
+   Compiling dpi v0.1.2
+   Compiling cookie v0.18.2
+   Compiling httparse v1.10.1
+   Compiling either v1.17.0
+   Compiling tauri-build v2.7.1
+   Compiling sha2 v0.11.0
+   Compiling chrono v0.4.45
+   Compiling crypto-common v0.1.7
+   Compiling block-buffer v0.10.4
+   Compiling libsqlite3-sys v0.37.0
+   Compiling bridge-tally-primitives v0.1.0 (<BUILD-L checkout>\src-tauri\crates\bridge-tally-primitives)
+   Compiling webview2-com-macros v0.8.1
+   Compiling windows-version v0.1.7
+   Compiling allocator-api2 v0.2.21
+   Compiling try-lock v0.2.5
+   Compiling winapi v0.3.9
+   Compiling byteorder v1.5.0
+   Compiling tower-service v0.3.3
+   Compiling bitflags v1.3.2
+   Compiling png v0.17.16
+   Compiling hashbrown v0.16.1
+   Compiling want v0.3.1
+   Compiling webview2-com v0.39.1
+   Compiling digest v0.10.7
+   Compiling crossbeam-channel v0.5.16
+   Compiling sync_wrapper v1.0.2
+   Compiling tauri-runtime v2.12.1
+   Compiling atomic-waker v1.1.2
+   Compiling parking v2.2.1
+   Compiling crc-catalog v2.5.0
+   Compiling zlib-rs v0.6.7
+   Compiling wry v0.57.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling cpufeatures v0.2.17
+   Compiling tower-layer v0.3.3
+   Compiling sha2 v0.10.9
+   Compiling tower v0.5.3
+   Compiling tinyvec v1.12.0
+   Compiling crc v3.4.0
+   Compiling event-listener v5.4.2
+   Compiling hyper v1.11.0
+   Compiling ico v0.5.0
+   Compiling hashlink v0.11.1
+   Compiling tauri v2.12.1
+   Compiling png v0.18.1
+   Compiling crossbeam-queue v0.3.13
+   Compiling tokio-stream v0.1.19
+   Compiling futures-intrusive v0.5.0
+   Compiling spin v0.9.9
+   Compiling quick-xml v0.42.0
+   Compiling pdfium-render v0.9.4
+   Compiling ipnet v2.12.1
+   Compiling bumpalo v3.20.3
+   Compiling getrandom v0.3.4
+   Compiling muda v0.20.0
+   Compiling piston-float v1.0.1
+warning: openssl-sys@0.9.117: configuring OpenSSL build: 'perl' reported failure with exit code: 2
+warning: openssl-sys@0.9.117: openssl-src: failed to build OpenSSL from source
+error: failed to run custom build command for `openssl-sys v0.9.117`
+
+Caused by:
+  process didn't exit successfully: `<BUILD-L checkout>\src-tauri\target\release\build\openssl-sys-286f85ef954d2ad4\build-script-main` (exit code: 1)
+  --- stdout
+  cargo:rustc-check-cfg=cfg(osslconf, values("OPENSSL_NO_OCB", "OPENSSL_NO_SM4", "OPENSSL_NO_SEED", "OPENSSL_NO_CHACHA", "OPENSSL_NO_CAST", "OPENSSL_NO_IDEA", "OPENSSL_NO_CAMELLIA", "OPENSSL_NO_RC4", "OPENSSL_NO_BF", "OPENSSL_NO_PSK", "OPENSSL_NO_DEPRECATED_3_0", "OPENSSL_NO_SCRYPT", "OPENSSL_NO_SM3", "OPENSSL_NO_RMD160", "OPENSSL_NO_EC2M", "OPENSSL_NO_OCSP", "OPENSSL_NO_CMS", "OPENSSL_NO_COMP", "OPENSSL_NO_SOCK", "OPENSSL_NO_STDIO", "OPENSSL_NO_EC", "OPENSSL_NO_SSL3_METHOD", "OPENSSL_NO_KRB5", "OPENSSL_NO_TLSEXT", "OPENSSL_NO_SRP", "OPENSSL_NO_SRTP", "OPENSSL_NO_RFC3779", "OPENSSL_NO_SHA", "OPENSSL_NO_NEXTPROTONEG", "OPENSSL_NO_ENGINE", "OPENSSL_NO_BUF_FREELISTS", "OPENSSL_NO_RC2"))
+  cargo:rustc-check-cfg=cfg(openssl)
+  cargo:rustc-check-cfg=cfg(libressl)
+  cargo:rustc-check-cfg=cfg(boringssl)
+  cargo:rustc-check-cfg=cfg(awslc)
+  cargo:rustc-check-cfg=cfg(awslc_pregenerated)
+  cargo:rustc-check-cfg=cfg(libressl250)
+  cargo:rustc-check-cfg=cfg(libressl251)
+  cargo:rustc-check-cfg=cfg(libressl252)
+  cargo:rustc-check-cfg=cfg(libressl261)
+  cargo:rustc-check-cfg=cfg(libressl270)
+  cargo:rustc-check-cfg=cfg(libressl271)
+  cargo:rustc-check-cfg=cfg(libressl273)
+  cargo:rustc-check-cfg=cfg(libressl280)
+  cargo:rustc-check-cfg=cfg(libressl281)
+  cargo:rustc-check-cfg=cfg(libressl291)
+  cargo:rustc-check-cfg=cfg(libressl310)
+  cargo:rustc-check-cfg=cfg(libressl321)
+  cargo:rustc-check-cfg=cfg(libressl332)
+  cargo:rustc-check-cfg=cfg(libressl340)
+  cargo:rustc-check-cfg=cfg(libressl350)
+  cargo:rustc-check-cfg=cfg(libressl360)
+  cargo:rustc-check-cfg=cfg(libressl361)
+  cargo:rustc-check-cfg=cfg(libressl370)
+  cargo:rustc-check-cfg=cfg(libressl380)
+  cargo:rustc-check-cfg=cfg(libressl381)
+  cargo:rustc-check-cfg=cfg(libressl382)
+  cargo:rustc-check-cfg=cfg(libressl390)
+  cargo:rustc-check-cfg=cfg(libressl400)
+  cargo:rustc-check-cfg=cfg(libressl410)
+  cargo:rustc-check-cfg=cfg(libressl420)
+  cargo:rustc-check-cfg=cfg(libressl430)
+  cargo:rustc-check-cfg=cfg(ossl101)
+  cargo:rustc-check-cfg=cfg(ossl102)
+  cargo:rustc-check-cfg=cfg(ossl102f)
+  cargo:rustc-check-cfg=cfg(ossl102h)
+  cargo:rustc-check-cfg=cfg(ossl110)
+  cargo:rustc-check-cfg=cfg(ossl110f)
+  cargo:rustc-check-cfg=cfg(ossl110g)
+  cargo:rustc-check-cfg=cfg(ossl110h)
+  cargo:rustc-check-cfg=cfg(ossl111)
+  cargo:rustc-check-cfg=cfg(ossl111b)
+  cargo:rustc-check-cfg=cfg(ossl111c)
+  cargo:rustc-check-cfg=cfg(ossl111d)
+  cargo:rustc-check-cfg=cfg(ossl300)
+  cargo:rustc-check-cfg=cfg(ossl310)
+  cargo:rustc-check-cfg=cfg(ossl320)
+  cargo:rustc-check-cfg=cfg(ossl330)
+  cargo:rustc-check-cfg=cfg(ossl340)
+  cargo:rustc-check-cfg=cfg(ossl400)
+  cargo:rerun-if-env-changed=X86_64_PC_WINDOWS_MSVC_OPENSSL_NO_VENDOR
+  X86_64_PC_WINDOWS_MSVC_OPENSSL_NO_VENDOR unset
+  cargo:rerun-if-env-changed=OPENSSL_NO_VENDOR
+  OPENSSL_NO_VENDOR unset
+  cargo:rerun-if-env-changed=X86_64_PC_WINDOWS_MSVC_OPENSSL_CONFIG_DIR
+  X86_64_PC_WINDOWS_MSVC_OPENSSL_CONFIG_DIR unset
+  cargo:rerun-if-env-changed=OPENSSL_CONFIG_DIR
+  OPENSSL_CONFIG_DIR unset
+  openssl-src: Enable the assembly language routines in building OpenSSL.
+  running "perl" "./Configure" "--prefix=<BUILD-L checkout>/src-tauri/target/release/build/openssl-sys-7eec437de1fd3bf2/out/openssl-build/install" "--openssldir=SYS$MANAGER:[OPENSSL]" "no-shared" "no-module" "no-tests" "no-comp" "no-zlib" "no-zlib-dynamic" "--libdir=lib" "no-ssl3" "no-md2" "no-rc5" "no-weak-ssl-ciphers" "no-camellia" "no-idea" "no-seed" "no-capieng" "VC-WIN64A"
+  cargo:warning=configuring OpenSSL build: 'perl' reported failure with exit code: 2
+  cargo:warning=openssl-src: failed to build OpenSSL from source
+
+  --- stderr
+  Can't locate Locale/Maketext/Simple.pm in @INC (you may need to install the Locale::Maketext::Simple module) (@INC entries checked: /d/dev/wt738l/src-tauri/target/release/build/openssl-sys-7eec437de1fd3bf2/out/openssl-build/build/src/util/perl /usr/lib/perl5/site_perl /usr/share/perl5/site_perl /usr/lib/perl5/vendor_perl /usr/share/perl5/vendor_perl /usr/lib/perl5/core_perl /usr/share/perl5/core_perl /d/dev/wt738l/src-tauri/target/release/build/openssl-sys-7eec437de1fd3bf2/out/openssl-build/build/src/external/perl/Text-Template-1.56/lib) at /usr/share/perl5/core_perl/Params/Check.pm line 6.
+  BEGIN failed--compilation aborted at /usr/share/perl5/core_perl/Params/Check.pm line 6.
+  Compilation failed in require at /usr/share/perl5/core_perl/IPC/Cmd.pm line 59.
+  BEGIN failed--compilation aborted at /usr/share/perl5/core_perl/IPC/Cmd.pm line 59.
+  Compilation failed in require at /d/dev/wt738l/src-tauri/target/release/build/openssl-sys-7eec437de1fd3bf2/out/openssl-build/build/src/util/perl/OpenSSL/config.pm line 19.
+  BEGIN failed--compilation aborted at /d/dev/wt738l/src-tauri/target/release/build/openssl-sys-7eec437de1fd3bf2/out/openssl-build/build/src/util/perl/OpenSSL/config.pm line 19.
+  Compilation failed in require at ./Configure line 23.
+  BEGIN failed--compilation aborted at ./Configure line 23.
+
+
+
+  Error configuring OpenSSL build:
+      'perl' reported failure with exit code: 2
+      Command failed: "perl" "./Configure" "--prefix=<BUILD-L checkout>/src-tauri/target/release/build/openssl-sys-7eec437de1fd3bf2/out/openssl-build/install" "--openssldir=SYS$MANAGER:[OPENSSL]" "no-shared" "no-module" "no-tests" "no-comp" "no-zlib" "no-zlib-dynamic" "--libdir=lib" "no-ssl3" "no-md2" "no-rc5" "no-weak-ssl-ciphers" "no-camellia" "no-idea" "no-seed" "no-capieng" "VC-WIN64A"
+
+
+
+warning: build failed, waiting for other jobs to finish...
+--- retry with PERL=C:/Strawberry/perl/bin/perl.exe (Git Bash's perl lacks Locale::Maketext::Simple) start 2026-11-04T08:20:08Z
+    Blocking waiting for file lock on build directory
+   Compiling openssl-sys v0.9.117
+   Compiling tauri-runtime-wry v2.12.1
+   Compiling zeroize v1.9.1
+   Compiling unicode-segmentation v1.13.3
+   Compiling getrandom v0.3.4
+   Compiling tao v0.37.1
+   Compiling hyper-util v0.1.20
+   Compiling vecmath v1.0.0
+   Compiling zopfli v0.8.3
+   Compiling pdfium-render v0.9.4
+   Compiling muda v0.20.0
+   Compiling dirs-sys v0.5.0
+   Compiling sqlx-core v0.9.0
+   Compiling bridge-tally-protocol v0.1.0 (<BUILD-L checkout>\src-tauri\crates\bridge-tally-protocol)
+   Compiling flume v0.12.0
+   Compiling tauri-codegen v2.7.1
+   Compiling tauri v2.12.1
+   Compiling libloading v0.7.4
+   Compiling tower-http v0.6.11
+   Compiling wry v0.57.0
+   Compiling tauri-runtime v2.12.1
+   Compiling unicode-normalization v0.1.25
+   Compiling utf16string v0.2.0
+   Compiling itertools v0.15.0
+   Compiling http-body-util v0.1.5
+   Compiling atoi v2.0.0
+   Compiling softbuffer v0.4.8
+   Compiling futures-executor v0.3.34
+   Compiling keyboard-types v0.8.3
+   Compiling tokio-util v0.7.19
+   Compiling keyring-core v1.0.0
+   Compiling serialize-to-javascript-impl v0.1.2
+   Compiling lazy_static v1.5.0
+   Compiling rfd v0.17.2
+   Compiling base64 v0.23.1
+   Compiling bytemuck v1.25.2
+   Compiling maybe-owned v0.3.4
+   Compiling typed-path v0.12.3
+   Compiling zip v9.0.5
+   Compiling reqwest v0.13.5
+   Compiling sharded-slab v0.1.7
+   Compiling serialize-to-javascript v0.1.2
+   Compiling windows-native-keyring-store v1.1.0
+   Compiling tauri-macros v2.7.1
+   Compiling dirs v7.0.0
+   Compiling window-vibrancy v0.8.1
+   Compiling nu-ansi-term v0.50.3
+   Compiling bridge v0.7.0 (<BUILD-L checkout>\src-tauri)
+   Compiling sha1 v0.11.0
+   Compiling matchers v0.2.0
+   Compiling tracing-log v0.2.0
+   Compiling async-trait v0.1.92
+   Compiling serde_repr v0.1.21
+   Compiling thread_local v1.1.10
+   Compiling fastrand v2.5.0
+   Compiling ryu v1.0.23
+   Compiling mime v0.3.17
+   Compiling heck v0.5.0
+   Compiling bridge-tally-core v0.1.0 (<BUILD-L checkout>\src-tauri\crates\bridge-tally-core)
+   Compiling pdf-writer v0.15.0
+   Compiling tempfile v3.27.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling bridge-bank-statement v0.1.0 (<BUILD-L checkout>\src-tauri\crates\bridge-bank-statement)
+   Compiling bridge-tax-audit v0.1.0 (<BUILD-L checkout>\src-tauri\crates\bridge-tax-audit)
+   Compiling bridge-tally-transport v0.1.0 (<BUILD-L checkout>\src-tauri\crates\bridge-tally-transport)
+   Compiling keyring v4.2.0
+   Compiling rust_xlsxwriter v0.100.0
+   Compiling libsqlite3-sys v0.37.0
+   Compiling sqlx-sqlite v0.9.0
+   Compiling sqlx v0.9.0
+warning: variable does not need to be mutable
+   --> src\agent_lab.rs:341:9
+    |
+341 |     let mut builder = fs::DirBuilder::new();
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `bridge` (lib) generated 1 warning (run `cargo fix --lib -p bridge` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 27m 07s
+exit 0 end 2026-11-04T08:47:18Z

@@ -1,0 +1,9 @@
+2026-11-04T08:08:56Z exe sha256 9bda7144f54e5ef68477b5ca30be33a17759de2e1ad756f840785c67bcab2dc0 ok; launch-env.json sha256 9090ce0660f4f42bb188fe224c482106c27e76efe5404a66a3f74ef815254e7d; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: False
+2026-11-04T08:08:56Z launched pid 14948; stderr to server-stderr-20261104T080856Z.log
+2026-11-04T08:08:56Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-04T08:09:05Z 000-tools.json tool=list secs=0.019 isError=None error=None saved_sha256=c82127d3dc0d1d6431904728d2e35b0dc43588fea45342feac76c8b6657baa16
+2026-11-04T08:09:07Z 001-a1-list-companies.json tool=list_companies secs=0.235 isError=False error=None saved_sha256=22a40e01ef4ee9db5403fda90fa7bcb8c88d9ace35cf8adf3c44cfa826cb986c
+2026-11-04T08:09:08Z 002-a1-tally-status.json tool=tally_status secs=0.164 isError=False error=None saved_sha256=84ebbec09807d518fb625d6ee47d9d5a01f22028ac79293855d7959399fbedc5
+2026-11-04T08:10:18Z 003-a3-trial-balance-p0.json tool=trial_balance secs=2.667 isError=False error=None saved_sha256=3e3a3df51cea1e2a7b2a415191a17ddc8d6fdffb7317de6228213db99f14d1e6
+2026-11-04T08:16:08Z 004-b4-trial-balance-p0.json tool=trial_balance secs=1.829 isError=False error=None saved_sha256=0cdfa5bef5e6c9ca81947e61cbc11970d317ed760f7171b4e37476615391ed9a
+2026-11-04T08:47:35Z session ended; server pid 14948 exit code 0

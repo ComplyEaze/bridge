@@ -16,7 +16,7 @@ descendants: 19
 14 | ControlType.Pane | class=ToolbarWindow32 | name=User Promoted Notification Area
 15 | ControlType.Pane | class=TrayInputIndicatorWClass | name=Tray Input Indicator
 16 | ControlType.Pane | class=InputIndicatorButton | name=
-17 | ControlType.Pane | class=TrayClockWClass | name=System Clock, 11:52, ‎04-‎11-‎2026
+17 | ControlType.Pane | class=TrayClockWClass | name=System Clock, 11:52, 04-11-2026
 18 | ControlType.Pane | class=TrayButton | name=Action Center, 5 new notifications
 19 | ControlType.Pane | class=TrayShowDesktopButtonWClass | name=
 MSTaskListWClass children: 0

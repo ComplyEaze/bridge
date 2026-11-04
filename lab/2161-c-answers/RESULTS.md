@@ -28,6 +28,8 @@ Tally's title was clicked by the runner, and Tally was in front. One read set X 
 - **A managed `System.Windows.Automation` walk of `Shell_TrayWnd`** (all descendants, read-only; `uia-walk-diag.txt`) lists 19 elements, all `ControlType.Pane` window elements: Start, the search box, Task View, `ReBarWindow32`, `MSTaskSwWClass` and `MSTaskListWClass` ("Running applications"), and the notification area. `MSTaskListWClass` has 0 children. (verified)
 - **Hypothesis, unverified:** .NET's managed UI Automation client sees the Windows 10 taskbar only through its Win32 window proxy, and does not reach the task list's own UI Automation buttons. If so, `taskbar-uia.ps1` reads 0 on this PC whatever is open, and a COM `IUIAutomation` read would be needed. (hypothesis)
 
+- **Bidi marks removed (forward commit):** the clock's name in `uia-walk-diag.txt` (line 19, `TrayClockWClass`) held three U+200E left-to-right marks that Windows puts in the date. They were removed, and nothing else in the file changed. The file's sha256 in `SHA256.txt` is refreshed. (verified)
+
 ## Close (C10)
 
 - **MARKS while loaded:** ALTVCHID 87, ALTMSTID 224, the answer byte-equal to P0's. (verified)

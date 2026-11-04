@@ -573,6 +573,16 @@ No fixture in this repository was captured with this FETCH list before this date
 observed shapes (empty and `SHAPELAB-MANUAL-1`/`Yes`/`No`) into an existing captured voucher
 fixture, following §8.2a's own convention for a shape not yet exercised in the committed corpus.
 
+**A supplier reference keyed twice is saved against the first bill (PARTIAL 2026-10-27: TallyPrime
+7.2 Silver, one synthetic book, one pair, `lab/1867-l3-answers`, the fixtures `gst-ledger-l3`).** A
+second Purchase keyed with the `REFERENCE` and `REFERENCEDATE` of an earlier one, on the same party,
+was saved after Tally warned that the reference had been used. In the class-entry window both carry
+that `REFERENCE`. The earlier one's party entry holds a `BILLALLOCATIONS.LIST` of `BILLTYPE`
+`New Ref`, and the second one's holds `Agst Ref`, with the same bill `NAME` and `BILLID`.
+`gst_by_counter_ledger` sets the second one aside as `bill_already_opened` only when its
+counter-ledger amount and every tax head equal the first one's, and lists any other attributed
+Purchase that is `Agst Ref` (bridge#2069).
+
 ### 8.2d A ledger's `CURRENCYNAME` is the NAME of the Currency master it is kept in — **VERIFIED 2026-09-23; TallyPrime 7.1, synthetic and client-derived books**
 
 **Scope:** TallyPrime 7.1 Silver, licensed, `education_mode: false`. `CURRENCYNAME` appended to the

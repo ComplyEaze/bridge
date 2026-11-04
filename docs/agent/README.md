@@ -1052,7 +1052,15 @@ entry on a ledger under Duties & Taxes whose master carries a recognised GST dut
   not look, such as an item invoice of a shape not measured whose purchase ledger is in an inventory allocation), `sales_ledger_present`,
   `gst_on_both_sides` (reverse-charge and set-off journals), `other_ledgers_present` (any other group, such as Current
   Assets or Stock-in-Hand), `no_creditor_party` (such as a GST challan payment),
-  `no_counter_ledger` or `several_counter_ledgers`.
+  `no_counter_ledger` or `several_counter_ledgers`; or
+- **set aside as `bill_already_opened`**, decided across the window after the others: a Purchase whose Sundry
+  Creditors entry is `Agst Ref` to a bill another attributed Purchase of the window opened (`New Ref`) on the same
+  party ledger, when its counter-ledger amount and every tax head equal the opener's. It is a supplier invoice keyed
+  twice; the opener stays attributed. A Purchase that also opens a bill of its own is never taken as a copy.
+
+`agst_ref_purchase` lists, at most 100, every other attributed Purchase that is `Agst Ref` to a bill: a supplementary
+invoice, a copy whose amounts differ, or a bill opened before the window. Each stays counted, so the CA checks it. A
+Debit Note or Journal against a bill is neither set aside nor listed by this (bridge#2069).
 
 `counter_ledgers` gives, per ledger, its `ledger_guid` (Tally's GUID of the ledger), its predefined `group`, its `parent` (masked like a ledger name when it is a group
 the book named), `vouchers`, `debit_side_tax` (negative, as

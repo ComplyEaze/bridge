@@ -1,11 +1,10 @@
 Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
-notes.txt: original 11641 B sha256 4247c75e37d35deed60b46495b03daddf7aafa1e83cc1be238070add30a61156 (kept on the lab PC); 4 x -> <LAB_DIR>
-RESULTS.md: original 12146 B sha256 72fc6aeb4da381c7cc3a9a2bbab69c9fadb8ddcc112c5bd1532386edaf269d1f (kept on the lab PC); 3 x -> <LAB_DIR>; 1 x -> <lab folder>
+notes.txt: original 12015 B sha256 e7a84b078d1244b6da9fc6f2edaabdbad5a8cbdead281635ba588c7f296f9340 (kept on the lab PC); 4 x -> <LAB_DIR>
+RESULTS.md: original 12328 B sha256 05814579b760ad00427717bedc091e9b6ab527a9cfefe8102623ea50bd96f0a7 (kept on the lab PC); 3 x -> <LAB_DIR>; 1 x -> <lab folder>
 evidence/a0-before-c2-netstat.txt: original 10906 B sha256 2b2b1b0186fa7abf421bb8f076907b593d588d78556e9d48ed500ddf84330e08 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
 evidence/a0-c2-netstat.txt: original 14112 B sha256 dd4ffba1126fd4f7bd93ad8284bb381af9df98af839f95a055cf4886e763bb3f (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
 evidence/b0-c2-netstat.txt: original 16671 B sha256 b75e11be7c2684e3a8edffcc7d14262adf04a06f83cc36283b0872d61cd5d3e5 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
 evidence/c10-c2-netstat.txt: original 9955 B sha256 a814ad0b520740b6d7719c03e80e629e4544964227e389afddb4c91a51af88e9 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
-build/build-log.txt: original 17817 B sha256 fd5e4720a9918f21b80a6790efa41148521cdba525d0f6926adbfd43c83cc5bb (kept on the lab PC); 10 x -> <BUILD-L checkout>
 run/launch-env.json: original 149 B sha256 9090ce0660f4f42bb188fe224c482106c27e76efe5404a66a3f74ef815254e7d (kept on the lab PC); 1 x -> <LAB_DIR>
 run-l/launch-env.json: original 284 B sha256 5e582ce227c85925d2beafdbe69fb0c5b947f74682a8038be32093e96103eab0 (kept on the lab PC); 1 x -> <LAB_DIR>
 send738.py: original 2933 B sha256 708465e399027a1dfc887cde9c87bca742d7974d0838618ac8123f37f21a299a (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop

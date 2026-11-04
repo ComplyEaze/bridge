@@ -43,7 +43,7 @@ The sheet is `lab/738-a/RUN-SHEET.md` at 7795e0b9; its SHA256.txt is 7 of 7 equa
 - **BUILD-M:** CI run <CI run id>, artifact <CI artifact id>. The zip's sha256 1940bd9736edc2aa76d811b3bcd0d6229ee69b5e01f5f59321a46b6ca28f691a equals the digest. `bridge_mcp.exe` 9bda7144f54e5ef68477b5ca30be33a17759de2e1ad756f840785c67bcab2dc0, equal to `mcpb-smoke.json`'s, before and after. (verified)
 - **BUILD-L:** built on the lab PC in a clean detached checkout of master **44be49d3bc146c84ddcbf6e25920defe360b4a60**, which contains cd100807. The command was `cargo build --locked --release --manifest-path src-tauri/Cargo.toml -p bridge --bin bridge_mcp --features lab-writes` (cargo and rustc 1.96.0). `bridge_mcp.exe` is 35,630,080 B, sha256 **21a66eabf2ca09d1baf708f2379343ba4e0b9b2626f49ff9571efbb114182edf**, the same before B6 and after B9. (verified)
   - The first build stopped in openssl-sys's build script: Git Bash's perl could not load `Locale::Maketext::Simple` for OpenSSL's Configure.
-  - The same command was then run in the same checkout with `PERL` and `OPENSSL_SRC_PERL` set to the PC's Strawberry Perl. It finished in 27 min 07 s. No source changed. (`build/build-log.txt`)
+  - The same command was then run in the same checkout with `PERL` and `OPENSSL_SRC_PERL` set to the PC's Strawberry Perl. It finished in 27 min 07 s. No source changed. (The build log stays on the lab PC, listed in `kept-local.txt`.)
 - **The client:** the 852-C1 inbox stdio client (`run/client.py`). It never cancels and has no call limit of its own. One process per build, each with a new empty data folder.
   - **BUILD-M:** TERMS true, host 127.0.0.1, port 9001; WRITES, BATCH_POST, TAX_AUDIT and REDACTION unset.
   - **BUILD-L:** the same, plus ENABLE_TAX_AUDIT true, LAB_WRITES 1 and LAB_TARGET_GUID THE COMPANY's; LAB_DENY_GUIDS, WRITES, IMPORT and REDACTION unset.
@@ -51,7 +51,7 @@ The sheet is `lab/738-a/RUN-SHEET.md` at 7795e0b9; its SHA256.txt is 7 of 7 equa
 
 ## Kept on the lab PC
 
-No captured byte is altered. A captured file is pushed whole unless it holds the company number, or a run of 10 or more digits that is not inside a whole 64-hex or 40-hex hash value. Such files are listed in `kept-local.txt` by size and sha256, with structure lines in `evidence/kept-structure.txt`.
+No captured byte is altered. A captured file is pushed whole unless it holds the company number, or a run of 10 or more digits that is not inside a whole 64-hex or 40-hex hash value. Such files are listed in `kept-local.txt` by size and sha256, with structure lines in `evidence/kept-structure.txt`. The BK0 folder's listing before the backup and the build log also stay local, whole: each holds a word the evidence gate refuses. (verified)
 
 Seven tool answers stay local because they carry the company number: both `list_companies`, `tally_status`, both `trial_balance` reads and both `audit_test_run` answers. The audit answers also carry the 10-digit threshold, 1,000,000,000 paise. Every value quoted above was read from these files by the lab. Each read's `result` member is also hashed as canonical JSON (`json.dumps(obj, sort_keys=True, separators=(",",":"), ensure_ascii=False).encode("utf-8")`, leaving out company, evidence, read_at and truncated); those bytes are written to no file. (verified)
 

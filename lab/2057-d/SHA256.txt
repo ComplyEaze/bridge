@@ -1,7 +1,7 @@
 # sha256  bytes  file  (every file but RUN-SHEET.md byte-equal to lab/2057-c-sheet at 67b12237; LAB-COMMON.md byte-equal to lab/2057-b-sheet; templates/ byte-equal to the two committed fixtures named in gen_requests.py; requests/ from gen_requests.py)
 d13bfb7ad438ed990b12090ee49e38d6d751345e951ff6048bc7ae5136a74149  66  .gitattributes
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
-d0d6f81823b7f5d518018a79f51e6dfb3c209d0bebea3e2898f6f01325d388c8  28282  RUN-SHEET.md
+d221094810b2283c6a197a2b447b7813edfb44fde8399e9bce24813a0ebd7b17  28420  RUN-SHEET.md
 46adbff1ed7e7e6b8aa081b8cf36b41c0a356d166697fa89791d74172a47e5ab  3672  gen_requests.py
 47cf36c300a5cc31297033dba27c6233729e93d3ad6e17d72022e73d28352d9c  1740  templates/a07-vouchers-shape-20250424.xml
 df30b272695f5ce6170d41f05730b8dac0ecdd7c514c8c598c7d42e8e5835cd1  3122  templates/sl-stock-lines-20260520.xml

@@ -1,0 +1,15 @@
+2026-11-04T13:21:54Z exe sha256 ace7cdb0b79a6bc6d91229d7530c29badc2b6ea8c9a93acf7ea8e2e08ad05928 ok; launch-env.json sha256 2cf2913ba846d64a45294c514c8032a1d4fae9b14a4de6a748c630997bf4eee6; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-04T13:21:54Z launched pid 22196; stderr to server-stderr-20261104T132154Z.log
+2026-11-04T13:22:29Z exe sha256 ace7cdb0b79a6bc6d91229d7530c29badc2b6ea8c9a93acf7ea8e2e08ad05928 ok; launch-env.json sha256 2cf2913ba846d64a45294c514c8032a1d4fae9b14a4de6a748c630997bf4eee6; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-04T13:22:29Z launched pid 10576; stderr to server-stderr-20261104T132229Z.log
+2026-11-04T13:22:29Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-04T13:22:44Z 000-tools-list.json tool=list secs=0.012 isError=None error=None saved_sha256=b4021e36cadc4e2bd8dc998aa934bd3f8c05c4c5d3705d95cef2f7b5f3a155ec
+2026-11-04T13:22:45Z 001-r1-list-companies.json tool=list_companies secs=0.115 isError=False error=None saved_sha256=4dc9a2307082b474a52baaf5f344108912f98e512e7ced4ab23cc569089e6f62
+2026-11-04T13:23:08Z 002-r2-godowns.json tool=masters secs=0.953 isError=False error=None saved_sha256=763bd7d7d68dd3baf489e0ad8eb3824bf027357d944881d532c11843200ab68c
+2026-11-04T13:23:23Z 003-r3-units.json tool=masters secs=0.936 isError=False error=None saved_sha256=e162927f8371842f7ebcfb0d9b49ce1fd8e31bfc87cd1aeef708a5937bb2bdec
+2026-11-04T13:23:25Z 004-r4-stock-items.json tool=masters secs=0.846 isError=False error=None saved_sha256=d809326e6498638decd847857c4e04a47d35e2d9d6f62a03be0c2d6645aeea11
+2026-11-04T13:23:27Z 005-r5-vchtypes.json tool=masters secs=0.866 isError=False error=None saved_sha256=490b8370ca1095fcc2e633a37af5e599201f864ef172921c332d11cff38951b9
+2026-11-04T13:23:35Z 006-r6-sales-ledgers.json tool=ledger_masters secs=1.562 isError=False error=None saved_sha256=c98d754eb634f9919f751bc1beb9f7e08f5ca7e3b5681302210f5b82483790f3
+2026-11-04T13:23:38Z 007-r7-debtors.json tool=ledger_masters secs=1.586 isError=False error=None saved_sha256=489ac9ed810732df6cf4efdfdc3a59a86cf8a1522535b6d31073ac3aed0ad873
+2026-11-04T13:23:41Z 008-r8-duties.json tool=ledger_masters secs=1.597 isError=False error=None saved_sha256=3d0a874abf001ec28b42e41375f01a5d9abb3809afeb1248e2e6039d63c7d6b1
+2026-11-04T13:23:57Z session ended; server pid 10576 exit code 0

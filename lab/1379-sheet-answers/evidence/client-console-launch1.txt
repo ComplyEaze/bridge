@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "<LAB_DIR>\srv\run-client.py", line 72, in <module>
+    with open(os.path.join(ROOT, 'step0', 'initialize.json'), 'w', encoding='utf-8', newline=chr(10)) as f:
+FileNotFoundError: [Errno 2] No such file or directory: '<LAB_DIR>\\srv\\step0\\initialize.json'

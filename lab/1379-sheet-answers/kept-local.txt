@@ -1,0 +1,13 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+srv/answers/001-r1-list-companies.json 1563 B 4dc9a2307082b474a52baaf5f344108912f98e512e7ced4ab23cc569089e6f62 (company number)
+srv/answers/002-r2-godowns.json 4344 B 763bd7d7d68dd3baf489e0ad8eb3824bf027357d944881d532c11843200ab68c (company number)
+srv/answers/003-r3-units.json 3860 B e162927f8371842f7ebcfb0d9b49ce1fd8e31bfc87cd1aeef708a5937bb2bdec (company number)
+srv/answers/004-r4-stock-items.json 44373 B d809326e6498638decd847857c4e04a47d35e2d9d6f62a03be0c2d6645aeea11 (company number)
+srv/answers/005-r5-vchtypes.json 28929 B 490b8370ca1095fcc2e633a37af5e599201f864ef172921c332d11cff38951b9 (company number)
+srv/answers/006-r6-sales-ledgers.json 9560 B c98d754eb634f9919f751bc1beb9f7e08f5ca7e3b5681302210f5b82483790f3 (company number)
+srv/answers/007-r7-debtors.json 8306 B 489ac9ed810732df6cf4efdfdc3a59a86cf8a1522535b6d31073ac3aed0ad873 (company number)
+srv/answers/008-r8-duties.json 10297 B 3d0a874abf001ec28b42e41375f01a5d9abb3809afeb1248e2e6039d63c7d6b1 (company number)
+raw/m-a.xml 4894 B 6b68c769a11de31494248b096ad683cd669eb44613b3d22df33d1f353cd2efe1 (company number)
+raw/m-b.xml 4894 B 6b68c769a11de31494248b096ad683cd669eb44613b3d22df33d1f353cd2efe1 (company number)
+raw/s0-marks.xml 4894 B 6b68c769a11de31494248b096ad683cd669eb44613b3d22df33d1f353cd2efe1 (company number)
+stage-1379r.py 7756 B fa2319495d876cb591d4084a86a3e5188fff4104f8697e62745629d9121b155d (this stage script: its patterns name the lab paths)

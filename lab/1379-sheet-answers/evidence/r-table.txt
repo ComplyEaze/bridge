@@ -1,0 +1,83 @@
+1379 Part R: the parser table (JSON answers as returned; one page each). A field the answer does not carry reads "not returned".
+
+## r2 masters godowns: 3 rows
+- name 'Lab Godown A'; parent '&#4; Primary'; master_id 208
+- name 'Lab Godown B'; parent '&#4; Primary'; master_id 209
+- name 'Main Location'; parent '&#4; Primary'; master_id 99
+Exactly one godown: no (3). Tally's default "Main Location" among them: yes.
+
+## r3 masters units: 2 rows
+- name 'Kgs'; decimal_places 3; simple True
+- name 'U.'; decimal_places 0; simple True
+
+## r4 masters stock_items: 55 rows (keys returned per item: ['alter_id', 'gst', 'guid', 'hsn', 'inherited_from_group_or_company', 'master_id', 'name', 'parent']; base unit: not returned)
+- name "Lab Item's 08"; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 01'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 02'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 03'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 04'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 05'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 06'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 11'; parent '&#4; Primary'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 13'; parent '&#4; Primary'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item 14'; parent 'Lab Group C'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item A & B 07'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Lab Item No. 09'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 001'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 002'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 003'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 004'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 005'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 006'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 007'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 008'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 009'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 010'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 011'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 012'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 013'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 014'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 015'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 016'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 017'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 018'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 019'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 020'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 021'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 022'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 023'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 024'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 025'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 026'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 027'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 028'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 029'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 030'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 031'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 032'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 033'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 034'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 035'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 036'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 037'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 038'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 039'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Bulk 040'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Test 01'; parent 'Lab Group C'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Test 02 Renamed'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+- name 'Stale Test 03'; parent 'Lab Raw Materials'; base unit not returned; gst {"entries": [], "observation": "entries"}; hsn {"entries": [], "observation": "entries"}; inherited_from_group_or_company 'not_read'
+Counts: with a GST rate entry 0; with an HSN entry 0; with neither 55; of 55.
+
+## r5 masters voucher_types: 24 rows; of the Sales class (parent "Sales"): 1
+- name 'Sales'; active True; numbering_method 'default'; series_numbering {"duplicates": "not_prevented", "method": "automatic", "observation": "observed", "sub_method": "auto_retain"}
+
+## r6 ledger_masters Sales Accounts (ancestry, compliance, gst details): 1 rows; group_filter {"excluded_subgroup_ledgers": {"count": 0, "group_count": 0, "groups": []}, "group": "Sales Accounts", "scope": "ancestry", "unresolved_ancestry_ledgers": 0}
+- name 'Lab Sales'; parent 'Sales Accounts'; tax_type 'Others'; gst_duty_head {"observation": "not_tax_ledger", "tax_type": "Others"}; affects stock not returned
+  gst_details {"entries": [{"applicable_from": "20250401", "ineligible_itc": true, "other_content_skipped": false, "source": "As per Company/Group", "states": [{"rates": [{"duty_head": "CGST", "rate": {"kind": "absent"}, "valuation_type": "Based on Value"}, {"duty_head": "SGST/UTGST", "rate": {"kind": "absent"}, "valuation_type": "Based on Value"}, {"duty_head": "IGST", "rate": {"kind": "absent"}, "valuation_type": "Based on Value"}, {"duty_head": "Cess", "rate": {"kind": "absent"}, "valuation_type": "�#4; Not Applicable"}, {"duty_head": "State Cess", "rate": {"kind": "absent"}, "valuation_type": "Based on Value"}], "slab_rates_present": false, "state_name": "�#4; Any"}], "taxability": null}], "observation": "entries"}
+
+## r7 ledger_masters Sundry Debtors (ancestry, compliance, gst details): 1 rows; group_filter {"excluded_subgroup_ledgers": {"count": 0, "group_count": 0, "groups": []}, "group": "Sundry Debtors", "scope": "ancestry", "unresolved_ancestry_ledgers": 0}
+- name 'Lab Customer One'; parent 'Sundry Debtors'; registration type None; gst_registrations {"entries": [], "observation": "entries"}; GSTIN status 'not_reported'; state None; bill-wise not returned
+
+## r8 ledger_masters Duties & Taxes (ancestry, compliance, gst details): 2 rows; group_filter {"excluded_subgroup_ledgers": {"count": 0, "group_count": 0, "groups": []}, "group": "Duties & Taxes", "scope": "ancestry", "unresolved_ancestry_ledgers": 0}
+- name 'Lab Output CGST'; parent 'Duties & Taxes'; tax_type 'GST'; gst_duty_head {"head": "cgst", "observation": "recognized", "raw": "CGST"}; own rate details (gst_details) {"entries": [], "observation": "entries"}
+- name 'Lab Output SGST'; parent 'Duties & Taxes'; tax_type 'GST'; gst_duty_head {"head": "sgst_utgst", "observation": "recognized", "raw": "SGST/UTGST"}; own rate details (gst_details) {"entries": [], "observation": "entries"}

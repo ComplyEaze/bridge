@@ -1,0 +1,15 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+notes.txt: original 4879 B sha256 45b2a0d636d9111d0c46882a918a35a775464365647280dc77a3f0c548191dda (kept on the lab PC); 1 x -> <CI run id>; 1 x -> <CI artifact id>
+evidence/client-console-launch1.txt: original 323 B sha256 c5525f4fc3589bb1921dc29381fbd967fcd7145c18943b8896155f65e2837cd6 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/exe-sha-end.txt: original 142 B sha256 c42b0df22a3036a257637b33b7cb9dca1d0f526fe5c20ed21f32a98decdbb201 (kept on the lab PC); 1 x -> <CI build>
+evidence/s0-c2-netstat.txt: original 8905 B sha256 f7287d458bcb4ce29bef3ba879e8195b9663c2903b384e2c0d48a2358ced4766 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s4-c2-netstat.txt: original 9200 B sha256 168fc2f78203d80d25b03246843136d3748d1ca967fb6c7f7f8f91dfe6146f37 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+srv/launch-env.json: original 154 B sha256 2cf2913ba846d64a45294c514c8032a1d4fae9b14a4de6a748c630997bf4eee6 (kept on the lab PC); 1 x -> <LAB_DIR>
+call.py: original 1906 B sha256 a2397f4c2263176c49f411530edb6d04b87bbe1cf5b6e2cb5834f3562d6c9cff (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+c2.py: original 1310 B sha256 008be390f081f8371567f96ffa1b1bda9e6dc8eb29183f42763bc0357ab53c13 (kept on the lab PC); 1 x -> <LAB_DIR>
+cap.py: original 778 B sha256 1ba67365080e1b7bef468ccfb087a6fc0e448f7cce6efe75731a85e3bc8e0042 (kept on the lab PC); 2 x -> <LAB_DIR>
+raw.ps1: original 1143 B sha256 880b45f1761980f44ff6209f4ce021bdc5a958aa1fe8d9cccd1dc966dff38f06 (kept on the lab PC); 5 x -> <LAB_DIR>; 1 x -> <lab folder>
+marks-c4.py: original 1684 B sha256 378c4b3cc64c96e8fd7583e714b72a1bb1a8c291a85ed9e8c7ab6e38cc349c9c (kept on the lab PC); 1 x -> stop
+pages.py: original 1997 B sha256 1ac9dab956823a0f74b2b3143fe8b960484f0849f38948e9dfa0260a6a64a44b (kept on the lab PC); 1 x -> <LAB_DIR>
+table.py: original 3854 B sha256 864b66257677c50784732f7b108bc518fd93fec50499ed4e052d58a3071f5bc4 (kept on the lab PC); 1 x -> <LAB_DIR>
+srv/run-client.py: original 5013 B sha256 f90d9d2a81495390bee43de5d934955e55ab074ee6b77213abfd5cbe77624b28 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <CI build>

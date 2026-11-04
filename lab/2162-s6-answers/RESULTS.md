@@ -4,6 +4,7 @@
 - Every Y1 answer is byte-equal to its window's Y0 answer, and count6 finds it element-for-element equal to Y0's Sales-class rows (day, month and year). The filter serves.
 - Every voucher this book holds in the year is Sales class: 29,900 of 29,900. So this book does not measure the cut.
 - The year's answer is 83,742,646 B, above the transport's 32 MiB. Y0-year took 44.06 s and Y1-year 13.06 s (twice), both above its 20 s.
+  - Correction (4 Nov 2026): the line above is wrong on Y1-year. Of the year reads, only Y0-year (44.06 s) is above the 20 s; Y1-year (13.06 s, both times) is below it. The control read N1 (24.81 s) is also above it. The line above is kept as first written.
 - The control read N1 (24.81 s) equals Y0-year's row numbered `1`. (verified)
 
 Sheet `lab/2162-s6/ROW.md` at 49fa4c17; SHA256.txt 14 of 14 equal. Reads only, with no Bridge build. Every send is in `run/log-*.txt` and `notes.txt` (UTC). count6.py's whole output after each step is in `evidence/count6-after-*.txt`.

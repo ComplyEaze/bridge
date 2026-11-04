@@ -1,0 +1,11 @@
+003-s1-ledgers-gst.json rows now 6 31 Oct 6 top keys ['compliance', 'fields', 'items', 'limitations', 'offset', 'snapshot', 'total']
+  Cash: equal
+  Lab CGST: equal
+  Lab Purchases: equal
+  Lab SGST: equal
+  Lab Supplier: equal
+  Profit & Loss A/c: equal
+004-s1-vchtypes.json rows now 0 31 Oct 0 top keys ['basis', 'company_guid', 'kind', 'limitations', 'masters', 'next_offset', 'offset', 'snapshot', 'state', 'total', 'verification']
+  Purchase: equal
+rows 24 24 total 24 24 Purchase rows 1 1
+Purchase row equal: True

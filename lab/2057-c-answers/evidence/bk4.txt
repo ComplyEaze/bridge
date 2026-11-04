@@ -1,0 +1,1 @@
+TDBK1800_<company number>.001 24100 B sha256 e08bd0136b05e1a525c642ac1e51d9a1b8c905cbcf06884a5f8033fb9da23041 17:05 local (name = TDBK1800_ + the book folder + .001: True)

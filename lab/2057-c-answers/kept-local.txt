@@ -1,0 +1,9 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+srv/answers/001-list-companies.json 1581 B 7da0a4ce759c5e76a7bbecab807ccde5e510dc60dadd1a893de1d45ec0e7c88f (company number)
+srv/answers/002-marks-s1-M0V0.json 3500 B d3a58ef945e01e28733f24e145ce5ebb611fa36c139b6b07dd243272a8e892ef (company number)
+srv/answers/003-s1-ledgers-gst.json 17087 B 21f5c99461b6c7ae58dace51e1e44acfeb5135ff1bcb4a0434823df1335a5a2c (company number)
+srv/answers/004-s1-vchtypes.json 28955 B e7f210d11d022a5b6fe35ab1381e4148151d319917852e07d8f09fd78e22189d (company number)
+srv/answers/005-marks-s2-after-bk4.json 3500 B b30e349d59a7cb9f00a21da0eb2c24e0c99873b8d5e5027ccd8dc0cb7088c781 (company number)
+srv/answers/006-marks-s2b-after-look.json 3500 B 8576aebd67e0f73c491df6290a8b6754ef068d12a34c8260ad24f381d8daa5e5 (company number)
+backups/bk4/TDBK1800_<company number>.001 (BK4) 24100 B e08bd0136b05e1a525c642ac1e51d9a1b8c905cbcf06884a5f8033fb9da23041 (the backup: never pushed)
+stage-2057c.py 7879 B 45349588713fbd1db6f77a1fa0c58b364f1248c0a59413166d5983ba5b1c96e8 (this stage script: its patterns name the lab paths)

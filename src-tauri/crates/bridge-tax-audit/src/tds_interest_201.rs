@@ -1636,6 +1636,37 @@ mod tests {
     }
 
     #[test]
+    fn a_payee_is_classified_only_under_its_exact_name() {
+        let rules = Rules::vendored().unwrap();
+        let payees = payees_result(
+            "deductor",
+            vec![
+                finding("tds_payees/deductor_status", "deductor_status"),
+                finding("tds_payees/194C_aa", "credited"),
+            ],
+        );
+        let partners = TestResult::new(partners_40b_194t::TEST_ID, "1", "r");
+        // A ledger's name is kept as the book has it, and the list is matched by exact name.
+        let foreseeability: BTreeMap<String, Foreseeability> =
+            [("Payee A".to_string(), Foreseeability::OneOff)].into();
+        let rows = assemble_rows(
+            &rules,
+            &payees,
+            &payee_table("194C_aa", "Payee A "),
+            &partners,
+            &PartnerTranches::new(),
+            false,
+            &foreseeability,
+        )
+        .unwrap();
+        assert_eq!(rows.len(), 4);
+        assert!(
+            rows.iter().all(|r| r.foreseeability.is_none()),
+            "\"Payee A \" is not the listed \"Payee A\""
+        );
+    }
+
+    #[test]
     fn s194j_categories_take_their_rates() {
         let rates = Rules::vendored().unwrap().tds_rates.unwrap();
         let rate_list = |cat: &str| payee_rates("194J", cat, &rates).unwrap().1;

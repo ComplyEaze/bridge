@@ -14828,8 +14828,8 @@
   "by": "author",
   "what": "tds_interest_201: the still-not-deducted fact points at the maximum",
   "file": "src/tds_interest_201.rs",
-  "from": "(\"interest_if_not_deducted\", f_not_deducted),",
-  "to": "(\"interest_if_not_deducted\", f_max.clone()),"
+  "from": "            (\"interest_max\", f_max),\n            (\"interest_if_not_deducted\", f_not_deducted),",
+  "to": "            (\"interest_max\", f_max.clone()),\n            (\"interest_if_not_deducted\", f_max),"
  },
  {
   "id": "TI-61",

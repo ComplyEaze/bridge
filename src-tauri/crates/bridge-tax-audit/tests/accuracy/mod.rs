@@ -99,6 +99,7 @@ pub const FAMILIES: &[&str] = &[
     "cash_payments_40a3/s269st_payment/{",
     "cash_payments_40a3/s40a3/{",
     "clause21a_candidates/{",
+    "clause42_sft/candidates",
     "clause44/breakup",
     "clause44/interest_individual_no_gstin_candidate",
     "clause44/judgement_money_item_candidate",

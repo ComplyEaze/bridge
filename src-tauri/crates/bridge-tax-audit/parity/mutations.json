@@ -636,8 +636,8 @@
   "by": "author",
   "what": "registry find matches a prefix",
   "file": "src/registry.rs",
-  "from": "    PORTED.iter().find(|t| t.id == id)",
-  "to": "    PORTED.iter().find(|t| t.id.starts_with(id))"
+  "from": "    PORTED.iter().chain(CRATE_FIRST).find(|t| t.id == id)",
+  "to": "    PORTED.iter().chain(CRATE_FIRST).find(|t| t.id.starts_with(id))"
  },
  {
   "id": "F04",
@@ -14278,5 +14278,77 @@
   "file": "src/book.rs",
   "from": "    check_voucher_identity(&parts)?; // C11, over every part together\n",
   "to": ""
+ },
+ {
+  "id": "C42-01",
+  "by": "author",
+  "what": "the limit is not strict",
+  "file": "src/clause42_sft.rs",
+  "from": "        if debits > limit.paise() {\n",
+  "to": "        if debits >= limit.paise() {\n"
+ },
+ {
+  "id": "C42-02",
+  "by": "author",
+  "what": "Contra is listed",
+  "file": "src/clause42_sft.rs",
+  "from": "        if v.base_type == \"Contra\" {\n            continue;\n        }\n",
+  "to": ""
+ },
+ {
+  "id": "C42-03",
+  "by": "author",
+  "what": "a cash credit reduces the voucher's cash",
+  "file": "src/clause42_sft.rs",
+  "from": "l.amount_paise > 0 && cash.contains(&l.ledger)",
+  "to": "cash.contains(&l.ledger)"
+ },
+ {
+  "id": "C42-04",
+  "by": "author",
+  "what": "a debit to any ledger counts as cash",
+  "file": "src/clause42_sft.rs",
+  "from": "l.amount_paise > 0 && cash.contains(&l.ledger)",
+  "to": "l.amount_paise > 0"
+ },
+ {
+  "id": "C42-05",
+  "by": "author",
+  "what": "vouchers outside the books population are listed",
+  "file": "src/clause42_sft.rs",
+  "from": "    for v in book.population()? {\n",
+  "to": "    for v in &book.vouchers {\n"
+ },
+ {
+  "id": "C42-06",
+  "by": "author",
+  "what": "a limit of zero or less is admitted",
+  "file": "src/clause42_sft.rs",
+  "from": "            Some(paise) if paise > 0 => Ok(Self(paise)),\n",
+  "to": "            Some(paise) => Ok(Self(paise)),\n"
+ },
+ {
+  "id": "C42-07",
+  "by": "author",
+  "what": "a voucher's cash total wraps instead of refusing",
+  "file": "src/clause42_sft.rs",
+  "from": ".try_fold(0i64, |sum, l| sum.checked_add(l.amount_paise))",
+  "to": ".try_fold(0i64, |sum, l| Some(sum.wrapping_add(l.amount_paise)))"
+ },
+ {
+  "id": "C42-08",
+  "by": "author",
+  "what": "candidates keep the book's order",
+  "file": "src/clause42_sft.rs",
+  "from": "(a.date.as_str(), voucher_label(a), &a.guid).cmp(&(",
+  "to": "(b.date.as_str(), voucher_label(b), &b.guid).cmp(&("
+ },
+ {
+  "id": "C42-09",
+  "by": "author",
+  "what": "a table other than sft_013 is read",
+  "file": "src/clause42_sft.rs",
+  "from": "        if let Some(name) = table.keys().find(|k| k.as_str() != \"sft_013\") {\n",
+  "to": "        if let Some(name) = table.keys().find(|k| k.as_str().is_empty()) {\n"
  }
 ]

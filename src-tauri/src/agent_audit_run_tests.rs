@@ -699,3 +699,82 @@ async fn the_tool_is_absent_and_refused_while_its_setting_is_off() {
     assert_eq!(error_code(&response), "audit_tool_disabled");
     assert_eq!(response["structuredContent"]["evidence"]["bytes"], 0);
 }
+
+/// The canonical form of a result that the lab records by sha256: Python's
+/// `json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False)` in UTF-8. The JSON
+/// maps here are sorted (no `preserve_order`), and the results hold integers only, so the compact
+/// serialisation is that form; `the_canonical_form_is_pythons_byte_for_byte` pins it.
+fn canonical(value: &Value) -> Vec<u8> {
+    serde_json::to_vec(value).unwrap()
+}
+
+/// One object with keys out of order, non-ASCII text, every control character Python escapes by
+/// name, ones it escapes by number, one it leaves as it is, and integers past 2^53, against the
+/// bytes Python 3 writes for it.
+#[test]
+fn the_canonical_form_is_pythons_byte_for_byte() {
+    // The two large integers are i64::MAX and 2^53 + 1, written out by the format.
+    let (big, over) = (i64::MAX, (1_i64 << 53) + 1);
+    let object: Value = serde_json::from_str(&format!(
+        r#"{{"z": 1, "a": {{"\u00e9": "\u20b9 1,00,000", "E": "tab\there", "b": "quote \" backslash \\ lf \n cr \r bs \b ff \f", "c": "\u0001\u001f\u007f", "d": "\u2028 \u6f22 \ud83d\ude00"}}, "big": {big}, "over_2_53": {over}, "neg": -5, "none": null, "t": true, "list": [3, "x", []], "empty": {{}}}}"#
+    ))
+    .unwrap();
+    let python = format!(
+        "{{\"a\":{{\"E\":\"tab\\there\",\"b\":\"quote \\\" backslash \\\\ lf \\n cr \\r bs \\b ff \\f\",\"c\":\"\\u0001\\u001f\u{7f}\",\"d\":\"\u{2028} 漢 😀\",\"é\":\"₹ 1,00,000\"}},\"big\":{big},\"empty\":{{}},\"list\":[3,\"x\",[]],\"neg\":-5,\"none\":null,\"over_2_53\":{over},\"t\":true,\"z\":1}}"
+    );
+    // The size and sha256 of the file Python wrote for this object.
+    assert_eq!(python.len(), 254);
+    assert_eq!(
+        sha256_hex(python.as_bytes()),
+        "b7cf45d38729c975f1b62b4e5dc95d8cd12f9ed46974bb7835f1a55b0ab0534d"
+    );
+    assert_eq!(String::from_utf8(canonical(&object)).unwrap(), python);
+}
+
+/// `audit_test_run` over the live answers of BRIDGE SFT LAB (lab row 699-R1) gives the result the
+/// lab recorded, byte for byte in its canonical form: the read, the cash test and the projection
+/// on today's code reproduce what the build the lab ran gave. Measured against the synthetic lab
+/// book only.
+#[tokio::test]
+async fn the_live_sft_lab_answers_give_the_result_the_lab_recorded() {
+    use super::super::audit_read::tests::live_sft_lab;
+    let status = || {
+        ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let mut plans = vec![
+        plan(live_sft_lab::companies()),
+        status(),
+        plan(live_sft_lab::companies()),
+        status(),
+    ];
+    plans.extend(live_sft_lab::plans());
+    let one = serve(plans, Redaction::None);
+    // The arguments the lab sent in row 699-R1, step 4.
+    let response = one
+        .server
+        .call_tool(
+            "audit_test_run",
+            json!({
+                "company_guid": live_sft_lab::guid(),
+                "from": "2025-04-01",
+                "to": "2026-03-31",
+                "test": "cash_44ab",
+                "cash_groups": ["Cash-in-Hand"],
+                "bank_groups": ["Bank Accounts"],
+            }),
+        )
+        .await;
+    let run = result(&response);
+    assert_eq!(run["state"], "completed");
+    let bytes = canonical(run);
+    // 699-R1 RESULTS.md: "audit result (canonical JSON): 2667 B, sha256 f4115258…".
+    assert_eq!(bytes.len(), 2667, "{}", String::from_utf8_lossy(&bytes));
+    assert_eq!(
+        sha256_hex(&bytes),
+        "f41152587c9b287c4413881bbad67fc4049aa640d61b377724f0f5d0c360a3e4"
+    );
+    // The paired company list (four requests), then ten parts, each between two company checks:
+    // the 34 the lab's relay recorded.
+    assert_eq!(one.simulator.unwrap().finish().unwrap().len(), 34);
+}

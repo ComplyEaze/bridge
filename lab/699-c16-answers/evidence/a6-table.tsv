@@ -1,0 +1,20 @@
+C#	voucher type	number	date	lines (ledger amount side)	narration	keyed
+C1	Receipt	20	30-Jun-2025	Capital SFT 5000 Cr; Bank SFT 5000 Dr (Bank Allocations accepted as offered: Cheque/DD, 30-Jun-25)	Bank interest credited	keyed
+C2	Receipt	21	30-Sep-2025	Interest C16 6000 Cr; Bank SFT 6000 Dr (Bank Allocations accepted as offered)	Bank interest credited	keyed
+C3	Receipt	22	15-Oct-2025	Reserve C16 7000 Cr; Bank SFT 7000 Dr (Bank Allocations accepted as offered)	Claim received	keyed
+C4	Receipt	23	20-Oct-2025	Refund C16 8000 Cr; Bank SFT 8000 Dr (Bank Allocations accepted as offered)	Duty refund received	keyed
+C5	Receipt	24	25-Oct-2025	Suspense C16 9000 Cr; Cash 9000 Dr	Receipt not identified	keyed
+C6	Journal	1	31-Oct-2025	Expense C16 10000 Dr; Creditor C16 10000 Cr	Bill for services	keyed
+C7	Journal	2	30-Nov-2025	Expense C16 11000 Dr; Provision C16 11000 Cr	Provision for expenses	keyed
+C8	Journal	3	15-Dec-2025	Creditor C16 4000 Dr; Reserve C16 4000 Cr	Balance written back	keyed
+C9	Payment	2	20-Dec-2025	Creditor C16 3000 Dr; OD C16 3000 Cr (Bank Allocations accepted as offered: Cheque, 20-Dec-25; OD C16 Cur Bal shown 3,000.00 Cr in red, no warning box)	Paid from overdraft	keyed
+C10	Journal	4	31-Dec-2025	Profit & Loss A/c 12000 Dr; Capital SFT 12000 Cr (Profit & Loss A/c offered in the Journal ledger list)	Transfer	keyed
+C11	Receipt	25	10-Jan-2026	Interest C16 6500 Cr; Bank SFT 13000 Dr (Tally prefilled line 2 as Bank SFT 6,500, amount typed over to 13000; Bank Allocations accepted as offered); Capital SFT 6500 Cr (line 3)	Bank interest credited	keyed
+C12	Journal	5	20-Jan-2026	Asset SFT 14000 Dr; Creditor C16 14000 Cr	Asset bought on credit	keyed
+C13	Receipt	26	25-Jan-2026	Grant C16 15000 Cr; Bank SFT 15000 Dr (Bank Allocations accepted as offered)	Grant received	keyed
+C14	Journal	6	31-Jan-2026	Party Four 16000 Dr; Suspense C16 16000 Cr (no bill-wise screen shown)	Claim on customer	keyed
+C15	Receipt	27	5-Feb-2026	Capital SFT 1000 Cr (line 1); Bank SFT 3000 Dr (line 2, prefilled 1,000, typed over; Bank Allocations accepted as offered); Capital SFT 2000 Cr (line 3, a separate line, not joined on the screen)	Two credits	keyed
+C16	Receipt	28	10-Feb-2026	Advance SFT 20000 Cr; Bank SFT 19900 Dr (prefilled Cash 20,000: ledger typed to Bank SFT, amount typed 19900; Bank Allocations accepted as offered); Expense C16 100 Dr (line 3, prefilled Cash 100: ledger typed to Expense C16)	Advance received less bank charges	keyed
+C17	Payment	3	15-Feb-2026	Creditor C16 5000 Dr; Bank SFT 4500 Cr (prefilled OD C16 5,000: ledger typed to Bank SFT, amount typed 4500; Bank Allocations accepted as offered: Cheque); Tax Held C16 500 Cr (line 3, prefilled OD C16 500: ledger typed to Tax Held C16)	Paid less tax withheld	keyed
+C18	Sales (accounting invoice mode)	14	20-Feb-2026	Party One 11800 Dr (party ledger; total 11,800.00); Sales SFT 10000 Cr; Tax Held C16 1800 Cr (Rate left empty). Party Details (Dispatch Details, then Buyer Bill to Party One, Mailing Name Party One, State Not Applicable, Country India) accepted as Tally offered with Ctrl+A	Sale with tax	keyed
+C19	Journal	7	25-Feb-2026	Expense C16 10000 Dr (line 1); Creditor C16 11800 Cr (line 2, prefilled Provision C16 10,000: ledger typed to Creditor C16, amount typed 11800); Tax Held C16 1800 Dr (line 3, By, prefilled 1,800 and typed 1800)	Bill for services with tax	keyed

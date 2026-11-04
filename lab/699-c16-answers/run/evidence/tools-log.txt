@@ -1,0 +1,5 @@
+2026-11-04T10:35:28.727Z 000-tools-list.json list secs 0.019 bytes 173435 isError None
+2026-11-04T10:35:36.784Z 001-c3-list-companies.json list_companies secs 0.535 bytes 1560 isError False
+2026-11-04T10:36:06.030Z 002-c4-audit-test-run.json audit_test_run secs 8.058 bytes 7322 isError False
+2026-11-04T10:36:30.734Z 003-c5-read-evidence.json read_evidence secs 0.052 bytes 2272 isError False
+2026-11-04T10:36:41.945Z 004-c6-vouchers-p0.json vouchers secs 4.36 bytes 61935 isError False

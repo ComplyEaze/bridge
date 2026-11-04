@@ -1,0 +1,14 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+notes.txt: original 12713 B sha256 4f5d5303eb305757d3fc14bcca95a0f77478a1b24015d42c4bc854e746330216 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> <CI build>; 2 x -> stop
+evidence/a0-c2-netstat.txt: original 9720 B sha256 e97adb3ddeabc7fde669fd2d6263c5e0873f3ca5f16c295b183fbf4fb0363ca6 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/b10-c2-netstat.txt: original 9050 B sha256 3a075e8b20c828bfd101be40c6b39fa9335729fb4e8005e4f30e023b5f047e51 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/exe-sha-end.txt: original 173 B sha256 36996f8628029dfb7277bbb9330ac05ce3ad1042c99468c9937cfd4728b5300d (kept on the lab PC); 1 x -> <CI build>
+evidence/exe-sha-start.txt: original 175 B sha256 bba2808eded6ab4601ce7c17b6ca0bed4da496c8b9098fc3f0d3b1d6af593c1d (kept on the lab PC); 1 x -> <CI build>
+run/launch-env.json: original 192 B sha256 0f4dc1bf2eb28141f6d95054d34bfff06b4c45c4e088e2e3b1294bf633959795 (kept on the lab PC); 1 x -> <LAB_DIR>
+cap.py: original 782 B sha256 1f78f0db5f99f61e2ae014c2d324c130a3e38b1aadfebb8e5a35f8d862dec1a6 (kept on the lab PC); 2 x -> <LAB_DIR>
+c2.py: original 1279 B sha256 7a53d3d5d89a9f6777cbfb7de6a5d3fc2824a37cf483bf1c52a27506cbd68ad2 (kept on the lab PC); 1 x -> <LAB_DIR>
+c3-send.ps1: original 2009 B sha256 a90f514fa24bd1fb9bc3b820811b75b8f9cc300333ff4cd728076b29461b81db (kept on the lab PC); 3 x -> stop
+send699.py: original 2985 B sha256 d2ea31ffd5c87281905ca9634b591d4d92afc0848f750c9540cfc4d5eb1bea07 (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop
+bk.py: original 1364 B sha256 16fa5332e40eee802aa3e34dc21396e551ed7072c5bc9a31ad169e977aea6ad9 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+run/client.py: original 4687 B sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (kept on the lab PC); 3 x -> stop; 1 x -> lab-client
+check-c6.py: original 2668 B sha256 38d9cfe7bbc51488d48b953da191d3f42a55dcab03c58a34bc29c1a447c2be60 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <lab folder>

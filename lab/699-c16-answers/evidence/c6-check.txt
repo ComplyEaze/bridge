@@ -1,0 +1,26 @@
+on record: 53 (A5 34, A6 19) | read rows 53 | total 53 | state complete | next_offset None
+read by type: Contra 1, Journal 7, Payment 3, Receipt 28, Sales 14
+on record by type: Contra 1, Journal 7, Payment 3, Receipt 28, Sales 14
+every row with this GUID's prefix: True
+on record, not read: []
+read, not on record: []
+type, number and date equal as multisets: True
+C1 Receipt 20 20250630 narration 'Bank interest credited' cancelled False optional False lines [('Bank SFT', '-5000.00'), ('Capital SFT', '5000.00')]
+C2 Receipt 21 20250930 narration 'Bank interest credited' cancelled False optional False lines [('Bank SFT', '-6000.00'), ('Interest C16', '6000.00')]
+C3 Receipt 22 20251015 narration 'Claim received' cancelled False optional False lines [('Bank SFT', '-7000.00'), ('Reserve C16', '7000.00')]
+C4 Receipt 23 20251020 narration 'Duty refund received' cancelled False optional False lines [('Bank SFT', '-8000.00'), ('Refund C16', '8000.00')]
+C5 Receipt 24 20251025 narration 'Receipt not identified' cancelled False optional False lines [('Cash', '-9000.00'), ('Suspense C16', '9000.00')]
+C6 Journal 1 20251031 narration 'Bill for services' cancelled False optional False lines [('Creditor C16', '10000.00'), ('Expense C16', '-10000.00')]
+C7 Journal 2 20251130 narration 'Provision for expenses' cancelled False optional False lines [('Expense C16', '-11000.00'), ('Provision C16', '11000.00')]
+C8 Journal 3 20251215 narration 'Balance written back' cancelled False optional False lines [('Creditor C16', '-4000.00'), ('Reserve C16', '4000.00')]
+C9 Payment 2 20251220 narration 'Paid from overdraft' cancelled False optional False lines [('Creditor C16', '-3000.00'), ('OD C16', '3000.00')]
+C10 Journal 4 20251231 narration 'Transfer' cancelled False optional False lines [('Capital SFT', '12000.00'), ('Profit & Loss A/c', '-12000.00')]
+C11 Receipt 25 20260110 narration 'Bank interest credited' cancelled False optional False lines [('Bank SFT', '-13000.00'), ('Capital SFT', '6500.00'), ('Interest C16', '6500.00')]
+C12 Journal 5 20260120 narration 'Asset bought on credit' cancelled False optional False lines [('Asset SFT', '-14000.00'), ('Creditor C16', '14000.00')]
+C13 Receipt 26 20260125 narration 'Grant received' cancelled False optional False lines [('Bank SFT', '-15000.00'), ('Grant C16', '15000.00')]
+C14 Journal 6 20260131 narration 'Claim on customer' cancelled False optional False lines [('Party Four', '-16000.00'), ('Suspense C16', '16000.00')]
+C15 Receipt 27 20260205 narration 'Two credits' cancelled False optional False lines [('Bank SFT', '-3000.00'), ('Capital SFT', '1000.00'), ('Capital SFT', '2000.00')]
+C16 Receipt 28 20260210 narration 'Advance received less bank charges' cancelled False optional False lines [('Advance SFT', '20000.00'), ('Bank SFT', '-19900.00'), ('Expense C16', '-100.00')]
+C17 Payment 3 20260215 narration 'Paid less tax withheld' cancelled False optional False lines [('Bank SFT', '4500.00'), ('Creditor C16', '-5000.00'), ('Tax Held C16', '500.00')]
+C18 Sales 14 20260220 narration 'Sale with tax' cancelled False optional False lines [('Party One', '-11800.00'), ('Sales SFT', '10000.00'), ('Tax Held C16', '1800.00')]
+C19 Journal 7 20260225 narration 'Bill for services with tax' cancelled False optional False lines [('Creditor C16', '11800.00'), ('Expense C16', '-10000.00'), ('Tax Held C16', '-1800.00')]

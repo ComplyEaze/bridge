@@ -3,10 +3,17 @@
 //!
 //! A key names every finding id a test can emit and, for each, the evidence items a reader who
 //! saw only the book expects it to list, each with that reader's reason. A key is sealed: it opens
-//! only with the sha256 committed for it before any run was scored, so a key edited afterwards
-//! does not open. A score compares `kind:id` item sets per finding: the items expected and listed,
-//! the items missed (with the key's reason), and the items listed that the key did not expect.
-//! Figures are not scored; parity covers them.
+//! only with the sha256 given for it, so a key whose bytes changed after that hash was taken does
+//! not open (when the hash was taken is outside what the scorer can see). A score compares the
+//! items expected and listed per finding: the items matched, the items missed (with the key's
+//! reason), and the items listed that the key did not expect. Figures are not scored; parity
+//! covers them.
+//!
+//! An item is its kind, id and label, as the canonical dump keeps them (`canonical::evidence`): a
+//! dump may list two refs with one kind and id that differ by label (vouchers with an empty id
+//! among them), and even one ref twice. So items are counted with their repeats: an item the key
+//! names twice matches at most two listed copies. A key's id and label are NFC-normalised, as the
+//! dump's are; nothing is trimmed.
 //!
 //! A score describes one run against one key for one synthetic book, and nothing beyond it.
 //!
@@ -25,17 +32,44 @@
 //! [[finding.item]]
 //! kind = "ledger"
 //! id = "A ledger name, exactly as the book spells it"
+//! label = ""                       # optional; the dump's label for the ref, exactly
 //! reason = "Why the reader expects it listed"
 //! ```
 //!
 //! A finding with no `item` is one the reader expects to list nothing.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
-use bridge_tax_audit::canonical::hex;
+use bridge_tax_audit::canonical::{hex, nfc};
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+
+/// The evidence kinds the crate's tests emit (`EvidenceRef::new` and `with_label` across
+/// `src/`). A key's kind outside this list does not open, and a dump's kind outside it is not
+/// scored, so a misspelt kind is refused rather than counted as a miss.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Kind {
+    Config,
+    DocumentRow,
+    ExcludedVoucher,
+    Ledger,
+    Pan,
+    PayeeName,
+    Row,
+    Rule,
+    StockItem,
+    Voucher,
+}
+
+/// One evidence item: a ref's kind, id and label.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Item {
+    pub kind: Kind,
+    pub id: String,
+    pub label: String,
+}
 
 /// Why a key does not open.
 #[derive(Debug, PartialEq, Eq)]
@@ -46,16 +80,13 @@ pub enum KeyError {
         actual: String,
     },
     NotUtf8,
-    /// Not the key format: a missing or unknown field, or a value of the wrong type.
+    /// Not the key format: a missing or unknown field, an unknown kind, or a value of the wrong
+    /// type.
     Parse(String),
     /// A required text is empty or only whitespace. Names are never trimmed otherwise.
     Blank(&'static str),
     NoFindings,
     DuplicateFinding(String),
-    DuplicateItem {
-        finding: String,
-        item: String,
-    },
 }
 
 /// Why a dump is not scored against a key.
@@ -65,14 +96,11 @@ pub enum ScoreError {
         key: String,
         dump: String,
     },
-    /// The dump is not a canonical dump: a missing field or a value of the wrong type.
+    /// The dump is not a canonical dump: a missing field, an unknown kind, or a value of the
+    /// wrong type.
     DumpInvalid(String),
     /// The dump holds a finding the key does not name, so the key cannot judge its items.
     DumpFindingNotInKey(String),
-    DuplicateListed {
-        finding: String,
-        item: String,
-    },
     /// The key expects nothing and the dump lists nothing: refused, never a perfect score.
     Empty,
 }
@@ -96,8 +124,10 @@ struct RawFinding {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawItem {
-    kind: String,
+    kind: Kind,
     id: String,
+    #[serde(default)]
+    label: String,
     reason: String,
 }
 
@@ -105,8 +135,8 @@ struct RawItem {
 #[derive(Debug)]
 pub struct SealedKey {
     test_id: String,
-    /// finding id -> item (`kind:id`) -> reason.
-    findings: BTreeMap<String, BTreeMap<String, String>>,
+    /// finding id -> item -> the reason for each time the key names it.
+    findings: BTreeMap<String, BTreeMap<Item, Vec<String>>>,
 }
 
 fn non_blank(text: &str, field: &'static str) -> Result<(), KeyError> {
@@ -135,18 +165,20 @@ impl SealedKey {
         let mut findings = BTreeMap::new();
         for finding in raw.finding {
             non_blank(&finding.id, "finding.id")?;
-            let mut items = BTreeMap::new();
+            let mut items: BTreeMap<Item, Vec<String>> = BTreeMap::new();
             for item in finding.item {
-                non_blank(&item.kind, "item.kind")?;
-                non_blank(&item.id, "item.id")?;
-                non_blank(&item.reason, "item.reason")?;
-                let key = format!("{}:{}", item.kind, item.id);
-                if items.insert(key.clone(), item.reason).is_some() {
-                    return Err(KeyError::DuplicateItem {
-                        finding: finding.id,
-                        item: key,
-                    });
+                // A voucher ref may have an empty id and only a label; one with neither cannot be
+                // told from any other.
+                if item.id.trim().is_empty() && item.label.trim().is_empty() {
+                    return Err(KeyError::Blank("item.id and item.label"));
                 }
+                non_blank(&item.reason, "item.reason")?;
+                let key = Item {
+                    kind: item.kind,
+                    id: nfc(&item.id),
+                    label: nfc(&item.label),
+                };
+                items.entry(key).or_default().push(item.reason);
             }
             if findings.insert(finding.id.clone(), items).is_some() {
                 return Err(KeyError::DuplicateFinding(finding.id));
@@ -162,12 +194,12 @@ impl SealedKey {
 /// An expected item the dump did not list, with the key's reason for expecting it.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Miss {
-    pub item: String,
+    pub item: Item,
     pub reason: String,
 }
 
-/// One finding's comparison. Recall is `matched / expected`, precision `matched / listed`; each is
-/// undefined when its denominator is 0.
+/// One finding's comparison, each count with repeats. Recall is `matched / expected`, precision
+/// `matched / listed`; each is undefined when its denominator is 0.
 #[derive(Debug, PartialEq, Eq)]
 pub struct FindingScore {
     pub finding_id: String,
@@ -175,8 +207,8 @@ pub struct FindingScore {
     pub listed: usize,
     pub matched: usize,
     pub missed: Vec<Miss>,
-    /// Items listed that the key does not expect, as `kind:id`.
-    pub extra: Vec<String>,
+    /// Each listed copy the key does not expect.
+    pub extra: Vec<Item>,
 }
 
 /// Every finding the key names, in id order.
@@ -204,21 +236,22 @@ fn array<'a>(doc: &'a Value, key: &str, at: &str) -> Result<&'a [Value], ScoreEr
         .ok_or_else(|| ScoreError::DumpInvalid(format!("{at}: {key} is not a list")))
 }
 
-/// Each finding's listed items (`kind:id`), from a canonical dump.
-fn listed_items(dump: &Value) -> Result<BTreeMap<String, BTreeSet<String>>, ScoreError> {
+/// Each finding's listed items, each with how many times it is listed, from a canonical dump.
+fn listed_items(dump: &Value) -> Result<BTreeMap<String, BTreeMap<Item, usize>>, ScoreError> {
     let mut listed = BTreeMap::new();
     for finding in array(dump, "findings", "dump")? {
         let id = string(finding, "id", "finding")?.to_string();
-        let mut items = BTreeSet::new();
+        let mut items: BTreeMap<Item, usize> = BTreeMap::new();
         for evidence in array(finding, "evidence", &id)? {
-            let item = format!(
-                "{}:{}",
-                string(evidence, "kind", &id)?,
-                string(evidence, "id", &id)?
-            );
-            if !items.insert(item.clone()) {
-                return Err(ScoreError::DuplicateListed { finding: id, item });
-            }
+            let kind = string(evidence, "kind", &id)?;
+            let kind = serde_json::from_value::<Kind>(Value::from(kind))
+                .map_err(|_| ScoreError::DumpInvalid(format!("{id}: unknown kind {kind}")))?;
+            let item = Item {
+                kind,
+                id: string(evidence, "id", &id)?.to_string(),
+                label: string(evidence, "label", &id)?.to_string(),
+            };
+            *items.entry(item).or_default() += 1;
         }
         if listed.insert(id.clone(), items).is_some() {
             return Err(ScoreError::DumpInvalid(format!("finding {id} repeats")));
@@ -244,24 +277,29 @@ pub fn score(key: &SealedKey, dump: &Value) -> Result<Score, ScoreError> {
     let mut findings = Vec::new();
     for (finding_id, expected) in &key.findings {
         let listed = listed.remove(finding_id).unwrap_or_default();
-        let missed = expected
-            .iter()
-            .filter(|(item, _)| !listed.contains(*item))
-            .map(|(item, reason)| Miss {
+        let mut missed = Vec::new();
+        let mut matched = 0;
+        for (item, reasons) in expected {
+            let found = listed.get(item).copied().unwrap_or(0).min(reasons.len());
+            matched += found;
+            missed.extend(reasons[found..].iter().map(|reason| Miss {
                 item: item.clone(),
                 reason: reason.clone(),
-            })
-            .collect::<Vec<_>>();
-        let extra = listed
-            .iter()
-            .filter(|item| !expected.contains_key(*item))
-            .cloned()
-            .collect::<Vec<_>>();
+            }));
+        }
+        let mut extra = Vec::new();
+        for (item, &count) in &listed {
+            let wanted = expected.get(item).map_or(0, Vec::len);
+            extra.extend(std::iter::repeat_n(
+                item.clone(),
+                count.saturating_sub(wanted),
+            ));
+        }
         findings.push(FindingScore {
             finding_id: finding_id.clone(),
-            expected: expected.len(),
-            listed: listed.len(),
-            matched: expected.len() - missed.len(),
+            expected: expected.values().map(Vec::len).sum(),
+            listed: listed.values().sum(),
+            matched,
             missed,
             extra,
         });

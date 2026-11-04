@@ -1,0 +1,37 @@
+n runner pid 14636 2026-11-04T08:56:46.620Z; dpi_context=ok; Tally window 0xa826a4; fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+recorded console: 2026-11-04T08:56:49.242Z cell=n name=trace console pid=21160 window=0x1600404
+trace console started minimised 2026-11-04T08:56:49.320Z pid 21160: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <LAB_DIR>\evidence\trace-n.txt -Seconds 100
+recorded console: 2026-11-04T08:56:51.036Z cell=n name=watcher console pid=9932 window=0x781552
+watcher console started minimised 2026-11-04T08:56:51.132Z pid 9932: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\switcher-watch.ps1 -Name n -OutDir <LAB_DIR>\shots -Out <LAB_DIR>\evidence\switch-n.txt -Seconds 100
+CLICK left tallyTitlePoint 2026-11-04T08:56:51.279Z logical (330,14) physical (412,17); +300 ms fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+Tally in front: True
+WAIT 2026-11-04T08:56:51.981Z: the lab's screen-tool copy before the cell (cmd\n-pre-done, at most 120 s)
+pre copy word: True 2026-11-04T08:57:07.079Z
+OPEN 2026-11-04T08:57:07.361Z: explorer.exe "<LAB_DIR>\cmd\n.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -Command Start-Sleep -Seconds 60
+recorded console: 2026-11-04T08:57:10.215Z cell=n name=cmd console pid=14952 window=0x631600
+minimise cmd console: it is the foreground window; nothing done
+CLICK left tallyTitlePoint 2026-11-04T08:57:11.414Z logical (330,14) physical (412,17); +300 ms fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+title click 4.44 s after the open; Tally in front: True
+MINIMISED cmd console 0x631600 by ShowWindow(SW_MINIMIZE) 2026-11-04T08:57:12.171Z (P-min: after the title click, the console was in front before it); iconic=1; fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+n-T0 2026-11-04T08:57:15.358Z (the open's stamp + 8 s)
+G-P t8 2026-11-04T08:57:23.377Z to 2026-11-04T08:57:24.542Z (1.16 s): 3,0,1,1200,TallyPrime:9001 | visible_titled_windows,13
+T0+9.21 Tally in front: True
+X n 2026-11-04T08:57:25.387Z to 2026-11-04T08:57:33.272Z (7.88 s) ;; rect out:  ;; uia out: E 2026-11-04T08:57:28.576Z dpi_context=ok tray=0x20138 client=com8 B 2026-11-04T08:57:28.871Z n=1 parent_class=Shell_TrayWnd class=Start offscreen=0 rect=0,1030,60,1080 name=Start B 2026-11-04T08:57:28.876Z n=2 parent_class=TrayDummySearchControl class=DynamicContent1 offscreen=0 rect=320,1030,420,1080 name=Search highlights icon opens search home window B 2026-11-04T08:57:28.879Z n=3 parent_class=TrayDummySearchControl class=Button offscreen=0 rect=60,1030,420,1080 name=Type here to search B 2026-11-04T08:57:28.891Z n=4 parent_class=Shell_TrayWnd class=TrayButton offscreen=0 rect=420,1030,480,1080 name=Task View B 2026-11-04T08:57:28.901Z n=5 parent_class=MSTaskListWClass class= offscreen=0 rect=484,1030,546,1080 name=File Explorer B 2026-11-04T08:57:28.907Z n=6 parent_class=MSTaskListWClass class= offscreen=0 rect=546,1030,608,1080 name=Brave - 1 running window B 2026-11-04T08:57:28.926Z n=7 parent_class=MSTaskListWClass class= offscreen=0 rect=670,1030,732,1080 name=Snipping Tool B 2026-11-04T08:57:28.937Z n=8 parent_class=MSTaskListWClass class= offscreen=0 rect=732,1030,794,1080 name=TallyPrime - 1 running window B 2026-11-04T08:57:28.944Z n=9 parent_class=MSTaskListWClass class= offscreen=0 rect=794,1030,856,1080 name=<desktop client> - 1 running window B 2026-11-04T08:57:28.960Z n=10 parent_class=MSTaskListWClass class= offscreen=0 rect=856,1030,918,1080 name=Command Prompt - 1 running window B 2026-11-04T08:57:28.970Z n=11 parent_class=Shell_TrayWnd class=DynamicContent2 offscreen=0 rect=1392,1030,1557,1080 name=<widget text>
+HA starts at T0+17.96 s
+G-P ha 2026-11-04T08:57:33.367Z to 2026-11-04T08:57:34.908Z (1.54 s): 3,0,1,1200,TallyPrime:9001 | visible_titled_windows,13
+HA gate met 2026-11-04T08:57:34.936Z: Tally in front
+KEY Alt down 2026-11-04T08:57:35.075Z
+KEY Tab down 2026-11-04T08:57:35.210Z
+KEY Tab up 2026-11-04T08:57:35.409Z
+HA held 12.05 s 2026-11-04T08:57:47.501Z; switcher before Esc: 0x101207e; fg hwnd=0x101207e pid=11384 image=explorer.exe title=Task Switching; control shot word: False
+KEY Esc down 2026-11-04T08:57:47.557Z
+KEY Esc up 2026-11-04T08:57:48.014Z
+KEY Alt up 2026-11-04T08:57:48.484Z
+after HA 2026-11-04T08:57:49.310Z: fg hwnd=0x191b60 pid=18680 image=<desktop client> title=<desktop client>; box none
+trace lines: END 2026-11-04T08:58:31.873Z
+watcher lines A/C/G/F/Z: A 2026-11-04T08:57:35.954Z hwnd=0x101207e class=MultitaskingViewFrame pid=11384 rect=0,0,1920,1030 fg=0x101207e fg_class=MultitaskingViewFrame fg_pid=11384 fg_title=Task Switching | C 2026-11-04T08:57:36.565Z file=n-switcher.png rect=0,0,1920,1080 | G 2026-11-04T08:57:47.685Z fg=0x191b60 fg_class=Chrome_WidgetWin_1 fg_pid=18680 fg_title=<desktop client> | F 2026-11-04T08:57:48.484Z fg=0x191b60 fg_class=Chrome_WidgetWin_1 fg_pid=18680 fg_title=<desktop client> | Z 2026-11-04T08:58:34.878Z polls=1461 new_windows=2 appearances=1 copies=1
+console cmd console 0x631600 exists=0 iconic=0
+console trace console 0x1600404 exists=0 iconic=0
+console watcher console 0x781552 exists=0 iconic=0
+the watcher's Z line is written: the lab's screen-tool copy after the cell
+n DONE 2026-11-04T08:58:35.426Z

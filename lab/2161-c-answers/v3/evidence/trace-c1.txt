@@ -1,0 +1,64 @@
+START 2026-11-04T09:07:59.547Z title_part=ComplyEaze Bridge interval_ms=50 seconds=100
+FIRST 2026-11-04T09:08:12.250Z box_pid=9348
+T 2026-11-04T09:08:12.280Z fg_hwnd=0x11c27aa fg_pid=9348 box_pid=9348 windows=4
+W 2026-11-04T09:08:12.280Z hwnd=0x11c27aa class=#32770 visible=1 exstyle=0x00010108 topmost=1 thread=17932 owner=0x287277a owner_class=Static owner_pid=9348 owner_exstyle=0x00000088 owner_topmost=1 title=ComplyEaze Bridge — post this voucher?
+W 2026-11-04T09:08:12.280Z hwnd=0x287277a class=Static visible=0 exstyle=0x00000088 topmost=1 thread=17932 owner=0 title=
+W 2026-11-04T09:08:12.280Z hwnd=0xec2ce0 class=MSCTFIME UI visible=0 exstyle=0x00000008 topmost=1 thread=17932 owner=0x3f41bf6 owner_class=IME owner_pid=9348 owner_exstyle=0x00000008 owner_topmost=1 title=MSCTFIME UI
+W 2026-11-04T09:08:12.280Z hwnd=0x3f41bf6 class=IME visible=0 exstyle=0x00000008 topmost=1 thread=17932 owner=0x11c27aa owner_class=#32770 owner_pid=9348 owner_exstyle=0x00010108 owner_topmost=1 title=Default IME
+PROC path=<LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe parent_pid=24348
+PROC command_line="<LAB_DIR>\build\bin\x86_64-pc-windows-msvc\bridge_mcp.exe" --confirm-journal
+PROC sha256=9bda7144f54e5ef68477b5ca30be33a17759de2e1ad756f840785c67bcab2dc0 bytes=34832384
+H 2026-11-04T09:08:13.291Z unchanged
+H 2026-11-04T09:08:14.324Z unchanged
+H 2026-11-04T09:08:15.364Z unchanged
+H 2026-11-04T09:08:16.394Z unchanged
+H 2026-11-04T09:08:17.411Z unchanged
+H 2026-11-04T09:08:18.472Z unchanged
+H 2026-11-04T09:08:19.546Z unchanged
+H 2026-11-04T09:08:20.604Z unchanged
+H 2026-11-04T09:08:21.636Z unchanged
+H 2026-11-04T09:08:22.662Z unchanged
+H 2026-11-04T09:08:23.700Z unchanged
+H 2026-11-04T09:08:24.716Z unchanged
+H 2026-11-04T09:08:25.748Z unchanged
+H 2026-11-04T09:08:26.750Z unchanged
+H 2026-11-04T09:08:27.778Z unchanged
+H 2026-11-04T09:08:28.782Z unchanged
+H 2026-11-04T09:08:29.826Z unchanged
+H 2026-11-04T09:08:30.843Z unchanged
+H 2026-11-04T09:08:31.876Z unchanged
+H 2026-11-04T09:08:32.921Z unchanged
+H 2026-11-04T09:08:33.927Z unchanged
+H 2026-11-04T09:08:34.981Z unchanged
+H 2026-11-04T09:08:35.999Z unchanged
+H 2026-11-04T09:08:37.039Z unchanged
+H 2026-11-04T09:08:38.041Z unchanged
+H 2026-11-04T09:08:39.042Z unchanged
+H 2026-11-04T09:08:40.091Z unchanged
+H 2026-11-04T09:08:41.091Z unchanged
+H 2026-11-04T09:08:42.108Z unchanged
+H 2026-11-04T09:08:43.124Z unchanged
+H 2026-11-04T09:08:44.125Z unchanged
+H 2026-11-04T09:08:45.126Z unchanged
+H 2026-11-04T09:08:46.173Z unchanged
+H 2026-11-04T09:08:47.205Z unchanged
+H 2026-11-04T09:08:48.206Z unchanged
+H 2026-11-04T09:08:49.222Z unchanged
+H 2026-11-04T09:08:50.270Z unchanged
+H 2026-11-04T09:08:51.321Z unchanged
+H 2026-11-04T09:08:52.374Z unchanged
+H 2026-11-04T09:08:53.380Z unchanged
+H 2026-11-04T09:08:54.430Z unchanged
+H 2026-11-04T09:08:55.436Z unchanged
+H 2026-11-04T09:08:56.477Z unchanged
+H 2026-11-04T09:08:57.473Z unchanged
+H 2026-11-04T09:08:58.530Z unchanged
+H 2026-11-04T09:08:59.531Z unchanged
+H 2026-11-04T09:09:00.532Z unchanged
+H 2026-11-04T09:09:01.550Z unchanged
+T 2026-11-04T09:09:02.056Z fg_hwnd=0xa826a4 fg_pid=1200 box_pid=9348 windows=0
+H 2026-11-04T09:09:03.076Z unchanged
+H 2026-11-04T09:09:04.081Z unchanged
+H 2026-11-04T09:09:05.130Z unchanged
+GONE 2026-11-04T09:09:05.130Z
+END 2026-11-04T09:09:05.130Z

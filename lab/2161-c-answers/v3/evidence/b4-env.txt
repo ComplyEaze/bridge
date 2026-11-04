@@ -1,0 +1,5 @@
+B4 2026-11-04T08:54:52.423Z
+logical screen 1536x864; physical 1920x1080; scale 125 %; Tally window DPI 120
+monitors: 1
+Windows: Microsoft Windows 10 Home Single Language version 10.0.19045 build 19045
+Tally window 0xa826a4 title 'TallyPrime:9001' rect physical 0,0,1920,1030 maximised True

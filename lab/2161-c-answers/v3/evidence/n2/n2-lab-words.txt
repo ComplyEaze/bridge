@@ -1,0 +1,3 @@
+2026-11-04T09:00:58.772Z capture shots/n-pre-printwindow.png 43368 B sha256 0194e22013a546486a95d9bb3eca286958162536a7bec35431d0abdca2c1000c
+2026-11-04T09:00:59.048Z wrote cmd/n-pre-done
+2026-11-04T09:02:37.984Z capture shots/n-post-printwindow.png 43368 B sha256 0194e22013a546486a95d9bb3eca286958162536a7bec35431d0abdca2c1000c

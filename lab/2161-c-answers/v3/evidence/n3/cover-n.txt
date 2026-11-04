@@ -1,0 +1,8 @@
+E 2026-11-04T09:04:41.116Z dpi_context=ok
+T 2026-11-04T09:04:41.116Z tray=0x20138 z=1 rect=0,1030,1920,1080
+W 2026-11-04T09:04:41.116Z z=5 above_tray=0 hwnd=0x191b60 class=Chrome_WidgetWin_1 pid=18680 image=<desktop client> topmost=0 exstyle=0x00080100 cloaked=0 rect=-9,-9,1929,1039 title=<desktop client>
+W 2026-11-04T09:04:41.116Z z=6 above_tray=0 hwnd=0x204d4 class=Chrome_WidgetWin_1 pid=29324 image=brave.exe topmost=0 exstyle=0x00000100 cloaked=0 rect=-9,-9,1929,1039 title=a browser tab
+W 2026-11-04T09:04:41.116Z z=8 above_tray=0 hwnd=0x852a44 class=ApplicationFrameWindow pid=18940 image=ApplicationFrameHost.exe topmost=0 exstyle=0x00200100 cloaked=1 rect=-9,-9,1929,1039 title=<other window 1>
+W 2026-11-04T09:04:41.116Z z=15 above_tray=0 hwnd=0x10808 class=Windows.UI.Core.CoreWindow pid=7348 image=TextInputHost.exe topmost=0 exstyle=0x00200000 cloaked=1 rect=0,0,1920,1080 title=Microsoft Text Input Application
+W 2026-11-04T09:04:41.116Z z=17 above_tray=0 hwnd=0x1019a class=Progman pid=11384 image=explorer.exe topmost=0 exstyle=0x00000080 cloaked=0 rect=0,0,1920,1080 title=Program Manager
+Z 2026-11-04T09:04:41.116Z visible_windows=17 meeting_tray=5

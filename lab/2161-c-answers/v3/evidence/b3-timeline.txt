@@ -1,0 +1,5 @@
+b3 runner pid 6564 2026-11-04T08:56:14.185Z; dpi_context=ok; Tally window 0xa826a4; fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+CLICK left tallyTitlePoint 2026-11-04T08:56:14.586Z logical (330,14) physical (412,17); +300 ms fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+G-P b3 2026-11-04T08:56:15.503Z to 2026-11-04T08:56:16.948Z (1.43 s): 3,0,1,1200,TallyPrime:9001 | visible_titled_windows,10
+Tally first and in front: True
+b3 DONE 2026-11-04T08:56:17.024Z

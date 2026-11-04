@@ -1,0 +1,22 @@
+E 2026-11-04T09:04:40.417Z dpi_context=ok tray=0x20138 client=com8
+B 2026-11-04T09:04:40.514Z n=1 parent_class=Shell_TrayWnd class=Start offscreen=0 rect=0,1030,60,1080 name=Start
+B 2026-11-04T09:04:40.530Z n=2 parent_class=TrayDummySearchControl class=DynamicContent1 offscreen=0 rect=320,1030,420,1080 name=Search highlights icon opens search home window
+B 2026-11-04T09:04:40.530Z n=3 parent_class=TrayDummySearchControl class=Button offscreen=0 rect=60,1030,420,1080 name=Type here to search
+B 2026-11-04T09:04:40.530Z n=4 parent_class=Shell_TrayWnd class=TrayButton offscreen=0 rect=420,1030,480,1080 name=Task View
+B 2026-11-04T09:04:40.530Z n=5 parent_class=MSTaskListWClass class= offscreen=0 rect=484,1030,546,1080 name=File Explorer
+B 2026-11-04T09:04:40.530Z n=6 parent_class=MSTaskListWClass class= offscreen=0 rect=546,1030,608,1080 name=Brave - 1 running window
+B 2026-11-04T09:04:40.546Z n=7 parent_class=MSTaskListWClass class= offscreen=0 rect=670,1030,732,1080 name=Snipping Tool
+B 2026-11-04T09:04:40.546Z n=8 parent_class=MSTaskListWClass class= offscreen=0 rect=732,1030,794,1080 name=TallyPrime - 1 running window
+B 2026-11-04T09:04:40.546Z n=9 parent_class=MSTaskListWClass class= offscreen=0 rect=794,1030,856,1080 name=<desktop client> - 1 running window
+B 2026-11-04T09:04:40.561Z n=10 parent_class=MSTaskListWClass class= offscreen=0 rect=856,1030,918,1080 name=Command Prompt - 1 running window
+B 2026-11-04T09:04:40.561Z n=11 parent_class=Shell_TrayWnd class=DynamicContent2 offscreen=0 rect=1390,1030,1557,1080 name=<widget text>
+B 2026-11-04T09:04:40.561Z n=12 parent_class=TrayNotifyWnd class=Button offscreen=0 rect=1567,1030,1597,1080 name=Notification Chevron
+B 2026-11-04T09:04:40.561Z n=13 parent_class=ToolbarWindow32 class= offscreen=0 rect=1597,1030,1627,1080 name=Meet Now
+B 2026-11-04T09:04:40.577Z n=14 parent_class=ToolbarWindow32 class= offscreen=0 rect=1627,1030,1657,1080 name=Fully charged (100%)
+B 2026-11-04T09:04:40.577Z n=15 parent_class=ToolbarWindow32 class= offscreen=0 rect=1657,1030,1687,1080 name=Speaker/Headphone: 76%
+B 2026-11-04T09:04:40.577Z n=16 parent_class=ToolbarWindow32 class= offscreen=0 rect=1687,1030,1717,1080 name=<network name> Internet access
+B 2026-11-04T09:04:40.577Z n=17 parent_class=TrayInputIndicatorWClass class=InputIndicatorButton offscreen=0 rect=1717,1030,1762,1080 name=Tray Input Indicator - English (United States)
+B 2026-11-04T09:04:40.577Z n=18 parent_class=TrayNotifyWnd class=TrayClockWClass offscreen=0 rect=1762,1030,1854,1080 name=System Clock, 14:34, 04-11-2026
+B 2026-11-04T09:04:40.593Z n=19 parent_class=TrayNotifyWnd class=TrayButton offscreen=0 rect=1854,1030,1914,1080 name=Action Center, 5 new notifications
+B 2026-11-04T09:04:40.593Z n=20 parent_class=TrayNotifyWnd class=TrayShowDesktopButtonWClass offscreen=0 rect=1914,1030,1920,1080 name=Show desktop
+Z 2026-11-04T09:04:40.593Z buttons=20 in_task_list=6

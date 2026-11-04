@@ -1,0 +1,4 @@
+B5 end 2026-11-04T09:12:21.513Z
+processes: 0
+windows: 0
+minimised recorded consoles: 0 (of 15 recorded pids)

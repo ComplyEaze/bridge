@@ -1,0 +1,4 @@
+S 2026-11-04T09:10:25.597Z dpi_context=ok visible_windows=16 screen=0,0,1920,1080
+N 2026-11-04T09:10:27.233Z hwnd=0x1680404 class=ConsoleWindowClass pid=25896 image=cmd.exe cloaked=0 rect=32,32,1151,679 title=C:\WINDOWS\system32\cmd.exe
+N 2026-11-04T09:10:36.168Z hwnd=0x14b29ca class=#32770 pid=26196 image=bridge_mcp.exe cloaked=0 rect=686,181,1254,926 title=ComplyEaze Bridge — post this voucher?
+Z 2026-11-04T09:12:05.617Z polls=1549 new_windows=2 appearances=0 copies=0

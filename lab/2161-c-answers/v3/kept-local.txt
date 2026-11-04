@@ -1,0 +1,8 @@
+Kept on the lab PC by size and sha256 (the originals of the lab-text copies are listed in substitutions.txt):
+evidence/c1-runner-console.txt 7323 B 6cd30e4c6d653c6e79d6609cbe2decf10fb3a7f7415c6b6de01e60b5268730e8 (the runner's console copy, in the console's code page; its lines are in the cell's timeline)
+evidence/c2-runner-console.txt 7337 B 949c09166b96dcab727139a261c48bcdbeb171708aadbc194e3b63db604d3549 (the runner's console copy, in the console's code page; its lines are in the cell's timeline)
+evidence/n1/n-runner-console.txt 6899 B 118071051045d3fad969e25a4a195d678cd0211d121462bb59afe4a43b45046f (the runner's console copy, in the console's code page; its lines are in the cell's timeline)
+evidence/n2/n-runner-console.txt 6148 B 0f23dbd8a78b51dd2e6c390c5f7be9881365e204688a14421c3afbd734981455 (the runner's console copy, in the console's code page; its lines are in the cell's timeline)
+evidence/n3/n-runner-console.txt 6909 B 68b182137b60315ff3f2c8219ee570e2c623a6d9d495a0a811735150fd8d5874 (the runner's console copy, in the console's code page; its lines are in the cell's timeline)
+stage-2161c-v3.py 8569 B fa202f38afb2e08b98f2a68907dc9054e4893f4f55308c91716930e582e87aa8 (the stage script and its private list: they name the lab paths and the network)
+network-name.local 17 B 8554ca76b666ff91cf8b9e383e664a8108a534f7a24da46e3819afbe0bf6b75e (the stage script and its private list: they name the lab paths and the network)

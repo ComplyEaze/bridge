@@ -1,0 +1,6 @@
+2026-11-04T08:55:47.669Z name=x0 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-11-04T08:57:32.974Z name=n dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-11-04T09:01:20.263Z name=n dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-11-04T09:04:41.735Z name=n dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-11-04T09:08:24.350Z name=c1 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+2026-11-04T09:10:48.380Z name=c2 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True

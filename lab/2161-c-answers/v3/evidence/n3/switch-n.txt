@@ -1,0 +1,14 @@
+S 2026-11-04T09:04:18.904Z dpi_context=ok visible_windows=16 screen=0,0,1920,1080
+N 2026-11-04T09:04:21.799Z hwnd=0x592138 class=ConsoleWindowClass pid=19432 image=cmd.exe cloaked=0 rect=64,64,1183,711 title=C:\WINDOWS\system32\cmd.exe
+N 2026-11-04T09:04:42.571Z hwnd=0x11b27aa class=MultitaskingViewFrame pid=11384 image=explorer.exe cloaked=1 rect=0,0,1920,1030 title=Task Switching
+A 2026-11-04T09:04:42.651Z hwnd=0x11b27aa class=MultitaskingViewFrame pid=11384 rect=0,0,1920,1030 fg=0x11b27aa fg_class=MultitaskingViewFrame fg_pid=11384 fg_title=Task Switching
+C 2026-11-04T09:04:43.099Z file=n-switcher.png rect=0,0,1920,1080
+L 2026-11-04T09:04:43.249Z n=1 name=TallyPrime:9001
+L 2026-11-04T09:04:43.266Z n=2 name=C:\WINDOWS\system32\cmd.exe
+L 2026-11-04T09:04:43.266Z n=3 name=Windows PowerShell
+L 2026-11-04T09:04:43.282Z n=4 name=Windows PowerShell
+L 2026-11-04T09:04:43.282Z n=5 name=<desktop client>
+L 2026-11-04T09:04:43.299Z n=6 name=a browser tab
+G 2026-11-04T09:04:54.841Z fg=0xa826a4 fg_class=Ganeshji fg_pid=1200 fg_title=TallyPrime:9001
+F 2026-11-04T09:04:55.367Z fg=0xa826a4 fg_class=Ganeshji fg_pid=1200 fg_title=TallyPrime:9001
+Z 2026-11-04T09:05:58.947Z polls=1542 new_windows=2 appearances=1 copies=1

@@ -1,0 +1,31 @@
+n runner pid 19352 2026-11-04T09:00:53.669Z; dpi_context=ok; Tally window 0xa826a4; fg hwnd=0x204d4 pid=29324 image=brave.exe title=a browser tab
+recorded console: 2026-11-04T09:00:55.452Z cell=n name=trace console pid=17004 window=0xb81b00
+trace console started minimised 2026-11-04T09:00:55.468Z pid 17004: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\box-trace-early.ps1 -Title "ComplyEaze Bridge" -Out <LAB_DIR>\evidence\trace-n.txt -Seconds 100
+recorded console: 2026-11-04T09:00:57.021Z cell=n name=watcher console pid=21328 window=0x12f0290
+watcher console started minimised 2026-11-04T09:00:57.035Z pid 21328: powershell -NoProfile -ExecutionPolicy Bypass -File <LAB_DIR>\requests\switcher-watch.ps1 -Name n -OutDir <LAB_DIR>\shots -Out <LAB_DIR>\evidence\switch-n.txt -Seconds 100
+CLICK left tallyTitlePoint 2026-11-04T09:00:57.068Z logical (330,14) physical (412,17); +300 ms fg hwnd=0x191b60 pid=18680 image=<desktop client> title=<desktop client>
+Tally in front: False
+WAIT 2026-11-04T09:00:57.436Z: the lab's screen-tool copy before the cell (cmd\n-pre-done, at most 120 s)
+pre copy word: True 2026-11-04T09:00:59.167Z
+CLICK left tallyTitlePoint 2026-11-04T09:00:59.184Z logical (330,14) physical (412,17); +300 ms fg hwnd=0x191b60 pid=18680 image=<desktop client> title=<desktop client>
+Tally in front again: False
+OPEN 2026-11-04T09:00:59.567Z: explorer.exe "<LAB_DIR>\cmd\n.cmd"; the .cmd holds: powershell -NoProfile -Command Start-Sleep -Seconds 8 | powershell -NoProfile -Command Start-Sleep -Seconds 60
+recorded console: 2026-11-04T09:01:00.306Z cell=n name=cmd console pid=23028 window=0x39a2904
+minimise cmd console: it is the foreground window; nothing done
+CLICK left tallyTitlePoint 2026-11-04T09:01:03.608Z logical (330,14) physical (412,17); +300 ms fg hwnd=0x191b60 pid=18680 image=<desktop client> title=<desktop client>
+title click 4.38 s after the open; Tally in front: False
+MINIMISED cmd console 0x39a2904 by ShowWindow(SW_MINIMIZE) 2026-11-04T09:01:04.300Z (P-min: after the title click, the console was in front before it); iconic=1; fg hwnd=0x191b60 pid=18680 image=<desktop client> title=<desktop client>
+n-T0 2026-11-04T09:01:07.567Z (the open's stamp + 8 s)
+G-P t8 2026-11-04T09:01:15.598Z to 2026-11-04T09:01:16.147Z (0.55 s): 5,0,0,1200,TallyPrime:9001 | visible_titled_windows,12
+T0+8.65 Tally in front: False
+X n 2026-11-04T09:01:17.613Z to 2026-11-04T09:01:20.396Z (2.8 s) ;; rect out:  ;; uia out: E 2026-11-04T09:01:18.763Z dpi_context=ok tray=0x20138 client=com8 B 2026-11-04T09:01:18.885Z n=1 parent_class=Shell_TrayWnd class=Start offscreen=0 rect=0,1030,60,1080 name=Start B 2026-11-04T09:01:18.888Z n=2 parent_class=TrayDummySearchControl class=DynamicContent1 offscreen=0 rect=320,1030,420,1080 name=Search highlights icon opens search home window B 2026-11-04T09:01:18.891Z n=3 parent_class=TrayDummySearchControl class=Button offscreen=0 rect=60,1030,420,1080 name=Type here to search B 2026-11-04T09:01:18.894Z n=4 parent_class=Shell_TrayWnd class=TrayButton offscreen=0 rect=420,1030,480,1080 name=Task View B 2026-11-04T09:01:18.899Z n=5 parent_class=MSTaskListWClass class= offscreen=0 rect=484,1030,546,1080 name=File Explorer B 2026-11-04T09:01:18.904Z n=6 parent_class=MSTaskListWClass class= offscreen=0 rect=546,1030,608,1080 name=Brave - 1 running window B 2026-11-04T09:01:18.936Z n=7 parent_class=MSTaskListWClass class= offscreen=0 rect=670,1030,732,1080 name=Snipping Tool B 2026-11-04T09:01:18.941Z n=8 parent_class=MSTaskListWClass class= offscreen=0 rect=732,1030,794,1080 name=TallyPrime - 1 running window B 2026-11-04T09:01:18.946Z n=9 parent_class=MSTaskListWClass class= offscreen=0 rect=794,1030,856,1080 name=<desktop client> - 1 running window B 2026-11-04T09:01:18.946Z n=10 parent_class=MSTaskListWClass class= offscreen=0 rect=856,1030,918,1080 name=Command Prompt - 1 running window B 2026-11-04T09:01:18.946Z n=11 parent_class=Shell_TrayWnd class=DynamicContent2 offscreen=0 rect=1390,1030,1557,1080 name=<widget text> B 2026-11-04T09:01:18.946Z n=12 parent_class=TrayNotifyWnd class=Button offscreen=0 rect=1567,1030,1597,1080 name=Notification Chevron B 2026-11-04T09:01:18.946Z n=13 parent_class=ToolbarWindow32 class= offscreen=0 rect=1597,1030,1627,1080 name=Meet Now B 2026-11-04T09:01:18.965Z n=14 parent_class=ToolbarWindow32 class= offscreen=0 rect=1627,1030,1657,1080 name=Fully charged (100%) B 2026-11-04T09:01:18.969Z n=15 parent_class=ToolbarWindow32 class= offscreen=0 rect=1657,1030,1687,1080 name=Speaker/Headphone: 76% B 2026-11-04T09:01:18.973Z n=16 parent_class=ToolbarWindow32 class= offscreen=0 rect=1687,1030,1717,1080 name=<network name> Internet access B 2026-11-04T09:01:18.976Z n=17 parent_class=TrayInputIndicatorWClass class=InputIndicatorButton offscreen=0 rect=1717,1030,1762,1080 name=Tray Input Indicator - English (United States) B 2026-11-04T09:01:18.978Z n=18 parent_class=TrayNotifyWnd class=TrayClockWClass offscreen=0 rect=1762,1030,1854,1080 name=System Clock, 14:31, ?04-?11-?2026 B 2026-11-04T09:01:18.981Z n=19 parent_class=TrayNotifyWnd class=TrayButton offscreen=0 rect=1854,1030,1914,1080 name=Action Center, 5 new notifications B 2026-11-04T09:01:18.984Z n=20 parent_class=TrayNotifyWnd class=TrayShowDesktopButtonWClass offscreen=0 rect=1914,1030,1920,1080 name=Show desktop Z 2026-11-04T09:01:18.985Z buttons=20 in_task_list=6 ;; cover out:  ;; capture out: 2026-11-04T09:01:20.263Z name=n dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+HA starts at T0+12.95 s
+G-P ha 2026-11-04T09:01:20.529Z to 2026-11-04T09:01:20.998Z (0.47 s): 5,0,0,1200,TallyPrime:9001 | visible_titled_windows,12
+HA skipped: Tally did not hold the foreground
+trace lines: END 2026-11-04T09:02:34.765Z
+watcher lines A/C/G/F/Z: Z 2026-11-04T09:02:36.466Z polls=1544 new_windows=1 appearances=0 copies=0
+console cmd console 0x39a2904 exists=0 iconic=0
+console trace console 0xb81b00 exists=0 iconic=0
+console watcher console 0x12f0290 exists=0 iconic=0
+the watcher's Z line is written: the lab's screen-tool copy after the cell
+n DONE 2026-11-04T09:02:36.862Z

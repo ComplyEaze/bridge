@@ -1,0 +1,36 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured answer is altered):
+evidence/c1-timeline.txt: original 7348 B sha256 bdedbb9b9411482db98807ad0b1894de219b3e492cee4fb43519cab5d2d677f8 (kept on the lab PC); 1 x -> <network name>; 1 x -> <widget text>; 11 x -> <LAB_DIR>; 1 x -> <desktop client>
+evidence/c1.txt: original 368 B sha256 66fce583b3a4df2fa6a4b0b7a2af09613d44da771bc58691ccbba9eaef385e5d (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/c10-netstat.txt: original 9483 B sha256 48a400320aebfe3a9fdd135ab564b85c519b7c3277fcbeb96065268f3b022d8e (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/c2-timeline.txt: original 7362 B sha256 3b415b61d3e50878eaec3c30e97ff75b7812d11737b70a13a22170a230dc9f76 (kept on the lab PC); 1 x -> <network name>; 1 x -> <widget text>; 11 x -> <LAB_DIR>; 1 x -> <desktop client>
+evidence/c2.txt: original 370 B sha256 beaa40c2acfb4fdfd86985cb257c8be3870ddce2e4b2b56d1465c3f85b9b4fff (kept on the lab PC); 1 x -> <LAB_DIR>
+evidence/cover-c1.txt: original 1186 B sha256 56d8775bf3b9f583e8c82a97925ae22ad38747f4c5f03df2f29d5fb98f9de868 (kept on the lab PC); 1 x -> a browser tab; 1 x -> <other window 1>; 2 x -> <desktop client>
+evidence/cover-c2.txt: original 1186 B sha256 3760d76141ab000768c82ed67d49617b52efadeb433f0fb8ee7ba808ec0cef4e (kept on the lab PC); 1 x -> a browser tab; 1 x -> <other window 1>; 2 x -> <desktop client>
+evidence/cover-x0.txt: original 970 B sha256 7d0cdf68a8ae39139cef5ba170bf38ca64b9fb7d1aaefc498eb23c0b9b282341 (kept on the lab PC); 1 x -> <other window 1>; 2 x -> <desktop client>
+evidence/p0-netstat.txt: original 9708 B sha256 2f7ddb8c28c3271ca651b8a69954d30cf0abd3098df0908786cc0cdb87de5cb5 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/trace-c1.txt: original 3393 B sha256 e98ae51db5c5fedea96ea0f9e98590c3b48d5c417dbdf8074433502cee7fa95f (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/trace-c2.txt: original 4287 B sha256 98e6fd174d6f09bb21433c2709c8977533138098ecc456a7319f840e7e9236d9 (kept on the lab PC); 2 x -> <LAB_DIR>
+evidence/uia-c1.txt: original 2959 B sha256 cb3d7e3c7b777f6a4424ca3d222b6200dc7d8d823107fcbdeda549c4cea85af7 (kept on the lab PC); 3 U+200E mark(s) removed (the clock); 1 x -> <network name>; 1 x -> <widget text>; 1 x -> <desktop client>
+evidence/uia-c2.txt: original 2959 B sha256 fc75baa9666535f78331f41a11244d7537011c3c9dd692a0df39e2bb9bed5aea (kept on the lab PC); 3 U+200E mark(s) removed (the clock); 1 x -> <network name>; 1 x -> <widget text>; 1 x -> <desktop client>
+evidence/uia-x0.txt: original 2940 B sha256 2aa26bc04595715fc27dca65b1cb920454d2662bea0ba30f7e89c8e78747898c (kept on the lab PC); 3 U+200E mark(s) removed (the clock); 1 x -> <network name>; 1 x -> <widget text>; 1 x -> <desktop client>
+evidence/x0-timeline.txt: original 3518 B sha256 46ff6d1025fb3bd3c7a79e8b66d1b024e3cdda8e07e65d516997524763eccf6f (kept on the lab PC); 3 U+200E mark(s) removed (the clock); 1 x -> <network name>; 1 x -> <widget text>; 1 x -> <desktop client>
+evidence/n1/cover-n.txt: original 970 B sha256 4c217f2549e656eb1eaa02526acc0d5f5c60c1229df2b6fb3fcbb6b2d0e0fb92 (kept on the lab PC); 1 x -> <other window 1>; 2 x -> <desktop client>
+evidence/n1/n-timeline.txt: original 6925 B sha256 87d1b0878847e7fe68683f77bf090016c4eba02b60aaa3c503510c5dd7ff6481 (kept on the lab PC); 1 x -> <network name>; 1 x -> <widget text>; 6 x -> <LAB_DIR>; 5 x -> <desktop client>
+evidence/n1/switch-n.txt: original 1260 B sha256 76a9256b3e88d3cbca5e250f0dd64d1d2c12b840dd6533333b9aba7658d5fb05 (kept on the lab PC); 1 x -> a browser tab; 3 x -> <desktop client>
+evidence/n1/uia-n.txt: original 2955 B sha256 ea7f23a7019a31244a12a2033cc3c5308849d9d647eed2cbdc76738692b3f9c0 (kept on the lab PC); 3 U+200E mark(s) removed (the clock); 1 x -> <network name>; 1 x -> <widget text>; 1 x -> <desktop client>
+evidence/n2/cover-n.txt: original 1186 B sha256 730fe858b065df36d439b143d06d6931c31d0e33c00966065ad563f11199b7d2 (kept on the lab PC); 1 x -> a browser tab; 1 x -> <other window 1>; 2 x -> <desktop client>
+evidence/n2/n-timeline.txt: original 6169 B sha256 4c273d87e6ecc498d7bbabe273598307b765d013a74cb0c014c4899d01faf77b (kept on the lab PC); 1 x -> a browser tab; 1 x -> <network name>; 1 x -> <widget text>; 6 x -> <LAB_DIR>; 9 x -> <desktop client>
+evidence/n2/rect-n.txt: original 529 B sha256 1394db76a2873320db161208104432d1e77808637de1ae1922384feb25a090b9 (kept on the lab PC); 1 x -> <desktop client>
+evidence/n2/uia-n.txt: original 2959 B sha256 5d5557583fa2eac1a6ca030561221c78180d7bf647dbae0e889894ab058e249b (kept on the lab PC); 3 U+200E mark(s) removed (the clock); 1 x -> <network name>; 1 x -> <widget text>; 1 x -> <desktop client>
+evidence/n3/cover-n.txt: original 1186 B sha256 65b2de5bf06805fdedfee2164f5a7d73a1fdfa979c48ef98758560f667716287 (kept on the lab PC); 1 x -> a browser tab; 1 x -> <other window 1>; 2 x -> <desktop client>
+evidence/n3/n-timeline.txt: original 6936 B sha256 6d22d4902d6ba752141b7904486267b3e0a08736d6dd2597db48fb008e82218a (kept on the lab PC); 1 x -> <network name>; 1 x -> <widget text>; 6 x -> <LAB_DIR>; 1 x -> <desktop client>
+evidence/n3/switch-n.txt: original 1256 B sha256 c01644dc788f1416f807668592de05e51f13f7c9ab3149fd7b94aa6cae2f7613 (kept on the lab PC); 1 x -> a browser tab; 1 x -> <desktop client>
+evidence/n3/uia-n.txt: original 2959 B sha256 dc2a9632633087d665c2c589dddfd0cae61af804d265e1d76950ef89cd7087ad (kept on the lab PC); 3 U+200E mark(s) removed (the clock); 1 x -> <network name>; 1 x -> <widget text>; 1 x -> <desktop client>
+notes.txt: original 13671 B sha256 2d2d100498729e0850d672c6ee3022bbbd84046087464ab4779907a4ed90261a (kept on the lab PC); 1 x -> stop; 2 x -> <desktop client>
+scripts/cell.ps1: original 21695 B sha256 ba0003a967f6f5b8aa35483196b63ec9906f0b9eff27526187bcc9c4ead2f627 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> stop
+scripts/marks.ps1: original 1799 B sha256 47f3fa4a7ed515f5f14675ded9bc5edc89d0a47f8628acd24b1969b6bedc161e (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop
+scripts/step0.ps1: original 2424 B sha256 c8ed5d8a357fc9c1d7d9c6181e84bbe98a330353df42e8a07bb6f67b34b3eb29 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/leftover.ps1: original 3310 B sha256 37b2c8a44cbd4c9eddf2e781a8526c9210917bfd00ee48a365398b4b754c6aad (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/b1names.ps1: original 735 B sha256 e367c06313e0299f8dfa4f19600262597070c6d47d39b1b05b452f3623b3284d (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/n2-words.sh: original 1559 B sha256 603fb2ab81134230987036da40419776542f72f0217200c4ff032623aa57bb61 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/n3-words.sh: original 1576 B sha256 9810278321483adad385b83e6efd67627953575a69388d81cce7a4afe437b832 (kept on the lab PC); 2 x -> <LAB_DIR>

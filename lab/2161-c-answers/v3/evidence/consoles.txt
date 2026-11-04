@@ -1,0 +1,15 @@
+2026-11-04T08:56:49.242Z cell=n name=trace console pid=21160 window=0x1600404
+2026-11-04T08:56:51.036Z cell=n name=watcher console pid=9932 window=0x781552
+2026-11-04T08:57:10.215Z cell=n name=cmd console pid=14952 window=0x631600
+2026-11-04T09:00:55.452Z cell=n name=trace console pid=17004 window=0xb81b00
+2026-11-04T09:00:57.021Z cell=n name=watcher console pid=21328 window=0x12f0290
+2026-11-04T09:01:00.306Z cell=n name=cmd console pid=23028 window=0x39a2904
+2026-11-04T09:04:17.611Z cell=n name=trace console pid=24712 window=0x2501afc
+2026-11-04T09:04:19.181Z cell=n name=watcher console pid=27244 window=0x2732884
+2026-11-04T09:04:21.974Z cell=n name=cmd console pid=19432 window=0x592138
+2026-11-04T09:08:00.373Z cell=c1 name=trace console pid=22368 window=0x108207e
+2026-11-04T09:08:01.934Z cell=c1 name=watcher console pid=13208 window=0xbb1b00
+2026-11-04T09:08:03.115Z cell=c1 name=cmd console pid=22888 window=0xe2264e
+2026-11-04T09:10:24.666Z cell=c2 name=trace console pid=22396 window=0x1720574
+2026-11-04T09:10:26.231Z cell=c2 name=watcher console pid=11396 window=0x109207e
+2026-11-04T09:10:27.388Z cell=c2 name=cmd console pid=25896 window=0x1680404

@@ -1,0 +1,4 @@
+B5 after-c1 2026-11-04T09:10:20.344Z
+processes: 0
+windows: 0
+minimised recorded consoles: 0 (of 12 recorded pids)

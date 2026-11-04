@@ -2935,8 +2935,9 @@ class MergeWrapperControls(unittest.TestCase):
 
 class PrivacyMutationRecordDigests(unittest.TestCase):
     """A tax-audit mutation record's `"mutation"` and `"crate_tree"` values, 16 lowercase hex with at least one letter,
-    are masked before the counts. Any other key, length or case, an all-digit value, and any other shape on the line are
-    still scanned. Every value is built at run time."""
+    are masked before the counts, on a line that starts as the runner writes a record and on no other line. Any other
+    key, length or case, an all-digit value, and any other shape on the line are still scanned. Every value is built at
+    run time."""
 
     def setUp(self):
         self.privacy = load_privacy_module()
@@ -3001,6 +3002,42 @@ class PrivacyMutationRecordDigests(unittest.TestCase):
             text = self.line(self.with_phone, self.with_phone, extra=extra)
             blockers = self.blockers(text)
             self.assertTrue(any("1 identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_the_same_key_and_value_off_a_records_line_still_blocks(self):
+        pair = '"mutation": "%s"' % self.with_phone
+        for text in (
+            "Mask %s in the records (#2352)" % pair,  # a pull request title
+            "Regenerate the records\n\nThe record now reads %s." % pair,  # a commit message
+            "    let record = r#\"{%s}\"#;" % pair,  # a Rust string literal
+            "docs/%s.md" % pair.replace('"', ""),  # a path
+            "docs/{%s}.md" % pair,  # a path keeping the quotes
+        ):
+            self.assert_blocked(text)
+            self.assertNotIn("1 mutation-record digest(s) were masked", self.privacy.scan(text, HEAD)["notes"], text)
+
+    def test_only_a_line_that_starts_as_a_record_is_masked(self):
+        record = self.line(self.with_phone, self.with_phone)
+        for text in (
+            "x" + record,  # text before the record id
+            record.replace(HEAD, HEAD[:-1]),  # a 39-hex commit
+            record.replace(HEAD, HEAD.upper()),  # an uppercase commit
+            record.replace('{"commit": ', '{ "commit": '),
+            record.replace('"C42-01": ', '"C42-01" : '),
+        ):
+            self.assert_blocked(text)
+        # Each line is anchored on its own: a record line after a title is masked, the title is not.
+        title = 'Mask "mutation": "%s" (#2352)' % self.with_phone
+        record_hits = self.privacy.scan(title + "\n" + record, HEAD)
+        self.assertIn("2 mutation-record digest(s) were masked", record_hits["notes"])
+        self.assert_blocked(title + "\n" + record)
+        self.assertEqual(self.blockers(record + "\n" + record), [])
+
+    def test_a_lowercase_pan_of_a_to_f_letters_is_masked_on_a_records_line_only(self):
+        pan = "abcde" + "1234" + "f" + "0" * 6  # a PAN's shape, lowercase, letters a-f only, padded to 16
+        self.assertEqual(self.blockers(self.line(pan, self.with_run)), [])
+        for text in (self.line(pan, self.with_run, key="note"), "party %s" % pan):
+            blockers = self.blockers(text)
+            self.assertTrue(any("identifier shape" in b for b in blockers), (text, blockers))
 
 
 if __name__ == "__main__":

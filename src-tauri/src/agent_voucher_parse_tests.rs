@@ -2595,11 +2595,20 @@ fn every_dispatch_detail(state: Value) -> Value {
         "lading_no": state,
         "lading_date": state,
         "vehicle_no": state,
+        "delivery_notes": state,
     })
 }
 
-/// #2027: the lab's four invoices carry each dispatch element empty, so each says them absent; an
-/// answer that holds none of the seven says not reported.
+/// What an answer to the request before the Delivery Note list says: each detail `state`, and the
+/// notes not reported.
+fn dispatch_answered_without_the_list(state: Value) -> Value {
+    let mut dispatch = every_dispatch_detail(state);
+    dispatch["delivery_notes"] = json!({"state": "not_reported"});
+    dispatch
+}
+
+/// #2027: the lab's four invoices carry each dispatch element empty and one empty Delivery Note
+/// entry, so each says them absent; an answer that holds none of them says not reported.
 #[test]
 fn each_captured_invoice_says_its_dispatch_details_absent_and_a_read_without_them_not_reported() {
     assert_eq!(
@@ -2645,6 +2654,21 @@ fn a_voucher_that_is_no_invoice_says_dispatch_only_when_it_carries_a_detail() {
     ));
     assert_eq!(carried["dispatched_through"], present("ROADWAY"));
     assert_eq!(carried["doc_no"]["state"], "not_reported");
+    assert_eq!(carried["delivery_notes"]["state"], "not_reported");
+    assert!(said(&with_injected_voucher_element(
+        "<INVOICEDELNOTES.LIST>     </INVOICEDELNOTES.LIST>"
+    ))
+    .is_null());
+    let noted = said(&with_injected_voucher_element(
+        "<INVOICEDELNOTES.LIST><BASICSHIPDELIVERYNOTE>DN-9</BASICSHIPDELIVERYNOTE></INVOICEDELNOTES.LIST>",
+    ));
+    assert_eq!(
+        noted["delivery_notes"],
+        json!({"state": "present", "value": [
+            {"number": present("DN-9"), "date": {"state": "not_reported"}},
+        ]})
+    );
+    assert_eq!(noted["doc_no"]["state"], "not_reported");
 }
 
 /// #2027: under `mask_parties` the transporter, the carrier and the vehicle number are masked as a
@@ -2749,6 +2773,7 @@ fn the_captured_keyed_invoice_and_note_say_each_dispatch_detail() {
         "lading_no": present("LR-74"),
         "lading_date": present("20250403"),
         "vehicle_no": present("KA-75"),
+        "delivery_notes": {"state": "not_reported"},
     });
     for (voucher_type, number) in [("Sales", "3"), ("Credit Note", "1")] {
         assert_eq!(voucher(&rows, voucher_type, number)["dispatch"], keyed);
@@ -2756,7 +2781,7 @@ fn the_captured_keyed_invoice_and_note_say_each_dispatch_detail() {
     for number in ["1", "2"] {
         assert_eq!(
             voucher(&rows, "Sales", number)["dispatch"],
-            every_dispatch_detail(json!({"state": "absent"}))
+            dispatch_answered_without_the_list(json!({"state": "absent"}))
         );
     }
     assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
@@ -2804,7 +2829,7 @@ fn the_captured_class_read_with_e_invoice_says_dispatch_beside_both() {
         let sale = voucher(&rows, "Sales", number);
         assert_eq!(
             sale["dispatch"],
-            every_dispatch_detail(json!({"state": "absent"}))
+            dispatch_answered_without_the_list(json!({"state": "absent"}))
         );
         assert_eq!(sale["voucher_gst"]["place_of_supply"], present("Karnataka"));
     }
@@ -2817,6 +2842,137 @@ fn the_captured_class_read_with_e_invoice_says_dispatch_beside_both() {
         "absent"
     );
     assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
+}
+
+const EINVOICE_LAB_DELIVERY_NOTES: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml"
+);
+
+fn einvoice_lab_delivery_note_answer() -> String {
+    captured_notes_lab(EINVOICE_LAB_DELIVERY_NOTES)
+}
+
+fn delivery_notes_of(xml: &str) -> Result<Vec<Value>, String> {
+    Ok(parse_agent_rows_reading_gst(
+        xml,
+        EINVOICE_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        ASKING_VOUCHER_GST,
+        StockLines::NotAsked,
+    )?
+    .into_iter()
+    .map(|mut row| row["dispatch"]["delivery_notes"].take())
+    .collect())
+}
+
+fn delivery_note(number: &str, date: &str) -> Value {
+    json!({"number": present(number), "date": present(date)})
+}
+
+/// #2027: the window request's own answer, with one Delivery Note keyed on Sales 3 and two on
+/// Sales 4: each note is its number and date, in the order keyed; the earlier invoices say their
+/// notes and every other detail absent, and the Payment says none.
+#[test]
+fn the_captured_delivery_notes_come_with_their_dates_in_the_order_keyed() {
+    let rows = einvoice_lab_rows(EINVOICE_LAB_DELIVERY_NOTES, ASKING_VOUCHER_GST);
+    assert_eq!(rows.len(), 5);
+    let notes =
+        |number: &str| voucher(&rows, "Sales", number)["dispatch"]["delivery_notes"].clone();
+    assert_eq!(
+        notes("3"),
+        json!({"state": "present", "value": [delivery_note("DN-81", "20250401")]})
+    );
+    assert_eq!(
+        notes("4"),
+        json!({"state": "present", "value": [
+            delivery_note("DN-82", "20250402"),
+            delivery_note("DN-83", "20250401"),
+        ]})
+    );
+    for number in ["1", "2"] {
+        assert_eq!(
+            voucher(&rows, "Sales", number)["dispatch"],
+            every_dispatch_detail(json!({"state": "absent"}))
+        );
+    }
+    assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
+}
+
+/// #2027: a Delivery Note's number and date are the book's own, sent as they are under every
+/// setting, as `doc_no` is.
+#[test]
+fn under_mask_parties_the_captured_delivery_notes_stay() {
+    let rows = einvoice_lab_rows(EINVOICE_LAB_DELIVERY_NOTES, ASKING_VOUCHER_GST);
+    let marked: Vec<Value> = rows.into_iter().map(mark_voucher_party_names).collect();
+    let notes = |rows: Value| -> Vec<Value> {
+        rows.as_array()
+            .unwrap()
+            .iter()
+            .map(|row| row["dispatch"]["delivery_notes"].clone())
+            .collect()
+    };
+    let masked = notes(redact_value(
+        Value::Array(marked.clone()),
+        Redaction::MaskParties,
+    ));
+    assert_eq!(
+        masked,
+        notes(redact_value(Value::Array(marked), Redaction::None))
+    );
+    let text = Value::Array(masked).to_string();
+    assert!(
+        ["DN-81", "DN-82", "DN-83", "20250401", "20250402"]
+            .iter()
+            .all(|value| text.contains(value)),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_read_that_did_not_ask_reads_no_delivery_note() {
+    let bad = einvoice_lab_delivery_note_answer().replacen(
+        "<BASICSHIPPINGDATE>20250401</BASICSHIPPINGDATE>",
+        "<BASICSHIPPINGDATE>1-Apr-25</BASICSHIPPINGDATE>",
+        1,
+    );
+    let rows = parse_agent_rows_reading_gst(
+        &bad,
+        EINVOICE_LAB_COMPANY_GUID,
+        GstDetailsShown::Shown,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::NotAsked,
+    )
+    .unwrap();
+    assert!(rows.iter().all(|row| row.get("dispatch").is_none()));
+}
+
+#[test]
+fn a_delivery_note_date_that_is_no_date_refuses_the_read() {
+    let xml = einvoice_lab_delivery_note_answer().replacen(
+        "<BASICSHIPPINGDATE>20250401</BASICSHIPPINGDATE>",
+        "<BASICSHIPPINGDATE>1-Apr-25</BASICSHIPPINGDATE>",
+        1,
+    );
+    assert_eq!(
+        delivery_notes_of(&xml),
+        Err("voucher_delivery_note_date_invalid".to_string())
+    );
+}
+
+/// An entry's number and date are each read once, and hold text only.
+#[test]
+fn a_repeated_or_nested_delivery_note_element_refuses_the_read() {
+    let number = "<BASICSHIPDELIVERYNOTE>DN-81</BASICSHIPDELIVERYNOTE>";
+    for changed in [
+        format!("{number}{number}"),
+        "<BASICSHIPDELIVERYNOTE><NUMBER>DN-81</NUMBER></BASICSHIPDELIVERYNOTE>".to_string(),
+    ] {
+        let xml = einvoice_lab_delivery_note_answer().replacen(number, &changed, 1);
+        assert_eq!(
+            delivery_notes_of(&xml),
+            Err("voucher_delivery_note_invalid".to_string())
+        );
+    }
 }
 
 #[test]

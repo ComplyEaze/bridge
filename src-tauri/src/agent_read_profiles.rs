@@ -58,10 +58,11 @@ const AGENT_VOUCHER_E_INVOICE_WORDS: &str = ",IRN,IRNACKNO,IRNACKDATE";
 const AGENT_VOUCHER_GST_WORDS: &str = ",PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,\
 GSTNATUREOFRETURN,VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE";
 
-/// A voucher's dispatch details, sent only right after [`AGENT_VOUCHER_GST_WORDS`]: the request the
-/// lab answered (#2027, protocol reference §8.2l).
+/// A voucher's dispatch details and its Delivery Note list, sent only right after
+/// [`AGENT_VOUCHER_GST_WORDS`]: the request the lab answered (#2027, protocol reference §8.2l).
 const AGENT_VOUCHER_DISPATCH_WORDS: &str = ",BASICSHIPDOCUMENTNO,BASICSHIPPEDBY,\
-BASICFINALDESTINATION,EICHECKPOST,BILLOFLADINGNO,BILLOFLADINGDATE,BASICSHIPVESSELNO";
+BASICFINALDESTINATION,EICHECKPOST,BILLOFLADINGNO,BILLOFLADINGDATE,BASICSHIPVESSELNO,\
+INVOICEDELNOTES.*";
 
 /// [`AGENT_VOUCHER_FETCH`] with `ALLINVENTORYENTRIES.*` in place of `ALLLEDGERENTRIES.*`, sent only
 /// by a `vouchers` call that asks for stock lines (#2016): the request captured on each kind of

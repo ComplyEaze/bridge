@@ -2441,9 +2441,12 @@ or a note without an original invoice (protocol reference 8.2k).
 
 The same argument also adds `dispatch`, stated the same way: `doc_no` (Dispatch Doc No.), `dispatched_through`, `destination`,
 `carrier` (Carrier Name/Agent), `lading_no` and `lading_date` (Bill of Lading/LR-RR No. and its date, `YYYYMMDD`; one that is not
-a date refuses the read as `voucher_lading_date_invalid`) and `vehicle_no` (Motor Vehicle No.). A Delivery Note number is not
-returned. Under `mask_parties`, `dispatched_through`, the carrier and the vehicle number are masked as a party name is; the rest
-stay as the book has them. Measured on one synthetic book, one Sales invoice and one Credit Note (protocol reference 8.2l).
+a date refuses the read as `voucher_lading_date_invalid`), `vehicle_no` (Motor Vehicle No.) and `delivery_notes` (Delivery Note
+No(s)). `delivery_notes` is present with a list of `{number, date}` in the order keyed, each stated the same way, or absent when
+the voucher has none; a date is `YYYYMMDD`, and one that is not refuses the read as `voucher_delivery_note_date_invalid`. Under
+`mask_parties`, `dispatched_through`, the carrier and the vehicle number are masked as a party name is; the rest, Delivery Notes
+included, stay as the book has them. Measured on one synthetic book: one Sales invoice and one Credit Note with the details, and
+two Sales invoices with one and two Delivery Notes (protocol reference 8.2l).
 
 ### Cost-centre allocations in voucher reads
 

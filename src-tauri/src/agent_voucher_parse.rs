@@ -90,6 +90,12 @@ impl NativeCollectionScope {
                 .is_some_and(|c| c == "INVENTORYALLOCATIONS.LIST")
         })
     }
+    /// Whether the element being read is a child of a voucher's Delivery Note entry.
+    fn delivery_note_field(&self) -> bool {
+        self.path.len() == 7
+            && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
+            && self.path[5] == DELIVERY_NOTE_LIST
+    }
     pub(super) fn bill_allocation(&self) -> bool {
         self.path.len() == 7
             && self.path[..5] == ["ENVELOPE", "BODY", "DATA", "COLLECTION", "VOUCHER"]
@@ -437,8 +443,13 @@ impl VoucherGstFields {
     }
 
     /// An invoice's dispatch details, or a voucher's if it carries any, each named after the field
-    /// of Tally's form whose value the lab found in it (protocol reference §8.2l).
-    fn dispatch(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
+    /// of Tally's form whose value the lab found in it, and its Delivery Notes as
+    /// [`DeliveryNoteCollector::finish`] gives them (protocol reference §8.2l).
+    fn dispatch(
+        self,
+        row: &BTreeMap<String, String>,
+        delivery_notes: Option<Vec<Value>>,
+    ) -> Result<Option<Value>, String> {
         if self == Self::NotAsked {
             return Ok(None);
         }
@@ -459,7 +470,10 @@ impl VoucherGstFields {
             &lading_date,
             &vehicle_no,
         ];
-        if !row_says_details(row, &details) {
+        let carries_a_note = delivery_notes
+            .as_ref()
+            .is_some_and(|notes| !notes.is_empty());
+        if !carries_a_note && !row_says_details(row, &details) {
             return Ok(None);
         }
         Ok(Some(json!({
@@ -470,7 +484,73 @@ impl VoucherGstFields {
             "lading_no": lading_no.to_json(),
             "lading_date": lading_date.to_json(),
             "vehicle_no": vehicle_no.to_json(),
+            "delivery_notes": match delivery_notes {
+                None => json!({"state": "not_reported"}),
+                Some(notes) if notes.is_empty() => json!({"state": "absent"}),
+                Some(notes) => json!({"state": "present", "value": notes}),
+            },
         })))
+    }
+}
+
+/// The list a voucher keeps its Delivery Notes in, one entry each.
+const DELIVERY_NOTE_LIST: &str = "INVOICEDELNOTES.LIST";
+
+/// A voucher's Delivery Notes, read only when the GST details are asked for (#2027). Each entry of
+/// [`DELIVERY_NOTE_LIST`] holds one note's number in `BASICSHIPDELIVERYNOTE` and its date in
+/// `BASICSHIPPINGDATE`, in the order keyed, and a voucher with none sends one empty entry (protocol
+/// reference §8.2l).
+#[derive(Default)]
+struct DeliveryNoteCollector {
+    /// `None` until the voucher sends the list.
+    notes: Option<Vec<Value>>,
+    entry: Option<BTreeMap<String, String>>,
+}
+
+impl DeliveryNoteCollector {
+    fn start_entry(&mut self) {
+        self.notes.get_or_insert_with(Vec::new);
+        self.entry = Some(BTreeMap::new());
+    }
+
+    /// A child of an entry is read once, as a voucher field is.
+    fn start_field(&mut self, tag: &str) -> Result<(), String> {
+        match self.entry.as_mut() {
+            Some(entry) if !entry.contains_key(tag) => {
+                entry.insert(tag.to_string(), String::new());
+                Ok(())
+            }
+            _ => Err("voucher_delivery_note_invalid".to_string()),
+        }
+    }
+
+    fn text(&mut self, tag: &str, value: String) {
+        if let Some(entry) = self.entry.as_mut() {
+            append_agent_text(entry, tag, value);
+        }
+    }
+
+    /// An entry that carries neither a number nor a date is the empty one, not a note.
+    fn end_entry(&mut self) -> Result<(), String> {
+        let entry = self.entry.take().unwrap_or_default();
+        let number = VoucherDetail::of(&entry, "BASICSHIPDELIVERYNOTE");
+        let date = VoucherDetail::of(&entry, "BASICSHIPPINGDATE");
+        date.require_date("voucher_delivery_note_date_invalid")?;
+        if [&number, &date]
+            .iter()
+            .any(|detail| matches!(detail, VoucherDetail::Present(_)))
+        {
+            self.notes
+                .get_or_insert_with(Vec::new)
+                .push(json!({"number": number.to_json(), "date": date.to_json()}));
+        }
+        Ok(())
+    }
+
+    /// The voucher's notes: `None` if it sent no list, empty if the list held none.
+    fn finish(&mut self) -> Option<Vec<Value>> {
+        self.entry = None;
+        self.notes.take()
     }
 }
 
@@ -717,6 +797,7 @@ fn parse_voucher_rows(
     // not ask holds, sizes and returns exactly the rows it did before.
     let read_gst = gst_details == GstDetailsShown::Shown;
     let read_stock = stock == StockLines::Asked;
+    let read_notes = named.gst == VoucherGstFields::Asked;
     // Tally's collection XML varies by release; use a deliberately conservative
     // extractor and never infer a missing field. Malformed rows fail before
     // optional selectors can hide them as an apparently complete empty result.
@@ -737,6 +818,7 @@ fn parse_voucher_rows(
     let mut goods = GoodsLineCollector::default();
     let mut stock_lines = GoodsLineCollector::of_list(GoodsLineList::VoucherStockLines);
     let mut gst = EntryGstCollector::default();
+    let mut notes = DeliveryNoteCollector::default();
     let mut current_tag = String::new();
     let mut scope = NativeCollectionScope::default();
     // Set by a composite amount under `CompositePolicy::Withhold`, per voucher.
@@ -768,6 +850,10 @@ fn parse_voucher_rows(
                     entries.clear();
                     withheld = false;
                     stock_lines.reset();
+                    notes = DeliveryNoteCollector::default();
+                }
+                if read_notes {
+                    start_delivery_note_element(&scope, &tag, &mut notes)?;
                 }
                 if tag == "ALLLEDGERENTRIES.LIST" && scope.row("VOUCHER") {
                     entry = Some(BTreeMap::new());
@@ -804,6 +890,9 @@ fn parse_voucher_rows(
                 current_tag = tag;
             }
             Ok(quick_xml::events::Event::Text(text)) => {
+                if read_notes && scope.delivery_note_field() {
+                    notes.text(&current_tag, decoded_agent_text(text.clone())?);
+                }
                 if let Some(tail) = scope.entry_tail().filter(|_| read_gst) {
                     match decoded_agent_text(text.clone()) {
                         Ok(value) => gst.text(tail, &current_tag, &value),
@@ -853,6 +942,9 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::CData(text)) => {
                 let value = text.to_string();
+                if read_notes && scope.delivery_note_field() {
+                    notes.text(&current_tag, value.clone());
+                }
                 if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
                     stock_lines.text(tail, &current_tag, &value);
                 }
@@ -880,6 +972,9 @@ fn parse_voucher_rows(
                 }
             }
             Ok(quick_xml::events::Event::GeneralRef(reference)) => {
+                if read_notes && scope.delivery_note_field() {
+                    notes.text(&current_tag, decoded_agent_reference(reference.clone())?);
+                }
                 if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
                     match decoded_agent_reference(reference.clone()) {
                         Ok(value) => stock_lines.text(tail, &current_tag, &value),
@@ -929,6 +1024,9 @@ fn parse_voucher_rows(
             }
             Ok(quick_xml::events::Event::End(event)) => {
                 let end = event.name().as_ref().to_ascii_uppercase();
+                if read_notes && scope.child("VOUCHER", DELIVERY_NOTE_LIST) {
+                    notes.end_entry()?;
+                }
                 if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
                     stock_lines.end(tail);
                 }
@@ -1306,7 +1404,7 @@ fn parse_voucher_rows(
                         if let Some(details) = named.gst.details(&row)? {
                             parsed["voucher_gst"] = details;
                         }
-                        if let Some(details) = named.gst.dispatch(&row)? {
+                        if let Some(details) = named.gst.dispatch(&row, notes.finish())? {
                             parsed["dispatch"] = details;
                         }
                         rows.push((parsed, withheld));
@@ -1322,6 +1420,9 @@ fn parse_voucher_rows(
                 }
                 if scope.collection() {
                     return Err("agent_read_protocol_invalid".to_string());
+                }
+                if read_notes {
+                    start_delivery_note_element(&scope, &name, &mut notes)?;
                 }
                 claim_voucher_scalar(
                     &scope,
@@ -1351,6 +1452,9 @@ fn parse_voucher_rows(
                 }
                 if let Some(tail) = scope.stock_line_tail().filter(|_| read_stock) {
                     stock_lines.end(tail);
+                }
+                if read_notes && scope.child("VOUCHER", DELIVERY_NOTE_LIST) {
+                    notes.end_entry()?;
                 }
                 scope.end(&name)?;
             }
@@ -1395,6 +1499,25 @@ fn credit_period_json(text: &str) -> Value {
             }
             period
         }
+    }
+}
+
+/// Starts a Delivery Note entry, or a field of one; an element inside a field is refused, as one
+/// inside a voucher field is.
+fn start_delivery_note_element(
+    scope: &NativeCollectionScope,
+    tag: &str,
+    notes: &mut DeliveryNoteCollector,
+) -> Result<(), String> {
+    if scope.delivery_note_field() {
+        Err("voucher_delivery_note_invalid".to_string())
+    } else if scope.row("VOUCHER") && tag == DELIVERY_NOTE_LIST {
+        notes.start_entry();
+        Ok(())
+    } else if scope.child("VOUCHER", DELIVERY_NOTE_LIST) {
+        notes.start_field(tag)
+    } else {
+        Ok(())
     }
 }
 

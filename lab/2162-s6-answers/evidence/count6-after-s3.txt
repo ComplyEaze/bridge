@@ -1,0 +1,49 @@
+a-m1-M-marks.xml: 3406 bytes, sha256 fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['29900']; ALTMSTID ['328']
+a-s1-Y0-day.xml: 231386 bytes, sha256 9534412b36ebc99c3d51436f630e9e04119f38be213dcb51f7b4a04df6999fce
+  rows 82
+  row bytes: total 227376, the rest of the answer 4010; per row min 2766, max 2774, mean 2773
+  BRIDGEVCHISSALES: 'Yes' 82
+  VOUCHERTYPENAME: 'Sales' 82
+  ISCANCELLED: 'No' 82
+  DATE: first 20250401, last 20250401, distinct 1
+  IRN: once in 82 rows, not empty in 0
+  IRNACKNO: once in 82 rows, not empty in 0
+  IRNACKDATE: once in 82 rows, not empty in 0
+  Sales-class rows 82: distinct numbers 82, distinct folded 82, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-s2-Y1-day.xml: 231386 bytes, sha256 9534412b36ebc99c3d51436f630e9e04119f38be213dcb51f7b4a04df6999fce
+  rows 82
+  row bytes: total 227376, the rest of the answer 4010; per row min 2766, max 2774, mean 2773
+  BRIDGEVCHISSALES: 'Yes' 82
+  VOUCHERTYPENAME: 'Sales' 82
+  ISCANCELLED: 'No' 82
+  DATE: first 20250401, last 20250401, distinct 1
+  IRN: once in 82 rows, not empty in 0
+  IRNACKNO: once in 82 rows, not empty in 0
+  IRNACKDATE: once in 82 rows, not empty in 0
+  Sales-class rows 82: distinct numbers 82, distinct folded 82, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-s3-Y0-month.xml: 6792322 bytes, sha256 9262740a99747d24b5dca947cef3e5224160032a15e8ba7be3923a120a40aaa9
+  rows 2430
+  row bytes: total 6760136, the rest of the answer 32186; per row min 2766, max 2784, mean 2782
+  BRIDGEVCHISSALES: 'Yes' 2430
+  VOUCHERTYPENAME: 'Sales' 2430
+  ISCANCELLED: 'No' 2430
+  DATE: first 20250401, last 20250430, distinct 30
+  IRN: once in 2430 rows, not empty in 0
+  IRNACKNO: once in 2430 rows, not empty in 0
+  IRNACKDATE: once in 2430 rows, not empty in 0
+  Sales-class rows 2430: distinct numbers 2430, distinct folded 2430, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-s2-Y1-day.xml against the Sales-class rows of a-s1-Y0-day.xml: rows 82 and 82; element for element equal: yes
+a-m1-M-marks.xml: curl 0, HTTP 200, first byte 0.010501 s, curl total 0.011781 s, wall 0.34 s, 3406 bytes
+a-s1-Y0-day.xml: curl 0, HTTP 200, first byte 0.686588 s, curl total 0.688809 s, wall 0.77 s, 231386 bytes
+a-s2-Y1-day.xml: curl 0, HTTP 200, first byte 0.182039 s, curl total 0.183996 s, wall 0.26 s, 231386 bytes
+a-s3-Y0-month.xml: curl 0, HTTP 200, first byte 8.308709 s, curl total 8.376538 s, wall 8.65 s, 6792322 bytes

@@ -1,0 +1,5 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+run/a-s6-Y0-year.xml 83742646 B 1db925db90f703148e76c2971f6bd9ad1fc2980cb5f81c14d0e6ca5f6e8c78b6 (over the sheet's 10 MB)
+run/a-s7-Y1-year.xml 83742646 B 1db925db90f703148e76c2971f6bd9ad1fc2980cb5f81c14d0e6ca5f6e8c78b6 (over the sheet's 10 MB)
+run/a-s8-Y1-year.xml 83742646 B 1db925db90f703148e76c2971f6bd9ad1fc2980cb5f81c14d0e6ca5f6e8c78b6 (over the sheet's 10 MB)
+stage-2162s6.py 7718 B 5f6d04fb9e655d9d9e4f850eff4cf17b4b2050661e59170289f4da2110475f5c (this stage script: its patterns name the lab paths)

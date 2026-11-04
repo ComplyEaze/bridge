@@ -1,0 +1,3 @@
+a-m1-M-marks.xml: 3406 bytes, sha256 fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['29900']; ALTMSTID ['328']
+a-m1-M-marks.xml: curl 0, HTTP 200, first byte 0.010501 s, curl total 0.011781 s, wall 0.34 s, 3406 bytes

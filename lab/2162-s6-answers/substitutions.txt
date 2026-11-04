@@ -1,0 +1,5 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/s10-c2-netstat.txt: original 9424 B sha256 63e630e0b0cb585b6419318d497202ba1186a098e29e7f28a54ab901544d76aa (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+cap.py: original 782 B sha256 b7eb195ba35dac9fb5d0d34b9de88d79e25823859bde8d9283b9f1af101e4e0e (kept on the lab PC); 2 x -> <LAB_DIR>
+c2.py: original 1280 B sha256 1fb602a4f354dd7e761eb8b1314c6bbc09c56bdbf42d42b891b7df3765e71d2e (kept on the lab PC); 1 x -> <LAB_DIR>
+folder-list.py: original 1253 B sha256 499437211b55aa70df25ba6db196873f8461f4665c7e9caaa57923d124121bf7 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>

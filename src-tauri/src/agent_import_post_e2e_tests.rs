@@ -7840,6 +7840,50 @@ async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
 }
 
+/// The customer's registration row made Regular under the company's own GSTIN
+/// (`lab_invoice_listing_with_walk_in_gstin`, a stated edit of the captured
+/// listing): the tool refuses the invoice once the company's registration is
+/// read, names the customer and the next step, and writes no file. Tally
+/// listed such an invoice as uncertain (section 9.16).
+#[tokio::test]
+async fn a_customer_holding_the_companys_own_gstin_is_refused_through_build_import_xml() {
+    let listing = super::super::tests::lab_invoice_listing_with_walk_in_gstin("08ZZZZZ0000Z1ZQ");
+    let positions = PILOT_ORDER
+        .char_indices()
+        .filter(|(_, letter)| *letter == 'L')
+        .map(|(at, _)| at)
+        .collect();
+    let (simulator, server, directory) = pilot_lab_changed(
+        PILOT_ORDER,
+        &[Changed {
+            positions,
+            body: listing,
+        }],
+    );
+    let response = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(
+            PILOT_QUALIFIED,
+            server.call_tool(
+                "build_import_xml",
+                pilot_args("BRIDGE Walk-in", "25.02", "1051.00"),
+            ),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "invoice_not_admitted", "{response}");
+    let refusals = result["refusals"].as_array().unwrap();
+    assert_eq!(refusals.len(), 1, "{response}");
+    assert_eq!(refusals[0]["code"], "invoice_party_gstin_is_company_own");
+    assert!(refusals[0]["detail"].to_string().contains("BRIDGE Walk-in"));
+    assert!(refusals[0]["remediation"]
+        .as_str()
+        .is_some_and(|step| step.contains("company's own GSTIN")));
+    assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
 // ---- The queue re-reads the invoice's masters (#1337) ----
 //
 // The build and the re-reads before the post are the pilot lab's own answers.
@@ -8395,6 +8439,26 @@ async fn a_company_registration_that_lapsed_after_the_approval_is_refused_in_the
         "invoice_company_registration_not_regular",
         PILOT_ORDER.find('Z').unwrap(),
     );
+}
+
+/// The customer given the company's own GSTIN while the approval waited (its
+/// registration row in the queue's listing edited, as in the build test):
+/// refused under the admission's own code, not as a master that moved.
+/// SYNTHETIC answer: the captured listing with that one stated edit; it stands
+/// for a change, and is not Tally's answer to one.
+#[tokio::test]
+async fn a_customer_given_the_companys_gstin_after_the_approval_is_refused_in_the_queue() {
+    let run = pilot_post_changed(&[Changed {
+        positions: pilot_queue_positions('L'),
+        body: super::super::tests::lab_invoice_listing_with_walk_in_gstin("08ZZZZZ0000Z1ZQ"),
+    }])
+    .await;
+    let error = pilot_refused_in_the_queue(
+        &run,
+        "invoice_party_gstin_is_company_own",
+        PILOT_ORDER.find('Z').unwrap(),
+    );
+    assert_eq!(error["cause"], Value::Null, "{}", run.response);
 }
 
 /// Where the queue's re-read of the invoice's masters starts in `PILOT_ORDER`:

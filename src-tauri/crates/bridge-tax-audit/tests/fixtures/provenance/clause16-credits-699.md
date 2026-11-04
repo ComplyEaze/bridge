@@ -17,7 +17,7 @@ refuses `clause16_credits` by name (`CRATE_FIRST`). This note adds no golden. Th
 - the live audit read of BRIDGE SFT LAB, FY 2025-26, on TallyPrime 7.2 Silver, after sheet 699-C16 keyed 19 more vouchers (lab
   row C16-R), committed in the protocol crate as `tests/fixtures/agent/audit-read-sft-lab-c16r/` with its own `PROVENANCE.md`.
   The app crate's `live_sft_lab_c16r::clause16_lists_the_rows_key_v3_worked_by_hand_on_the_live_book` checks the 12 rows and
-  the three counted figures against a key worked by hand to the rule from the sheet, before any capture.
+  the three counted figures, each count and its amount, against a key worked by hand to the rule from the sheet, before any capture.
 
 Not established: accuracy against a CA. The key is worked to the rule, not by a CA; no CA has worked this book, blind or
 otherwise, and every result here is measured against the synthetic lab book only. Whether a credit is income, capital, a loan, a

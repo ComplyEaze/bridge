@@ -5,14 +5,18 @@
 //! is no reference golden to compare it with (`docs/tax-audit/parity-spec-v1.md`, section 12).
 //!
 //! The population is limited by structure in the book only: which head a ledger sits under, and
-//! what each voucher debits and credits. Nothing is left out for its size or for what a text says,
-//! and whatever is left out is counted in a figure of its own:
+//! what each voucher debits and credits. Nothing is left out for its size or for what a text says.
+//! A credit to a money ledger (the engagement's cash and bank ledgers, and any ledger under Bank OD
+//! A/c, though Tally keeps that under Loans (Liability)) is money, not a head credit: it is neither
+//! listed nor counted, and the finding's limits say so. Whatever else is left out is counted in a
+//! figure of its own:
 //! - a voucher none of whose credits is listed, because every debit is on a profit and loss,
 //!   asset or investment head, or on Duties & Taxes, with at least one on the former;
 //! - a Duties & Taxes credit on a voucher that also credits an income ledger or debits a creditor
-//!   (tax collected on a sale, or withheld on a payment);
-//! - a ledger whose head this cannot tell, because its chain is incomplete or ends at a group
-//!   that is not one of Tally's reserved primary groups.
+//!   (tax collected on a sale, or tax on any voucher that debits a creditor, such as a payment or
+//!   a purchase return);
+//! - a ledger whose head this cannot tell, because it is not in the masters, or its chain is
+//!   incomplete or ends at a group that is not one of Tally's reserved primary groups.
 //!
 //! Every other credit to a head ledger is one row per voucher and ledger. Whether it is income,
 //! capital, a loan, a liability or tax, the books do not say; each row is the CA's to decide.
@@ -220,7 +224,7 @@ pub fn run(book: &Book, rules: &Rules, money: &BTreeSet<String>) -> Result<TestR
         count(TEST_ID, rows.len())?,
         Unit::Count,
         &format!(
-            "Credits to capital, reserve, loan, liability, tax and suspense ledgers, one row per voucher and ledger. {POPULATION}"
+            "Credits to capital, reserve, loan, liability, tax and suspense ledgers, other than the cash, bank and overdraft ledgers, one row per voucher and ledger. {POPULATION}"
         ),
         voucher_refs(rows.iter().map(|row| row.voucher)),
     )?;
@@ -262,7 +266,7 @@ pub fn run(book: &Book, rules: &Rules, money: &BTreeSet<String>) -> Result<TestR
         "excluded_credit",
         Value::Int(excluded_credit),
         Unit::Paise,
-        "The head credits on those vouchers.",
+        "The head and Duties & Taxes credits on those vouchers.",
         voucher_refs(excluded.iter().copied()),
     )?;
     let taxed_id = r.fig(
@@ -296,7 +300,7 @@ pub fn run(book: &Book, rules: &Rules, money: &BTreeSet<String>) -> Result<TestR
         count(TEST_ID, names.len())?,
         Unit::Count,
         &format!(
-            "Credited ledgers whose head is not told: an incomplete group chain, or one ending at a group that is not one of Tally's reserved primary groups. Their credits are not listed.{named}"
+            "Credited ledgers whose head is not told: not in the masters, an incomplete group chain, or one ending at a group that is not one of Tally's reserved primary groups. Their credits are not listed.{named}"
         ),
         ledger_refs(),
     )?;
@@ -331,6 +335,8 @@ pub fn run(book: &Book, rules: &Rules, money: &BTreeSet<String>) -> Result<TestR
             "Bill-wise allocations are not read.".to_string(),
             "Receipts in Form 26AS or the AIS are not compared here.".to_string(),
             "Credits to Fixed Assets or Investments are not listed.".to_string(),
+            "Credits to the cash, bank and overdraft ledgers are not listed or counted: they are money, though an overdraft sits under Loans (Liability)."
+                .to_string(),
             "A journal whose every line is on Duties & Taxes, such as a GST set-off, is listed."
                 .to_string(),
         ],

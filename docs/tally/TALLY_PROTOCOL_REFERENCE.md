@@ -171,6 +171,10 @@ base revision.
 <a id="82k-a-vouchers-gst-and-note-details-on-the-voucher-fetch--partial-2026-10-28-tallyprime-72-one-synthetic-book"></a>
 
 [8.2k A voucher's GST and note details on the voucher `FETCH` — **PARTIAL 2026-10-28; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82k-a-vouchers-gst-and-note-details-on-the-voucher-fetch--partial-2026-10-28-tallyprime-72-one-synthetic-book)
+<a id="82l-a-vouchers-dispatch-details-on-the-voucher-fetch--partial-2026-11-04-tallyprime-72-one-synthetic-book"></a>
+
+[8.2l A voucher's dispatch details on the voucher `FETCH` — **PARTIAL 2026-11-04; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82l-a-vouchers-dispatch-details-on-the-voucher-fetch--partial-2026-11-04-tallyprime-72-one-synthetic-book)
+
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)

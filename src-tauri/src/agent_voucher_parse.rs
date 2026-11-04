@@ -435,6 +435,43 @@ impl VoucherGstFields {
             "party_note_date": party_note_date.to_json(),
         })))
     }
+
+    /// An invoice's dispatch details, or a voucher's if it carries any, each named after the field
+    /// of Tally's form whose value the lab found in it (protocol reference §8.2l).
+    fn dispatch(self, row: &BTreeMap<String, String>) -> Result<Option<Value>, String> {
+        if self == Self::NotAsked {
+            return Ok(None);
+        }
+        let doc_no = VoucherDetail::of(row, "BASICSHIPDOCUMENTNO");
+        let dispatched_through = VoucherDetail::of(row, "BASICSHIPPEDBY");
+        let destination = VoucherDetail::of(row, "BASICFINALDESTINATION");
+        let carrier = VoucherDetail::of(row, "EICHECKPOST");
+        let lading_no = VoucherDetail::of(row, "BILLOFLADINGNO");
+        let lading_date = VoucherDetail::of(row, "BILLOFLADINGDATE");
+        let vehicle_no = VoucherDetail::of(row, "BASICSHIPVESSELNO");
+        lading_date.require_date("voucher_lading_date_invalid")?;
+        let details = [
+            &doc_no,
+            &dispatched_through,
+            &destination,
+            &carrier,
+            &lading_no,
+            &lading_date,
+            &vehicle_no,
+        ];
+        if !row_says_details(row, &details) {
+            return Ok(None);
+        }
+        Ok(Some(json!({
+            "doc_no": doc_no.to_json(),
+            "dispatched_through": dispatched_through.to_json(),
+            "destination": destination.to_json(),
+            "carrier": carrier.to_json(),
+            "lading_no": lading_no.to_json(),
+            "lading_date": lading_date.to_json(),
+            "vehicle_no": vehicle_no.to_json(),
+        })))
+    }
 }
 
 /// The voucher fields a read's fetch list names beyond the plain list.
@@ -1268,6 +1305,9 @@ fn parse_voucher_rows(
                         }
                         if let Some(details) = named.gst.details(&row)? {
                             parsed["voucher_gst"] = details;
+                        }
+                        if let Some(details) = named.gst.dispatch(&row)? {
+                            parsed["dispatch"] = details;
                         }
                         rows.push((parsed, withheld));
                     }

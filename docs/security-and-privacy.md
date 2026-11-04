@@ -195,6 +195,18 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       registration type, a note's reason, and the party's own note number and
       date) are sent as the book has them under every setting, as `reference`
       and `party_gstin` are.
+    - A voucher's dispatch details (the `dispatch` field `vouchers` adds with
+      `include_gst_details`: the dispatch document number, how it was
+      dispatched, the destination, the carrier, the bill of lading or LR-RR
+      number and its date, and the motor vehicle number) are sent as the book
+      has them, except that how it was dispatched (usually the transporter's
+      name), the carrier and the vehicle number, which name or identify a
+      business or person other than the book's own, are masked under
+      `mask_parties` as a party name is: `mark_voucher_party_names`
+      (`src-tauri/src/agent.rs:434`) marks them for every `vouchers` row
+      (`src-tauri/src/agent_vouchers.rs:274`), and `redact_value` masks the
+      marked values. The destination, both document numbers and the date stay
+      as place of supply does.
     - The cost centre and cost category lists (two new kinds of the masters
       read) send each one's name, its parent (a cost centre's parent is another
       cost centre or the top level), its category for a cost centre, three

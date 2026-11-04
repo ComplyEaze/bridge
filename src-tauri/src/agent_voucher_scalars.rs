@@ -29,6 +29,13 @@ pub(in crate::agent) fn is_voucher_scalar(field: &str) -> bool {
             | "GSTNATUREOFRETURN"
             | "VATPARTYTRANSRETURNNUMBER"
             | "VATPARTYTRANSRETURNDATE"
+            | "BASICSHIPDOCUMENTNO"
+            | "BASICSHIPPEDBY"
+            | "BASICFINALDESTINATION"
+            | "EICHECKPOST"
+            | "BILLOFLADINGNO"
+            | "BILLOFLADINGDATE"
+            | "BASICSHIPVESSELNO"
     )
 }
 

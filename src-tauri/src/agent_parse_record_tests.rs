@@ -44,6 +44,7 @@ const MISMATCHES_SHOWN: usize = 20;
 const WR2_LAB: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
 const NOTES_LAB: &str = "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0";
+const EINVOICE_LAB: &str = "eb2f5190-292e-4ed8-bfd3-eace839fe699";
 const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
@@ -661,6 +662,16 @@ fn rows() -> Vec<Row> {
         "agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml",
         "parse_agent_rows(NOTES_LAB)",
         |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-dispatch/window-read-dispatch-keyed.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
     ));
     rows.push(row!(
         "agent/native-three-vouchers.utf16le.xml",

@@ -2626,7 +2626,11 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      each carries its comparison rule; even a single candidate still requires a
      decision. For every reason,
      render `candidate_count_is_lower_bound` as "at least N", never an exact total.
-   - `missing` — no live ledger matched. Bridge never creates masters.
+   - `missing` — no live ledger matched. `validate_masters` creates nothing.
+     When master writes are on, a missing ledger of a kind they admit can be
+     created with `prepare_ledger_creates` and `post_ledger_creates`, after the
+     person approves it (see "Approved voucher posting" below); otherwise it is
+     created in Tally.
    - A `missing` or `near_miss` row without `folded_twins` whose name is,
      character for character, an alias of exactly one live ledger also carries
      `alias_of`, that ledger's name as Tally lists it. The row is still not

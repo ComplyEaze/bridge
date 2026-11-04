@@ -704,6 +704,20 @@ fn a_row_without_a_purchase_ledger_entry_says_it_has_no_taxable_entry() {
     assert_eq!(row_on(&page.rows, "20250905")["has_taxable_entry"], true);
 }
 
+/// The five item invoices of `class-purchase-lab` (§8.2m), one keyed with the voucher's common
+/// ledger off, each carried the purchase ledger as an entry of its own, and the register listed it
+/// under `taxable_entries`, so the description may not say that an item invoice's purchase is never
+/// taken as taxable.
+#[test]
+fn the_purchase_description_says_what_the_measured_item_invoices_showed() {
+    assert!(PURCHASE_REGISTER_DESCRIPTION.contains(
+        "takes an item invoice's purchase as taxable only from its own Purchase Accounts entry, \
+         which the five item invoices measured each had (partial: one synthetic book, one with its \
+         common ledger off),"
+    ));
+    assert!(!PURCHASE_REGISTER_DESCRIPTION.contains("does not classify an item invoice"));
+}
+
 #[test]
 fn a_cancelled_purchase_with_no_tax_entry_is_listed_with_its_flag() {
     let mut rows = captured_rows();
@@ -1208,11 +1222,11 @@ fn derived_sales_tail() -> String {
             "a Sales or Credit Note voucher with no entry on a Duties & Taxes ledger under `sales_vouchers_without_duties_taxes_entry` (listed by identity only; the tool does not say why such a voucher carries no tax entry). A cancelled sale that Tally returns with no ledger entries is listed there too, with `cancelled` true; no cancelled sale has been read, so whether one keeps its entries is not measured.",
         ),
         (
-            "false when no entry sits on a Purchase Accounts ledger (an item invoice may hold it in an inventory allocation)",
-            "false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen, or an item invoice of another shape than the imported one that was measured, may hold the sales ledger in an inventory allocation instead; not measured)",
+            "false when no entry sits on a Purchase Accounts ledger.",
+            "false when no entry sits on a Sales Accounts ledger (a sale typed on Tally's screen, or an item invoice of another shape than the imported one that was measured, may hold the sales ledger in an inventory allocation instead; not measured).",
         ),
         (
-            "Not measured: a REFERENCEDATE on a sale, item invoices whose purchase ledger sits in an inventory allocation, and books with several currencies.",
+            "Not measured: a REFERENCEDATE on a sale, an item invoice whose purchase ledger is not an entry of its own, and books with several currencies.",
             "Measured so far: `sales_register` was run against a live Tally on two synthetic companies. On the first, once per day, for one taxed Sales item invoice and one untaxed one: the taxed sale came back as one row with its CGST and SGST/UTGST heads taken from the ledger masters and its sales ledger as the taxable entry, and the untaxed one (read once by an earlier build; its voucher window is committed, its masters and the tool's answer are not) was counted under `sales_vouchers_without_duties_taxes_entry`. On the second, which has 44 ledgers, for one Credit Note in voucher view booked on account: one row, with its CGST and state-tax heads and its sales ledger as the taxable entry. One Sales accounting voucher (not an invoice) was also classified, in tests, against the ledger masters of the purchase register's lab book. A Credit Note is returned as a row with its signs reversed as Tally sends them: the tool neither nets nor flips, so a caller that sums tax over a window must add signed amounts. The measured Credit Note of 1,000.00 with 90.00 CGST and 90.00 State Tax came back with the sales entry -1000.00, each tax entry -90.00 and the party entry 1180.00, where a Sales row has the sales and tax entries positive and the party entry negative. The state-side tax head is `state_tax` (raw State Tax) on one measured book and `sgst_utgst` (raw SGST/UTGST) on another; both are recognised heads for the same side of the tax, so a caller must not look for one of them only. The cost of a call varies by book: 94 requests on a book with 8 ledgers and one currency (96 recorded, six more to count a small book, eight fewer with no balance reads; not measured since), 118 on one with 44 ledgers and two currencies, which adds base-currency reads; the result does not report the cost. Not shown by any run: an invoice-view Credit Note; an inter-state (IGST) line; a cancelled or optional sales voucher; an unrecognised or missing duty head on a sale; more than one voucher in a window; paging; a company with a registration; a tax that Tally computes itself; a sale typed on Tally's screen; accounting-invoice mode; a post-dated sale; a REFERENCE or a populated PARTYGSTIN on a sale; a REFERENCEDATE on a sale; and a ledger or voucher kept in a currency other than the book's base. A row of such a kind is returned, not withheld, and carries `not_measured_live` naming why (invoice_view_credit_note, inter_state_line, sales_ledger_not_an_entry, cancelled, optional, post_dated, party_gstin_present, reference_present) only where the row itself shows the kind. Kinds a row cannot show are never marked and are not vouched for: a sale typed on Tally's screen in voucher view, a tax Tally computed itself, a duty head no sales capture has (such as cess), an invoice of another shape than the one run (for example several goods lines), and a ledger or voucher kept in a currency other than the book's base; an unmarked row is not a measured one in those respects. A row is marked `inter_state_line` only when a tax entry's ledger master carries a recognised IGST head; an IGST ledger with no head, or an unrecognised head, is listed under the without-head or unrecognised list and the status is not complete.",
         ),
     ];

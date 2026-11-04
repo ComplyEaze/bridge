@@ -570,6 +570,12 @@ RUNNERS = {
     "twentysixas_receipts": _twentysixas_receipts,
 }
 
+# The crate's tests that the reference engine has no module for (registry::CRATE_FIRST, parity spec section 12).
+# None has a reference golden, so asking for one is refused, with the reason.
+CRATE_FIRST = {
+    "clause42_sft": "no reference golden: the reference engine has no clause 42 test; the crate's module is the only one",
+}
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -577,7 +583,7 @@ def main() -> int:
     ap.add_argument("engagement")
     ap.add_argument("output")
     ap.add_argument("--read", help="override [snapshot] with this tally-read-v1 directory")
-    ap.add_argument("--test", default="cash_44ab", choices=sorted(RUNNERS))
+    ap.add_argument("--test", default="cash_44ab", choices=sorted([*RUNNERS, *CRATE_FIRST]))
     ap.add_argument("--turnover-inputs", help="applicability_44ab: comparison turnover JSON to use")
     ap.add_argument("--emit-turnover-inputs",
                     help="applicability_44ab: take GSTR-1 turnover from the reference's own pack and write it here")
@@ -595,6 +601,9 @@ def main() -> int:
     ap.add_argument("--emit-report-totals",
                     help="financial_statements: take report totals from the read and write them here")
     a = ap.parse_args()
+    if a.test in CRATE_FIRST:
+        print(f"{a.test}: {CRATE_FIRST[a.test]}", file=sys.stderr)
+        return 2
 
     sys.path.insert(0, str(Path(a.engine).resolve()))
     from tae.adapters import read_format

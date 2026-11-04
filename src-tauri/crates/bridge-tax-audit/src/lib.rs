@@ -38,6 +38,7 @@ pub mod cash_44ab;
 pub mod cash_book_integrity;
 pub mod cash_payments_40a3;
 pub mod clause21a_candidates;
+pub mod clause42_sft;
 pub mod clause44;
 pub mod compare;
 pub mod counter_cheques_40a3;
@@ -1650,6 +1651,19 @@ pub fn clause21a_candidates_on(
     let (bound, _report) = engagement.bind(book)?;
     let partner_ledgers = clause21a_candidates::partner_ledgers(&bound.partners)?;
     let result = clause21a_candidates::run(book, rules, &extra_terms, &partner_ledgers)?;
+    canonical::canonical_test_result(book, &result, None)
+}
+
+/// Run `clause42_sft` on a book and return its canonical parity dump: the vendored limit, and the
+/// cash ledgers under the engagement's cash groups. A crate-first test, with no reference module.
+pub fn clause42_sft_on(
+    engagement: &Engagement,
+    book: &book::Book,
+    rules: &Rules,
+) -> Result<serde_json::Value> {
+    let (bound, _report) = engagement.bind(book)?;
+    let cash = book.ledgers_under_any(&bound.cash_groups);
+    let result = clause42_sft::run(book, rules, clause42_sft::Limit::vendored()?, &cash)?;
     canonical::canonical_test_result(book, &result, None)
 }
 

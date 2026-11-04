@@ -258,9 +258,20 @@ pub const PORTED: &[PortedTest] = &[
     },
 ];
 
-/// The registry entry for `id`, if that test is ported.
+/// Tests the reference engine has no module for, sorted by test id: each is a declared divergence
+/// (`docs/tax-audit/parity-spec-v1.md`, section 12) with no reference golden, so neither the
+/// registry-wide parity nor `RUNNERS` holds it. `parity/python_golden.py`'s `CRATE_FIRST` names
+/// the same tests and refuses each.
+pub const CRATE_FIRST: &[PortedTest] = &[PortedTest {
+    id: "clause42_sft",
+    // The limit, the count and the cash total, on any book.
+    min_figures: 3,
+    run_on: |e, b, r, _| crate::clause42_sft_on(e, b, r),
+}];
+
+/// The registry entry for `id`, if that test is ported or crate-first.
 pub fn find(id: &str) -> Option<&'static PortedTest> {
-    PORTED.iter().find(|t| t.id == id)
+    PORTED.iter().chain(CRATE_FIRST).find(|t| t.id == id)
 }
 
 /// Read, verify and build the book, then run test `id` on it: its canonical parity dump.

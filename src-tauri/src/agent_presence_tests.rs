@@ -692,6 +692,11 @@ fn paired_read(payload: &str) -> Vec<Step> {
 /// Turns the step list into simulator plans. Separated from `presence_plans`
 /// so a test that varies one payload does not restate the framing of all six.
 fn plans(steps: Vec<Step>) -> Vec<ScenarioPlan> {
+    plans_answering(steps, &company_xml())
+}
+
+/// `plans` with `company` as the answer to every identity request.
+fn plans_answering(steps: Vec<Step>, company: &str) -> Vec<ScenarioPlan> {
     steps
         .into_iter()
         .map(|step| match step {
@@ -699,7 +704,7 @@ fn plans(steps: Vec<Step>) -> Vec<ScenarioPlan> {
                 tally_protocol_simulator::ProductStatus::TallyPrime,
             ))
             .with_framing(ResponseFraming::ContentLength),
-            Step::Company => ScenarioPlan::new(Fixture::SyntheticXml(company_xml()))
+            Step::Company => ScenarioPlan::new(Fixture::SyntheticXml(company.to_string()))
                 .with_encoding(WireEncoding::Utf16Le)
                 .with_framing(ResponseFraming::ContentLength),
             Step::Payload(body) => ScenarioPlan::new(Fixture::SyntheticXml(body))
@@ -803,9 +808,10 @@ fn presence_plans() -> Vec<ScenarioPlan> {
 /// The voucher high-water mark the pre-flight volume bound reads before the
 /// window (protocol reference §11c). Small enough that the window is read
 /// whole after its census, in the synthetic shape the import tests already
-/// replay.
+/// replay, and no lower than the window's AlterIDs (12 and 13): the census is
+/// spanned to the mark (#2145).
 fn high_water_xml() -> String {
-    format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>10</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
+    format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY><GUID>{CAPTURED_GUID}</GUID><ALTVCHID>13</ALTVCHID><ALTMSTID>7</ALTMSTID></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>")
 }
 
 /// `presence_plans` on a book whose voucher mark needs a census (#985): the
@@ -816,7 +822,7 @@ fn counted_presence_plans() -> Vec<ScenarioPlan> {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(
-        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>100</ALTVCHID>"),
+        &high_water_xml().replace("<ALTVCHID>13</ALTVCHID>", "<ALTVCHID>100</ALTVCHID>"),
     ));
     steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&window_xml()));
@@ -918,7 +924,7 @@ async fn an_uncounted_nonempty_window_issues_no_absent() {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue));
     steps.extend(paired_read(
-        &high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "<ALTVCHID>0</ALTVCHID>"),
+        &high_water_xml().replace("<ALTVCHID>13</ALTVCHID>", "<ALTVCHID>0</ALTVCHID>"),
     ));
     steps.extend(paired_read(&window_xml()));
     steps.extend(paired_read(&catalogue));
@@ -2023,11 +2029,285 @@ async fn a_transaction_label_outside_the_published_nested_schema_is_refused_befo
     }
 }
 
-/// #674: `vouchers` withholds a foreign-currency voucher, but presence sums
-/// and matches amounts, so a composite still refuses its whole window, by the
-/// same code as before.
+/// #683: the 7.2 lab book's captured day, read under that book's own captured base and masters
+/// as `vouchers` reads it, reaches presence with every composite as its rupee amount, and a
+/// proposal of one of its foreign-currency invoices is found by those amounts.
+#[test]
+fn a_captured_composite_window_is_matched_on_its_rupee_amounts() {
+    use crate::agent::voucher_parse::{
+        captured_72_book, captured_72_vouchers, parse_agent_rows_withholding, FOREX_72_COMPANY_GUID,
+    };
+    let parsed =
+        parse_agent_rows_withholding(&captured_72_vouchers(), FOREX_72_COMPANY_GUID).unwrap();
+    assert_eq!(parsed.iter().filter(|row| row.is_withheld()).count(), 8);
+    let rows = rows_read_whole(parsed, Some(&captured_72_book()))
+        .expect("every composite of the captured day is read");
+    assert_eq!(rows.len(), 11);
+
+    let window =
+        book_window("20250401", "20250401", WindowRead::Complete, &rows).expect("book window");
+    let entries = [
+        ObservedEntry {
+            ledger: "BRIDGE USD Customer",
+            amount: "-8641.25",
+        },
+        ObservedEntry {
+            ledger: "BRIDGE Export Sales",
+            amount: "8641.25",
+        },
+    ];
+    let proposals = ProposedVoucher::from_inputs([ProposedVoucherInput {
+        position: 0,
+        date: "20250401",
+        voucher_type: "Sales",
+        voucher_number: Some("2"),
+        remote_id: None,
+        narration_marker: None,
+        party: Some("BRIDGE USD Customer"),
+        entries: &entries,
+    }])
+    .expect("proposals");
+    let catalogue = rows
+        .iter()
+        .flat_map(|row| row["amounts"].as_array().unwrap())
+        .filter_map(|entry| entry["ledger"].as_str())
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let catalog = MasterCatalog::new(MasterClass::Ledger, &catalogue).expect("catalog");
+    // Only a number on a type declared Manual names a voucher `present`; the book's own
+    // numbering check is the tool's, before the window, and is not what this pins.
+    let numbering =
+        NumberingDeclaration::new([("Sales", NumberingMethod::Manual)]).expect("numbering");
+    let request =
+        PresenceRequest::new(&window, &catalog, &numbering, &proposals).expect("presence request");
+    let (result, _) = presence_result(
+        &book_presence::assess(&request),
+        &catalogue,
+        WindowRead::Complete,
+        None,
+        0,
+        10,
+        200_000,
+    );
+    let item = &result["items"][0];
+    assert_eq!(item["presence"], "present", "{result}");
+    assert!(
+        item.get("differences")
+            .and_then(Value::as_array)
+            .is_none_or(Vec::is_empty),
+        "the rupee amounts compared equal: {result}"
+    );
+}
+
+/// A composite left withheld (here, read under no book at all) refuses the window by its own
+/// code: presence never passes over a voucher whose amounts it could not read.
+#[test]
+fn a_composite_left_unread_refuses_the_window() {
+    use crate::agent::voucher_parse::{
+        captured_72_vouchers, parse_agent_rows_withholding, FOREX_72_COMPANY_GUID,
+    };
+    let parsed =
+        parse_agent_rows_withholding(&captured_72_vouchers(), FOREX_72_COMPANY_GUID).unwrap();
+    assert_eq!(
+        rows_read_whole(parsed, None).unwrap_err(),
+        "foreign_currency_amount_unparsed"
+    );
+}
+
+/// The 7.2 lab book's ledgers, as its captured vouchers name them, in the captured catalogue's
+/// row shape: no ledger catalogue of that book is committed.
+fn forex_72_catalogue() -> String {
+    use crate::agent::voucher_parse::FOREX_72_COMPANY_GUID;
+    let captured = catalogue_xml();
+    let start = captured.find("<LEDGER ").expect("a captured row");
+    let end = captured.rfind("</LEDGER>").expect("a captured row") + "</LEDGER>".len();
+    let rows = [
+        ("BRIDGE Export Sales", "Sales Accounts"),
+        ("BRIDGE INR Customer", "Sundry Debtors"),
+        ("BRIDGE Import Purchases", "Purchase Accounts"),
+        ("BRIDGE Lab Bank", "Bank Accounts"),
+        ("BRIDGE USD Customer", "Sundry Debtors"),
+        ("BRIDGE USD Supplier", "Sundry Creditors"),
+        ("Cash", "Cash-in-Hand"),
+    ]
+    .iter()
+    .enumerate()
+    .map(|(index, (name, parent))| {
+        format!(
+            concat!(
+                "<LEDGER NAME=\"{name}\" RESERVEDNAME=\"\">",
+                "<GUID TYPE=\"String\">{guid}-{id:08x}</GUID>",
+                "<PARENT TYPE=\"String\">{parent}</PARENT>",
+                "<BRIDGECOMPANYGUID TYPE=\"String\">{guid}</BRIDGECOMPANYGUID>",
+                "<BRIDGECOMPANYNAME TYPE=\"String\">BRIDGE FOREXGROUP LAB</BRIDGECOMPANYNAME>",
+                "<LANGUAGENAME.LIST><NAME.LIST TYPE=\"String\"><NAME>{name}</NAME></NAME.LIST>",
+                "<LANGUAGEID> 1033</LANGUAGEID></LANGUAGENAME.LIST></LEDGER>"
+            ),
+            name = name,
+            parent = parent,
+            guid = FOREX_72_COMPANY_GUID,
+            id = 0x100 + index,
+        )
+    })
+    .collect::<String>();
+    format!("{}{rows}{}", &captured[..start], &captured[end..])
+}
+
+/// #683 through the tool: the 7.2 lab book's captured day, then that book's captured currency
+/// reads (the masters, the masters with `ORIGINALNAME`, the company's `CURRENCYNAME`), sent after
+/// the window and only because it holds a composite. Every composite is read as its rupee
+/// amount, so the call answers instead of refusing. Declared Automatic, the invoice is
+/// `possibly_present` on its number, with that voucher among the candidates: `present` needs a
+/// Manual series, and no series answer of this book is committed.
 #[tokio::test]
-async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() {
+async fn voucher_presence_reads_a_captured_composite_window_under_the_books_base() {
+    use crate::agent::voucher_parse::{
+        captured_72_vouchers, decoded_utf16le, FOREX_72_COMPANY_GUID,
+    };
+    use bridge_tally_protocol::native_outstandings::{
+        render_company_base_currency_request, render_company_currency_request,
+        render_company_currency_request_with_originalname,
+    };
+    let company = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME=\"BRIDGE FOREXGROUP LAB\"><GUID>{FOREX_72_COMPANY_GUID}</GUID><COMPANYNUMBER>1</COMPANYNUMBER><BOOKSFROM>20250401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
+    let catalogue = forex_72_catalogue();
+    // No lower than the captured day's AlterIDs (1 to 11): the census is spanned to the mark.
+    let marks = high_water_xml()
+        .replace(CAPTURED_GUID, FOREX_72_COMPANY_GUID)
+        .replace("<ALTVCHID>13</ALTVCHID>", "<ALTVCHID>11</ALTVCHID>");
+    let window = captured_72_vouchers();
+    // The book's row in the captured extent answer's shape: no extent of this book is committed.
+    let extent = {
+        let captured = include_str!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/native-company-book-extents-with-number.utf8.xml"
+        );
+        let start = captured.find("<COMPANY NAME=").expect("a captured row");
+        let end = captured.rfind("</COMPANY>").expect("a captured row") + "</COMPANY>".len();
+        format!(
+            concat!(
+                "{head}<COMPANY NAME=\"BRIDGE FOREXGROUP LAB\" RESERVEDNAME=\"\">",
+                "<LASTVOUCHERDATE TYPE=\"Date\">20250401</LASTVOUCHERDATE>",
+                "<BOOKSFROM TYPE=\"Date\">20250401</BOOKSFROM>",
+                "<NAME TYPE=\"String\">BRIDGE FOREXGROUP LAB</NAME>",
+                "<GUID TYPE=\"String\">{guid}</GUID>",
+                "<COMPANYNUMBER TYPE=\"Number\"> 1</COMPANYNUMBER>",
+                "<ALTVCHID TYPE=\"Number\"> 11</ALTVCHID>",
+                "<ALTMSTID TYPE=\"Number\"> 7</ALTMSTID></COMPANY>{tail}"
+            ),
+            head = &captured[..start],
+            guid = FOREX_72_COMPANY_GUID,
+            tail = &captured[end..],
+        )
+    };
+    let currency_reads = [
+        decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_forex_72.utf16le.xml"
+        )),
+        decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/currency_masters_originalname_forex_72.utf16le.xml"
+        )),
+        decoded_utf16le(include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/native/company_base_currency_forex_72.utf16le.xml"
+        )),
+    ];
+    let pair = |answer: &str| {
+        [
+            Step::Payload(answer.to_string()),
+            Step::Status,
+            Step::Payload(answer.to_string()),
+            Step::Status,
+        ]
+    };
+    let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
+    steps.extend(paired_read(&catalogue));
+    steps.extend(paired_read(&marks));
+    // The census of the window (#1029), then the window.
+    steps.extend(paired_read(&window));
+    steps.extend(paired_read(&window));
+    // The base read: the identity bracket, the extent, the three currency reads, the extent
+    // again and the bracket again, each read a pair.
+    let base_read = steps.len();
+    steps.push(Step::Company);
+    steps.extend(pair(&extent));
+    for answer in &currency_reads {
+        steps.extend(pair(answer));
+    }
+    steps.extend(pair(&extent));
+    steps.push(Step::Company);
+    assert_eq!(steps.len() - base_read, 22);
+    steps.extend(paired_read(&catalogue));
+    let total = steps.len();
+    let simulator = SequenceSimulator::spawn(plans_answering(steps, &company)).expect("simulator");
+    let directory = tempfile::tempdir().expect("directory");
+    let server = presence_server(&simulator, directory.path());
+    let response = server
+        .call_tool(
+            "voucher_presence",
+            json!({
+                "company_guid": FOREX_72_COMPANY_GUID,
+                "from": "20250401",
+                "to": "20250401",
+                "numbering": [{"voucher_type":"Sales","numbering_method":"automatic"}],
+                "vouchers": [{
+                    "date": "20250401",
+                    "voucher_type": "Sales",
+                    "voucher_number": "2",
+                    "party": "BRIDGE USD Customer",
+                    "entries": [
+                        {"ledger": "BRIDGE USD Customer", "amount": "-8641.25"},
+                        {"ledger": "BRIDGE Export Sales", "amount": "8641.25"},
+                    ],
+                }],
+            }),
+        )
+        .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["window"]["read"], "complete", "{result}");
+    let item = &result["items"][0];
+    assert_eq!(item["presence"], "possibly_present", "{result}");
+    assert_eq!(item["reason"], "number_not_decisive", "{result}");
+    assert!(
+        item["candidates"]
+            .as_array()
+            .is_some_and(|candidates| candidates.contains(&json!({
+                "book_key": format!("{FOREX_72_COMPANY_GUID}-00000002"),
+                "rule": "shared_voucher_number",
+            }))),
+        "{result}"
+    );
+    let observed = simulator.finish().expect("requests");
+    assert_eq!(answered(&observed), total);
+    let sent = observed
+        .iter()
+        .filter(|request| !request.method.is_empty())
+        .collect::<Vec<_>>();
+    // The currency reads follow the window, for the company the identity named.
+    for (offset, request) in [
+        (5, render_company_currency_request("BRIDGE FOREXGROUP LAB")),
+        (
+            9,
+            render_company_currency_request_with_originalname("BRIDGE FOREXGROUP LAB"),
+        ),
+        (
+            13,
+            render_company_base_currency_request("BRIDGE FOREXGROUP LAB"),
+        ),
+    ] {
+        assert_eq!(
+            sent[base_read + offset].request_body,
+            bridge_tally_protocol::encode_tally_xml_request_utf16le(&request),
+            "request {}",
+            base_read + offset
+        );
+    }
+}
+
+/// The same through the tool with the book's currencies not served: the base read fails, and
+/// the call refuses by that read's code, not as an amount it could not read.
+#[tokio::test]
+async fn voucher_presence_refuses_a_composite_window_whose_base_read_fails() {
     let mut steps = vec![Step::Company, Step::Status, Step::Company, Step::Status];
     steps.extend(paired_read(&catalogue_xml()));
     steps.extend(paired_read(&high_water_xml()));
@@ -2057,7 +2337,7 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
                 "company_guid": CAPTURED_GUID,
                 "from": "20260801",
                 "to": "20260802",
-                // Declared automatic: the refusal under test is the window's amount code, which no numbering
+                // Declared automatic: the refusal under test is the base read's code, which no numbering
                 // changes, and the committed series answers hold no Sales row to check a manual declaration against.
                 "numbering": [{"voucher_type":"Sales","numbering_method":"automatic"}],
                 // Inside the captured window (1 Aug, Sales), which the check needs.
@@ -2077,7 +2357,7 @@ async fn voucher_presence_still_refuses_a_composite_window_by_its_amount_code() 
     simulator.cancel();
     let _ = simulator.finish();
     assert_eq!(
-        response["structuredContent"]["result"]["error"]["code"], "bill_allocation_amount_invalid",
+        response["structuredContent"]["result"]["error"]["code"], "company_currency_probe_failed",
         "{response}"
     );
 }
@@ -2605,7 +2885,7 @@ async fn a_company_that_never_held_a_voucher_still_has_its_numbering_checked() {
     // No ALTVCHID: the book has never held a voucher. The numbering check needs
     // only the master axis, so it runs and refuses on the book's own reading,
     // not on the empty book (the build path refuses that book on purpose).
-    let no_voucher_axis = high_water_xml().replace("<ALTVCHID>10</ALTVCHID>", "");
+    let no_voucher_axis = high_water_xml().replace("<ALTVCHID>13</ALTVCHID>", "");
     let plans = splice_numbering(
         presence_plans(),
         agent_import::numbering_fixtures::numbering_answers(CAPTURED_GUID, &[]),

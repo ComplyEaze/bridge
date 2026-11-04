@@ -110,12 +110,12 @@ async fn an_unshaped_bank_voucher_is_refused_before_dispatch_or_persistence() {
                     .clone();
                 voucher.entries.push(ImportEntry {
                     ledger: debit.clone(),
-                    amount: "1.00".into(),
+                    amount: ImportAmount::parse("1.00").unwrap(),
                     side: EntrySide::Cr,
                 });
                 voucher.entries.push(ImportEntry {
                     ledger: "Rounding Off".into(),
-                    amount: "1.00".into(),
+                    amount: ImportAmount::parse("1.00").unwrap(),
                     side: EntrySide::Dr,
                 });
             }),

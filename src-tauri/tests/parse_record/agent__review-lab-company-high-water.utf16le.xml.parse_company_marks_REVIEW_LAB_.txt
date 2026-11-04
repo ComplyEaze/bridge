@@ -1,0 +1,7 @@
+# fixture: agent/review-lab-company-high-water.utf16le.xml
+# parser: parse_company_marks(REVIEW_LAB)
+# source: captured
+Ok((
+    251,
+    207,
+))

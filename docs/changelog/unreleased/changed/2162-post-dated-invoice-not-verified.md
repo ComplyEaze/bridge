@@ -1,0 +1,1 @@
+- A posted GST Sales invoice that Tally marks post-dated now ends `posted_divergent` under `gst_status_post_dated`, where it ended `posted_verified`; the read-back fetches the mark as Tally's own status read does (#2162).

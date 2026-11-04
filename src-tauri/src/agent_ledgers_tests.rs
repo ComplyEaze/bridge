@@ -2394,6 +2394,60 @@ mod through_the_tool {
                 cause,
                 "{response}"
             );
+            assert_eq!(error["failed_request"], "ledger_count", "{response}");
+        }
+    }
+
+    /// One code and one cause cover every request of this read, so the refusal names the one that
+    /// failed (#2265). Each case cuts one request, and nothing is sent after it.
+    #[tokio::test]
+    async fn a_failed_ledger_read_names_the_request_that_failed() {
+        let rows = generated(&[("Sundry Debtors", 2)]);
+        let all = rows.iter().collect::<Vec<_>>();
+        let (masters, balances) = (generated_masters(&all), generated_balances(&all));
+        let to_masters = marked_compliance_plans(100, Vec::new(), None);
+        let to_the_source = |reads: Vec<String>| marked_compliance_plans(100, reads, None);
+        // The bracket's identity, company row and extent go before the currency read; that read,
+        // the rest of its bracket and the profile probe before the source's own opening extent.
+        let before_currency = identity_plans().len() + 5;
+        let before_opening_extent = before_currency + 12;
+        let cases = [
+            (to_masters[..before_currency].to_vec(), "base_currency"),
+            (to_masters[..before_opening_extent].to_vec(), "book_extent"),
+            (
+                marked_compliance_plans(6_000, Vec::new(), None),
+                "ledger_catalogue",
+            ),
+            (
+                marked_compliance_plans(102_161, Vec::new(), None),
+                "ledger_count",
+            ),
+            (to_masters.clone(), "ledger_master"),
+            (to_the_source(vec![masters.clone()]), "ledger_balance"),
+            (
+                to_the_source(vec![masters.clone(), balances.clone()]),
+                "groups",
+            ),
+            (
+                to_the_source(vec![masters.clone(), balances.clone(), groups()]),
+                "book_extent",
+            ),
+        ];
+        for (mut plans, request) in cases {
+            plans.push(
+                xml(String::new())
+                    .with_delivery(tally_protocol_simulator::Delivery::ResetBeforeBody),
+            );
+            let total = plans.len();
+            let (response, requests) =
+                call(plans, json!({"company_guid":GUID,"fields":"compliance"})).await;
+            assert_eq!(requests, total, "{request}: {response}");
+            let error = refusal(&response);
+            assert_eq!(
+                error["code"], "party_ledger_master_read_failed",
+                "{response}"
+            );
+            assert_eq!(error["failed_request"], request, "{response}");
         }
     }
 

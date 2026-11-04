@@ -594,3 +594,27 @@ fn a_tagged_copy_beside_a_bound_voucher_is_a_duplicate() {
         "{result}"
     );
 }
+
+/// Sign-rule site 3 at the verification comparison copy (#1872): the comparison copies carry
+/// canonical amounts, so a batch saved with `0012.61` verifies against the captured row `12.61`
+/// exactly as the batch saved with `12.61` does, and the saved lexeme is not what is compared.
+#[test]
+fn a_batch_written_with_a_padded_amount_verifies_against_its_row() {
+    let (captured, mut line) = captured_journal_and_line();
+    let plain = verify_batch(&line, &captured, Attribution::Tag).unwrap();
+    assert_eq!(plain["counts"]["posted_verified"], 1, "{plain}");
+    for entry in &mut line.vouchers[0].entries {
+        assert_eq!(entry.amount.as_str(), "12.61");
+        entry.amount = ImportAmount::parse("0012.61").unwrap();
+    }
+    let padded = verify_batch(&line, &captured, Attribution::Tag).unwrap();
+    assert_eq!(padded["counts"], plain["counts"], "{padded}");
+    assert_eq!(
+        padded["vouchers"][0]["marker"],
+        plain["vouchers"][0]["marker"]
+    );
+    assert_eq!(
+        padded["vouchers"][0]["diffs"],
+        plain["vouchers"][0]["diffs"]
+    );
+}

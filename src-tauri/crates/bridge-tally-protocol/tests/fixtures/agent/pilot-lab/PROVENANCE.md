@@ -42,6 +42,8 @@ The one-invoice round of #1342, sent by the same contributor on the same company
 
 `pilot-lab-number-new-invoice.utf16le.xml` and `pilot-lab-invoice-readback-before-post.utf16le.xml` are the same bytes: two requests whose answer was an empty collection of this company, which reads the same whatever the request.
 
+**The number reads are now answers to a derived request (partial, #2162 item 8).** Since the number read names `IRN, IRNACKNO, IRNACKDATE` in its fetch list, the code sends `r09-number-new-invoice.xml` and `r10-number-control-k0.xml` (and W18's `w18-number-0040.xml`, see `../pilot-lab-w18/PROVENANCE.md`) with those three words added, a request never sent to this book. The tests replay `pilot-lab-number-new-invoice.utf16le.xml`, `pilot-lab-number-in-use.utf16le.xml` and the S4 number answers below, all captured before the words were added, as answers to that request. They carry none of the three elements, so on them the build claims no IRN. This rests on one measurement on another book, `BRIDGE EINVOICE LAB` (`lab/2162-irn-read-answers` at 9a20049b, R1): with the words added, each row carried the three elements once and was otherwise the answer without them. The derived pins (`LAB_NUMBER_NEW_INVOICE_SHA256`, `LAB_NUMBER_CONTROL_SHA256`, `W18_NUMBER_SHA256`) are not captures: `the_lab_number_reads_are_the_sent_ones_with_the_e_invoice_words` asserts that removing the words, the one stated edit, gives each lab request file's sha256.
+
 The company's tax units were first read with a request typed by hand and sent as UTF-8 (the same collection under another name, before any voucher was keyed); that answer is not kept here, because it answers a request other than the one the code sends. `pilot-lab-tax-units.utf16le.xml` answers the code's own request.
 
 ## The voucher-numbering round (2026-10-16)
@@ -63,6 +65,37 @@ Three answers to the code's own read-back request with the four GSTR-1 status fi
 | `pilot-lab-invoice-readback-status.request.utf16le.xml` | 2,252 | `352dfca912a53499f058643e61db4febc301f6b53b753de54d7f2aac475db9c1` | `workorder/w8-readback-status-single.xml` in `lab/1342-capture-requests` (commit `ade0524ce`) | the code renders it: `render_invoice_readback_request` for `BP/26-27/0010` over the financial year 20260401 to 20270331; a test compares the bytes | the request that was answered, with a byte order mark |
 | `pilot-lab-invoice-readback-status-uncertain.utf16le.xml` | 98,118 | `cc9e543d8c2e097a4ab77b7a8b140046f1e52c8375a00afb9e2244f0277fb59c` | `workorder/aw7c-readback-status-0021.xml` (commit `8837e0d4c`) | `w7c-readback-status-0021.xml` (`b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5`; the same request for `BP/26-27/0021`, which a test renders and hashes) | the read-back of `BP/26-27/0021` after the HSN/SAC of its sales ledger `BRIDGE Svc 998315 5%` was set and the voucher was not touched: included No, uncertain Yes, excluded No, overridden No (AlterID 34) |
 | `pilot-lab-invoice-readback-status-resaved.utf16le.xml` | 98,450 | `e563f64f40fbec180295a2d3c56bec2da8d48d03786cddfc5da3dd62eb9c4ef6` | `workorder/aw7d-readback-status-0021.xml` (commit `fb5911696`) | `w7c-readback-status-0021.xml` (`b5167673a63dba8bb7e96791e3b6bc2746c60517ea06886c40d47b52ea76aca5`) | the same read after `BP/26-27/0021` was opened and saved in Tally with no change: included Yes, uncertain No, excluded No, overridden No (AlterID 35) |
+
+## `ISPOSTDATED` in the read-back (2026-11-03, #2162)
+
+Answers to the read-back request above with `ISPOSTDATED` added at the end of its fetch list, sent with curl, not through a build, on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, and published on `lab/2162-s1-answers` at 20ed166c (the request files on `lab/2162-s1-sheet` at 413f8b92). Each file here is byte-equal to the file there. The book was restored from its backup afterwards. The answers are UTF-16LE with no byte order mark, as received; the request file begins with one. Since then the code sends this request, and the 10 Oct request above is kept as the earlier evidence; no test compares it any more.
+
+| Fixture | Bytes | SHA-256 | Published as | What it is |
+| --- | ---: | --- | --- | --- |
+| `pilot-lab-invoice-readback-post-dated-no.utf16le.xml` | 94,474 | `af9cd7808856b196c9690be20541ebd88cec8dd7dd575a89530fd4a376c1af6c` | `answers/R-0010-ctl.xml` | the read-back of `BP/26-27/0010`: `ISPOSTDATED` No once, included Yes, uncertain No, excluded No, overridden No (AlterID 17). Apart from that line and five counters in the answer's header, equal to `pilot-lab-invoice-readback-status.utf16le.xml` |
+| `pilot-lab-invoice-readback-post-dated-yes.utf16le.xml` | 65,050 | `8da0e010b508ce6ffb9f86ccffe80d5a8abbbb92bd9620fed8996228df88f672` | `answers/R-0045-1.xml` | the read-back of `BP/26-27/0045`, keyed on Tally's screen marked post-dated: `ISPOSTDATED` Yes once, included Yes, uncertain No, excluded No, overridden No (AlterID 69). Read twice, byte-equal |
+| `pilot-lab-invoice-readback-post-dated.request.utf16le.xml` | 2,278 | `10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21` | `R-0010.xml` of the sheet | the request for `BP/26-27/0010` over 20260401 to 20270331: the 10 Oct request with `, ISPOSTDATED` added and nothing else; the code renders it, and a test compares the bytes |
+
+## A bill-wise customer's invoice (2026-11-03, #2162)
+
+Read-backs of four invoices, each imported raw as the build renders it for a bill-wise customer (the party leg one New Ref named by the invoice number) and read back by the request the code sends, with curl, not through a build, on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026. The first is published on `lab/2162-s3a-answers` at 4dff8215 and the other three on `lab/2162-s3b-answers` at 7fd14241; each file here is byte-equal to the file there. The bills they meet were seeded by direct XML to set the rows up and are not evidence here. The book was restored from its backup after each sitting. The answers are UTF-16LE with no byte order mark, as received. A test compares the SHA-256 of each read-back request the code renders with the request file the lab sent.
+
+| Fixture | Bytes | SHA-256 | Published as | What it is |
+| --- | ---: | --- | --- | --- |
+| `pilot-lab-invoice-readback-bill-wise-new.utf16le.xml` | 95,834 | `e8a4c19130200c082abac2f389137192cf64268ee259639ed5d893d24c5a9aa8` | `answers/a-s5-R-0047.xml` | the read-back of `BP/26-27/0047` to a customer with no other bill of that name: the party leg holds one New Ref named by the number, for the party amount |
+| `pilot-lab-invoice-readback-bill-wise-journal-bill.utf16le.xml` | 95,836 | `0e01dbf4588315ab27721e4309aa54950a227c0c64940718e7727d99705dcdcf` | `answers/a-s5r-R-0048.xml` | the read-back of `BP/26-27/0048` to a customer already holding an open bill of that name from a Journal: the party leg holds an Agst Ref of that name at -1051.00 |
+| `pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml` | 95,836 | `6496dd460ac6064968e475cd2cc721c8c625db1f2297f5222d85d7a5ea0fe6a3` | `answers/a-s6r-R-0049.xml` | the read-back of `BP/26-27/0049` to a customer whose bill of that name a Receipt had settled: an Agst Ref of that name at -1051.00, the settled bill reopened |
+| `pilot-lab-invoice-readback-bill-wise-opening-bill.utf16le.xml` | 95,940 | `ac53ba5f4a3f188fa286d22731ce66f142a65fd5f559971a52276b0bc0cbf364` | `answers/a-s7r-R-0050.xml` | the read-back of `BP/26-27/0050` to a customer whose opening bill, dated 31 Mar 2026, had that name: an Agst Ref of that name at -1051.00 |
+
+## A number already in use, in another spelling (2026-11-03, #2162)
+
+Answers of row S4 on `BRIDGE PILOT LAB`, TallyPrime 7.2 Silver, on 3 Nov 2026, sent with curl, not through a build, and published on `lab/2162-s4-answers` at 3651c746 (the request files on `lab/2162-s4-sheet` at c5f69f97). Each file here is byte-equal to the file there. The invoice `BP/26-27/0051` they meet was seeded by direct XML to set the row up and is not evidence here. The book was restored from its backup afterwards. The answers are UTF-16LE with no byte order mark, as received. A test compares the SHA-256 of each number read the code renders, less the `, IRN, IRNACKNO, IRNACKDATE` it now adds to the fetch list (#2162 item 8), with the request file the lab sent.
+
+| Fixture | Bytes | SHA-256 | Published as | What it is |
+| --- | ---: | --- | --- | --- |
+| `pilot-lab-number-in-use-lower-case.utf16le.xml` | 5,608 | `cf5d48ac2e3466a86b1b85c7fedc65d87662d6bbc77ce42115e1c911785e8839` | `answers/a-s4-N-lc0051.xml` | the number read for `bp/26-27/0051`: one row, `BP/26-27/0051`, Sales class. Byte-equal to the read for `BP/26-27/0051` at the same point |
+| `pilot-lab-number-dropped-zero.utf16le.xml` | 3,024 | `a36e6e43961ffe12722b224ef53fa046835dccf3d9090cba3a5d52d315e91d36` | `answers/a-s4-N-z051.xml` | the number read for `BP/26-27/051`, with `BP/26-27/0051` in the book: no row |
+| `pilot-lab-invoice-post-duplicate-declined.utf16le.xml` | 538 | `09a713e2674c7016c2cb10f194f6e0fc7f6bf9dee3b523f4f6bbf1b07ea0f874` | `answers/a-s5-I-0051b.xml` | the answer to an invoice numbered `BP/26-27/0051` sent to that book: `CREATED` 0, `EXCEPTIONS` 1, every other counter 0, `LASTVCHID` 0, no `LINEERROR`. The invoice numbered `bp/26-27/0051` was answered with the same bytes |
 
 ## The parent-filter round (2026-10-10, #1331)
 

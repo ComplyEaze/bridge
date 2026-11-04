@@ -5,13 +5,14 @@
 //! invoice's checks, and then for every ledger under the parents of the named
 //! ones. A customer's parent can hold thousands of ledgers, so the read now
 //! names the invoice's ledgers themselves, by the GUID the catalogue gave each,
-//! and believes the answer only when its rows are exactly those ledgers.
+//! and believes the answer only when its rows are exactly those ledgers. The
+//! compliance listing is read for the same part.
 //!
 //! The rules are a type, not reminders (AGENTS.md P2, P3): an
 //! [`InvoiceLedgerScope`] can only be made by [`InvoiceLedgerScope::from_catalogue`],
 //! from the catalogue the check has just read, so no request names a ledger
-//! the catalogue does not, and its only way to accept an answer is
-//! [`InvoiceLedgerScope::prove`].
+//! the catalogue does not, and its only ways to accept an answer are
+//! [`InvoiceLedgerScope::prove`] and [`InvoiceLedgerScope::prove_listing`].
 //!
 //! Matching is exact on the catalogue's row spelling, as the import's own
 //! binding is (no case fold, no alias, no stored name). After a ledger is
@@ -20,6 +21,7 @@
 
 use super::wire::ListedLedger;
 use super::{refuse_ledger, refuse_value, InvoiceRefusal};
+use crate::tally::runtime::PartyLedgerMasterListing;
 use bridge_tally_protocol::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
 use bridge_tally_protocol::parent_partition::ParentObservation;
 use bridge_tally_protocol::StandardLedgerCatalog;
@@ -81,7 +83,7 @@ impl InvoiceLedgerScope {
         Ok(Self { part, expected })
     }
 
-    /// The part the rate request is restricted to.
+    /// The part the rate request and the compliance listing are restricted to.
     pub(super) fn part(&self) -> &LedgerGuidPart {
         &self.part
     }
@@ -120,6 +122,34 @@ impl InvoiceLedgerScope {
                 return Err(differs("ledger_scope_row_repeated"));
             }
             if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())
+            {
+                return Err(differs("ledger_scope_row_differs_from_catalogue"));
+            }
+        }
+        Ok(())
+    }
+
+    /// The compliance listing read for the same ledgers: every row it holds is
+    /// a named ledger with the catalogue's name and parent. A row short was
+    /// refused at the read (the row count), and a ledger set aside for its
+    /// currency is left to read as not observed, as it does on a whole read.
+    pub(super) fn prove_listing(
+        &self,
+        listing: &PartyLedgerMasterListing,
+    ) -> Result<(), InvoiceRefusal> {
+        let differs = |cause: &str| refuse_value("invoice_ledger_listing_rows_differ", cause);
+        for record in &listing.records {
+            let name = &record.ledger.name;
+            let guid = listing
+                .ledger_guids
+                .get(name)
+                .ok_or_else(|| differs("ledger_scope_row_without_guid"))?
+                .to_ascii_lowercase();
+            let Some(expected) = self.expected.get(&guid) else {
+                return Err(differs("ledger_scope_row_not_named"));
+            };
+            if *name != expected.name
+                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())
             {
                 return Err(differs("ledger_scope_row_differs_from_catalogue"));
             }

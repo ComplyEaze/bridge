@@ -100,6 +100,7 @@ fn book(to: &str, rows: Vec<PartyLedgerMasterRow>) -> PartyLedgerMasterWorkbook 
         ],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
     })
     .unwrap()
 }

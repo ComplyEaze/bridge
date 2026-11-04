@@ -26,6 +26,15 @@ UUID_OR_DIGEST_RE = re.compile(
     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{12}|[0-9A-Fa-f]{32,}"
 )
+# A tax-audit mutation record's two 16-hex digests. A value is masked only on a line shaped as the mutation runner writes
+# a record: from its start, optional spaces or tabs, a quoted record id, a colon and `{"commit": "<40 lowercase hex>"`.
+# The scan has no path, so a line of that shape is masked wherever it sits in the scanned text; the same key and value
+# on any other line (a title, a commit message, a path, a source literal) are still scanned. On a record line, the value
+# of each `"mutation": "` and `"crate_tree": "` key that is exactly 16 of 0-9a-f with at least one letter is masked; an
+# all-digit value is still scanned. Within a masked value the scan is blind to any shape made of digits and the letters
+# a-f, up to 16 characters: a digit run of up to 15, or a lowercase PAN whose letters are all a-f.
+RECORD_LINE_RE = re.compile(r'^[ \t]*"[A-Za-z0-9_-]{1,32}": \{"commit": "[0-9a-f]{40}"[^\n]*', re.M)
+RECORD_DIGEST_RE = re.compile(r'("(?:mutation|crate_tree)": ")(?=[0-9a-f]{0,15}[a-f])[0-9a-f]{16}(")')
 ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
 # Boundaries include ordinary words plus snake/kebab field names and the first
@@ -486,6 +495,19 @@ def redact_shapes(text):
     return text
 
 
+def mask_record_digests(text):
+    """Mask the record digests on each mutation record line of `text` (RECORD_LINE_RE); return the text and the count."""
+    masked = 0
+
+    def on_line(match):
+        nonlocal masked
+        line, count = RECORD_DIGEST_RE.subn(r"\1<digest>\2", match.group(0))
+        masked += count
+        return line
+
+    return RECORD_LINE_RE.sub(on_line, text), masked
+
+
 def scan(text, head, fixture_provenance=None):
     record = result_record()
     decoded, utf16_runs = decode_utf16_runs(text)
@@ -509,8 +531,11 @@ def scan(text, head, fixture_provenance=None):
         add(record, "blockers", "privacy scan found %d customer email shape(s)" % email_count)
 
     uuid_tokenized = tokenize_uuids(credential_tokenized, allowed, record)
-    redacted = UUID_OR_DIGEST_RE.sub("<digest>", uuid_tokenized)
-    exempt = len(UUID_OR_DIGEST_RE.findall(uuid_tokenized))
+    record_masked, record_digests = mask_record_digests(uuid_tokenized)
+    if record_digests:
+        add(record, "notes", "%d mutation-record digest(s) were masked" % record_digests)
+    redacted = UUID_OR_DIGEST_RE.sub("<digest>", record_masked)
+    exempt = len(UUID_OR_DIGEST_RE.findall(record_masked))
     if exempt:
         add(record, "notes", "%d added/path line(s) carried generated UUID/digest shapes; inspect those lines" % exempt)
 

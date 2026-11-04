@@ -1,0 +1,1695 @@
+{
+ "file": "src-tauri/src/agent_import_ack.rs",
+ "base_commit": "8520f071",
+ "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at is base where the failing check exists at base, or this_commit where the change that adds this record adds it, as a new test or as cases added to a test that exists at base; before_this_change then gives the verdict at base. The tool and hand runs ran the bridge lib tests matching the filter, without the approval dialog seam tests, which need the stand-in example. Each mutant that survived its filtered run at base was run again at base against every bridge test, integration tests included, with the stand-in built (the whole_set run) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent,. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. A tool mutant is named as cargo-mutants --list names it, by line and column. Every run was on base_commit, with the test modules as at base or, for survivors_again, as this change leaves them.",
+ "runs": [
+  {
+   "run": "tool",
+   "tests_at": "base",
+   "tests_matching_filter": 362,
+   "tool": "cargo-mutants 27.1.0",
+   "command": "cargo mutants --in-place -p bridge --file src/agent_import_ack.rs --test-tool nextest --cargo-arg=--locked --cargo-test-arg=--lib --timeout 900 --no-shuffle -- -E 'test(/ack|review|fingerprint|doubt|stale/) - test(test_seam)'",
+   "time": "2026-11-02T23:51:42Z",
+   "tree": "base_commit"
+  },
+  {
+   "run": "hand",
+   "tests_at": "base",
+   "tests_matching_filter": 362,
+   "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge --lib -E 'test(/ack|review|fingerprint|doubt|stale/) - test(test_seam)'",
+   "tree": "base_commit"
+  },
+  {
+   "run": "whole_set",
+   "tests_at": "base",
+   "tests_run": 4688,
+   "command": "cargo build --locked -p bridge-approval-standin --example approval_standin, then for each mutant cargo nextest run --locked -p bridge -E 'all()', for the tool's seven missed mutants and the thirteen hand-written ones that survived",
+   "tree": "base_commit"
+  },
+  {
+   "run": "survivors_again",
+   "tests_at": "this_commit",
+   "tests_matching_filter": 367,
+   "command": "as the hand run, for the same twenty",
+   "tree": "base_commit"
+  }
+ ],
+ "summary": {
+  "tool": {
+   "caught": 184,
+   "missed": 2,
+   "unviable": 14
+  },
+  "hand": {
+   "caught": 45,
+   "missed": 4
+  },
+  "survived_at_base": {
+   "tool": 7,
+   "hand": 13
+  },
+  "equivalent": {
+   "tool": 2,
+   "hand": 4
+  }
+ },
+ "tool_results": {
+  "31:5 replace masters_ack_path -> PathBuf with Default::default()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "50:9 replace DoubtKind::name -> &'static str with \"\"": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "50:9 replace DoubtKind::name -> &'static str with \"xyzzy\"": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "57:9 replace DoubtKind::parse -> Option<Self> with None": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "57:9 replace DoubtKind::parse -> Option<Self> with Some(Default::default())": {
+   "verdict": "unviable"
+  },
+  "58:13 delete match arm \"masters\" in DoubtKind::parse": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "59:13 delete match arm \"batch_step\" in DoubtKind::parse": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "65:9 replace DoubtKind::ack_path -> PathBuf with Default::default()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "73:9 replace DoubtKind::possible -> &'static[Self] with Vec::leak(Vec::new())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "73:9 replace DoubtKind::possible -> &'static[Self] with Vec::leak(vec![Default::default()])": {
+   "verdict": "unviable"
+  },
+  "73:26 replace > with == in DoubtKind::possible": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "73:26 replace > with < in DoubtKind::possible": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "73:26 replace > with >= in DoubtKind::possible": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::only_a_batch_of_several_vouchers_can_name_a_step_doubt",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "81:9 replace DoubtKind::read -> MastersRecord with Default::default()": {
+   "verdict": "unviable"
+  },
+  "93:5 replace read_step_records -> MastersRecord with Default::default()": {
+   "verdict": "unviable"
+  },
+  "98:16 replace match guard doubt[\"state\"] == \"unmatched\" && doubt.get(\"target_voucher_step\").is_some() with true in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_step_doubt_without_its_step_reads_unreadable",
+   "killer_at": "base"
+  },
+  "98:16 replace match guard doubt[\"state\"] == \"unmatched\" && doubt.get(\"target_voucher_step\").is_some() with false in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "98:46 replace && with || in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_step_doubt_without_its_step_reads_unreadable",
+   "killer_at": "base"
+  },
+  "98:31 replace == with != in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "105:37 replace match guard check[\"batch_step\"][\"state\"] == MASTERS_CHECK_PENDING with true in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "105:37 replace match guard check[\"batch_step\"][\"state\"] == MASTERS_CHECK_PENDING with false in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "108:37 replace match guard check[\"batch_step\"][\"state\"] == \"unmatched\" with true in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "108:37 replace match guard check[\"batch_step\"][\"state\"] == \"unmatched\" with false in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_doubt_whose_own_file_was_not_written_reads_doubt_record_unavailable",
+   "killer_at": "base"
+  },
+  "105:66 replace == with != in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "108:66 replace == with != in read_step_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "132:5 replace select_doubt -> Result<DoubtKind, &'static str> with Ok(Default::default())": {
+   "verdict": "unviable"
+  },
+  "133:63 replace == with != in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "152:47 replace && with || in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "152:39 replace == with != in select_doubt": {
+   "verdict": "missed"
+  },
+  "152:57 replace == with != in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "155:9 delete match arm [kind] in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "156:9 delete match arm [] in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "160:20 replace match guard observed.iter().all(unavailable) with true in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "160:20 replace match guard observed.iter().all(unavailable) with false in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "158:39 replace != with == in select_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_names_its_doubt_and_two_doubts_need_a_name",
+   "killer_at": "base"
+  },
+  "168:5 replace doubt_states -> Vec<(DoubtKind, MastersRecord)> with vec![]": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "168:5 replace doubt_states -> Vec<(DoubtKind, MastersRecord)> with vec![(Default::default(), Default::default())]": {
+   "verdict": "unviable"
+  },
+  "176:5 replace with_doubt_cause -> ToolFailure with Default::default()": {
+   "verdict": "unviable"
+  },
+  "176:13 replace == with != in with_doubt_cause": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::an_unnamed_review_beside_a_doubt_without_its_file_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "191:5 replace still_the_only_doubt -> Result<(), &'static str> with Ok(())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_second_doubt_after_the_read_refuses_an_unnamed_review",
+   "killer_at": "base"
+  },
+  "200:17 replace > with == in still_the_only_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_second_doubt_after_the_read_refuses_an_unnamed_review",
+   "killer_at": "base"
+  },
+  "200:17 replace > with < in still_the_only_doubt": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_second_doubt_after_the_read_refuses_an_unnamed_review",
+   "killer_at": "base"
+  },
+  "200:17 replace > with >= in still_the_only_doubt": {
+   "verdict": "missed"
+  },
+  "227:5 replace read_masters_record_raw -> Result<Option<(Vec<u8>, Value)>, ()> with Ok(None)": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "227:5 replace read_masters_record_raw -> Result<Option<(Vec<u8>, Value)>, ()> with Ok(Some((vec![], Default::default())))": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_doubt_whose_own_file_was_not_written_reads_doubt_record_unavailable",
+   "killer_at": "base"
+  },
+  "227:5 replace read_masters_record_raw -> Result<Option<(Vec<u8>, Value)>, ()> with Ok(Some((vec![0], Default::default())))": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "227:5 replace read_masters_record_raw -> Result<Option<(Vec<u8>, Value)>, ()> with Ok(Some((vec![1], Default::default())))": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "229:23 replace match guard error.kind() == std::io::ErrorKind::NotFound with true in read_masters_record_raw": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_opened_is_unreadable_not_absent",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "229:23 replace match guard error.kind() == std::io::ErrorKind::NotFound with false in read_masters_record_raw": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "229:36 replace == with != in read_masters_record_raw": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "238:5 replace read_masters_records -> MastersRecord with Default::default()": {
+   "verdict": "unviable"
+  },
+  "247:16 replace match guard doubt[\"state\"] == \"posted_under_changed_masters\" && doubt[\"ledgers\"].as_array().is_some_and(|ledgers| { !ledgers.is_empty() && ledgers .iter() .all(|ledger| ledger.as_str().is_some_and(|name| !name.is_empty())) }) with true in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::an_unreadable_masters_record_is_refused",
+   "killer_at": "base"
+  },
+  "247:16 replace match guard doubt[\"state\"] == \"posted_under_changed_masters\" && doubt[\"ledgers\"].as_array().is_some_and(|ledgers| { !ledgers.is_empty() && ledgers .iter() .all(|ledger| ledger.as_str().is_some_and(|name| !name.is_empty())) }) with false in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "248:17 replace && with || in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::an_unreadable_masters_record_is_refused",
+   "killer_at": "base"
+  },
+  "247:31 replace == with != in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "250:25 replace && with || in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::an_unreadable_masters_record_is_refused",
+   "killer_at": "base"
+  },
+  "249:21 delete ! in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "252:78 delete ! in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "269:37 replace match guard check[\"state\"] == MASTERS_CHECK_PENDING with true in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "269:37 replace match guard check[\"state\"] == MASTERS_CHECK_PENDING with false in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "272:37 replace match guard check[\"state\"] == \"posted_under_changed_masters\" with true in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "272:37 replace match guard check[\"state\"] == \"posted_under_changed_masters\" with false in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "269:52 replace == with != in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "272:52 replace == with != in read_masters_records": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "283:5 replace voucher_fingerprint -> String with String::new()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_fingerprinted_field_changed_alone_changes_the_fingerprint",
+   "killer_at": "base"
+  },
+  "283:5 replace voucher_fingerprint -> String with \"xyzzy\".into()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_fingerprinted_field_changed_alone_changes_the_fingerprint",
+   "killer_at": "base"
+  },
+  "373:5 replace marked_row -> Option<&'a ReadVoucher> with None": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "base"
+  },
+  "373:5 replace marked_row -> Option<&'a ReadVoucher> with Some(Box::leak(Box::new(Default::default())))": {
+   "verdict": "unviable"
+  },
+  "390:5 replace marked_row_for -> Option<&'a ReadVoucher> with None": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "base"
+  },
+  "390:5 replace marked_row_for -> Option<&'a ReadVoucher> with Some(Box::leak(Box::new(Default::default())))": {
+   "verdict": "unviable"
+  },
+  "393:43 replace == with != in marked_row_for": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "base"
+  },
+  "398:17 replace && with || in marked_row_for": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "base"
+  },
+  "397:33 replace == with != in marked_row_for": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "base"
+  },
+  "398:45 replace == with != in marked_row_for": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "base"
+  },
+  "408:13 replace == with != in marked_row_for": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "426:5 replace admit_review -> Result<ReviewSnapshot, String> with Ok(Default::default())": {
+   "verdict": "unviable"
+  },
+  "440:45 replace != with == in admit_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "446:57 replace != with == in admit_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "454:68 replace == with != in admit_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "480:5 replace review_preview -> Result<String, String> with Ok(String::new())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "480:5 replace review_preview -> Result<String, String> with Ok(\"xyzzy\".into())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "496:5 replace render_review_text -> Result<String, String> with Ok(String::new())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "496:5 replace render_review_text -> Result<String, String> with Ok(\"xyzzy\".into())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "507:22 replace == with != in render_review_text": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+   "killer_at": "base"
+  },
+  "589:8 delete ! in render_review_text": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "602:5 replace narration_lines -> Result<(String, String), String> with Ok((String::new(), String::new()))": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+   "killer_at": "base"
+  },
+  "602:5 replace narration_lines -> Result<(String, String), String> with Ok((String::new(), \"xyzzy\".into()))": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+   "killer_at": "base"
+  },
+  "602:5 replace narration_lines -> Result<(String, String), String> with Ok((\"xyzzy\".into(), String::new()))": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+   "killer_at": "base"
+  },
+  "602:5 replace narration_lines -> Result<(String, String), String> with Ok((\"xyzzy\".into(), \"xyzzy\".into()))": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+   "killer_at": "base"
+  },
+  "618:5 replace ack_text_refusal -> String with String::new()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "618:5 replace ack_text_refusal -> String with \"xyzzy\".into()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "634:5 replace batch_review_preview -> Result<String, String> with Ok(String::new())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "634:5 replace batch_review_preview -> Result<String, String> with Ok(\"xyzzy\".into())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "672:18 replace += with -= in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_fits_at_exactly_3200_characters_and_not_one_more",
+   "killer_at": "base"
+  },
+  "672:18 replace += with *= in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "717:21 delete match arm (Some(before), Some(after), Some(moved)) in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_kind_of_step_doubt_is_shown_in_its_own_words",
+   "killer_at": "base"
+  },
+  "720:21 delete match arm (Some(before), Some(after), None) in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_kind_of_step_doubt_is_shown_in_its_own_words",
+   "killer_at": "base"
+  },
+  "771:9 replace || with && in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "770:9 replace || with && in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_fits_at_exactly_3200_characters_and_not_one_more",
+   "killer_at": "base"
+  },
+  "769:9 replace || with && in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read",
+   "killer_at": "base"
+  },
+  "768:19 replace > with == in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_of_three_byte_names_is_refused_past_7000_bytes",
+   "killer_at": "base"
+  },
+  "768:19 replace > with < in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "768:19 replace > with >= in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_of_three_byte_names_is_refused_past_7000_bytes",
+   "killer_at": "base"
+  },
+  "769:36 replace > with == in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_fits_at_exactly_3200_characters_and_not_one_more",
+   "killer_at": "base"
+  },
+  "769:36 replace > with < in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "769:36 replace > with >= in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_fits_at_exactly_3200_characters_and_not_one_more",
+   "killer_at": "base"
+  },
+  "770:26 replace > with == in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_of_three_byte_names_is_refused_past_7000_bytes",
+   "killer_at": "base"
+  },
+  "770:26 replace > with < in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "770:26 replace > with >= in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_of_three_byte_names_is_refused_past_7000_bytes",
+   "killer_at": "base"
+  },
+  "773:46 replace > with == in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "773:46 replace > with < in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "773:46 replace > with >= in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "777:8 delete ! in batch_review_preview": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "787:5 replace negated_as_written -> String with String::new()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "787:5 replace negated_as_written -> String with \"xyzzy\".into()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "790:17 replace match guard amount.is_zero() with true in negated_as_written": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "790:17 replace match guard amount.is_zero() with false in negated_as_written": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "798:5 replace caps_exceeded -> Vec<&'static str> with vec![]": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_too_long_to_show_is_refused_not_truncated",
+   "killer_at": "base"
+  },
+  "798:5 replace caps_exceeded -> Vec<&'static str> with vec![\"\"]": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "798:5 replace caps_exceeded -> Vec<&'static str> with vec![\"xyzzy\"]": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_debit_is_negated_in_the_digits_tally_sent_and_an_odd_sign_shows_as_it_is",
+   "killer_at": "base"
+  },
+  "799:32 replace > with == in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_review_cap_refuses_on_its_own",
+   "killer_at": "base"
+  },
+  "799:32 replace > with < in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+   "killer_at": "base"
+  },
+  "799:32 replace > with >= in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_single_review_fits_at_exactly_1600_characters_and_not_one_more",
+   "killer_at": "base"
+  },
+  "802:32 replace > with == in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_too_long_to_show_is_refused_not_truncated",
+   "killer_at": "base"
+  },
+  "802:32 replace > with < in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+   "killer_at": "base"
+  },
+  "802:32 replace > with >= in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_too_long_to_show_is_refused_not_truncated",
+   "killer_at": "base"
+  },
+  "805:56 replace > with == in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_review_cap_refuses_on_its_own",
+   "killer_at": "base"
+  },
+  "805:56 replace > with < in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_ledger_name_and_a_marked_narration_fit_the_review",
+   "killer_at": "base"
+  },
+  "805:56 replace > with >= in caps_exceeded": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_review_cap_refuses_on_its_own",
+   "killer_at": "base"
+  },
+  "819:5 replace recorded_review -> Option<RecordedReview> with None": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_answers_only_for_the_doubt_it_covers",
+   "killer_at": "base"
+  },
+  "819:5 replace recorded_review -> Option<RecordedReview> with Some(Default::default())": {
+   "verdict": "unviable"
+  },
+  "837:9 replace RecordedReview::answer -> &'static str with \"\"": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_answers_only_for_the_doubt_it_covers",
+   "killer_at": "base"
+  },
+  "837:9 replace RecordedReview::answer -> &'static str with \"xyzzy\"": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_answers_only_for_the_doubt_it_covers",
+   "killer_at": "base"
+  },
+  "838:37 replace match guard *sha256 != sha256_hex(doubt_raw) with true in RecordedReview::answer": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_answers_only_for_the_doubt_it_covers",
+   "killer_at": "base"
+  },
+  "838:37 replace match guard *sha256 != sha256_hex(doubt_raw) with false in RecordedReview::answer": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_answers_only_for_the_doubt_it_covers",
+   "killer_at": "base"
+  },
+  "838:45 replace != with == in RecordedReview::answer": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_answers_only_for_the_doubt_it_covers",
+   "killer_at": "base"
+  },
+  "852:5 replace write_record_once -> Result<(), String> with Ok(())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "867:5 replace operator_review -> Option<Value> with None": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "867:5 replace operator_review -> Option<Value> with Some(Default::default())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "867:28 replace > with == in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "867:28 replace > with < in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "867:28 replace > with >= in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_doubt_whose_own_file_was_not_written_reads_doubt_record_unavailable",
+   "killer_at": "base"
+  },
+  "892:62 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "897:9 replace && with || in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "896:9 replace && with || in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "895:40 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "897:32 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "902:9 replace && with || in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "899:63 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "906:17 replace && with || in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "905:17 replace && with || in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "904:17 replace && with || in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "903:33 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "904:45 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "905:33 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "906:45 replace == with != in operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "929:5 replace batch_operator_review -> Option<Value> with None": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "929:5 replace batch_operator_review -> Option<Value> with Some(Default::default())": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "947:20 replace match guard kind.ack_path(imports, &line.batch_id).exists() with true in batch_operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+   "killer_at": "base"
+  },
+  "947:20 replace match guard kind.ack_path(imports, &line.batch_id).exists() with false in batch_operator_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "975:5 replace batch_review_state -> Value with Default::default()": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "980:62 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "987:9 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "986:9 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "985:9 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "984:9 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "983:40 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "985:25 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "986:32 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "1002:55 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "1004:13 delete ! in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "1005:17 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "1004:49 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "1009:25 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "1008:25 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "1007:25 replace && with || in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "1006:41 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "1007:53 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "1008:41 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "1009:53 replace == with != in batch_review_state": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "1031:9 replace Server::acknowledge_post_review -> Result<ToolOutcome, ToolFailure> with Ok(Default::default())": {
+   "verdict": "unviable"
+  },
+  "1031:54 replace == with != in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1036:54 replace == with != in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1041:54 replace == with != in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1054:24 replace || with && in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_never_posted_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1054:12 delete ! in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1071:49 replace == with != in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1080:18 replace == with != in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_doubt_whose_own_file_was_not_written_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1086:41 replace > with == in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_of_several_vouchers_with_no_doubt_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1086:41 replace > with < in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_of_several_vouchers_with_no_doubt_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1086:41 replace > with >= in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  },
+  "1096:20 replace match guard !(batch && kind == DoubtKind::BatchStep) with true in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_step_review_beside_a_pending_step_answers_before_any_request",
+   "killer_at": "base"
+  },
+  "1096:20 replace match guard !(batch && kind == DoubtKind::BatchStep) with false in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finishes",
+   "killer_at": "base"
+  },
+  "1096:20 delete ! in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_step_review_beside_a_pending_step_answers_before_any_request",
+   "killer_at": "base"
+  },
+  "1096:28 replace && with || in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finishes",
+   "killer_at": "base"
+  },
+  "1096:36 replace == with != in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_step_review_beside_a_pending_step_answers_before_any_request",
+   "killer_at": "base"
+  },
+  "1106:17 delete match arm (_, Some(MastersRecord::NoDoubt)) in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_of_several_vouchers_with_no_doubt_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1109:17 delete match arm (DoubtKind::BatchStep, Some(MastersRecord::Pending)) in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_batch_step_review_left_pending_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "1128:13 delete match arm Some(ledger::PostSpanVerdict::Bound(bound)) in Server::acknowledge_post_review": {
+   "verdict": "unviable"
+  },
+  "1211:27 replace != with == in Server::acknowledge_post_review": {
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_doubt_beside_a_check_left_pending_is_reviewable",
+   "killer_at": "base"
+  }
+ },
+ "hand_mutations": {
+  "A01": {
+   "what": "the step-record refusal takes the masters code",
+   "edits": [
+    {
+     "from": "DoubtKind::BatchStep => \"ack_step_record_unreadable\",",
+     "to": "DoubtKind::BatchStep => \"ack_masters_record_unreadable\","
+    }
+   ],
+   "mutation": "1531c5ee5dffd368448cc449a49fd04c",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_step_doubt_without_its_step_reads_unreadable",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A02": {
+   "what": "a pending check is refused as no doubt",
+   "edits": [
+    {
+     "from": "MastersRecord::Pending => return Err(\"ack_check_pending\".into()),",
+     "to": "MastersRecord::Pending => return Err(\"ack_no_observed_doubt\".into()),"
+    }
+   ],
+   "mutation": "bf55e08db2062084d11121edbf5253ec",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_pending_check_is_refused_not_acknowledged",
+   "killer_at": "base"
+  },
+  "A03": {
+   "what": "admit_review: a doubt with no file is refused as no doubt",
+   "edits": [
+    {
+     "from": "MastersRecord::DoubtRecordUnavailable => return Err(\"ack_doubt_record_unavailable\".into()),",
+     "to": "MastersRecord::DoubtRecordUnavailable => return Err(\"ack_no_observed_doubt\".into()),"
+    }
+   ],
+   "mutation": "21d5db007a9a0c2ac89dd58e19ad2f8a",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+   "killer_at": "base"
+  },
+  "A04": {
+   "what": "an unclean response takes the readback code",
+   "edits": [
+    {
+     "from": "return Err(\"ack_response_not_clean\".into());",
+     "to": "return Err(\"ack_readback_not_matched\".into());"
+    }
+   ],
+   "mutation": "7c19f789b472f59c65155618d88b60ea",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_response_that_was_not_clean_is_refused",
+   "killer_at": "base"
+  },
+  "A05": {
+   "what": "a voucher not accounting-effective is admitted",
+   "edits": [
+    {
+     "from": "let row = marked_row_for(line, voucher, rows, bindings)\n                .filter(|row| voucher_is_accounting_effective(row) == Ok(true))?;",
+     "to": "let row = marked_row_for(line, voucher, rows, bindings)?;"
+    }
+   ],
+   "mutation": "caa1cc17aed58aaf32ee412a2565ca49",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_readback_guard_refuses_on_its_own_even_under_posted_verified",
+   "killer_at": "base"
+  },
+  "A06": {
+   "what": "the fingerprint leaves out the entry side",
+   "edits": [
+    {
+     "from": "json!([entry.ledger, entry.amount, entry.is_deemed_positive])",
+     "to": "json!([entry.ledger, entry.amount])"
+    }
+   ],
+   "mutation": "1cbe97272072dad423515acc0e3876dc",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::each_fingerprinted_field_changed_alone_changes_the_fingerprint",
+   "killer_at": "base"
+  },
+  "A07": {
+   "what": "the fingerprint leaves out the field list",
+   "edits": [
+    {
+     "from": "        FINGERPRINT_FIELDS,\n        row.guid,",
+     "to": "        row.guid,"
+    }
+   ],
+   "mutation": "01623ea369e1aa79ddb2f006744af972",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::the_fingerprint_of_a_read_voucher_is_unchanged",
+   "killer_at": "base"
+  },
+  "A08": {
+   "what": "a bound voucher takes the first of two rows",
+   "edits": [
+    {
+     "from": "let row = found.next()?;\n        return found.next().is_none().then_some(row);",
+     "to": "return found.next();"
+    }
+   ],
+   "mutation": "e6082319fefe3f43b8a089cf49b6b65d",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A09": {
+   "what": "a tagged voucher takes the first of two rows",
+   "edits": [
+    {
+     "from": "let row = marked.next()?;\n    marked.next().is_none().then_some(row)",
+     "to": "marked.next()"
+    }
+   ],
+   "mutation": "5125f13c5920f8fa92f06fb19a3f72c9",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_bound_voucher_is_reviewed_by_its_guid_not_a_tag",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A10": {
+   "what": "a one-voucher record of another version is read",
+   "edits": [
+    {
+     "from": "let Some(record) = record.filter(|record| record.version == RECORD_VERSION) else {",
+     "to": "let Some(record) = record else {"
+    }
+   ],
+   "mutation": "9ca1cc85ccd346ca8c996f572d5ec76a",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_record_this_build_cannot_read_is_reported_unreadable",
+   "killer_at": "base"
+  },
+  "A11": {
+   "what": "a batch record of another version is read",
+   "edits": [
+    {
+     "from": "let Some(record) = record.filter(|record| record.version == BATCH_RECORD_VERSION) else {",
+     "to": "let Some(record) = record else {"
+    }
+   ],
+   "mutation": "dea10a35246b5ae2a44e9571b5da5de9",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A12": {
+   "what": "one voucher: the ALTERID is not compared",
+   "edits": [
+    {
+     "from": "                && row.alter_id == Some(record.alter_id)\n",
+     "to": ""
+    }
+   ],
+   "mutation": "16f52cfb567987d851aec73bdaa8a6be",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "A13": {
+   "what": "one voucher: the GUID is not compared",
+   "edits": [
+    {
+     "from": "row.guid.as_deref() == Some(record.voucher_guid.as_str())\n                && row.master_id",
+     "to": "row.master_id"
+    }
+   ],
+   "mutation": "4c89050b2d2a42cc3130d7b9677571a6",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "A14": {
+   "what": "one voucher: the MASTERID is not compared",
+   "edits": [
+    {
+     "from": "                && row.master_id.as_deref() == Some(record.voucher_master_id.as_str())\n                && row.alter_id == Some(record.alter_id)\n",
+     "to": "                && row.alter_id == Some(record.alter_id)\n"
+    }
+   ],
+   "mutation": "1997c472cda376ab67363de4e5fe1edb",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "A15": {
+   "what": "one voucher: another company is not compared",
+   "edits": [
+    {
+     "from": "let covers_doubt = record.batch_id == line.batch_id\n        && batch_guid_matches(&line.company_guid, &record.company_guid)\n        && record.doubt_sha256 == sha256_hex(&raw);",
+     "to": "let covers_doubt = record.batch_id == line.batch_id\n        && record.doubt_sha256 == sha256_hex(&raw);"
+    }
+   ],
+   "mutation": "04efb5a825b22c77646e1981670ac508",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "A16": {
+   "what": "batch: the doubt named is not compared",
+   "edits": [
+    {
+     "from": "        && record.doubt == kind.name()\n",
+     "to": ""
+    }
+   ],
+   "mutation": "3fee821338f0c3022393a3f041b600c6",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "A17": {
+   "what": "batch: the voucher list is not compared",
+   "edits": [
+    {
+     "from": "        && record.doubt_sha256 == sha256_hex(doubt_raw)\n        && record\n            .vouchers\n            .iter()\n            .map(|voucher| voucher.bridge_txn_id.as_str())\n            .eq(line\n                .vouchers\n                .iter()\n                .map(|voucher| voucher.bridge_txn_id.as_str()));",
+     "to": "        && record.doubt_sha256 == sha256_hex(doubt_raw);"
+    }
+   ],
+   "mutation": "5edaedbe1d83c9b5ce05413aeec8b85f",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "A18": {
+   "what": "batch: the ALTERID is not compared",
+   "edits": [
+    {
+     "from": "                        && row.alter_id == Some(reviewed.alter_id)\n",
+     "to": ""
+    }
+   ],
+   "mutation": "aeee6a86483039f36651a81267a3a209",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "A19": {
+   "what": "batch: the field list is not compared",
+   "edits": [
+    {
+     "from": "!(record.voucher_fingerprint_fields == FINGERPRINT_FIELDS\n                && row.is_some_and(",
+     "to": "!(row.is_some_and("
+    }
+   ],
+   "mutation": "4b3606b54d5c3b8d808d4b4ac0f06f77",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+   "killer_at": "base"
+  },
+  "A20": {
+   "what": "one voucher: the field list is not compared",
+   "edits": [
+    {
+     "from": "let voucher_unchanged = record.voucher_fingerprint_fields == FINGERPRINT_FIELDS\n        // The fingerprint also covers the GUID and MASTERID today; they are\n        // compared on their own as well, and the ALTERID only here.\n        && row.is_some_and(",
+     "to": "let voucher_unchanged = row.is_some_and("
+    }
+   ],
+   "mutation": "fcff27c659928a86b94874e696cd6fd6",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_goes_stale_when_anything_it_bound_changes",
+   "killer_at": "base"
+  },
+  "A21": {
+   "what": "the step doubt shares the masters review file",
+   "edits": [
+    {
+     "from": "Self::BatchStep => imports.join(format!(\"{batch_id}.batch_step_ack.json\")),",
+     "to": "Self::BatchStep => masters_ack_path(imports, batch_id),"
+    }
+   ],
+   "mutation": "08ce4bd9f070b170d5ecc15ed7599044",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+   "killer_at": "base"
+  },
+  "A22": {
+   "what": "the first read does not check for a second doubt",
+   "edits": [
+    {
+     "from": "        if requested.is_none() {\n            still_the_only_doubt(&doubt_states(&imports, &line))\n                .map_err(|code| with_doubt_cause(fail(code.to_string()), code))?;\n        }\n",
+     "to": ""
+    }
+   ],
+   "mutation": "0174d333a8082e44a7c35e4820a66446",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt",
+   "killer_at": "base"
+  },
+  "A23": {
+   "what": "the second read does not check for a second doubt",
+   "edits": [
+    {
+     "from": "        if requested.is_none() {\n            still_the_only_doubt(&doubt_states(&imports, &line))\n                .map_err(|code| with_doubt_cause(fail(code), code))?;\n        }\n",
+     "to": ""
+    }
+   ],
+   "mutation": "c24870f645867fb841814b61f9d371eb",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_doubt",
+   "killer_at": "base"
+  },
+  "A24": {
+   "what": "a review recorded during the read does not answer",
+   "edits": [
+    {
+     "from": "        if let Some(recorded) = recorded_review(&ack_path) {\n            return Err(fail(recorded.answer(&shown.doubt_raw).to_string()));\n        }\n",
+     "to": ""
+    }
+   ],
+   "mutation": "07b68f42d0536ccf729817a271ac747e",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finishes",
+   "killer_at": "base"
+  },
+  "A25": {
+   "what": "a recorded step review beside a pending step goes on to read",
+   "edits": [
+    {
+     "from": "Some(MastersRecord::Pending))\n                if !(batch && kind == DoubtKind::BatchStep) => {}",
+     "to": "Some(MastersRecord::Pending)) => {}"
+    }
+   ],
+   "mutation": "d072631a19e3eece9eec3742b3c26f01",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_step_review_beside_a_pending_step_answers_before_any_request",
+   "killer_at": "base"
+  },
+  "A26": {
+   "what": "the ambiguity names no cause",
+   "edits": [
+    {
+     "from": "failure.cause = Some(\"masters_and_batch_step\");",
+     "to": "let _ = &mut failure;"
+    }
+   ],
+   "mutation": "d4b4dc1bd051af5a0a4fb0f73d68849c",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::an_unnamed_review_beside_a_doubt_without_its_file_is_refused_before_any_request",
+   "killer_at": "base"
+  },
+  "A27": {
+   "what": "a lost race for the record reads as a write failure",
+   "edits": [
+    {
+     "from": "persistence::RecordOnce::Exists => \"ack_already_recorded\".into(),",
+     "to": "persistence::RecordOnce::Exists => { \"import_file_write_failed\".into() }"
+    }
+   ],
+   "mutation": "6d327f28021f2bf0a03dd2ba418754a5",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_record_written_while_the_dialog_is_open_is_kept",
+   "killer_at": "base"
+  },
+  "A28": {
+   "what": "a failed write reads as already recorded",
+   "edits": [
+    {
+     "from": "persistence::RecordOnce::Failed => \"import_file_write_failed\".into(),",
+     "to": "persistence::RecordOnce::Failed => \"ack_already_recorded\".into(),"
+    }
+   ],
+   "mutation": "50bd6117eca45d0e3aa3e1e0e35c2d0a",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_record_that_cannot_be_written_is_not_taken_for_one_already_recorded",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A29": {
+   "what": "a record with no doubt hash reads as covering nothing",
+   "edits": [
+    {
+     "from": ".map_or(RecordedReview::Unreadable, |sha256| {",
+     "to": ".map_or(RecordedReview::Covers(String::new()), |sha256| {"
+    }
+   ],
+   "mutation": "d43b08e78e55ebada6d601f2310f81bd",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_recorded_review_answers_only_for_the_doubt_it_covers",
+   "killer_at": "base"
+  },
+  "A30": {
+   "what": "the single review does not admit the narration",
+   "edits": [
+    {
+     "from": "            .chain(row.narration.as_deref())\n            .chain(row.voucher_number.as_deref())",
+     "to": "            .chain(row.voucher_number.as_deref())"
+    }
+   ],
+   "mutation": "1a874c54c4f0f729351740bc52f5a8dc",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_value_with_a_line_break_or_hidden_character_is_refused",
+   "killer_at": "base"
+  },
+  "A31": {
+   "what": "the single review does not admit the voucher number",
+   "edits": [
+    {
+     "from": "            .chain(row.narration.as_deref())\n            .chain(row.voucher_number.as_deref())",
+     "to": "            .chain(row.narration.as_deref())"
+    }
+   ],
+   "mutation": "335c915c0a3698f590f7440c9e402fbd",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_value_with_a_line_break_or_hidden_character_is_refused",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A32": {
+   "what": "the single review does not admit the voucher type",
+   "edits": [
+    {
+     "from": "            .chain(row.voucher_type.as_deref())\n            .chain(std::iter::once(row.date.as_str())),",
+     "to": "            .chain(std::iter::once(row.date.as_str())),"
+    }
+   ],
+   "mutation": "c9fd4f1e178781c1ac5dbe1433da35b8",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_value_with_a_line_break_or_hidden_character_is_refused",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A33": {
+   "what": "the single review does not admit the date",
+   "edits": [
+    {
+     "from": "            .chain(row.voucher_type.as_deref())\n            .chain(std::iter::once(row.date.as_str())),",
+     "to": "            .chain(row.voucher_type.as_deref()),"
+    }
+   ],
+   "mutation": "1228573f8d89986e22212428e33f0cf6",
+   "verdict": "missed"
+  },
+  "A34": {
+   "what": "the batch review does not admit the voucher type",
+   "edits": [
+    {
+     "from": "                .chain(std::iter::once(row.date.as_str()))\n                .chain(row.voucher_type.as_deref())\n",
+     "to": "                .chain(std::iter::once(row.date.as_str()))\n"
+    }
+   ],
+   "mutation": "04d0f06b40901bc1ac4bf15bca8bab27",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "A35": {
+   "what": "the batch review does not admit the date",
+   "edits": [
+    {
+     "from": "                .chain(std::iter::once(row.date.as_str()))\n                .chain(row.voucher_type.as_deref())\n",
+     "to": "                .chain(row.voucher_type.as_deref())\n"
+    }
+   ],
+   "mutation": "8efd76e055942516e0b6e04e29e00161",
+   "verdict": "missed"
+  },
+  "A36": {
+   "what": "the batch review does not admit the amounts",
+   "edits": [
+    {
+     "from": "                .map(|entry| entry.amount.as_str())\n                .chain(std::iter::once(row.date.as_str()))",
+     "to": "                .map(|_| \"1\")\n                .chain(std::iter::once(row.date.as_str()))"
+    }
+   ],
+   "mutation": "80bdfdd414ba03cbbe67b4a5eaea8b46",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "A37": {
+   "what": "the single review skips the line-break check",
+   "edits": [
+    {
+     "from": "    if !post::line_break_names_are_marked(&preview, names.iter().copied()) {\n        return Err(ack_text_refusal(post::ReviewTextRefusal::Layout));\n    }\n",
+     "to": ""
+    }
+   ],
+   "mutation": "4738f677c23b4a76d262dd4a19ff5c62",
+   "verdict": "missed"
+  },
+  "A38": {
+   "what": "the batch review skips the line-break check",
+   "edits": [
+    {
+     "from": "    if !post::line_break_names_are_marked(&preview, shown_names.iter().copied()) {\n        return Err(ack_text_refusal(post::ReviewTextRefusal::Layout));\n    }\n",
+     "to": ""
+    }
+   ],
+   "mutation": "4715572a096ad2772157c1d5c53a632b",
+   "verdict": "missed"
+  },
+  "A39": {
+   "what": "the batch review drops the line-break note",
+   "edits": [
+    {
+     "from": "    text.extend(note.map(str::to_string));\n",
+     "to": ""
+    }
+   ],
+   "mutation": "f403fe5982fec066f7d4eabeeb77415e",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "A40": {
+   "what": "the single review drops the line-break note",
+   "edits": [
+    {
+     "from": "    let note = post::line_break_note(&names)\n        .map(|note| format!(\"\\n{note}\"))\n        .unwrap_or_default();",
+     "to": "    let note = String::new();"
+    }
+   ],
+   "mutation": "450caf2b45a771c3f44708ef2e6cbc67",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "A41": {
+   "what": "the step review drops that it covers no other voucher",
+   "edits": [
+    {
+     "from": "            text.push(\"Reviewing these vouchers covers no other voucher in this company.\".into());\n",
+     "to": ""
+    }
+   ],
+   "mutation": "8f5cea800cb76c03099ea11a1400c14c",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read",
+   "killer_at": "base"
+  },
+  "A42": {
+   "what": "the batch review drops what is not shown",
+   "edits": [
+    {
+     "from": "    text.push(\"Not shown here: narrations, voucher numbers and types.\".into());\n",
+     "to": ""
+    }
+   ],
+   "mutation": "aece0bcf7fc18295985ed2f4a0378bd6",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "A43": {
+   "what": "the batch review drops the Batch line",
+   "edits": [
+    {
+     "from": "    text.push(format!(\"Batch: {}\", line.batch_id));\n",
+     "to": ""
+    }
+   ],
+   "mutation": "5203e112441ca3abc76cd0cc6db4cda7",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "A44": {
+   "what": "the batch dates show last to first",
+   "edits": [
+    {
+     "from": "        dates\n            .clone()\n            .min()\n            .map_or_else(|| \"(none)\".into(), post::shown_date),\n        dates\n            .max()",
+     "to": "        dates\n            .clone()\n            .max()\n            .map_or_else(|| \"(none)\".into(), post::shown_date),\n        dates\n            .min()"
+    }
+   ],
+   "mutation": "1b4d64936e98a01548772c974ed0aeb9",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::the_batch_review_summarizes_the_doubt_and_the_vouchers_as_read",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A45": {
+   "what": "the batch ALTERIDs show last to first",
+   "edits": [
+    {
+     "from": "        alter_ids\n            .clone()\n            .min()\n            .map_or(\"(none)\".into(), |id| id.to_string()),\n        alter_ids.max().map_or",
+     "to": "        alter_ids\n            .clone()\n            .max()\n            .map_or(\"(none)\".into(), |id| id.to_string()),\n        alter_ids.min().map_or"
+    }
+   ],
+   "mutation": "020c1c36286e664b999984b8c1a0570c",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+   "killer_at": "base"
+  },
+  "A46": {
+   "what": "the narration keeps the space before its marker",
+   "edits": [
+    {
+     "from": "                .and_then(|text| text.strip_suffix(' '))\n",
+     "to": ""
+    }
+   ],
+   "mutation": "24c6aae21a0fab8b71f5435399ac4886",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_long_narration_is_reviewed_in_quoted_parts_under_the_heading",
+   "killer_at": "base"
+  },
+  "A47": {
+   "what": "an empty name in a doubt file is a doubt",
+   "edits": [
+    {
+     "from": ".all(|ledger| ledger.as_str().is_some_and(|name| !name.is_empty()))",
+     "to": ".all(|ledger| ledger.as_str().is_some())"
+    }
+   ],
+   "mutation": "d9b7f0e8caca48a717baac74e908442d",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_doubt_file_with_an_empty_ledger_name_reads_unreadable",
+   "killer_at": "this_commit",
+   "before_this_change": "missed"
+  },
+  "A48": {
+   "what": "operator_review: an unreadable doubt with a record reads stale",
+   "edits": [
+    {
+     "from": "        (MastersRecord::Unreadable, _) => return Some(json!({\"state\":\"unreadable\"})),\n",
+     "to": ""
+    }
+   ],
+   "mutation": "bf1772a398047bb8e452e0d9dc40a085",
+   "verdict": "caught",
+   "killer": "agent::agent_import::post::e2e_tests::ack_tests::a_record_this_build_cannot_read_is_reported_unreadable",
+   "killer_at": "base"
+  },
+  "A49": {
+   "what": "operator_review: a doubt with no file reads as nothing",
+   "edits": [
+    {
+     "from": "        (MastersRecord::DoubtRecordUnavailable, Ok(None)) => {\n            return Some(json!({\"state\":\"doubt_record_unavailable\"}))\n        }\n",
+     "to": ""
+    }
+   ],
+   "mutation": "8482d89e6f711a80e24a26bedca73fc5",
+   "verdict": "caught",
+   "killer": "agent::agent_import::ack::tests::a_doubt_whose_own_file_was_not_written_reads_doubt_record_unavailable",
+   "killer_at": "base"
+  }
+ },
+ "accepted_survivors": {
+  "152:39 replace == with != in select_doubt": {
+   "reason": "equivalent: the states come from DoubtKind::possible, which holds each kind once, and this test is reached only with both kinds observed. Then unavailable(Masters) reads the step's state and unavailable(BatchStep) the masters one, and all() over both is the same conjunction"
+  },
+  "200:17 replace > with >= in still_the_only_doubt": {
+   "reason": "equivalent: with one observed doubt select_doubt(None, ..) takes its one-element arm and returns Ok, so calling it changes nothing"
+  },
+  "A33": {
+   "mutation": "1228573f8d89986e22212428e33f0cf6",
+   "reason": "equivalent: the date is a TallyDate, parsed where the read is admitted, so it holds no character the text check refuses"
+  },
+  "A35": {
+   "mutation": "8efd76e055942516e0b6e04e29e00161",
+   "reason": "equivalent, for the reason given for A33"
+  },
+  "A37": {
+   "mutation": "4738f677c23b4a76d262dd4a19ff5c62",
+   "reason": "equivalent on every input traced: each value the review quotes is admitted first (a control character is refused unless it is a ledger name ending in a line break), quoting doubles a typed backslash and escapes a quote, each marked name is written on its own line after the mark, and the note comes from the same names. So no admitted text fails line_break_names_are_marked here; it stays as the review's second check"
+  },
+  "A38": {
+   "mutation": "4715572a096ad2772157c1d5c53a632b",
+   "reason": "equivalent, for the reason given for A37, in the batch review"
+  }
+ }
+}

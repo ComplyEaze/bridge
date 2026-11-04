@@ -19,7 +19,8 @@ use bridge_tally_protocol::native_stock_summary::{
     gate_stock_summary, parse_company_inventory_flags, parse_native_stock_items,
     parse_native_stock_summary_report, render_company_inventory_flags_request,
     render_native_stock_summary_request, stock_item_worst_row_bytes, NativeFlag,
-    NativeInventoryFlags, NativeStockGate, NativeStockItemCount, StockSummaryAsOf,
+    NativeInventoryFlags, NativeStockGate, NativeStockItemCount, NativeStockItems,
+    StockSummaryAsOf,
 };
 use bridge_tally_protocol::outstandings_shared::OutstandingsError;
 use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
@@ -383,6 +384,89 @@ async fn admit_on_census(
     Ok(admit_counted_stock(mark, items, groups, tally_items)?)
 }
 
+/// What a read reports when its bracket saw the book change: its own codes for a paired read
+/// that differed and for an extent that moved.
+#[derive(Clone, Copy)]
+pub(crate) struct BracketChanged {
+    pub(crate) collection: PairedReadValidationError,
+    pub(crate) extent: PairedReadValidationError,
+}
+
+/// The stock items a read inside the bracket admitted and read, with the premise they were
+/// admitted on. The premise's check is held, not returned: a caller reads the closing extent
+/// before it, so a book that moved mid-read is reported as moved, not as whatever its new rows
+/// broke.
+pub(crate) struct AdmittedStockItems {
+    pub(crate) items: NativeStockItems,
+    pub(crate) premise: Result<(), StockSummaryReadError>,
+    /// Set when the censuses' counts admitted the read past the mark (#1233).
+    pub(crate) counted: Option<CountedAdmission>,
+}
+
+/// Admits the stock-item read on the master mark or, past the mark the single read is admitted
+/// for, on the censuses' counts of the items and stock groups (#1233), then reads the items over
+/// `period`, paired. Both `stock_summary` and `stock_by_batch` read their items through this.
+/// A refusal of what a census found is held until the extent is read again: a book that moved
+/// during the census (an altered master changes its AlterID between slices) is reported as
+/// moved, not as what its census broke.
+pub(crate) async fn read_admitted_stock_items(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    extent: &CompanyBookExtent,
+    period: &NativeLedgerSnapshotPeriod,
+    tally_items: NativeStockItemCount,
+    changed: BracketChanged,
+    evidence: &mut RuntimeReadEvidence,
+) -> anyhow::Result<AdmittedStockItems> {
+    let mark = extent
+        .master_alter_id_high_water()
+        .ok_or(OutstandingsError::MasterWitnessAbsent)?
+        .get();
+    let (estimate, counted) = match admit_stock_summary_size(mark) {
+        Ok(estimate) => (estimate, None),
+        Err(StockSummaryReadError::TooLarge { .. }) => {
+            match admit_on_census(client, identity, mark, tally_items, evidence).await {
+                Ok(counted) => (counted.items_estimate, Some(counted)),
+                Err(error)
+                    if error
+                        .chain()
+                        .any(|cause| cause.is::<StockSummaryReadError>()) =>
+                {
+                    let closing_extent = client.fetch_company_book_extent(identity).await?;
+                    if &closing_extent != extent {
+                        return Err(changed.extent.into());
+                    }
+                    return Err(error);
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let company = ValidatedCompanyName::new(identity.display_name())?;
+    let range = ValidatedDateRange::new(period.from().as_str(), period.to().as_str())?;
+    let request = ReadOnlyProfile::AuditStockItemsV1 {
+        company: &company,
+        period: &range,
+    }
+    .render();
+    let (xml, bytes, hash) = client
+        .fetch_native_report_paired(request.clone())
+        .await?
+        .require_stable(changed.collection)?;
+    *evidence = evidence
+        .clone()
+        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+    let items = parse_native_stock_items(&xml, identity.company_guid())?;
+    let premise = check_stock_premise(items.rows.len(), mark, bytes, estimate)
+        .and_then(|()| counted.map_or(Ok(()), |counted| counted.check_items(items.rows.len())));
+    Ok(AdmittedStockItems {
+        items,
+        premise,
+        counted,
+    })
+}
+
 impl TallyRuntime {
     /// The company's stock at `as_of`, with the same queue, mode and identity
     /// brackets as the masters read: the extent before and after must be equal,
@@ -440,71 +524,23 @@ impl TallyRuntime {
                         return Err(StockSummaryReadError::NotEnabled.into());
                     }
 
-                    let mark = extent
-                        .master_alter_id_high_water()
-                        .ok_or(OutstandingsError::MasterWitnessAbsent)?
-                        .get();
-                    // Past the mark the single read is admitted for, the censuses count the
-                    // items and stock groups, and their counts admit the same read (#1233).
-                    let (estimate, counted) = match admit_stock_summary_size(mark) {
-                        Ok(estimate) => (estimate, None),
-                        Err(StockSummaryReadError::TooLarge { .. }) => {
-                            match admit_on_census(
-                                &client,
-                                &identity,
-                                mark,
-                                company_inventory.item_count,
-                                &mut evidence,
-                            )
-                            .await
-                            {
-                                Ok(counted) => (counted.items_estimate, Some(counted)),
-                                // A refusal of what the census found is held until the extent is
-                                // read again: a book that moved during the census (an altered
-                                // master changes its AlterID between slices) is reported as
-                                // moved, not as what its census broke.
-                                Err(error)
-                                    if error
-                                        .chain()
-                                        .any(|cause| cause.is::<StockSummaryReadError>()) =>
-                                {
-                                    let closing_extent =
-                                        client.fetch_company_book_extent(&identity).await?;
-                                    if closing_extent != extent {
-                                        return Err(
-                                            PairedReadValidationError::StockSummaryExtent.into()
-                                        );
-                                    }
-                                    return Err(error);
-                                }
-                                Err(error) => return Err(error),
-                            }
-                        }
-                        Err(error) => return Err(error.into()),
-                    };
-                    let company = ValidatedCompanyName::new(identity.display_name())?;
-                    let range =
-                        ValidatedDateRange::new(period.from().as_str(), period.to().as_str())?;
-                    let request = ReadOnlyProfile::AuditStockItemsV1 {
-                        company: &company,
-                        period: &range,
-                    }
-                    .render();
-                    let (xml, bytes, hash) = client
-                        .fetch_native_report_paired(request.clone())
-                        .await?
-                        .require_stable(PairedReadValidationError::StockSummaryCollection)?;
-                    evidence = evidence
-                        .clone()
-                        .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
-                    let items = parse_native_stock_items(&xml, identity.company_guid())?;
-                    // Held until the closing extent is read: a book that
-                    // moved mid-read is reported as moved, not as whatever
-                    // its new rows broke.
-                    let premise = check_stock_premise(items.rows.len(), mark, bytes, estimate)
-                        .and_then(|()| {
-                            counted.map_or(Ok(()), |counted| counted.check_items(items.rows.len()))
-                        });
+                    let AdmittedStockItems {
+                        items,
+                        premise,
+                        counted,
+                    } = read_admitted_stock_items(
+                        &client,
+                        &identity,
+                        &extent,
+                        &period,
+                        company_inventory.item_count,
+                        BracketChanged {
+                            collection: PairedReadValidationError::StockSummaryCollection,
+                            extent: PairedReadValidationError::StockSummaryExtent,
+                        },
+                        &mut evidence,
+                    )
+                    .await?;
 
                     let request =
                         render_native_stock_summary_request(identity.display_name(), &period);

@@ -43,6 +43,8 @@ const MISMATCHES_SHOWN: usize = 20;
 /// The companies the reading tests name, each the GUID its capture carries.
 const WR2_LAB: &str = "61c6de69-1748-461c-ad3f-162cb949df9f";
 const REGISTER_LAB: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const NOTES_LAB: &str = "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0";
+const EINVOICE_LAB: &str = "eb2f5190-292e-4ed8-bfd3-eace839fe699";
 const GST_LEDGER_LAB: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const SHAPE_LAB: &str = "3a6bd6e1-b835-4bff-89dd-8a6af138c346";
 const BANKREF_LAB: &str = "8fb5f4db-478d-4084-b1e5-5b8f5d3fef60";
@@ -51,6 +53,7 @@ const CORPUS_DENSE: &str = "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3";
 const BILLTRAIL_LAB: &str = "9ab5002c-e910-4242-83e4-a27cc490600b";
 const OUTSTANDINGS_LAB: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const STOCK_LAB: &str = "1edb9b05-8d35-4c0c-9959-dce655730463";
+const PILOT_LAB: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
 /// The empty book of the marks capture in `COMPANY_MARKS_EMPTY_CAPTURE_PROVENANCE.md`.
 const HANDIMPORT_LAB: &str = "9b5b6d54-4cdb-4b90-9600-cab45ee70c3a";
 const READS_LAB: &str = "de2e15f2-6d42-4715-b6e7-b7a95a68abe8";
@@ -60,11 +63,16 @@ const IMPORT_LAB: &str = "17a10910-773c-42c6-bd66-7bba9a392536";
 /// The line-break ledger capture's company (`agent_import_span_identity_tests.rs`'
 /// `LINE_BREAK_COMPANY_GUID`).
 const LINE_BREAK_LAB: &str = "224e7f8c-a0aa-45ce-889a-ad4b7fdbe852";
+/// The census row's company (`agent_import_ack_tests.rs`' `REVIEW_GUID`).
+const REVIEW_LAB: &str = "63292d7c-d541-42e5-aa9d-2ab5f8b993ff";
 const FOREX_LAB: &str = "b14e9b2d-8a63-4779-804d-25d59eb787eb";
+const FX_72_LAB: &str = "1bb48be5-baba-45b2-90d8-7593244915a9";
 const AARAV: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const BILL_ALLOCATION_LAB: &str = "74d7e825-396a-4667-90b2-83f593f06a36";
 const GST_CREDIT_PERIODS_LAB: &str = "46faa869-1208-4119-8961-f28db4df3b8e";
 const REOPEN_LAB: &str = "ec4454ae-5c4c-4bfa-b3b0-68182a749689";
+/// The class purchase capture's company (`agent_voucher_goods_lines_tests.rs`' `CLASS_PURCHASE_LAB`).
+const CLASS_PURCHASE_LAB: &str = "92a7ef97-dd28-4286-b02c-c059fcb8690e";
 
 /// Whether a fixture is evidence of what Tally sends.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -141,6 +149,17 @@ fn agent_rows(text: &str, guid: &str) -> String {
     coded(parse_agent_rows(text, guid))
 }
 
+fn stock_line_rows(text: &str, guid: &str) -> String {
+    use super::voucher_parse::{parse_agent_rows_reading_gst, NamedVoucherFields, StockLines};
+    coded(parse_agent_rows_reading_gst(
+        text,
+        guid,
+        super::GstDetailsShown::Withheld,
+        NamedVoucherFields::NOT_ASKED,
+        StockLines::Asked,
+    ))
+}
+
 fn withholding(text: &str, guid: &str) -> String {
     coded(parse_agent_rows_withholding(text, guid))
 }
@@ -154,7 +173,7 @@ fn census(text: &str, on: &str) -> String {
     coded(parse_voucher_census(text, (day(on), day(on)), None))
 }
 
-/// A census over a window and one AlterID span, as a ledger-scoped census read asks for it.
+/// A census over a window and one AlterID span, as every census read asks for it (#2145).
 fn census_span(text: &str, (from, to): (&str, &str), (after, through): (u64, u64)) -> String {
     coded(parse_voucher_census(
         text,
@@ -232,6 +251,18 @@ fn rows() -> Vec<Row> {
     rows.extend(high_water_rows!(
         "agent/wa1-payment-company-high-water.utf16le.xml",
         IMPORT_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/amend-now-company-high-water.utf16le.xml",
+        IMPORT_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/review-lab-company-high-water.utf16le.xml",
+        REVIEW_LAB
+    ));
+    rows.extend(high_water_rows!(
+        "agent/review-hand-company-high-water.utf16le.xml",
+        REVIEW_LAB
     ));
     rows.extend(high_water_rows!(
         "agent/post-span-company-high-water-after.utf16le.xml",
@@ -391,6 +422,36 @@ fn rows() -> Vec<Row> {
         |_, t| census(t, "20260403")
     ));
     rows.push(row!(
+        "agent/amend-now-d3-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260401, (0, 1829])",
+        |_, t| census_span(t, ("20260401", "20260401"), (0, 1829))
+    ));
+    rows.push(row!(
+        "agent/amend-now-wa1-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260403, (0, 1829])",
+        |_, t| census_span(t, ("20260403", "20260403"), (0, 1829))
+    ));
+    rows.push(row!(
+        "agent/review-lab-batch-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260402, (0, 251])",
+        |_, t| census_span(t, ("20260402", "20260402"), (0, 251))
+    ));
+    rows.push(row!(
+        "agent/review-lab-payment-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260404, (0, 251])",
+        |_, t| census_span(t, ("20260404", "20260404"), (0, 251))
+    ));
+    rows.push(row!(
+        "agent/review-hand-voucher-census.utf16le.xml",
+        "parse_voucher_census(20260406, (0, 302])",
+        |_, t| census_span(t, ("20260406", "20260406"), (0, 302))
+    ));
+    rows.push(row!(
+        "agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
+        "parse_voucher_census(20260804 to 20260805, (0, 68])",
+        |_, t| census_span(t, ("20260804", "20260805"), (0, 68))
+    ));
+    rows.push(row!(
         "agent/register-e2e/native-register-e2e-census.utf16le.xml",
         "parse_voucher_census(20250903)",
         |_, t| census(t, "20250903")
@@ -480,6 +541,11 @@ fn rows() -> Vec<Row> {
         "parse_voucher_census(20250428)",
         |_, t| census(t, "20250428")
     ));
+    rows.push(row!(
+        "stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml",
+        "parse_voucher_census(20250421, span 0 to 3)",
+        |_, t| census_span(t, ("20250421", "20250421"), (0, 3))
+    ));
     // Import verification and span reads (`agent_import_ack_tests.rs`,
     // `agent_import_index_tests.rs`, `agent_import_span_identity_tests.rs`).
     rows.push(row!(
@@ -501,6 +567,31 @@ fn rows() -> Vec<Row> {
         "agent/wa1-payment-import-verification.utf16le.xml",
         "parse_import_verification_rows(IMPORT_LAB)",
         |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/amend-now-d3-import-verification.utf16le.xml",
+        "parse_import_verification_rows(IMPORT_LAB)",
+        |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/amend-now-wa1-import-verification.utf16le.xml",
+        "parse_import_verification_rows(IMPORT_LAB)",
+        |_, t| verification(t, IMPORT_LAB)
+    ));
+    rows.push(row!(
+        "agent/review-lab-batch-import-verification.utf16le.xml",
+        "parse_import_verification_rows(REVIEW_LAB)",
+        |_, t| verification(t, REVIEW_LAB)
+    ));
+    rows.push(row!(
+        "agent/review-lab-payment-import-verification.utf16le.xml",
+        "parse_import_verification_rows(REVIEW_LAB)",
+        |_, t| verification(t, REVIEW_LAB)
+    ));
+    rows.push(row!(
+        "agent/review-hand-import-verification.utf16le.xml",
+        "parse_import_verification_rows(REVIEW_LAB)",
+        |_, t| verification(t, REVIEW_LAB)
     ));
     rows.push(row!(
         "agent/post-span-alterid-span-read.utf16le.xml",
@@ -550,6 +641,66 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, WR2_LAB)
     ));
     rows.push(row!(
+        "agent/gst-note-fields-lab/native-four-vouchers.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/shipped-read-credit-note.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml",
+        "parse_agent_rows(NOTES_LAB)",
+        |_, t| agent_rows(t, NOTES_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-dispatch/window-read-dispatch-keyed.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-dispatch/window-read-class-e-invoice-delivery-notes.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml",
+        "parse_agent_rows_reading_gst(CLASS_PURCHASE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, CLASS_PURCHASE_LAB)
+    ));
+    rows.push(row!(
+        "agent/class-purchase-lab/item-purchase-common-ledger-off.utf16le.xml",
+        "parse_agent_rows(CLASS_PURCHASE_LAB)",
+        |_, t| agent_rows(t, CLASS_PURCHASE_LAB)
+    ));
+    rows.push(row!(
+        "agent/class-purchase-lab/item-purchase-through-class.utf16le.xml",
+        "parse_agent_rows(CLASS_PURCHASE_LAB)",
+        |_, t| agent_rows(t, CLASS_PURCHASE_LAB)
+    ));
+    rows.push(row!(
         "agent/native-three-vouchers.utf16le.xml",
         "parse_agent_rows(WR2_LAB)",
         |_, t| agent_rows(t, WR2_LAB)
@@ -583,6 +734,11 @@ fn rows() -> Vec<Row> {
         "agent/register-e2e/native-register-e2e-window.utf16le.xml",
         "parse_agent_rows(REGISTER_LAB)",
         |_, t| agent_rows(t, REGISTER_LAB)
+    ));
+    rows.push(row!(
+        "agent/pilot-lab-register/pilot-lab-register-window.utf16le.xml",
+        "parse_agent_rows(PILOT_LAB)",
+        |_, t| agent_rows(t, PILOT_LAB)
     ));
     rows.push(row!(
         "agent/gst-ledger-l1/s6-03nov-w-1.utf16le.xml",
@@ -651,6 +807,11 @@ fn rows() -> Vec<Row> {
     ));
     rows.push(row!(
         "agent/gst-ledger-l1/s6-17nov-w-1.utf16le.xml",
+        "parse_agent_rows(GST_LEDGER_LAB)",
+        |_, t| agent_rows(t, GST_LEDGER_LAB)
+    ));
+    rows.push(row!(
+        "agent/gst-ledger-l3/l3-dec-w-1.utf16le.xml",
         "parse_agent_rows(GST_LEDGER_LAB)",
         |_, t| agent_rows(t, GST_LEDGER_LAB)
     ));
@@ -730,6 +891,31 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, SHAPE_LAB)
     ));
     rows.push(row!(
+        "stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
+        "stock_movement_mixed_window_stock_lines_shape_lab_live.utf16le.xml",
+        "parse_agent_rows_reading_gst(SHAPE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, SHAPE_LAB)
+    ));
+    rows.push(row!(
         "voucher_contra_hand_keyed_bankref_lab_live.utf16le.xml",
         "parse_agent_rows(BANKREF_LAB)",
         |_, t| agent_rows(t, BANKREF_LAB)
@@ -759,6 +945,11 @@ fn rows() -> Vec<Row> {
         "agent/vouchers-forex-composite-20260915.utf16le.xml",
         "parse_agent_rows_withholding(FOREX_LAB)",
         |_, t| withholding(t, FOREX_LAB)
+    ));
+    rows.push(row!(
+        "agent/vouchers-forex-unspaced-20250401.utf16le.xml",
+        "parse_agent_rows_withholding(FX_72_LAB)",
+        |_, t| withholding(t, FX_72_LAB)
     ));
     // A synthetic voucher-import file, read as bytes (`source_draft_xml_tests.rs`).
     rows.push(Row {

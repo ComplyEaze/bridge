@@ -291,6 +291,8 @@ const AARAV_GUID: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const OUTSTANDINGS_LAB_GUID: &str = "49f1fbda-ee59-4a4b-aacf-b45fe32402d7";
 const MASTERS_LAB_GUID: &str = "f107e523-3d6b-4516-bd24-5b1a14498fa6";
 const REGISTER_LAB_GUID: &str = "ae1490be-52c5-4544-9ffc-4b7da85f9797";
+const PILOT_LAB_GUID: &str = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+const REVIEW_LAB_GUID: &str = "63292d7c-d541-42e5-aa9d-2ab5f8b993ff";
 const GST_LEDGER_LAB_GUID: &str = "aae372c5-a894-491c-8843-5532e43d2d2f";
 const NESTED_STOCK_GUID: &str = "4b6094e2-d6db-46b6-a4ad-90c283cd1b52";
 const BATCH_LAB_GUID: &str = "a30f23c3-4819-4334-96ab-ffa6fba70976";
@@ -679,6 +681,32 @@ const ROWS: &[Row] = &[
         parser: "parse_native_stock_items",
         parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
     },
+    // One sitting's empty Stock Query answers beside the collection at the same dates: the
+    // zero-stock and no-movement cases of the stock_by_batch tool (#2018)
+    Row {
+        fixture: "tests/fixtures/stock-query/q-r-13-stock-query-zero-stock-item-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/q-r-04-stock-query-cleaning-kit-b.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_stock_query",
+        parse: |_, text| typed(bridge_tally_protocol::native_stock_query::parse_stock_query(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/c-a-01-items-to-20250401.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/stock-query/c-a-03-items-to-20260331.answer.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_stock_items",
+        parse: |_, text| typed(parse_native_stock_items(text, SHAPE_GUID)),
+    },
     // tests/simulator_corpus.rs, src/agent_tests.rs (an empty collection's export status)
     Row {
         fixture: "tests/fixtures/agent/native-bank-allocation-status.utf16le.xml",
@@ -782,6 +810,54 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/d3-cancelled-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/amend-now-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/amend-now-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/review-lab-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/review-lab-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/review-hand-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/review-hand-company-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_gateway_capability_observation",
+        parse: |_, text| gateway(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_companies_from_collection",
+        parse: |_, text| companies(text),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
         source: Source::Captured,
         parser: "parse_company_gateway_capability_observation",
         parse: |_, text| gateway(text),
@@ -908,6 +984,18 @@ const ROWS: &[Row] = &[
                 text,
                 "tests/fixtures/agent/register-e2e/native-register-e2e-extent.utf16le.xml",
                 REGISTER_LAB_GUID,
+            )
+        },
+    },
+    Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-book-extent.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_company_book_extent_v2(PILOT LAB)",
+        parse: |_, text| {
+            extent_v2(
+                text,
+                "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-extent.utf16le.xml",
+                PILOT_LAB_GUID,
             )
         },
     },
@@ -1156,6 +1244,12 @@ const ROWS: &[Row] = &[
         source: Source::Captured,
         parser: "parse_ledger_name_index(ALIAS LAB)",
         parse: |_, text| typed(parse_ledger_name_index(text, ALIAS_LAB_GUID)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/review-lab-ledger-catalogue-v2.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_standard_ledger_catalog_v2_with_identities(REVIEW LAB)",
+        parse: |_, text| catalogue_v2(text, "BRIDGE REVIEW LAB", REVIEW_LAB_GUID),
     },
     Row {
         fixture: "tests/fixtures/agent/d3-amend-lab-ledger-catalogue-v2.utf16le.xml",
@@ -1744,11 +1838,39 @@ const ROWS: &[Row] = &[
             ))
         },
     },
+    Row {
+        fixture: "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-company-object.utf16le.xml",
+        source: Source::Captured,
+        parser: "admit_audit_company_part(BRIDGE SFT LAB)",
+        parse: |_, text| {
+            typed(admit_audit_company_part(
+                text,
+                "00f0c618-b0df-43bd-bd69-b4c7b92c616f",
+                "20250401",
+            ))
+        },
+    },
     // Native masters: src/native_masters_tests.rs (SHAPE LAB and READS LAB);
     // src/agent_voucher_type_class_tests.rs for READS LAB's voucher types, read by production
     // (src/agent_vouchers.rs) as a voucher-type collection.
     Row {
         fixture: "tests/fixtures/masters_voucher_types_shape_lab_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(VoucherTypes)",
+        parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
+    },
+    // The same book's voucher types as its first and its second read after a company load
+    // answered them (2 November 2026, #2160): the first leaves one element out of two rows. The
+    // two records are equal below the header, which is the proof that the parser reads the
+    // element in neither.
+    Row {
+        fixture: "tests/fixtures/masters_voucher_types_shape_lab_first_read_live.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_masters(VoucherTypes)",
+        parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/masters_voucher_types_shape_lab_second_read_live.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_masters(VoucherTypes)",
         parse: |_, text| masters(NativeMasterKind::VoucherTypes, text, SHAPE_GUID),
@@ -2413,6 +2535,12 @@ const ROWS: &[Row] = &[
         parse: |_, text| ledger_snapshot_for(text, REGISTER_LAB_GUID),
     },
     Row {
+        fixture: "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-ledgers-paired.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot_for_company(PILOT LAB)",
+        parse: |_, text| ledger_snapshot_for(text, PILOT_LAB_GUID),
+    },
+    Row {
         fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-P-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_ledger_snapshot_for_company(GST LEDGER LAB)",
@@ -2521,6 +2649,12 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-L-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_party_ledger_master_records_with_evidence(GST LEDGER LAB)",
+        parse: |_, text| party_masters(text, GST_LEDGER_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l3/l3-dec-L-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_party_ledger_master_records_with_evidence(GST LEDGER LAB)",
         parse: |_, text| party_masters(text, GST_LEDGER_LAB_GUID),
@@ -2662,6 +2796,12 @@ const ROWS: &[Row] = &[
     },
     Row {
         fixture: "tests/fixtures/agent/gst-ledger-l1/s6-03nov-g-1.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_group_snapshot(GST LEDGER LAB)",
+        parse: |_, text| groups(text, GST_LEDGER_LAB_GUID),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/gst-ledger-l3/l3-dec-g-1.utf16le.xml",
         source: Source::Captured,
         parser: "parse_native_group_snapshot(GST LEDGER LAB)",
         parse: |_, text| groups(text, GST_LEDGER_LAB_GUID),
@@ -3028,11 +3168,11 @@ const APP_FOREX_VOUCHERS: &str = "recorded by the app crate's record (#1198 slic
      parse_agent_rows_withholding (src/currency_composite_tests.rs only classifies its amounts)";
 const VOUCHER_EXPORT_NO_PARSER: &str = "a voucher collection export that no parser of this \
      crate reads: its only reader, the voucher-scan parser, was removed; kept as captured evidence";
-const INVENTORY_FETCH_NO_PARSER: &str = "a voucher collection export whose FETCH asks for \
-     ALLINVENTORYENTRIES.* in place of ALLLEDGERENTRIES.*: neither the protocol crate's nor the app \
-     crate's record reads it yet (#2016); bridge-tax-audit's `inventory_lines` reads the same lists \
-     from an AuditVouchersV1 part, whose FETCH is field by field rather than this wildcard; \
-     STOCK_MOVEMENT_CAPTURE_PROVENANCE.md says what it holds";
+const APP_STOCK_LINE_ROWS: &str = "recorded by the app crate's record (#1198 slice 2): \
+     parse_agent_rows_reading_gst asked for stock lines (#2016); the four answers of 28 Oct name no \
+     voucher type class, so their records show each row withheld (agent_voucher_goods_lines_tests.rs \
+     reads their lines with the class inserted), and the twelve-voucher answer of 3 Nov names one \
+     for every row";
 const IMPORT_REQUEST: &str =
     "an import request body Bridge sends to Tally (TALLYMESSAGE under REQUESTDATA), not a response";
 const NOT_READ_REPORT: &str = "a built-in report no parser of this crate reads \
@@ -3106,10 +3246,40 @@ const AUDIT_READ_LIVE: &str = "an answer of the audit read's live sittings on th
      read (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
      (live_pilot_lab) serves it in the reader's order and pins the book admitted from it; \
      agent/audit-read-pilot-lab/PROVENANCE.md says what each file is";
+const AUDIT_READ_SFT_LIVE: &str = "an answer of the audit read of BRIDGE SFT LAB through a \
+     recording relay (699-R1, 4 Nov 2026, #699), with no row here: the app crate's audit read \
+     (src/agent_audit_read.rs) and the tax-audit crate parse it, and src/agent_audit_read_tests.rs \
+     (live_sft_lab) serves it in the reader's order, each request checked byte for byte, and pins \
+     the book admitted from it; agent/audit-read-sft-lab/PROVENANCE.md says what each file is";
 const WHOLE_DAY_READ: &str = "an answer of the whole-day read's lab run on BRIDGE TRANSFER LAB \
-     (26 Oct 2026, #1392), with no row here: no parser or test reads it yet, and the pull request \
-     that adds the day reader replays it and changes this reason; \
+     (26 Oct 2026, #1392), with no row here: the app crate's day reader \
+     (src/agent_transfer_pairing.rs) parses it, and the whole_day tests in \
+     src/agent_transfer_pairing_tests.rs serve it in the reader's order, each request checked byte \
+     for byte, and pin what each read admits; \
      agent/whole-day-read-transfer-lab/PROVENANCE.md says what each file is";
+const TRANSFER_DAYS_READ: &str = "an answer of the transfer days' lab run on BRIDGE TRANSFER LAB \
+     (2 Nov 2026, #1392), with no row here: the app crate's day reader and transfers section \
+     (src/agent_transfer_pairing.rs, src/agent_import_transfers.rs) parse it, and the whole_day \
+     tests in src/agent_transfer_pairing_tests.rs, with src/agent_import_transfers_tests.rs and \
+     src/agent_import_transfer_flow_tests.rs, serve it in the reader's order, each request checked \
+     byte for byte, and pin what each read admits; agent/transfer-days-lab/PROVENANCE.md says what \
+     each file is";
+const TRANSFER_DAYS_FIRST_CENSUS: &str = "a census answer of the transfer days' lab run on BRIDGE \
+     TRANSFER LAB (2 Nov 2026, #1392), read unspanned, with no row here: since #2199 the code \
+     spans every census, so the replays serve the spanned answer of the same day (dNN-c2) in its \
+     place, and the whole_day test each_spanned_census_holds_the_vouchers_of_the_days_first_read \
+     in src/agent_transfer_pairing_tests.rs parses this one with the census parser and pins that \
+     it holds the spanned answer's vouchers; agent/transfer-days-lab/PROVENANCE.md says what each \
+     file is";
+const TRANSFER_DAYS_SPANNED_CENSUS: &str =
+    "a census answer of the transfer days' lab row on BRIDGE \
+     TRANSFER LAB (3 Nov 2026, #1392), spanned (0, 12] as the code sends it since #2199, with no \
+     row here: the app crate's day reader parses it, the whole_day tests in \
+     src/agent_transfer_pairing_tests.rs, with src/agent_import_transfers_tests.rs and \
+     src/agent_import_transfer_flow_tests.rs, serve it in the reader's order, each request checked \
+     byte for byte, and each_spanned_census_holds_the_vouchers_of_the_days_first_read pins that it \
+     holds the vouchers of the same day's unspanned answer (dNN-c); \
+     agent/transfer-days-lab/PROVENANCE.md says what each file is";
 const OBJECT_READBACK: &str = "a master-fields lab object readback (§9.4a): tests lift single \
      fields from it into a collection; no parser of this crate reads the object envelope";
 const FOREX_OPEN_BILL: &str = "a Bills Receivable answer of BRIDGE FOREXGROUP LAB (30 Oct 2026, \
@@ -3122,6 +3292,23 @@ const SPANNED_CENSUS: &str = "an answer of the span read's lab run on BRIDGE TRA
      BRIDGE OUTSTANDINGS LAB (26 Oct 2026, #899), with no row here: no parser or test reads it \
      yet, and the pull request that renders the census as a span replays it and changes this \
      reason; agent/spanned-census-two-books/PROVENANCE.md says what each file is";
+const SPANNED_CENSUS_OTHER_BOOK_MARKS: &str = "BRIDGE OUTSTANDINGS LAB's marks answer from the \
+     span read's lab run (26 Oct 2026, #899), read with only that book loaded, with no row here: \
+     the whole_day tests in src/agent_transfer_pairing_tests.rs serve it to the lab request for \
+     BRIDGE TRANSFER LAB's marks, as an answer that holds no row of that company, and pin that the \
+     day's read fails on it (#1392); agent/spanned-census-two-books/PROVENANCE.md says what it is";
+
+const FOREX_REGISTER_READ: &str = "an answer of the registers' lab run on BRIDGE FOREXGROUP LAB \
+     (4 Nov 2026, #683), with no row here: the app crate's register tools parse it, and the forex \
+     tests in src/agent_register_server_tests.rs serve it in the reader's order, each request's \
+     sha256 checked, and pin what each tool returns; the window test there parses the window \
+     under both composite policies; the extent answers carry the lab's redacted company number, \
+     which those tests replace at load; agent/forex-register/PROVENANCE.md says what each file is";
+
+const EINVOICE_NUMBER_READ: &str = "an answer of the e-invoice lab book (4 Nov 2026, #2162 \
+     item 8), with no row here: the app crate's invoice tests (src/agent_import_invoice_wire_tests.rs \
+     on the parsers, src/agent_import_invoice_admission_tests.rs through the server) pin what each \
+     parse returns; agent/einvoice-lab/PROVENANCE.md says what each file is";
 
 /// Response fixtures with no row, each with its reason. Requests are recognised by name and need
 /// no entry.
@@ -3158,6 +3345,35 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/audit-read-pilot-lab/pilot-lab-audit-vouchers.utf16le.xml",
         AUDIT_READ_LIVE,
+    ),
+    // The audit read's live answers on BRIDGE SFT LAB (the company object has a row).
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-census.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-groups.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-ledgers.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-marks.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-trial-balance.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-voucher-types.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
+    ),
+    (
+        "tests/fixtures/agent/audit-read-sft-lab/sft-lab-audit-vouchers.utf16le.xml",
+        AUDIT_READ_SFT_LIVE,
     ),
     (
         "tests/fixtures/builtin_sales_register_probe_b_fy_live.utf16le.xml",
@@ -3215,6 +3431,42 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml",
         PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-yes.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-new.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-journal-bill.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-opening-bill.utf16le.xml",
+        PILOT_LAB_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use-lower-case.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-number-dropped-zero.utf16le.xml",
+        PILOT_LAB_REPLAY,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-duplicate-declined.utf16le.xml",
+        PILOT_LAB_REPLAY,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-ledger-catalogue-v2-10oct.utf16le.xml",
@@ -3400,6 +3652,9 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     // Import request bodies named without `request`.
     ("tests/fixtures/agent/d3-batch-import.xml", IMPORT_REQUEST),
+    ("tests/fixtures/agent/review-lab-batch-import.xml", IMPORT_REQUEST),
+    ("tests/fixtures/agent/review-lab-payment-import.xml", IMPORT_REQUEST),
+    ("tests/fixtures/agent/review-hand-batch-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/l1-reentry-import.xml", IMPORT_REQUEST),
     ("tests/fixtures/agent/post-span-import.xml", IMPORT_REQUEST),
     (
@@ -3431,6 +3686,18 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/wa1-payment-company-high-water.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/amend-now-company-high-water.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/review-lab-company-high-water.utf16le.xml",
+        APP_HIGH_WATER,
+    ),
+    (
+        "tests/fixtures/agent/review-hand-company-high-water.utf16le.xml",
         APP_HIGH_WATER,
     ),
     (
@@ -3620,6 +3887,30 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_CENSUS,
     ),
     (
+        "tests/fixtures/agent/amend-now-d3-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/amend-now-wa1-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/review-lab-batch-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/review-lab-payment-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/review-hand-voucher-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-census.utf16le.xml",
+        APP_CENSUS,
+    ),
+    (
         "tests/fixtures/agent/register-e2e/native-register-e2e-census.utf16le.xml",
         APP_CENSUS,
     ),
@@ -3691,6 +3982,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/note-days/debit_note_day_voucher_census_response.utf16le.xml",
         APP_CENSUS,
     ),
+    (
+        "tests/fixtures/stock-lab-day/stock_lab_taxed_day_voucher_census_response.utf16le.xml",
+        APP_CENSUS,
+    ),
     // Import verification and span reads.
     (
         "tests/fixtures/agent/d3-batch-import-verification.utf16le.xml",
@@ -3698,6 +3993,26 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/d3-cancelled-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/review-lab-batch-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/review-lab-payment-import-verification.utf16le.xml",
+        APP_VERIFICATION,
+    ),
+    (
+        "tests/fixtures/agent/review-hand-import-verification.utf16le.xml",
         APP_VERIFICATION,
     ),
     (
@@ -3746,6 +4061,54 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/agent/gst-note-fields-lab/native-four-vouchers.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-note-fields-lab/shipped-read-credit-note.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-note-fields-lab/build-read-four-vouchers.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-note-fields-lab/window-read-inter-state-sale.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/gst-note-fields-lab/build-read-class-party-in-karnataka.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-dispatch/window-read-dispatch-keyed.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-delivery-notes.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml",
+        APP_STOCK_LINE_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/class-purchase-lab/item-purchase-common-ledger-off.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/class-purchase-lab/item-purchase-through-class.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/agent/native-three-vouchers.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
@@ -3771,6 +4134,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/register-e2e/native-register-e2e-window.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab-register/pilot-lab-register-window.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (
@@ -3830,6 +4197,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/agent/gst-ledger-l3/l3-dec-w-1.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/note-days/cancelled_purchase_day_voucher_window_response.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
@@ -3859,6 +4230,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/vouchers-forex-composite-20260915.utf16le.xml",
+        APP_FOREX_VOUCHERS,
+    ),
+    (
+        "tests/fixtures/agent/vouchers-forex-unspaced-20250401.utf16le.xml",
         APP_FOREX_VOUCHERS,
     ),
     // Voucher exports captured for the removed voucher-scan parser.
@@ -3904,19 +4279,23 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/stock_movement_credit_note_inventory_shape_lab_live.utf16le.xml",
-        INVENTORY_FETCH_NO_PARSER,
+        APP_STOCK_LINE_ROWS,
     ),
     (
         "tests/fixtures/stock_movement_delivery_note_inventory_shape_lab_live.utf16le.xml",
-        INVENTORY_FETCH_NO_PARSER,
+        APP_STOCK_LINE_ROWS,
+    ),
+    (
+        "tests/fixtures/stock_movement_mixed_window_stock_lines_shape_lab_live.utf16le.xml",
+        APP_STOCK_LINE_ROWS,
     ),
     (
         "tests/fixtures/stock_movement_receipt_note_inventory_shape_lab_live.utf16le.xml",
-        INVENTORY_FETCH_NO_PARSER,
+        APP_STOCK_LINE_ROWS,
     ),
     (
         "tests/fixtures/stock_movement_stock_journal_inventory_shape_lab_live.utf16le.xml",
-        INVENTORY_FETCH_NO_PARSER,
+        APP_STOCK_LINE_ROWS,
     ),
     (
         "tests/fixtures/vouchers_agst_ref_reopen_live.utf16le.xml",
@@ -3995,6 +4374,139 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         "tests/fixtures/agent/whole-day-read-transfer-lab/m2.utf16le.xml",
         WHOLE_DAY_READ,
     ),
+    // The transfer days' answers on BRIDGE TRANSFER LAB (#1392).
+    (
+        "tests/fixtures/agent/transfer-days-lab/cat1.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/cat2.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d12-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d13-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d14-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d19-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d20-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d21-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d26-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d27-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d28-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-c.utf16le.xml",
+        TRANSFER_DAYS_FIRST_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-c2.utf16le.xml",
+        TRANSFER_DAYS_SPANNED_CENSUS,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/d29-v.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
+    (
+        "tests/fixtures/agent/transfer-days-lab/m2.utf16le.xml",
+        TRANSFER_DAYS_READ,
+    ),
     // Built-in reports no parser reads.
     (
         "tests/fixtures/builtin_ratio_analysis_probe_b_fy_live.utf16le.xml",
@@ -4033,7 +4545,7 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     ),
     (
         "tests/fixtures/agent/spanned-census-two-books/o-m1.utf16le.xml",
-        SPANNED_CENSUS,
+        SPANNED_CENSUS_OTHER_BOOK_MARKS,
     ),
     (
         "tests/fixtures/agent/spanned-census-two-books/o-c1.utf16le.xml",
@@ -4046,6 +4558,40 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/spanned-census-two-books/o-m2.utf16le.xml",
         SPANNED_CENSUS,
+    ),
+    // The registers' run on the several-currency book (#683).
+    (
+        "tests/fixtures/agent/forex-register/forex-register-extent.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-book-extent.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-ledgers-master.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-census.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-window.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    (
+        "tests/fixtures/agent/forex-register/forex-register-marks.utf16le.xml",
+        FOREX_REGISTER_READ,
+    ),
+    // The number read with the e-invoice words (#2162 item 8).
+    (
+        "tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml",
+        EINVOICE_NUMBER_READ,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml",
+        EINVOICE_NUMBER_READ,
     ),
 ];
 

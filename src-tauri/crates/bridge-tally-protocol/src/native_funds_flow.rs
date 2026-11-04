@@ -15,8 +15,8 @@
 //! What the columns mean is NOT decided here. On the one book measured, `Dr`
 //! equalled the working capital at the start of the month, `Cr` at its end, and
 //! `CL` was `Cr - Dr`, with June tying to the trial balance's debtors, bank and
-//! cash (a recorded reading: the trial balance responses were not kept); which
-//! groups Tally counts as working capital was not measured. Nothing
+//! cash (observed live; the trial balance side is not committed and is UNVERIFIED
+//! here); which groups Tally counts as working capital was not measured. Nothing
 //! here applies that reading, and nothing ties the figures to anything.
 use serde::Serialize;
 use std::fmt;

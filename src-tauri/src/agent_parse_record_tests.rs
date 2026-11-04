@@ -686,6 +686,16 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, EINVOICE_LAB)
     ));
     rows.push(row!(
+        "agent/class-purchase-lab/item-purchase-common-ledger-off-stock-lines.utf16le.xml",
+        "parse_agent_rows_reading_gst(CLASS_PURCHASE_LAB, StockLines::Asked)",
+        |_, t| stock_line_rows(t, CLASS_PURCHASE_LAB)
+    ));
+    rows.push(row!(
+        "agent/class-purchase-lab/item-purchase-common-ledger-off.utf16le.xml",
+        "parse_agent_rows(CLASS_PURCHASE_LAB)",
+        |_, t| agent_rows(t, CLASS_PURCHASE_LAB)
+    ));
+    rows.push(row!(
         "agent/class-purchase-lab/item-purchase-through-class.utf16le.xml",
         "parse_agent_rows(CLASS_PURCHASE_LAB)",
         |_, t| agent_rows(t, CLASS_PURCHASE_LAB)

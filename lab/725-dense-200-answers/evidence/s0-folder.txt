@@ -1,0 +1,4 @@
+2026-11-04T05:49:45Z PC local date/time 2026-11-04 11:19:45 (IST)
+folders holding THE BOOK's name: 1
+<Tally data folder>/<company number>: 23 files, 152001536 B (145.0 MiB); newest modified 2026-11-04 11:18:59 local
+BK0 folder holds 1 file(s): TDBK1800_<company number>.001 14661545 B sha256 223a2ceaef95bfae88d2e6115dcea8745401d8540c96d523ad61cb85c7c678da (name matches the folder: True)

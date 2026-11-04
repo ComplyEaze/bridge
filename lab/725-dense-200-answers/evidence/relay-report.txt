@@ -1,0 +1,5 @@
+lines 450 | exchanges 444 | import exchanges 1
+events [('listening', None), ('open', None), ('sent', None), ('reply_lost', 'bridge_left'), ('close', None), ('open', None)]
+before the import: 380 requests; sent 486592 B; answered 3722451 B; summed answer_s 2.485; largest answer 202614 B
+after the import, before the verify: 0 requests; sent 0 B; answered 0 B; summed answer_s 0; largest answer 0 B
+the verify (from line 386): 63 requests; sent 78880 B; answered 3083796 B; summed answer_s 4.379; largest answer 839546 B

@@ -1,0 +1,1 @@
+060ad15aaf612cd7b406aee57b0530bdc71337927f2422760f3cf63f9102e3ff *<0.7.0 CI build>/mcpb/bin/x86_64-pc-windows-msvc/bridge_mcp.exe

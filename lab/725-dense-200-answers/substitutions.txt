@@ -1,0 +1,24 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+answers/001-s3-tally-status.json: original 1823 B sha256 fadf067c4875f03e42e59ddcad1f32c807b4177986fc07ce9cd731e2a2402bda (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+answers/002-s3-list-companies.json: original 1569 B sha256 146189a12217f63baa07ab2c2f250031895b7661302dbccc8e102c92d042c6cd (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+answers/003-s3-vchtypes.json: original 28943 B sha256 2dbc5093517a053fd5aa48b2decf31e6468c9c9824808cf6cae1147d142ebe5d (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+answers/004-s3-vouchers-20260401.json: original 2432 B sha256 09ba8a7ee8515a2e1a658623f2f46e70cc5ae655dcedd2699e2ca9606ddde2aa (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser
+answers/005-s4-build.json: original 55653 B sha256 70dd01919ab6fecd712671b1001a1770f27d50246a6966eeee28e50eac80d188 (kept on the lab PC); company_number replaced in 2 place(s), by a JSON parser; 2 x -> <LAB_DIR>
+answers/009-s8-verify.json: original 134030 B sha256 ab15563f4d703234aa5af29cca19fb24644823d6b8a01555467924a81313df0b (kept on the lab PC); company_number replaced in 4 place(s), by a JSON parser
+run/launch-env.json: original 188 B sha256 a20dbdf5d9e7ea73d3517d504dd1faf140b0d34c7b291a33a3edd5f3349a1420 (kept on the lab PC); 1 x -> <LAB_DIR>
+agent/imports/bridge-9194ba5b-e79a-482e-8f74-be461c02dfc7.proof.20261104T055823184Z.f6f0e51e58acf25579d74b16ed3a0e8662d625bc0c8f57a41655e87a381f1244.json: original 17842 B sha256 f6f0e51e58acf25579d74b16ed3a0e8662d625bc0c8f57a41655e87a381f1244 (kept on the lab PC); company_number replaced in 1 place(s), by a JSON parser
+agent/imports/bridge-9194ba5b-e79a-482e-8f74-be461c02dfc7.proof.20261104T055940486Z.4855901acabb136b96013960c0d6796988e3aeef67ecafba55a69b2d83d7f110.json: original 17842 B sha256 4855901acabb136b96013960c0d6796988e3aeef67ecafba55a69b2d83d7f110 (kept on the lab PC); company_number replaced in 1 place(s), by a JSON parser
+agent/imports/bridge-9194ba5b-e79a-482e-8f74-be461c02dfc7.proof.20261104T060158533Z.458ec08fcfca4b2e62b712dac5e2712cdc15f3277b8f1dd011ba4fdef4ec7a2d.json: original 78164 B sha256 458ec08fcfca4b2e62b712dac5e2712cdc15f3277b8f1dd011ba4fdef4ec7a2d (kept on the lab PC); company_number replaced in 1 place(s), by a JSON parser
+box/c1-box.txt: original 2509 B sha256 0fe960fa9008bfb5b4d83270d4db83a7732b415c7b184d1a3633fcb20ed0710f (kept on the lab PC); the company number replaced in 1 place(s); 1 x -> <LAB_DIR>; 2 x -> <desktop client>
+evidence/s0-c2-netstat.txt: original 9269 B sha256 accca5cf3bbd113b327219efb8f668114b594eaa905ed17ca2660919349ed9b3 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/s0c-c2-netstat.txt: original 10015 B sha256 db2acbfa2204368953dc4a4210cbc9fd5e43c4f8f35b969ec67a95c44088c1da (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/s10-after-shut-c2-netstat.txt: original 9337 B sha256 c715ebd9a35d7c3026dc4b354e5e6a9189e880e68b31ce7fa974463ca50ae920 (kept on the lab PC); only the port-9001 LISTENING lines kept
+notes.txt: original 12290 B sha256 f5608c2dc851da4992b0ec29351177a39fd9acaa2b69b7d9e5002aaa959d9c54 (kept on the lab PC); 2 x -> <LAB_DIR>; 2 x -> stop; 1 x -> <CI run id>; 1 x -> <CI artifact id>
+scripts/marks.py: original 2415 B sha256 331a35bb18b8e10c916bb8fe954f93acdabfffcdfe38f507b5c486a226648f8c (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/folder-list.py: original 1207 B sha256 af458c99198ff63eea9b6abb8cb60443015a7d6b12e49c3c113d33f56858395d (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+scripts/step0.py: original 1616 B sha256 1510181add9f5f46d7827c2eb736d253c5893c6adf6a351dd94b26d2688c7dca (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>; 1 x -> <BK0 folder>
+scripts/boxcheck.py: original 2261 B sha256 deb6597ec822f5e7ab0fe910abc678cce89fec93c243009059bc8028645fac8f (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/relay-report.py: original 1545 B sha256 69b014c530390bd0a2c3f16cbfd7f72c979d3b4e3b613cdcff99a46eae69c8fe (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/cap.py: original 780 B sha256 59f3a66ce861df30f92a637bfb8ae1756ceedc86eae8d6ea94c3ec50ec14d1dc (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/c2.py: original 1278 B sha256 66a083a25bc193b608ae6e04b1c64190d4d3326526c8302bcc7c542c054f1a48 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/client.py: original 4687 B sha256 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (kept on the lab PC); 1 x -> lab-client; 3 x -> stop

@@ -1,0 +1,18 @@
+PASS box seen
+PASS Create 200 vouchers in "BRIDGE CORPUS DENSE"
+PASS Types: 200 Journal
+PASS both dates 1-Apr-2026
+PASS total debit 20150.00
+PASS total credit 20150.00
+PASS Cash: Dr 20150 Cr 0, 200 entries
+PASS DN Sales: Dr 0 Cr 20150, 200 entries
+PASS one line per ledger, two ledgers
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Dates: 1-Apr-2026 to 1-Apr-2026  Voucher numbers: Tally assigns them
+  | Total debit: 20150  Total credit: 20150
+  | Total debit: 20150  Total credit: 20150
+  | Types: 200 Journal
+  | Dr 20150  Cr 0  200 entries  "Cash"
+  | Dr 0  Cr 20150  200 entries  "DN Sales"

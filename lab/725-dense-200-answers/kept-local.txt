@@ -1,0 +1,8 @@
+Kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+backups/bk1/TDBK1800_<company number>.001 (BK1) 14661545 B 6a9c0012b5392a35553e050e3aff8615ecf93ac906fc7af27546d7c735c5f0aa
+a/import-1.request (the import request Bridge sent (each voucher's REMOTEID is a UUID; some have an all-digit last group of 12)) 227736 B aa86e04db15c697b55b9fc4de0805c3143915b9a8a728023f2327ce7236b7e2b
+agent/agent-import-ledger.jsonl (Bridge's import ledger (the same UUIDs)) 62564 B 64f99425371da5800ca8094ab5b9a384ee2fc800b0be51c7c6628fef562265a3
+agent/imports/bridge-9194ba5b-e79a-482e-8f74-be461c02dfc7.xml (the saved batch XML (the same UUIDs)) 123008 B 7a83111018016dfab62aab97d7344dcd6948f0a32e3132449c2bda47e6f5279a
+box/c1-open.png (the screen capture of Bridge's approval box (it shows the company number)) 364457 B 8bcc2f780153bac8fe33b011022dc0069ecabc8d37e3d5a8ac2d49cf22cd1da7
+evidence/bk1-listing-before.txt (the backup folder before step 2: 0 items) 153 B 06f2f2545a150b7300ca1c9628ef4205539d7d897ae31160331d123a59935ac4
+stage-725d1.py (this stage script: its patterns name the lab paths) 8876 B 436971312fbb3b6a8b258ed771de231206322b916654551264c74c1377b8e88a

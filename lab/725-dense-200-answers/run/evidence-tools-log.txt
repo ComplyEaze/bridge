@@ -1,0 +1,10 @@
+2026-11-04T05:55:28.918Z 000-tools-list.json list secs 0.021 bytes 235556 isError None
+2026-11-04T05:55:29.883Z 001-s3-tally-status.json tally_status secs 0.118 bytes 1823 isError False
+2026-11-04T05:55:37.349Z 002-s3-list-companies.json list_companies secs 0.098 bytes 1569 isError False
+2026-11-04T05:55:47.217Z 003-s3-vchtypes.json masters secs 0.899 bytes 28943 isError False
+2026-11-04T05:55:57.928Z 004-s3-vouchers-20260401.json vouchers secs 7.449 bytes 2432 isError False
+2026-11-04T05:57:22.422Z 005-s4-build.json build_import_xml secs 7.439 bytes 55653 isError False
+2026-11-04T05:58:17.540Z 006-s5-call1-post.json post_import secs 40.084 bytes 1773 isError False
+2026-11-04T05:59:27.960Z 007-s6-call2-post.json post_import secs 0.159 bytes 1772 isError False
+2026-11-04T05:59:35.182Z 008-s7-post-call.json post_import secs 29.92 bytes 1951 isError True
+2026-11-04T06:01:43.771Z 009-s8-verify.json verify_import secs 15.225 bytes 134030 isError True

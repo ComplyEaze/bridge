@@ -1,0 +1,12 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/s0-gateway-reloaded.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s0-gateway.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s10-gateway-after-restore.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s10-restore-accept-prompt.png 45592 B d7357cd467f036e6838ebc6c44c44784dc241070822e3eecf54a53c5ce6841a7
+shots/s10-restore-replace-prompt.png 51702 B 2f52e530ebd71530a753255d69502b5f3145dc54a6517ba0911e0893655e52e1
+shots/s2-bk1-before-accept.png 72078 B 85f4a3b9a36d7692e93a3bee78aba0964fdeb918c63e34dc77666b25ea09d177
+shots/s9-day-book-1-apr-detailed.png 92711 B a783a540d5525ec8ead0605609f35c77ee89e8ab7a108f110c6c8726900e7b71
+shots/s9-day-book-1-apr-end.png 97611 B 6dc7aa783038ab3643abea6fa28078dd276ac84220bb54b142bf3793c9a70547
+shots/s9-day-book-1-apr.png 106878 B feb398820e018665e8a6467caf5c82280e788b1cbcbfde655493c1b2749ecae2
+shots/s9-journal-1-display.png 57782 B 6b2a75486a2dabb5f8df432d8757d7f3443d70b92b439d4f9f65a0eb91f486b2
+box/c1-open.png 364457 B 8bcc2f780153bac8fe33b011022dc0069ecabc8d37e3d5a8ac2d49cf22cd1da7

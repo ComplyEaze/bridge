@@ -1,0 +1,14 @@
+2026-11-04T05:55:13Z exe sha256 060ad15aaf612cd7b406aee57b0530bdc71337927f2422760f3cf63f9102e3ff ok; launch-env.json sha256 a20dbdf5d9e7ea73d3517d504dd1faf140b0d34c7b291a33a3edd5f3349a1420; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-04T05:55:13Z launched pid 14544; stderr to server-stderr-20261104T055513Z.log
+2026-11-04T05:55:14Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-04T05:55:29Z 000-tools-list.json tool=list secs=0.021 isError=None error=None saved_sha256=d4feaf43a518ea17a90559891131d1bd5ea13d164ccb8fc8a9160232a3440819
+2026-11-04T05:55:30Z 001-s3-tally-status.json tool=tally_status secs=0.118 isError=False error=None saved_sha256=fadf067c4875f03e42e59ddcad1f32c807b4177986fc07ce9cd731e2a2402bda
+2026-11-04T05:55:37Z 002-s3-list-companies.json tool=list_companies secs=0.098 isError=False error=None saved_sha256=146189a12217f63baa07ab2c2f250031895b7661302dbccc8e102c92d042c6cd
+2026-11-04T05:55:48Z 003-s3-vchtypes.json tool=masters secs=0.899 isError=False error=None saved_sha256=2dbc5093517a053fd5aa48b2decf31e6468c9c9824808cf6cae1147d142ebe5d
+2026-11-04T05:56:05Z 004-s3-vouchers-20260401.json tool=vouchers secs=7.449 isError=False error=None saved_sha256=09ba8a7ee8515a2e1a658623f2f46e70cc5ae655dcedd2699e2ca9606ddde2aa
+2026-11-04T05:57:30Z 005-s4-build.json tool=build_import_xml secs=7.439 isError=False error=None saved_sha256=70dd01919ab6fecd712671b1001a1770f27d50246a6966eeee28e50eac80d188
+2026-11-04T05:58:58Z 006-s5-call1-post.json tool=post_import secs=40.084 isError=False error=None saved_sha256=5c39ec88500ea05d21927c295a4dfe4e59d8c41a2b823b7a5f8b61c39c6d3c5c
+2026-11-04T05:59:28Z 007-s6-call2-post.json tool=post_import secs=0.159 isError=False error=None saved_sha256=03b83ca77b979a008e8522ef01c21cc5b9298fdd7ae0191a4318e8b8a2682038
+2026-11-04T06:00:05Z 008-s7-post-call.json tool=post_import secs=29.920 isError=True error=None saved_sha256=596c4bf2044e70dd955ad30cf8beefb35b3aa2bf8847151e831d69d8668d9fb5
+2026-11-04T06:01:59Z 009-s8-verify.json tool=verify_import secs=15.225 isError=True error=None saved_sha256=ab15563f4d703234aa5af29cca19fb24644823d6b8a01555467924a81313df0b
+2026-11-04T06:04:14Z session ended; server pid 14544 exit code 0

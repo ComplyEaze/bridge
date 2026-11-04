@@ -14350,5 +14350,213 @@
   "file": "src/clause42_sft.rs",
   "from": "        if let Some(name) = table.keys().find(|k| k.as_str() != \"sft_013\") {\n",
   "to": "        if let Some(name) = table.keys().find(|k| k.as_str().is_empty()) {\n"
+ },
+ {
+  "id": "C16-01",
+  "by": "author",
+  "what": "an overdraft is not money",
+  "file": "src/clause16_credits.rs",
+  "from": "    let mut money = book.ledgers_under_any(&[OVERDRAFT_GROUP.to_string()]);\n",
+  "to": "    let mut money = BTreeSet::new();\n"
+ },
+ {
+  "id": "C16-02",
+  "by": "author",
+  "what": "no ledger is money",
+  "file": "src/clause16_credits.rs",
+  "from": "    if money.contains(&ledger.name) {\n",
+  "to": "    if false {\n"
+ },
+ {
+  "id": "C16-03",
+  "by": "author",
+  "what": "the reserved profit and loss ledger is not excluded",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if reserved_pl {\n        Role::Excluded\n",
+  "to": "    } else if false {\n        Role::Excluded\n"
+ },
+ {
+  "id": "C16-04",
+  "by": "author",
+  "what": "any ledger of the reserved name is the reserved one",
+  "file": "src/clause16_credits.rs",
+  "from": "matches!(ledger.chain.as_slice(), [root] if crate::xml::is_reserved_root(root))",
+  "to": "true"
+ },
+ {
+  "id": "C16-05",
+  "by": "author",
+  "what": "an incomplete chain is tested",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if !ledger.chain_complete\n",
+  "to": "    } else if false\n"
+ },
+ {
+  "id": "C16-06",
+  "by": "author",
+  "what": "a chain ending at a user group is tested",
+  "file": "src/clause16_credits.rs",
+  "from": ".is_some_and(|g| PRIMARY_GROUPS.contains(&g.as_str()))",
+  "to": ".is_some_and(|_| true)"
+ },
+ {
+  "id": "C16-07",
+  "by": "author",
+  "what": "asset and investment heads are not excluded",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if PL_GROUPS\n        .iter()\n        .chain(&ASSET_GROUPS)\n",
+  "to": "    } else if PL_GROUPS\n        .iter()\n"
+ },
+ {
+  "id": "C16-08",
+  "by": "author",
+  "what": "a tax ledger is a head",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if ledger.under(TAX_GROUP) {\n",
+  "to": "    } else if false {\n"
+ },
+ {
+  "id": "C16-09",
+  "by": "author",
+  "what": "no ledger is a head",
+  "file": "src/clause16_credits.rs",
+  "from": "    } else if HEAD_GROUPS.iter().any(|g| ledger.under(g)) {\n",
+  "to": "    } else if false {\n"
+ },
+ {
+  "id": "C16-10",
+  "by": "author",
+  "what": "a ledger missing from the book is other",
+  "file": "src/clause16_credits.rs",
+  "from": ".map_or(Role::Untested, |l| role(l, money))",
+  "to": ".map_or(Role::Other, |l| role(l, money))"
+ },
+ {
+  "id": "C16-11",
+  "by": "author",
+  "what": "one excluded or tax debit is enough to exclude",
+  "file": "src/clause16_credits.rs",
+  "from": "            .all(|l| matches!(role_of(&l.ledger), Role::Excluded | Role::Tax))\n",
+  "to": "            .any(|l| matches!(role_of(&l.ledger), Role::Excluded | Role::Tax))\n"
+ },
+ {
+  "id": "C16-12",
+  "by": "author",
+  "what": "tax debits alone exclude",
+  "file": "src/clause16_credits.rs",
+  "from": "\n            && debits.iter().any(|l| role_of(&l.ledger) == Role::Excluded);\n",
+  "to": ";\n"
+ },
+ {
+  "id": "C16-13",
+  "by": "author",
+  "what": "tax on a sale is listed",
+  "file": "src/clause16_credits.rs",
+  "from": ".any(|l| l.amount_paise < 0 && under_any(&l.ledger, &CREDIT_BALANCE_GROUPS))",
+  "to": ".any(|_| false)"
+ },
+ {
+  "id": "C16-14",
+  "by": "author",
+  "what": "an income debit triggers the tax rule",
+  "file": "src/clause16_credits.rs",
+  "from": "l.amount_paise < 0 && under_any(&l.ledger, &CREDIT_BALANCE_GROUPS)",
+  "to": "under_any(&l.ledger, &CREDIT_BALANCE_GROUPS)"
+ },
+ {
+  "id": "C16-15",
+  "by": "author",
+  "what": "tax withheld from a creditor is listed",
+  "file": "src/clause16_credits.rs",
+  "from": "\n            || debits\n                .iter()\n                .any(|l| under_any(&l.ledger, &[CREDITOR_GROUP]));\n",
+  "to": ";\n"
+ },
+ {
+  "id": "C16-16",
+  "by": "author",
+  "what": "a repeated debit ledger is named again",
+  "file": "src/clause16_credits.rs",
+  "from": "            if !debit_names.contains(&l.ledger.as_str()) {\n",
+  "to": "            if true {\n"
+ },
+ {
+  "id": "C16-17",
+  "by": "author",
+  "what": "tax credited on an excluded voucher is listed",
+  "file": "src/clause16_credits.rs",
+  "from": "                Role::Head | Role::Tax if is_excluded => {\n",
+  "to": "                Role::Head if is_excluded => {\n"
+ },
+ {
+  "id": "C16-18",
+  "by": "author",
+  "what": "a ledger's credits on one voucher are not summed",
+  "file": "src/clause16_credits.rs",
+  "from": "Role::Head | Role::Tax => add(listed.entry(&l.ledger).or_insert(0), credit)?,",
+  "to": "Role::Head | Role::Tax => *listed.entry(&l.ledger).or_insert(0) = credit,"
+ },
+ {
+  "id": "C16-19",
+  "by": "author",
+  "what": "an excluded voucher with nothing listed is counted",
+  "file": "src/clause16_credits.rs",
+  "from": "        if excluded_here {\n",
+  "to": "        if is_excluded {\n"
+ },
+ {
+  "id": "C16-20",
+  "by": "author",
+  "what": "a voucher the tax rule applies to is counted without a tax credit",
+  "file": "src/clause16_credits.rs",
+  "from": "        if taxed_here {\n",
+  "to": "        if tax_left_out {\n"
+ },
+ {
+  "id": "C16-21",
+  "by": "author",
+  "what": "the excluded credit is not added",
+  "file": "src/clause16_credits.rs",
+  "from": "                    add(&mut excluded_credit, credit)?;\n",
+  "to": ""
+ },
+ {
+  "id": "C16-22",
+  "by": "author",
+  "what": "the tax left out is not added",
+  "file": "src/clause16_credits.rs",
+  "from": "                    add(&mut taxed_credit, credit)?;\n",
+  "to": ""
+ },
+ {
+  "id": "C16-23",
+  "by": "author",
+  "what": "an untested credit is not added",
+  "file": "src/clause16_credits.rs",
+  "from": "Role::Untested => add(untested.entry(&l.ledger).or_insert(0), credit)?,",
+  "to": "Role::Untested => add(untested.entry(&l.ledger).or_insert(0), 0)?,"
+ },
+ {
+  "id": "C16-24",
+  "by": "author",
+  "what": "rows are not sorted by date first",
+  "file": "src/clause16_credits.rs",
+  "from": "    rows.sort_by(|a, b| {\n        (\n            a.voucher.date.as_str(),\n            voucher_label(a.voucher),\n            &a.voucher.guid,\n            a.ledger,\n        )\n            .cmp(&(\n                b.voucher.date.as_str(),\n                voucher_label(b.voucher),\n                &b.voucher.guid,\n                b.ledger,\n            ))\n    });\n",
+  "to": "    rows.sort_by(|a, b| {\n        (voucher_label(a.voucher), &a.voucher.guid, a.ledger).cmp(&(\n            voucher_label(b.voucher),\n            &b.voucher.guid,\n            b.ledger,\n        ))\n    });\n"
+ },
+ {
+  "id": "C16-25",
+  "by": "author",
+  "what": "rows are not sorted by label",
+  "file": "src/clause16_credits.rs",
+  "from": "    rows.sort_by(|a, b| {\n        (\n            a.voucher.date.as_str(),\n            voucher_label(a.voucher),\n            &a.voucher.guid,\n            a.ledger,\n        )\n            .cmp(&(\n                b.voucher.date.as_str(),\n                voucher_label(b.voucher),\n                &b.voucher.guid,\n                b.ledger,\n            ))\n    });\n",
+  "to": "    rows.sort_by(|a, b| {\n        (a.voucher.date.as_str(), &a.voucher.guid, a.ledger).cmp(&(\n            b.voucher.date.as_str(),\n            &b.voucher.guid,\n            b.ledger,\n        ))\n    });\n"
+ },
+ {
+  "id": "C16-26",
+  "by": "author",
+  "what": "a credit's sign is not checked",
+  "file": "src/clause16_credits.rs",
+  "from": "    amount_paise.checked_neg()\n",
+  "to": "    Some(amount_paise.wrapping_neg())\n"
  }
 ]

@@ -256,12 +256,20 @@ pub const PORTED: &[PortedTest] = &[
 /// (`docs/tax-audit/parity-spec-v1.md`, section 12) with no reference golden, so neither the
 /// registry-wide parity nor `RUNNERS` holds it. `parity/python_golden.py`'s `CRATE_FIRST` names
 /// the same tests and refuses each.
-pub const CRATE_FIRST: &[PortedTest] = &[PortedTest {
-    id: "clause42_sft",
-    // The limit, the count and the cash total, on any book.
-    min_figures: 3,
-    run_on: |e, b, r, _| crate::clause42_sft_on(e, b, r),
-}];
+pub const CRATE_FIRST: &[PortedTest] = &[
+    PortedTest {
+        id: "clause42_sft",
+        // The limit, the count and the cash total, on any book.
+        min_figures: 3,
+        run_on: |e, b, r, _| crate::clause42_sft_on(e, b, r),
+    },
+    PortedTest {
+        id: "clause16_credits",
+        // The row count and total, and the six counted figures, on any book.
+        min_figures: 8,
+        run_on: |e, b, r, _| crate::clause16_credits_on(e, b, r),
+    },
+];
 
 /// The registry entry for `id`, if that test is ported or crate-first.
 pub fn find(id: &str) -> Option<&'static PortedTest> {

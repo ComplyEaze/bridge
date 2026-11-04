@@ -556,6 +556,7 @@ RUNNERS = {
 # None has a reference golden, so asking for one is refused, with the reason.
 CRATE_FIRST = {
     "clause42_sft": "no reference golden: the reference engine has no clause 42 test; the crate's module is the only one",
+    "clause16_credits": "no reference golden: the reference engine has no clause 16 test; the crate's module is the only one",
 }
 
 

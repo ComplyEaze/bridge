@@ -71,8 +71,8 @@ There are no requests: this row sends nothing raw.
    - Marks M0, V0: EXPECT 213 / null, `reused` false, as 2057-C's RESULTS records from its step 1 to its end. A difference = STOP.
 2. **Data > Configuration** (look only):
    - From the Gateway, open the top menu "Data" by its key as the menu bar shows it (on 4 Nov its CONFIGURE heading held "Configuration"). Screenshot the menu whole and transcribe every heading and entry. If no "Configuration" entry is there, record the menu and go to step 4.
-   - Press Enter on "Configuration" only. Screenshot the screen that opens, whole, and transcribe every entry or option with its value, in the screen's own words. Bring the rest of the list into view by rule 3.
-   - If an entry's own label names vouchers, voucher entry, invoices or accounting (for example "Voucher Entry" or "Invoicing"), open it with Enter on that label, and transcribe it the same way. Open no other entry.
+   - Press Enter on "Configuration" only. Screenshot the screen that opens, whole, and transcribe every entry or option with its value, in the screen's own words. Bring the rest of the list into view by rule 3. A field whose value is a folder or file path (a data or backup location) is recorded by its label and the words "a path, not recorded" (C11).
+   - Open every entry whose own label names vouchers, voucher entry, invoices or accounting (for example "Voucher Entry" or "Invoicing"), one at a time, in the screen's order: Enter on that label, transcribe it the same way, then leave it with ONE Ctrl+Q back to the Configuration screen before the next. Open no other entry.
    - Leave each screen with ONE Ctrl+Q after a screenshot of its title, back to the Gateway. A prompt on leaving = C7.
    - Marks: equal to M0 and V0.
 3. **Record from step 2** every label that names a ledger per item (or per stock item, or per item allocation) or an accounting allocation, with its value as shown and the screen it is on. Write "none" if there is none.
@@ -80,8 +80,11 @@ There are no requests: this row sends nothing raw.
    - Gateway > Vouchers > F9 Purchase. Screenshot the voucher screen as it opens and record its mode (Item Invoice or Accounting Invoice), its title, and the field the cursor is on.
    - If it is not in Item Invoice mode, press Ctrl+H, screenshot the mode list, and press Enter on "Item Invoice" only. Record the mode it opened in.
    - With nothing typed in any field, press F12 (Configure). Screenshot the screen that opens whole and transcribe every option with its value, in the screen's own words. Bring the rest into view by rule 3. If F12 opens nothing, record that.
-   - Open no sub-screen of it, and press Enter on none of its options. Leave it with ONE Ctrl+Q after a screenshot of its title. A prompt on leaving = C7.
-   - Back on the voucher screen, screenshot it, then ONE Ctrl+Q. Answer the quit prompt only as rule 4 says. Screenshot the screen Tally returns to.
+   - Open no sub-screen of it, and press Enter on none of its options. Leave it with ONE Ctrl+Q after a screenshot of its title, and screenshot what follows:
+     - **back on the voucher screen:** screenshot it, then ONE Ctrl+Q;
+     - **rule 4's quit prompt, straight from the F12 screen:** rule 4 holds, not C7. Answer it as rule 4 says, and record that this one Ctrl+Q closed both screens;
+     - **any other prompt:** C7, no key, STOP.
+   - After the voucher's quit prompt is answered, screenshot the screen Tally returns to and record which it is (the Gateway, the Vouchers menu or the voucher type list). Press no further key on it until the marks are read.
    - Marks: equal to M0 and V0. A V that moved = STOP and report: a voucher may have been saved. Do not alter or delete it.
 5. **Record from step 4** every label that names a ledger per item or an accounting allocation, with its value as shown. Write "none" if there is none.
 6. **The end.** Gateway screenshot: "No Vouchers Entered", compared with step 0's. Then:

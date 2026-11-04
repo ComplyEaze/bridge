@@ -11,13 +11,17 @@
 //! * The aggregate is GROSS and a crossing is never undone: a credit of zero or less (a reversal)
 //!   lowers nothing and un-crosses nothing.
 //!
-//! The reference's `BASIS_TEXT` is not ported: only `tds_interest_201` quotes it.
+//! The reference's `BASIS_TEXT`, the five texts that state this reading per section, is quoted
+//! only by `tds_interest_201`, and lives there.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use bridge_tally_primitives::TallyDate;
 
+use crate::book::Voucher;
 use crate::error::{AuditError, Result};
+use crate::findings::EvidenceRef;
+use crate::support::voucher_refs;
 
 /// One day's tranche: the credits that became deductible on `day`, their total, their vouchers'
 /// ids (sorted, unique) and each credit as (own date, paise), sorted.
@@ -27,6 +31,31 @@ pub struct Tranche<'a, K: ?Sized = str> {
     pub paise: i64,
     pub ids: Vec<&'a K>,
     pub credits: Vec<(TallyDate, i64)>,
+}
+
+/// A [`Tranche`] with its vouchers cited in place of the caller's keys: each voucher's GUID and
+/// label, distinct and sorted, as [`voucher_refs`] cites them, so two vouchers sharing a GUID are
+/// two refs unless their labels match too. `tds_interest_201` takes a row's evidence from them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefTranche {
+    pub day: TallyDate,
+    pub paise: i64,
+    pub refs: Vec<EvidenceRef>,
+    pub credits: Vec<(TallyDate, i64)>,
+}
+
+/// `t` with each id resolved to its voucher by `voucher`, and cited.
+pub(crate) fn with_refs<'a, K: ?Sized>(
+    t: Tranche<'a, K>,
+    voucher: impl Fn(&'a K) -> &'a Voucher,
+) -> RefTranche {
+    let refs = voucher_refs(t.ids.iter().map(|k| voucher(*k)));
+    RefTranche {
+        day: t.day,
+        paise: t.paise,
+        refs,
+        credits: t.credits,
+    }
 }
 
 /// `credits` are (date, voucher id, net paise), the id the caller's own and unique per voucher

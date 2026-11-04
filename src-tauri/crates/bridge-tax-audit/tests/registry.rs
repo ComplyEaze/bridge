@@ -126,6 +126,20 @@ fn an_unregistered_test_is_refused() {
 }
 
 #[test]
+fn tds_interest_201_refuses_rules_without_tds_rates() {
+    // On every book, a row or none: the synthetic read gives none.
+    let e = common::engagement(&common::fixtures().join("synthetic-read"), false);
+    let mut rules = rules_for(&e).unwrap();
+    rules.tds_rates = None;
+    match registry::run_canonical("tds_interest_201", &e, &rules, &CallerData::default()) {
+        Err(bridge_tax_audit::error::AuditError::Config(m)) => {
+            assert_eq!(m, "tds_interest_201 needs rules [tds_rates]");
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
 fn the_26as_floors_are_what_each_test_emits_with_no_documents() {
     // The synthetic engagement configures no TDS/TCS ledger and two deductor aliases, so with no
     // document rows `tds_tcs_26as` emits its structural figures plus one per alias, and

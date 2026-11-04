@@ -85,6 +85,7 @@ use crate::read::Window;
 use crate::rules::Rules;
 use crate::support::{hash8, overflow, py_repr_str, rupees, voucher_label};
 use crate::tds_payees::py_format_g;
+use crate::tds_tranches::{crossing_tranches, with_refs, RefTranche};
 use crate::PartnersConfig;
 
 pub const TEST_ID: &str = "partners_40b_194t";
@@ -95,7 +96,7 @@ pub const VERSION: &str = "1";
 pub const S40B_EXCESS_COMPUTED: bool = false;
 
 /// The reference's `DEFAULT_S194T`, used (and said so) when the rules carry no `[s194t]` table.
-const DEFAULT_S194T_RATE_BP: i64 = 1000;
+pub(crate) const DEFAULT_S194T_RATE_BP: i64 = 1000;
 const DEFAULT_S194T_LIMIT_PAISE: i64 = 2_000_000;
 
 /// One `[partners.<key>]` entry, typed when the test runs.
@@ -595,6 +596,40 @@ fn s194t_credits<'a>(w: &Walk<'a>) -> Vec<(&'a Voucher, VoucherKey, i128)> {
         .collect()
 }
 
+/// A partner's s.194T credits as tranches, for `tds_interest_201`: the aggregate limit only, as
+/// s.194T has no single-sum limit; the base gross, a reversal lowering nothing.
+fn s194t_tranches(
+    credits: &[(&Voucher, VoucherKey, i128)],
+    limit_paise: i64,
+) -> Result<Vec<RefTranche>> {
+    let mut by_key: BTreeMap<&VoucherKey, &Voucher> = BTreeMap::new();
+    let mut paise = Vec::new();
+    for (v, k, p) in credits {
+        by_key.insert(k, *v);
+        paise.push((
+            v.date.clone(),
+            k,
+            i64::try_from(*p).map_err(|_| overflow(TEST_ID))?,
+        ));
+    }
+    Ok(crossing_tranches(&paise, None, Some(limit_paise), TEST_ID)?
+        .into_iter()
+        .map(|t| with_refs(t, |k| by_key[k]))
+        .collect())
+}
+
+/// One configured partner's s.194T tranches, for `tds_interest_201`: the partner's key and its
+/// tranches in date order, each citing its vouchers (none when the base never exceeds the limit).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PartnerRow {
+    pub key: String,
+    pub tranches: Vec<RefTranche>,
+}
+
+/// Every configured partner's tranches by its tag (`hash8(key)`, the s.194T finding id's last
+/// part). Empty when the test does not apply.
+pub type PartnerTranches = BTreeMap<String, PartnerRow>;
+
 /// Sum over every day of the period of max(-(ledger balance), 0): each event applies on its own
 /// day, before that day counts (the reference's `capital_paise_days`).
 fn capital_paise_days(opening_paise: i128, events: &[(i64, i128)], period: &Window) -> i128 {
@@ -743,9 +778,32 @@ pub fn run(
     )
 }
 
+/// [`run`], with every configured partner's s.194T tranches as well. The result is [`run`]'s
+/// exactly.
+pub fn run_with_tranches(
+    book: &Book,
+    rules: &Rules,
+    period: &Window,
+    entity_type: &str,
+    cfg: &PartnersConfig,
+    tds_ledgers: &BTreeSet<String>,
+) -> Result<(TestResult, PartnerTranches)> {
+    let mut tranche_table = PartnerTranches::new();
+    let r = run_into(
+        book,
+        rules,
+        period,
+        entity_type,
+        cfg,
+        tds_ledgers,
+        S40B_EXCESS_COMPUTED,
+        Some(&mut tranche_table),
+    )?;
+    Ok((r, tranche_table))
+}
+
 /// [`run`], with the closing rule's switch given: `excess_computed` true reaches the s.40(b)
 /// computation the reference keeps behind `S40B_EXCESS_COMPUTED`.
-#[allow(clippy::too_many_lines)] // one section per figure and finding, as the reference lays them out
 pub fn run_with(
     book: &Book,
     rules: &Rules,
@@ -754,6 +812,30 @@ pub fn run_with(
     cfg: &PartnersConfig,
     tds_ledgers: &BTreeSet<String>,
     excess_computed: bool,
+) -> Result<TestResult> {
+    run_into(
+        book,
+        rules,
+        period,
+        entity_type,
+        cfg,
+        tds_ledgers,
+        excess_computed,
+        None,
+    )
+}
+
+// one section per figure and finding, as the reference lays them out
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+fn run_into(
+    book: &Book,
+    rules: &Rules,
+    period: &Window,
+    entity_type: &str,
+    cfg: &PartnersConfig,
+    tds_ledgers: &BTreeSet<String>,
+    excess_computed: bool,
+    mut tranche_table: Option<&mut PartnerTranches>,
 ) -> Result<TestResult> {
     let mut r = TestResult::new(TEST_ID, VERSION, &rules.version);
     let s40b_rate = rules.s40b_interest_rate_bp(entity_type)?;
@@ -1477,6 +1559,16 @@ part of it.",
             || !w.unread_credit_vouchers.is_empty();
         // Gross: each voucher's net credit to the partner, a reversal lowering nothing.
         let credits = s194t_credits(&w);
+        // Only when asked for, so `run` refuses nothing it did not refuse before.
+        if let Some(table) = tranche_table.as_deref_mut() {
+            table.insert(
+                h.clone(),
+                PartnerRow {
+                    key: key.clone(),
+                    tranches: s194t_tranches(&credits, tds_limit_paise)?,
+                },
+            );
+        }
         let subject_paise: i128 = credits.iter().map(|c| c.2).filter(|p| *p > 0).sum();
         let f_subject = r.fig(
             &format!("s194t_amount_credited_{h}"),
@@ -2576,6 +2668,64 @@ wrong (above), so whether it crosses the threshold is not computed."
         };
         assert!(found(&on(2_000_000).unwrap(), "s194t/").is_empty());
         assert_eq!(found(&on(2_000_001).unwrap(), "s194t/").len(), 1);
+    }
+
+    /// The tranche table `tds_interest_201` reads: an entry for every configured partner, one with
+    /// no credit included; the base gross of TDS deducted against the capital alone; a reversal
+    /// never lowering the running total. The result is `run`'s exactly.
+    #[test]
+    fn the_tranche_table_has_every_partner_and_a_reversal_never_lowers_the_total() {
+        let tranches = |vouchers: Vec<Voucher>| {
+            let tds: BTreeSet<String> = ["TDS Payable".to_string()].into();
+            let (book, rules) = (book_of(vouchers), Rules::vendored().unwrap());
+            let config = cfg(&format!("{TWO}{DEED}"));
+            let plain = run(&book, &rules, &year(), "firm", &config, &tds).unwrap();
+            let (r, table) =
+                run_with_tranches(&book, &rules, &year(), "firm", &config, &tds).unwrap();
+            assert_eq!(format!("{r:?}"), format!("{plain:?}"));
+            table
+        };
+        let (a, b) = (hash8("partner_a"), hash8("partner_b"));
+        // Rs 50,000 of interest, Rs 5,000 of it TDS deducted against the capital alone.
+        let table = tranches(vec![voucher_on(
+            "p1",
+            "20250601",
+            &[
+                ("Interest to Partners", 5_000_000),
+                ("Partner A", -4_500_000),
+                ("TDS Payable", -500_000),
+            ],
+        )]);
+        let mut tags = vec![a.clone(), b.clone()];
+        tags.sort();
+        assert_eq!(table.keys().cloned().collect::<Vec<_>>(), tags);
+        assert_eq!(table[&a].key, "partner_a");
+        assert_eq!(table[&b].key, "partner_b");
+        assert!(table[&b].tranches.is_empty());
+        let t = &table[&a].tranches;
+        assert_eq!(t.len(), 1);
+        assert_eq!(t[0].paise, 5_000_000);
+        assert_eq!(t[0].refs.len(), 1);
+        // Rs 15,000, a reversal of Rs 10,000, then Rs 6,000: the Rs 20,000 limit is crossed on the
+        // third, as the reversal lowers nothing.
+        let credit = |guid: &str, date: &str, paise: i64| {
+            voucher_on(
+                guid,
+                date,
+                &[("Interest to Partners", paise), ("Partner A", -paise)],
+            )
+        };
+        let table = tranches(vec![
+            credit("p1", "20250601", 1_500_000),
+            credit("p2", "20250701", -1_000_000),
+            credit("p3", "20250801", 600_000),
+        ]);
+        let t = &table[&a].tranches;
+        assert_eq!(t.len(), 1);
+        assert_eq!(t[0].day, TallyDate::parse("20250801").unwrap());
+        assert_eq!(t[0].paise, 2_100_000);
+        let ids: Vec<&str> = t[0].refs.iter().map(|e| e.id.as_str()).collect();
+        assert_eq!(ids, ["p1", "p3"]);
     }
 
     #[test]

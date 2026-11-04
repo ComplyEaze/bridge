@@ -1076,6 +1076,21 @@ practical.
 batch-of-one, because import counters are unattributable at N>1: a request carrying 100
 objects that returns `CREATED=99` gives no way to identify which one failed.
 
+**On a dense book, one import of 200 outlasts Bridge's 20 s request limit — PARTIAL, 2026-11-04.**
+One run, through Bridge's own post path: a native `post_import` of one saved batch of 200
+Journals, after one approval, on TallyPrime 7.2 Silver, on one synthetic book of about 30,000
+vouchers loaded alone (`lab/725-dense-200-answers` at 596ce464, bridge#725). Tally answered the
+one import request after 23.235 s. Bridge's transport stops waiting at its one 20 s request
+limit; it left at 19.985 s, and the answer was lost. Tally's write stood in full: its answer,
+kept by the relay, read `CREATED=200` and every other counter 0, and `ALTVCHID` rose by 200.
+The post ended `import_dispatch_outcome_unknown`. `verify_import` a minute later found all 200
+by content, none twice, and could not attribute them to the post. The same batch shape took
+5.24 s in one request on a small, quiet TallyPrime 7.1 book (bridge#725, 2026-09-26). An
+import's time therefore grows with the book, and the table above does not bound it on a large
+one. On this measurement Bridge's batch cap stays 50 (`MAX_BATCH_POST_VOUCHERS`). Not
+measured: TallyPrime 7.1 on a dense book, Payment, Receipt and Contra batches, sizes between 50
+and 200, books between the two sizes, and a second user working during the post.
+
 ### 9.7 Operation support matrix — **vouchers cannot be modified**
 
 > **Qualified by §9.14 and §9.5 (2026-09-25):** on licensed TallyPrime 7.1 Silver, a same-`REMOTEID`

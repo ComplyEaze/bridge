@@ -1,0 +1,1 @@
+- `purchase_register`'s description no longer says an item invoice's purchase is not taken as taxable. It says the purchase is taken as taxable from the invoice's own Purchase Accounts entry, which each of the four item invoices measured carried (#2057).

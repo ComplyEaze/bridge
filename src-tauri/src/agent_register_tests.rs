@@ -704,6 +704,18 @@ fn a_row_without_a_purchase_ledger_entry_says_it_has_no_taxable_entry() {
     assert_eq!(row_on(&page.rows, "20250905")["has_taxable_entry"], true);
 }
 
+/// The four item invoices of `class-purchase-lab` (§8.2m) each carried the purchase ledger as an
+/// entry of its own, and the register listed it under `taxable_entries`, so the description may
+/// not say that an item invoice's purchase is never taken as taxable.
+#[test]
+fn the_purchase_description_says_what_the_measured_item_invoices_showed() {
+    assert!(PURCHASE_REGISTER_DESCRIPTION.contains(
+        "takes an item invoice's purchase as taxable only from its own Purchase Accounts entry, \
+         which the four item invoices measured each had,"
+    ));
+    assert!(!PURCHASE_REGISTER_DESCRIPTION.contains("does not classify an item invoice"));
+}
+
 #[test]
 fn a_cancelled_purchase_with_no_tax_entry_is_listed_with_its_flag() {
     let mut rows = captured_rows();

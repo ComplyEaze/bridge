@@ -54,15 +54,24 @@ reference's maintainers.
 
 ## Declared behaviour differences
 
-None of these is reached by a book or a golden; each is in the module's own documentation and unit tests.
+No golden reaches any of these. Each is in the module's own documentation, and each names the test that
+covers it.
 
-- Two rows whose tags coincide are refused, as the crate refuses a repeated figure id, where the reference's
-  later row overwrites the earlier one's figures.
+- Two rows whose tags coincide, or two groups whose group tags coincide, are refused, as the crate refuses a
+  repeated figure id, where the reference's later row or group overwrites the earlier one's figures. A tag is
+  8 hex digits, so whether a book reaches this grows with its size: about n² in 2³³ for n rows, near 1% at
+  10,000 rows. No test in the module makes two tags coincide; the refusal is `TestResult::fig`'s, covered by
+  `a_repeated_figure_id_is_refused_with_its_typed_error` in `src/findings.rs`.
 - A s.194H row when the rules' `[tds_rates]` has no `s194h_bp` is refused; the pack does not say what the
-  reference does there. A s.194J row of a category other than the four is refused too.
+  reference does there (`assembly_refuses_without_tds_rates_a_missing_entry_and_194h_without_a_rate`). A
+  s.194J row of a category other than the four is refused too (`s194j_categories_take_their_rates`).
+- An as-of date that is not ISO is refused at the start of the run; the pack does not say what the reference
+  does with one [unverified] (`a_row_with_no_credits_and_a_non_iso_as_of_date_are_refused`).
 - The module check (TDSI-1) recomputes only a row whose deducted date is not supplied, the only kind the
-  caller builds; for a row with one it checks only that no still-not-deducted amount is published.
-- The module check refuses a result that has no `as_of` figure or no rate figure, where the reference raises.
+  caller builds; for a row with one it checks only that no still-not-deducted amount is published
+  (`each_tdsi_1_message_fires_on_its_own_tampering`).
+- The module check refuses a result that has no `as_of` figure or no rate figure, where the reference raises
+  (`an_absent_deducted_date_reads_as_not_supplied_and_tags_come_in_order`).
 
 ## Bytes
 

@@ -14,15 +14,22 @@
 //!
 //! Where this port differs from the reference, in cases no golden reaches:
 //!
-//! * two rows with one tag are refused, as [`TestResult::fig`] refuses a repeated figure id, where
-//!   the reference's later row overwrites the earlier one's figures;
+//! * two rows with one tag, or two groups with one group tag, are refused, as [`TestResult::fig`]
+//!   refuses a repeated figure id, where the reference's later row or group overwrites the earlier
+//!   one's figures. A tag is 8 hex digits, so the odds of a repeat grow with the book: about n² in
+//!   2³³ for n rows, near 1% at 10,000 rows;
 //! * a s.194H row with no `[tds_rates].s194h_bp`, and a s.194J row of a category other than the
 //!   four, are refused;
+//! * an as-of date that is not ISO is refused at the start of the run; the pack does not say what
+//!   the reference does with one;
 //! * the module check ([`check_invariants`]) recomputes only a row whose deducted date is not
 //!   supplied; for a row with one, which no caller builds, it checks only that no
 //!   still-not-deducted amount is published;
 //! * the module check refuses a result without its as-of date or a rate figure, where the
 //!   reference raises.
+//!
+//! The run time grows as the square of the rows, as [`TestResult::fig`] scans every figure for a
+//! repeat and a row writes fifteen. That is to be bounded before the test is admitted to the app.
 
 use std::collections::BTreeMap;
 
@@ -532,6 +539,13 @@ fn price_row(
     as_of: &str,
     default_rate: bool,
 ) -> Result<Priced> {
+    // README section 11.1: the reference refuses a row with no credits; `assemble_rows` builds none.
+    if row.credits.is_empty() {
+        return Err(AuditError::Config(format!(
+            "{TEST_ID}: row {p} ({}) has no credits",
+            row.payee_key
+        )));
+    }
     let section = row.section.as_str();
     let t = hash8(&format!("{section}:{}:{p}", row.payee_key));
     let k = py_repr_str(&row.payee_key);
@@ -997,7 +1011,8 @@ the Form 26A relief scenario could not be computed.",
 
 type Ymd = (i64, i64, i64);
 
-/// An ISO `YYYY-MM-DD` text as (year, month, day); `None` for any other shape.
+/// An ISO `YYYY-MM-DD` text as (year, month, day); `None` for any other shape, and for a month
+/// outside 1 to 12 or a day outside 1 to 31, on which [`check_maximum`]'s month walk would not end.
 fn check_ymd(text: &str) -> Option<Ymd> {
     let b = text.as_bytes();
     if b.len() != 10 || b[4] != b'-' || b[7] != b'-' {
@@ -1008,7 +1023,8 @@ fn check_ymd(text: &str) -> Option<Ymd> {
             c.is_ascii_digit().then(|| a * 10 + i64::from(c - b'0'))
         })
     };
-    Some((number(0, 4)?, number(5, 7)?, number(8, 10)?))
+    let (y, m, d) = (number(0, 4)?, number(5, 7)?, number(8, 10)?);
+    ((1..=12).contains(&m) && (1..=31).contains(&d)).then_some((y, m, d))
 }
 
 fn check_next_day((y, m, d): Ymd) -> Ymd {
@@ -1759,6 +1775,39 @@ mod tests {
         });
         assert_eq!(v.len(), 1);
         assert!(v[0].ends_with(" != independently recomputed None"), "{v:?}");
+        // A month above 12 is not a date: the row is reported, and the month walk is not entered.
+        let v = tampered(&|x| {
+            set(
+                x,
+                &format!("deductible_date_{t}"),
+                Value::Text("2025-13-01".into()),
+            );
+        });
+        assert_eq!(
+            v,
+            [format!(
+                "TDSI-1: {t}: missing a figure needed for independent recomputation"
+            )]
+        );
+        let mut bad_as_of = r.clone();
+        set(&mut bad_as_of, "as_of", Value::Text("2026-00-30".into()));
+        assert!(matches!(
+            check_invariants(&bad_as_of),
+            Err(AuditError::Config(_))
+        ));
+    }
+
+    #[test]
+    fn a_row_with_no_credits_and_a_non_iso_as_of_date_are_refused() {
+        let rules = Rules::vendored().unwrap();
+        let x = row(Section::S194C, "194C_aa", RateTag::Single, "20250701", 2000);
+        assert!(run(&rules, std::slice::from_ref(&x), "30-09-2026").is_err());
+        let mut empty = x;
+        empty.credits.clear();
+        assert!(matches!(
+            run(&rules, &[empty], "2026-09-30"),
+            Err(AuditError::Config(m)) if m.contains("has no credits")
+        ));
     }
 
     #[test]
@@ -1787,6 +1836,14 @@ mod tests {
         assert!(matches!(
             check_invariants(&no_as_of),
             Err(AuditError::Config(_))
+        ));
+        let mut no_rate = r.clone();
+        no_rate
+            .figures
+            .retain(|f| f.id != format!("{TEST_ID}.rate_after_deduction_bp"));
+        assert!(matches!(
+            check_invariants(&no_rate),
+            Err(AuditError::Config(m)) if m.contains("rate_after_deduction_bp")
         ));
     }
 }

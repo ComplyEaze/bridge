@@ -636,8 +636,8 @@
   "by": "author",
   "what": "registry find matches a prefix",
   "file": "src/registry.rs",
-  "from": "    PORTED.iter().find(|t| t.id == id)",
-  "to": "    PORTED.iter().find(|t| t.id.starts_with(id))"
+  "from": "    PORTED.iter().chain(CRATE_FIRST).find(|t| t.id == id)",
+  "to": "    PORTED.iter().chain(CRATE_FIRST).find(|t| t.id.starts_with(id))"
  },
  {
   "id": "F04",

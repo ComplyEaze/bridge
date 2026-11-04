@@ -1,0 +1,11 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+evidence/c10-netstat.txt: original 9475 B sha256 e1c93027c1361a0b6248118877b5d5ef378dfb7b53bdb39db25c7674fa0eb92c (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/cover-x0.txt: original 970 B sha256 3767435fb4dfee84e51c59dca52b9a5f3af2c989673221b439ba9c0e8ebd85e1 (kept on the lab PC); window titles of programs other than Tally and the system named <other window n>; 1 x -> <desktop client>
+evidence/p0-netstat.txt: original 9712 B sha256 34c9682151765eef8213831d11d4346bfef89a4ed6f144af8448d2fed8106ca8 (kept on the lab PC); only the port-9001 LISTENING lines kept
+evidence/x0-timeline.txt: original 1193 B sha256 945c232914db2e3153d59044b3b3f492cd62be18d8e845f885208e439a70c30d (kept on the lab PC); 1 x -> <LAB_DIR>
+notes.txt: original 3677 B sha256 6c6659f64bd0fcfca11ccb71d623ea64403d89db346da6e030b95cbc71174ef0 (kept on the lab PC); 1 x -> stop
+scripts/cell.ps1: original 21695 B sha256 ba0003a967f6f5b8aa35483196b63ec9906f0b9eff27526187bcc9c4ead2f627 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> stop
+scripts/marks.ps1: original 1799 B sha256 47f3fa4a7ed515f5f14675ded9bc5edc89d0a47f8628acd24b1969b6bedc161e (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop
+scripts/step0.ps1: original 2424 B sha256 c8ed5d8a357fc9c1d7d9c6181e84bbe98a330353df42e8a07bb6f67b34b3eb29 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/leftover.ps1: original 3310 B sha256 37b2c8a44cbd4c9eddf2e781a8526c9210917bfd00ee48a365398b4b754c6aad (kept on the lab PC); 2 x -> <LAB_DIR>
+Window names: <other window 1> = a window of the owner's own or of the desktop client, named by its program in the same line; <other window 2> = a window of the owner's own or of the desktop client, named by its program in the same line

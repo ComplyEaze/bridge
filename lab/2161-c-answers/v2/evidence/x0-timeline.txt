@@ -1,0 +1,6 @@
+x0 runner pid 22984 2026-11-04T06:37:17.509Z; dpi_context=ok; Tally window 0xa826a4; fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+CLICK left tallyTitlePoint 2026-11-04T06:37:18.076Z logical (330,14) physical (412,17); +300 ms fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+Tally in front: True
+X x0 2026-11-04T06:37:19.051Z to 2026-11-04T06:37:28.548Z (9.48 s) ;; rect out:  ;; uia out: Cannot convert argument "uia", with value: "System.__ComObject", for "Buttons" to type "IUIAutomation": "Cannot  convert the "System.__ComObject" value of type "System.__ComObject" to type "IUIAutomation"." At <LAB_DIR>\requests\taskbar-uia.ps1:124 char:16 + foreach ($l in [TUia]::Buttons($uia, $tray)) { $lines.Add($l) } +                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~     + CategoryInfo          : NotSpecified: (:) [], MethodException     + FullyQualifiedErrorId : MethodArgumentConversionInvalidCastArgument   E 2026-11-04T06:37:23.537Z dpi_context=ok tray=0x20138 client=com8 ;; cover out:  ;; capture out: 2026-11-04T06:37:28.256Z name=x0 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+X-time 9.48 s
+x0 DONE 2026-11-04T06:37:28.622Z

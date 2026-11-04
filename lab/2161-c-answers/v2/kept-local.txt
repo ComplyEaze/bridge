@@ -1,0 +1,2 @@
+Kept on the lab PC, by size and sha256:
+stage-2161c-v2.py (this stage script: its patterns name the lab paths) 5857 B 683b39597280148e6cad55a8ec14600d95cc34c190a2a1f6ceb64fb18ea824e0

@@ -1,0 +1,651 @@
+{
+  "file": "src-tauri/src/agent_import_cancel.rs",
+  "base_commit": "a5463e2f",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's own tests (agent_import_cancel_tests.rs). killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. The hand-written mutants (C01 to C38) change, one at a time: the one refusal code, the arm that refuses text that is not a UUID, the required version (the constant, the check dropped, any version, and each other version admitted beside version 4: Nil, Mac, Dce, Md5, Sha1, SortMac, SortRand, Custom and Max), the required variant (the constant, the check dropped, and each other variant admitted beside RFC4122: NCS, Microsoft and Future), the spelling check (upper case admitted, the simple form required, the check dropped), the verdict (inverted, a minted id returned as the nil UUID, a refused id given another code), and in the renderer the action, the narration attribution, the REMOTEID, the not-renderable condition (false, true, inverted) and its Err arm, the envelope (not built, an empty company, the All Masters report, an empty message, the company and the message swapped). Not mutated: the derive lists, the visibility of the items, the doc comments, the test module's attribute, the voucher argument (the only voucher the function is given), and the enum's one variant (it has no other); the not-renderable condition is mutated only by constant and inversion, not by a threshold, because the renderer's output is empty or a whole voucher; and a version, variant or spelling is mutated only by the sets named here, not by every possible set. Seven edits (C06, C12, C13, C21, C22, C24 and C25) were changed to an equivalent edit of the same kind (a neighbouring spelling of the same change: matches!(..., Some(_)) for is_some(), the set of versions with its members in the other order or joined by | between two Some(...), lower-casing both sides for the case-insensitive comparison, text.to_string() for text, == false for a negation, and Uuid::from_u128(0) for Uuid::nil()), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses. In every run the file was byte for byte as at base_commit, checked after each restore (and, for the tool, after the run); the restore was a copy, never a rename. In the tool, hand and whole_set runs the test module was as at base_commit; in survivors_again it is as this change leaves it.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 6,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_cancel.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/agent_import::cancel::tests::/) | test(/the_cancel_candidate_of_/) | test(/an_invoice_with_nothing_observed_has_no_cancel_request/)'",
+      "time": "2026-11-04T13:22:10Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 6,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/agent_import::cancel::tests::/) | test(/the_cancel_candidate_of_/) | test(/an_invoice_with_nothing_observed_has_no_cancel_request/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 4842,
+      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 10 hand-written mutants the filtered run missed (the tool's run had no mutant missed); the unmutated baseline passed all 4842",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 5,
+      "command": "as the hand run with -E 'test(/agent_import::cancel::tests::/)', for the 10 hand-written mutants that survived the whole_set run",
+      "tree": "base_commit with the tests this change adds"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 7,
+      "unviable": 1
+    },
+    "hand": {
+      "caught": 35,
+      "missed": 3
+    },
+    "survived_at_base": {
+      "tool": 0,
+      "hand": 10
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 3
+    },
+    "accepted_not_equivalent": {
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "25:9 replace RemoteId::parse -> Result<Self, &'static str> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `RemoteId: std::default::Default` is not satisfied"
+    },
+    "29:13 replace && with || in RemoteId::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "28:13 replace && with || in RemoteId::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "27:39 replace == with != in RemoteId::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "28:33 replace == with != in RemoteId::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::an_invoice_with_nothing_observed_has_no_cancel_request",
+      "killer_at": "base"
+    },
+    "29:44 replace == with != in RemoteId::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::every_captured_native_remote_id_is_admitted",
+      "killer_at": "base"
+    },
+    "50:5 replace render_native_cancel_xml -> Result<String, CancelRenderRefusal> with Ok(String::new())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::an_invoice_with_nothing_observed_has_no_cancel_request",
+      "killer_at": "base"
+    },
+    "50:5 replace render_native_cancel_xml -> Result<String, CancelRenderRefusal> with Ok(\"xyzzy\".into())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::an_invoice_with_nothing_observed_has_no_cancel_request",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "C01": {
+      "what": "parse: the one refusal code is another (REFUSED changed)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "const REFUSED: &str = \"import_remote_id_not_native\";",
+          "to": "const REFUSED: &str = \"import_remote_id_invalid\";"
+        }
+      ],
+      "mutation": "4b816c857936b864df4ec66c4a0be240",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C02": {
+      "what": "parse: text that is not a UUID is refused with another code (map_err arm)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "Uuid::try_parse(text).map_err(|_| REFUSED)?;",
+          "to": "Uuid::try_parse(text).map_err(|_| \"import_remote_id_malformed\")?;"
+        }
+      ],
+      "mutation": "b38fd479b0c7c644652a24d0cd1e96cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C03": {
+      "what": "parse: text that is not a UUID is read as the nil UUID instead of refused (map_err arm dropped)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "Uuid::try_parse(text).map_err(|_| REFUSED)?;",
+          "to": "Uuid::try_parse(text).unwrap_or_default();"
+        }
+      ],
+      "mutation": "d496b42da311e2c860cde3786527d9e2",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "C04": {
+      "what": "version: version 7 is required, not version 4 (constant changed)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "id.get_version() == Some(uuid::Version::SortRand)"
+        }
+      ],
+      "mutation": "1ad6b3d6002cebb5f114c6fa6b6a1e45",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C05": {
+      "what": "version: the check is dropped (clause replaced by true)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)\n            && ",
+          "to": ""
+        }
+      ],
+      "mutation": "42c3656e823dee53c4451b7563e21f99",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C06": {
+      "what": "version: any version is admitted (Some(_))",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(_))"
+        }
+      ],
+      "mutation": "e5fb00e4a9fa7faba5304736d5121c1e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C07": {
+      "what": "version: version Nil is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random | uuid::Version::Nil))"
+        }
+      ],
+      "mutation": "9fc7c3b0d86fbe9af7ae18081d448185",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "C08": {
+      "what": "version: version Mac is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random | uuid::Version::Mac))"
+        }
+      ],
+      "mutation": "bf7730bedb3eaaef401dbfa459e9b3a6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C09": {
+      "what": "version: version Dce is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random | uuid::Version::Dce))"
+        }
+      ],
+      "mutation": "a5265d5e3d19654dce64a3a8190523cc",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_for_version_4_and_the_rfc_variant_alone",
+      "killer_at": "this_commit"
+    },
+    "C10": {
+      "what": "version: version Md5 is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random | uuid::Version::Md5))"
+        }
+      ],
+      "mutation": "189dde8a9cd0053a608ce9371a28b0cc",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_for_version_4_and_the_rfc_variant_alone",
+      "killer_at": "this_commit"
+    },
+    "C11": {
+      "what": "version: version Sha1 is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random | uuid::Version::Sha1))"
+        }
+      ],
+      "mutation": "51bd2ccc26e7330f6cd66ca90e535669",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_for_version_4_and_the_rfc_variant_alone",
+      "killer_at": "this_commit"
+    },
+    "C12": {
+      "what": "version: version SortMac is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random) | Some(uuid::Version::SortMac))"
+        }
+      ],
+      "mutation": "3964cfdc461709c85e99c976737a5aeb",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_for_version_4_and_the_rfc_variant_alone",
+      "killer_at": "this_commit"
+    },
+    "C13": {
+      "what": "version: version SortRand is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random) | Some(uuid::Version::SortRand))"
+        }
+      ],
+      "mutation": "bae98345d7898bd4df7dac1309a0449c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C14": {
+      "what": "version: version Custom is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random | uuid::Version::Custom))"
+        }
+      ],
+      "mutation": "2b7b265faa503dc9f24c9e72d93d17c6",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_for_version_4_and_the_rfc_variant_alone",
+      "killer_at": "this_commit"
+    },
+    "C15": {
+      "what": "version: version Max is admitted as well as Random (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_version() == Some(uuid::Version::Random)",
+          "to": "matches!(id.get_version(), Some(uuid::Version::Random | uuid::Version::Max))"
+        }
+      ],
+      "mutation": "016a76d871c635d5fc8a51f2f495640b",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "C16": {
+      "what": "variant: the Microsoft variant is required, not RFC4122 (constant changed)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_variant() == uuid::Variant::RFC4122",
+          "to": "id.get_variant() == uuid::Variant::Microsoft"
+        }
+      ],
+      "mutation": "36ddb5a9efcb0ac994cf8041683e495d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C17": {
+      "what": "variant: the check is dropped (clause removed)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "\n            && id.get_variant() == uuid::Variant::RFC4122",
+          "to": ""
+        }
+      ],
+      "mutation": "860254f39a029e65e8679c6fd833eefb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C18": {
+      "what": "variant: the NCS variant is admitted as well as RFC4122 (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_variant() == uuid::Variant::RFC4122",
+          "to": "matches!(id.get_variant(), uuid::Variant::RFC4122 | uuid::Variant::NCS)"
+        }
+      ],
+      "mutation": "f660ca17876f219bce4b2f9d34f8ca59",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_for_version_4_and_the_rfc_variant_alone",
+      "killer_at": "this_commit"
+    },
+    "C19": {
+      "what": "variant: the Microsoft variant is admitted as well as RFC4122 (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_variant() == uuid::Variant::RFC4122",
+          "to": "matches!(id.get_variant(), uuid::Variant::RFC4122 | uuid::Variant::Microsoft)"
+        }
+      ],
+      "mutation": "3ad13d0c9cfb5af9ca699cd5dd5173e2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C20": {
+      "what": "variant: the Future variant is admitted as well as RFC4122 (set widened)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.get_variant() == uuid::Variant::RFC4122",
+          "to": "matches!(id.get_variant(), uuid::Variant::RFC4122 | uuid::Variant::Future)"
+        }
+      ],
+      "mutation": "af870bee0863904b59d4172e25ca42d4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_for_version_4_and_the_rfc_variant_alone",
+      "killer_at": "this_commit"
+    },
+    "C21": {
+      "what": "spelling: upper case is admitted (comparison ignores case)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.hyphenated().to_string() == text",
+          "to": "id.hyphenated().to_string().to_lowercase() == text.to_lowercase()"
+        }
+      ],
+      "mutation": "e75aeaeeb07d2b54d8413ba2f413979c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C22": {
+      "what": "spelling: only the simple form is admitted (form changed)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "id.hyphenated().to_string() == text",
+          "to": "id.simple().to_string() == text.to_string()"
+        }
+      ],
+      "mutation": "100c62f795c214e012b600289af953ba",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::an_invoice_with_nothing_observed_has_no_cancel_request",
+      "killer_at": "base"
+    },
+    "C23": {
+      "what": "spelling: the check is dropped, so any form the parser reads is admitted (clause removed)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "\n            && id.hyphenated().to_string() == text",
+          "to": ""
+        }
+      ],
+      "mutation": "f5a8736bc1891b892fca9d6ca2dfc1cc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C24": {
+      "what": "parse: the verdict is inverted (if minted -> if !minted)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "    if minted {",
+          "to": "    if minted == false {"
+        }
+      ],
+      "mutation": "8bb3fc57647ad26022bd38cf58837dcc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C25": {
+      "what": "parse: a minted id is admitted as the nil UUID (returned field)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "Ok(Self(id))",
+          "to": "Ok(Self(Uuid::from_u128(0)))"
+        }
+      ],
+      "mutation": "c5b9e4d53222d8bcfad9dd88e0eeea52",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C26": {
+      "what": "parse: a refused id takes another code (Err arm)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "Err(REFUSED)",
+          "to": "Err(\"import_remote_id_malformed\")"
+        }
+      ],
+      "mutation": "605c01c1b9fffebd5c30889fad24e95d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::cancel::tests::a_remote_id_is_admitted_only_in_the_form_a_native_post_mints",
+      "killer_at": "base"
+    },
+    "C27": {
+      "what": "render: the action is Create (VoucherAction::Cancel -> Create)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        VoucherAction::Cancel,\n",
+          "to": "        VoucherAction::Create,\n"
+        }
+      ],
+      "mutation": "439a3e6e38ce4d3a29eb315fb57346ab",
+      "verdict": "caught",
+      "killer": "agent::agent_import::span_identity::tests::the_cancel_candidate_of_each_captured_request_changes_only_its_actions",
+      "killer_at": "base"
+    },
+    "C28": {
+      "what": "render: the narration is tagged (NarrationAttribution::Untagged -> Tagged)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        NarrationAttribution::Untagged,\n",
+          "to": "        NarrationAttribution::Tagged(remote_id.0),\n"
+        }
+      ],
+      "mutation": "bfbf39ff80453d6eaebc3f956ddd0c7e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::span_identity::tests::the_cancel_candidate_of_each_captured_request_changes_only_its_actions",
+      "killer_at": "base"
+    },
+    "C29": {
+      "what": "render: the voucher carries the nil REMOTEID (remote_id.0 -> nil)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        remote_id.0,\n",
+          "to": "        Uuid::nil(),\n"
+        }
+      ],
+      "mutation": "53be661625ea5282cc75ba406246cc3f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::the_cancel_candidate_of_an_invoice_changes_only_its_action",
+      "killer_at": "base"
+    },
+    "C30": {
+      "what": "render: a voucher rendered as nothing is not refused (condition false)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "    if message.is_empty() {",
+          "to": "    if false {"
+        }
+      ],
+      "mutation": "cd5d83b86e9156675dbb903afa393a36",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::an_invoice_with_nothing_observed_has_no_cancel_request",
+      "killer_at": "base"
+    },
+    "C31": {
+      "what": "render: every voucher is refused (condition true)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "    if message.is_empty() {",
+          "to": "    if true {"
+        }
+      ],
+      "mutation": "0ed06428a7b88fa1b1b5ad8829bfc077",
+      "verdict": "caught",
+      "killer": "agent::agent_import::span_identity::tests::the_cancel_candidate_of_each_captured_request_changes_only_its_actions",
+      "killer_at": "base"
+    },
+    "C32": {
+      "what": "render: a voucher rendered as something is refused, nothing as nothing (condition inverted)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "    if message.is_empty() {",
+          "to": "    if !message.is_empty() {"
+        }
+      ],
+      "mutation": "78cd6eae0dddac7d4c6bd3927a6ed239",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::the_cancel_candidate_of_an_invoice_changes_only_its_action",
+      "killer_at": "base"
+    },
+    "C33": {
+      "what": "render: a voucher rendered as nothing is sent as an empty request (Err arm -> Ok)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        return Err(CancelRenderRefusal::VoucherNotRenderable);",
+          "to": "        return Ok(String::new());"
+        }
+      ],
+      "mutation": "8043fa66b336bca74607edd5fc50232d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::an_invoice_with_nothing_observed_has_no_cancel_request",
+      "killer_at": "base"
+    },
+    "C34": {
+      "what": "render: the envelope is not built, the bare voucher is returned",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "    Ok(render_import_envelope(\n        company,\n        ImportReport::Vouchers,\n        &message,\n    ))\n",
+          "to": "    Ok(message)\n"
+        }
+      ],
+      "mutation": "752f4547d007efc6dc21ea441e2bf768",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::the_cancel_candidate_of_an_invoice_changes_only_its_action",
+      "killer_at": "base"
+    },
+    "C35": {
+      "what": "render: the company is empty in the envelope",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        company,\n        ImportReport::Vouchers,\n        &message,\n",
+          "to": "        \"\",\n        ImportReport::Vouchers,\n        &message,\n"
+        }
+      ],
+      "mutation": "f52beb3fdb4d1acd854b1ed80cf6da04",
+      "verdict": "caught",
+      "killer": "agent::agent_import::span_identity::tests::the_cancel_candidate_of_each_captured_request_changes_only_its_actions",
+      "killer_at": "base"
+    },
+    "C36": {
+      "what": "render: the envelope reports All Masters (ImportReport::Vouchers -> AllMasters)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        company,\n        ImportReport::Vouchers,\n        &message,\n",
+          "to": "        company,\n        ImportReport::AllMasters,\n        &message,\n"
+        }
+      ],
+      "mutation": "b1bc7aec6d51494d374087e26e555672",
+      "verdict": "caught",
+      "killer": "agent::agent_import::span_identity::tests::the_cancel_candidate_of_each_captured_request_changes_only_its_actions",
+      "killer_at": "base"
+    },
+    "C37": {
+      "what": "render: the envelope carries no voucher (message empty)",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        company,\n        ImportReport::Vouchers,\n        &message,\n",
+          "to": "        company,\n        ImportReport::Vouchers,\n        \"\",\n"
+        }
+      ],
+      "mutation": "b8143ffaaf5a7f8da26f74a91bb8042a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::tests::the_cancel_candidate_of_an_invoice_changes_only_its_action",
+      "killer_at": "base"
+    },
+    "C38": {
+      "what": "render: the company and the voucher are swapped in the envelope",
+      "applied_to": "src-tauri/src/agent_import_cancel.rs",
+      "edits": [
+        {
+          "from": "        company,\n        ImportReport::Vouchers,\n        &message,\n",
+          "to": "        &message,\n        ImportReport::Vouchers,\n        company,\n"
+        }
+      ],
+      "mutation": "0103f14cbbffb520f7d143b4412d7572",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::the_cancel_candidate_of_a_saved_batch_changes_only_its_actions",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "C03": {
+      "mutation": "d496b42da311e2c860cde3786527d9e2",
+      "reason": "equivalent: text that is not a UUID is read as the nil UUID instead of refused, and the nil UUID is refused further on (its version is Nil, not Random), with the same code, so no input is answered differently"
+    },
+    "C07": {
+      "mutation": "9fc7c3b0d86fbe9af7ae18081d448185",
+      "reason": "equivalent: the only UUID whose version is Nil is the nil UUID, which has the NCS variant, and the variant check refuses it with the same code; no other UUID reads as version Nil, so admitting Nil beside Random changes no answer"
+    },
+    "C15": {
+      "mutation": "016a76d871c635d5fc8a51f2f495640b",
+      "reason": "equivalent: the only UUID whose version is Max is the max UUID, which has the Future variant, and the variant check refuses it with the same code; no other UUID reads as version Max, so admitting Max beside Random changes no answer"
+    }
+  }
+}

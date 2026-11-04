@@ -1,0 +1,9 @@
+Kept on the lab PC, by size and sha256 (they hold party names):
+answers/s1-marks.xml 3406 B fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+answers/s2-ref-receivable.xml 13679490 B 5a406cab1a2fe7f6581591a0e910215c48cf380ce04f7558b0896f109a560f5a
+answers/s4-lo-p1-1.xml 205336 B 76e1b3e5e1ac8617e352ae3b8228af6f0b34c5a61b7a178290655e5f25ccd3af
+answers/s4-lo-p1-2.xml 205336 B 76e1b3e5e1ac8617e352ae3b8228af6f0b34c5a61b7a178290655e5f25ccd3af
+answers/s6-marks.xml 3406 B fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+lo/lo-p1.utf16le.xml 1196 B 87b020a84e143bcb1d769f2d478d2d3925f76333364de3e794da9fd16779a37c
+lo/party.txt 18 B 078b01c5dedf292fb5ddaa99be3cf344406fd8b88b427b1acc785494e3099b60
+stage-2119l.py (this stage script) 5342 B 9dcf786d78b97d01028500c5cc0239616fc9f0bd862012840126e6c2e09563a3

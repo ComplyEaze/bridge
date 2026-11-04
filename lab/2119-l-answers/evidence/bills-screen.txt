@@ -1,0 +1,11 @@
+screen rows 248 total pending 11815459.60 Dr
+row 1 date 20250402 ref DN-INV-000120 opening 5420.20 Dr pending 5420.20 Dr due 2-May-25 overdue 333
+row 2 date 20250403 ref DN-INV-000240 opening 10340.40 Dr pending 10340.40 Dr due 3-May-25 overdue 332
+row 3 date 20250405 ref DN-INV-000360 opening 15260.60 Dr pending 15260.60 Dr due 5-May-25 overdue 330
+row 4 date 20250406 ref DN-INV-000480 opening 20180.80 Dr pending 20180.80 Dr due 6-May-25 overdue 329
+row 5 date 20250408 ref DN-INV-000600 opening 25100.00 Dr pending 25100.00 Dr due 8-May-25 overdue 327
+row 244 date 20260325 ref DN-INV-029400 opening 65900.00 Dr pending 65900.00 Dr due 24-Apr-26 overdue -
+row 245 date 20260326 ref DN-INV-029520 opening 70820.20 Dr pending 70820.20 Dr due 25-Apr-26 overdue -
+row 246 date 20260328 ref DN-INV-029640 opening 75740.40 Dr pending 75740.40 Dr due 27-Apr-26 overdue -
+row 247 date 20260329 ref DN-INV-029760 opening 80660.60 Dr pending 80660.60 Dr due 28-Apr-26 overdue -
+row 248 date 20260331 ref DN-INV-029880 opening 85580.80 Dr pending 85580.80 Dr due 30-Apr-26 overdue -

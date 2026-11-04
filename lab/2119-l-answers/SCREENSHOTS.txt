@@ -1,0 +1,15 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/s0-gateway.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s0-select-company.png 96778 B eddc4bb237079bd4f5b3fbc340fee757e652a7119b16c634159c1eee5645a8d4
+shots/s2-after.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s2-during-1.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s4-after-send-1.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s4-after-send-2.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/s5-screen-first-page.png 149059 B 9920c1a37bc763801882f2d8b27ccd039df5be6d4db4b5476cccb0617b946e79
+shots/s5-screen-last-page.png 132690 B ff272b7de9a2a53e7aa85dd3cc031b0ce96d831c1b676eba8ebcbb65edee4ec6
+shots/s6-gateway.png 68784 B aced459504f17dbc8e8a325dc60163aaef021b97194570b05130ee57d1d2d02a
+shots/s7-after-shut.png 96767 B a91e006bd7651989dcaadd836efec7cb378cec47d15f738bdc7df0989ed655d7
+shots/stray-idle-1.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/stray-idle-2.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/stray-idle-3.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f
+shots/stray-idle-4.png 68743 B 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f

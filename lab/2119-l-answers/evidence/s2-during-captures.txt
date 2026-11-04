@@ -1,0 +1,1 @@
+capture s2-during-1.png 68743 B sha256 154e2c38ad431ef5a153e9d8aca2e332decc2ac8bcb8d41736f04f3ce377ea1f

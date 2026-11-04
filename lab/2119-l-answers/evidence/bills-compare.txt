@@ -1,0 +1,4 @@
+ref (this party) ok bytes 13679490 rows 248 sum -11815459.60
+lo ok bytes 205336 rows 248 sum -11815459.60
+lo bills 248 debit 248 credit 0 (sum 0) on_account 0 (sum 0) voucher_lines 248
+key ref+date matched 248 equal 248 differ 0 only_ref 0 only_lo_debit 0 repeated_keys 0

@@ -20,7 +20,6 @@ relay/c2/0025-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b254083208
 relay/c2/0026-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c2/0028-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c2/0029-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
-relay/c2/0030-response.bin 1391690 B e8f9564a5e4388aeb3c51b04200cf3059a3a2290175ad95ba3073ec0427467ca (the gate word f-r-e-e)
 relay/c2/0031-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c2/0032-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c2/0033-response.bin 428826 B f678fb4685cfdf0476b295483c3f92345bb8b9bb5bb1efff3dbe3b3d1fadbe39 (the gate word f-r-e-e)
@@ -34,8 +33,6 @@ relay/c3/0010-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b254083208
 relay/c3/0011-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c3/0016-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c3/0017-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
-relay/c3/0018-response.bin 1391690 B e8f9564a5e4388aeb3c51b04200cf3059a3a2290175ad95ba3073ec0427467ca (the gate word f-r-e-e)
-relay/c3/0020-response.bin 1391690 B e8f9564a5e4388aeb3c51b04200cf3059a3a2290175ad95ba3073ec0427467ca (the gate word f-r-e-e)
 relay/c3/0022-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c3/0023-response.bin 4000 B 71a660d81f173937a707e149ed78091fecf5b2540832085c0bbd2e83d2e6e238 (company number)
 relay/c3/0024-response.bin 428826 B f678fb4685cfdf0476b295483c3f92345bb8b9bb5bb1efff3dbe3b3d1fadbe39 (the gate word f-r-e-e)
@@ -54,3 +51,4 @@ reads/a6-marks.xml 4886 B dda4ec59f9d5139eb1403d37b989e60c973da1b16556f443ba2e6a
 reads/b9-marks.xml 4886 B dda4ec59f9d5139eb1403d37b989e60c973da1b16556f443ba2e6a0e00fc5455 (company number)
 BK-C16/TDBK1800_<company number>.001 42052 B 92cbf1217873eaea120c55e8d85d75bc71b9aaed74353a4311ec3b10d3ae53db (the backup: never pushed)
 stage-c16.py 7801 B 1c4f28b746e7f980766992bd552451776f4f5d8d8abe9f670d5a0d3988108543 (this stage script: its patterns name the lab paths)
+Note (4 Nov 2026, forward commit): the push gate's word check is whole-word, by the run lead's clarification. The voucher-window answers kept above only for Tally's empty element name that holds the word inside a longer token are now pushed whole, byte for byte: relay/c2/0030-response.bin, relay/c3/0018-response.bin, relay/c3/0020-response.bin. Each holds no company number and no counted 10+ digit run (VOUCHERKEY values exempt).

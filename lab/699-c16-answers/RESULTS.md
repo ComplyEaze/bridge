@@ -55,3 +55,5 @@ Tally's Gateway showed no dialog after Phase B (`shots/b10-gateway-before-shut.p
 Phase A ran as written. In Phase B, c2 holds every answer, `audit_test_run` answers with a result, `read_evidence` is all complete, c3 counts 53 with the types and dates on record, and b9 equals a6. So, by the sheet's first row, `c2`'s exchanges become the fixtures of clause 16(a)/(d)'s tests, measured against the synthetic lab book only. No shape is unkeyed. (verified; the reading is the sheet's)
 
 The four desktop-client connector servers stayed running: no call was made to them from this sitting, and their calls were not measured.
+
+Note (4 Nov 2026, forward commit): the push gate's word check is whole-word, by the run lead's clarification. The voucher-window answers listed above as kept only for Tally's empty element name that holds the word inside a longer token are now pushed whole, byte for byte: relay/c2/0030-response.bin, relay/c3/0018-response.bin, relay/c3/0020-response.bin. Each holds no company number and no counted 10+ digit run (VOUCHERKEY values exempt).

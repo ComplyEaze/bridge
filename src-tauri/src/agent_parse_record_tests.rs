@@ -71,6 +71,8 @@ const AARAV: &str = "bb8ad19e-6aef-4239-a917-87fec0c6215e";
 const BILL_ALLOCATION_LAB: &str = "74d7e825-396a-4667-90b2-83f593f06a36";
 const GST_CREDIT_PERIODS_LAB: &str = "46faa869-1208-4119-8961-f28db4df3b8e";
 const REOPEN_LAB: &str = "ec4454ae-5c4c-4bfa-b3b0-68182a749689";
+/// The class purchase capture's company (`agent_voucher_goods_lines_tests.rs`' `CLASS_PURCHASE_LAB`).
+const CLASS_PURCHASE_LAB: &str = "92a7ef97-dd28-4286-b02c-c059fcb8690e";
 
 /// Whether a fixture is evidence of what Tally sends.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -682,6 +684,11 @@ fn rows() -> Vec<Row> {
         "agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
         "parse_agent_rows(EINVOICE_LAB)",
         |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
+        "agent/class-purchase-lab/item-purchase-through-class.utf16le.xml",
+        "parse_agent_rows(CLASS_PURCHASE_LAB)",
+        |_, t| agent_rows(t, CLASS_PURCHASE_LAB)
     ));
     rows.push(row!(
         "agent/native-three-vouchers.utf16le.xml",

@@ -4039,6 +4039,10 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/agent/class-purchase-lab/item-purchase-through-class.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/agent/native-three-vouchers.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),

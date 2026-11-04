@@ -6,7 +6,7 @@
 
 For each day D of the set below it writes requests/r-a07-D.utf16le.xml: the template with only the company text and
 the day changed (the day stands in four places: the two date variables and the two bounds of the window formula).
-It is lab/2057-item-purchase-class-gst/gen_requests.py with one day added (20250613); the first three requests are
+It is lab/2057-item-purchase-class-gst/gen_requests.py with two days added (20250613 and 20250614); the first three requests are
 byte-equal to that sheet's.
 
 Run:  python -I gen_requests.py --out requests
@@ -24,7 +24,7 @@ TEMPLATE = os.path.join(HERE, "templates", "a07-vouchers-shape-20250424.xml")
 TEMPLATE_SHA256 = "47cf36c300a5cc31297033dba27c6233729e93d3ad6e17d72022e73d28352d9c"
 OLD_COMPANY, OLD_DAY = "BRIDGE SHAPE LAB", "20250424"
 COMPANY = "BRIDGE CLASS PURCHASE LAB"
-DAYS = ["20250610", "20250611", "20250612", "20250613"]
+DAYS = ["20250610", "20250611", "20250612", "20250613", "20250614"]
 
 
 def request(day):

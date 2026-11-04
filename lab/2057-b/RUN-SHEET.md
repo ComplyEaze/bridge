@@ -1,6 +1,6 @@
 # 2057-B item purchase on a voucher class, GST, after the central-tax ledger is completed (#2057): the 31 Oct invoices keyed again, one change at a time
 
-Not for merge. About 2.5 hours. This sheet WRITES by hand on Tally's screens: company GST details, two ledgers, one stock item, one voucher class and four Purchase vouchers. It then reads, and restores the book from one backup. ComplyEaze Bridge only reads. `SHA256.txt` lists every file here with its bytes; check it before step 0.
+Not for merge. About 2.5 hours. This sheet WRITES by hand on Tally's screens: company GST details, two ledgers (a third only if step 19 b runs), one stock item, one voucher class and four Purchase vouchers (a fifth only if step 20 runs). It then reads, and restores the book from one backup. ComplyEaze Bridge only reads. `SHA256.txt` lists every file here with its bytes; check it before step 0.
 
 `LAB-COMMON.md` in this folder applies in full. It is v3, byte-equal to the one in `lab/2057-item-purchase-class-gst` (sha256 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6). Where it and this sheet differ, the stricter holds. The row runs alone and restores its own backup.
 
@@ -15,7 +15,7 @@ Every read equalled Tally's screen. Its recorded causes:
 - **(b) and (d), the State head alone:** likely, at partial confidence. `ledger_masters` reads Lab CGST with `gst_duty_head` `absent` while Lab SGST reads State Tax, and did so before any change.
 - **(a), no tax through the class on I1:** unknown, unverified. I2 went through the same class and the same purchase ledger and did carry the State head. I1 opened in Accounting Invoice mode and was switched to Item Invoice before any line was keyed; I2 opened in Item Invoice.
 
-This row keys the same setup again (steps 3 to 8, word for word) and makes ONE more change: Lab CGST's duty head (step 9). Then it keys I1, C1 and I2 again, in the same order and with the same lines, and adds one invoice, I3, with I1's lines, keyed after I2.
+This row keys the same setup again (steps 3 to 8, word for word) and makes ONE more change before any invoice: Lab CGST's duty head (step 9). Then it keys I1, C1 and I2 again, in the same order and with the same lines, and adds one invoice, I3, with I1's lines, keyed after I2.
 
 **Records:**
 - whether C1 carries both heads once Lab CGST has its head (tests the cause of (b) and (d));
@@ -26,7 +26,10 @@ This row keys the same setup again (steps 3 to 8, word for word) and makes ONE m
 
 **Limit, whatever the result:** one book, one release, one voucher per shape, intra-state only.
 
-**What this row does not change.** It makes no change to `Lab Purchases`. On 31 Oct its GST Rate Details read "As per Company/Group" at 0 %. Tally's list for that field was never opened, so the values it offers are not known, and C1 and I2 computed the State head through that same ledger. A change to it waits for this row's result and a ruling.
+**A second change, only if the class still computes nothing (B2, step 19).** On 31 Oct, `Lab Purchases`' GST Rate Details read "As per Company/Group" at 0 %. Tally's list for that field was never opened, so its values are not known. C1 and I2 computed the State head through that same ledger.
+- **When it runs:** only when I1-B and I3 both carry no tax amount, and only after the reads of steps 14 to 18.
+- **What it does:** it opens that list and transcribes it. It changes the ledger's rate details only if one entry, by its own label, puts the details on this ledger.
+- **Then:** I1-C, I1's lines again, is keyed and read. Otherwise the row records the list and goes to the restore.
 
 ## Rules and company
 
@@ -49,7 +52,7 @@ If it is absent, or step 1's answers differ from 31 Oct's as step 1 sets out: ST
 Differences from LAB-COMMON (the stricter rule holds everywhere else):
 1. **Two kinds of read.**
    - **Tool reads** are calls of ComplyEaze Bridge's built tool, one at a time.
-   - **Raw reads** by curl are allowed by the owner's decision of 26 Oct 2026 for shape discovery. They are only the four files in `requests/`, written by `gen_requests.py` from the committed vouchers request (`python -I gen_requests.py --check` must print its ok line, with 4 requests, before step 0), and sent by C3's line, each answer under 2,000,000 bytes. The first three are byte-equal to the 31 Oct sheet's.
+   - **Raw reads** by curl are allowed by the owner's decision of 26 Oct 2026 for shape discovery. They are only the five files in `requests/`, written by `gen_requests.py` from the committed vouchers request (`python -I gen_requests.py --check` must print its ok line, with 5 requests, before step 0). The 20250614 one is sent only if step 20 keys I1-C, and sent by C3's line, each answer under 2,000,000 bytes. The first three are byte-equal to the 31 Oct sheet's.
    - An empty envelope, a 0-byte 200 answer or an in-band refusal is a **result**, recorded whole.
 2. **Marks.** M (`ALTMSTID`) and V (`ALTVCHID`) are read with `ledger_masters` (basic, first page, no `snapshot_id`): `snapshot.master_alter_id`, `snapshot.voucher_alter_id` (null was read after the 31 Oct restore; record it as read), `snapshot.reused` false.
    - Each master save raises M by at least 1 and leaves V unchanged. Record the exact rise. On 31 Oct steps 3 and 8 each moved M by 2.
@@ -60,7 +63,7 @@ Differences from LAB-COMMON (the stricter rule holds everywhere else):
    - **Then:** the 21 Oct BK1 (24,100 bytes, sha256 `324bd37e5e2e5af6e55c3a45e1dad45e1e78c5e1a899da4e4114233d81dc9d49`).
 4. **Keys.**
    - Accept with Ctrl+A. Leave a creation, alteration or voucher screen with ONE Ctrl+Q, only after a screenshot shows its title.
-   - **Never Ctrl+Q or Escape at the Gateway of Tally**, never two Ctrl+Q in one call, never Escape on a master or voucher screen (C7).
+   - **Never Ctrl+Q or Escape at the Gateway of Tally**, never two Ctrl+Q in one call, never Escape on a master or voucher screen (C7). The one exception is step 19 a: ONE Escape closes the GST Rate Details list without choosing, on the run coordinator's ruling.
    - A sub-form Tally opens by itself (Receipt Details, Party Details, a GST rate screen) is accepted as shown unless the step names a field, with a screenshot.
    - The one dialog answered is the one the 31 Oct row met at Create > GST Registration: "GST Registration already exists for the Company. Do you want to alter the existing GST Registration or create a new GST Registration?" Answer **Alter Existing**. Any other dialog = C7.
    - Reach a master by the label read on screen before Enter, not by a count of Up or Down presses (the 31 Oct step 7 slip).
@@ -88,7 +91,7 @@ Client: `scripts/client.py` of `lab/2057-item-purchase-class-gst-answers` at a8b
 ## Files
 
 - `gen_requests.py` and `templates/` (one committed request);
-- `requests/` (four generated reads);
+- `requests/` (five generated reads);
 - `LAB-COMMON.md`, `.gitattributes`, `SHA256.txt`.
 
 ## Steps
@@ -118,6 +121,11 @@ Steps 3 to 8 are the 31 Oct sheet's steps 3 to 8, word for word. The 31 Oct mark
 
    Screenshot before the Accept. EXPECT M 218. (On 31 Oct the screen showed one "GST Rate" field, keyed 18 %.)
 7. **The purchase ledger** (Alter > Ledger > `Lab Purchases`): record, with a screenshot, every GST field the screen shows (GST applicability, Type of Supply, any rate details). Change nothing. Leave with ONE Ctrl+Q after the screenshot (no Accept: no save, no mark). EXPECT M 218.
+   - **Added to the 31 Oct step, one look with no save:** on 31 Oct a "1 ▾" marker showed one more line below the left panel, and a mouse-wheel scroll did not move it. Before the Ctrl+Q, try to bring that line into view:
+     - Use the Down arrow only, one press at a time, with a screenshot after each. Never press Enter, which can reach the Accept prompt, and never type into a field.
+     - Transcribe the line's label and value once it shows.
+     - If the cursor reaches the last field and the line has not shown, record that and stop trying.
+     - Then ONE Ctrl+Q. If Tally asks anything on leaving, that is C7: no key, STOP. Marks: 218, unchanged.
 8. **The voucher class** (Alter > Voucher Type > `Purchase` > Name of Class: `Lab Class`), exactly as on 21 Oct:
    - default accounting allocation `Lab Purchases` 100%;
    - additional accounting entries `Lab CGST` and `Lab SGST`, Type of Calculation `GST` (set by Tally), Remove if Zero Yes;
@@ -193,7 +201,7 @@ The book after step 13: step 9's, plus I1-B, C1-B, I2-B and I3.
 - **from `vouchers`:** each entry's ledger and amount, and `goods_lines`;
 - **from `purchase_register`:** the row's `status`, `tax_in_books` (ledger, head, raw_head, amount), `taxable_entries`, `has_taxable_entry`, `party_entries` and `other_entries`, or the side list it is in.
 
-**EXPECT:** each amount in the raw answer, in `vouchers` and in `purchase_register` equals Tally's screen for the same voucher. A difference is the FINDING, reported whole before step 19.
+**EXPECT:** each amount in the raw answer, in `vouchers` and in `purchase_register` equals Tally's screen for the same voucher. A difference is the FINDING, reported whole before anything more is keyed.
 
 **Answer, from what was recorded:**
 - **(a)** Did C1-B carry both heads? If so, at what amounts?
@@ -202,16 +210,45 @@ The book after step 13: step 9's, plus I1-B, C1-B, I2-B and I3.
 - **(d)** What rounding is stored on each head of I2-B, and is there a round-off line?
 - **(e)** Where does `Lab Purchases` sit in each voucher: a ledger entry of its own, or only inside the goods line's accounting allocation? Hence `has_taxable_entry`. In which `purchase_register` list is each voucher?
 
+### B2: only if I1-B and I3 both carry no tax amount
+
+If either I1-B or I3 carries a tax amount on either head, skip steps 19 to 22 and go to step 23. Record "B2 not run" and the reason.
+
+19. **B2: the purchase ledger's GST Rate Details** (Alter > Ledger > `Lab Purchases`). This is the run coordinator's ruling, so that no value is guessed.
+    - **a. Read the list.** Screenshot the screen as it opens. Open the list of the field labelled "GST Rate Details" (on 31 Oct it read "As per Company/Group"). Screenshot the list whole and transcribe every entry in it. Then ONE Escape closes the list without choosing (rule 4's one exception). Screenshot.
+    - **b. If one entry, by its own label, puts the details on this ledger** (for example "Specify Details Here"):
+      - Choose it.
+      - Set Taxability Type to `Taxable` and GST Rate to `18` (%), the item's rate keyed at step 6.
+      - Leave HSN/SAC Details and every other field as shown: that would be a second variable. A sub-form Tally opens by itself is accepted as shown, apart from those two fields (rule 4), with a screenshot.
+      - Record each field's name and value from the screen. Screenshot before the Accept, then Accept.
+      - Marks: M up, V unchanged; record the rise.
+    - **c. If no entry does that, or more than one could:** leave with ONE Ctrl+Q, with no save. Record the list. Skip steps 20 to 22 and go to step 23. If Tally asks anything on leaving, that is C7: no key, STOP.
+    - **d. Read it** (after b only): `ledger_masters` `fields` `compliance`, `include_gst_details` true: the five ledgers' rows whole. Record `Lab Purchases`' `compliance.gst_details` as read; it is a result, not an EXPECT. A read that shows any change on another ledger = STOP.
+20. **I1-C, 14-06-2025, through the class, I1-B's lines again:** as I1-B, with Supplier Invoice No. `LAB-2057-5`, dated 14-Jun-25, 5 Nos @ 100.00 = 500.00.
+    - Record the mode it opened in before any key. If it is not Item Invoice, Ctrl+H to Item Invoice as on I1-B.
+    - **EXPECT on screen:** Lab CGST 45.00 and Lab SGST 45.00, total 590.00. Whatever is shown is recorded and accepted as it stands (rule 5).
+    - Accept. Marks: V +1.
+21. **The reads of I1-C.** Marks before (M2, V2). Then, in this order:
+    - the raw `requests/r-a07-20250614.utf16le.xml` (C3's line), with a screenshot after it;
+    - `vouchers` with `from` and `to` 20250614 and `goods_lines` true;
+    - `purchase_register` 20250601 to 20250630;
+    - `ledger_masters` and `masters` as at step 16.
+
+    Marks after: equal to M2 and V2, else STOP. Record I1-C by structure as above.
+22. **Tally's screens:** I1-C from the Day Book (14 Jun 2025), and the Purchase Register for June 2025, each screenshotted and transcribed. The EXPECT of the reads holds for I1-C.
+
+- **(f)** Did B2's list offer an entry that puts the details on the ledger? If B2 ran, did I1-C carry tax, on which heads, at what amounts? What did `ledger_masters` read on `Lab Purchases` after it?
+
 ### Back to the start
 
-19. **Restore** (C6) from BK3, on the run coordinator's explicit RESTORE. Then, in order:
+23. **Restore** (C6) from BK3, on the run coordinator's explicit RESTORE. Then, in order:
     - a screenshot of the Gateway (Current Date 1-Apr-2025, "No Vouchers Entered"), compared byte for byte with step 0's;
     - `list_companies`: exactly THE COMPANY, `verified_tuple`, the same GUID;
     - marks equal to those after BK3 (M0, V0);
     - `ledger_masters` and `masters` as in step 1, equal.
 
     Anything else = STOP; the fallback is rule 3's.
-20. Hash the exe. LAB-COMMON C10: Company > Shut from the Gateway's menu (never Ctrl+Q at the Gateway); Select Company with none loaded; Tally's current date as step 0 recorded; one tally.exe; 9001 LISTENING; `GET /status` 200.
+24. Hash the exe. LAB-COMMON C10: Company > Shut from the Gateway's menu (never Ctrl+Q at the Gateway); Select Company with none loaded; Tally's current date as step 0 recorded; one tally.exe; 9001 LISTENING; `GET /status` 200.
 
 ## STOP rules
 
@@ -219,8 +256,9 @@ LAB-COMMON's, with rules 1 to 6 above. Also:
 - a raw answer that does not parse as XML;
 - a voucher saved with a wrong item, quantity, rate, party or date (do not alter it: STOP and report what was saved);
 - any identifier keyed other than the three of the Identifiers rule;
-- any change to a master other than the six of steps 3 to 6, 8 and 9;
+- any change to a master other than those of steps 3 to 6, 8, 9 and (only as step 19 b sets out) 19;
 - step 9's STOP cases;
+- a key at step 19 other than those it names;
 - any prompt not named here (C7).
 
 ## What the book holds after each step (C8)
@@ -232,14 +270,17 @@ LAB-COMMON's, with rules 1 to 6 above. Also:
 | step 8 | and `Lab Class` |
 | step 9 | and Lab CGST's head |
 | steps 10 to 13 | and I1-B, then C1-B, then I2-B, then I3 |
-| step 19 | as at BK3, the book of step 1 |
+| step 19 (b only) | and `Lab Purchases`' GST Rate Details on the ledger, Taxable 18 % |
+| step 20 (if run) | and I1-C |
+| step 23 | as at BK3, the book of step 1 |
 
 ## What the row decides
 
 - **C1-B carries 45.00 on each head, and every read equals the screen:** the State head alone on 31 Oct was the book's incomplete CGST ledger. A plain-type item purchase with both heads is recorded once in the protocol reference, verified on one voucher.
 - **I1-B, I2-B or I3 carries both heads, and the reads equal the screen:** the class computes once the ledgers are whole. That is #2057's acceptance: a capture and a protocol reference entry with its confidence marker, and no code. The answer of that voucher is committed as a fixture by the gate's manifest route.
 - **I1-B and I3 differ:** the opening mode, or the order of keying, is recorded as the only difference seen, unverified as the cause.
-- **No class invoice carries tax while C1-B does:** recorded. #2057 stays open. The next change (for example to `Lab Purchases`) waits for a ruling and a sheet of its own.
+- **I1-B and I3 carry no tax, and I1-C after B2 carries both heads:** the purchase ledger's rate details are what held the class at zero. Recorded at the confidence one voucher gives, and the same acceptance as above.
+- **No class invoice carries tax, I1-C included or B2 not possible:** recorded, with B2's list. #2057 stays open. Any next change waits for a ruling and a sheet of its own.
 - **A read differs from the screen:** stop and report. Any code waits for a ruling.
 
 ## What master admits, at ae9a1bb5
@@ -263,7 +304,7 @@ LAB-COMMON's, with rules 1 to 6 above. Also:
 - the class's settings in any read: no existing request fetches a voucher class, so the class is recorded from Tally's screen only;
 - a voucher's class name (not in the vouchers request's fetch list);
 - `vouchers` `include_gst_details` (not passed);
-- any change to `Lab Purchases`;
+- `Lab Purchases`' HSN/SAC details, or its rate details unless step 19 b runs;
 - other releases, Gold, Education mode;
 - several items, a discount, cess.
 

@@ -2933,5 +2933,75 @@ class MergeWrapperControls(unittest.TestCase):
                 self.assertEqual(calls, [])
 
 
+class PrivacyMutationRecordDigests(unittest.TestCase):
+    """A tax-audit mutation record's `"mutation"` and `"crate_tree"` values, 16 lowercase hex with at least one letter,
+    are masked before the counts. Any other key, length or case, an all-digit value, and any other shape on the line are
+    still scanned. Every value is built at run time."""
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+        self.mobile = "".join(str(9 - index) for index in range(10))  # a ten-digit run led by a 9
+        self.with_phone = "a" + self.mobile + "bcdef"
+        self.with_run = run_of(12) + "abcd"
+
+    def line(self, mutation, crate_tree=None, key="mutation", extra=""):
+        crate_tree = self.with_run if crate_tree is None else crate_tree
+        return (
+            '  "C42-01": {"commit": "%s", "crate_tree": "%s", "killers": ["tests/registry.rs::a_test"], '
+            '"mode": "proof", "%s": "%s", "time": "2026-11-04T10:00:00+00:00", "verdict": "killed"%s},'
+            % (HEAD, crate_tree, key, mutation, extra)
+        )
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def assert_blocked(self, text):
+        blockers = self.blockers(text)
+        self.assertTrue(any("long digit run" in b or "identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_a_records_line_with_digit_runs_in_both_digests_is_clean(self):
+        for text in (self.line(self.with_phone), self.line(self.with_run, self.with_phone)):
+            record = self.privacy.scan(text, HEAD)
+            self.assertEqual(record["blockers"] + record["indeterminate"], [], text)
+            self.assertIn("2 mutation-record digest(s) were masked", record["notes"])
+
+    def test_explain_locates_nothing_on_a_records_line_and_still_locates_another_key(self):
+        document = {"sources": [], "added": [
+            {"path": "parity/mutation-results.json", "line": 1, "text": self.line(self.with_phone)},
+            {"path": "parity/mutation-results.json", "line": 2, "text": self.line(self.with_phone, key="note")},
+        ]}
+        hits = self.privacy.explain(document, HEAD)["hits"]
+        self.assertEqual([hit["where"] for hit in hits], ["parity/mutation-results.json:2"], hits)
+
+    def test_a_phone_alone_in_a_mutation_field_still_blocks(self):
+        self.assert_blocked(self.line(self.mobile))
+
+    def test_an_all_digit_sixteen_character_value_still_blocks(self):
+        self.assert_blocked(self.line(run_of(16)))
+        self.assert_blocked(self.line(self.with_phone, run_of(16)))
+        self.assert_blocked(self.line(self.mobile + run_of(6)))
+
+    def test_the_same_value_under_another_key_or_in_another_form_still_blocks(self):
+        for text in (
+            self.line(self.with_phone, key="note"),
+            self.line(self.with_phone, key="mutations"),
+            self.line(self.with_phone.upper()),
+            self.line(self.with_phone + "0"),
+            self.line(self.with_phone[:-1]),
+            self.line(self.with_phone).replace('"mutation": "', '"mutation":"'),
+            self.line(self.with_phone).replace('"mutation": "', 'mutation: "'),
+            '{"mutation": "%s" }' % self.with_phone.replace("b", "", 1),
+            "mutation digest " + self.with_phone,
+        ):
+            self.assert_blocked(text)
+
+    def test_a_pan_or_gstin_elsewhere_on_the_line_still_blocks(self):
+        pan = "ABCDE" + "1234" + "F"
+        for extra in (', "party": "%s"' % pan, ', "gstin": "%s"' % ("07" + pan + "1Z5")):
+            text = self.line(self.with_phone, self.with_phone, extra=extra)
+            blockers = self.blockers(text)
+            self.assertTrue(any("1 identifier shape" in b for b in blockers), (text, blockers))
+
+
 if __name__ == "__main__":
     unittest.main()

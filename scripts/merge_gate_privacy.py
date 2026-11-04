@@ -26,6 +26,9 @@ UUID_OR_DIGEST_RE = re.compile(
     r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
     r"[0-9A-Fa-f]{12}|[0-9A-Fa-f]{32,}"
 )
+# A tax-audit mutation record's two 16-hex digests, in the exact JSON context the mutation runner writes. The value must
+# hold at least one of a-f, so an all-digit value in either field is still scanned; no other key or length is masked.
+RECORD_DIGEST_RE = re.compile(r'("(?:mutation|crate_tree)": ")(?=[0-9a-f]{0,15}[a-f])[0-9a-f]{16}(")')
 ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
 # Boundaries include ordinary words plus snake/kebab field names and the first
@@ -509,8 +512,11 @@ def scan(text, head, fixture_provenance=None):
         add(record, "blockers", "privacy scan found %d customer email shape(s)" % email_count)
 
     uuid_tokenized = tokenize_uuids(credential_tokenized, allowed, record)
-    redacted = UUID_OR_DIGEST_RE.sub("<digest>", uuid_tokenized)
-    exempt = len(UUID_OR_DIGEST_RE.findall(uuid_tokenized))
+    record_masked, record_digests = RECORD_DIGEST_RE.subn(r"\1<digest>\2", uuid_tokenized)
+    if record_digests:
+        add(record, "notes", "%d mutation-record digest(s) were masked" % record_digests)
+    redacted = UUID_OR_DIGEST_RE.sub("<digest>", record_masked)
+    exempt = len(UUID_OR_DIGEST_RE.findall(record_masked))
     if exempt:
         add(record, "notes", "%d added/path line(s) carried generated UUID/digest shapes; inspect those lines" % exempt)
 

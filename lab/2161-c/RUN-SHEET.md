@@ -1,4 +1,4 @@
-# Windows item 2161-C v1: on master's Windows bundle, does the product's approval box get a taskbar button, and is it listed in Alt+Tab? Read three ways, with one Alt+Tab per cell, every box answered No by mouse. (Part of #2161)
+# Windows item 2161-C v2: on master's Windows bundle, does the product's approval box get a taskbar button, and is it listed in Alt+Tab? Read three ways, with one Alt+Tab per cell, every box answered No by mouse. (Part of #2161)
 
 WRITES to the book: NONE. **No ComplyEaze Bridge server is launched.**
 
@@ -40,6 +40,10 @@ Every box comes from the product's own dialog child, fed a fixed text, so with n
 
   All of them ran in rows 1780-H, 2161-A and 2161-B and are kept byte for byte, so their hashes hold. Some headers still say "NOT RUN"; that predates those rows. `confirm-input.txt` holds a nonce line, the count 1 and a 23-line box text with zero GUID and amounts. The child prints a token only on Yes; with no server, nothing can post.
 - **New, read-only: `requests/taskbar-uia.ps1`.** `taskbar-uia.ps1 -Out <file>` lists every Button element under the taskbar (`Shell_TrayWnd`) as UI Automation finds them: a `B` line each, with its parent's class (`MSTaskListWClass` for a running program's button on Windows 10), class, rectangle and name, then a `Z` line with the count and the count in the task list. It is per-monitor DPI aware and invokes no pattern. Its C# compiled with Mono; the PowerShell has not run, so B2 checks it first.
+  - **v2 (4 Nov 2026): the read goes through the COM client, IUIAutomation in `UIAutomationCore.dll`** (CUIAutomation8, else CUIAutomation). It no longer uses the managed `System.Windows.Automation` client.
+    - **Why:** in v1's B2, with Tally in front, the managed client read `buttons=0` and `in_task_list=0`, while the `PrintWindow` copy showed 6 running programs' buttons. A managed walk of `Shell_TrayWnd` found 19 Pane elements and nothing under `MSTaskListWClass`, from both the runner and a PowerShell STA. That the COM client reaches the buttons is unverified, and B2 checks it.
+    - **What changes:** this script, this note and the read check in B2; nothing else. Its lines are v1's, with `client=com8` or `client=com` added to the `E` line. The query is the same: Button elements among the descendants of `Shell_TrayWnd`, each with its control-view parent's class. Every other file and step is v1's.
+    - The C# compiled with Mono with no warning, and every interface slot and GUID it uses was checked against Wine's `uiautomationclient.idl`. It has not run.
 - **New, read-only: `requests/switcher-watch.ps1`.** `switcher-watch.ps1 -Name <cell> -OutDir <shots> -Out <file> -Seconds <n>` is started before a cell. It polls every 50 ms for the switcher, a visible, uncloaked window of class `MultitaskingViewFrame` on Windows 10. When the switcher first shows, it writes:
   - an `A` line with the foreground;
   - about 300 ms later, one whole-screen copy, `<cell>-switcher.png` (a `C` line);
@@ -112,7 +116,7 @@ The cell runner is the lab's own, as in row 2161-B. It is committed with the ans
   - the runner's sha256, recorded;
   - a case-insensitive scan of the runner for any variable name spelled two ways. EXPECT none; any = fix the runner first.
 - **B2. The idle read X0.** No box open, Tally maximised and in front, only Tally and the runner. Run the read set X with `<cell>` = `x0`. EXPECT:
-  - `uia-x0.txt`: `dpi_context=ok`, a `B` line in the task list (`parent_class=MSTaskListWClass`) whose name contains "Tally", and `in_task_list` equal to the number of task buttons the `x0` `PrintWindow` copy shows;
+  - `uia-x0.txt`: `dpi_context=ok`, `client=com8` or `client=com`, a `B` line in the task list (`parent_class=MSTaskListWClass`) whose name contains "Tally", and `in_task_list` equal to the number of task buttons the `x0` `PrintWindow` copy shows. **This is the known answer for the read: no cell runs until it is met.**
   - `cover-x0.txt`: `dpi_context=ok`, the `T` line and the `W` lines.
 
   A throw, a missing line, or counts that differ: record the output whole and STOP.

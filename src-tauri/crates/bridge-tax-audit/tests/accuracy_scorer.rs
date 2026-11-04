@@ -307,6 +307,75 @@ fn a_voucher_is_matched_by_type_number_and_date_through_its_guid() {
     assert_eq!(f.extra, vec![voucher("Journal", "J/2", "2025-06-01")]);
 }
 
+/// A key and the Book are compared in NFC, whichever of them writes a name decomposed: a key's
+/// ledger name with a combining accent matches the dump's composed name, and a voucher's type and
+/// number match when either the key or the Book holds them decomposed. Each case decomposes one
+/// field on one side only, so each of the scorer's normalisations is needed by a case of its own.
+#[test]
+fn a_decomposed_name_type_or_number_matches_its_composed_form() {
+    let key = KEY.replace("Invented Debtor C", "Invented De\u{301}biteur C");
+    let got = score(
+        &open(&key).unwrap(),
+        &dump(vec![finding(DEBTOR, &["Invented D\u{e9}biteur C"])]),
+        &Book::default(),
+    )
+    .unwrap();
+    assert_eq!(family(&got, RECOVERABILITY).matched, 1);
+
+    let (composed_type, decomposed_type) = ("Re\u{e7}u", "Rec\u{327}u");
+    let (composed_number, decomposed_number) = ("J/\u{e9}2", "J/e\u{301}2");
+    let book_with = |vtype: &str, number: &str| {
+        let mut book = book();
+        let mut found = 0;
+        for v in book.vouchers.iter_mut().filter(|v| v.guid == JOURNAL_J2) {
+            v.vtype = vtype.to_string();
+            v.number = number.to_string();
+            found += 1;
+        }
+        assert!(found > 0);
+        book
+    };
+    let d = lag_dump(json!([{"kind": "voucher", "id": JOURNAL_J2, "label": ""}]));
+    for (book_type, book_number, key_type, key_number) in [
+        (
+            composed_type,
+            composed_number,
+            decomposed_type,
+            composed_number,
+        ),
+        (
+            composed_type,
+            composed_number,
+            composed_type,
+            decomposed_number,
+        ),
+        (
+            decomposed_type,
+            composed_number,
+            composed_type,
+            composed_number,
+        ),
+        (
+            composed_type,
+            decomposed_number,
+            composed_type,
+            composed_number,
+        ),
+    ] {
+        let got = score(
+            &open(&lag_key(&voucher_item(key_type, key_number, "2025-06-01"))).unwrap(),
+            &d,
+            &book_with(book_type, book_number),
+        )
+        .unwrap();
+        assert_eq!(
+            family(&got, LAG).matched,
+            1,
+            "Book {book_type:?} {book_number:?}, key {key_type:?} {key_number:?}"
+        );
+    }
+}
+
 /// A voucher ref with an empty GUID is counted as unresolved, never matched from its label, even
 /// when the label spells the key's voucher exactly.
 #[test]

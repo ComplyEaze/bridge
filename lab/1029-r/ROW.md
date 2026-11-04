@@ -24,6 +24,8 @@ BUILD-M, the one already staged for row 2161-C:
 - the `unsigned-bundle-smoke-windows-latest` artifact of CI run 41772223948, the merge-queue run of #2329 at 187e882b5176a3b577d57f257a6ec4319fc2aecd;
 - artifact id 13295846440, 59,336,955 bytes, GitHub digest `sha256:1940bd9736edc2aa76d811b3bcd0d6229ee69b5e01f5f59321a46b6ca28f691a`, expiring 11 Nov 2026.
 
+This is the 187e882b build, not master's head. Master moved to 91059155 (#2331) on 4 Nov 2026. That commit changes only the gate's data files (`scripts/merge-gate-lab-captures.json`, `scripts/merge-gate-synthetic-uuids.json`) and no source, so every line cited below is the same on both.
+
 Check the zip's sha256 against the digest, and `bridge_mcp.exe` against `mcpb-smoke.json`, before the first call. Either differing is a stop. Record the exe's sha256 before and after.
 
 Over stdio, directly on 9001, no relay: `BRIDGE_AGENT_ENABLE_WRITES=true`, `BRIDGE_TERMS_ACCEPTED=true`, `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9001`, one new empty `BRIDGE_AGENT_DATA_DIR` for the whole row, `BRIDGE_AGENT_ENABLE_BATCH_POST` absent (set, `post_import` refuses `setting_retired`), `BRIDGE_AGENT_REDACTION` unset. One `bridge_mcp` process for the whole row, so the batch journal carries from each build to its post and its check.

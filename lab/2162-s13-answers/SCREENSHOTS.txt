@@ -1,0 +1,14 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the whole Tally window (PrintWindow).
+shots/s1-after-bk.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s1-bk-before-accept.png 71905 B d2648451d36313847e1041cef0e42d118a4ca50dddade747379fd92e08c179d3
+shots/s1-gateway.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s1-tally-window-start.png 95851 B a6a0fec923130e9146d02ed0c866df59bf40e6372012b1b9095162201c506e0d
+shots/s3-after-ledger.png 68714 B 20889a9837aa00cb66c45e54bd520f5dd58b0bab838bff9a17395d4db03deadc
+shots/s4-after-import.png 68714 B 20889a9837aa00cb66c45e54bd520f5dd58b0bab838bff9a17395d4db03deadc
+shots/s5-after-import.png 68714 B 20889a9837aa00cb66c45e54bd520f5dd58b0bab838bff9a17395d4db03deadc
+shots/s6-after-restore.png 96570 B b39b4c98fec7313582392b865141522eeba9ac7c85870252220a31add3cc09a9
+shots/s6-after-shut.png 96570 B b39b4c98fec7313582392b865141522eeba9ac7c85870252220a31add3cc09a9
+shots/s6-gateway-after-restore.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s6-restore-accept-prompt.png 45398 B a56f5791832fc93b339cb95ddefa551a8c2b4654650668a702eea0c0964a6448
+shots/s6-restore-replace-prompt.png 51503 B 3cb2b8383402da3580d993957cfde53f6841030b3c0abec31cbf87297a2234de
+shots/s7-after-shut.png 96583 B d3d433dba42d6f47a5dd1d4009bbe1ad436ab99b01e28079e8fca472e6d5114d

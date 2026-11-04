@@ -1,0 +1,4 @@
+2026-11-04T17:36:00Z python -I count.py --diff a-s2-R-0010.xml a-s5r-R-0010.xml
+exit 0
+== --diff a-s2-R-0010.xml a-s5r-R-0010.xml
+   legs: 6 -> 6

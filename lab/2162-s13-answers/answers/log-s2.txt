@@ -1,0 +1,5 @@
+23:02:48	C-catalogue.xml	a-s2-C-catalogue.xml	curl 0	25010 bytes
+23:02:48	Q-rates.xml	a-s2-Q-rates.xml	curl 0	82392 bytes
+23:02:48	N-0053.xml	a-s2-N-0053.xml	curl 0	3022 bytes
+23:02:49	N-0054.xml	a-s2-N-0054.xml	curl 0	3022 bytes
+23:02:49	R-0010.xml	a-s2-R-0010.xml	curl 0	94474 bytes

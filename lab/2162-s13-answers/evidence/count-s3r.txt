@@ -1,0 +1,16 @@
+python -I count.py a-s3r-C-catalogue.xml a-s3r-Q-rates.xml a-s3r-M-marks.xml
+exit 0
+== a-s3r-C-catalogue.xml: 26224 bytes
+  STATUS '1'
+  LEDGER rows: 19; named 'BRIDGE Customer RJ': 1
+   PARENT 'Sundry Debtors'; ISBILLWISEON 'No'
+== a-s3r-Q-rates.xml: 85190 bytes
+  STATUS '1'
+  LEDGER rows: 19; named 'BRIDGE Customer RJ': 1
+   PARENT 'Sundry Debtors'; PARTYGSTIN <absent>; STATENAME <absent>
+   LEDGSTREGDETAILS.LIST: APPLICABLEFROM '20260401'; GSTREGISTRATIONTYPE 'Regular'; PLACEOFSUPPLY 'Rajasthan'; GSTIN '08ZZZZZ0000Z1ZQ'
+   LEDGSTREGDETAILS.LIST elements: 1 of which non-empty: 1
+== a-s3r-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '246'
+  COMPANY rows: 1

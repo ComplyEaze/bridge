@@ -1,0 +1,14 @@
+2026-11-04T17:34:35Z python -I count.py a-s3-I-seed.xml
+exit 0
+== a-s3-I-seed.xml: 538 bytes
+  root RESPONSE
+  CREATED '1'
+  ALTERED '0'
+  DELETED '0'
+  LASTVCHID '0'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '0'

@@ -1,0 +1,3 @@
+23:04:41	C-catalogue.xml	a-s3r-C-catalogue.xml	curl 0	26224 bytes
+23:04:41	Q-rates.xml	a-s3r-Q-rates.xml	curl 0	85190 bytes
+23:04:41	M-marks.xml	a-s3r-M-marks.xml	curl 0	3394 bytes

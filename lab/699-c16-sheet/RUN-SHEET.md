@@ -1,7 +1,7 @@
 # 699-C16: nineteen vouchers added to BRIDGE SFT LAB for clause 16(a)/(d), and the book's audit read recorded byte for byte. WRITE sitting, then READ-ONLY.
 
 Not for merge. Part of #699 (clause 16(a)/(d), step 1). Written 4 Nov 2026 at master `1400175e`; C16 to C18 and `Tax Held C16`, then C19,
-added the same day, before any of it was run. `SHA256.txt` lists every file here with its bytes; check it before step A0. Confidence of everything here until the row runs: unverified.
+added the same day, before any of it was run. Row C16-R, at the end, was added after the row ran. `SHA256.txt` lists every file here with its bytes; check it before step A0. Confidence of everything here until the row runs: unverified.
 
 ## Rules and company
 `LAB-COMMON.md` in this folder applies in full. It is v3, a byte copy of the one on `lab/699-sft-candidates-sheet`, sha256
@@ -170,3 +170,79 @@ stays on the lab PC, listed by size and sha256, as R1's results did. Screens sta
 SHA to the run coordinator before pushing.
 
 Restore: none. Keep THE COMPANY as it stands after Phase B. `BK-C16` holds it as R1 read it, with 34 vouchers.
+
+## Row C16-R: one voucher keyed again, so its window can be pushed (WRITE, then READ-ONLY)
+Added 4 Nov 2026, after the row above ran (`lab/699-c16-answers` at 491b4ce4). Run it after row 2057-C, on the run coordinator's
+word. Everything above still applies, except as said here.
+
+**Why.** Phase B's answer to the 1-Feb-2026 to 31-Mar-2026 voucher window (`relay/c2/0033`, and its copies in c3) stays on the lab
+PC: one NAME element in it has a GUID-shaped value with a run of 10 digits. That window holds C15 to C19, which the fixtures need.
+- Tally made that value when the voucher was keyed. Keying the voucher again gives it a new one.
+- Keying again changes the book's marks and census. The whole audit read is therefore made again (R5), so that every fixture comes
+  from one read.
+
+R0. Load THE COMPANY alone (C1), then **r0 marks**: EXPECT one COMPANY row with this GUID, byte-identical to the a6 and b9 answers
+    (sha256 dda4ec59f9d5139eb1403d37b989e60c973da1b16556f443ba2e6a0e00fc5455; V 53, M 230). Anything else: STOP.
+
+R1. **Name the voucher** from the kept file `relay/c2/0033-response.bin`, by structure only:
+    - find the VOUCHER element that holds the NAME element with the GUID-shaped value, by parsing the file, not by a text search;
+    - record that voucher's VOUCHERTYPENAME, VOUCHERNUMBER and DATE, and the name of the list element directly above that NAME;
+    - record nothing else from it, and never the value.
+
+    EXPECT exactly one such voucher. None, or more than one: STOP and report the count.
+
+R2. **Back up** THE COMPANY by C5 into the new empty local folder `BK-C16R`. Record the file's name, bytes and sha256, and the time the
+    Restore list will show. Then the marks: EXPECT them byte-identical to r0's.
+
+R3. **Delete that voucher alone.**
+    - Open it from the Day Book for its date (Display More Reports, Day Book, F2 to that date), Enter on its row, then Alt+D.
+    - Tally's delete confirmation for that voucher is the one prompt this step names. Copy its text exactly, screenshot it, answer
+      Yes.
+    - Then screenshot the Day Book for that date, showing the voucher gone and every other voucher of that date still there.
+    - Then **r3 marks**. Record V and M; they are recorded, not predicted.
+
+R4. **Key it again by hand**, on its own date: the same type, ledgers, amounts, sides and narration as it had.
+    - For C1 to C19, these are in the A5 table above and `lab/699-c16-answers` `evidence/a6-table.tsv`.
+    - For an earlier voucher, they are in `lab/699-sft-lab-answers` A5-VOUCHERS.md.
+    - Bank Allocations are accepted as offered, as in A5. The voucher number is the one Tally offers; record it.
+    - Tally's prefills are met as in the earlier sitting (Enter on the To/By selector, then the ledger name and amount typed over the
+      prefill).
+    - If Tally will not take the voucher as it was, accept nothing: screenshot, then Ctrl+Q after a screenshot showing the screen's
+      title. Record "not keyed again", then restore `BK-C16R` (C6, on the run coordinator's word), and the row's answer is "not
+      cleared".
+
+    Then **r4 marks**. Record V and M. EXPECT the answer to differ from r3's.
+
+R5. **The read again.** Phase B of this sheet once more, with these differences:
+    - the relay folders are `r5-list`, `r5` and `r5v` in place of `c1`, `c2` and `c3`, each new and empty;
+    - the relay's `--ledger-name` is `"Unused 699 C16R"`;
+    - the marks that open and close the read are the r4 marks, and the closing read EXPECTs an answer byte-identical to r4's;
+    - the vouchers count EXPECTs 53, with the types and dates on record, the voucher of R1 under the number R4 records.
+
+    The build and the tool call are Phase B's.
+
+R6. **The check.** In `r5`, take the POST whose request is byte-identical to `relay/c2/0033-request.bin` (sha256
+    26933e853602a146e3fab3bb449b0a45ea8bb14f27782265bc1f3dfa80abe60a); none, or one whose request differs: STOP.
+    - Decode its answer and count every run of 10 or more digits by the keep rule that sorted `lab/699-c16-answers`. The same two
+      places are exempt: inside a whole 64-hex or 40-hex hash value, and the whole value of a VOUCHERKEY element. Use the same
+      script.
+    - Record the count, and for each run the name of the element holding it, never its value.
+    - Then sort every other file of `r5` and `r5v` by the keep rule, as before.
+    - **EXPECT: no run in that answer.** If one remains: restore `BK-C16R` (C6, on the run coordinator's word), take the marks
+      (EXPECT them byte-identical to R2's), and the row's answer is "not cleared".
+
+**What to report** (first line: any STOP, any EXPECT not met, and "cleared" or "not cleared"):
+
+| step | result |
+|---|---|
+| r0 marks | |
+| R1: the voucher's type, number and date; the list element above the NAME | |
+| R2: the backup's name, bytes, sha256, time; its marks | |
+| R3: the prompt's text; the Day Book screenshot's name; r3 marks | |
+| R4: the number Tally offered; every line as keyed again; r4 marks | |
+| R5: everything Phase B reports, for `r5` and `r5v`, and the closing marks against r4 | |
+| R6: the request's sha256; the digit-run count and the elements holding any; how each file of `r5` and `r5v` was sorted | |
+
+**Evidence.** Forward commit on `lab/699-c16-answers`: the folders `r5` and `r5v` and the marks answers, under the keep rule as
+before. Add the new files to `SHA256.txt`. Send the SHA to the run coordinator before pushing. If cleared, THE COMPANY stays as it
+stands after R5, and `BK-C16R` holds it as Phase B read it.

@@ -1,0 +1,5 @@
+Pushed copies that differ from the files kept on the lab PC, with what changed:
+notes.txt: original 3925 B sha256 99b58f1756be07472b3161f97c5855484f410ecb8cfda7c354e65ed03932a363 (kept on the lab PC); 1 x -> <LAB_DIR>
+RESULTS.md: original 39013 B sha256 60903b43d000a45321468e6fdd2e7b23bafb5ebc19f33fc531cedab6911c5dd2 (kept on the lab PC); 1 x -> stop
+scripts/cap.py: original 782 B sha256 95f70706c17103a7cf117048a78fbb01a7bd41c9fcbf88bcbe9333849474f971 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/folder-list.py: original 1261 B sha256 4a4c3223cefdc6cacc9bf3c75e6cac9a9d17ef53d9718a7d93e255347bd93089 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>

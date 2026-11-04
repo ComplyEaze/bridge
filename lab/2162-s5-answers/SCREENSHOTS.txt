@@ -1,0 +1,9 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/s1-bk-before-accept.png 71796 B 8c185c7a1763123cafa8fd97a76d20f4eec50507966766fc6f2ba1d0c59fa722
+shots/s1-gateway.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s3-after-import.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s4-after-import.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b
+shots/s6-restore-accept-prompt.png 45396 B 0d5f189b24e7475a05c26979e324be0746be8012230b38bd986a30e586fd882d
+shots/s6-restore-replace-prompt.png 51503 B 56d193a0e0609a0b22eab9da16cdc76fe4beed82924c07ceb08b100a181370a7
+shots/s7-after-shut.png 96767 B a91e006bd7651989dcaadd836efec7cb378cec47d15f738bdc7df0989ed655d7
+shots/s9-gateway.png 70032 B ce6182628b8762ce4cab03c75f9ba08c07b241787e05c473675d5c4d27d67c6b

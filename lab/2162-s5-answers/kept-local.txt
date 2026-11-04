@@ -1,0 +1,7 @@
+Kept on the lab PC, by size and sha256 (the company number shown as <company number>):
+backups/bk/TDBK1800_<company number>.001 (BK) 90051 B eaae8666e784f57caf404da2963d9e30fe9ee25f2ffde8a17265218bdfbd3b74
+evidence/bk-listing-before.txt (a folder listing: names, sizes, times) 151 B a73091080d3925af328b1b06ca2d8d0a206c7331c333cd518793435600833c52
+evidence/s6a-loaded-before-restore-folder-list.txt (a folder listing: names, sizes, times) 1119 B 7e3ca2f4282cc64ae3afd97c35709ca4ea14640f0b2bf3b324e15637c621727b
+evidence/s6b-shut-before-restore-folder-list.txt (a folder listing: names, sizes, times) 992 B 22f36f9693de505f0ccf2caf23f0bf7b47de26c85652cf315d9fe61526e8587e
+evidence/s6c-shut-after-restore-folder-list.txt (a folder listing: names, sizes, times) 815 B 0ddb5cce2b7205959eeedfff587e509ff8553eb60a28f7f1c3bac20d18c39ae6
+stage-2162s5.py (this stage script: its patterns name the lab paths) 4418 B a4e155897c8c1be527266698b6202b5b3bd22504a2712e5601a61e9e385493e2

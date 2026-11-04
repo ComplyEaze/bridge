@@ -1,0 +1,7 @@
+2026-11-04T06:43:46Z
+listing of backups/bk after BK:
+total 88
+drwxr-xr-x 1 <user> 197609     0 2026-11-04_12:13:29 .
+drwxr-xr-x 1 <user> 197609     0 2026-11-04_12:11:46 ..
+-rw-r--r-- 1 <user> 197609 90051 2026-11-04_12:13:29 TDBK1800_<company number>.001
+eaae8666e784f57caf404da2963d9e30fe9ee25f2ffde8a17265218bdfbd3b74 *backups/bk/TDBK1800_<company number>.001

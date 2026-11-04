@@ -208,8 +208,9 @@ R4. **Key it again by hand**, on its own date: the same type, ledgers, amounts, 
     - Tally's prefills are met as in the earlier sitting (Enter on the To/By selector, then the ledger name and amount typed over the
       prefill).
     - If Tally will not take the voucher as it was, accept nothing: screenshot, then Ctrl+Q after a screenshot showing the screen's
-      title. Record "not keyed again", then restore `BK-C16R` (C6, on the run coordinator's word), and the row's answer is "not
-      cleared".
+      title. If Tally then asks whether to quit the voucher, that prompt is named here: copy its text, screenshot it, and answer so
+      that nothing is saved (Yes to quit). Record "not keyed again", then restore `BK-C16R` (C6, on the run coordinator's word), take
+      the marks (EXPECT them byte-identical to R2's), and the row's answer is "not cleared".
 
     Then **r4 marks**. Record V and M. EXPECT the answer to differ from r3's.
 

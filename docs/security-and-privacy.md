@@ -206,7 +206,9 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       (`src-tauri/src/agent.rs:434`) marks them for every `vouchers` row
       (`src-tauri/src/agent_vouchers.rs:274`), and `redact_value` masks the
       marked values. The destination, both document numbers and the date stay
-      as place of supply does.
+      as place of supply does, and so does each Delivery Note's number and date
+      (`delivery_notes`), the book's own document as the dispatch document number
+      is.
     - The cost centre and cost category lists (two new kinds of the masters
       read) send each one's name, its parent (a cost centre's parent is another
       cost centre or the top level), its category for a cost centre, three

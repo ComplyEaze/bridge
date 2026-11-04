@@ -4027,7 +4027,15 @@ const NOT_RECORDED: &[(&str, &str)] = &[
         APP_VOUCHER_ROWS,
     ),
     (
+        "tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-delivery-notes.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
         "tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml",
+        APP_VOUCHER_ROWS,
+    ),
+    (
+        "tests/fixtures/agent/einvoice-lab-dispatch/window-read-delivery-notes.utf16le.xml",
         APP_VOUCHER_ROWS,
     ),
     (

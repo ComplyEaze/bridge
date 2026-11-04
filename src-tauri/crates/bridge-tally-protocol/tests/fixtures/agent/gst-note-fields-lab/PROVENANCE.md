@@ -14,11 +14,11 @@ as received (UTF-16LE without a BOM). The data is synthetic (SYN and BRIDGE name
   the window answer.
 
 **Derived request (partial, #2027 dispatch details).** Since the dispatch change, the request `vouchers` sends with
-`include_gst_details` names seven more words after the six (protocol reference §8.2l). The 30 Oct and 3 Nov answers here were
-answered without them, so a test that reads them as the answer to today's request is DERIVED, not a capture of it. It rests on
+`include_gst_details` names seven more words after the six, and then the Delivery Note list (protocol reference §8.2l). The 30 Oct
+and 3 Nov answers here were answered without them, so a test that reads them as the answer to today's request is DERIVED, not a capture of it. It rests on
 row 2027-D's measurement on another book (`lab/2027-dispatch-answers` at 4e0918e7): with the seven words added, every row and the
-whole answer less them was otherwise the same. `only_a_read_that_asks_names_the_e_invoice_and_voucher_gst_details` asserts the
-one edit.
+whole answer less them was otherwise the same, and with the list added to each read that names the GST words the same held (rows 2027-D2, 2027-DN and 2027-DN2).
+`only_a_read_that_asks_names_the_e_invoice_and_voucher_gst_details` asserts the one edit.
 
 One voucher of each kind, one release. Not measured: unregistered parties, exports, a note without an original invoice, other releases
 (protocol reference §8.2k).

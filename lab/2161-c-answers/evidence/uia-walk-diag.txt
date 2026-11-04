@@ -1,0 +1,22 @@
+2026-11-04T06:22:57.972Z managed System.Windows.Automation walk of Shell_TrayWnd, TreeScope Descendants, TrueCondition (read-only; run from the lab's PowerShell tool, STA); tray found: True
+descendants: 19
+1 | ControlType.Pane | class=Start | name=Start
+2 | ControlType.Pane | class=TrayDummySearchControl | name=
+3 | ControlType.Pane | class=DynamicContent1 | name=<widget text>
+4 | ControlType.Pane | class=Button | name=Type here to search
+5 | ControlType.Pane | class=TrayButton | name=Task View
+6 | ControlType.Pane | class=ReBarWindow32 | name=
+7 | ControlType.Pane | class=MSTaskSwWClass | name=Running applications
+8 | ControlType.Pane | class=MSTaskListWClass | name=Running applications
+9 | ControlType.Pane | class=HPSAMessengerClass | name=HPSA_TASKBAR
+10 | ControlType.Pane | class=DynamicContent2 | name=<widget text>
+11 | ControlType.Pane | class=TrayNotifyWnd | name=
+12 | ControlType.Pane | class=Button | name=
+13 | ControlType.Pane | class=SysPager | name=
+14 | ControlType.Pane | class=ToolbarWindow32 | name=User Promoted Notification Area
+15 | ControlType.Pane | class=TrayInputIndicatorWClass | name=Tray Input Indicator
+16 | ControlType.Pane | class=InputIndicatorButton | name=
+17 | ControlType.Pane | class=TrayClockWClass | name=System Clock, 11:52, ‎04-‎11-‎2026
+18 | ControlType.Pane | class=TrayButton | name=Action Center, 5 new notifications
+19 | ControlType.Pane | class=TrayShowDesktopButtonWClass | name=
+MSTaskListWClass children: 0

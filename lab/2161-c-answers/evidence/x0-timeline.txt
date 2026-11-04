@@ -1,0 +1,6 @@
+x0 runner pid 3400 2026-11-04T06:20:55.715Z; dpi_context=ok; Tally window 0xa826a4; fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+CLICK left tallyTitlePoint 2026-11-04T06:20:56.246Z logical (330,14) physical (412,17); +300 ms fg hwnd=0xa826a4 pid=1200 image=tally.exe title=TallyPrime:9001
+Tally in front: True
+X x0 2026-11-04T06:20:57.273Z to 2026-11-04T06:21:06.894Z (9.6 s) ;; rect out:  ;; uia out: E 2026-11-04T06:21:01.118Z dpi_context=ok tray=0x20138 Z 2026-11-04T06:21:02.763Z buttons=0 in_task_list=0 ;; cover out:  ;; capture out: 2026-11-04T06:21:06.546Z name=x0 dpi=ok tray=0x20138 rect=0,1030,1920,1080 print_window=True
+X-time 9.6 s
+x0 DONE 2026-11-04T06:21:06.949Z

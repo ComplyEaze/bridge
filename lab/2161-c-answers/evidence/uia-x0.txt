@@ -1,0 +1,2 @@
+E 2026-11-04T06:21:01.118Z dpi_context=ok tray=0x20138
+Z 2026-11-04T06:21:02.763Z buttons=0 in_task_list=0

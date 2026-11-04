@@ -4700,6 +4700,196 @@
       "seed_basis": "synthetic lab book; see src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "2f791622cb1abb7bb13a46719cccc63abfecac09c3b5be4dd84f15acdf880d5b",
       "size": 40164
+    },
+    {
+      "blob": "24b9209a5c2dd22fdb61384b1d470740dc3268db",
+      "capture_id": "sft-lab-audit-census.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-census.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d9316797d160eb623323779606db0f6ab0cf8d6ba3cbbc9da6481fa29b811d9a",
+      "size": 1516
+    },
+    {
+      "blob": "125e9d45864f95a8d85b426cf28f2cf12b75ce16",
+      "capture_id": "sft-lab-audit-census.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-census.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "35e5061ae21a4809b908d4a0f0f461f758eae2e1ebcd0992c403bbe45bab1c4d",
+      "size": 130704
+    },
+    {
+      "blob": "9519e1181911b7fef52547652ae59712dd87ddf0",
+      "capture_id": "sft-lab-audit-company-check.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-company-check.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8",
+      "size": 2524
+    },
+    {
+      "blob": "6a3059b947ec9ed291098021825ef4533f78f076",
+      "capture_id": "sft-lab-audit-company-object.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-company-object.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "04945bcb847ef2a78a3f552ec0ad45422388cb26b9cd9e4858212fd7f9757ca9",
+      "size": 888
+    },
+    {
+      "blob": "8accfcf6f1345abfe818b49c3b14e7c8fdfa7354",
+      "capture_id": "sft-lab-audit-company-object.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-company-object.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "73c051f43bb5ec85f91617c99c45d7d860ca7cc603987aa5664ec1d7dabb96eb",
+      "size": 4194
+    },
+    {
+      "blob": "66c5c6e2a871ab04f75f35e3b946edae3a4efe77",
+      "capture_id": "sft-lab-audit-groups.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-groups.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "6d2d43db2a491991f32472efed0fa3682527d087b31f79b65aca9ee2b1460aa4",
+      "size": 1062
+    },
+    {
+      "blob": "d1cdf154adbfe982627397efb1ba0d83d6841e60",
+      "capture_id": "sft-lab-audit-groups.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-groups.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "7fef8d7fa0b747ec129e43b25ddf733919ab87a2ea73455279bcd588e65eb464",
+      "size": 55756
+    },
+    {
+      "blob": "1b0fefe24040b73b1fbc2ea17f29ea86173b6e53",
+      "capture_id": "sft-lab-audit-ledgers.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-ledgers.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "8de714717336ac2ea0fa1119b678a43174426f6b9c3ddd18f2a4f5ed126fcfbb",
+      "size": 1274
+    },
+    {
+      "blob": "f36c7d16487cd93e95cce78164affa87aae199fb",
+      "capture_id": "sft-lab-audit-ledgers.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "d8b30f58062b008f738518c6aea2f25b92e68b02e56017189fc10e03c78f3ad1",
+      "size": 30694
+    },
+    {
+      "blob": "a41445414a8ef05312f62245f00ec2700f3f27f8",
+      "capture_id": "sft-lab-audit-marks.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-marks.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "4fb6dbda9add3cd0efcacaa11a4af0c4ffd1ec6f43d52630a75374b9e2cb19b5",
+      "size": 972
+    },
+    {
+      "blob": "f865e85185fbaf302e3f7a42bb7123d8c479928c",
+      "capture_id": "sft-lab-audit-marks.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-marks.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "92b8e2392b5a948bbe366d0ae1f20ad1aed3fac9194ff804c6c30a48951a688e",
+      "size": 3390
+    },
+    {
+      "blob": "c6014fa8202b1ddc0939e26768002a947c02dcea",
+      "capture_id": "sft-lab-audit-trial-balance.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-trial-balance.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "a3b5fbb86978145a86f10a715c85b4a8e2d91be2785d62cc41d94ed3c59b328b",
+      "size": 1140
+    },
+    {
+      "blob": "c066dc810b2bc71b5a6a5c6e61b0961c29277bd3",
+      "capture_id": "sft-lab-audit-trial-balance.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-trial-balance.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "bdb65cba1f568089401191ca9db1a0615b53651f7d3286ea239f0bdd81686bd4",
+      "size": 30174
+    },
+    {
+      "blob": "297747073586c9231f87f1e03a67936b073a99fe",
+      "capture_id": "sft-lab-audit-voucher-types.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-voucher-types.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "2e747645e284764bbb64646b7348d6fc44c798b8b1f6fa307b42c6fa7ac492a9",
+      "size": 968
+    },
+    {
+      "blob": "c52f457c808ad52bb0b5002f240b29c00fc568e3",
+      "capture_id": "sft-lab-audit-voucher-types.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-voucher-types.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ba95f86edf730947b51634bb25b1cde2617d8445cee759c3a83ded55e41077f5",
+      "size": 33032
+    },
+    {
+      "blob": "d6986318894d2f22fcdff53b5bc1b40eb8dd707e",
+      "capture_id": "sft-lab-audit-vouchers-1.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-vouchers-1.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "1b4199bb8f2f6d942a2556c0b4d1a651143b8df812096def57d39bef6d3a99e7",
+      "size": 1736
+    },
+    {
+      "blob": "3abbedfe1596ee899925a4b7ecbe264886c4e7ef",
+      "capture_id": "sft-lab-audit-vouchers-1.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-vouchers-1.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "ea9cbb77b1874bff54c563a225fa361c266750ea4c76963132749118bbe494b6",
+      "size": 1391682
+    },
+    {
+      "blob": "7352b3c3ff7c58922e7adab208e230e1e22dd6d9",
+      "capture_id": "sft-lab-audit-vouchers-2.request.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-vouchers-2.request.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "26933e853602a146e3fab3bb449b0a45ea8bb14f27782265bc1f3dfa80abe60a",
+      "size": 1736
+    },
+    {
+      "blob": "c3565404cb4af15e1ce6704b98e1b5f5a5338767",
+      "capture_id": "sft-lab-audit-vouchers-2.utf16le.xml",
+      "company": "BRIDGE SFT LAB",
+      "lab_ref": "branch lab/699-c16-answers at dde3313e",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/sft-lab-audit-vouchers-2.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
+      "sha256": "687bfeb4655a286ee10fdf5d1a8dae72b8126052332bfee90756301b62db327c",
+      "size": 428818
     }
   ]
 }

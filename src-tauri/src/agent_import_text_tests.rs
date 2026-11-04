@@ -363,10 +363,11 @@ fn the_scalar_fields_publish_exactly_the_patterns_and_limits_the_server_applies(
     assert!(valid_txn_id(&"t".repeat(64)));
     assert!(!valid_txn_id(&"t".repeat(65)));
     assert!(!valid_txn_id(""));
-    // A ledger name is one to 1024 characters, and a voucher number one to 32.
+    // A ledger name is one to 1024 characters; a voucher number's limits are applied below.
     assert_eq!(entry["ledger"]["minLength"], json!(1));
     assert_eq!(entry["ledger"]["maxLength"], json!(1024));
     assert_eq!(voucher["voucher_number"]["minLength"], json!(1));
+    assert_eq!(voucher["voucher_number"]["maxLength"], json!(32));
     let mut input = captured_catalogue_payload();
     for (name, admitted) in [
         ("", false),
@@ -389,7 +390,9 @@ fn the_scalar_fields_publish_exactly_the_patterns_and_limits_the_server_applies(
 
 /// What the schema requires, closes and counts is what the server's own parse and admission
 /// do: a field is listed as required exactly when the parse fails without it, an unknown key
-/// is refused where the schema closes the object, and the counts are the edges of admission.
+/// is refused where the schema closes the object, and the voucher and entry counts are the edges
+/// of admission. The arguments beside `vouchers` are applied in
+/// `the_other_arguments_are_admitted_at_the_edges_the_schema_publishes`.
 #[test]
 fn the_schema_requires_closes_and_counts_what_the_server_does() {
     let schema = voucher_input_schema();
@@ -457,11 +460,10 @@ fn the_schema_requires_closes_and_counts_what_the_server_does() {
         assert!(parse_payload(&input).is_err(), "an unknown key");
     }
 
-    // The counts: one to a thousand vouchers, two or more entries, at most a hundred approvals.
+    // The counts: one to a thousand vouchers, and two or more entries.
     assert_eq!(top["vouchers"]["minItems"], json!(1));
     assert_eq!(top["vouchers"]["maxItems"], json!(1000));
     assert_eq!(voucher["properties"]["entries"]["minItems"], json!(2));
-    assert_eq!(top["on_account_approvals"]["maxItems"], json!(100));
     let sample = captured_catalogue_payload().vouchers[0].clone();
     let batch_of = |count: usize| {
         let mut input = captured_catalogue_payload();
@@ -491,17 +493,283 @@ fn the_schema_requires_closes_and_counts_what_the_server_does() {
         Err("voucher_entries_too_few".into())
     );
 
-    // The identifiers of a proposals file are fixed in width, and the skips are a closed list.
-    assert_eq!(top["proposals_id"]["minLength"], json!(46));
-    assert_eq!(top["proposals_id"]["maxLength"], json!(46));
-    assert_eq!(top["proposals_sha256"]["minLength"], json!(64));
-    assert_eq!(top["proposals_sha256"]["maxLength"], json!(64));
+    // The withdrawal list is a list of statement row ids; its count and uniqueness are applied
+    // below, in `the_other_arguments_are_admitted_at_the_edges_the_schema_publishes`.
     let skips = &top[transfers::WITHDRAW_SKIPS_KEY];
     assert_eq!(skips["type"], json!("array"));
-    assert_eq!(skips["uniqueItems"], json!(true));
-    assert_eq!(skips["maxItems"], json!(1000));
     assert_eq!(
         skips["items"],
         json!({"type": "string", "pattern": crate::agent::catalog::STATEMENT_ROW_ID_PATTERN})
     );
+}
+
+/// The voucher number, the text fields and the amount each publish a length limit and a refusal.
+/// The server's rule is applied at the limit and one past it, and the voucher number's pattern
+/// is taken apart: a class of controls and the dollar sign, and white space at either end.
+#[test]
+fn the_text_number_and_amount_limits_are_applied_at_their_edges() {
+    use std::collections::BTreeSet;
+    let schema = voucher_input_schema();
+    let voucher = &schema["properties"]["vouchers"]["items"]["properties"];
+    let entry = &voucher["entries"]["items"]["properties"];
+    let with = |change: &dyn Fn(&mut ImportVoucher<String>)| {
+        let mut input = captured_catalogue_payload();
+        change(&mut input.vouchers[0]);
+        payload_verdict(&input)
+    };
+    let refused = |code: &str| Err(code.to_string());
+
+    // A voucher number is one to 32 characters (not bytes).
+    assert_eq!(voucher["voucher_number"]["minLength"], json!(1));
+    assert_eq!(voucher["voucher_number"]["maxLength"], json!(32));
+    for (number, expected) in [
+        ("N".repeat(32), Ok(())),
+        ("N".repeat(33), refused("voucher_number_invalid")),
+        ("क".repeat(32), Ok(())),
+        ("क".repeat(33), refused("voucher_number_invalid")),
+        ("PV 1".into(), Ok(())),
+        ("PV$1".into(), refused("voucher_number_invalid")),
+        (" PV1".into(), refused("voucher_number_invalid")),
+        ("PV1 ".into(), refused("voucher_number_invalid")),
+        ("\u{a0}PV1".into(), refused("voucher_number_invalid")),
+        ("PV1\u{3000}".into(), refused("voucher_number_invalid")),
+        (String::new(), refused("voucher_text_invalid")),
+    ] {
+        assert_eq!(
+            with(&|v| v.voucher_number = Some(number.clone())),
+            expected,
+            "{number:?}"
+        );
+    }
+    // Its pattern: every control or a dollar sign, or white space at the start, or at the end.
+    let pattern = voucher["voucher_number"]["not"]["pattern"]
+        .as_str()
+        .expect("a pattern");
+    let alternatives: Vec<&str> = pattern.split('|').collect();
+    assert_eq!(alternatives.len(), 3, "{pattern}");
+    assert_eq!(alternatives[1..], [r"^\s", r"\s$"]);
+    let class = alternatives[0]
+        .strip_suffix("$]")
+        .map(|rest| format!("{rest}]"))
+        .expect("the class ends with a dollar sign");
+    let controls: BTreeSet<char> = (0..=char::MAX as u32)
+        .filter_map(char::from_u32)
+        .filter(|c| c.is_control())
+        .collect();
+    assert_eq!(class_members(&class), controls);
+    for control in controls {
+        assert_eq!(
+            with(&|v| v.voucher_number = Some(format!("PV{control}1"))),
+            refused("voucher_text_invalid"),
+            "{control:?}"
+        );
+    }
+
+    // Narration and reference are one text, one to 2,000 characters.
+    assert_eq!(voucher["narration"], voucher["reference"]);
+    assert_eq!(voucher["narration"]["minLength"], json!(1));
+    assert_eq!(voucher["narration"]["maxLength"], json!(2000));
+    for (text, expected) in [
+        ("t".repeat(2000), Ok(())),
+        ("t".repeat(2001), refused("voucher_text_invalid")),
+    ] {
+        assert_eq!(with(&|v| v.narration = Some(text.clone())), expected);
+        assert_eq!(with(&|v| v.reference = Some(text.clone())), expected);
+    }
+
+    // An amount is at most MAX_EXACT_DECIMAL_BYTES bytes: that many is admitted, one more is not.
+    let most = bridge_tally_core::MAX_EXACT_DECIMAL_BYTES;
+    assert_eq!(entry["amount"]["maxLength"], json!(most));
+    assert_eq!(most, 256);
+    for (digits, expected) in [
+        (most - 3, Ok(())),
+        (most - 2, refused("voucher_entry_invalid")),
+    ] {
+        let amount = format!("{}.99", "9".repeat(digits));
+        assert_eq!(
+            with(&|v| v
+                .entries
+                .iter_mut()
+                .for_each(|entry| entry.amount = amount.clone())),
+            expected,
+            "{} bytes",
+            amount.len()
+        );
+    }
+}
+
+/// The arguments beside `vouchers` are admitted by the server's own checks of the published tool
+/// schema (`validate_tool_arguments`, and the parses of the approvals and the withdrawal list),
+/// so each width, count and shape is applied at its edge: the proposals file's two widths, the
+/// hundred approvals, the thousand vouchers and withdrawals, the batch id, and the closed shapes.
+#[test]
+fn the_other_arguments_are_admitted_at_the_edges_the_schema_publishes() {
+    let schema = voucher_input_schema();
+    let top = &schema["properties"];
+    let admit = |extra: Value| {
+        let mut args = json!({"company_guid": GUID});
+        for (key, value) in extra.as_object().expect("an object") {
+            args[key] = value.clone();
+        }
+        crate::agent::catalog::validate_tool_arguments("build_import_xml", &args)
+    };
+    let invalid = |key: &str| Err(format!("argument_invalid:{key}"));
+    assert_eq!(admit(json!({})), Ok(()));
+    assert_eq!(admit(json!({"colour": 1})), Err("argument_unknown".into()));
+    assert_eq!(
+        crate::agent::catalog::validate_tool_arguments("build_import_xml", &json!({})),
+        Err("company_guid_required".into())
+    );
+    assert_eq!(admit(json!({"company_guid": ""})), invalid("company_guid"));
+
+    // The two widths of a proposals file.
+    for (field, width) in [("proposals_id", 46), ("proposals_sha256", 64)] {
+        assert_eq!(top[field]["minLength"], json!(width));
+        assert_eq!(top[field]["maxLength"], json!(width));
+        for (length, expected) in [
+            (width - 1, invalid(field)),
+            (width, Ok(())),
+            (width + 1, invalid(field)),
+        ] {
+            assert_eq!(
+                admit(json!({field: "a".repeat(length)})),
+                expected,
+                "{field}"
+            );
+        }
+    }
+
+    // One to 1,000 vouchers.
+    assert_eq!(top["vouchers"]["minItems"], json!(1));
+    assert_eq!(top["vouchers"]["maxItems"], json!(1000));
+    for (count, expected) in [
+        (0, invalid("vouchers")),
+        (1, Ok(())),
+        (1000, Ok(())),
+        (1001, invalid("vouchers")),
+    ] {
+        assert_eq!(admit(json!({"vouchers": vec![json!({}); count]})), expected);
+    }
+
+    // The batch id: the build's own rule, applied to a good id and to each way of being wrong.
+    let batch = "bridge-2b1c9f4e-9d3a-4f71-8c2e-5a6b7c8d9e01";
+    assert_eq!(
+        top["amends_batch_id"]["pattern"],
+        json!(crate::agent::catalog::BRIDGE_BATCH_ID_PATTERN)
+    );
+    for (id, expected) in [
+        (batch.to_string(), Ok(())),
+        (batch.to_uppercase(), invalid("amends_batch_id")),
+        (
+            batch[..batch.len() - 1].to_string(),
+            invalid("amends_batch_id"),
+        ),
+        (format!("{batch}0"), invalid("amends_batch_id")),
+        (
+            batch.replace("-4f71-", "-1f71-"),
+            invalid("amends_batch_id"),
+        ),
+        (format!("{batch}\n"), invalid("amends_batch_id")),
+    ] {
+        assert_eq!(admit(json!({"amends_batch_id": id})), expected, "{id:?}");
+    }
+
+    // At most 100 approvals, each an object with a 64-digit lower-case hex digest and nothing
+    // else but a ledger. The server counts the 100 at admission, and no batch has more than 100
+    // distinct ledgers to approve (one more is voucher_unique_ledger_limit_exceeded).
+    let approvals = &top["on_account_approvals"];
+    assert_eq!(approvals["maxItems"], json!(100));
+    let digest = "a".repeat(64);
+    for (count, expected) in [(100, Ok(())), (101, invalid("on_account_approvals"))] {
+        let items = vec![json!({"party_digest": digest}); count];
+        assert_eq!(admit(json!({"on_account_approvals": items})), expected);
+    }
+    let ledgers = |count: usize| {
+        let mut input = captured_catalogue_payload();
+        input.vouchers.truncate(1);
+        let entries: Vec<Value> = (0..count + count % 2)
+            .map(|n| {
+                let side = if n % 2 == 0 { "Dr" } else { "Cr" };
+                json!({"ledger": format!("Ledger {}", n % count), "amount": "1.00", "side": side})
+            })
+            .collect();
+        input.vouchers[0].entries = serde_json::from_value(Value::Array(entries)).unwrap();
+        payload_verdict(&input)
+    };
+    assert_eq!(ledgers(100), Ok(()));
+    assert_eq!(
+        ledgers(101),
+        Err("voucher_unique_ledger_limit_exceeded".into())
+    );
+    let digest_pattern = approvals["items"]["properties"]["party_digest"]["pattern"]
+        .as_str()
+        .expect("a pattern");
+    assert_eq!(digest_pattern, "^[0-9a-f]{64}$");
+    let took = |item: Value| {
+        let mut args = json!({"on_account_approvals": [item]});
+        bill_wise::take_approvals(&mut args).map(|taken| taken.len())
+    };
+    for (item, expected) in [
+        (json!({"party_digest": "a".repeat(64)}), Ok(1)),
+        (
+            json!({"party_digest": "0f".repeat(32), "ledger": "L"}),
+            Ok(1),
+        ),
+        (
+            json!({"party_digest": "a".repeat(63)}),
+            Err(bill_wise::ApprovalError::Malformed),
+        ),
+        (
+            json!({"party_digest": "a".repeat(65)}),
+            Err(bill_wise::ApprovalError::Malformed),
+        ),
+        (
+            json!({"party_digest": "A".repeat(64)}),
+            Err(bill_wise::ApprovalError::Malformed),
+        ),
+        (
+            json!({"party_digest": "g".repeat(64)}),
+            Err(bill_wise::ApprovalError::Malformed),
+        ),
+        (
+            json!({"party_digest": format!("{}\n", "a".repeat(63))}),
+            Err(bill_wise::ApprovalError::Malformed),
+        ),
+        (
+            json!({"party_digest": "a".repeat(64), "colour": 1}),
+            Err(bill_wise::ApprovalError::Malformed),
+        ),
+        (
+            json!({"ledger": "L"}),
+            Err(bill_wise::ApprovalError::Malformed),
+        ),
+    ] {
+        assert_eq!(took(item.clone()), expected, "{item}");
+    }
+
+    // The withdrawal list: at most 1,000 distinct rows, each a statement row id.
+    let skips = &top[transfers::WITHDRAW_SKIPS_KEY];
+    assert_eq!(skips["maxItems"], json!(1000));
+    assert_eq!(skips["uniqueItems"], json!(true));
+    let rows = |count: usize| -> Vec<Value> {
+        (0..count)
+            .map(|n| json!(format!("st-20260901-{n:016x}")))
+            .collect()
+    };
+    let key = transfers::WITHDRAW_SKIPS_KEY;
+    let taken = |list: Vec<Value>| {
+        let mut args = json!({ key: list });
+        transfers::take_withdraw_skips(&mut args).map(|rows| rows.len())
+    };
+    let bad = Err("argument_schema_invalid".to_string());
+    assert_eq!(admit(json!({ key: rows(1000) })), Ok(()));
+    assert_eq!(admit(json!({ key: rows(1001) })), invalid(key));
+    assert_eq!(admit(json!({ key: ["st-2026-09-01-x"] })), invalid(key));
+    assert_eq!(admit(json!({ key: [1] })), invalid(key));
+    assert_eq!(taken(rows(1000)), Ok(1000));
+    assert_eq!(taken(rows(1001)), bad);
+    assert_eq!(taken(vec![rows(1)[0].clone(), rows(1)[0].clone()]), bad);
+    assert_eq!(taken(vec![json!("st-2026-09-01-x")]), bad);
+    assert_eq!(taken(vec![json!(1)]), bad);
+    assert_eq!(taken(Vec::new()), Ok(0));
 }

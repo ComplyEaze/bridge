@@ -1,7 +1,7 @@
 {
   "file": "src-tauri/src/agent_import_schema.rs",
   "base_commit": "ae9a1bb5",
-  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's text tests. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs, and filtered_run gives the verdict of the filtered hand run where the whole_set run decided otherwise. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent. The file is one function that builds a JSON value from constants, so cargo-mutants finds one mutant in it; the hand-written mutants change what the schema admits (every pattern constant and each of its alternatives, every limit, every required list, every additionalProperties and the voucher-type enum). A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. Six edits (S01, S19, S21, S29, S35 and S46) were changed to an equivalent edit of the same kind (a lower-case hex digit, a longer from text, or a neighbouring boundary), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses. In every run the file was byte for byte as at base_commit, checked after each restore; the restore was a copy, never a rename. In the first three runs the test module was as at base_commit; in survivors_again it is as this change leaves it.",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's text tests. killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs, and filtered_run gives the verdict of the filtered hand run where the whole_set run decided otherwise. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent. The file is one function that builds a JSON value from constants, so cargo-mutants finds one mutant in it; the hand-written mutants change what the schema admits (every pattern constant and each of its alternatives, every limit, every required list, every additionalProperties and the voucher-type enum). A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. Fourteen edits (S01, S19, S21, S29, S35, S46, S54, S60, S72, S73, S74, S75, S76 and S78) were changed to an equivalent edit of the same kind (a lower-case hex digit, a longer from text, or a neighbouring boundary), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses. S01 to S48 were written first; S49 to S78 were added after a review found published limits and patterns that S01 to S48 did not mutate (the voucher number's maximum and its pattern's parts, the approval digest's pattern, the text fields' maximum and their two checks, the controls constant's range ends, the batch id's pattern, the proposals file's widths, the amount's maximum and anchor, the withdrawal list's count and the company GUID's minimum). In every run the file was byte for byte as at base_commit, checked after each restore; the restore was a copy, never a rename. In the tool, hand and whole_set runs the test module was as at base_commit (for S49 to S78 the base copy of the text tests was put back over this change's by a copy, and this change's restored by a copy afterwards); in survivors_again it is as this change leaves it.",
   "runs": [
     {
       "run": "tool",
@@ -23,14 +23,14 @@
       "run": "whole_set",
       "tests_at": "base",
       "tests_run": 4827,
-      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 42 hand-written mutants the filtered run missed; the unmutated baseline passed all 4827",
+      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 48 hand-written mutants the filtered run missed (42 of S01 to S48 and 6 of S49 to S78); the unmutated baseline passed all 4827",
       "tree": "base_commit"
     },
     {
       "run": "survivors_again",
       "tests_at": "this_commit",
-      "tests_matching_filter": 9,
-      "command": "as the hand run with -E 'test(/text_tests::/)', for the 41 hand-written mutants that survived the whole_set run",
+      "tests_matching_filter": 11,
+      "command": "as the hand run with -E 'test(/text_tests::/)', for the 47 hand-written mutants that survived the whole_set run",
       "tree": "base_commit with the tests this change adds"
     }
   ],
@@ -39,12 +39,12 @@
       "caught": 1
     },
     "hand": {
-      "caught": 47,
+      "caught": 77,
       "missed": 1
     },
     "survived_at_base": {
       "tool": 0,
-      "hand": 41
+      "hand": 47
     },
     "equivalent": {
       "tool": 0,
@@ -133,7 +133,7 @@
       "mutation": "fd09c69a9ed8479c7d2bde1fdb9b5f7c",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_scalar_fields_publish_exactly_the_patterns_and_limits_the_server_applies",
+      "killer": "agent::agent_import::tests::text_tests::the_published_character_classes_are_the_sets_the_server_refuses",
       "killer_at": "this_commit"
     },
     "S06": {
@@ -414,7 +414,7 @@
       "mutation": "8e612d5d5f5c281e8905d01282fec652",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_published_character_classes_are_the_sets_the_server_refuses",
+      "killer": "agent::agent_import::tests::text_tests::a_ledger_name_may_end_in_one_crlf_and_hold_no_other_line_break",
       "killer_at": "this_commit"
     },
     "S25": {
@@ -667,7 +667,7 @@
       "mutation": "4d686db2157f54549e3bc117ba6a1021",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_schema_requires_closes_and_counts_what_the_server_does",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
       "killer_at": "this_commit"
     },
     "S42": {
@@ -682,7 +682,7 @@
       "mutation": "4d6aa1f2ca2b1e899e0ee35dec782555",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_schema_requires_closes_and_counts_what_the_server_does",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
       "killer_at": "this_commit"
     },
     "S43": {
@@ -697,7 +697,7 @@
       "mutation": "e8c9cfa6bebc26ac9c3519b9724b3206",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_schema_requires_closes_and_counts_what_the_server_does",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
       "killer_at": "this_commit"
     },
     "S44": {
@@ -727,7 +727,7 @@
       "mutation": "4e1ca42aa626a0df5e0888cc928f2c23",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_schema_requires_closes_and_counts_what_the_server_does",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
       "killer_at": "this_commit"
     },
     "S46": {
@@ -756,7 +756,7 @@
       "mutation": "196263b02329b9556b4807828cf481bd",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_schema_requires_closes_and_counts_what_the_server_does",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
       "killer_at": "this_commit"
     },
     "S48": {
@@ -771,7 +771,433 @@
       "mutation": "5801a15bd002eca175dabf75bee600ec",
       "verdict": "caught",
       "before_this_change": "missed",
-      "killer": "agent::agent_import::tests::text_tests::the_schema_requires_closes_and_counts_what_the_server_does",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
+      "killer_at": "this_commit"
+    },
+    "S49": {
+      "what": "voucher_number: 33 characters are admitted (maxLength moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"type\":\"string\", \"minLength\":1, \"maxLength\":32,",
+          "to": "\"type\":\"string\", \"minLength\":1, \"maxLength\":33,"
+        }
+      ],
+      "mutation": "4e7c2ea1e98e5893f464c082e61b2097",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::voucher_number_length_counts_unicode_characters_and_preserves_safety_checks",
+      "killer_at": "base"
+    },
+    "S50": {
+      "what": "voucher_number: 32 characters are refused (maxLength moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"type\":\"string\", \"minLength\":1, \"maxLength\":32,",
+          "to": "\"type\":\"string\", \"minLength\":1, \"maxLength\":31,"
+        }
+      ],
+      "mutation": "cc516c2aeef44b7efe27dab80e538ab8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::voucher_number_length_counts_unicode_characters_and_preserves_safety_checks",
+      "killer_at": "base"
+    },
+    "S51": {
+      "what": "voucher_number: the last C0 control is not refused (range end moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "r\"[\\u0000-\\u001F\\u007F-\\u009F$]|^\\s|\\s$\"",
+          "to": "r\"[\\u0000-\\u001E\\u007F-\\u009F$]|^\\s|\\s$\""
+        }
+      ],
+      "mutation": "0ed7f21ac7f5b226c5bf57680db5bcba",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S52": {
+      "what": "voucher_number: the last C1 control is not refused (range end moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "r\"[\\u0000-\\u001F\\u007F-\\u009F$]|^\\s|\\s$\"",
+          "to": "r\"[\\u0000-\\u001F\\u007F-\\u009E$]|^\\s|\\s$\""
+        }
+      ],
+      "mutation": "d4631ad08da5865d92ee4af39d0dc064",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S53": {
+      "what": "voucher_number: a dollar sign is not refused (member dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "r\"[\\u0000-\\u001F\\u007F-\\u009F$]|^\\s|\\s$\"",
+          "to": "r\"[\\u0000-\\u001F\\u007F-\\u009F]|^\\s|\\s$\""
+        }
+      ],
+      "mutation": "5e8f35a7ee9f469a78f7479a040e96ed",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S54": {
+      "what": "voucher_number: white space at the start is not refused (alternative dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "|^\\s|\\s$\"}",
+          "to": "|\\s$\"}"
+        }
+      ],
+      "mutation": "9d347bb31f9a3f68a87b4a5d6ba9a1d9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S55": {
+      "what": "voucher_number: white space at the end is not refused (alternative dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "r\"[\\u0000-\\u001F\\u007F-\\u009F$]|^\\s|\\s$\"",
+          "to": "r\"[\\u0000-\\u001F\\u007F-\\u009F$]|^\\s\""
+        }
+      ],
+      "mutation": "2fef8740d176418a544de9801d8884f5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S56": {
+      "what": "voucher_number: NUL is not refused (range start moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "r\"[\\u0000-\\u001F\\u007F-\\u009F$]|^\\s|\\s$\"",
+          "to": "r\"[\\u0001-\\u001F\\u007F-\\u009F$]|^\\s|\\s$\""
+        }
+      ],
+      "mutation": "b96000fcd374eb87c0965f64a161be1c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S57": {
+      "what": "voucher_number: DEL is not refused (range start moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "r\"[\\u0000-\\u001F\\u007F-\\u009F$]|^\\s|\\s$\"",
+          "to": "r\"[\\u0000-\\u001F\\u0080-\\u009F$]|^\\s|\\s$\""
+        }
+      ],
+      "mutation": "0abb97bb253e360d8ccd7dcc9fb84005",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S58": {
+      "what": "party_digest: 63 hex digits are admitted (width moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}",
+          "to": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{63}$\"}"
+        }
+      ],
+      "mutation": "c8fcc713b11906f919b4301a7149079f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::the_schema_admits_an_approval_list_and_the_build_strips_it_before_parsing",
+      "killer_at": "base"
+    },
+    "S59": {
+      "what": "party_digest: 65 hex digits are admitted (width moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}",
+          "to": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{65}$\"}"
+        }
+      ],
+      "mutation": "e3eebddb4d52756e2104d021fecb7c32",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::the_schema_admits_an_approval_list_and_the_build_strips_it_before_parsing",
+      "killer_at": "base"
+    },
+    "S60": {
+      "what": "party_digest: upper-case hex digits are admitted (class widened)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}",
+          "to": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"^[0-9A-Fa-f]{64}$\"}"
+        }
+      ],
+      "mutation": "c1082d83dfedede151acf41d4d2cded5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::the_schema_admits_an_approval_list_and_the_build_strips_it_before_parsing",
+      "killer_at": "base"
+    },
+    "S61": {
+      "what": "party_digest: text before the digits is admitted (start anchor dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"^[0-9a-f]{64}$\"}",
+          "to": "\"party_digest\":{\"type\":\"string\",\"pattern\":\"[0-9a-f]{64}$\"}"
+        }
+      ],
+      "mutation": "4f9c2924193db523a612048a8e35cb0e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::bill_wise_build_tests::the_schema_admits_an_approval_list_and_the_build_strips_it_before_parsing",
+      "killer_at": "base"
+    },
+    "S62": {
+      "what": "text: one more character is admitted (maxLength moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"type\":\"string\", \"minLength\":1, \"maxLength\":MAX_TEXT_CHARS,",
+          "to": "\"type\":\"string\", \"minLength\":1, \"maxLength\":MAX_TEXT_CHARS + 1,"
+        }
+      ],
+      "mutation": "15315b4aab776c06d7e2520bf62a792b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S63": {
+      "what": "text: the last allowed character is refused (maxLength moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"type\":\"string\", \"minLength\":1, \"maxLength\":MAX_TEXT_CHARS,",
+          "to": "\"type\":\"string\", \"minLength\":1, \"maxLength\":MAX_TEXT_CHARS - 1,"
+        }
+      ],
+      "mutation": "f5d6bac85e7bea2718c87f418c11987b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S64": {
+      "what": "text: a control character is not refused (alternative dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "{\"pattern\":CONTROLS},{\"pattern\":RESERVED_MARKER}",
+          "to": "{\"pattern\":RESERVED_MARKER}"
+        }
+      ],
+      "mutation": "8d5aa73136f6588b78137daa4d075393",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S65": {
+      "what": "text: the reserved marker is not refused (alternative dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "{\"pattern\":CONTROLS},{\"pattern\":RESERVED_MARKER}",
+          "to": "{\"pattern\":CONTROLS}"
+        }
+      ],
+      "mutation": "95b3a9f8719fa66bcba37c1da8bf0097",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S66": {
+      "what": "CONTROLS: the last C0 control is not refused (range end moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "const CONTROLS: &str = r\"[\\u0000-\\u001F\\u007F-\\u009F]\";",
+          "to": "const CONTROLS: &str = r\"[\\u0000-\\u001E\\u007F-\\u009F]\";"
+        }
+      ],
+      "mutation": "dfaefad4e56cff592f56c93a23b308f0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S67": {
+      "what": "CONTROLS: the last C1 control is not refused (range end moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "const CONTROLS: &str = r\"[\\u0000-\\u001F\\u007F-\\u009F]\";",
+          "to": "const CONTROLS: &str = r\"[\\u0000-\\u001F\\u007F-\\u009E]\";"
+        }
+      ],
+      "mutation": "7f9f731acb1f76a26d248b99475d4f50",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::optional_text_constraints_publish_unicode_lengths_and_reject_controls",
+      "killer_at": "base"
+    },
+    "S68": {
+      "what": "amends_batch_id: any text is admitted (pattern dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\n                \"pattern\":crate::agent::catalog::BRIDGE_BATCH_ID_PATTERN,",
+          "to": ""
+        }
+      ],
+      "mutation": "c71c1a9b2477ba6870c4c677ee1fc1a7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_build_schema_admits_amends_batch_id_and_the_payload_parses_it",
+      "killer_at": "base"
+    },
+    "S69": {
+      "what": "amends_batch_id: any text after bridge- is admitted (pattern loosened)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"pattern\":crate::agent::catalog::BRIDGE_BATCH_ID_PATTERN,",
+          "to": "\"pattern\":r\"^bridge-[0-9a-f-]+$\","
+        }
+      ],
+      "mutation": "6d129bcc3351adc2eb0e5bfa32863b07",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::the_build_schema_admits_amends_batch_id_and_the_payload_parses_it",
+      "killer_at": "base"
+    },
+    "S70": {
+      "what": "proposals_sha256: 63 characters are admitted (minLength moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"minLength\":64, \"maxLength\":64,",
+          "to": "\"minLength\":63, \"maxLength\":64,"
+        }
+      ],
+      "mutation": "ea1fb7500567cd1452e22cfe1969f249",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
+      "killer_at": "this_commit"
+    },
+    "S71": {
+      "what": "proposals_sha256: 65 characters are admitted (maxLength moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"minLength\":64, \"maxLength\":64,",
+          "to": "\"minLength\":64, \"maxLength\":65,"
+        }
+      ],
+      "mutation": "f00d5e78007d798c9132e9cd0541835f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
+      "killer_at": "this_commit"
+    },
+    "S72": {
+      "what": "proposals_id: 44 characters are admitted (minLength moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"minLength\":46, \"maxLength\":46,",
+          "to": "\"minLength\":44, \"maxLength\":46,"
+        }
+      ],
+      "mutation": "c2797b2d80b502424d164db78d696482",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
+      "killer_at": "this_commit"
+    },
+    "S73": {
+      "what": "amount: the length limit is one more",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"maxLength\":bridge_tally_core::MAX_EXACT_DECIMAL_BYTES,\n",
+          "to": "\"maxLength\":bridge_tally_core::MAX_EXACT_DECIMAL_BYTES + 1,\n"
+        }
+      ],
+      "mutation": "7e05d2198a1052d8dbc76abe1641062f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::scalar_schema_limits_match_existing_boundary_admission",
+      "killer_at": "base"
+    },
+    "S74": {
+      "what": "amount: the length limit is two fewer",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "MAX_EXACT_DECIMAL_BYTES,",
+          "to": "MAX_EXACT_DECIMAL_BYTES - 2,"
+        }
+      ],
+      "mutation": "e13cdd6f0efa5abf1d5e766d9fc119f8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::scalar_schema_limits_match_existing_boundary_admission",
+      "killer_at": "base"
+    },
+    "S75": {
+      "what": "amount: there is no length limit (maxLength dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"maxLength\":bridge_tally_core::MAX_EXACT_DECIMAL_BYTES,\n                ",
+          "to": ""
+        }
+      ],
+      "mutation": "d82a781e92956ee18f26f9082a7bb5a6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::text_tests::scalar_schema_limits_match_existing_boundary_admission",
+      "killer_at": "base"
+    },
+    "S76": {
+      "what": "amount: text after the digits is admitted (end anchor dropped)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "{2}$\",\n                \"maxLength\"",
+          "to": "{2}\",\n                \"maxLength\""
+        }
+      ],
+      "mutation": "db661b44329d3f3cdda73b62a3b2a635",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::text_tests::the_scalar_fields_publish_exactly_the_patterns_and_limits_the_server_applies",
+      "killer_at": "this_commit"
+    },
+    "S77": {
+      "what": "withdraw skips: one more row than the voucher limit is admitted (maxItems moved)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"type\":\"array\", \"uniqueItems\":true, \"maxItems\":MAX_VOUCHERS,",
+          "to": "\"type\":\"array\", \"uniqueItems\":true, \"maxItems\":MAX_VOUCHERS + 1,"
+        }
+      ],
+      "mutation": "8b8d80ee2424c7e2272b7ab703ccef3a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
+      "killer_at": "this_commit"
+    },
+    "S78": {
+      "what": "company_guid: an empty GUID is admitted (minLength 0)",
+      "applied_to": "src-tauri/src/agent_import_schema.rs",
+      "edits": [
+        {
+          "from": "\"company_guid\":{\"type\":\"string\",\"minLength\":1,\"description\":crate",
+          "to": "\"company_guid\":{\"type\":\"string\",\"minLength\":0,\"description\":crate"
+        }
+      ],
+      "mutation": "696a0026dff3ba5321fb0966ab64c85e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::text_tests::the_other_arguments_are_admitted_at_the_edges_the_schema_publishes",
       "killer_at": "this_commit"
     }
   },

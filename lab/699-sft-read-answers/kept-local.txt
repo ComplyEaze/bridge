@@ -37,4 +37,4 @@ run/answers/004-s6-vouchers-p0.json 40318 B 863f6c0711662440c290ad7be33d3ed984b0
 reads/s1-marks.xml 4878 B 6d3aebaa05b2d03b8384df58fb940adae098fb82e33275c8834599fce3ff933a (company number)
 reads/s9-marks.xml 4878 B 6d3aebaa05b2d03b8384df58fb940adae098fb82e33275c8834599fce3ff933a (company number)
 evidence/a4-marks-26oct.xml 4888 B 5431ca42d360fe1c3e8af7729986e9415398a7a054ab7f726281fd74fad7226c (company number)
-stage-699r1.py 6803 B cb70966c5402af99c1816bf2acaf2c132d08015c14b0251d7c864a5f12d9b418 (this stage script: its patterns name the lab paths)
+stage-699r1.py 6853 B 4ff8d77b181419202df965b0b9df704bf2d29cc26f1dcc354154be3b59c8f1ed (this stage script: its patterns name the lab paths)

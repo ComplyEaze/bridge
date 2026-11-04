@@ -14,7 +14,8 @@
 #   N-0053.xml          the number read with the e-invoice words, as lab/2162-s5's gen.py makes it.
 # The GSTIN is checked here, before any file is written: its check character (mod 36), and that it is neither the
 # company's own (COMPANY_GSTIN, the book's tax unit) nor the one other GSTIN the book's ledgers held before S13
-# (BOOK_GSTINS, from S13's a-s2-Q-rates answer).
+# (BOOK_GSTINS, from S13's a-s2-Q-rates answer). Its PAN part is the company's, on purpose: the synthetic family that
+# public files may carry is exactly the PAN part ZZZZZ0000Z (ROW.md says what that leaves undecided).
 # M-marks.xml, run.py, Q-rates.xml and C-catalogue.xml are not generated; ROW.md says where each is from.
 # Example: python3 -I gen.py
 import pathlib
@@ -42,6 +43,7 @@ CUSTOMER = "BRIDGE Customer RJ"
 assert len(GSTIN) == 15 and GSTIN[-1] == check_character(GSTIN[:14]), GSTIN
 assert COMPANY_GSTIN[-1] == check_character(COMPANY_GSTIN[:14])
 assert GSTIN != COMPANY_GSTIN and GSTIN not in BOOK_GSTINS, GSTIN
+assert GSTIN[2:12] == COMPANY_GSTIN[2:12] == "ZZZZZ0000Z", GSTIN
 
 ledger = load("template-ledger.utf16le.xml")
 ledger = swap(ledger, "BRIDGE Walk-in BW", CUSTOMER, 2)

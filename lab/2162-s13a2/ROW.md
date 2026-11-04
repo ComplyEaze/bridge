@@ -1,8 +1,12 @@
-# Row 2162-S13a2: does the S13 invoice to a registered customer still read uncertain when the customer's GSTIN is not the company's own? And what cause does Tally's GSTR-1 screen give?
+# Row 2162-S13a2: does the S13 invoice to a registered customer still read uncertain when the customer's GSTIN is not the company's own, though it is another registration under the company's PAN? And what cause does Tally's GSTR-1 screen give?
 
 Question (ADR 0004, item 18 and row S13). S13 sent the build's request for a Sales invoice to a registered customer that is not bill-wise (`BP/26-27/0053`). Tally stored it as sent, but its GST status read included No and uncertain Yes. The control `BP/26-27/0010` reads included.
 - S13's customer GSTIN, `08ZZZZZ0000Z1ZQ`, is the company's own. The book's tax unit reads `GSTREGNUMBER` `08ZZZZZ0000Z1ZQ`: the `pilot-lab-tax-units` fixture, with the same book GUID, 6b43e498. So S13 measured an invoice billed to the seller's own GSTIN, and its status says nothing yet about registered customers.
 - **This row changes that one variable.** The customer's GSTIN becomes `08ZZZZZ0000Z3ZO`. Every other byte of every request is S13's, including the invoice's number `BP/26-27/0053` and its REMOTEID tail 0788: S13's restore left neither in the book (S13's step 6, s9).
+- **The PAN stays the company's, on purpose.**
+  - The company (`…Z1ZQ`), the book's supplier (`…Z2ZP`) and this customer (`…Z3ZO`) share the PAN part `ZZZZZ0000Z` and the state 08. Only the registration's entity character differs.
+  - The synthetic family that public files may carry is exactly that PAN part. The repository's identifier check refuses any other PAN in a GSTIN, and a GSTIN with another state code fails the build's place-of-supply test (:850).
+  - So this sitting separates "the company's own GSTIN" from "another registration of the same PAN", and not from an unrelated customer. Decides says what each result does and does not settle.
 - It then reads, on Tally's GSTR-1 screen, what Tally gives as the invoice's status and, if it is uncertain, the cause. No field carries the cause (agent_gst_status.rs:634). That step presses no key that alters anything and takes screenshots only.
 - Sub-row b of S13 (the round off on the debit side) is done, and is not repeated.
 
@@ -11,7 +15,7 @@ Book: BRIDGE PILOT LAB (synthetic), loaded alone, in a sitting of its own. `LAB-
 - One BK before the first write and one restore after the last (C5, C6). The restore is checked by the COMPANY row of the marks read: its GUID, ALTVCHID and ALTMSTID equal step 1's. The bytes of the marks answer are not compared across the restore and reload, because its CMPINFO counters belong to each load (the ruling of 4 Nov 2026 on unchanged marks).
 - Write down the release shown on Tally's screen. S13 read TallyPrime 7.2 Silver.
 
-**The ledger is setup**, seeded by direct XML under the owner's seed rule, as S13 seeded it. It is never evidence of its own shape. `L-seed.xml` is S13's, with the GSTIN changed and nothing else. The GSTIN is of the synthetic family that cannot be issued, and its check character is right, so `gstin_valid` admits it. `gen.py` asserts, before it writes any file, that it is neither the company's GSTIN nor the one other GSTIN the book's ledgers held before S13 (`08ZZZZZ0000Z2ZP`, `BRIDGE Supplier RJ`'s, from S13's `a-s2-Q-rates` answer).
+**The ledger is setup**, seeded by direct XML under the owner's seed rule, as S13 seeded it. It is never evidence of its own shape. `L-seed.xml` is S13's, with the GSTIN changed and nothing else. The GSTIN is of the synthetic family that cannot be issued, and its check character is right, so `gstin_valid` admits it. `gen.py` asserts, before it writes any file, that the GSTIN is neither the company's GSTIN nor the one other GSTIN the book's ledgers held before S13 (`08ZZZZZ0000Z2ZP`, `BRIDGE Supplier RJ`'s, from S13's `a-s2-Q-rates` answer). It also asserts that its PAN part is the company's (above).
 
 **No Bridge build.** Raw requests, one at a time, through `run.py` (S13's, byte-equal). The build cannot send the invoice, because Sales is not a qualified voucher type. The import is what the build would render for this invoice (see "Code admits the trigger").
 
@@ -62,11 +66,12 @@ Run each step as `python3 -I run.py <gateway URL> <label> <files>`, then `python
 5. **Tally's GSTR-1 screen, read only.** No request is sent and nothing is keyed but what is listed here. The screen names are those of Tally's help pages. If a screen's words differ, write down the screen's words and go on only if the step is still plain.
    - **Stop rule for this step:** a prompt, a screen not described here, or a button bar that would have to be used. Stop, press nothing more, screenshot, and ask.
    - **Never press Enter on a voucher's own line,** which opens it for alteration. Never press a key that resolves, accepts or marks anything (Accept As Is or any other button the screen offers).
-   1. At the Gateway, press Alt+G (Go To), type `GSTR-1`, and press Enter on the line that reads GSTR-1. Screenshot.
+   - **If any Enter opens a voucher or a master screen, press nothing at all, not even Esc** (C7), and stop. Esc in this step is for report screens only.
+   1. At the Gateway, press Alt+G (Go To), type `GSTR-1`, and press Enter on the line that reads GSTR-1. If Tally first shows a list of GST registrations, it should hold one line, `08ZZZZZ0000Z1ZQ` (Rajasthan): screenshot it and press Enter on that line. A list of more than one line is a stop. Screenshot the report.
    2. Set the period with Alt+F2 (Period): From `1-8-2026`, To `31-8-2026`, Enter. Do not use F2, which changes Tally's current date. Screenshot the whole return summary, with every section's count.
    3. **If `0053` is uncertain** (step 4's read-back):
       - Move with the arrow keys to the line Uncertain Transactions (Corrections needed), and press Enter: the list of causes, each with its count. Screenshot.
-      - For each cause line, press Enter to see its vouchers, screenshot, and press Esc. Go on until the line that lists `BP/26-27/0053` is found.
+      - Open every cause line in turn, not only until `0053` is found, because a voucher can sit under more than one cause. On each, press Enter to see its vouchers, screenshot, and press Esc back to the list of causes.
       - Write down, as text and exactly as shown, every cause line under which `0053` is listed, with its count. Then write down every other cause line's words and count.
    4. **If `0053` is included:** move to the section that counts it (B2B is expected; write down the section's name), press Enter, screenshot the list, and write down the section's name and count as text.
    5. Press Esc one screen at a time back to the Gateway. Screenshot the Gateway.
@@ -113,11 +118,12 @@ Run each step as `python3 -I run.py <gateway URL> <label> <files>`, then `python
 ## Decides
 
 The post refuses an invoice unless every field it wrote reads back (`invoice_readback_differences`) and the status reads included, not overridden and not post-dated (`gst_status_differences`).
-- **Included Yes, uncertain No:** S13's uncertain status came from the customer's GSTIN being the company's own (one variable, one voucher, one book). Item 18's first element set is then stored as the build writes it and listed as included. That is PARTIAL: a raw import, not a build. Step 5's section is item 19's placement for a registered customer (PARTIAL: a screen read).
-- **Still uncertain:** the GSTIN being the company's own is not the cause, or not the only one. Step 5's cause text decides the next sitting:
-  - a cause about the party or its registration: vary the ledger by one field, its state first, copied from a ledger keyed on Tally's screen and read natively;
+- **Included Yes, uncertain No:** S13's uncertain status came from the customer's GSTIN being the company's own (one variable, one voucher, one book). The shared PAN is then not a cause either, since this customer shares it. Item 18's first element set is then stored as the build writes it and listed as included. That is PARTIAL: a raw import, not a build, and a customer under the company's own PAN. Step 5's section is item 19's placement for a registered customer (PARTIAL: a screen read).
+- **Still uncertain:** the same GSTIN is not the cause on its own. **The same PAN is still a live cause**, which this sitting cannot rule out. Step 5's cause text decides the next sitting:
+  - a cause that names the party's GSTIN or PAN as the company's own, or a supply to itself: the shared PAN. A customer under another PAN cannot be sent within the synthetic family public files may carry, so that sitting needs the run coordinator's decision first;
+  - another cause about the party or its registration: vary the ledger by one field, its state first, copied from a ledger keyed on Tally's screen and read natively;
   - a cause about the invoice: a twin keyed on Tally's screen against the same ledger, with both read natively;
-  - no cause readable: the keyed twin first.
+  - no cause readable: the keyed twin first. A keyed twin under the same PAN still leaves the PAN live.
 - **`PARTYGSTIN` or `GSTREGISTRATIONTYPE` not as sent:** the read-back comparison refuses every such post. Report it.
 - **s5m or s5r not unchanged:** looking at GSTR-1 changed the book. Report it before any other row uses that screen.
 - **A decline:** report its `LINEERROR`.

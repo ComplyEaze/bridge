@@ -1,0 +1,4 @@
+A5 rows 34 | read rows 34
+in A5, not read: []
+read, not in A5: []
+type, number and date equal as sets: True

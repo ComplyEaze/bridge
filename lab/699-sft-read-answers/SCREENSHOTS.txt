@@ -1,0 +1,3 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC.
+shots/s0-gateway.png 67450 B 57110951e2d41c5f8a24a224c9cc6e4272029dd11dea9d0ddc1921fcaeba95bc
+shots/s10-after-shut.png 96767 B a91e006bd7651989dcaadd836efec7cb378cec47d15f738bdc7df0989ed655d7

@@ -2898,6 +2898,44 @@ fn the_captured_delivery_notes_come_with_their_dates_in_the_order_keyed() {
     assert!(voucher(&rows, "Payment", "1").get("dispatch").is_none());
 }
 
+/// #2027: the widest read `vouchers` sends with these words, captured with the same Delivery Notes
+/// keyed: each voucher's dispatch details, its notes among them, are the plain read's, beside the
+/// e-invoice details.
+#[test]
+fn the_captured_class_read_with_e_invoice_carries_the_plain_reads_delivery_notes() {
+    let widest = einvoice_lab_rows(
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/window-read-class-e-invoice-delivery-notes.utf16le.xml"
+        ),
+        ASKING_E_INVOICE_AND_VOUCHER_GST,
+    );
+    let plain = einvoice_lab_rows(EINVOICE_LAB_DELIVERY_NOTES, ASKING_VOUCHER_GST);
+    assert_eq!(widest.len(), 5);
+    for (voucher_type, number) in [
+        ("Sales", "1"),
+        ("Sales", "2"),
+        ("Sales", "3"),
+        ("Sales", "4"),
+        ("Payment", "1"),
+    ] {
+        assert_eq!(
+            voucher(&widest, voucher_type, number)["dispatch"],
+            voucher(&plain, voucher_type, number)["dispatch"]
+        );
+    }
+    assert_eq!(
+        voucher(&widest, "Sales", "4")["dispatch"]["delivery_notes"]["value"],
+        json!([
+            delivery_note("DN-82", "20250402"),
+            delivery_note("DN-83", "20250401"),
+        ])
+    );
+    assert_eq!(
+        voucher(&widest, "Sales", "1")["e_invoice"]["irn"]["state"],
+        "present"
+    );
+}
+
 /// #2027: a Delivery Note's number and date are the book's own, sent as they are under every
 /// setting, as `doc_no` is.
 #[test]

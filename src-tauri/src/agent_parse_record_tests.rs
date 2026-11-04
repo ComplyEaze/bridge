@@ -669,6 +669,11 @@ fn rows() -> Vec<Row> {
         |_, t| agent_rows(t, EINVOICE_LAB)
     ));
     rows.push(row!(
+        "agent/einvoice-lab-dispatch/window-read-class-e-invoice-delivery-notes.utf16le.xml",
+        "parse_agent_rows(EINVOICE_LAB)",
+        |_, t| agent_rows(t, EINVOICE_LAB)
+    ));
+    rows.push(row!(
         "agent/einvoice-lab-dispatch/window-read-class-e-invoice-dispatch.utf16le.xml",
         "parse_agent_rows(EINVOICE_LAB)",
         |_, t| agent_rows(t, EINVOICE_LAB)

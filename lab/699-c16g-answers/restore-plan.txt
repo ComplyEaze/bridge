@@ -1,0 +1,7 @@
+restore-plan.txt (699-C16G P6, LAB-COMMON C6), written before the restore.
+Source folder: <LAB_DIR>/BK-C16G (holds 1 file).
+File: TDBK1800_<company number>.001, 24100 B, sha256 46ec32df25961e3c628350b6bf896785a2d27ea31cce201318e1ffa621ea463f (P1 recorded 24,100 B, sha256 46ec32df25961e3c628350b6bf896785a2d27ea31cce201318e1ffa621ea463f: True).
+Company: BRIDGE CLASS PURCHASE LAB, number <company number> (the Restore list must show this book with its number and the backup's date and time 4-Nov-26, 4.27 pm local).
+Restore Data Path: <Tally data folder>.
+Prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace will overwrite the existing folder." = Replace.
+Before: shut THE COMPANY by Company > Shut; listing of <Tally data folder>/<company number> (evidence/p6-listing-before.txt). After: the same listing (evidence/p6-listing-after.txt), THE COMPANY loaded alone, a whole-window screenshot and the Gateway, then p9 marks.

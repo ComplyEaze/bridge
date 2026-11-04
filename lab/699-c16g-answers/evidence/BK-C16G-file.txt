@@ -1,0 +1,3 @@
+2026-11-04T10:58:03Z folders holding THE BOOK's name: 1
+backup folder <LAB_DIR>/BK-C16G holds 1 file(s)
+TDBK1800_<company number>.001 24100 B sha256 46ec32df25961e3c628350b6bf896785a2d27ea31cce201318e1ffa621ea463f (name is TDBK1800_ + this book's folder + .001: True)

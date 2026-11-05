@@ -1,0 +1,1410 @@
+{
+  "file": "src-tauri/src/agent_import_invoice_scope.rs",
+  "base_commit": "6af59c3a",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's own tests (agent_import_invoice_scope_tests.rs) and to the invoice admission tests (agent_import_invoice_admission_tests.rs), the latter because a listing of ledgers can only be had from that module's lab harness (the extent a listing carries cannot be built by hand). killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. A mutant whose edit does not compile is recorded as unviable with the compiler's reason, not as caught. The hand-written mutants (S01 to S88) change, one at a time: in from_catalogue, the set of names (not deduplicated or ordered, only the first resolved, resolved in reverse), the exact-name find (case folded, trimmed, the first row that differs, containment), the refusal for a name the catalogue lacks (another code, no ledger named, the name lower-cased), the refusal for a GUID outside the alphabet (another code, no ledger named), the GUID parsed (upper-cased, trimmed), the refusal for a ledger with no usable parent (another code, no ledger named, an Absent parent accepted as empty, an Unsupported parent accepted as empty), the GUID key (kept as spelt, upper-cased), the stored name (empty, lower-cased, trimmed), the stored parent (empty, lower-cased, trimmed, the ledger's name), the GUID put in the part (not at all, twice), and the refusal for an unplannable part (another code, no cause, a ledger rather than a value detail); in parents, the members swapped, the name in place of the parent, the order reversed, only the first, the first left out, the GUID upper-cased, the parent lower-cased; in prove, the count check (<, >, ==), the refusal code and the lack of a cause, the cause of the count refusal, of a row without a GUID, of an unnamed row, of a repeated row and of a differing row, the row's GUID not lower-cased and upper-cased, the repeat check inverted and never firing, the name and parent comparison (|| as &&, each half alone, each half inverted, the name case folded and trimmed, the parent case folded and trimmed, a row with no parent passing), and the loop (the first row not examined, only the first examined, the last not examined); in prove_listing, the refusal code and the lack of a cause, the loop (the first record not examined, only the first examined, the last not examined), the GUID looked up by the lower-cased name, the cause of a record without a GUID, of an unnamed record and of a differing record, the record's GUID not lower-cased and upper-cased, the name and parent comparison (|| as &&, each half alone, each half inverted, the name case folded and trimmed, the parent case folded and trimmed, a parent the listing did not return passing, and returned_text replaced by workbook_text). Not mutated: the derive lists, the visibility of the items, the doc comments, the test module's attribute and path, the body of part (the tool mutates it; it does not compile), the order of the repeat check against the name and parent comparison inside prove, which of two ledgers with the same GUID the map keeps (the catalogue refuses a repeated GUID), the type of the set that detects a repeat, and the wording of the closure that builds a refusal; every edit above is one change, so none of the lists above is every possible change to the line it names. Fifteen edits (S02, S04, S06, S07, S17, S32, S34, S42, S47, S50, S57, S76, S79, S84 and S86) were changed to an equivalent edit of the same kind (a neighbouring spelling of the same change: next() for take(1), str::eq_ignore_ascii_case(row, name) for the method call, !(a == b) for a != b, find(name).is_some() for contains(name), &(\"\") for &\"\", &*error.code() for error.code(), name.to_string() for name.clone(), the comparison written the other way round or through eq, to_owned() for to_string(), == true on the inverted test, a closure in place of the method path, is_some_and for unwrap_or, and for S76 the wrong cause ledger_scope_row_count_differs after ledger_scope_row_repeated also gave a digit run), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses; S42 and S76 needed a second respelling. In every run the file was byte for byte as at base_commit, checked after each restore (and, for the tool, after the run); the restore was a copy, never a rename. In the tool, hand and whole_set runs the test modules were as at base_commit; in survivors_again they are as this change leaves them.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 600,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_invoice_scope.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/agent_import::invoice::/) | test(/agent_import::tests::invoice_admission_tests::/) | test(/agent_import::post::e2e_tests::/) | test(/agent_import::tests::number_identity_tests::/) | test(/tally::approved_import::/) | test(/invoice/)'",
+      "time": "2026-11-05T02:43:18Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 600,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/agent_import::invoice::/) | test(/agent_import::tests::invoice_admission_tests::/) | test(/agent_import::post::e2e_tests::/) | test(/agent_import::tests::number_identity_tests::/) | test(/tally::approved_import::/) | test(/invoice/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 4862,
+      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 20 hand-written mutants the filtered run missed (the tool's run had no mutant missed); the unmutated baseline passed all 4862",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 23,
+      "command": "as the hand run with -E 'test(/agent_import::invoice::scope::tests::/) | test(/a_listing_row_is_held_to_the_catalogue_at_every_position/) | test(/a_parent_the_listing_did_not_return_is_not_a_group_called_not_observed/)', for the 20 hand-written mutants that survived the whole_set run",
+      "tree": "base_commit with the tests this change adds"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 16,
+      "missed": 0,
+      "unviable": 2
+    },
+    "hand": {
+      "caught": 86,
+      "missed": 2,
+      "unviable": 0
+    },
+    "survived_at_base": {
+      "tool": 0,
+      "hand": 20
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 2
+    },
+    "accepted_not_equivalent": {
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "58:9 replace InvoiceLedgerScope::from_catalogue -> Result<Self, InvoiceRefusal> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `InvoiceLedgerScope: std::default::Default` is not satisfied"
+    },
+    "64:79 replace == with != in InvoiceLedgerScope::from_catalogue": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_is_resolved_exactly",
+      "killer_at": "base"
+    },
+    "88:9 replace InvoiceLedgerScope::part -> &LedgerGuidPart with Box::leak(Box::new(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `LedgerGuidPart: std::default::Default` is not satisfied"
+    },
+    "95:9 replace InvoiceLedgerScope::parents -> Vec<(String, String)> with vec![]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "95:9 replace InvoiceLedgerScope::parents -> Vec<(String, String)> with vec![(String::new(), String::new())]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "95:9 replace InvoiceLedgerScope::parents -> Vec<(String, String)> with vec![(String::new(), \"xyzzy\".into())]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "95:9 replace InvoiceLedgerScope::parents -> Vec<(String, String)> with vec![(\"xyzzy\".into(), String::new())]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "95:9 replace InvoiceLedgerScope::parents -> Vec<(String, String)> with vec![(\"xyzzy\".into(), \"xyzzy\".into())]": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "107:9 replace InvoiceLedgerScope::prove -> Result<(), InvoiceRefusal> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "108:25 replace != with == in InvoiceLedgerScope::prove": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "121:16 delete ! in InvoiceLedgerScope::prove": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "124:42 replace || with && in InvoiceLedgerScope::prove": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "124:25 replace != with == in InvoiceLedgerScope::prove": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "124:67 replace != with == in InvoiceLedgerScope::prove": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "140:9 replace InvoiceLedgerScope::prove_listing -> Result<(), InvoiceRefusal> with Ok(())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "152:17 replace || with && in InvoiceLedgerScope::prove_listing": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "151:22 replace != with == in InvoiceLedgerScope::prove_listing": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read",
+      "killer_at": "base"
+    },
+    "152:57 replace != with == in InvoiceLedgerScope::prove_listing": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "S01": {
+      "what": "from_catalogue: the names are not deduplicated or ordered (BTreeSet -> Vec)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for name in named.iter().copied().collect::<BTreeSet<_>>() {",
+          "to": "for name in named.iter().copied().collect::<Vec<_>>() {"
+        }
+      ],
+      "mutation": "06ac635a465a2828082fdeb053b5c093",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::the_first_unresolvable_name_in_name_order_is_the_one_refused",
+      "killer_at": "this_commit"
+    },
+    "S02": {
+      "what": "from_catalogue: only the first name in order is resolved",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for name in named.iter().copied().collect::<BTreeSet<_>>() {",
+          "to": "for name in named.iter().copied().collect::<BTreeSet<_>>().into_iter().next() {"
+        }
+      ],
+      "mutation": "4cb6f65c119a2e7fd928dd554499a558",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_is_resolved_exactly",
+      "killer_at": "base"
+    },
+    "S03": {
+      "what": "from_catalogue: the names are resolved in reverse order",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for name in named.iter().copied().collect::<BTreeSet<_>>() {",
+          "to": "for name in named.iter().copied().collect::<BTreeSet<_>>().into_iter().rev() {"
+        }
+      ],
+      "mutation": "e177127c3c352359c6dc3466060a95d2",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::the_first_unresolvable_name_in_name_order_is_the_one_refused",
+      "killer_at": "this_commit"
+    },
+    "S04": {
+      "what": "from_catalogue: the name is found with the case folded",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "rows.iter().find(|(row, _, _)| *row == name)",
+          "to": "rows.iter().find(|(row, _, _)| str::eq_ignore_ascii_case(row, name))"
+        }
+      ],
+      "mutation": "2cc95cec8c9e5880a5d68a4ca2592b49",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_is_resolved_exactly",
+      "killer_at": "base"
+    },
+    "S05": {
+      "what": "from_catalogue: the name is found with both sides trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "rows.iter().find(|(row, _, _)| *row == name)",
+          "to": "rows.iter().find(|(row, _, _)| row.trim() == name.trim())"
+        }
+      ],
+      "mutation": "7e7bbe3bdfefdc3ab5ae0b84e6804bba",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_is_resolved_exactly",
+      "killer_at": "base"
+    },
+    "S06": {
+      "what": "from_catalogue: the name is found at the first row that differs (== -> !=)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "rows.iter().find(|(row, _, _)| *row == name)",
+          "to": "rows.iter().find(|(row, _, _)| !(*row == name))"
+        }
+      ],
+      "mutation": "02ebbf6af62cf04af7f71b0fa5ed8496",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_ledger_whose_guid_is_of_another_form_is_refused",
+      "killer_at": "base"
+    },
+    "S07": {
+      "what": "from_catalogue: the name is found by containment",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "rows.iter().find(|(row, _, _)| *row == name)",
+          "to": "rows.iter().find(|(row, _, _)| row.find(name).is_some())"
+        }
+      ],
+      "mutation": "7557222ceccba6af6621ab0c61bd820d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_with_spaces_at_its_ends_is_kept_as_spelt",
+      "killer_at": "this_commit"
+    },
+    "S08": {
+      "what": "from_catalogue: a name the catalogue lacks is refused with another code (invoice_ledger_guid_unnameable)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "return Err(refuse_ledger(\"invoice_ledger_not_observed\", name));",
+          "to": "return Err(refuse_ledger(\"invoice_ledger_guid_unnameable\", name));"
+        }
+      ],
+      "mutation": "8a132687d733e97b6d373dd868bba3d7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_is_resolved_exactly",
+      "killer_at": "base"
+    },
+    "S09": {
+      "what": "from_catalogue: a name the catalogue lacks is refused naming no ledger",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "return Err(refuse_ledger(\"invoice_ledger_not_observed\", name));",
+          "to": "return Err(refuse_ledger(\"invoice_ledger_not_observed\", \"\"));"
+        }
+      ],
+      "mutation": "a0374f07e086223d9226effa8cf6888b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_is_resolved_exactly",
+      "killer_at": "base"
+    },
+    "S10": {
+      "what": "from_catalogue: a name the catalogue lacks is refused naming it in lower case",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "return Err(refuse_ledger(\"invoice_ledger_not_observed\", name));",
+          "to": "return Err(refuse_ledger(\"invoice_ledger_not_observed\", &name.to_lowercase()));"
+        }
+      ],
+      "mutation": "b2777d620cd0313aeeb87fcef78c80ae",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_is_resolved_exactly",
+      "killer_at": "base"
+    },
+    "S11": {
+      "what": "from_catalogue: a GUID outside the alphabet is refused with another code (invoice_ledger_parent_unnameable)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".map_err(|_| refuse_ledger(\"invoice_ledger_guid_unnameable\", name))?;",
+          "to": ".map_err(|_| refuse_ledger(\"invoice_ledger_parent_unnameable\", name))?;"
+        }
+      ],
+      "mutation": "cd39b661aa3f97ee43853c7d6caf38fe",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_ledger_whose_guid_is_of_another_form_is_refused",
+      "killer_at": "base"
+    },
+    "S12": {
+      "what": "from_catalogue: a GUID outside the alphabet is refused naming no ledger",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".map_err(|_| refuse_ledger(\"invoice_ledger_guid_unnameable\", name))?;",
+          "to": ".map_err(|_| refuse_ledger(\"invoice_ledger_guid_unnameable\", \"\"))?;"
+        }
+      ],
+      "mutation": "448023f70dfbbccee24c290f8372c386",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_ledger_whose_guid_is_of_another_form_is_refused",
+      "killer_at": "base"
+    },
+    "S13": {
+      "what": "from_catalogue: the GUID is parsed in upper case",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let guid = LedgerGuid::parse(guid)",
+          "to": "let guid = LedgerGuid::parse(&guid.to_ascii_uppercase())"
+        }
+      ],
+      "mutation": "cd7350473f30864d24f0f11e6c1f3c22",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::only_the_named_ledgers_are_read",
+      "killer_at": "base"
+    },
+    "S14": {
+      "what": "from_catalogue: the GUID is parsed trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let guid = LedgerGuid::parse(guid)",
+          "to": "let guid = LedgerGuid::parse(guid.trim())"
+        }
+      ],
+      "mutation": "a6e8dfd5532bbd43a34102b3711df2ab",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S15": {
+      "what": "from_catalogue: a ledger with no usable parent is refused with another code (invoice_ledger_guid_unnameable)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let ParentObservation::Named(parent) = parent else {\n                return Err(refuse_ledger(\"invoice_ledger_parent_unnameable\", name));\n            };",
+          "to": "let ParentObservation::Named(parent) = parent else {\n                return Err(refuse_ledger(\"invoice_ledger_guid_unnameable\", name));\n            };"
+        }
+      ],
+      "mutation": "4cbc8bbe3d9bdf64d5092eb77ccbba73",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_ledger_whose_parent_the_catalogue_cannot_carry_is_refused",
+      "killer_at": "base"
+    },
+    "S16": {
+      "what": "from_catalogue: a ledger with no usable parent is refused naming no ledger",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let ParentObservation::Named(parent) = parent else {\n                return Err(refuse_ledger(\"invoice_ledger_parent_unnameable\", name));\n            };",
+          "to": "let ParentObservation::Named(parent) = parent else {\n                return Err(refuse_ledger(\"invoice_ledger_parent_unnameable\", \"\"));\n            };"
+        }
+      ],
+      "mutation": "b334fd9450d8012b4b47b0fa145d8b51",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_ledger_whose_parent_the_catalogue_cannot_carry_is_refused",
+      "killer_at": "base"
+    },
+    "S17": {
+      "what": "from_catalogue: a ledger with no parent (Absent) is accepted with an empty parent",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let ParentObservation::Named(parent) = parent else {\n                return Err(refuse_ledger(\"invoice_ledger_parent_unnameable\", name));\n            };",
+          "to": "let parent = match parent {\n                ParentObservation::Named(parent) => parent,\n                ParentObservation::Absent => &(\"\"),\n                ParentObservation::Unsupported => {\n                    return Err(refuse_ledger(\"invoice_ledger_parent_unnameable\", name));\n                }\n            };"
+        }
+      ],
+      "mutation": "4dcdc4b4cb950e60d6778b731c0f607a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_ledger_whose_parent_the_catalogue_cannot_carry_is_refused",
+      "killer_at": "base"
+    },
+    "S18": {
+      "what": "from_catalogue: a ledger whose parent the catalogue could not carry (Unsupported) is accepted with an empty parent",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let ParentObservation::Named(parent) = parent else {\n                return Err(refuse_ledger(\"invoice_ledger_parent_unnameable\", name));\n            };",
+          "to": "let parent = match parent {\n                ParentObservation::Named(parent) => parent,\n                ParentObservation::Unsupported => &\"\",\n                ParentObservation::Absent => {\n                    return Err(refuse_ledger(\"invoice_ledger_parent_unnameable\", name));\n                }\n            };"
+        }
+      ],
+      "mutation": "4b7a6db9db790b6678e60a686477c527",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::a_parent_the_catalogue_would_not_carry_is_refused_as_unnameable",
+      "killer_at": "this_commit"
+    },
+    "S19": {
+      "what": "from_catalogue: the GUID key is kept as the catalogue spells it (no lower-casing)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "guid.as_str().to_ascii_lowercase(),",
+          "to": "guid.as_str().to_string(),"
+        }
+      ],
+      "mutation": "4358c5ff45c5afa38a32e0bc7061081e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::a_catalogue_guid_in_capitals_is_the_same_ledger_as_its_row_in_lower_case",
+      "killer_at": "this_commit"
+    },
+    "S20": {
+      "what": "from_catalogue: the GUID key is upper-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "guid.as_str().to_ascii_lowercase(),",
+          "to": "guid.as_str().to_ascii_uppercase(),"
+        }
+      ],
+      "mutation": "b510ba8d426e8b6a2b351a9562cb7f1c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S21": {
+      "what": "from_catalogue: the stored name is empty",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "name: name.to_string(),",
+          "to": "name: String::new(),"
+        }
+      ],
+      "mutation": "e32bd800c2d2ec73971e53bdd079cd4c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_parent_no_filter_could_hold_is_read_and_compared_verbatim",
+      "killer_at": "base"
+    },
+    "S22": {
+      "what": "from_catalogue: the stored name is lower-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "name: name.to_string(),",
+          "to": "name: name.to_lowercase(),"
+        }
+      ],
+      "mutation": "10f8d5940fbdacb9942786b6c0da4031",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S23": {
+      "what": "from_catalogue: the stored name is trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "name: name.to_string(),",
+          "to": "name: name.trim().to_string(),"
+        }
+      ],
+      "mutation": "a1af12c88aa9bbe8e3fbd4c78a868991",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::a_name_with_spaces_at_its_ends_is_kept_as_spelt",
+      "killer_at": "this_commit"
+    },
+    "S24": {
+      "what": "from_catalogue: the stored parent is empty",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "parent: (*parent).to_string(),",
+          "to": "parent: String::new(),"
+        }
+      ],
+      "mutation": "fade543af536076bd6c9eb5639cd2173",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_parent_no_filter_could_hold_is_read_and_compared_verbatim",
+      "killer_at": "base"
+    },
+    "S25": {
+      "what": "from_catalogue: the stored parent is lower-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "parent: (*parent).to_string(),",
+          "to": "parent: parent.to_lowercase(),"
+        }
+      ],
+      "mutation": "14f2e8d36ec6e9dfe91774aa29b86267",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_parent_no_filter_could_hold_is_read_and_compared_verbatim",
+      "killer_at": "base"
+    },
+    "S26": {
+      "what": "from_catalogue: the stored parent is trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "parent: (*parent).to_string(),",
+          "to": "parent: parent.trim().to_string(),"
+        }
+      ],
+      "mutation": "035f2dda10a3bad298c902856baad5bc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_parent_no_filter_could_hold_is_read_and_compared_verbatim",
+      "killer_at": "base"
+    },
+    "S27": {
+      "what": "from_catalogue: the stored parent is the ledger's own name",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "parent: (*parent).to_string(),",
+          "to": "parent: name.to_string(),"
+        }
+      ],
+      "mutation": "9af47bfe283d2915c8fdf860999a4d4e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S28": {
+      "what": "from_catalogue: the GUID is not put in the part",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "guids.push(guid);",
+          "to": "drop(guid);"
+        }
+      ],
+      "mutation": "2beb736edc3ac38c3e70040d83edc94e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_ledger_whose_parent_the_catalogue_cannot_carry_is_refused",
+      "killer_at": "base"
+    },
+    "S29": {
+      "what": "from_catalogue: the GUID is put in the part twice",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "guids.push(guid);",
+          "to": "guids.push(guid.clone());\n            guids.push(guid);"
+        }
+      ],
+      "mutation": "bb8b993fb163e94d306ef4f6a187b6d7",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "S30": {
+      "what": "from_catalogue: an unplannable part is refused with another code (invoice_ledger_guid_unnameable)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".map_err(|error| refuse_value(\"invoice_ledger_scope_unplannable\", error.code()))?;",
+          "to": ".map_err(|error| refuse_value(\"invoice_ledger_guid_unnameable\", error.code()))?;"
+        }
+      ],
+      "mutation": "b994bdce3f33f98a75e80473ac21b41f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_scope_of_no_ledger_is_unplannable",
+      "killer_at": "base"
+    },
+    "S31": {
+      "what": "from_catalogue: an unplannable part is refused with no cause",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".map_err(|error| refuse_value(\"invoice_ledger_scope_unplannable\", error.code()))?;",
+          "to": ".map_err(|_| refuse_value(\"invoice_ledger_scope_unplannable\", \"\"))?;"
+        }
+      ],
+      "mutation": "faa17f00e81d057d8f899dc40ee50edf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_scope_of_no_ledger_is_unplannable",
+      "killer_at": "base"
+    },
+    "S32": {
+      "what": "from_catalogue: an unplannable part is refused as a ledger, not a value",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".map_err(|error| refuse_value(\"invoice_ledger_scope_unplannable\", error.code()))?;",
+          "to": ".map_err(|error| refuse_ledger(\"invoice_ledger_scope_unplannable\", &*error.code()))?;"
+        }
+      ],
+      "mutation": "09f6ac24f60f05cba59e51c3d8ee715c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_scope_of_no_ledger_is_unplannable",
+      "killer_at": "base"
+    },
+    "S33": {
+      "what": "parents: the GUID and the parent are swapped",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "(guid.clone(), ledger.parent.clone())",
+          "to": "(ledger.parent.clone(), guid.clone())"
+        }
+      ],
+      "mutation": "0c1d830d74bbe3d9f7a2310ba4d73523",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S34": {
+      "what": "parents: the ledger's name is carried in place of its parent",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "(guid.clone(), ledger.parent.clone())",
+          "to": "(guid.clone(), ledger.name.to_string())"
+        }
+      ],
+      "mutation": "4c6d92f3646846e0cd717707defa45e1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S35": {
+      "what": "parents: the order is reversed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "ledger.parent.clone()))\n            .collect()",
+          "to": "ledger.parent.clone()))\n            .rev()\n            .collect()"
+        }
+      ],
+      "mutation": "a2576c4f6e5163525c537c8c662f45d1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S36": {
+      "what": "parents: only the first ledger is carried",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "ledger.parent.clone()))\n            .collect()",
+          "to": "ledger.parent.clone()))\n            .take(1)\n            .collect()"
+        }
+      ],
+      "mutation": "0c4707d4cf53c93cadf529027d01b282",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S37": {
+      "what": "parents: the first ledger is left out",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "ledger.parent.clone()))\n            .collect()",
+          "to": "ledger.parent.clone()))\n            .skip(1)\n            .collect()"
+        }
+      ],
+      "mutation": "7dc0959be6229c9a8decf27bc73fd684",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S38": {
+      "what": "parents: the GUID is upper-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "(guid.clone(), ledger.parent.clone())",
+          "to": "(guid.to_ascii_uppercase(), ledger.parent.clone())"
+        }
+      ],
+      "mutation": "5d73ea2c2f024220eddee044a0b0d9ba",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S39": {
+      "what": "parents: the parent is lower-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "(guid.clone(), ledger.parent.clone())",
+          "to": "(guid.clone(), ledger.parent.to_lowercase())"
+        }
+      ],
+      "mutation": "1e4ddcc67ee7fa0039175c2cf99810b0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_regrouped_ledger_changes_the_parents_but_not_the_request",
+      "killer_at": "base"
+    },
+    "S40": {
+      "what": "prove: the count check is < (a surplus passes the count)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if listed.len() != self.expected.len() {",
+          "to": "if listed.len() < self.expected.len() {"
+        }
+      ],
+      "mutation": "c0eb3a2c36ecb8e196d9368bc2472abc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::an_answer_that_is_not_the_scopes_is_refused_on_its_rows",
+      "killer_at": "base"
+    },
+    "S41": {
+      "what": "prove: the count check is > (a shortfall passes the count)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if listed.len() != self.expected.len() {",
+          "to": "if listed.len() > self.expected.len() {"
+        }
+      ],
+      "mutation": "492598d13fcf862b4fdd709c5a28c0ee",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::an_answer_that_is_not_the_scopes_is_refused_on_its_rows",
+      "killer_at": "base"
+    },
+    "S42": {
+      "what": "prove: the count check is == (equal counts are refused)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if listed.len() != self.expected.len() {",
+          "to": "if listed.len().eq(&self.expected.len()) {"
+        }
+      ],
+      "mutation": "88ff883b1dd509fd86c7d1309e04ecc3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S43": {
+      "what": "prove: every refusal takes the listing's code (invoice_ledger_listing_rows_differ)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let differs = |cause: &str| refuse_value(\"invoice_ledger_rates_rows_differ\", cause);",
+          "to": "let differs = |cause: &str| refuse_value(\"invoice_ledger_listing_rows_differ\", cause);"
+        }
+      ],
+      "mutation": "61bae8950d77cfbd4edaf91641fb0f0c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S44": {
+      "what": "prove: every refusal carries no cause",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let differs = |cause: &str| refuse_value(\"invoice_ledger_rates_rows_differ\", cause);",
+          "to": "let differs = |_cause: &str| refuse_value(\"invoice_ledger_rates_rows_differ\", \"\");"
+        }
+      ],
+      "mutation": "fb0fedb5df476c1d9bdd64147e118bb9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S45": {
+      "what": "prove: the count refusal names another cause (ledger_scope_row_not_named)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "return Err(differs(\"ledger_scope_row_count_differs\"));",
+          "to": "return Err(differs(\"ledger_scope_row_not_named\"));"
+        }
+      ],
+      "mutation": "dd09cab550139da54d663de199ad9808",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::an_answer_that_is_not_the_scopes_is_refused_on_its_rows",
+      "killer_at": "base"
+    },
+    "S46": {
+      "what": "prove: a row without a GUID names another cause (ledger_scope_row_not_named)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".as_deref()\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();",
+          "to": ".as_deref()\n                .ok_or_else(|| differs(\"ledger_scope_row_not_named\"))?\n                .to_ascii_lowercase();"
+        }
+      ],
+      "mutation": "725735af38fc5b067f5a594228b6d68b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S47": {
+      "what": "prove: the row's GUID is not lower-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".as_deref()\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();",
+          "to": ".as_deref()\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_owned();"
+        }
+      ],
+      "mutation": "420a3e1ccf4211ae06e1af0731d197c1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S48": {
+      "what": "prove: the row's GUID is upper-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".as_deref()\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();",
+          "to": ".as_deref()\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_uppercase();"
+        }
+      ],
+      "mutation": "937b29966febde97f8fcccf6bef63c32",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_parent_no_filter_could_hold_is_read_and_compared_verbatim",
+      "killer_at": "base"
+    },
+    "S49": {
+      "what": "prove: an unnamed row names another cause (ledger_scope_row_without_guid)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "return Err(differs(\"ledger_scope_row_not_named\"));\n            };\n            if !seen.insert(guid) {",
+          "to": "return Err(differs(\"ledger_scope_row_without_guid\"));\n            };\n            if !seen.insert(guid) {"
+        }
+      ],
+      "mutation": "42b1d74a2e4ecfa4fea2395a93f0c6e6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S50": {
+      "what": "prove: the repeat check is inverted (the first sight of a GUID is refused)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if !seen.insert(guid) {",
+          "to": "if seen.insert(guid) == true {"
+        }
+      ],
+      "mutation": "743695e114c6aa39775ca016dd47dfa7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_parent_no_filter_could_hold_is_read_and_compared_verbatim",
+      "killer_at": "base"
+    },
+    "S51": {
+      "what": "prove: a repeated GUID is never refused",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if !seen.insert(guid) {",
+          "to": "if !seen.insert(guid) && false {"
+        }
+      ],
+      "mutation": "6520ec227f424f422589c8cd42213e0f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S52": {
+      "what": "prove: a repeated row names another cause (ledger_scope_row_not_named)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "return Err(differs(\"ledger_scope_row_repeated\"));",
+          "to": "return Err(differs(\"ledger_scope_row_not_named\"));"
+        }
+      ],
+      "mutation": "4b5fbab99262e88b257ae589a3eef04f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S53": {
+      "what": "prove: a row is refused only if its name and its parent both differ (|| -> &&)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name != expected.name && row.parent.as_deref() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "c02498ce58c2cd6e52fda96658dd0fad",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S54": {
+      "what": "prove: only the parent is compared (the name half dropped)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.parent.as_deref() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "f3731f32ee154b1f1594b115faf973f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S55": {
+      "what": "prove: only the name is compared (the parent half dropped)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name != expected.name {"
+        }
+      ],
+      "mutation": "91bac2bde0067966a0ed63a23f4afc91",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S56": {
+      "what": "prove: the name comparison is inverted (!= -> ==)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name == expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "4a5d857b3d402bd1d9db3823cfc0125a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S57": {
+      "what": "prove: the parent comparison is inverted (!= -> ==)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name != expected.name || Some(expected.parent.as_str()) == row.parent.as_deref()\n            {"
+        }
+      ],
+      "mutation": "d2c47338d64b9773382f90b9db5cfd94",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S58": {
+      "what": "prove: the name is compared with the case folded",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if !row.name.eq_ignore_ascii_case(&expected.name) || row.parent.as_deref() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "8b6f919fe2418e33d24e35ad26296b5a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S59": {
+      "what": "prove: the name is compared trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name.trim() != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "69919d23aa9df693f6ac3389e0d9050b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::a_fault_in_any_one_row_of_the_real_answer_is_refused_at_its_position",
+      "killer_at": "this_commit"
+    },
+    "S60": {
+      "what": "prove: the parent is compared with the case folded",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name != expected.name || row.parent.as_deref().map(str::to_ascii_lowercase) != Some(expected.parent.to_ascii_lowercase())\n            {"
+        }
+      ],
+      "mutation": "20df46fdaada01ee3dfc5ce17ebc7df4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S61": {
+      "what": "prove: the parent is compared trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name != expected.name || row.parent.as_deref().map(str::trim) != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "4e640e2385b436c74d6213cf61fd720d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S62": {
+      "what": "prove: a row with no parent passes the parent comparison",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if row.name != expected.name || row.parent.as_deref() != Some(expected.parent.as_str())\n            {",
+          "to": "if row.name != expected.name || row.parent.as_deref().unwrap_or(expected.parent.as_str()) != expected.parent.as_str()\n            {"
+        }
+      ],
+      "mutation": "b4677cf5ecfdff159f74a58ce1fb167f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::invoice::scope::tests::a_fault_in_any_one_row_of_the_real_answer_is_refused_at_its_position",
+      "killer_at": "this_commit"
+    },
+    "S63": {
+      "what": "prove: a row that differs names another cause (ledger_scope_row_not_named)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "row.parent.as_deref() != Some(expected.parent.as_str())\n            {\n                return Err(differs(\"ledger_scope_row_differs_from_catalogue\"));",
+          "to": "row.parent.as_deref() != Some(expected.parent.as_str())\n            {\n                return Err(differs(\"ledger_scope_row_not_named\"));"
+        }
+      ],
+      "mutation": "0eb99f44e3e1d08126c38ae4a4d85f25",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S64": {
+      "what": "prove: the first row is not examined",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for row in listed {",
+          "to": "for row in listed.iter().skip(1) {"
+        }
+      ],
+      "mutation": "f945c8ad736ff86f1a042c320456ba48",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S65": {
+      "what": "prove: only the first row is examined",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for row in listed {",
+          "to": "for row in listed.iter().take(1) {"
+        }
+      ],
+      "mutation": "7bdf917c5387a677bb8d7776dbacc319",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::one_row_of_the_real_answer_changed_is_refused",
+      "killer_at": "base"
+    },
+    "S66": {
+      "what": "prove: the last row is not examined",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for row in listed {",
+          "to": "for row in listed.iter().take(listed.len() - 1) {"
+        }
+      ],
+      "mutation": "f4f2acbe0c3bcfba83bef84e4e47625f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::invoice::scope::tests::a_row_parent_with_a_trailing_space_is_read_verbatim",
+      "killer_at": "base"
+    },
+    "S67": {
+      "what": "prove_listing: every refusal takes the rates code (invoice_ledger_rates_rows_differ)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let differs = |cause: &str| refuse_value(\"invoice_ledger_listing_rows_differ\", cause);",
+          "to": "let differs = |cause: &str| refuse_value(\"invoice_ledger_rates_rows_differ\", cause);"
+        }
+      ],
+      "mutation": "e56fcfae2242292a057f04b285e7fb5e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "S68": {
+      "what": "prove_listing: every refusal carries no cause",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "let differs = |cause: &str| refuse_value(\"invoice_ledger_listing_rows_differ\", cause);",
+          "to": "let differs = |_cause: &str| refuse_value(\"invoice_ledger_listing_rows_differ\", \"\");"
+        }
+      ],
+      "mutation": "fa254df9b3c8b651de52cc626fbee7d2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "S69": {
+      "what": "prove_listing: the first record is not examined",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for record in &listing.records {",
+          "to": "for record in listing.records.iter().skip(1) {"
+        }
+      ],
+      "mutation": "3331d8b76a68f439c5ec02b0b1c8f7f1",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_is_held_to_the_catalogue_at_every_position",
+      "killer_at": "this_commit"
+    },
+    "S70": {
+      "what": "prove_listing: only the first record is examined",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for record in &listing.records {",
+          "to": "for record in listing.records.iter().take(1) {"
+        }
+      ],
+      "mutation": "a27094b8be351bc8f9d07254ea5dad70",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "S71": {
+      "what": "prove_listing: the last record is not examined",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "for record in &listing.records {",
+          "to": "for record in listing.records.iter().take(listing.records.len() - 1) {"
+        }
+      ],
+      "mutation": "ec6124c3eb1ada3fdd365fe7d69cfb9c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_parent_the_listing_did_not_return_is_not_a_group_called_not_observed",
+      "killer_at": "this_commit"
+    },
+    "S72": {
+      "what": "prove_listing: the GUID is looked up by the lower-cased name",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".get(name)\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();",
+          "to": ".get(&name.to_lowercase())\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();"
+        }
+      ],
+      "mutation": "095b9cfd878f8fb6e310d7a209fdce26",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read",
+      "killer_at": "base"
+    },
+    "S73": {
+      "what": "prove_listing: a record without a GUID names another cause (ledger_scope_row_not_named)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".get(name)\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();",
+          "to": ".get(name)\n                .ok_or_else(|| differs(\"ledger_scope_row_not_named\"))?\n                .to_ascii_lowercase();"
+        }
+      ],
+      "mutation": "85b4fb12f8130762f30fd8069f7f900a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_is_held_to_the_catalogue_at_every_position",
+      "killer_at": "this_commit"
+    },
+    "S74": {
+      "what": "prove_listing: the record's GUID is not lower-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".get(name)\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();",
+          "to": ".get(name)\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_string();"
+        }
+      ],
+      "mutation": "68c0bee169e74ec00037a5a3333b553e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_is_held_to_the_catalogue_at_every_position",
+      "killer_at": "this_commit"
+    },
+    "S75": {
+      "what": "prove_listing: the record's GUID is upper-cased",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": ".get(name)\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_lowercase();",
+          "to": ".get(name)\n                .ok_or_else(|| differs(\"ledger_scope_row_without_guid\"))?\n                .to_ascii_uppercase();"
+        }
+      ],
+      "mutation": "4524907ee7c4907e100be2ea5cbdb4bf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read",
+      "killer_at": "base"
+    },
+    "S76": {
+      "what": "prove_listing: an unnamed record names another cause (ledger_scope_row_count_differs)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "return Err(differs(\"ledger_scope_row_not_named\"));\n            };\n            if *name != expected.name",
+          "to": "return Err(differs(\"ledger_scope_row_count_differs\"));\n            };\n            if *name != expected.name"
+        }
+      ],
+      "mutation": "ab7a9d6145c04440dd63645a8e79f512",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "S77": {
+      "what": "prove_listing: a record is refused only if its name and its parent both differ (|| -> &&)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if *name != expected.name\n                && record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "2bebee9174ea47b9938f9ba2ab557c0a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "S78": {
+      "what": "prove_listing: only the parent is compared (the name half dropped)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "570bec2904f653f50a6fd78a3e6a07af",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "S79": {
+      "what": "prove_listing: only the name is compared (the parent half dropped)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if expected.name != *name {"
+        }
+      ],
+      "mutation": "9bfc855f83d895d390aed08bc77d4cfc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    },
+    "S80": {
+      "what": "prove_listing: the name comparison is inverted (!= -> ==)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if *name == expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "8afd259d359b8a5350bf1cf0f2c33c07",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read",
+      "killer_at": "base"
+    },
+    "S81": {
+      "what": "prove_listing: the parent comparison is inverted (!= -> ==)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if *name != expected.name\n                || record.ledger.parent.returned_text() == Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "a74dbbe8c0b8cdda2e38bf309f66e669",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read",
+      "killer_at": "base"
+    },
+    "S82": {
+      "what": "prove_listing: the name is compared with the case folded",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if !name.eq_ignore_ascii_case(&expected.name)\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "f505f2435ccc22e858ce405254a5136e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_is_held_to_the_catalogue_at_every_position",
+      "killer_at": "this_commit"
+    },
+    "S83": {
+      "what": "prove_listing: the name is compared trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if name.trim() != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "1af05ece02d003a1f0bff6149be66aad",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_is_held_to_the_catalogue_at_every_position",
+      "killer_at": "this_commit"
+    },
+    "S84": {
+      "what": "prove_listing: the parent is compared with the case folded",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if *name != expected.name\n                || record.ledger.parent.returned_text().map(|text| text.to_ascii_lowercase()) != Some(expected.parent.to_ascii_lowercase())\n            {"
+        }
+      ],
+      "mutation": "60794fbe19ee107afa16c79ba74f24d2",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_is_held_to_the_catalogue_at_every_position",
+      "killer_at": "this_commit"
+    },
+    "S85": {
+      "what": "prove_listing: the parent is compared trimmed",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if *name != expected.name\n                || record.ledger.parent.returned_text().map(str::trim) != Some(expected.parent.as_str())\n            {"
+        }
+      ],
+      "mutation": "61e56b612c163cc07e26346a58b9fd6e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_is_held_to_the_catalogue_at_every_position",
+      "killer_at": "this_commit"
+    },
+    "S86": {
+      "what": "prove_listing: a parent the listing did not return passes the parent comparison",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if *name != expected.name\n                || record.ledger.parent.returned_text().is_some_and(|text| text != expected.parent)\n            {"
+        }
+      ],
+      "mutation": "9141c9c6735accb2684b48a80080c383",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_parent_the_listing_did_not_return_is_not_a_group_called_not_observed",
+      "killer_at": "this_commit"
+    },
+    "S87": {
+      "what": "prove_listing: a parent the listing did not return reads as its workbook text (workbook_text in place of returned_text)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "if *name != expected.name\n                || record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {",
+          "to": "if *name != expected.name\n                || record.ledger.parent.workbook_text() != expected.parent.as_str()\n            {"
+        }
+      ],
+      "mutation": "87d985e6b7d5cb8743e9003528ce38ad",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_parent_the_listing_did_not_return_is_not_a_group_called_not_observed",
+      "killer_at": "this_commit"
+    },
+    "S88": {
+      "what": "prove_listing: a record that differs names another cause (ledger_scope_row_not_named)",
+      "applied_to": "src-tauri/src/agent_import_invoice_scope.rs",
+      "edits": [
+        {
+          "from": "record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {\n                return Err(differs(\"ledger_scope_row_differs_from_catalogue\"));",
+          "to": "record.ledger.parent.returned_text() != Some(expected.parent.as_str())\n            {\n                return Err(differs(\"ledger_scope_row_not_named\"));"
+        }
+      ],
+      "mutation": "09ca3f296a14c8cde9d276f88c710901",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::invoice_admission_tests::a_listing_row_that_is_not_the_catalogues_is_refused",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "S14": {
+      "mutation": "a6e8dfd5532bbd43a34102b3711df2ab",
+      "reason": "equivalent: the catalogue trims a ledger's GUID when it reads it (a GUID with a space at its end is held without it, checked by building a catalogue from one), so the text handed to LedgerGuid::parse never has a space at either end and trimming it changes nothing"
+    },
+    "S29": {
+      "mutation": "bb8b993fb163e94d306ef4f6a187b6d7",
+      "reason": "equivalent: LedgerGuidPart::new collects its GUIDs into a BTreeSet (a ledger named twice is named once, its documented rule), so the same GUID pushed twice gives the same part and the same request; the expected map is keyed by GUID and takes the same entry twice"
+    }
+  }
+}

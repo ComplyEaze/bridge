@@ -456,3 +456,187 @@ fn every_refusal_of_a_scope_has_a_next_step() {
         assert!(crate::agent::refusal_remediation(code).is_some(), "{code}");
     }
 }
+
+// ---- Names, parents and GUIDs at their edges (the #2058 mutation record) ----
+
+/// With several names the catalogue lacks, the one refused is the first in name
+/// order, whatever order the invoice named them in and however often.
+/// (SYNTHETIC.)
+#[test]
+fn the_first_unresolvable_name_in_name_order_is_the_one_refused() {
+    for named in [
+        &["Zed", "Alpha"][..],
+        &["Alpha", "Zed"][..],
+        &["Zed", "Sales", "Alpha", "Zed"][..],
+    ] {
+        assert_eq!(
+            scope_of(&book(), named).err(),
+            Some(refuse_ledger("invoice_ledger_not_observed", "Alpha")),
+            "{named:?}"
+        );
+    }
+}
+
+/// A name is found whole: a part of a ledger's name, or the empty name, is no
+/// ledger. (SYNTHETIC.)
+#[test]
+fn a_part_of_a_name_resolves_no_ledger() {
+    for name in ["Custom", "ustomer", "Cust", "ale", ""] {
+        assert_eq!(
+            scope_of(&book(), &["Sales", name]).err(),
+            Some(refuse_ledger("invoice_ledger_not_observed", name)),
+            "{name:?}"
+        );
+    }
+}
+
+/// A parent the catalogue returned but this parse would not carry (one with a
+/// right-to-left override, or past 1024 bytes) is `Unsupported`, which is
+/// refused as a blank one is. (SYNTHETIC.)
+#[test]
+fn a_parent_the_catalogue_would_not_carry_is_refused_as_unnameable() {
+    for parent in ["Group\u{202e}", &"G".repeat(1025)] {
+        let catalogue = synthetic(&[("Customer", parent), ("Sales", "Sales Accounts")]);
+        assert_eq!(
+            scope_of(&catalogue, &["Customer", "Sales"]).err(),
+            Some(refuse_ledger(
+                "invoice_ledger_parent_unnameable",
+                "Customer"
+            )),
+            "{} bytes",
+            parent.len()
+        );
+        assert!(scope_of(&catalogue, &["Sales"]).is_ok());
+    }
+}
+
+/// A ledger with no parent at all (an empty `PARENT`) is refused too: it has no
+/// parent its row could be compared with. (SYNTHETIC.)
+#[test]
+fn a_ledger_with_no_parent_is_refused_as_unnameable() {
+    let catalogue = synthetic(&[("Customer", ""), ("Sales", "Sales Accounts")]);
+    assert_eq!(
+        scope_of(&catalogue, &["Customer", "Sales"]).err(),
+        Some(refuse_ledger(
+            "invoice_ledger_parent_unnameable",
+            "Customer"
+        ))
+    );
+}
+
+/// A GUID is compared in lower case on both sides, whatever case the catalogue
+/// spelt it in. (SYNTHETIC: the lab's GUIDs are lower case.)
+#[test]
+fn a_catalogue_guid_in_capitals_is_the_same_ledger_as_its_row_in_lower_case() {
+    let upper = format!("{PILOT_GUID}-00000ABC");
+    let catalogue = synthetic_with_guids(&[("Sales", "Sales Accounts", upper.clone())]);
+    let scope = scope_of(&catalogue, &["Sales"]).unwrap();
+    let lower = ListedLedger {
+        name: "Sales".to_string(),
+        guid: Some(upper.to_ascii_lowercase()),
+        parent: Some("Sales Accounts".to_string()),
+    };
+    let capitals = ListedLedger {
+        guid: Some(upper),
+        ..lower.clone()
+    };
+    assert_eq!(scope.prove(&[lower]), Ok(()));
+    assert_eq!(scope.prove(&[capitals]), Ok(()));
+}
+
+/// A ledger name is the catalogue's spelling to the byte: one the catalogue
+/// holds with a space at each end resolves only as spelt, and its row must carry
+/// it as spelt. (SYNTHETIC.)
+#[test]
+fn a_name_with_spaces_at_its_ends_is_kept_as_spelt() {
+    let catalogue = synthetic(&[(" Sales ", "Sales Accounts")]);
+    assert_eq!(
+        scope_of(&catalogue, &["Sales"]).err(),
+        Some(refuse_ledger("invoice_ledger_not_observed", "Sales"))
+    );
+    let scope = scope_of(&catalogue, &[" Sales "]).unwrap();
+    assert_eq!(scope.prove(&[row(0, " Sales ", "Sales Accounts")]), Ok(()));
+    assert_eq!(
+        scope.prove(&[row(0, "Sales", "Sales Accounts")]),
+        Err(refuse_value(
+            "invoice_ledger_rates_rows_differ",
+            "ledger_scope_row_differs_from_catalogue"
+        ))
+    );
+}
+
+/// A fault in any one row of the lab's real answer is refused, wherever the row
+/// stands in it: each row in turn is lost its parent, given another, padded,
+/// recased, renamed, padded in its name, given another ledger's GUID, left
+/// without a GUID, or made the copy of another row.
+#[test]
+fn a_fault_in_any_one_row_of_the_real_answer_is_refused_at_its_position() {
+    let scope = scope_of(&pilot_catalogue(), &FIVE).unwrap();
+    let differs = |cause: &str| Err(refuse_value("invoice_ledger_rates_rows_differ", cause));
+    let rows = listed(GUID_ANSWER);
+    assert_eq!(scope.prove(&rows), Ok(()));
+    // The other case, so that a name already in capitals is still changed.
+    let recased = |text: &str| {
+        let upper = text.to_uppercase();
+        if upper == text {
+            text.to_lowercase()
+        } else {
+            upper
+        }
+    };
+    for at in 0..rows.len() {
+        let each = |edit: &dyn Fn(&mut Vec<ListedLedger>)| {
+            let mut changed = rows.clone();
+            edit(&mut changed);
+            scope.prove(&changed)
+        };
+        let moved = "differs_from_catalogue";
+        let cause = format!("ledger_scope_row_{moved}");
+        assert_eq!(each(&|r| r[at].parent = None), differs(&cause), "{at}");
+        assert_eq!(
+            each(&|r| r[at].parent = Some("BRIDGE Elsewhere".to_string())),
+            differs(&cause),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at].parent = r[at].parent.as_ref().map(|p| format!("{p} "))),
+            differs(&cause),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at].parent = r[at].parent.as_ref().map(|p| recased(p))),
+            differs(&cause),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at].name = "Renamed".to_string()),
+            differs(&cause),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at].name = format!("{} ", r[at].name)),
+            differs(&cause),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at].name = recased(&r[at].name)),
+            differs(&cause),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at].guid = Some(guid(999))),
+            differs("ledger_scope_row_not_named"),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at].guid = None),
+            differs("ledger_scope_row_without_guid"),
+            "{at}"
+        );
+        assert_eq!(
+            each(&|r| r[at] = r[(at + 1) % r.len()].clone()),
+            differs("ledger_scope_row_repeated"),
+            "{at}"
+        );
+    }
+}

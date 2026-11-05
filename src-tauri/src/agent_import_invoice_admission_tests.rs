@@ -1872,3 +1872,220 @@ fn a_number_the_literal_cannot_hold_is_refused_before_either_number_read() {
         other => panic!("{other:?}"),
     }
 }
+
+/// The listing's rows are held to the catalogue at every position, by the
+/// judge the build and the queue run (#1331, #2058): each of the invoice's
+/// ledgers in turn, as the listing read returned it, is lost its GUID, given a
+/// foreign one, renamed, padded or recased in its name, or lost, padded,
+/// recased or changed in its parent, and each is refused under its own cause;
+/// the same GUID in capitals is accepted. DERIVED: the lab's listing with the
+/// stated edit to one record, after the code's own reader has read it.
+#[tokio::test]
+async fn a_listing_row_is_held_to_the_catalogue_at_every_position() {
+    use bridge_tally_protocol::PartyLedgerMasterFieldObservation::{NotObserved, Returned};
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
+    let control = ledger::NumberControl::NoneStanding;
+    let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    let catalogue = pilot_catalogue();
+    let judged = |catalogue: &bridge_tally_protocol::StandardLedgerCatalogV2,
+                  answers: &InvoiceAnswers| {
+        InvoiceJudge {
+            identity: &identity,
+            voucher: &voucher,
+            catalogue,
+            control: &control,
+        }
+        .judge(answers)
+    };
+    let count = pilot_listing().await.records.len();
+    assert!(count > 1);
+    let differs = "ledger_scope_row_differs_from_catalogue";
+    type Edit = Box<dyn Fn(&mut crate::tally::runtime::PartyLedgerMasterListing, usize)>;
+    let rekey =
+        |listing: &mut crate::tally::runtime::PartyLedgerMasterListing, at: usize, to: String| {
+            let from = listing.records[at].ledger.name.clone();
+            let guid = listing.ledger_guids.remove(&from).unwrap();
+            listing.ledger_guids.insert(to.clone(), guid);
+            listing.records[at].ledger.name = to;
+        };
+    let cases: Vec<(&str, Edit, Option<&str>)> = vec![
+        (
+            "no guid",
+            Box::new(|l, at| {
+                let name = l.records[at].ledger.name.clone();
+                l.ledger_guids.remove(&name);
+            }),
+            Some("ledger_scope_row_without_guid"),
+        ),
+        (
+            "foreign guid",
+            Box::new(|l, at| {
+                let name = l.records[at].ledger.name.clone();
+                l.ledger_guids
+                    .insert(name, format!("{}-0000ffff", pilot_lab_guid()));
+            }),
+            Some("ledger_scope_row_not_named"),
+        ),
+        (
+            "guid in capitals",
+            Box::new(|l, at| {
+                let name = l.records[at].ledger.name.clone();
+                let guid = l.ledger_guids.get_mut(&name).unwrap();
+                *guid = guid.to_ascii_uppercase();
+            }),
+            None,
+        ),
+        (
+            "name padded",
+            Box::new(move |l, at| {
+                let to = format!("{} ", l.records[at].ledger.name);
+                rekey(l, at, to);
+            }),
+            Some(differs),
+        ),
+        (
+            "name recased",
+            Box::new(move |l, at| {
+                let name = l.records[at].ledger.name.clone();
+                let upper = name.to_uppercase();
+                rekey(
+                    l,
+                    at,
+                    if upper == name {
+                        name.to_lowercase()
+                    } else {
+                        upper
+                    },
+                );
+            }),
+            Some(differs),
+        ),
+        (
+            "name lost its end",
+            Box::new(move |l, at| {
+                let to = l.records[at]
+                    .ledger
+                    .name
+                    .trim_end_matches(char::is_alphanumeric)
+                    .to_string();
+                let to = if to == l.records[at].ledger.name {
+                    format!("{to}x")
+                } else {
+                    to
+                };
+                rekey(l, at, to);
+            }),
+            Some(differs),
+        ),
+        (
+            "parent not returned",
+            Box::new(|l, at| l.records[at].ledger.parent = NotObserved),
+            Some(differs),
+        ),
+        (
+            "parent padded",
+            Box::new(|l, at| {
+                let parent = l.records[at]
+                    .ledger
+                    .parent
+                    .returned_text()
+                    .unwrap()
+                    .to_string();
+                l.records[at].ledger.parent = Returned(format!("{parent} "));
+            }),
+            Some(differs),
+        ),
+        (
+            "parent recased",
+            Box::new(|l, at| {
+                let parent = l.records[at]
+                    .ledger
+                    .parent
+                    .returned_text()
+                    .unwrap()
+                    .to_string();
+                let upper = parent.to_uppercase();
+                l.records[at].ledger.parent = Returned(if upper == parent {
+                    parent.to_lowercase()
+                } else {
+                    upper
+                });
+            }),
+            Some(differs),
+        ),
+        (
+            "parent another",
+            Box::new(|l, at| {
+                l.records[at].ledger.parent = Returned("BRIDGE Elsewhere".to_string())
+            }),
+            Some(differs),
+        ),
+    ];
+    for at in 0..count {
+        for (label, edit, cause) in &cases {
+            let mut answers = pilot_queue_answers(pilot_rate_listing()).await;
+            edit(answers.listing.as_mut().unwrap(), at);
+            match (judged(&catalogue, &answers), cause) {
+                (Ok(_), None) => {}
+                (Err(invoice::Verdict::Refused(refusals)), Some(cause)) => {
+                    assert_eq!(refusals.len(), 1, "{label} at {at}");
+                    assert_eq!(
+                        refusals[0].code, "invoice_ledger_listing_rows_differ",
+                        "{label} at {at}"
+                    );
+                    assert_eq!(
+                        refusals[0].detail,
+                        invoice::RefusalDetail::Value((*cause).to_string()),
+                        "{label} at {at}"
+                    );
+                }
+                (other, cause) => panic!("{label} at {at}: {other:?}, wanted {cause:?}"),
+            }
+        }
+    }
+}
+
+/// A listing row whose parent was not returned is not read as the text a
+/// workbook shows for it: a ledger whose catalogue parent is a group called
+/// "Not observed" still has no matching row when the listing did not return one.
+/// DERIVED: the lab's catalogue with the walk-in customer's `PARENT` replaced,
+/// and the lab's listing with that record's parent not returned.
+#[tokio::test]
+async fn a_parent_the_listing_did_not_return_is_not_a_group_called_not_observed() {
+    use bridge_tally_protocol::PartyLedgerMasterFieldObservation::NotObserved;
+    let identity = crate::tally::VerifiedCompanyIdentity::test_fixture(PILOT, pilot_lab_guid());
+    let control = ledger::NumberControl::NoneStanding;
+    let voucher = pilot_invoice("BRIDGE Walk-in", "BRIDGE Sales");
+    let catalogue = pilot_catalogue_with_parent(
+        "BRIDGE Walk-in",
+        bridge_tally_protocol::PartyLedgerMasterFieldObservation::NOT_OBSERVED_WORKBOOK_TEXT,
+    );
+    let mut answers = pilot_queue_answers(pilot_rate_listing()).await;
+    let listing = answers.listing.as_mut().unwrap();
+    let at = listing
+        .records
+        .iter()
+        .position(|record| record.ledger.name == "BRIDGE Walk-in")
+        .unwrap();
+    listing.records[at].ledger.parent = NotObserved;
+    match (InvoiceJudge {
+        identity: &identity,
+        voucher: &voucher,
+        catalogue: &catalogue,
+        control: &control,
+    })
+    .judge(&answers)
+    {
+        Err(invoice::Verdict::Refused(refusals)) => {
+            assert_eq!(refusals.len(), 1);
+            assert_eq!(refusals[0].code, "invoice_ledger_listing_rows_differ");
+            assert_eq!(
+                refusals[0].detail,
+                invoice::RefusalDetail::Value(
+                    "ledger_scope_row_differs_from_catalogue".to_string()
+                )
+            );
+        }
+        other => panic!("{other:?}"),
+    }
+}

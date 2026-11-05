@@ -1,0 +1,16 @@
+2026-11-05T09:17:01Z exe sha256 9bda7144f54e5ef68477b5ca30be33a17759de2e1ad756f840785c67bcab2dc0 ok; launch-env.json sha256 c57dcab4a9852a910105f7cbb3686c57672888ef40b08308fb0795c4ce994411; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_AGENT_ENABLE_WRITES', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; ENABLE_WRITES present: True
+2026-11-05T09:17:01Z launched pid 11856; stderr to server-stderr-20261105T091701Z.log
+2026-11-05T09:17:01Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-05T09:17:07Z 000-tools.json tool=list secs=0.018 isError=None error=None saved_sha256=3fe6a1a28643da59b735c2b738e0dfc7fce37925e42dddc96fb08b544ba4b208
+2026-11-05T09:17:08Z 001-list-companies.json tool=list_companies secs=0.131 isError=False error=None saved_sha256=75e53e16867f87d0c056815f2bcac96d8c41d9accda0983d57efa3aca80ab8f5
+2026-11-05T09:17:20Z 002-tally-status.json tool=tally_status secs=0.056 isError=False error=None saved_sha256=282d4e286a40f48d7c8f33b83ad248af52f352c72c35ab49e34918f86be96aab
+2026-11-05T09:17:22Z 003-masters-vt.json tool=masters secs=0.858 isError=False error=None saved_sha256=048a07b838698b9c9b7f48bf9d1a3c0369c3074fd5ad420fe00fbab93be55866
+2026-11-05T09:17:50Z 004-e-build.json tool=build_import_xml secs=14.779 isError=False error=None saved_sha256=0632b9d27f143f8dc39de684eda5a240268876b76fdb82871fd3fe07b9bbf9e9
+2026-11-05T09:18:18Z 005-f-build.json tool=build_import_xml secs=13.760 isError=False error=None saved_sha256=5efc28eaf4ff602a2df07ab54924b60355a67aa0e588762051b74d4ebec81bcc
+2026-11-05T09:20:08Z 006-e-p1.json tool=post_import secs=33.647 isError=False error=None saved_sha256=7e45e5a862ff14572cacface46823247ac28d13f45e7956e23f658757168d10c
+2026-11-05T09:22:06Z 007-e-verify.json tool=verify_import secs=12.098 isError=False error=None saved_sha256=327d47dcb551e767ca380389afac4963539c91029a32fec56648e321afa39885
+2026-11-05T09:22:07Z 008-e-egress.json tool=egress_log secs=0.051 isError=False error=None saved_sha256=3feaa6f86194376835d82f39402c30345f211240eac8e9cd4e875afc13601bc3
+2026-11-05T09:26:11Z 009-f-p1.json tool=post_import secs=30.755 isError=False error=None saved_sha256=106cac59913c5411d2b7866befe0b7c2773351d6d1118a52bce0b0be8e4e4e8b
+2026-11-05T09:26:59Z 010-f-verify.json tool=verify_import secs=11.910 isError=False error=None saved_sha256=ccf4d801f3efa2ac8c0e1a52814ebd6e88ef5a47eb8d32d300b20258faa67679
+2026-11-05T09:27:00Z 011-f-egress.json tool=egress_log secs=0.127 isError=False error=None saved_sha256=8d13f222f5631a0bbdb26f65cc6fdf9927f21baf15e922fea069806d73b77981
+2026-11-05T09:27:13Z session ended; server pid 11856 exit code 0

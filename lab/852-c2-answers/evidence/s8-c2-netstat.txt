@@ -1,0 +1,7 @@
+command: netstat -ano 2>&1
+time: 2026-11-05T09:30:26.471Z
+exit: 0
+TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       1200
+TCP    127.0.0.1:9002         0.0.0.0:0              LISTENING       16908
+TCP    [::]:9001              [::]:0                 LISTENING       1200
+(EXCERPT of netstat -ano: only the LISTENING lines on ports 9001 and 9002; the full output had 38 LISTENING lines and is kept on the lab PC)

@@ -1,0 +1,3 @@
+2026-11-05T09:16:15Z folders holding THE BOOK's name: 1
+backup folder <BK folder> holds 1 file(s)
+TDBK1800_<company number>.001 9199575 B sha256 821854b91c2135162e43478faae80ed11ed6329e5883787202da106a92e33f9f (name is TDBK1800_ + this book's folder + .001: True)

@@ -1,0 +1,21 @@
+2026-11-05T09:19:34.016Z keys start: tally pid 1200; waiting for box.ps1's click (up to 200 s); Down once a second, Up after 81 Downs
+2026-11-05T09:19:51.211Z box.ps1 logged CLICKED Yes
+2026-11-05T09:19:51.845Z CLICK on Tally's title band at 1478,26 (physical; window 0,0,1920,1030); foreground pid now 18680
+2026-11-05T09:19:51.865Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:52.885Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:53.860Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:54.866Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:55.876Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:56.882Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:57.894Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:58.868Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:59.869Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:00.870Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:01.862Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:02.875Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:03.851Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:04.861Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:05.873Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:06.884Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:07.851Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:08.546Z answer file seen: stop. Downs 0, Ups 0, skipped 17

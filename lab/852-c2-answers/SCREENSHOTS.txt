@@ -1,0 +1,15 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the whole Tally window (PrintWindow); box/ are whole-screen captures taken by box.ps1 when a box was seen.
+shots/s0-gateway.png 68438 B 53b15ca7a24df2d0eb29cddbf634d63556f7f49c6609669426fa832f1cc627f3
+shots/s1-bk-accept.png 71683 B 7e6ca4e87d79e1b15db6183e836ebe910c914a1cbbc2d758084ef9257eb7d90b
+shots/s4a-daybook.png 134703 B 42d28f13ee4d13c7e1e48f267919aafbb26bbda1371d8d82c241bea007bee83d
+shots/s4c-after-post.png 133617 B a82bffe8a9aa19794e722b5e13d5541913b1febb9c985591820bbbc4a6b2efe2
+shots/s4c-gateway.png 68438 B 53b15ca7a24df2d0eb29cddbf634d63556f7f49c6609669426fa832f1cc627f3
+shots/s5a-journal-one-line.png 57321 B b9f750138097c83a346cf31b8add85e01e34e83a68009ce3bbcdb0b5e308a56d
+shots/s5c-after-post.png 55735 B e74bc4d56332dd28c09bc20442645a055f2dc233a550d4082fdbe531c9284e85
+shots/s5c-gateway.png 68452 B 3b4e978804827627f11a34452a800f1fa4d044220b1812a3a28d86cd7a332744
+shots/s7-gateway-after-restore.png 68438 B 53b15ca7a24df2d0eb29cddbf634d63556f7f49c6609669426fa832f1cc627f3
+shots/s7-restore-accept.png 45231 B c5a772d5b8806b14619723a4c6e8a95591d72a5cbf84f0c26688fec0b609afbf
+shots/s7-restore-replace.png 51401 B 6dd8844bf4c97643f8aae7acdf702de8d606c801c9502645ce521ed67cd002b5
+shots/s8-c10-select-company.png 96501 B 1415bc4e259d3f60dfa258a41a15d74b2e622222e533310328099c644661993f
+box/e-p1-open.png 243634 B 6cc0f353b6a179492454ddd7aa50ea6562958f57a94f7a46cfa0ae5e7f49f26b
+box/f-p1-open.png 228429 B 582dff01a87b40bebc5587cd390a63bec296b75cf1f5908f47a7014ee90160b9

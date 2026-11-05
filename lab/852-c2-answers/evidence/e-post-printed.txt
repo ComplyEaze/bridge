@@ -1,0 +1,86 @@
+c50e.json sha256 85fead276f3c459040a34c10d99ac9142c45ea06203ef9725e9df307de6b5a8c = SHA256.txt: True
+006-e-p1.json: post_import sent 2026-11-05T09:19:34.878Z secs 33.647 bytes 33219 isError False rpc False
+{'batch_id': 'bridge-68d7166b-77e3-4710-b3bb-6224f03b48eb', 'dispatch': {'application_status': 'not_reported', 'automatic_retry': False, 'counters': {'altered': 0, 'cancelled': 0, 'counter_presence': {'altered': True, 'cancelled': True, 'created': True, 'deleted': True, 'errors': True, 'excepti
+--- box log
+2026-11-05T09:19:34.013Z watch start: tally window 0xa826a4; see within 120 s; answer by 120 s
+2026-11-05T09:19:50.438Z BOX SEEN 0x18e2924 pid 13976 title 'ComplyEaze Bridge — post 50 vouchers?' class #32770
+2026-11-05T09:19:50.471Z rect 688,162,1252,945 (screen 1920x1080); exstyle 0x10108 topmost 1; z-order place box 0 tally 4 (lower = nearer the top); above tally True
+2026-11-05T09:19:50.493Z foreground 0x18e2924 pid 13976 bridge_mcp title 'ComplyEaze Bridge — post 50 vouchers?'
+Nothing is posted until you answer.
+
+Create 50 vouchers in "BRIDGE LARGE LAB"
+Types: 6 Contra, 20 Payment, 24 Receipt
+Dates: 1-Sep-2026 to 10-Sep-2026  Voucher numbers: Tally assigns them
+Total debit: 333438  Total credit: 333438
+Money in by Receipt vouchers: 16288
+Money out by Payment vouchers: 13780
+Contra: moves between cash/bank ledgers, net zero
+Company GUID: 2ba6df28-d1e3-4e81-b6d2-eb50f0a693ab
+Tally: http://127.0.0.1:9002
+Per-voucher lines are not shown: this batch has over 10 vouchers.
+
+Dr 317716  Cr 15722  50 entries  "Lab Vol Bank"
+Dr 1942  Cr 301428  6 entries  "Lab Vol Cash"
+Dr 13780  Cr 0  20 entries  "Lab Vol Expense"
+Dr 0  Cr 16288  24 entries  "Lab Vol Income"
+
+Batch: bridge-68d7166b-77e3-4710-b3bb-6224f03b48eb
+
+Ledgers checked by identity against the build; narrations sent as prepared, nothing added.
+Do not post a file already imported manually.
+Pause other edits/imports; keep this company and Tally mode as is until ComplyEaze Bridge finishes.
+After a timeout, reconcile this batch; do not rebuild or resend it.
+ComplyEaze Bridge posts now or if asked again within 15 min, unless cancelled, refused or restarted.
+2026-11-05T09:19:50.769Z capture e-p1-open.png 1920x1080 243634 B sha256 6cc0f353b6a179492454ddd7aa50ea6562958f57a94f7a46cfa0ae5e7f49f26b
+2026-11-05T09:19:50.785Z WAITING for <LAB_DIR>\box\e-p1.answer
+2026-11-05T09:19:51.070Z before click: foreground 0x18e2924 pid 13976 bridge_mcp title 'ComplyEaze Bridge — post 50 vouchers?'
+2026-11-05T09:19:51.131Z CLICKED Yes at 951,906 (physical) 2026-11-05T09:19:51.099Z; seen-to-click 0.7 s
+2026-11-05T09:19:51.975Z after click: box visible False; foreground 0x191b60 pid 18680 <desktop client> title '<desktop client>'
+--- check
+2026-11-05T09:19:50.912Z check of e-p1 for batch bridge-68d7166b-77e3-4710-b3bb-6224f03b48eb, 50 vouchers (log read whole after 61 read(s))
+PASS box seen
+PASS count is 50
+PASS title names 50 vouchers
+PASS Create 50 vouchers in "BRIDGE LARGE LAB"
+PASS one Create line
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Types: 6 Contra, 20 Payment, 24 Receipt
+  | Dates: 1-Sep-2026 to 10-Sep-2026  Voucher numbers: Tally assigns them
+  | Total debit: 333438  Total credit: 333438
+  | Dr 317716  Cr 15722  50 entries  "Lab Vol Bank"
+  | Dr 1942  Cr 301428  6 entries  "Lab Vol Cash"
+  | Dr 13780  Cr 0  20 entries  "Lab Vol Expense"
+  | Dr 0  Cr 16288  24 entries  "Lab Vol Income"
+2026-11-05T09:19:50.912Z answer file written: Yes
+--- keys 0 presses; first - last -
+2026-11-05T09:19:34.016Z keys start: tally pid 1200; waiting for box.ps1's click (up to 200 s); Down once a second, Up after 81 Downs
+2026-11-05T09:19:51.211Z box.ps1 logged CLICKED Yes
+2026-11-05T09:19:51.845Z CLICK on Tally's title band at 1478,26 (physical; window 0,0,1920,1030); foreground pid now 18680
+2026-11-05T09:19:51.865Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:52.885Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:53.860Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:54.866Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:55.876Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:56.882Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:57.894Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:58.868Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:19:59.869Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:00.870Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:01.862Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:02.875Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:03.851Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:04.861Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:05.873Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:06.884Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:07.851Z SKIP: Tally not in front (foreground pid 18680)
+2026-11-05T09:20:08.546Z answer file seen: stop. Downs 0, Ups 0, skipped 17
+--- post answer 006-e-p1.json
+post_import secs 33.647 isError False rpc_error None
+result keys ['alter_id_delta', 'batch_id', 'batch_sha256', 'built_at', 'company', 'counts', 'dispatch', 'dispatch_response', 'duplicates', 'evidence', 'masters_after_post', 'post_location', 'post_span_binding', 'pre_import_mark', 'unrelated_duplicates_in_window', 'verification_status', 'verified_at', 'vouchers']
+batch_id: "bridge-68d7166b-77e3-4710-b3bb-6224f03b48eb"
+verification_status: "posted_verified"
+counts: {"bound_not_in_window": 0, "cancelled_with_effective_copy": 0, "duplicate_fingerprint": 0, "matching_content_observed": 0, "not_attributable": 0, "not_found": 0, "posted_divergent": 0, "posted_not_effective": 0, "posted_verified": 50}
+dispatch: {"application_status": "not_reported", "automatic_retry": false, "counters": {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 50, "deleted": 0, "errors": 0, "exceptions": 0, "ignored": 0, "line_error_count": 0}, "resent": false, "response": {"bytes": 548, "outcome": {"application_status": "not_reported", "counters": {"altered": 0, "cancelled": 0, "counter_presence": {"altered": true, "cancelled": true, "created": true, "deleted": true, "errors": true, "exceptions": true, "ignored": true}, "created": 50, "deleted": 0, "errors": 0, "exceptions": 0, "ignored": 0, "line_error_count": 0}, "exceptions_were_reported": true, "last_vch_id": 30218}, "request_sha256": "502cf87ec50f24968a6029fa9dad3456545f9c4b4ccf2cc63a673f8ebc987a56", "response_sha256": "fcc5b4d341ffd5e52860036e9fcc9763909c1a62f4278fb9ec6b0d2d19584a89"}, "response_state": "response_clean", "state": "posted_verified"}
+PLAIN PATH

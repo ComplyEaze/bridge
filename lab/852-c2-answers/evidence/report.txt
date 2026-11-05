@@ -1,0 +1,20 @@
+relay e (both posts): events ['close', 'listening', 'open', 'sent']; connections opened 3; requests 812; reply_lost/tally_closed/relay_error: 0
+   whole log: max answer_s 3.656, any bridge_left_s set: []
+== batch e (import-1): post_import call start 2026-11-05T09:19:34.878Z end 2026-11-05T09:20:08.525Z seconds 33.647
+   relay lines of this call: utc 2026-11-05T09:19:34.920Z to 2026-11-05T09:20:08.198Z, connection(s) [1], requests 218
+   in the call: requests before the import 144, sent bytes 188108, answered bytes 29199405, summed answer_s 6.233
+   the import line: sent at 2026-11-05T09:19:53.565Z, answered line utc 2026-11-05T09:19:57.229Z; sent 66816 answered 548 first_byte_s 3.656 answer_s 3.656 bridge_left_s None | import-1.request file 66933 B (HTTP headers and body) sha256 2a5c9fb35797b1ac403ccf27404d234193d6ab103fc7bf90e737f2de330e1523
+   Tally counters (import-1.answer): {'CREATED': ['50'], 'ALTERED': ['0'], 'DELETED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['30218'], 'LINEERROR': []}
+   in the call: requests after the import 73, sent bytes 96756, answered bytes 13041051, summed answer_s 2.953
+   result: verification_status posted_verified counts.posted_verified 50; dispatch state posted_verified created 50 response_state response_clean resent False; attempt_recorded None; error None; next_step None
+   box shown at 2026-11-05T09:19:50.438Z; Yes at 2026-11-05T09:19:51.099Z
+   screen work: Day Book open from 4a through the call; key presses 0, skipped 17 (Tally not in front), first skip 2026-11-05T09:19:51.865Z, last skip 2026-11-05T09:20:07.851Z; the import line 2026-11-05T09:19:53.565Z + 3.656 s lies inside the skip window: True
+== batch f (import-2): post_import call start 2026-11-05T09:25:40.869Z end 2026-11-05T09:26:11.624Z seconds 30.755
+   relay lines of this call: utc 2026-11-05T09:25:40.915Z to 2026-11-05T09:26:11.222Z, connection(s) [3], requests 218
+   in the call: requests before the import 144, sent bytes 188108, answered bytes 29200521, summed answer_s 4.763
+   the import line: sent at 2026-11-05T09:25:58.234Z, answered line utc 2026-11-05T09:26:00.600Z; sent 66816 answered 548 first_byte_s 2.375 answer_s 2.375 bridge_left_s None | import-2.request file 66933 B (HTTP headers and body) sha256 c6c3f26787823a17ecf1e8389dd26552f97c056375875cc138151b966073f1c1
+   Tally counters (import-2.answer): {'CREATED': ['50'], 'ALTERED': ['0'], 'DELETED': ['0'], 'ERRORS': ['0'], 'EXCEPTIONS': ['0'], 'LASTVCHID': ['30268'], 'LINEERROR': []}
+   in the call: requests after the import 73, sent bytes 96756, answered bytes 13041467, summed answer_s 2.621
+   result: verification_status posted_verified counts.posted_verified 50; dispatch state posted_verified created 50 response_state response_clean resent False; attempt_recorded None; error None; next_step None
+   box shown at 2026-11-05T09:25:54.814Z; Yes at 2026-11-05T09:25:55.497Z
+   screen work: the Journal half entered (5a) left on screen untouched from before the call to after it (5a 09:25 capture, 5c capture); the import line inside the call: True

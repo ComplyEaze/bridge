@@ -1,0 +1,20 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+agent-run/launch-env.json: original 189 B sha256 c57dcab4a9852a910105f7cbb3686c57672888ef40b08308fb0795c4ce994411 (kept on the lab PC); 1 x -> <LAB_DIR>
+agent-run/server-stderr-20261105T091701Z.log: pushed as agent-run/server-stderr-20261105T091701Z.txt (the repository ignores *.log); bytes unchanged
+evidence/e-post-printed.txt: original 6962 B sha256 08c71fed1e943f3ee11265f127801053d7bf5eba2bfda980922a8c106f5976ec (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> <desktop client>
+evidence/f-post-printed.txt: original 5281 B sha256 a12354a8cd2df7fa716cb658249314bd2e3c232379b22282277e2b1320e1f079 (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> <desktop client>
+evidence/s0-c2-netstat.txt: original 10286 B sha256 18af591ec9cf1632ba5bcb77e8dc252b3bafe4373a694117b0258efcf2399588 (kept on the lab PC); an excerpt: only the port-9001/9002 LISTENING lines kept
+evidence/s8-c2-netstat.txt: original 9195 B sha256 9631b22a7a21e059081e722e30b8f9e4b9bee864eb019bae822c4493db5387a7 (kept on the lab PC); an excerpt: only the port-9001/9002 LISTENING lines kept
+notes.txt: original 12047 B sha256 1a61d5a592bb73792242f2966c4a342408d16584b5f1ade88ef3afdc264b5e26 (kept on the lab PC); 2 x -> <lab folder>; 1 x -> stop
+RESULTS.md: original 9913 B sha256 0bd8c8de8f0b6ee658d91cb870bfa80d4eec89f9d6483b7865acadff3a18a46e (kept on the lab PC); 1 x -> stop
+scripts/setup.py: original 1603 B sha256 e77aed7a89554f0c2ca785943eed44e626fc586f4468d3c5556041feefe0da92 (kept on the lab PC); 2 x -> <LAB_DIR>; 5 x -> <lab folder>
+scripts/marks.py: original 2495 B sha256 92d2c3880d2bd038583d14b2f9095b5af58e0a94320d5cf3e6ee0fcc8988e179 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/post.py: original 4698 B sha256 1db9837769a72759f27700ecd445f52c5985192e07a44eead24a3663a83326d3 (kept on the lab PC); 3 x -> <LAB_DIR>
+scripts/report.py: original 5325 B sha256 802c551202880df38bfae9fa7468434c7bb463af273fd4c5edbd1c4708ab738f (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/boxcheck.py: original 3861 B sha256 3863589144206c86e158dbdd7c83518efe18df8bed70d243edf65a80ca26dd02 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/selftest-box.py: original 490 B sha256 61d5dd2ad9e42090d77c4c8a1ad16ba9ce48d3e39c0f5a2d293f6168e5f3c1af (kept on the lab PC); 3 x -> <LAB_DIR>
+scripts/selftest-run.py: original 4072 B sha256 a73c377edb0c394d6232bc6ec216ec423f41dbc09192c47c5e8c8f246af28dec (kept on the lab PC); 1 x -> <LAB_DIR>; 5 x -> <lab folder>
+scripts/restore-prep.py: original 2974 B sha256 5b9640bd6285d9799406650530848d4536b43c15c47f497aa0e31f51a588716f (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+scripts/bk.py: original 1307 B sha256 9a56f0e21976b4bdd4e5fbfe9e5ed2a24274d5448c42ce79f690ca893f41f910 (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+scripts/c2.py: original 1304 B sha256 e243a5f20f31eedaa37ca5663a8fc95c6346842fd355e1678f20baf61f842798 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/cap.py: original 780 B sha256 3dc713bc262e709a42ddac11ad3805476aa09adf6dbafa3306ab6bfdd63ce148 (kept on the lab PC); 2 x -> <LAB_DIR>

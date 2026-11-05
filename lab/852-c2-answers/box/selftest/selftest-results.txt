@@ -1,0 +1,11 @@
+s1: expected Yes, got Yes, exit 0, reads not whole 0 (saved log c1a, batch of c1a, count 50) OK
+s2: expected Yes, got Yes, exit 0, reads not whole 0 (saved log c1b, batch of c1b, count 50) OK
+s3: expected Yes, got Yes, exit 0, reads not whole 0 (saved log r50a, batch of r50a, count 50) OK
+s4: expected Yes, got Yes, exit 0, reads not whole 0 (saved log r50b, batch of r50b, count 50) OK
+s5: expected No, got No, exit 1, reads not whole 0 (saved log c1a, batch of c1b, count 50) OK
+s6: expected No, got No, exit 1, reads not whole 0 (saved log r25, batch of r25, count 25) OK
+s7: expected No, got No, exit 1, reads not whole 0 (saved log r25, batch of r25, count 50) OK
+s8: expected No, got No, exit 1, reads not whole 0 (saved log c1a, batch of c1a, count 49) OK
+s9: expected Yes, got Yes, exit 0, reads not whole 19 (appended in chunks; the answer must come after the last write) OK answer-after-last-write
+s10: expected Yes, got Yes, exit 0, reads not whole 21 (held under an exclusive lock for 5 s) OK
+s11: expected No, got No, exit 2, reads not whole 117 (cut inside the WAITING line, never finished) OK

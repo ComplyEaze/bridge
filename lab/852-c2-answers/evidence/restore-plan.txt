@@ -1,0 +1,9 @@
+restore plan (2026-11-05T09:27:39Z)
+folder: <LAB_DIR>/backups/bkc2
+file: TDBK1800_<company number>.001
+bytes: 9199575
+sha256: 821854b91c2135162e43478faae80ed11ed6329e5883787202da106a92e33f9f
+company number: <company number>
+Restore Data Path: Tally's data folder
+list must show: BRIDGE LARGE LAB (<company number>), backup of 2026-11-05 14:45 local
+prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace ..." = Replace

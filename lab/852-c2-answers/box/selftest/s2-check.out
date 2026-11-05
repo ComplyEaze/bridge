@@ -1,0 +1,17 @@
+2026-11-05T09:11:49.671Z check of s2 for batch bridge-08d8a991-7c7f-4dc6-82b6-cca1867729f5, 50 vouchers (log read whole after 1 read(s))
+PASS box seen
+PASS count is 50
+PASS title names 50 vouchers
+PASS Create 50 vouchers in "BRIDGE LARGE LAB"
+PASS one Create line
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Types: 6 Contra, 20 Payment, 24 Receipt
+  | Dates: 21-Oct-2026 to 30-Oct-2026  Voucher numbers: Tally assigns them
+  | Total debit: 332898  Total credit: 332898
+  | Dr 317356  Cr 15542  50 entries  "Lab Vol Bank"
+  | Dr 2162  Cr 301308  6 entries  "Lab Vol Cash"
+  | Dr 13380  Cr 0  20 entries  "Lab Vol Expense"
+  | Dr 0  Cr 16048  24 entries  "Lab Vol Income"
+2026-11-05T09:11:49.671Z answer file written: Yes

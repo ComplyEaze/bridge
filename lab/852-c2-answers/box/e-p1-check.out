@@ -1,0 +1,17 @@
+2026-11-05T09:19:50.912Z check of e-p1 for batch bridge-68d7166b-77e3-4710-b3bb-6224f03b48eb, 50 vouchers (log read whole after 61 read(s))
+PASS box seen
+PASS count is 50
+PASS title names 50 vouchers
+PASS Create 50 vouchers in "BRIDGE LARGE LAB"
+PASS one Create line
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Types: 6 Contra, 20 Payment, 24 Receipt
+  | Dates: 1-Sep-2026 to 10-Sep-2026  Voucher numbers: Tally assigns them
+  | Total debit: 333438  Total credit: 333438
+  | Dr 317716  Cr 15722  50 entries  "Lab Vol Bank"
+  | Dr 1942  Cr 301428  6 entries  "Lab Vol Cash"
+  | Dr 13780  Cr 0  20 entries  "Lab Vol Expense"
+  | Dr 0  Cr 16288  24 entries  "Lab Vol Income"
+2026-11-05T09:19:50.912Z answer file written: Yes

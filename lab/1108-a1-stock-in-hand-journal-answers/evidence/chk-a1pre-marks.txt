@@ -1,0 +1,4 @@
+$ python -I check_1108.py marks a1pre-marks.utf16le.xml
+exit 0
+COMPANY rows: 1
+  GUID <company guid> ALTVCHID  ALTMSTID 212

@@ -1,0 +1,12 @@
+$ python -I check_1108.py import w2-w2-capital-ledger.utf16le.xml
+exit 0
+CREATED 1
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 0
+LASTVCHID 0
+LASTMID 0

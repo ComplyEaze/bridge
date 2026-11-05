@@ -2259,6 +2259,14 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              user to enter this invoice in Tally, or, if the customer's bills are not tracked, to \
              turn off its bill-by-bill setting in Tally and build again.",
         ),
+        "invoice_party_gstin_is_company_own" => Some(
+            "This customer's ledger in Tally holds the company's own GSTIN, and Tally lists an \
+             invoice to such a customer as uncertain in GSTR-1, so ComplyEaze Bridge does not post \
+             it. Nothing was written to Tally. Ask the user to check the GSTIN in the customer's GST \
+             registration details in Tally: if the customer has its own GSTIN, correct it there and \
+             build again; if the sale is to the company itself, it is not a Sales invoice to post \
+             here.",
+        ),
         "invoice_party_bill_wise_unknown" => Some(
             "Tally's ledger list did not name this customer's ledger exactly once, so whether it \
              keeps its balance bill by bill is not known and the invoice was not built. Nothing \

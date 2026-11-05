@@ -28,7 +28,7 @@ use crate::stock_read::StockReadParts;
 use crate::xml::{self, Element};
 
 /// Group names Tally reserves as primary (the reference engine's `PRIMARY_GROUPS`).
-const PRIMARY_GROUPS: [&str; 15] = [
+pub(crate) const PRIMARY_GROUPS: [&str; 15] = [
     "Branch / Divisions",
     "Capital Account",
     "Current Assets",

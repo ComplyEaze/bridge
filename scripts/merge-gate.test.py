@@ -1435,10 +1435,11 @@ class MergeGateControls(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("unknown option", result.stderr)
 
-    def run_copy(self, copy, scenario="pass", script_dir="scripts"):
+    def run_copy(self, copy, scenario="pass", script_dir="scripts", env_extra=None):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
+        env.update(env_extra or {})
         return subprocess.run([str(copy / script_dir / "merge-gate.sh"), "321", "--repo", "lamemustafa/bridge"], env=env, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
 
@@ -1456,6 +1457,66 @@ class MergeGateControls(unittest.TestCase):
         self.git_copy(copy, "push", "-q", "origin", "master")
         self.git_copy(copy, "fetch", "-q", "origin", "master")
         return copy
+
+    def rev(self, copy, ref="HEAD"):
+        return subprocess.run(["git", "-C", str(copy), "rev-parse", ref], check=True, capture_output=True, text=True).stdout.strip()
+
+    def pr_head_copy(self, name, text):
+        """A private copy with a real pull request head: one commit over master adding docs/example.md (the file the
+        fake's changed-files list names, one line). The checkout is left on master. Returns the copy, master and the head."""
+        copy = self.private_copy(name)
+        base = self.rev(copy)
+        self.git_copy(copy, "checkout", "-q", "-b", "pr")
+        (copy / "docs").mkdir(exist_ok=True)
+        (copy / "docs" / "example.md").write_text(text)
+        self.git_copy(copy, "add", "-A")
+        self.git_copy(copy, "commit", "-q", "-m", "pull request head")
+        head = self.rev(copy)
+        self.git_copy(copy, "checkout", "-q", "master")
+        return copy, base, head
+
+    def test_a_diff_github_will_not_serve_is_built_here_from_the_head_and_the_merge_base(self):
+        # GitHub refuses a diff over 20000 lines; the gate fetches refs/pull/<n>/head and diffs it against the merge base it read
+        for name, text, code, phrase in (
+            ("clean", "Safe content line.\n", 0, "MAY MERGE"),
+            # the address is joined at run time, so this pull request's own privacy scan does not stop on its test
+            ("email", "Contact: " + "@".join(("customer", "company.test")) + "\n", 1, "customer email shape"),
+        ):
+            with self.subTest(case=name):
+                copy, base, head = self.pr_head_copy("local-diff-" + name, text)
+                self.git_copy(copy, "push", "-q", "origin", head + ":refs/pull/321/head")
+                result = self.run_copy(copy, "diff-refused", env_extra={"GATE_HEAD": head, "GATE_BASE_TIP": base})
+                self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+                self.assertIn(phrase, result.stdout)
+                self.assertIn("GitHub served no diff (could not find pull request diff: HTTP 406", result.stdout)
+                self.assertIn(f"it was built here from merge base {base[:7]} and head {head[:7]}", result.stdout)
+                self.assertNotIn("could not read diff", result.stdout)
+                self.assertNotIn("was read from GitHub", result.stdout)
+
+    def test_the_output_names_github_as_the_diff_source_when_github_served_it(self):
+        result = self.assert_pass("pass", "the diff for the privacy scan was read from GitHub")
+        self.assertNotIn("built here", result.stdout)
+
+    def test_a_diff_that_cannot_be_built_here_is_indeterminate_never_empty(self):
+        for how, phrase in (
+            ("not-pushed", "the head could not be fetched"),
+            ("other-head", "the fetched head is not"),
+            ("not-an-ancestor", "the merge base {} is not an ancestor of the head"),
+        ):
+            with self.subTest(how=how):
+                copy, base, head = self.pr_head_copy("local-diff-" + how, "Safe content line.\n")
+                if how == "other-head":
+                    self.git_copy(copy, "push", "-q", "origin", base + ":refs/pull/321/head")
+                elif how == "not-an-ancestor":
+                    self.git_copy(copy, "push", "-q", "origin", head + ":refs/pull/321/head")
+                    self.git_copy(copy, "checkout", "-q", "-b", "side", base)
+                    self.git_copy(copy, "commit", "-q", "--allow-empty", "-m", "a commit the head does not contain")
+                    base = self.rev(copy)
+                    self.git_copy(copy, "checkout", "-q", "master")
+                result = self.run_copy(copy, "diff-refused", env_extra={"GATE_HEAD": head, "GATE_BASE_TIP": base})
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("INDETERMINATE could not read diff for the privacy scan: GitHub served none, and it could not be built here (" + phrase.format(base[:7]), result.stdout)
+                self.assertNotIn("MAY MERGE", result.stdout)
 
     def test_the_gate_refuses_to_run_from_a_tree_that_is_not_origin_masters(self):
         for how in ("edit", "committed-edit", "untracked-file", "remote-has-moved", "stale-tracking-ref", "tag-named-master", "script-elsewhere", "no-remote"):
@@ -2931,6 +2992,113 @@ class MergeWrapperControls(unittest.TestCase):
                 result, calls = self.run_wrapper(args=args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertEqual(calls, [])
+
+
+class PrivacyMutationRecordDigests(unittest.TestCase):
+    """A tax-audit mutation record's `"mutation"` and `"crate_tree"` values, 16 lowercase hex with at least one letter,
+    are masked before the counts, on a line that starts as the runner writes a record and on no other line. Any other
+    key, length or case, an all-digit value, and any other shape on the line are still scanned. Every value is built at
+    run time."""
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+        self.mobile = "".join(str(9 - index) for index in range(10))  # a ten-digit run led by a 9
+        self.with_phone = "a" + self.mobile + "bcdef"
+        self.with_run = run_of(12) + "abcd"
+
+    def line(self, mutation, crate_tree=None, key="mutation", extra=""):
+        crate_tree = self.with_run if crate_tree is None else crate_tree
+        return (
+            '  "C42-01": {"commit": "%s", "crate_tree": "%s", "killers": ["tests/registry.rs::a_test"], '
+            '"mode": "proof", "%s": "%s", "time": "2026-11-04T10:00:00+00:00", "verdict": "killed"%s},'
+            % (HEAD, crate_tree, key, mutation, extra)
+        )
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def assert_blocked(self, text):
+        blockers = self.blockers(text)
+        self.assertTrue(any("long digit run" in b or "identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_a_records_line_with_digit_runs_in_both_digests_is_clean(self):
+        for text in (self.line(self.with_phone), self.line(self.with_run, self.with_phone)):
+            record = self.privacy.scan(text, HEAD)
+            self.assertEqual(record["blockers"] + record["indeterminate"], [], text)
+            self.assertIn("2 mutation-record digest(s) were masked", record["notes"])
+
+    def test_explain_locates_nothing_on_a_records_line_and_still_locates_another_key(self):
+        document = {"sources": [], "added": [
+            {"path": "parity/mutation-results.json", "line": 1, "text": self.line(self.with_phone)},
+            {"path": "parity/mutation-results.json", "line": 2, "text": self.line(self.with_phone, key="note")},
+        ]}
+        hits = self.privacy.explain(document, HEAD)["hits"]
+        self.assertEqual([hit["where"] for hit in hits], ["parity/mutation-results.json:2"], hits)
+
+    def test_a_phone_alone_in_a_mutation_field_still_blocks(self):
+        self.assert_blocked(self.line(self.mobile))
+
+    def test_an_all_digit_sixteen_character_value_still_blocks(self):
+        self.assert_blocked(self.line(run_of(16)))
+        self.assert_blocked(self.line(self.with_phone, run_of(16)))
+        self.assert_blocked(self.line(self.mobile + run_of(6)))
+
+    def test_the_same_value_under_another_key_or_in_another_form_still_blocks(self):
+        for text in (
+            self.line(self.with_phone, key="note"),
+            self.line(self.with_phone, key="mutations"),
+            self.line(self.with_phone.upper()),
+            self.line(self.with_phone + "0"),
+            self.line(self.with_phone[:-1]),
+            self.line(self.with_phone).replace('"mutation": "', '"mutation":"'),
+            self.line(self.with_phone).replace('"mutation": "', 'mutation: "'),
+            '{"mutation": "%s" }' % self.with_phone.replace("b", "", 1),
+            "mutation digest " + self.with_phone,
+        ):
+            self.assert_blocked(text)
+
+    def test_a_pan_or_gstin_elsewhere_on_the_line_still_blocks(self):
+        pan = "ABCDE" + "1234" + "F"
+        for extra in (', "party": "%s"' % pan, ', "gstin": "%s"' % ("07" + pan + "1Z5")):
+            text = self.line(self.with_phone, self.with_phone, extra=extra)
+            blockers = self.blockers(text)
+            self.assertTrue(any("1 identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_the_same_key_and_value_off_a_records_line_still_blocks(self):
+        pair = '"mutation": "%s"' % self.with_phone
+        for text in (
+            "Mask %s in the records (#2352)" % pair,  # a pull request title
+            "Regenerate the records\n\nThe record now reads %s." % pair,  # a commit message
+            "    let record = r#\"{%s}\"#;" % pair,  # a Rust string literal
+            "docs/%s.md" % pair.replace('"', ""),  # a path
+            "docs/{%s}.md" % pair,  # a path keeping the quotes
+        ):
+            self.assert_blocked(text)
+            self.assertNotIn("1 mutation-record digest(s) were masked", self.privacy.scan(text, HEAD)["notes"], text)
+
+    def test_only_a_line_that_starts_as_a_record_is_masked(self):
+        record = self.line(self.with_phone, self.with_phone)
+        for text in (
+            "x" + record,  # text before the record id
+            record.replace(HEAD, HEAD[:-1]),  # a 39-hex commit
+            record.replace(HEAD, HEAD.upper()),  # an uppercase commit
+            record.replace('{"commit": ', '{ "commit": '),
+            record.replace('"C42-01": ', '"C42-01" : '),
+        ):
+            self.assert_blocked(text)
+        # Each line is anchored on its own: a record line after a title is masked, the title is not.
+        title = 'Mask "mutation": "%s" (#2352)' % self.with_phone
+        record_hits = self.privacy.scan(title + "\n" + record, HEAD)
+        self.assertIn("2 mutation-record digest(s) were masked", record_hits["notes"])
+        self.assert_blocked(title + "\n" + record)
+        self.assertEqual(self.blockers(record + "\n" + record), [])
+
+    def test_a_lowercase_pan_of_a_to_f_letters_is_masked_on_a_records_line_only(self):
+        pan = "abcde" + "1234" + "f" + "0" * 6  # a PAN's shape, lowercase, letters a-f only, padded to 16
+        self.assertEqual(self.blockers(self.line(pan, self.with_run)), [])
+        for text in (self.line(pan, self.with_run, key="note"), "party %s" % pan):
+            blockers = self.blockers(text)
+            self.assertTrue(any("identifier shape" in b for b in blockers), (text, blockers))
 
 
 if __name__ == "__main__":

@@ -16,9 +16,10 @@ import sys
 args = sys.argv[1:]
 scenario = os.environ.get("GATE_SCENARIO", "pass")
 
-HEAD = "0123456789abcdef0123456789abcdef01234567"
+# A control that builds the diff from real commits names them in GATE_HEAD and GATE_BASE_TIP.
+HEAD = os.environ.get("GATE_HEAD") or "0123456789abcdef0123456789abcdef01234567"
 SHORT = HEAD[:7]
-BASE_TIP = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+BASE_TIP = os.environ.get("GATE_BASE_TIP") or "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 BEHIND_MERGE_BASE = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 DIGEST = "a" * 64
 # git blob ids of lab captures, as the files API reports them in "sha": LAB_BLOB is the one the manifest tests list, LAB_BLOB_OFF
@@ -1424,6 +1425,8 @@ if args[:2] == ["pr", "view"]:
           "changedFiles": S["changed_files_expected"], "headRefName": S["head_ref"]})
 
 elif args[:2] == ["pr", "diff"]:
+    if scenario == "diff-refused":
+        fail("could not find pull request diff: HTTP 406: Sorry, the diff exceeded the maximum number of lines (20000)")
     emit(S["diff"])
 
 elif args and args[0] == "api":

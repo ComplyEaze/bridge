@@ -1,0 +1,1068 @@
+{
+  "file": "src-tauri/src/agent_import_identity.rs",
+  "base_commit": "93cb7125",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's own tests (agent_import_identity_tests.rs). killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. A hand-written mutant whose edit does not compile is recorded as unviable with the compiler's reason, not as caught. The hand-written mutants (I01 to I69) change, one at a time: the domain string bridge.mcp.import.v1 (another version, empty, upper-case first letter, another namespace, hyphens for dots); the members and order of the tuple (batch id and transaction id swapped, the domain last or in the middle, each of the three members dropped, a member given twice in place of another, an extra empty fourth member, the batch id or the transaction id lower-cased, trimmed or empty); the encoding (NUL-, colon- and un-joined text, pretty-printed JSON, the Rust Debug text, a JSON object, and the serialization error read as empty bytes); the digest (SHA-512, SHA-256 twice, the first input byte skipped); the slice range and buffer (the second half, shifted by one, fifteen and seventeen bytes, a fifteen-byte buffer, a buffer that starts at ones); the UUID builder and its use of the bytes (version 4, no stamp, little-endian fields, versions 5 and 3, the bytes reversed, a constant in place of the digest, and the version or the variant overwritten after the build); identity_batch_id (always the line's own batch id, an empty id in its own arm, the arms exchanged, an empty id for an amendment); attribution_tag (the batch-v1 arm with the line's own batch id, with the raw transaction id, with the arguments swapped, with an empty transaction id, and with the id written without hyphens, in upper case or as a URN; the unversioned arm with the derived id of either batch id and with an empty string; the two arms exchanged; the batch-v1 arm never taken); and the serde rename of the scheme (kebab, camel, lower, upper, screaming-snake and Pascal case, and the rename dropped). Not mutated: the derive lists, the visibility of the items, the doc comments, the test module's attribute, the expect message's text, and the enum's one variant (it has no other); the domain, the members and the digest range are mutated by the changes listed here, not by every possible one; and the rename is mutated by the six other cases listed, not by every spelling. Twelve edits (I07, I09, I24, I26, I35, I44, I50, I54, I57, I58, I59 and I63) were changed to an equivalent edit of the same kind (a neighbouring spelling of the same change: a trailing comma in the tuple, an array for a tuple, to_string_pretty(...).into_bytes() for to_vec_pretty, unwrap_or(Vec::new()) for unwrap_or_default(), [0u8; 15] for [0; 15], with_version on one line, .map(|_| \"\").unwrap_or(...) for map_or, String::default() for String::new(), as_str(), &String::default() for \"\", as_simple() for simple(), and the whole serde attribute line for its argument), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses. In every run the file was byte for byte as at base_commit, checked after each restore (and, for the tool, after the run); the restore was a copy, never a rename. In the tool, hand and whole_set runs the test module was as at base_commit; in survivors_again it is as this change leaves it.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 238,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_identity.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/agent_import::tests::identity_tests::/) | test(/agent_import::tests::amend_tests::/) | test(/agent_import::tests::amount_pin_tests::/) | test(/agent::presence::tests::/) | test(/agent_import::post::tests::/)'",
+      "time": "2026-11-04T17:43:26Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 238,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/agent_import::tests::identity_tests::/) | test(/agent_import::tests::amend_tests::/) | test(/agent_import::tests::amount_pin_tests::/) | test(/agent::presence::tests::/) | test(/agent_import::post::tests::/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 4851,
+      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 5 hand-written mutants the filtered run missed (the tool's run had no mutant missed); the unmutated baseline passed all 4851",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 19,
+      "command": "as the hand run with -E 'test(/agent_import::tests::identity_tests::/)', for the 5 hand-written mutants that survived the whole_set run",
+      "tree": "base_commit with the tests this change adds"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 5,
+      "missed": 0,
+      "unviable": 0
+    },
+    "hand": {
+      "caught": 65,
+      "missed": 2,
+      "unviable": 2
+    },
+    "survived_at_base": {
+      "tool": 0,
+      "hand": 5
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 2
+    },
+    "accepted_not_equivalent": {
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "17:5 replace import_identity -> Uuid with Default::default()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_amendment_carries_the_original_batch_identity_and_nothing_else_does",
+      "killer_at": "base"
+    },
+    "29:9 replace ImportLedgerLine::identity_batch_id -> &str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_is_admitted_only_under_the_batch_limit",
+      "killer_at": "base"
+    },
+    "29:9 replace ImportLedgerLine::identity_batch_id -> &str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_is_admitted_only_under_the_batch_limit",
+      "killer_at": "base"
+    },
+    "33:9 replace ImportLedgerLine::attribution_tag -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "33:9 replace ImportLedgerLine::attribution_tag -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "I01": {
+      "what": "domain: the version is another (v1 -> v2)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "\"bridge.mcp.import.v1\"",
+          "to": "\"bridge.mcp.import.v2\""
+        }
+      ],
+      "mutation": "7f1e22da08e6c3698e4639c72d792927",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I02": {
+      "what": "domain: the string is empty",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "\"bridge.mcp.import.v1\"",
+          "to": "\"\""
+        }
+      ],
+      "mutation": "375234f1c25d52c2a2c2586dfbaa372e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I03": {
+      "what": "domain: the first letter is upper case",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "\"bridge.mcp.import.v1\"",
+          "to": "\"Bridge.mcp.import.v1\""
+        }
+      ],
+      "mutation": "9684db2488a046231f5d9f680a8190ef",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I04": {
+      "what": "domain: another namespace (mcp -> app)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "\"bridge.mcp.import.v1\"",
+          "to": "\"bridge.app.import.v1\""
+        }
+      ],
+      "mutation": "990e4666bfae402a321fcccf145a7e9a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I05": {
+      "what": "domain: the dots are hyphens",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "\"bridge.mcp.import.v1\"",
+          "to": "\"bridge-mcp-import-v1\""
+        }
+      ],
+      "mutation": "358a534e7e6d4729702f67f921a5e96e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I06": {
+      "what": "tuple: the batch id and the transaction id are swapped",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", txn_id, batch_id)"
+        }
+      ],
+      "mutation": "09997e663bcc429b5d71b3918958c3c1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I07": {
+      "what": "tuple: the domain is last",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(batch_id, txn_id, \"bridge.mcp.import.v1\",)"
+        }
+      ],
+      "mutation": "f97b84301d2f95b5f8b7b5df8feccc66",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I08": {
+      "what": "tuple: the domain is in the middle",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(batch_id, \"bridge.mcp.import.v1\", txn_id)"
+        }
+      ],
+      "mutation": "6d311086d860a2615defd1d7fa902231",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I09": {
+      "what": "tuple: the domain is dropped",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&[batch_id, txn_id]"
+        }
+      ],
+      "mutation": "ac709e9874312a168729a29e961f7b33",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I10": {
+      "what": "tuple: the batch id is dropped",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", txn_id)"
+        }
+      ],
+      "mutation": "639f4e4f47eccad8c8ebdee485805e52",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_amendment_carries_the_original_batch_identity_and_nothing_else_does",
+      "killer_at": "base"
+    },
+    "I11": {
+      "what": "tuple: the transaction id is dropped",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id)"
+        }
+      ],
+      "mutation": "b33d1e0041af77b8ad8e3c56495ff985",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::one_diverged_voucher_refuses_the_whole_amendment",
+      "killer_at": "base"
+    },
+    "I12": {
+      "what": "tuple: the batch id is given twice, no transaction id",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id, batch_id)"
+        }
+      ],
+      "mutation": "c23d5d363d688bdc14e00e798330f15a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::one_diverged_voucher_refuses_the_whole_amendment",
+      "killer_at": "base"
+    },
+    "I13": {
+      "what": "tuple: the transaction id is given twice, no batch id",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", txn_id, txn_id)"
+        }
+      ],
+      "mutation": "857d3d9710cf71f7a0662fe3a70b48b2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_amendment_carries_the_original_batch_identity_and_nothing_else_does",
+      "killer_at": "base"
+    },
+    "I14": {
+      "what": "tuple: a fourth, empty member is added",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id, txn_id, \"\")"
+        }
+      ],
+      "mutation": "c2e1eab749cc6f9b3fce2d71b5495569",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I15": {
+      "what": "tuple: the batch id is lower-cased",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id.to_lowercase(), txn_id)"
+        }
+      ],
+      "mutation": "b8b332bcf1aa3612c2c9da414082d22c",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::identity_tests::a_batch_or_transaction_label_is_compared_as_written",
+      "killer_at": "this_commit"
+    },
+    "I16": {
+      "what": "tuple: the transaction id is lower-cased",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id, txn_id.to_lowercase())"
+        }
+      ],
+      "mutation": "8e8c966b7fa412fefa55756e048b387f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I17": {
+      "what": "tuple: the transaction id is trimmed",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id, txn_id.trim())"
+        }
+      ],
+      "mutation": "bbbe889f251c0f35612bb79ac6ac1363",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::identity_tests::a_batch_or_transaction_label_is_compared_as_written",
+      "killer_at": "this_commit"
+    },
+    "I18": {
+      "what": "tuple: the batch id is trimmed",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id.trim(), txn_id)"
+        }
+      ],
+      "mutation": "2b8bc69d0b3b70c09a73ea906b74a82a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::tests::identity_tests::a_batch_or_transaction_label_is_compared_as_written",
+      "killer_at": "this_commit"
+    },
+    "I19": {
+      "what": "tuple: the transaction id is empty",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", batch_id, \"\")"
+        }
+      ],
+      "mutation": "0c2dc72bfe296124d14eb9010c841921",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::one_diverged_voucher_refuses_the_whole_amendment",
+      "killer_at": "base"
+    },
+    "I20": {
+      "what": "tuple: the batch id is empty",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&(\"bridge.mcp.import.v1\", batch_id, txn_id)",
+          "to": "&(\"bridge.mcp.import.v1\", \"\", txn_id)"
+        }
+      ],
+      "mutation": "054753d5296282c67305b521ac5de153",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_amendment_carries_the_original_batch_identity_and_nothing_else_does",
+      "killer_at": "base"
+    },
+    "I21": {
+      "what": "encoding: NUL-joined text instead of the JSON array",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "serde_json::to_vec(&(\"bridge.mcp.import.v1\", batch_id, txn_id))\n        .expect(\"string tuple serializes\")",
+          "to": "format!(\"bridge.mcp.import.v1\\0{batch_id}\\0{txn_id}\").into_bytes()"
+        }
+      ],
+      "mutation": "691c1076ce294ae24194c260d5ea0bb3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I22": {
+      "what": "encoding: colon-joined text instead of the JSON array",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "serde_json::to_vec(&(\"bridge.mcp.import.v1\", batch_id, txn_id))\n        .expect(\"string tuple serializes\")",
+          "to": "format!(\"bridge.mcp.import.v1:{batch_id}:{txn_id}\").into_bytes()"
+        }
+      ],
+      "mutation": "02b8a6035d7fe0f43c6d8549212de1db",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I23": {
+      "what": "encoding: the members concatenated with no separator",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "serde_json::to_vec(&(\"bridge.mcp.import.v1\", batch_id, txn_id))\n        .expect(\"string tuple serializes\")",
+          "to": "format!(\"bridge.mcp.import.v1{batch_id}{txn_id}\").into_bytes()"
+        }
+      ],
+      "mutation": "cbbafa72cf3566df142d7071bbe08ee6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I24": {
+      "what": "encoding: pretty-printed JSON",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "serde_json::to_vec(&(\"bridge.mcp.import.v1\", batch_id, txn_id))\n        .expect(\"string tuple serializes\")",
+          "to": "serde_json::to_string_pretty(&(\"bridge.mcp.import.v1\", batch_id, txn_id))\n        .expect(\"string tuple serializes\")\n        .into_bytes()"
+        }
+      ],
+      "mutation": "f5122baa8cf49a3ed9a0c5c5634199f8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I25": {
+      "what": "encoding: Rust Debug text of the tuple",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "serde_json::to_vec(&(\"bridge.mcp.import.v1\", batch_id, txn_id))\n        .expect(\"string tuple serializes\")",
+          "to": "format!(\"{:?}\", (\"bridge.mcp.import.v1\", batch_id, txn_id)).into_bytes()"
+        }
+      ],
+      "mutation": "b808dc1e493ad7a8e10616fcbff5f6e4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I26": {
+      "what": "encoding: the serialization error is read as empty bytes (expect -> unwrap_or_default)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "        .expect(\"string tuple serializes\");",
+          "to": "        .unwrap_or(Vec::new());"
+        }
+      ],
+      "mutation": "8fa264c129b3f1044313cbf6e02cbfae",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "I27": {
+      "what": "encoding: the members as a JSON object with named fields",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "serde_json::to_vec(&(\"bridge.mcp.import.v1\", batch_id, txn_id))\n        .expect(\"string tuple serializes\")",
+          "to": "serde_json::to_vec(&serde_json::json!({\"d\": \"bridge.mcp.import.v1\", \"b\": batch_id, \"t\": txn_id}))\n        .expect(\"string tuple serializes\")"
+        }
+      ],
+      "mutation": "acb5000e185a1823f52ab684567b88bd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I28": {
+      "what": "digest: SHA-512 instead of SHA-256",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "Sha256::digest(input)",
+          "to": "sha2::Sha512::digest(input)"
+        }
+      ],
+      "mutation": "b430603e57738f05b351e2027d9afead",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I29": {
+      "what": "digest: SHA-256 applied twice",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "Sha256::digest(input)",
+          "to": "Sha256::digest(Sha256::digest(input))"
+        }
+      ],
+      "mutation": "5c81af05a56b5a4fd46b298d015bd4f9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I30": {
+      "what": "digest: the first input byte is skipped",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "Sha256::digest(input)",
+          "to": "Sha256::digest(&input[1..])"
+        }
+      ],
+      "mutation": "1b6c642c928aa0d1069e1d29aaade3e7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I31": {
+      "what": "slice: the second half of the digest (..16 -> 16..)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&digest[..16]",
+          "to": "&digest[16..]"
+        }
+      ],
+      "mutation": "1695b86a8ca1e4abde3dfd318967e648",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I32": {
+      "what": "slice: shifted by one byte (..16 -> 1..17)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&digest[..16]",
+          "to": "&digest[1..17]"
+        }
+      ],
+      "mutation": "0d90f814d98df0e31a47e28abc05717a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I33": {
+      "what": "slice: fifteen bytes (..16 -> ..15), which cannot fill the buffer",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&digest[..16]",
+          "to": "&digest[..15]"
+        }
+      ],
+      "mutation": "9b903016c74b12f0f74620dbd3e091cb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_bank_voucher_with_the_note_and_the_on_account_sentence_fits_one_entry_fewer",
+      "killer_at": "base"
+    },
+    "I34": {
+      "what": "slice: seventeen bytes (..16 -> ..17), which cannot fill the buffer",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "&digest[..16]",
+          "to": "&digest[..17]"
+        }
+      ],
+      "mutation": "ada7f406232ed76e0a68b4cbea4bb08b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_is_admitted_only_under_the_batch_limit",
+      "killer_at": "base"
+    },
+    "I35": {
+      "what": "slice: the buffer is fifteen bytes",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "[0; 16]",
+          "to": "[0u8; 15]"
+        }
+      ],
+      "mutation": "18da53c629d21efa4b98a8a22ab60cdf",
+      "verdict": "unviable",
+      "reason": "does not compile: from_custom_bytes expects an array with a size of 16, found one with a size of 15"
+    },
+    "I36": {
+      "what": "slice: the buffer starts at ones (it is filled whole)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "[0; 16]",
+          "to": "[1; 16]"
+        }
+      ],
+      "mutation": "f0fbcba6a4733591ecad271f139c9666",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "I37": {
+      "what": "builder: version 4 (from_random_bytes)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes)",
+          "to": "from_random_bytes(bytes)"
+        }
+      ],
+      "mutation": "0f3dfe2fdc42b6b9649f46f1e889fc76",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I38": {
+      "what": "builder: no version or variant stamped (from_bytes)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes)",
+          "to": "from_bytes(bytes)"
+        }
+      ],
+      "mutation": "606335c04b22addaa58edca2ee5a411c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I39": {
+      "what": "builder: the bytes read as little-endian fields (from_bytes_le)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes)",
+          "to": "from_bytes_le(bytes)"
+        }
+      ],
+      "mutation": "8fc62eacebd21e8a16fab67888c7436b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I40": {
+      "what": "builder: version 5 (from_sha1_bytes)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes)",
+          "to": "from_sha1_bytes(bytes)"
+        }
+      ],
+      "mutation": "c9fb9430c5a795e1901a8fed3eb3c885",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_l1_reentry_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I41": {
+      "what": "builder: version 3 (from_md5_bytes)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes)",
+          "to": "from_md5_bytes(bytes)"
+        }
+      ],
+      "mutation": "d925d2365df6ad21e51d363c2595db33",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I42": {
+      "what": "builder: the digest bytes are reversed",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes)",
+          "to": "from_custom_bytes({\n        let mut reversed = bytes;\n        reversed.reverse();\n        reversed\n    })"
+        }
+      ],
+      "mutation": "40a27f8b72248ca10b037e9a1864c175",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I43": {
+      "what": "builder: the digest is ignored (a constant, all-zero byte string)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes)",
+          "to": "from_custom_bytes([0; 16])"
+        }
+      ],
+      "mutation": "49caaea21157dc1b0b624d2f23004e67",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::an_amendment_carries_the_original_batch_identity_and_nothing_else_does",
+      "killer_at": "base"
+    },
+    "I44": {
+      "what": "builder: the version is set to 4 after the build",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes).into_uuid()",
+          "to": "from_custom_bytes(bytes).with_version(uuid::Version::Random).into_uuid()"
+        }
+      ],
+      "mutation": "388e196da971e324ff414f938d92932d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I45": {
+      "what": "builder: the variant is set to Microsoft after the build",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes).into_uuid()",
+          "to": "from_custom_bytes(bytes)\n        .with_variant(uuid::Variant::Microsoft)\n        .into_uuid()"
+        }
+      ],
+      "mutation": "b7ea3ca89967bd753b8ee9a2906b53f7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I46": {
+      "what": "builder: the variant is set to NCS after the build",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "from_custom_bytes(bytes).into_uuid()",
+          "to": "from_custom_bytes(bytes)\n        .with_variant(uuid::Variant::NCS)\n        .into_uuid()"
+        }
+      ],
+      "mutation": "ca9424cab0e9ae3cf39bdf0ec85ea348",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::the_d3_batch_re_renders_to_its_saved_file",
+      "killer_at": "base"
+    },
+    "I47": {
+      "what": "identity_batch_id: always the line's own batch id",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "self.amends_batch_id.as_deref().unwrap_or(&self.batch_id)",
+          "to": "&self.batch_id"
+        }
+      ],
+      "mutation": "fee47bad79b67d2f0f400498e5c4d30c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_holds_the_original_and_its_amendments_and_no_other_batch",
+      "killer_at": "base"
+    },
+    "I48": {
+      "what": "identity_batch_id: the amended batch id, or empty for a line that amends nothing (own arm -> \"\")",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "unwrap_or(&self.batch_id)",
+          "to": "unwrap_or(\"\")"
+        }
+      ],
+      "mutation": "a6c550967d28f1d2ad3c8c4f4a044ffc",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_is_admitted_only_under_the_batch_limit",
+      "killer_at": "base"
+    },
+    "I49": {
+      "what": "identity_batch_id: an amendment's own id when it has one, the amended id otherwise (arms exchanged)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "self.amends_batch_id.as_deref().unwrap_or(&self.batch_id)",
+          "to": "if self.amends_batch_id.is_some() {\n            &self.batch_id\n        } else {\n            self.amends_batch_id.as_deref().unwrap_or(&self.batch_id)\n        }"
+        }
+      ],
+      "mutation": "2fd6551e22a446a64eab50db1762357e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_holds_the_original_and_its_amendments_and_no_other_batch",
+      "killer_at": "base"
+    },
+    "I50": {
+      "what": "identity_batch_id: never the amended id, the empty string for an amendment",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "self.amends_batch_id.as_deref().unwrap_or(&self.batch_id)",
+          "to": "self.amends_batch_id.as_deref().map(|_| \"\").unwrap_or(&self.batch_id)"
+        }
+      ],
+      "mutation": "32bde16dcd11c8bef491e8abf5d61696",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_lineage_holds_the_original_and_its_amendments_and_no_other_batch",
+      "killer_at": "base"
+    },
+    "I51": {
+      "what": "attribution_tag: the batch-v1 arm uses the line's own batch id, not the lineage's",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id)",
+          "to": "import_identity(&self.batch_id, &voucher.bridge_txn_id)"
+        }
+      ],
+      "mutation": "69ae31101a48b09b03de03d93b1790a1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_second_amendment_is_decided_by_the_first_amendments_verification",
+      "killer_at": "base"
+    },
+    "I52": {
+      "what": "attribution_tag: the batch-v1 arm returns the raw transaction id",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id).to_string()",
+          "to": "voucher.bridge_txn_id.clone()"
+        }
+      ],
+      "mutation": "1bdfa12c7c411ce8ec6293c41cda2ac3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "I53": {
+      "what": "attribution_tag: the unversioned arm returns the derived id",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "            None => voucher.bridge_txn_id.clone()",
+          "to": "            None => import_identity(self.identity_batch_id(), &voucher.bridge_txn_id).to_string()"
+        }
+      ],
+      "mutation": "3281cb3320c7ff9ed10fe1ddac9e4cb8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::identity_tests::historical_journal_without_scheme_keeps_raw_attribution_and_serialization",
+      "killer_at": "base"
+    },
+    "I54": {
+      "what": "attribution_tag: the unversioned arm returns an empty string",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "            None => voucher.bridge_txn_id.clone()",
+          "to": "            None => String::default()"
+        }
+      ],
+      "mutation": "9ebe291c90890a1e86ff8a7ef5f21ffa",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::identity_tests::historical_journal_without_scheme_keeps_raw_attribution_and_serialization",
+      "killer_at": "base"
+    },
+    "I55": {
+      "what": "attribution_tag: the unversioned arm returns the derived id of the line's own batch id",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "            None => voucher.bridge_txn_id.clone()",
+          "to": "            None => import_identity(&self.batch_id, &voucher.bridge_txn_id).to_string()"
+        }
+      ],
+      "mutation": "ab456ec1aa74e61907cdda19285f9568",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::identity_tests::historical_journal_without_scheme_keeps_raw_attribution_and_serialization",
+      "killer_at": "base"
+    },
+    "I56": {
+      "what": "attribution_tag: the arms are exchanged (batch-v1 returns the raw id, unversioned the derived id)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id).to_string()",
+          "to": "voucher.bridge_txn_id.clone()"
+        },
+        {
+          "from": "            None => voucher.bridge_txn_id.clone()",
+          "to": "            None => import_identity(self.identity_batch_id(), &voucher.bridge_txn_id).to_string()"
+        }
+      ],
+      "mutation": "8ab95a51d9223d24db402222a6d80f50",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "I57": {
+      "what": "attribution_tag: the batch id and the transaction id are passed the wrong way round",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id)",
+          "to": "import_identity(voucher.bridge_txn_id.as_str(), self.identity_batch_id())"
+        }
+      ],
+      "mutation": "04eaca6e0e788eca90749ca4970cb445",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "I58": {
+      "what": "attribution_tag: the transaction id passed is empty",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id)",
+          "to": "import_identity(self.identity_batch_id(), &String::default())"
+        }
+      ],
+      "mutation": "4bcae9d2f726e86dc5b06b2c674d1a61",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "I59": {
+      "what": "attribution_tag: the derived id is written without hyphens",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id).to_string()",
+          "to": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id)\n                    .as_simple()\n                    .to_string()"
+        }
+      ],
+      "mutation": "e0fe74fb4b5b5a00a406321f62971d06",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "I60": {
+      "what": "attribution_tag: the derived id is written in upper case",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id).to_string()",
+          "to": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id)\n                    .to_string()\n                    .to_uppercase()"
+        }
+      ],
+      "mutation": "95f0eb76d18bc4b3a6fd32fec347da32",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "I61": {
+      "what": "attribution_tag: the derived id is written as a URN",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id).to_string()",
+          "to": "import_identity(self.identity_batch_id(), &voucher.bridge_txn_id)\n                    .urn()\n                    .to_string()"
+        }
+      ],
+      "mutation": "08c6ada06fa971e1647a200dc39df09d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amend_tests::a_padded_saved_narration_is_compared_as_the_text_the_import_wrote",
+      "killer_at": "base"
+    },
+    "I62": {
+      "what": "attribution_tag: the batch-v1 arm is never taken (arm pattern -> Some(_) if false)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "Some(ImportIdentityScheme::BatchV1) =>",
+          "to": "Some(ImportIdentityScheme::BatchV1) if false =>"
+        }
+      ],
+      "mutation": "2275e3b97ed38a3b1628ddc95abe416a",
+      "verdict": "unviable",
+      "reason": "does not compile: non-exhaustive patterns, Some(ImportIdentityScheme::BatchV1) not covered once its arm has a false guard"
+    },
+    "I63": {
+      "what": "serde: the scheme is spelt in kebab case (batch-v1)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "#[serde(rename_all = \"snake_case\")]",
+          "to": "#[serde(rename_all = \"kebab-case\")]"
+        }
+      ],
+      "mutation": "a8ba9a44f706b09c235d3ab1f49c3fa0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_is_admitted_only_under_the_batch_limit",
+      "killer_at": "base"
+    },
+    "I64": {
+      "what": "serde: the scheme is spelt in camel case (batchV1)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "rename_all = \"snake_case\"",
+          "to": "rename_all = \"camelCase\""
+        }
+      ],
+      "mutation": "925ee227ca964d4c1609b652f6e8101a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_an_earlier_release_saved_keeps_its_ledger_binding",
+      "killer_at": "base"
+    },
+    "I65": {
+      "what": "serde: the scheme is spelt in lower case (batchv1)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "rename_all = \"snake_case\"",
+          "to": "rename_all = \"lowercase\""
+        }
+      ],
+      "mutation": "e1ea523d94b6393454e7474c429e13cd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_an_earlier_release_saved_keeps_its_ledger_binding",
+      "killer_at": "base"
+    },
+    "I66": {
+      "what": "serde: the scheme is spelt in upper case (BATCHV1)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "rename_all = \"snake_case\"",
+          "to": "rename_all = \"UPPERCASE\""
+        }
+      ],
+      "mutation": "50f85c381a490d318faedf00d95f7ff7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_approval_summarizes_every_ledger_and_the_money_the_types_move",
+      "killer_at": "base"
+    },
+    "I67": {
+      "what": "serde: the scheme is spelt in screaming snake case (BATCH_V1)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "rename_all = \"snake_case\"",
+          "to": "rename_all = \"SCREAMING_SNAKE_CASE\""
+        }
+      ],
+      "mutation": "130d7c2af2ad10458e7b6d370234db2a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_approval_that_does_not_fit_is_refused_and_every_voucher_is_unnumbered",
+      "killer_at": "base"
+    },
+    "I68": {
+      "what": "serde: the rename is dropped (the scheme is spelt BatchV1)",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "#[serde(rename_all = \"snake_case\")]\n",
+          "to": ""
+        }
+      ],
+      "mutation": "d4bf6e36ddfa1e354cce7fb00cb10427",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_bank_preview_is_refused_at_each_cap_rather_than_truncated",
+      "killer_at": "base"
+    },
+    "I69": {
+      "what": "serde: the scheme is spelt in Pascal case (BatchV1), by rename_all",
+      "applied_to": "src-tauri/src/agent_import_identity.rs",
+      "edits": [
+        {
+          "from": "rename_all = \"snake_case\"",
+          "to": "rename_all = \"PascalCase\""
+        }
+      ],
+      "mutation": "499ed3219f13d44a78f88855aa2aa319",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::tests::a_batch_is_admitted_only_under_the_batch_limit",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "I26": {
+      "mutation": "8fa264c129b3f1044313cbf6e02cbfae",
+      "reason": "equivalent: serde_json::to_vec of a tuple of three strings cannot fail (a str is always valid UTF-8 and the tuple has no map keys), so the expect never fires and the default taken instead of it is never reached; no input is answered differently"
+    },
+    "I36": {
+      "mutation": "f0fbcba6a4733591ecad271f139c9666",
+      "reason": "equivalent: the buffer is overwritten whole by copy_from_slice of exactly sixteen digest bytes before anything reads it (a shorter or longer slice panics, mutants I33 and I34), so the value it starts at never reaches the identity"
+    }
+  }
+}

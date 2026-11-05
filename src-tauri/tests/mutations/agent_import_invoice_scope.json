@@ -1400,7 +1400,7 @@
   "accepted_survivors": {
     "S14": {
       "mutation": "a6e8dfd5532bbd43a34102b3711df2ab",
-      "reason": "equivalent: the catalogue trims a ledger's GUID when it reads it (a GUID with a space at its end is held without it, checked by building a catalogue from one), so the text handed to LedgerGuid::parse never has a space at either end and trimming it changes nothing"
+      "reason": "equivalent: the catalogue trims a ledger's GUID when it reads it (a_catalogue_guid_with_spaces_at_its_ends_is_named_without_them holds this: a catalogue built with a GUID padded at both ends resolves its ledger, and the scope names the GUID unpadded), so the text handed to LedgerGuid::parse never has a space at either end and trimming it changes nothing"
     },
     "S29": {
       "mutation": "bb8b993fb163e94d306ef4f6a187b6d7",

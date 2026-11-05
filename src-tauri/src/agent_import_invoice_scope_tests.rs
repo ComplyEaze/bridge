@@ -544,6 +544,24 @@ fn a_catalogue_guid_in_capitals_is_the_same_ledger_as_its_row_in_lower_case() {
     assert_eq!(scope.prove(&[capitals]), Ok(()));
 }
 
+/// A GUID the catalogue was answered with a space at each end is held without
+/// them, so the scope resolves its ledger and names the GUID unpadded. This is
+/// what makes the record's S14 (the GUID parsed trimmed) equivalent: a
+/// catalogue read that stopped trimming would hand `LedgerGuid::parse` the
+/// spaces, and this test would fail. (SYNTHETIC.)
+#[test]
+fn a_catalogue_guid_with_spaces_at_its_ends_is_named_without_them() {
+    let padded = synthetic_with_guids(&[("Sales", "Sales Accounts", format!(" {} ", guid(0)))]);
+    let scope = scope_of(&padded, &["Sales"]).unwrap();
+    assert_eq!(
+        scope.parents(),
+        vec![(guid(0), "Sales Accounts".to_string())]
+    );
+    let plain = scope_of(&synthetic(&[("Sales", "Sales Accounts")]), &["Sales"]).unwrap();
+    assert_eq!(rendered(&scope), rendered(&plain));
+    assert_eq!(scope.prove(&[row(0, "Sales", "Sales Accounts")]), Ok(()));
+}
+
 /// A ledger name is the catalogue's spelling to the byte: one the catalogue
 /// holds with a space at each end resolves only as spelt, and its row must carry
 /// it as spelt. (SYNTHETIC.)

@@ -690,12 +690,42 @@ fi
 # Scan destination paths and added payload lines. Removed/context lines never
 # enter the privacy scan. Binary additions are an explicit human-inspection
 # hold because their bytes are absent from a textual patch.
+# GitHub serves a pull request's diff only up to 20000 lines (HTTP 406 beyond). When it serves none, the same diff is built here
+# from the head and the merge base this gate read from the API: the head is fetched into this checkout and must be that exact
+# commit, the merge base must be its ancestor, and every option that changes Git's output is pinned, so no local setting changes
+# it (attributes come from the master just fetched, never from the pull request). On a pull request GitHub did serve, this diff
+# equalled GitHub's byte for byte. A fetch or a check that fails leaves the diff empty, which is INDETERMINATE, never a pass.
+local_pr_diff() {
+  local fetched
+  [ -n "$merge_base" ] || { local_diff_failure="the merge base was not read"; return 1; }
+  git -C "$gate_tree" fetch -q --no-tags origin "+refs/pull/$PR/head:refs/merge-gate/pr-head" 2>>"$errfile" </dev/null \
+    || { local_diff_failure="the head could not be fetched"; return 1; }
+  fetched=$(git -C "$gate_tree" rev-parse --verify -q 'refs/merge-gate/pr-head^{commit}' 2>>"$errfile") || fetched=""
+  [ "$fetched" = "$head" ] || { local_diff_failure="the fetched head is not $short"; return 1; }
+  git -C "$gate_tree" merge-base --is-ancestor "$merge_base" "$head" 2>>"$errfile" \
+    || { local_diff_failure="the merge base ${merge_base:0:7} is not an ancestor of the head"; return 1; }
+  diff=$(git -C "$gate_tree" --attr-source=refs/merge-gate/master -c core.quotePath=true diff --no-color --no-ext-diff \
+    --no-textconv --no-relative -M --abbrev=9 -U3 --inter-hunk-context=0 --diff-algorithm=myers --indent-heuristic \
+    --ignore-submodules=none --submodule=short --src-prefix=a/ --dst-prefix=b/ -O/dev/null "$merge_base" "$head" 2>>"$errfile") \
+    || { local_diff_failure="git diff failed"; diff=""; return 1; }
+}
 : >"$errfile"
 diff_status=0
 diff=$(gh pr diff "$PR" --repo "$REPO" 2>"$errfile") || diff_status=$?
 if [ "$diff_status" -ne 0 ] || [ -z "$diff" ]; then
-  unknown "could not read diff for the privacy scan"
+  github_diff_failure=$(head -c 200 "$errfile" | tr -cd '[:print:]')
+  diff=""
+  local_diff_failure=""
+  if local_pr_diff && [ -n "$diff" ]; then
+    say "note" "GitHub served no diff (${github_diff_failure:-an empty answer}): it was built here from merge base ${merge_base:0:7} and head $short"
+  else
+    diff=""
+    unknown "could not read diff for the privacy scan: GitHub served none, and it could not be built here (${local_diff_failure:-the built diff was empty})"
+  fi
 else
+  say "note" "the diff for the privacy scan was read from GitHub"
+fi
+if [ -n "$diff" ]; then
   # Parse Git's C-style quoted paths with the existing Python runtime. The
   # shell receives only JSON/TSV data after the parser has matched every diff
   # section, so non-ASCII destinations retain their REST filename identity.

@@ -34,7 +34,7 @@ BUILD-M, the one already staged for rows 2161-C, 1029-R and 1392-E:
 - the `unsigned-bundle-smoke-windows-latest` artifact of CI run 41772223948, the merge-queue run of #2329 at 187e882b5176a3b577d57f257a6ec4319fc2aecd;
 - artifact id 13295846440, 59,336,955 bytes, GitHub digest `sha256:1940bd9736edc2aa76d811b3bcd0d6229ee69b5e01f5f59321a46b6ca28f691a`, expiring 11 Nov 2026.
 
-C1 ran build 838242cb. This row's one variable is the screen work, so the build change is named, not hidden: `agent_import_post.rs` differs between 838242cb and 187e882b (31 lines in, 8 out), and 1029-R's five posts on 187e882b on this book took at most 43.3 s a call with no refused read-back. Those five are this build's baseline on this book with nobody at Tally.
+C1 ran build 838242cb. This row's one variable is the screen work, so the build change is named, not hidden: `agent_import_post.rs` differs between 838242cb and 187e882b (31 lines in, 8 out), and 1029-R's five posts on 187e882b on this book took at most 43.3 s a call with no refused read-back. Those five are this build's baseline on this book with nobody at Tally. Between the two builds no transport, relay, wire-lock or endpoint file changed, and `runtime.rs` did not change. `agent_import_post.rs` changed in only two commits: 96b30ca8 (#2317, the release dialog's listing) and ffc94950 (#2318, typing the import amount). `agent_import_invoice_wire.rs` changed too, but it only builds the invoice XML. So the path that reads the reply is C1's, and the screen work is still the one variable.
 
 Check the zip's sha256 against the digest, and `bridge_mcp.exe` against `mcpb-smoke.json`, before the first call. Either differing is a stop. Record the exe's sha256 before and after.
 

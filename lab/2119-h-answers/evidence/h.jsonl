@@ -27,3 +27,4 @@
 {"time":"2026-11-05T13:22:15.905Z","event":"result_sent","id":2,"elapsed":60.002678}
 {"time":"2026-11-05T13:25:59.672Z","event":"received","message":{"method":"tools/call","params":{"name":"sleep","arguments":{"progress_every":10,"seconds":60}},"jsonrpc":"2.0","id":3}}
 {"time":"2026-11-05T13:26:59.692Z","event":"result_sent","id":3,"elapsed":60.009827}
+{"time":"2026-11-05T14:29:19.242Z","event":"stdin_closed","running":0}

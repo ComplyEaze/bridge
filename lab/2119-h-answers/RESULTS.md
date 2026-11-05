@@ -1,6 +1,6 @@
 # Results: #2119 row H, how long the desktop client on the lab PC waits for one tool call, 5 Nov 2026
 
-**EXPECT not met on the Chat tab: C1 (60 s, plain) was cut at the client's 60 s device wait, so the climb stopped at C1; C2 (60 s, progress every 10 s) was cut the same way, and C9 was not sent. Neither tab sent a `progressToken` on any call, so no progress was ever sent.** The Code tab cut K1 and K2 at about 60 s with `SdkError: Request timed out`, as on 29 Oct. The Chat-tab calls reached the sleep server on a `local-agent-mode-sleep-2119h` connection, not on the desktop client's own `<client>` connection, and the client's server log holds no line for them. The restore (step 6) and close (step 7) come after this commit, since the restore ends the lab's session; they follow in a second commit. One sitting, one PC: PARTIAL until the restore is recorded.
+**EXPECT not met on the Chat tab: C1 (60 s, plain) was cut at the client's 60 s device wait, so the climb stopped at C1; C2 (60 s, progress every 10 s) was cut the same way, and C9 was not sent. Neither tab sent a `progressToken` on any call, so no progress was ever sent.** The Code tab cut K1 and K2 at about 60 s with `SdkError: Request timed out`, as on 29 Oct. The Chat-tab calls reached the sleep server on a `local-agent-mode-sleep-2119h` connection, not on the desktop client's own `<client>` connection, and the client's server log holds no line for them. The configuration was restored to B0 by sha256 and the client's server list is as before the row; Tally's window is byte-equal to step 0's capture. One sitting, one PC, one client version.
 
 Sheet `lab/2119-h-sheet` at 16169508, `SHA256.txt` 5 of 5 equal. No Tally request was sent and no key went to Tally; Tally was left as the owner had it.
 
@@ -18,7 +18,9 @@ Sheet `lab/2119-h-sheet` at 16169508, `SHA256.txt` 5 of 5 equal. No Tally reques
 | C3 to C9 | not sent: the climb stops at the first plain cut (C1), and C9 runs only if C2 was answered whole. |
 | the client's log lines | `mcp-server-sleep-2119h.log` (3,292 B) ends at 13:06:12.334Z (`tools/list` result on the `<client>` connection). It has no `tools/call` line for any call of the row. |
 | longest whole, shortest cut | Code tab: none whole; cut at 59.969 s (K1, N 90). Chat tab: none whole; cut at the 60 s device wait (C1, N 60). |
-| restore | after this commit (step 6). |
+| hold check | `calls.py` over `h.jsonl` whole: started 4, calls 4, each sent once and each with its end (cancelled, cancelled, `result_sent`, `result_sent`). |
+| restore | Close only at 14:29:08Z, from the owner's own window; then `restore ok f7a9ab6c732491f7f46f800b2238040dcc7ac594eb04cd8f4459ea38891b8c1d (9420 bytes)` (= B0); the client started by the owner. Compare after the start (14:31:40Z): sha256 = B0, servers `<lab server 724m7>` before and now, added -, removed -, keys changed - (no rewrite by the client so far). The extension setting is as step 0 (on). |
+| close | No `node.exe` runs the sleep server. Tally's window, captured at step 0's scale, is byte-equal to step 0's capture (kept on the lab PC; client data). Nothing was sent or keyed to Tally. |
 | dialogs and prompts | The Chat-tab tool prompts for `sleep`, answered by the owner; the server received exactly the asked arguments both times. No permission prompt on the Code tab. A "Relaunch to update" item in the client's sidebar: not clicked. A Bitdefender antivirus entry at about 13:05Z (Critical, "Infected item detected"): detection `CMD:Heur.BZC.PZQ.Boxter.949.0E3A44C9`, action blocked; the file is outside the kit and the lab folders; nothing in Bitdefender was changed. No dialog from Windows or Tally. |
 
 Each answer the model gave alongside the error suggested retrying with fewer than 60 seconds. Not done: each call of the ladder is sent once.
@@ -37,6 +39,6 @@ One sitting, one client version, one PC, Windows only. N 60 equals the wait, so 
 
 ## Other processes
 
-The four desktop-client connector servers ended with the client at the owner's restart (13:04Z) and four new ones started with it. No call was made to them from this sitting, and their calls were not measured.
+The four desktop-client connector servers ended with the client at the owner's restart (13:04Z) and four new ones started with it; the same again at the restore's close (14:29Z) and the owner's start. No call was made to them from this sitting, and their calls were not measured.
 
-**Confidence:** PARTIAL (restore to follow).
+**Confidence:** measured for this client version on this PC, both tabs; the Chat tab's wait below 60 s not measured.

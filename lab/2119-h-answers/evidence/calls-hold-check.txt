@@ -1,0 +1,9 @@
+initialize 2026-11-05T13:06:03.385Z client local-agent-mode-sleep-2119h protocol 2025-11-25
+initialize 2026-11-05T13:06:11.769Z client <client> protocol 2025-11-25
+initialize 2026-11-05T13:18:05.294Z client local-agent-mode-sleep-2119h protocol 2025-11-25
+initialize 2026-11-05T13:21:15.882Z client local-agent-mode-sleep-2119h protocol 2025-11-25
+call 1 received 2026-11-05T13:08:39.697Z id 2 arguments {"seconds": 90} progressToken no meta_keys - progress_sent 0 end cancelled 59.969 at 2026-11-05T13:09:39.729Z reason SdkError: Request timed out
+call 2 received 2026-11-05T13:18:05.309Z id 2 arguments {"progress_every": 10, "seconds": 90} progressToken no meta_keys - progress_sent 0 end cancelled 60.013 at 2026-11-05T13:19:05.335Z reason SdkError: Request timed out
+call 3 received 2026-11-05T13:21:15.895Z id 2 arguments {"seconds": 60} progressToken no meta_keys - progress_sent 0 end result_sent 60.003 at 2026-11-05T13:22:15.905Z
+call 4 received 2026-11-05T13:25:59.672Z id 3 arguments {"progress_every": 10, "seconds": 60} progressToken no meta_keys - progress_sent 0 end result_sent 60.010 at 2026-11-05T13:26:59.692Z
+started 4 calls 4

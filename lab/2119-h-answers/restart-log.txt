@@ -5,3 +5,9 @@
 2026-11-05T13:04:55.561Z setup <desktop client exe> left: 0; bridge_mcp.exe ; node sleep server 
 2026-11-05T13:04:55.671Z setup the desktop client started by its AppID
 2026-11-05T13:05:25.860Z setup after start: <desktop client exe> 8; bridge_mcp.exe 18396 parent 11180 | 28600 parent 11180 | 5072 parent 11180 | 30260 parent 11180; node sleep server 28620
+2026-11-05T14:29:08.477Z restore start; waiting 5 s; close only: True
+2026-11-05T14:29:14.059Z restore <desktop client exe> processes before: 12; bridge_mcp.exe 18396 parent 11180 | 28600 parent 11180 | 5072 parent 11180 | 30260 parent 11180; node sleep server 3760 20932
+2026-11-05T14:29:14.101Z restore close requested (CloseMainWindow on each <desktop client exe>)
+2026-11-05T14:29:19.179Z restore ended 12 <desktop client exe> still running after the close request
+2026-11-05T14:29:27.322Z restore <desktop client exe> left: 0; bridge_mcp.exe ; node sleep server 
+2026-11-05T14:29:27.322Z restore close only: not started

@@ -1,0 +1,32 @@
+{
+ "tool": "voucher_presence",
+ "arguments": {
+  "company_guid": "d45bc1b0-e5e3-4261-b3b2-cce3915f42d3",
+  "from": "2025-04-01",
+  "to": "2025-04-07",
+  "numbering": [
+   {
+    "voucher_type": "Sales",
+    "numbering_method": "manual"
+   }
+  ],
+  "vouchers": [
+   {
+    "date": "2025-04-01",
+    "voucher_type": "Sales",
+    "voucher_number": "1",
+    "party": "DN Party 002",
+    "entries": [
+     {
+      "ledger": "DN Party 002",
+      "amount": "-541.01"
+     },
+     {
+      "ledger": "DN Sales",
+      "amount": "541.01"
+     }
+    ]
+   }
+  ]
+ }
+}

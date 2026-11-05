@@ -316,10 +316,65 @@ impl PlanRefusal {
             Self::TooManyReads { reads, allowed } => failure.with_planned_reads(PlannedReads {
                 needed_at_least: reads,
                 allowed,
+                certainly_refused: None,
             }),
             Self::VoucherOverBudget { .. } | Self::DayDividedBySpan { .. } => failure,
         }
     }
+}
+
+/// The shortest stretch of days whose counted vouchers alone are more than
+/// `limits` lets one read carry (#2372): every window that contains it needs
+/// more reads than allowed, since its own census counts at least these vouchers
+/// on an unchanged book and day boundaries only add reads
+/// ([`WindowReadLimits::reads_at_least`]). Of stretches equally short, the
+/// latest. `None` when the counts fit, or the default figure fits no voucher.
+///
+/// It is a refusal the count proves, never a window promised to fit: a window
+/// that avoids it can still hold more vouchers than the census has counted.
+fn certainly_refused(
+    counted: &BTreeMap<NaiveDate, u64>,
+    limits: WindowReadLimits,
+) -> Option<CertainlyRefused> {
+    let carried = limits.vouchers_at_most()?;
+    let days: Vec<(NaiveDate, u64)> = counted.iter().map(|(day, n)| (*day, *n)).collect();
+    let mut best: Option<CertainlyRefused> = None;
+    let mut start = 0;
+    let mut sum = 0_u64;
+    for end in 0..days.len() {
+        sum = sum.saturating_add(days[end].1);
+        // Shrink from the left while the stretch still holds more than carried,
+        // so each end is paired with its shortest refused stretch.
+        while start < end && sum.saturating_sub(days[start].1) > carried {
+            sum -= days[start].1;
+            start += 1;
+        }
+        if sum > carried {
+            let stretch = CertainlyRefused {
+                from: days[start].0,
+                to: days[end].0,
+                vouchers_counted: sum,
+                vouchers_allowed_at_most: carried,
+            };
+            let span = |s: &CertainlyRefused| (s.to - s.from).num_days();
+            if best
+                .as_ref()
+                .is_none_or(|known| span(&stretch) <= span(known))
+            {
+                best = Some(stretch);
+            }
+        }
+    }
+    best
+}
+
+/// Each counted day's vouchers, from census rows.
+fn counted_per_day(rows: &[CensusRow]) -> BTreeMap<NaiveDate, u64> {
+    let mut days = BTreeMap::new();
+    for row in rows {
+        *days.entry(row.day).or_insert(0) += 1;
+    }
+    days
 }
 
 /// A window plan that divides a day by AlterID span cannot become the tax
@@ -614,6 +669,17 @@ impl WindowCensus {
             .filter(|id| span.is_none_or(|span| span.holds(*id)))
             .map(|id| (id, self.guids.get(&id).map(String::as_str)))
             .collect()
+    }
+
+    /// The stretch of days this count proves refused under `limits`
+    /// ([`certainly_refused`]).
+    fn refused_stretch(&self, limits: WindowReadLimits) -> Option<CertainlyRefused> {
+        let per_day = self
+            .days
+            .iter()
+            .map(|(day, ids)| (*day, ids.len() as u64))
+            .collect();
+        certainly_refused(&per_day, limits)
     }
 
     pub(super) fn total(&self) -> u64 {
@@ -1158,6 +1224,28 @@ impl WindowReadLimits {
                     planning_figure(self.default_bytes_per_voucher, 0),
                 );
                 1 + vouchers.saturating_sub(first).div_ceil(later.max(1))
+            }
+        })
+    }
+
+    /// The most vouchers `max_reads` reads can carry under these limits: the
+    /// largest count [`Self::reads_at_least`] admits. `None` when the default
+    /// figure fits no voucher in a read.
+    fn vouchers_at_most(self) -> Option<u64> {
+        let first = vouchers_per_read(self.budget_bytes, self.default_bytes_per_voucher);
+        if first == 0 {
+            return None;
+        }
+        let reads = self.max_reads as u64;
+        Some(match self.read_count_refusal {
+            ReadCountRefusal::AtTheDefault => reads.saturating_mul(first),
+            ReadCountRefusal::AtTheFloor if reads == 0 => 0,
+            ReadCountRefusal::AtTheFloor => {
+                let later = vouchers_per_read(
+                    self.budget_bytes,
+                    planning_figure(self.default_bytes_per_voucher, 0),
+                );
+                first.saturating_add((reads - 1).saturating_mul(later.max(1)))
             }
         })
     }
@@ -2175,7 +2263,8 @@ where
                         .map_or(0, |marks| marks.vouchers())
                         .max(counted.max_alter_id());
                     let (plan, admitted) = first_plan(first, last, &counted, ceiling, limits)
-                        .map_err(|refusal| with_prior(refusal.into_failure(), &preflight, &None))?;
+                        .map_err(|refusal| with_prior(refusal.into_failure(), &preflight, &None))
+                        .map_err(|f| f.with_certainly_refused(counted.refused_stretch(limits)))?;
                     unmeasured = admitted;
                     census = Some(counted);
                     stack_of(&plan).map_err(|failure| with_prior(failure, &preflight, &None))?
@@ -2711,7 +2800,8 @@ async fn census_window<R: WindowReader>(
                     reads: usize::try_from(needed).unwrap_or(usize::MAX),
                     allowed: limits.max_reads,
                 }
-                .into_failure());
+                .into_failure()
+                .with_certainly_refused(certainly_refused(&counted_per_day(&rows), limits)));
             }
         }
     }
@@ -2786,6 +2876,15 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// the read fails safe. The spans are produced one at a time, and a mark
 /// needing more of them than [`MAX_CENSUS_READS`] is refused before any is.
 ///
+/// The spans are cut at multiples of `capacity` from 0 and produced from the
+/// mark down (#2372): the span holding the mark first, `(0, capacity]` last. A
+/// recent window's vouchers carry the book's highest AlterIDs, so a recent
+/// window that no allowed read count can carry is refused within its first
+/// spans ([`census_window`]) rather than after the whole walk. The census is
+/// the same set of rows in either order ([`WindowCensus::from_census_rows`]
+/// sorts each day), so a window that is read plans exactly as it would
+/// counted upward. A window of old, unaltered vouchers is still counted late.
+///
 /// The cost is a census count proportional to the book, not the window: a
 /// mark of 250,000 is 31 census requests however short the window. That is a
 /// cost in elapsed time, not in gateway safety: every request stays bounded,
@@ -2798,12 +2897,11 @@ pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans
     if requests > MAX_CENSUS_READS as u64 {
         return Err(BOOK_TOO_LARGE);
     }
+    // A book that has never held a voucher has nothing to count: a top of 0
+    // yields no span.
     Ok(CensusSpans {
-        after: 0,
-        high_water,
+        through: high_water,
         capacity,
-        // A book that has never held a voucher has nothing to count.
-        done: high_water == 0,
     })
 }
 
@@ -2833,7 +2931,7 @@ impl CensusPlan {
         self.requests
     }
 
-    /// The span of each request, in order.
+    /// The span of each request, in the order sent: from the mark down.
     pub(super) fn spans(&self) -> impl Iterator<Item = AlterIdSpan> {
         self.spans.clone()
     }
@@ -2842,29 +2940,24 @@ impl CensusPlan {
 /// See [`census_spans`].
 #[derive(Clone, Debug)]
 pub(super) struct CensusSpans {
-    after: u64,
-    high_water: u64,
+    /// The top of the next span; 0 once `(0, capacity]` has been produced.
+    through: u64,
     capacity: u64,
-    done: bool,
 }
 
 impl Iterator for CensusSpans {
     type Item = AlterIdSpan;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.done {
+        if self.through == 0 {
             return None;
         }
-        let through = self
-            .after
-            .saturating_add(self.capacity)
-            .min(self.high_water);
+        let after = (self.through - 1) / self.capacity * self.capacity;
         let span = AlterIdSpan {
-            after: self.after,
-            through,
+            after,
+            through: self.through,
         };
-        self.after = through;
-        self.done = through >= self.high_water;
+        self.through = after;
         Some(span)
     }
 }

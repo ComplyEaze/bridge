@@ -942,6 +942,19 @@ impl ToolFailure {
         self
     }
 
+    /// A read-count refusal with the stretch its census proves refused. Nothing
+    /// changes on any other failure.
+    fn with_certainly_refused(mut self, stretch: Option<CertainlyRefused>) -> Self {
+        if let Some(reads) = self
+            .read_detail
+            .as_mut()
+            .and_then(|detail| detail.planned_reads.as_mut())
+        {
+            reads.certainly_refused = stretch;
+        }
+        self
+    }
+
     fn with_window_scope(mut self, report: ScopeReport) -> Self {
         self.read_detail
             .get_or_insert_with(Box::default)
@@ -965,11 +978,24 @@ impl ToolFailure {
 
 /// A window read refused as needing more requests than one call may spend:
 /// `needed_at_least` (exact when the plan was made, a lower bound when the
-/// census stopped early) against `allowed`.
+/// census stopped early) against `allowed`, and, when the refusal was decided
+/// from the census, the stretch of days it proves refused (#2372).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PlannedReads {
     needed_at_least: usize,
     allowed: usize,
+    certainly_refused: Option<CertainlyRefused>,
+}
+
+/// The shortest stretch of a refused window's days whose counted vouchers
+/// alone are more than the allowed reads carry, so that any window containing
+/// it is refused too (`voucher_window::certainly_refused`). Dates and counts only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CertainlyRefused {
+    from: NaiveDate,
+    to: NaiveDate,
+    vouchers_counted: u64,
+    vouchers_allowed_at_most: u64,
 }
 
 /// The reason a partial read gave, carried by a refusal that needed a complete
@@ -1976,6 +2002,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              A shorter date window will not help, because the count covers the whole book. \
              Read this company with Tally's own reports, or split the company in Tally so \
              that each part's books are smaller.",
+        ),
+        // A window that needs more data requests than one call may spend
+        // (protocol reference §11c): the count proves a refusal, never a fit,
+        // so the step names a narrower window and promises nothing about it.
+        "voucher_window_too_many_reads" => Some(
+            "This date window holds more vouchers than one call may read (`reads.needed_at_least` \
+             requests against `reads.allowed`), so nothing was returned. Ask for a narrower \
+             window. Where `reads.certainly_refused` is given, any window that contains its \
+             `from` to `to` is refused again, because ComplyEaze Bridge already counted more \
+             vouchers on those days than the allowed requests carry; a window that avoids them \
+             is not promised to fit. On a very large book (a voucher history of about a million) \
+             read one day per call, and a longer period a day at a time. For a period's totals, \
+             use trial_balance instead of reading its vouchers.",
         ),
         // The `outstandings` party detail (#945) refuses, never cuts, an answer
         // over its row limit; each kind has its own code and its own remedy.
@@ -3185,6 +3224,14 @@ impl Server {
                             "needed_at_least": reads.needed_at_least,
                             "allowed": reads.allowed,
                         });
+                        if let Some(stretch) = reads.certainly_refused {
+                            error["reads"]["certainly_refused"] = json!({
+                                "from": stretch.from.format("%Y%m%d").to_string(),
+                                "to": stretch.to.format("%Y%m%d").to_string(),
+                                "vouchers_counted": stretch.vouchers_counted,
+                                "vouchers_allowed_at_most": stretch.vouchers_allowed_at_most,
+                            });
+                        }
                     }
                 }
                 if let Some(scope) = window_scope {

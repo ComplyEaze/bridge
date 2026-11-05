@@ -1,0 +1,3 @@
+Screen captures, kept on the lab PC only, by name, size and sha256:
+shots/0a-tally.png 67779 B d965b30122c4d762a274dc78bbbfccccbbc6293bac6a9c5359a1574da7b685e3
+shots/0c-stop2-screen.png 191565 B e50afcd8d239f39f52c5ad5c1fe4ea4f59f04f97a5dc0288b47ae64428aff3fd

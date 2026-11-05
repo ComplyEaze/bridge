@@ -1,0 +1,4 @@
+Kept on the lab PC only, by name, size and sha256 (public forms: evidence/K1a-in-summary.txt and evidence/0a-netstat.txt):
+evidence/K1a-in.json 552507 B cd216b71373936c219a02d987e04f331819bead3271f12ac06561284d823070f
+evidence/0a-netstat-raw.txt 10633 B 962cc9d044d1f56925ce7807bcfc603c5fab486639d312b330d11c714133e43c
+ka.txt 20 B 697e7649b4efcb5ad0633574d5717858d7905974e6b7cb3b1721baff6f3a14cf

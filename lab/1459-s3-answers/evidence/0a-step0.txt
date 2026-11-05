@@ -1,0 +1,8 @@
+0a 2026-11-05T14:47Z. Run lead's grant for S3 held (its message about 14:44Z: S3 with the owner; extension calls allowed for this sitting; start 0a when the owner says the company is loaded; the owner said so at about 14:46Z).
+Windows: Microsoft Windows NT 10.0.19045.0, DisplayVersion 22H2.
+C1: the owner shut the earlier company with Tally's Shut Company and loaded BRIDGE CORPUS DENSE alone (the owner's act; nothing keyed by the lab).
+C2 screenshot (shots\0a-tally.png, 67,779 B, sha256 d965b30122c4d762a274dc78bbbfccccbbc6293bac6a9c5359a1574da7b685e3, 14:47:04Z): Gateway of Tally, TallyPrime SILVER, one company BRIDGE CORPUS DENSE, current period 1-Apr-25 to 31-Mar-26, current date Tuesday, 31-Mar-2026, date of last entry 31-Mar-26; Gateway lines "(Schedule Backup)" and a "Try Now" panel; no dialog, no half-entered screen; no Educational mode shown.
+C2 a: tasklist (cmd.exe, 2>&1): one line "tally.exe","1200"; exit 0 (0a-tasklist.txt).
+C2 b: netstat -ano (cmd.exe, 2>&1): TCP 0.0.0.0:9001 LISTENING 1200 and [::]:9001 LISTENING 1200; 37 LISTENING lines in all; exit 0 (0a-netstat-raw.txt, kept local).
+C2 c: curl.exe GET /status: exit 0, status 200, 51 bytes (0a-status.txt, 0a-status.body).
+C2 d: at 0e (the sheet's difference 1: list_companies in place of MARKS).

@@ -1,0 +1,8 @@
+0a 2026-11-05T14:47Z passed: Windows 10.0.19045, 22H2. BRIDGE CORPUS DENSE the one company loaded (the owner's act; nothing keyed by the lab); Gateway current date Tuesday, 31-Mar-2026; no dialog, no half-entered screen, no Educational mode. tasklist: one tally.exe, pid 1200, exit 0. netstat: 9001 LISTENING on the tally pid; 37 LISTENING lines; exit 0. GET /status: exit 0, 200, 51 bytes.
+0b 2026-11-05T14:47Z passed: exactly one package of the desktop client, version 4.4212.0.0, SignatureKind Developer; the same version lab/1584-msix-paths-answers recorded.
+0c 2026-11-05T14:48Z nonces N1 341c7fc2 and N2 afc70663 written (run/nonces.txt). K1a (in) ran, exit 0: evidence/K1a-in.json, 552,507 B, kept on the lab PC by sha256 (summary: evidence/K1a-in-summary.txt).
+0c 2026-11-05T14:48:00Z K1b (out), attempt 1: the .cmd was written and started by the WMI create (return value 0). No K1b-out.json and no K1b-out.exit appeared, and the .cmd was no longer in run/.
+0c 2026-11-05T14:55:49Z K1b attempt 2: writing the .cmd was refused (access denied); nothing was written. The WMI create, issued in the same command line, ran on the missing file; nothing ran. No output by 14:57:20Z.
+0c 2026-11-05T15:00:51Z K1b attempt 3, the write alone: refused (access denied); nothing was written; no WMI create was issued.
+0c 2026-11-05T15:00:57Z the sitting ends here: K1b not run; the lab PC refused the probe file. K1c not run. Which side is which is not established, so 0d, 0d2, 0e, O1 to O5 and rows S3-1459-1 to S3-1459-4 were not run.
+close 2026-11-05T15:00:57Z C10 skipped: nothing reached Tally after 0a (no request, no tool call, nothing keyed by the lab). BRIDGE CORPUS DENSE stays loaded as the owner left it. Nothing was posted and nothing was deleted.

@@ -1,0 +1,6 @@
+Name              : <desktop client>
+PackageFamilyName : <family>
+Version           : 4.4212.0.0
+SignatureKind     : Developer
+InstallLocation   : C:\Program Files\WindowsApps\<package folder 4.4212.0.0>
+Version equals the one lab/1584-msix-paths-answers recorded (4.4212.0.0): yes. Exactly one package: yes. F = <family>.

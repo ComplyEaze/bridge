@@ -1,0 +1,18 @@
+# sha256  bytes  file  (LAB-COMMON.md, check-request-ids.py and templates/*.utf16le.xml byte-equal to lab/1381-stock-item-create at 5bbd6fb2; templates/post-span-journal-import.xml byte-equal to master's src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/post-span-journal-import.xml; requests/ from gen_requests.py)
+f50b500ac7ddb47b8fbf83724776360fd559a27996b047ed134226093f27014e  67  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+14cb831fe842c4287c273dc5ae8446954ef12156a3f68ff991320bdbdc2efb26  9621  RUN-SHEET.md
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
+0898e7c15cfefb9a9ff14e3f1e07e5eea818e342afe75f43c14992fff9146436  5360  check_1108.py
+95af0f4040ff58b9e86cabad4fe02508256d214767ddfdfee3653cc90ec2478d  5218  gen_requests.py
+113997a9df525d0d2f2def83fcc841e0f0a06db44c9b8ba0d6bc9913ec5c9f99  1850  requests/a1-stock-journal.utf16le.xml
+a03151bf69b06e173ee49dbff63e355a5b5684796aee132f701bf2f76820c507  1822  requests/b-cash-journal.utf16le.xml
+7146a97fb35faeed0df69dc208f0999e4549433819030011f63fc7d1523585b2  1154  requests/flags.utf16le.xml
+6b8bda84c414413acccf231e0c295aa3a4aab9bb9d844b0bab9c1316684421f0  1124  requests/ledgers.utf16le.xml
+5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b  990  requests/marks.utf16le.xml
+6af4d7142baffbae2d0133b25251d4762e030d1db64a2bccd0900dd69445b9a8  1450  requests/vouchers.utf16le.xml
+0072f0ada6ca24e8855195545ad9e0cb7d2d0e52f44cfc8fcf7f9c65b2e9207d  1032  requests/w1-stock-ledger.utf16le.xml
+9bb8f7a4aad86679164beae28d69d3cba6738924c42030ef3490e57d79dfff6b  1012  requests/w2-capital-ledger.utf16le.xml
+6a2cfdaae54dfdb6f1477ba082f3fdfc8094f8c1111362bb06f35207fc4b2262  1738  templates/create-l0.utf16le.xml
+f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b  990  templates/marks-l0.utf16le.xml
+69c8aa0225f67d402072b1b9015f2517a08b6a57bc741c1543737b2517a0ca4b  3422  templates/post-span-journal-import.xml

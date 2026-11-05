@@ -1,0 +1,1 @@
+[{"bridge_txn_id":"b1108-p1-1","date":"2025-04-12","voucher_type":"Journal","narration":"Row 1108-P1 stock leg","entries":[{"ledger":"A1 Closing Stock","amount":"10.00","side":"Dr"},{"ledger":"A1 Capital","amount":"10.00","side":"Cr"}]}]

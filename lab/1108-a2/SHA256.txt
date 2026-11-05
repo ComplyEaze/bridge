@@ -1,0 +1,23 @@
+# sha256  bytes  file  (LAB-COMMON.md, check-request-ids.py, check_1108.py and templates/* byte-equal to lab/1108-a1-stock-in-hand-journal at 72b54de8, templates/b-cash-journal.utf16le.xml being its requests/b-cash-journal.utf16le.xml; relay.py and check-relay.py byte-equal to lab/852-c2-screen-work at d2b5ccca; requests/ and batches/ from gen_requests.py)
+f50b500ac7ddb47b8fbf83724776360fd559a27996b047ed134226093f27014e  67  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+7d36400b988ace5537e9174956c306a87e7f8d2e652dd7cb18e9ea5d6a587191  21507  RUN-SHEET.md
+9a8068485f2d5d9a415d294610794a496e9dec0363880b021bd3f2e1a1598d6b  6822  check-relay.py
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
+0898e7c15cfefb9a9ff14e3f1e07e5eea818e342afe75f43c14992fff9146436  5360  check_1108.py
+744b9b0322ef36c972119f48295ce365a6c07777de3882d2dbde6e0b32bf2e93  5808  gen_requests.py
+80ffdb204506af6810f0ff1fea1f6e1d72e07e3577adc249e2f2132f7452b9e5  9352  relay.py
+28c8e629bda04c974b11b54b1f2cb8a90fbd9bef2f8bbfc90576145468f747ee  238  batches/p1.json
+d87c28629ce5701317bf1bde79e183ab0b9404f36c5bae33ff9bcf3a28982e7d  690  batches/p2.json
+54e90fae3d089308b255d6c5a7fed79d890574147089e348c748116f47081a7c  688  batches/p3.json
+7146a97fb35faeed0df69dc208f0999e4549433819030011f63fc7d1523585b2  1154  requests/flags.utf16le.xml
+6b8bda84c414413acccf231e0c295aa3a4aab9bb9d844b0bab9c1316684421f0  1124  requests/ledgers.utf16le.xml
+5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b  990  requests/marks.utf16le.xml
+a03151bf69b06e173ee49dbff63e355a5b5684796aee132f701bf2f76820c507  1822  requests/s0-seed-journal.utf16le.xml
+6af4d7142baffbae2d0133b25251d4762e030d1db64a2bccd0900dd69445b9a8  1450  requests/vouchers.utf16le.xml
+0072f0ada6ca24e8855195545ad9e0cb7d2d0e52f44cfc8fcf7f9c65b2e9207d  1032  requests/w1-stock-ledger.utf16le.xml
+9bb8f7a4aad86679164beae28d69d3cba6738924c42030ef3490e57d79dfff6b  1012  requests/w2-capital-ledger.utf16le.xml
+a302d01d102239f4fe7cd9ecfcec0db97460bdb6a1a0afadf8fcad4d9be14929  1016  requests/w3-expense-ledger.utf16le.xml
+a03151bf69b06e173ee49dbff63e355a5b5684796aee132f701bf2f76820c507  1822  templates/b-cash-journal.utf16le.xml
+6a2cfdaae54dfdb6f1477ba082f3fdfc8094f8c1111362bb06f35207fc4b2262  1738  templates/create-l0.utf16le.xml
+f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b  990  templates/marks-l0.utf16le.xml

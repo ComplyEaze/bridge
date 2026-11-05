@@ -102,7 +102,7 @@ keyring = { version = "4.1.4", default-features = false, features = ["v1"] }
 quick-xml = "0.42"
 # Bridge supports Windows and macOS; rfd's defaults add Linux portal/Wayland code.
 rfd = { version = "0.17", default-features = false }
-rust_xlsxwriter = { version = "0.100.0", default-features = false }
+rust_xlsxwriter = { version = "0.102.0", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.11"

@@ -5895,16 +5895,21 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
     assert!(unread["result"]["error"]
         .get("unsettled_batch_id")
         .is_none());
-    // The invoice text never leaves a person at a dead end or offers to nudge
-    // a figure: where a new number cannot help it says to enter the invoice by
-    // hand, and it forbids changing the number, date, ledger, amount or side.
-    // Case (2), a match by figures alone: a new number cannot help.
+    // The invoice text never offers to nudge a figure: it forbids changing the
+    // number, date, ledger, amount or side.
+    // Case (2), a match by figures alone: a new number cannot help, and the
+    // sale is left out with the user told, as the rows step leaves out a
+    // second real row. A stated stop, never a hand entry (#1709).
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
-        "a new number does not get past this check: tell the user and enter the invoice in Tally by hand"
+        "a new number does not get past this check, and ComplyEaze Bridge cannot post this sale yet: leave it out and tell the user so; do not enter it in Tally by hand"
     ));
-    // Case (3), an unconfirmed earlier batch: hand entry, and how it ends.
-    assert!(PREEXISTING_INVOICE_NEXT_STEP
-        .contains("cannot post it while that batch is unconfirmed: enter it in Tally by hand"));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("tell the user and enter the invoice"));
+    // Case (3), an unconfirmed earlier batch: the same stated stop, and how it
+    // ends. A stop release does not end it (the owner's ruling on #1709).
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "cannot post it while that batch is unconfirmed: verify_import on that batch is the only way this refusal ends, and until it does, leave the invoice out and tell the user so; do not enter it in Tally by hand"
+    ));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("unconfirmed: enter it in Tally by hand"));
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("verify_import on it can confirm it"));
     // A busy journal is a retry, not a reason to enter anything by hand.
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(

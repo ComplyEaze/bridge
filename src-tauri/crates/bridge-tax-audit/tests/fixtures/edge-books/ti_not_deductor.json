@@ -1,0 +1,106 @@
+{
+ "comment": "An individual carrying on a business whose previous-year turnover, Rs 9,00,000, is within the limit: tds_payees gives the status 'not_deductor'. n01 credits Ivy Agency (s.194H) Rs 24,000 and tds_payees still lists the payee as over the limit, with a 'credited' fact; the caller passes by every payee of a non-deductor, so there is no row and the golden is byte-identical to ti_empty's.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_not_deductor-ledger-00"
+  },
+  {
+   "name": "Ivy Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_not_deductor-ledger-01"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_not_deductor-ledger-02"
+  },
+  {
+   "name": "Proprietor Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_not_deductor-ledger-03"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 2400000,
+   "credit": 0,
+   "closing": 2400000
+  },
+  {
+   "ledger": "Ivy Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2400000,
+   "closing": -2400000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": 40000000
+  },
+  {
+   "ledger": "Proprietor Capital",
+   "opening": -40000000,
+   "debit": 0,
+   "credit": 0,
+   "closing": -40000000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-n01",
+   "date": "2025-07-14",
+   "base_type": "Journal",
+   "number": "CJ/01",
+   "lines": [
+    [
+     "Sales Commission",
+     2400000
+    ],
+    [
+     "Ivy Agency",
+     -2400000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "nature_by_ledger": {
+  "Sales Commission": "194H"
+ },
+ "previous_year_turnover_paise": 90000000,
+ "deductor_activity": "business"
+}

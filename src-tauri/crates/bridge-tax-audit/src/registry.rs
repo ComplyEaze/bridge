@@ -231,6 +231,12 @@ pub const PORTED: &[PortedTest] = &[
         run_on: |e, b, r, _| crate::stock_on(e, b, r),
     },
     PortedTest {
+        id: "tds_interest_201",
+        // The seventeen figures of README §5, on every book (no row: the synthetic read).
+        min_figures: 17,
+        run_on: |e, b, r, _| crate::tds_interest_201_on(e, b, r),
+    },
+    PortedTest {
         id: "tds_payees",
         min_figures: 30,
         run_on: |e, b, r, _| crate::tds_payees_on(e, b, r),

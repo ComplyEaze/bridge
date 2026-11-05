@@ -313,6 +313,23 @@ def _tds_payees(c):
     return tds_payees, pack_tds_payees(c.eng, c.rules, c.cfg, tax_ledgers, partners_config(c.cfg)[0])
 
 
+def _tds_interest_201(c):
+    from tae.audit_tests import tds_interest_201, tds_payees
+    from tae import config as tc
+    from tae.pack import _tds_interest_defaults
+    tax_ledgers = tc.tax_ledgers_by_head(c.cfg) if "tax_ledgers" in c.cfg.get("roles", {}) else {}
+    nature_by_ledger, payee_aliases, _turnover, s194j_category_by_ledger = tc.tds_config(c.cfg)
+    payees, partners_result = _tds_payees(c)[1], _partners_40b_194t(c)[1]
+    uncertain = (payees.figures[f"{tds_payees.TEST_ID}.deductor_status"].value == "unknown"
+                 or tc.turnover_is_placeholder(c.cfg))
+    defaults = _tds_interest_defaults(
+        c.eng, c.rules, payees, partners_result, uncertain,
+        (nature_by_ledger, payee_aliases, s194j_category_by_ledger), tc.partners_config(c.cfg)[0],
+        tc.tds_payees_reversals(c.cfg), tc.tds_payees_foreseeability(c.cfg), tc.tds_payees_gst_separate(c.cfg),
+        frozenset(tax_ledgers), tc.tds_payable_ledgers(c.cfg))
+    return tds_interest_201, tds_interest_201.run(c.eng, c.rules, defaults, c.rules["due_dates"]["audit_report"])
+
+
 def _loans_interest(c):
     from tae.audit_tests import loans_interest
     from tae.config import deductor_activity, loan_ledgers_config, tds_payable_ledgers, turnover_is_placeholder
@@ -546,6 +563,7 @@ RUNNERS = {
     "stale_balances_41_1": _stale_balances_41_1,
     "statutory_dues_43b": _statutory_dues_43b,
     "stock": _stock,
+    "tds_interest_201": _tds_interest_201,
     "tds_payees": _tds_payees,
     "tds_tcs_26as": _tds_tcs_26as,
     "trial_balance": _trial_balance,

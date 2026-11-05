@@ -1,0 +1,20 @@
+2026-11-05T08:51:06.421Z read 1 not whole: UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe2 in position 173: unexpected end of data
+2026-11-05T08:51:06.681Z read 2 not whole: UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe2 in position 173: unexpected end of data
+2026-11-05T08:51:06.956Z read 3 not whole: UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe2 in position 173: unexpected end of data
+2026-11-05T08:51:07.221Z read 4 not whole: UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe2 in position 173: unexpected end of data
+2026-11-05T08:51:07.487Z read 5 not whole: UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe2 in position 173: unexpected end of data
+2026-11-05T08:51:07.755Z read 6 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:08.009Z read 7 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:08.261Z read 8 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:08.526Z read 9 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:08.787Z read 10 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:09.039Z read 11 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:09.297Z read 12 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:09.551Z read 13 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:09.810Z read 14 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:13.214Z read 27 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:13.474Z read 28 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:13.739Z read 29 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:14.003Z read 30 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:14.256Z read 31 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:14.530Z read 32 not whole: ValueError: log not ended by a line break

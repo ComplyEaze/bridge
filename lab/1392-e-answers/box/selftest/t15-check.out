@@ -1,0 +1,12 @@
+2026-11-05T08:51:06.126Z check of t15 for batch bridge-e4abb1d3-6ef6-4211-8cb4-185d35013a4a, 1 vouchers (log read whole after 1 read(s))
+PASS box seen
+FAIL built batch read (one build answer, its XML sha256 equal, voucher_count 1)
+PASS Company GUID
+PASS Batch
+NOT ALL PASS
+  | Types: 3 Receipt
+  | Dates: 22-Oct-2026 to 24-Oct-2026  Voucher numbers: Tally assigns them
+  | Total debit: 306  Total credit: 306
+  | Dr 306  Cr 0  3 entries  "Cash"
+  | Dr 0  Cr 306  3 entries  "TLab Clearing"
+2026-11-05T08:51:06.142Z answer file written: No

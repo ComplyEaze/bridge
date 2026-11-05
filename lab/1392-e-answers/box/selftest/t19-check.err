@@ -1,0 +1,130 @@
+2026-11-05T08:51:20.579Z read 1 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:20.851Z read 2 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:21.102Z read 3 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:21.358Z read 4 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:21.620Z read 5 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:21.883Z read 6 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:22.139Z read 7 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:22.407Z read 8 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:22.670Z read 9 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:22.920Z read 10 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:23.182Z read 11 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:23.440Z read 12 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:23.699Z read 13 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:23.951Z read 14 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:24.211Z read 15 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:24.472Z read 16 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:24.732Z read 17 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:24.995Z read 18 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:25.246Z read 19 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:25.510Z read 20 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:25.775Z read 21 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:26.028Z read 22 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:26.293Z read 23 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:26.545Z read 24 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:26.798Z read 25 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:27.059Z read 26 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:27.310Z read 27 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:27.571Z read 28 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:27.831Z read 29 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:28.086Z read 30 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:28.343Z read 31 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:28.600Z read 32 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:28.859Z read 33 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:29.121Z read 34 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:29.378Z read 35 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:29.636Z read 36 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:29.901Z read 37 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:30.164Z read 38 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:30.427Z read 39 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:30.690Z read 40 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:30.943Z read 41 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:31.205Z read 42 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:31.460Z read 43 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:31.724Z read 44 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:31.984Z read 45 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:32.235Z read 46 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:32.499Z read 47 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:32.764Z read 48 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:33.021Z read 49 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:33.288Z read 50 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:33.549Z read 51 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:33.799Z read 52 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:34.061Z read 53 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:34.322Z read 54 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:34.578Z read 55 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:34.842Z read 56 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:35.104Z read 57 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:35.356Z read 58 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:35.614Z read 59 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:35.878Z read 60 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:36.140Z read 61 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:36.401Z read 62 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:36.662Z read 63 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:36.924Z read 64 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:37.188Z read 65 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:37.451Z read 66 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:37.715Z read 67 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:37.968Z read 68 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:38.226Z read 69 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:38.489Z read 70 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:38.749Z read 71 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:39.014Z read 72 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:39.278Z read 73 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:39.533Z read 74 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:39.794Z read 75 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:40.049Z read 76 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:40.314Z read 77 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:40.565Z read 78 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:40.828Z read 79 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:41.089Z read 80 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:41.347Z read 81 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:41.601Z read 82 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:41.865Z read 83 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:42.124Z read 84 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:42.374Z read 85 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:42.637Z read 86 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:42.900Z read 87 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:43.177Z read 88 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:43.440Z read 89 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:43.691Z read 90 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:43.947Z read 91 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:44.200Z read 92 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:44.464Z read 93 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:44.717Z read 94 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:44.973Z read 95 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:45.223Z read 96 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:45.482Z read 97 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:45.735Z read 98 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:45.998Z read 99 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:46.262Z read 100 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:46.526Z read 101 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:46.788Z read 102 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:47.041Z read 103 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:47.300Z read 104 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:47.563Z read 105 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:47.829Z read 106 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:48.089Z read 107 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:48.344Z read 108 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:48.601Z read 109 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:48.863Z read 110 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:49.124Z read 111 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:49.375Z read 112 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:49.626Z read 113 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:49.886Z read 114 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:50.148Z read 115 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:50.410Z read 116 not whole: ValueError: log not ended by a line break
+2026-11-05T08:51:50.675Z read 117 not whole: ValueError: log not ended by a line break
+Traceback (most recent call last):
+  File "boxcheck.py", line 26, in read_whole
+    if not t.endswith('\n'): raise ValueError('log not ended by a line break')
+ValueError: log not ended by a line break
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "boxcheck.py", line 36, in <module>
+    t, reads = read_whole()
+  File "boxcheck.py", line 31, in read_whole
+    if time.monotonic() - bad_since > 30: raise RuntimeError('no whole read of the box log in 30 s')
+RuntimeError: no whole read of the box log in 30 s

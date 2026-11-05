@@ -1,0 +1,11 @@
+2026-11-05T08:54:42.155Z check of b3-p3 for batch bridge-519a6289-40d3-4980-99ca-f7ed2e44c063, 1 vouchers (log read whole after 460 read(s))
+FAIL box seen
+FAIL title names this voucher
+FAIL Create ONE Contra in "BRIDGE TRANSFER LAB"
+FAIL one Create line
+FAIL Date: 29-Oct-2026
+FAIL entry lines equal the built batch: Dr 7003.00 TLab Bank B; Cr 7003.00 TLab Bank A
+FAIL Company GUID
+FAIL Batch
+NOT ALL PASS
+2026-11-05T08:54:42.155Z answer file written: No

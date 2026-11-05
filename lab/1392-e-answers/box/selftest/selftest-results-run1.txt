@@ -1,0 +1,10 @@
+t11: expected Yes, got Yes, exit 0, reads not whole 0 (saved log b3-p1, count 1) OK
+t12: expected Yes, got Yes, exit 0, reads not whole 0 (saved log b3-p2, count 1) OK
+t13: expected No, got No, exit 1, reads not whole 0 (saved log b3-p2, count 2) OK
+t14: expected Yes, got Yes, exit 0, reads not whole 0 (saved log f-p1, count 3) OK
+t15: expected No, got No, exit 1, reads not whole 0 (saved log f-p1, count 1) OK
+t16: expected Yes, got Yes, exit 0, reads not whole 0 (saved log b1-p1, count 2) OK
+t16b: expected No, got No, exit 1, reads not whole 0 (saved log b1-p1, count 3) OK
+t17: expected Yes, got Yes, exit 0, reads not whole 20 (appended in chunks; the answer must come after the last write) OK answer-after-last-write
+t18: expected Yes, got No, exit 2, reads not whole 0 (held under an exclusive lock for 5 s) WRONG
+t19: expected No, got No, exit 2, reads not whole 117 (cut inside the WAITING line, never finished) OK

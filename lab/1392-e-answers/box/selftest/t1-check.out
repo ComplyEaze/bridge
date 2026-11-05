@@ -1,0 +1,12 @@
+2026-11-05T08:38:03.212Z check of t1 for batch bridge-519a6289-40d3-4980-99ca-f7ed2e44c063, 1 vouchers
+PASS box seen
+PASS title names this voucher
+PASS Create ONE Contra in "BRIDGE TRANSFER LAB"
+PASS one Create line
+PASS Date: 29-Oct-2026
+PASS entry lines equal the built batch: Dr 7003.00 TLab Bank B; Cr 7003.00 TLab Bank A
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Total debit: 7003  Total credit: 7003
+2026-11-05T08:38:03.212Z answer file written: Yes

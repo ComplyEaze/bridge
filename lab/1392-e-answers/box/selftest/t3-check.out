@@ -1,0 +1,14 @@
+2026-11-05T08:38:03.567Z check of t3 for batch bridge-e4abb1d3-6ef6-4211-8cb4-185d35013a4a, 3 vouchers
+PASS box seen
+PASS title names 3 vouchers
+PASS Create 3 vouchers in "BRIDGE TRANSFER LAB"
+PASS one Create line
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Types: 3 Receipt
+  | Dates: 22-Oct-2026 to 24-Oct-2026  Voucher numbers: Tally assigns them
+  | Total debit: 306  Total credit: 306
+  | Dr 306  Cr 0  3 entries  "Cash"
+  | Dr 0  Cr 306  3 entries  "TLab Clearing"
+2026-11-05T08:38:03.586Z answer file written: Yes

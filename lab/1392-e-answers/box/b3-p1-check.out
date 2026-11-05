@@ -1,0 +1,10 @@
+2026-11-05T08:36:00.740Z check of b3-p1 for batch bridge-519a6289-40d3-4980-99ca-f7ed2e44c063, 1 vouchers
+PASS box seen
+FAIL title names 1 vouchers
+FAIL Create 1 vouchers in "BRIDGE TRANSFER LAB"
+FAIL one Create line
+PASS Company GUID
+PASS Batch
+NOT ALL PASS
+  | Total debit: 7003  Total credit: 7003
+2026-11-05T08:36:00.742Z answer file written: No

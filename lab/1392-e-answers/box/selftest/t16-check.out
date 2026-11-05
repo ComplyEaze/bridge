@@ -1,0 +1,14 @@
+2026-11-05T08:51:06.234Z check of t16 for batch bridge-66b8afb1-e6ed-4d20-bd45-598113b0e544, 2 vouchers (log read whole after 1 read(s))
+PASS box seen
+PASS title names 2 vouchers
+PASS Create 2 vouchers in "BRIDGE TRANSFER LAB"
+PASS one Create line
+PASS Company GUID
+PASS Batch
+ALL PASS
+  | Types: 2 Receipt
+  | Dates: 20-Oct-2026 to 28-Oct-2026  Voucher numbers: Tally assigns them
+  | Total debit: 2403  Total credit: 2403
+  | Dr 2403  Cr 0  2 entries  "TLab Bank B"
+  | Dr 0  Cr 2403  2 entries  "TLab Clearing"
+2026-11-05T08:51:06.234Z answer file written: Yes

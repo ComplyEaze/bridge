@@ -690,11 +690,14 @@ fi
 # Scan destination paths and added payload lines. Removed/context lines never
 # enter the privacy scan. Binary additions are an explicit human-inspection
 # hold because their bytes are absent from a textual patch.
-# GitHub serves a pull request's diff only up to 20000 lines (HTTP 406 beyond). When it serves none, the same diff is built here
-# from the head and the merge base this gate read from the API: the head is fetched into this checkout and must be that exact
-# commit, the merge base must be its ancestor, and every option that changes Git's output is pinned, so no local setting changes
-# it (attributes come from the master just fetched, never from the pull request). On a pull request GitHub did serve, this diff
-# equalled GitHub's byte for byte. A fetch or a check that fails leaves the diff empty, which is INDETERMINATE, never a pass.
+# GitHub serves a pull request's diff only up to 20000 lines (HTTP 406 beyond). When it serves none, for any reason, the diff is
+# built here from the head and the merge base this gate read from the API: the head is fetched into this checkout and must be that
+# exact commit, the merge base must be its ancestor, and the options that change Git's output are pinned (attributes come from the
+# master just fetched, never from the pull request), so no local setting can make it pass: one that still applies (an attributes
+# file of this checkout, a rename limit) turns a file binary, which blocks, or fails the REST reconciliation below. On the pull
+# requests measured where GitHub did serve a diff, the scan's input (each section's path, counts and added lines) equalled GitHub's;
+# the bytes can differ in the index lines' abbreviation and in hunk-header context, which the parser does not read.
+# A fetch or a check that fails leaves the diff empty, which is INDETERMINATE, never a pass.
 local_pr_diff() {
   local fetched
   [ -n "$merge_base" ] || { local_diff_failure="the merge base was not read"; return 1; }

@@ -1435,10 +1435,11 @@ class MergeGateControls(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("unknown option", result.stderr)
 
-    def run_copy(self, copy, scenario="pass", script_dir="scripts"):
+    def run_copy(self, copy, scenario="pass", script_dir="scripts", env_extra=None):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
+        env.update(env_extra or {})
         return subprocess.run([str(copy / script_dir / "merge-gate.sh"), "321", "--repo", "lamemustafa/bridge"], env=env, text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
 
@@ -1456,6 +1457,66 @@ class MergeGateControls(unittest.TestCase):
         self.git_copy(copy, "push", "-q", "origin", "master")
         self.git_copy(copy, "fetch", "-q", "origin", "master")
         return copy
+
+    def rev(self, copy, ref="HEAD"):
+        return subprocess.run(["git", "-C", str(copy), "rev-parse", ref], check=True, capture_output=True, text=True).stdout.strip()
+
+    def pr_head_copy(self, name, text):
+        """A private copy with a real pull request head: one commit over master adding docs/example.md (the file the
+        fake's changed-files list names, one line). The checkout is left on master. Returns the copy, master and the head."""
+        copy = self.private_copy(name)
+        base = self.rev(copy)
+        self.git_copy(copy, "checkout", "-q", "-b", "pr")
+        (copy / "docs").mkdir(exist_ok=True)
+        (copy / "docs" / "example.md").write_text(text)
+        self.git_copy(copy, "add", "-A")
+        self.git_copy(copy, "commit", "-q", "-m", "pull request head")
+        head = self.rev(copy)
+        self.git_copy(copy, "checkout", "-q", "master")
+        return copy, base, head
+
+    def test_a_diff_github_will_not_serve_is_built_here_from_the_head_and_the_merge_base(self):
+        # GitHub refuses a diff over 20000 lines; the gate fetches refs/pull/<n>/head and diffs it against the merge base it read
+        for name, text, code, phrase in (
+            ("clean", "Safe content line.\n", 0, "MAY MERGE"),
+            # the address is joined at run time, so this pull request's own privacy scan does not stop on its test
+            ("email", "Contact: " + "@".join(("customer", "company.test")) + "\n", 1, "customer email shape"),
+        ):
+            with self.subTest(case=name):
+                copy, base, head = self.pr_head_copy("local-diff-" + name, text)
+                self.git_copy(copy, "push", "-q", "origin", head + ":refs/pull/321/head")
+                result = self.run_copy(copy, "diff-refused", env_extra={"GATE_HEAD": head, "GATE_BASE_TIP": base})
+                self.assertEqual(result.returncode, code, result.stdout + result.stderr)
+                self.assertIn(phrase, result.stdout)
+                self.assertIn("GitHub served no diff (could not find pull request diff: HTTP 406", result.stdout)
+                self.assertIn(f"it was built here from merge base {base[:7]} and head {head[:7]}", result.stdout)
+                self.assertNotIn("could not read diff", result.stdout)
+                self.assertNotIn("was read from GitHub", result.stdout)
+
+    def test_the_output_names_github_as_the_diff_source_when_github_served_it(self):
+        result = self.assert_pass("pass", "the diff for the privacy scan was read from GitHub")
+        self.assertNotIn("built here", result.stdout)
+
+    def test_a_diff_that_cannot_be_built_here_is_indeterminate_never_empty(self):
+        for how, phrase in (
+            ("not-pushed", "the head could not be fetched"),
+            ("other-head", "the fetched head is not"),
+            ("not-an-ancestor", "the merge base {} is not an ancestor of the head"),
+        ):
+            with self.subTest(how=how):
+                copy, base, head = self.pr_head_copy("local-diff-" + how, "Safe content line.\n")
+                if how == "other-head":
+                    self.git_copy(copy, "push", "-q", "origin", base + ":refs/pull/321/head")
+                elif how == "not-an-ancestor":
+                    self.git_copy(copy, "push", "-q", "origin", head + ":refs/pull/321/head")
+                    self.git_copy(copy, "checkout", "-q", "-b", "side", base)
+                    self.git_copy(copy, "commit", "-q", "--allow-empty", "-m", "a commit the head does not contain")
+                    base = self.rev(copy)
+                    self.git_copy(copy, "checkout", "-q", "master")
+                result = self.run_copy(copy, "diff-refused", env_extra={"GATE_HEAD": head, "GATE_BASE_TIP": base})
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("INDETERMINATE could not read diff for the privacy scan: GitHub served none, and it could not be built here (" + phrase.format(base[:7]), result.stdout)
+                self.assertNotIn("MAY MERGE", result.stdout)
 
     def test_the_gate_refuses_to_run_from_a_tree_that_is_not_origin_masters(self):
         for how in ("edit", "committed-edit", "untracked-file", "remote-has-moved", "stale-tracking-ref", "tag-named-master", "script-elsewhere", "no-remote"):

@@ -1,0 +1,9 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed:
+RESULTS.md: original 5416 B sha256 b6a00bdc2a72a2bc76d471efc02345a800d04b6092f2db56ed82324b53bc09e2 (kept on the lab PC); 1 x -> stop
+scripts/make-reqs.py: original 2333 B sha256 7bf4226acb26b1a6a65d2f02fb770a03f77b8448d3e9a209f0592a99ed73efec (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/rd.py: original 3107 B sha256 a700b0a47acf848c192f2b26e04450dde8fcfea7b21a4a9f92eea2467d2d3dfd (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/guid-args.py: original 1045 B sha256 632dbae77cc40af86df754f1a5db465d57f4998e82bcceaed2a6b00c1f7c3955 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/egress-sum.py: original 1589 B sha256 c5fd521764fd9769223fc059f89ab1f85e019441134c1974cb34055b921006b4 (kept on the lab PC); 2 x -> <LAB_DIR>
+scripts/sampler.ps1: original 1566 B sha256 19f29937a625add26967d57af307db4487c29ad5a4b574f592c72c85845ccf80 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/c2.py: original 1327 B sha256 a809d08c39290e85590e4a5febf9356cc74840b07e24af562ebf6e5b953e52f6 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/cap.py: original 784 B sha256 a292c2b13851024aacc49b9f4992e895c32546a086911febfb899f4ab0dc967a (kept on the lab PC); 2 x -> <LAB_DIR>

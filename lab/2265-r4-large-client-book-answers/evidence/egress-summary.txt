@@ -1,0 +1,9 @@
+records 4
+2026-11-05T10:05:09.477Z response_prepared list_companies rows 1 bytes 1357 trail {"failed": 0, "omitted": 0, "sent": 4}
+  kept tail: {"post answered": 2, "status answered": 2}; request bytes 5048, response bytes 8298 (largest 4098), held ms 18 (longest 12)
+  seq:kind:request/response/held_ms  1:p:2524/4098/12 2:s:0/51/0 3:p:2524/4098/6 4:s:0/51/0
+2026-11-05T10:05:09.511Z stdio_write_completed None rows None bytes None trail -
+2026-11-05T10:25:27.962Z response_prepared sales_register rows 0 bytes 1326 trail {"failed": 0, "omitted": 776, "sent": 808}
+  kept tail: {"status answered": 11, "post answered": 21}; request bytes 43644, response bytes 42738951 (largest 17905816), held ms 30225 (longest 3757)
+  seq:kind:request/response/held_ms  777:s:0/51/0 778:p:2524/4098/3 779:p:2524/4098/8 780:p:1588/3022/2799 781:s:0/51/0 782:p:1588/3022/2847 783:s:0/51/0 784:p:2524/4098/5 785:p:2524/4098/9 786:p:1588/3022/2812 787:s:0/51/1 788:p:1588/3022/2802 789:s:0/51/0 790:p:2524/4098/3 791:p:2524/4098/4 792:p:1588/10004/2788 793:s:0/51/0 794:p:1588/10004/2833 795:s:0/51/0 796:p:2524/4098/4 797:p:2524/4098/13 798:p:1588/3424792/2985 799:s:0/51/0 800:p:1588/3424792/2939 801:s:0/51/0 802:p:2524/4098/3 803:p:2524/4098/12 804:p:1588/17905816/3757 805:s:0/51/0 806:p:1588/17905816/3594 807:s:0/51/0 808:p:2524/4098/4
+2026-11-05T10:25:28.074Z stdio_write_completed None rows None bytes None trail -

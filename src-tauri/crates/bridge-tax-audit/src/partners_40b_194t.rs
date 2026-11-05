@@ -119,7 +119,7 @@ pub struct Deed {
 /// number of basis points 0 or more (a float, a boolean, text or a negative number is refused),
 /// its `no_interest_authorised` a boolean, never `true` beside an `interest_rate_bp`. A partner
 /// that is not a table or has no `capital_ledgers` list of names is refused; the list's contents
-/// and the ledgers themselves are checked by [`check_partners_config`], against the book.
+/// and the ledgers themselves are checked by `check_partners_config`, against the book.
 pub fn partners_config(cfg: &PartnersConfig) -> Result<(BTreeMap<String, Partner>, Option<Deed>)> {
     let deed = match &cfg.deed {
         None => None,

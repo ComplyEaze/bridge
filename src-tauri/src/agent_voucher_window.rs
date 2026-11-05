@@ -40,9 +40,9 @@ pub(super) const WINDOW_READ_BUDGET_BYTES: u64 =
 /// 1.2 KB per row in UTF-8 — Tally emits a fixed envelope whatever narrow fields
 /// are named — which is about 2.4 KB on Bridge's UTF-16 wire. This leaves room
 /// above that rather than assuming it. Measured live since: 2.42 to 2.72 KB per
-/// row on earlier books (§11c.5) and about 3.27 KB on a book with a mark of
-/// about 1.03M (#899); `WindowReadLimits::census_capacity` gives the headroom
-/// that leaves.
+/// row on earlier books (§11c.5), about 3.27 KB on a book with a mark of about
+/// 1.03M and 3.24 to 3.38 KB on spans of up to 5,029 rows of a real book (#899);
+/// `WindowReadLimits::census_capacity` gives the headroom that leaves.
 const CENSUS_WIRE_BYTES_PER_VOUCHER: u64 = 4 * 1024;
 
 /// The most census requests one window read may spend. A book whose voucher
@@ -69,9 +69,44 @@ pub(super) enum VoucherReadShape {
     /// `render_agent_class_vouchers_in_span`: the entry wildcard plus each
     /// row's voucher type resolved by Tally (bridge#625).
     ClassEntryWildcard,
+    /// [`Self::EntryWildcard`] naming fields the plain list leaves out (#1378, #2027).
+    NamedEntryWildcard(NamedVoucherFields),
+    /// [`Self::ClassEntryWildcard`] naming them.
+    NamedClassEntryWildcard(NamedVoucherFields),
+    /// `render_agent_stock_line_vouchers_in_span`: `ALLINVENTORYENTRIES.*` in place of the entry
+    /// wildcard, with each row's voucher type resolved by Tally (#2016).
+    ClassInventoryWildcard,
 }
 
 impl VoucherReadShape {
+    /// This shape as a read that names `fields`, the same shape when `fields` names none.
+    pub(super) const fn asking(self, fields: NamedVoucherFields) -> Self {
+        if !fields.names_any() {
+            return self;
+        }
+        match self {
+            Self::EntryWildcard => Self::NamedEntryWildcard(fields),
+            Self::ClassEntryWildcard => Self::NamedClassEntryWildcard(fields),
+            shape => shape,
+        }
+    }
+
+    /// The fields this shape's request named beyond the plain list.
+    pub(super) const fn named_fields(self) -> NamedVoucherFields {
+        match self {
+            Self::NamedEntryWildcard(fields) | Self::NamedClassEntryWildcard(fields) => fields,
+            _ => NamedVoucherFields::NOT_ASKED,
+        }
+    }
+
+    /// Whether this shape's request returns stock lines in place of ledger entries.
+    pub(super) const fn stock_lines(self) -> StockLines {
+        match self {
+            Self::ClassInventoryWildcard => StockLines::Asked,
+            _ => StockLines::NotAsked,
+        }
+    }
+
     /// Encoded bytes per voucher to assume before anything has been measured.
     ///
     /// Set above the heaviest figure measured for each shape (§11c): named entry
@@ -87,7 +122,14 @@ impl VoucherReadShape {
             // The class COMPUTEs add about 1.2 KB of UTF-16 per voucher
             // (ten elements at ~120 bytes, measured one at a time on 7.1),
             // well inside the margin above the 256 KB measured.
-            Self::EntryWildcard | Self::ClassEntryWildcard => 384 * 1024,
+            // The stock-line shape measured 35.2 to 36.2 KB of UTF-16 per voucher with one or
+            // two lines on one synthetic book (§11c.1), about 33 KiB a line: a voucher of more
+            // than about ten lines passes this default, which sizes only the first part.
+            Self::EntryWildcard
+            | Self::ClassEntryWildcard
+            | Self::NamedEntryWildcard(_)
+            | Self::NamedClassEntryWildcard(_)
+            | Self::ClassInventoryWildcard => 384 * 1024,
         }
     }
 
@@ -104,9 +146,12 @@ impl VoucherReadShape {
     const fn day_not_readable_code(self) -> &'static str {
         match self {
             Self::ImportVerification => "verification_window_day_not_readable",
-            Self::Movement | Self::EntryWildcard | Self::ClassEntryWildcard => {
-                "voucher_window_day_not_readable"
-            }
+            Self::Movement
+            | Self::EntryWildcard
+            | Self::ClassEntryWildcard
+            | Self::NamedEntryWildcard(_)
+            | Self::NamedClassEntryWildcard(_)
+            | Self::ClassInventoryWildcard => "voucher_window_day_not_readable",
         }
     }
 
@@ -137,6 +182,15 @@ impl VoucherReadShape {
             }
             (Self::ClassEntryWildcard, _) => {
                 render_agent_class_vouchers_in_span(company, from, to, span)
+            }
+            (Self::NamedEntryWildcard(fields), _) => {
+                render_agent_named_vouchers_in_span(company, from, to, span, fields, false)
+            }
+            (Self::NamedClassEntryWildcard(fields), _) => {
+                render_agent_named_vouchers_in_span(company, from, to, span, fields, true)
+            }
+            (Self::ClassInventoryWildcard, _) => {
+                render_agent_stock_line_vouchers_in_span(company, from, to, span)
             }
         }
     }
@@ -239,6 +293,10 @@ pub(super) enum PlanRefusal {
     /// The window divides, but into more reads than one call may spend:
     /// `reads` needed (at least) against the `allowed` allowance.
     TooManyReads { reads: usize, allowed: usize },
+    /// Refusing at the floor, `day` holds more vouchers than any read of it
+    /// can carry, so every plan divides it by AlterID span, which a read whose
+    /// parts must tile its window by date cannot use (#2173).
+    DayDividedBySpan { day: NaiveDate },
 }
 
 impl PlanRefusal {
@@ -246,6 +304,7 @@ impl PlanRefusal {
         match self {
             Self::VoucherOverBudget { .. } => "voucher_window_part_over_budget",
             Self::TooManyReads { .. } => "voucher_window_too_many_reads",
+            Self::DayDividedBySpan { .. } => WINDOW_DIVIDED_BY_ALTERID,
         }
     }
 
@@ -258,18 +317,25 @@ impl PlanRefusal {
                 needed_at_least: reads,
                 allowed,
             }),
-            Self::VoucherOverBudget { .. } => failure,
+            Self::VoucherOverBudget { .. } | Self::DayDividedBySpan { .. } => failure,
         }
     }
 }
+
+/// A window plan that divides a day by AlterID span cannot become the tax
+/// audit's read: its windows must tile the period by date (C7). Refused before
+/// any data part when the census makes it certain (#2173), and after the read
+/// when a measured part makes it so.
+pub(super) const WINDOW_DIVIDED_BY_ALTERID: &str = "audit_window_divided_by_alterid";
 
 /// Neither the high-water mark nor a census could describe the window, so no
 /// prediction exists. Refused rather than sent: an unestimated read is exactly
 /// the unbounded request this module exists to stop.
 pub(super) const VOLUME_UNESTIMATED: &str = "voucher_window_volume_unestimated";
 
-/// The voucher high-water mark moved while a divided window was being read, so
-/// its parts may not describe one state of the book. See `read_voucher_window`.
+/// The voucher high-water mark moved while a divided window was being read, or
+/// while a window was being counted, so its parts or its count may not describe
+/// one state of the book. See `read_voucher_window` and [`count_window_only`].
 pub(super) const WINDOW_CHANGED_DURING_READ: &str = "voucher_window_changed_during_read";
 
 /// A part returned vouchers that are not the ones its plan counted for it: a row
@@ -707,6 +773,127 @@ pub(super) fn plan_window_reads(
     finish(reads, max_reads)
 }
 
+/// Where the rest of a window starts after a part that ended on `end_day`:
+/// inside the same day when the part was a span short of the ceiling, with the
+/// AlterID it resumes after, otherwise the next day. `None` at the last date
+/// Tally can hold.
+fn rest_after(
+    end_day: NaiveDate,
+    span: Option<AlterIdSpan>,
+    ceiling: u64,
+) -> Option<(NaiveDate, Option<u64>)> {
+    match span {
+        Some(span) if span.through < ceiling => Some((end_day, Some(span.through))),
+        _ => end_day.succ_opt().map(|next_day| (next_day, None)),
+    }
+}
+
+/// The plan a counted window is read on before anything is measured: every
+/// part at the default figure. Refused before any data part when it needs more
+/// reads than the limits allow at their refusal point. Refusing at the floor,
+/// the plan at the default figure is only how the first part is read, and the
+/// read count is admitted against the plan that follows it (#2173).
+///
+/// With the plan comes how many of its parts may be sent before one is
+/// measured: the whole allowance at the default; at the floor, only the parts
+/// the admission counted up to the first that holds vouchers.
+fn first_plan(
+    first: NaiveDate,
+    last: NaiveDate,
+    census: &WindowCensus,
+    ceiling: u64,
+    limits: WindowReadLimits,
+) -> Result<(Vec<PlannedRead>, usize), PlanRefusal> {
+    let allowed = match limits.read_count_refusal {
+        ReadCountRefusal::AtTheDefault => limits.max_reads,
+        ReadCountRefusal::AtTheFloor => usize::MAX,
+    };
+    let plan = plan_window_reads(
+        first,
+        last,
+        census,
+        None,
+        ceiling,
+        limits.default_bytes_per_voucher,
+        limits.budget_bytes,
+        allowed,
+    )?;
+    let unmeasured = match limits.read_count_refusal {
+        ReadCountRefusal::AtTheDefault => limits.max_reads,
+        ReadCountRefusal::AtTheFloor => {
+            admit_at_the_floor(&plan, (first, last), census, ceiling, limits)?
+        }
+    };
+    Ok((plan, unmeasured))
+}
+
+/// Refusing at the floor (#2173): admit a window planned at the default figure
+/// (`plan`) only if the read it makes after its first measured part, re-planned
+/// at the floor, the lightest figure it can ever use, fits what is left of the
+/// allowance. The first measured part is the first that holds vouchers: a part
+/// of empty days before it returns no row to measure. That is exactly the
+/// re-plan a first measurement at or under the floor makes, so a refusal here
+/// is certain. A window admitted here can still be refused later, when a part
+/// measures heavier than the floor.
+///
+/// Before the count, a day certain to be divided by AlterID span is refused:
+/// the first day that holds vouchers, over what one read holds at the default
+/// figure, or any later day over what one holds at the floor. Returns how many
+/// parts are sent up to and including the first measured one.
+fn admit_at_the_floor(
+    plan: &[PlannedRead],
+    (first, last): (NaiveDate, NaiveDate),
+    census: &WindowCensus,
+    ceiling: u64,
+    limits: WindowReadLimits,
+) -> Result<usize, PlanRefusal> {
+    let at_default = vouchers_per_read(limits.budget_bytes, limits.default_bytes_per_voucher);
+    let at_floor = vouchers_per_read(
+        limits.budget_bytes,
+        planning_figure(limits.default_bytes_per_voucher, 0),
+    );
+    let mut voucher_days = census
+        .days
+        .range(first..=last)
+        .filter(|(_, ids)| !ids.is_empty())
+        .map(|(day, ids)| (*day, ids.len() as u64));
+    let first_day = voucher_days.next();
+    if let Some((day, _)) = first_day
+        .filter(|(_, vouchers)| *vouchers > at_default)
+        .or_else(|| voucher_days.find(|(_, vouchers)| *vouchers > at_floor))
+    {
+        return Err(PlanRefusal::DayDividedBySpan { day });
+    }
+    let Some(measured) = plan.iter().position(|read| read.vouchers > 0) else {
+        return Ok(plan.len());
+    };
+    let sent = measured + 1;
+    let first = &plan[measured];
+    let Some((rest, resume_after)) =
+        rest_after(first.to, first.span, ceiling).filter(|(rest, _)| *rest <= last)
+    else {
+        return finish(plan[..sent].to_vec(), limits.max_reads).map(|_| sent);
+    };
+    plan_window_reads(
+        rest,
+        last,
+        census,
+        resume_after,
+        ceiling,
+        planning_figure(limits.default_bytes_per_voucher, 0),
+        limits.budget_bytes,
+        limits.max_reads.saturating_sub(sent),
+    )
+    .map(|_| sent)
+    .map_err(|refusal| match refusal {
+        PlanRefusal::TooManyReads { reads, .. } => PlanRefusal::TooManyReads {
+            reads: sent + reads,
+            allowed: limits.max_reads,
+        },
+        other => other,
+    })
+}
+
 fn finish(reads: Vec<PlannedRead>, max_reads: usize) -> Result<Vec<PlannedRead>, PlanRefusal> {
     if reads.len() > max_reads {
         return Err(PlanRefusal::TooManyReads {
@@ -900,6 +1087,25 @@ pub(super) enum SmallBooks {
     Count,
 }
 
+/// When a counted window is refused for needing more data reads than one read
+/// may spend (#2173). Either way every part is planned the same: the first at
+/// the shape's default figure, the rest at the measured one, never below the
+/// floor ([`planning_figure`]). Only the moment of the refusal differs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ReadCountRefusal {
+    /// As soon as a plan at the default figure needs too many reads, before any
+    /// data part: a caller that can narrow its window is told to at once, and
+    /// a paired read is not sent towards a size it may not finish in time.
+    AtTheDefault,
+    /// Before any data part only when even the plan the read would make after
+    /// a first part measured at the floor needs too many; otherwise after the
+    /// first measured part, when its re-plan does. For a window that cannot be
+    /// narrowed: the tax audit's period. That read's parts must also tile it by
+    /// date, so a day no read can carry whole is refused before any data part
+    /// too ([`PlanRefusal::DayDividedBySpan`]).
+    AtTheFloor,
+}
+
 /// The per-call limits a window read plans under.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct WindowReadLimits {
@@ -910,6 +1116,8 @@ pub(super) struct WindowReadLimits {
     pub(super) max_reads: usize,
     /// Whether a book small enough to read whole is counted first (#1029).
     pub(super) small_books: SmallBooks,
+    /// When a window needing too many reads is refused (#2173).
+    pub(super) read_count_refusal: ReadCountRefusal,
 }
 
 impl WindowReadLimits {
@@ -919,7 +1127,39 @@ impl WindowReadLimits {
             default_bytes_per_voucher: shape.default_wire_bytes_per_voucher(),
             max_reads: MAX_PLANNED_READS,
             small_books: SmallBooks::Skip,
+            read_count_refusal: ReadCountRefusal::AtTheDefault,
         }
+    }
+
+    /// These limits, refusing a window for its read count only when no
+    /// measurement could fit it (#2173). Only the tax audit's read asks for it.
+    pub(super) const fn refusing_at_the_floor(self) -> Self {
+        Self {
+            read_count_refusal: ReadCountRefusal::AtTheFloor,
+            ..self
+        }
+    }
+
+    /// The fewest data reads that can carry `vouchers` counted vouchers under
+    /// these limits: all at the default figure, or, refusing at the floor, the
+    /// first part at the default and the rest at the floor. Day boundaries only
+    /// add reads, so a count above `max_reads` is a certain refusal. `None` when
+    /// the default figure fits no voucher in a read.
+    fn reads_at_least(self, vouchers: u64) -> Option<u64> {
+        let first = vouchers_per_read(self.budget_bytes, self.default_bytes_per_voucher);
+        if first == 0 {
+            return None;
+        }
+        Some(match self.read_count_refusal {
+            ReadCountRefusal::AtTheDefault => vouchers.div_ceil(first),
+            ReadCountRefusal::AtTheFloor => {
+                let later = vouchers_per_read(
+                    self.budget_bytes,
+                    planning_figure(self.default_bytes_per_voucher, 0),
+                );
+                1 + vouchers.saturating_sub(first).div_ceil(later.max(1))
+            }
+        })
     }
 
     /// These limits, counting a small book as well (#1029). Only the reads
@@ -1410,7 +1650,7 @@ pub(super) struct RetainedWindowRead {
 }
 
 /// The audit_read reader: every request is one [`fetch_audit_part`] (single,
-/// unpaired, identity-bracketed, Education-guarded, drain-debted), and every
+/// unpaired, identity-bracketed, Education-guarded), and every
 /// admitted response is retained byte for byte, in order. A failed read keeps
 /// its typed kind for [`audit_window_failure`].
 ///
@@ -1846,6 +2086,8 @@ where
     let mut boundary: Option<DateBoundaryProfile> = None;
     let mut census = None;
     let mut ceiling = 0;
+    // How many parts may be sent before one is measured ([`first_plan`]).
+    let mut unmeasured = limits.max_reads;
     let mut bytes_per_voucher = limits.default_bytes_per_voucher;
     // A stack whose pops are in order and whose parts always tile the part
     // of the window not yet read, so the rows arrive in order.
@@ -1910,6 +2152,7 @@ where
                 Preflight::Whole {
                     census: counted,
                     marks,
+                    ..
                 } => {
                     if let Some(counted) = &counted {
                         ceiling = marks
@@ -1926,21 +2169,14 @@ where
                 Preflight::Counted {
                     census: counted,
                     marks,
+                    ..
                 } => {
                     ceiling = marks
                         .map_or(0, |marks| marks.vouchers())
                         .max(counted.max_alter_id());
-                    let plan = plan_window_reads(
-                        first,
-                        last,
-                        &counted,
-                        None,
-                        ceiling,
-                        bytes_per_voucher,
-                        limits.budget_bytes,
-                        limits.max_reads,
-                    )
-                    .map_err(|refusal| with_prior(refusal.into_failure(), &preflight, &None))?;
+                    let (plan, admitted) = first_plan(first, last, &counted, ceiling, limits)
+                        .map_err(|refusal| with_prior(refusal.into_failure(), &preflight, &None))?;
+                    unmeasured = admitted;
                     census = Some(counted);
                     stack_of(&plan).map_err(|failure| with_prior(failure, &preflight, &None))?
                 }
@@ -1977,7 +2213,9 @@ where
             // plan is made: a part divided after Tally could not serve it, or
             // split because a sibling could not be served, costs a request
             // no plan counted.
-            if dispatched >= limits.max_reads {
+            // Refusing at the floor, a read sends no more than its admission
+            // counted before a part is measured (#2173).
+            if dispatched >= limits.max_reads || (!measured && dispatched >= unmeasured) {
                 return Err(PlanRefusal::TooManyReads {
                     reads: dispatched + 1 + pending.len(),
                     allowed: limits.max_reads,
@@ -2029,24 +2267,22 @@ where
                     } else {
                         planning_figure(limits.default_bytes_per_voucher, observed)
                     };
+                    // Refusing at the floor, the first measurement re-plans even
+                    // at the same figure: no plan at the default figure was
+                    // admitted beyond its first part (#2173).
+                    let must_replan =
+                        !measured && limits.read_count_refusal == ReadCountRefusal::AtTheFloor;
                     measured = true;
-                    if next == bytes_per_voucher {
+                    if next == bytes_per_voucher && !must_replan {
                         continue;
                     }
                     bytes_per_voucher = next;
-                    let end_day = day_of(&part.to)?;
-                    // The rest of the window starts after this part: inside
-                    // the same day when this was a span short of the ceiling.
-                    let (rest, resume_after) = match part.span {
-                        Some(span) if span.through < ceiling => (end_day, Some(span.through)),
-                        _ => match end_day.succ_opt() {
-                            Some(next_day) => (next_day, None),
-                            None => continue,
-                        },
-                    };
-                    if rest > last {
+                    let Some((rest, resume_after)) =
+                        rest_after(day_of(&part.to)?, part.span, ceiling)
+                            .filter(|(rest, _)| *rest <= last)
+                    else {
                         continue;
-                    }
+                    };
                     let allowance = limits.max_reads.saturating_sub(dispatched);
                     let plan = plan_window_reads(
                         rest,
@@ -2197,22 +2433,29 @@ pub(super) enum WindowCount {
         marks: Option<CompanyMarks>,
         evidence: Option<Evidence>,
     },
-    /// Every voucher the window holds, counted per day, bracketed by the company
-    /// marks read before and after. No data part was sent.
+    /// Every voucher the window holds, counted per day, bracketed by the voucher
+    /// mark read before and after. No data part was sent. `voucher_mark` is the
+    /// one read after, when it was read. A book is counted only when its mark is
+    /// above 0, so this mark never makes an empty window `company_has_no_vouchers`:
+    /// only [`Self::NotCounted`] can.
     Counted {
         census: WindowCensus,
         evidence: Evidence,
+        voucher_mark: Option<u64>,
     },
 }
 
 /// Count `window` with a census of its own and send no data part (#1240). A
 /// caller that needs only to know whether, and on which days, the window holds
 /// vouchers has what it needs from the census: its rows carry each voucher's
-/// day. Nothing is admitted against the count. A count taken in one request is
-/// one observation, as a window read whole is; a count divided into several
-/// spans is bracketed as a divided window read is: both company marks are read
-/// again after the last census request, and marks that moved refuse it
-/// ([`WINDOW_CHANGED_DURING_READ`]).
+/// day. Nothing is admitted against the count. Every count is bracketed: the
+/// company marks are read again after the last census request, and a voucher
+/// mark that moved refuses it ([`WINDOW_CHANGED_DURING_READ`]). A count taken in
+/// one request is bracketed too: its census is spanned to the mark read before
+/// it (#2145), so a voucher saved after that read lies outside the span, and
+/// only the mark read again can show it. The master mark is not compared: a
+/// census counts vouchers, so a master saved during the count does not change
+/// it.
 pub(super) async fn count_window_only<R: WindowReader>(
     reader: &R,
     identity: &VerifiedCompanyIdentity,
@@ -2262,26 +2505,29 @@ pub(super) async fn count_window_only<R: WindowReader>(
         | Preflight::Counted { census, .. } => census,
     };
     let mut closing = None;
+    let mut closing_marks = None;
     if let Some(opened) = opening {
-        let spans = census_spans(opened.vouchers(), limits.census_capacity())
-            .map_or(usize::MAX, Iterator::count);
-        if spans > 1 {
-            let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
-                .await
-                .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
-            if closed != opened {
-                return Err(with_prior_closed(
-                    WINDOW_CHANGED_DURING_READ.to_string().into(),
-                    &preflight,
-                    &None,
-                    &closing,
-                ));
-            }
+        let closed = read_marks(reader, identity, company, &mut closing, &mut boundary)
+            .await
+            .map_err(|failure| with_prior_closed(failure, &preflight, &None, &closing))?;
+        closing_marks = Some(closed);
+        if closed.vouchers() != opened.vouchers() {
+            return Err(with_prior_closed(
+                WINDOW_CHANGED_DURING_READ.to_string().into(),
+                &preflight,
+                &None,
+                &closing,
+            ));
         }
     }
+    let voucher_mark = closing_marks.map(CompanyMarks::vouchers);
     let evidence = chronological(&preflight, &None, &closing)
         .unwrap_or_else(|| super::agent_import::local_evidence("voucher_window_count_empty"));
-    Ok(WindowCount::Counted { census, evidence })
+    Ok(WindowCount::Counted {
+        census,
+        evidence,
+        voucher_mark,
+    })
 }
 
 impl Server {
@@ -2400,11 +2646,11 @@ pub(super) fn census_read_count(
     if skips_census(high_water, limits) {
         return Ok(0);
     }
-    census_spans(high_water, limits.census_capacity()).map(|spans| spans.count() as u64)
+    CensusPlan::new(high_water, limits).map(|plan| plan.requests())
 }
 
 /// Count the window's vouchers per day, every census request bounded
-/// before it is sent. See [`census_spans`].
+/// before it is sent ([`CensusPlan`]).
 #[allow(clippy::too_many_arguments)]
 async fn census_window<R: WindowReader>(
     reader: &R,
@@ -2419,31 +2665,18 @@ async fn census_window<R: WindowReader>(
     boundary: &mut Option<DateBoundaryProfile>,
 ) -> Result<Vec<CensusRow>, ToolFailure> {
     let unestimated = || ToolFailure::from(VOLUME_UNESTIMATED.to_string());
-    let spans = census_spans(high_water, limits.census_capacity())
-        .map_err(|code| ToolFailure::from(code.to_string()))?;
-    // The first plan reads at most this many vouchers a request (the default
-    // figure, which every plan starts from) and may send at most `max_reads`
-    // requests, so a census that has already counted more than both allow is
-    // a certain refusal: it is refused there, before the census spans left.
-    let per_read = vouchers_per_read(limits.budget_bytes, limits.default_bytes_per_voucher);
-    let plannable = per_read.saturating_mul(limits.max_reads as u64);
-    let mut spans = spans.peekable();
+    let plan =
+        CensusPlan::new(high_water, limits).map_err(|code| ToolFailure::from(code.to_string()))?;
+    // A census that has already counted more vouchers than the fewest reads
+    // the limits allow can carry is a certain refusal
+    // ([`WindowReadLimits::reads_at_least`]): it is refused there, before the
+    // census spans left. After the last span the plan itself decides.
+    let mut spans = plan.spans().peekable();
     let mut rows = Vec::new();
     while let Some(span) = spans.next() {
-        // A ledger census is always spanned, the one form observed: a book that fits
-        // one census request is asked over (0, high_water], the same rows.
-        let span = match scope {
-            WindowScope::Book => span,
-            WindowScope::Ledger(_) => Some(span.unwrap_or(AlterIdSpan {
-                after: 0,
-                through: high_water,
-            })),
-        };
-        let request = match (scope, span) {
-            (WindowScope::Ledger(ledger), Some(span)) => {
-                ledger_census_read(company, ledger, from, to, span)?
-            }
-            _ => voucher_census_read(company, from, to, span)?,
+        let request = match scope {
+            WindowScope::Ledger(ledger) => ledger_census_read(company, ledger, from, to, span)?,
+            WindowScope::Book => voucher_census_read(company, from, to, span)?,
         };
         let (xml, evidence) = match reader.read(identity, request, WindowReadKind::Census).await {
             Ok((xml, evidence, observed)) => {
@@ -2463,19 +2696,23 @@ async fn census_window<R: WindowReader>(
             Err(failure) => return Err(failure),
         };
         fold_evidence(preflight, evidence);
-        rows.extend(parse_voucher_census(&xml, days, span).map_err(|code| {
-            let mut refused = unestimated();
-            refused.cause = census_refusal_cause(&code);
-            refused
-        })?);
-        let counted = rows.len() as u64;
-        if per_read > 0 && counted > plannable && spans.peek().is_some() {
-            // The caller adds the census's evidence, as for any refusal here.
-            return Err(PlanRefusal::TooManyReads {
-                reads: usize::try_from(counted.div_ceil(per_read)).unwrap_or(usize::MAX),
-                allowed: limits.max_reads,
+        rows.extend(
+            parse_voucher_census(&xml, days, Some(span)).map_err(|code| {
+                let mut refused = unestimated();
+                refused.cause = census_refusal_cause(&code);
+                refused
+            })?,
+        );
+        let needed = limits.reads_at_least(rows.len() as u64);
+        if let Some(needed) = needed.filter(|needed| *needed > limits.max_reads as u64) {
+            if spans.peek().is_some() {
+                // The caller adds the census's evidence, as for any refusal here.
+                return Err(PlanRefusal::TooManyReads {
+                    reads: usize::try_from(needed).unwrap_or(usize::MAX),
+                    allowed: limits.max_reads,
+                }
+                .into_failure());
             }
-            .into_failure());
         }
     }
     Ok(rows)
@@ -2536,12 +2773,18 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// a cardinality bound fixed before it is sent (§11c.3).
 ///
 /// A date census alone is bounded only by the whole book: a date range can
-/// hold every voucher the book has. So a book whose mark fits one census is
-/// counted in one date census of the window, bounded by the mark itself; any
-/// larger book is counted in AlterID spans of `capacity` across `(0, mark]`,
-/// each also narrowed to the window's dates, and each bounded by construction
-/// because AlterIDs are distinct. The spans are produced one at a time, and a
-/// mark needing more of them than [`MAX_CENSUS_READS`] is refused before any is.
+/// hold every voucher the book has. So every census is an AlterID span across
+/// `(0, mark]`, narrowed to the window's dates and bounded by construction
+/// because AlterIDs are distinct: one span `(0, mark]` for a book whose mark
+/// fits one census, spans of `capacity` for a larger one, and none for a book
+/// that has never held a voucher. A single census is spanned too, so a voucher
+/// saved after the mark was read cannot raise its count past the mark (#2145;
+/// byte-equal to the unspanned census in every window live whose unspanned
+/// census held no row above the mark). A voucher saved between the marks read
+/// and a whole read's census therefore lies outside the span: a part that
+/// returns it is refused as [`PART_CENSUS_MISMATCH`], as on a divided read, and
+/// the read fails safe. The spans are produced one at a time, and a mark
+/// needing more of them than [`MAX_CENSUS_READS`] is refused before any is.
 ///
 /// The cost is a census count proportional to the book, not the window: a
 /// mark of 250,000 is 31 census requests however short the window. That is a
@@ -2551,22 +2794,54 @@ fn is_divided(parts: &[WindowPart]) -> bool {
 /// but no such shape is qualified live.
 pub(super) fn census_spans(high_water: u64, capacity: u64) -> Result<CensusSpans, &'static str> {
     let capacity = capacity.max(1);
-    let requests = high_water.div_ceil(capacity).max(1);
+    let requests = high_water.div_ceil(capacity);
     if requests > MAX_CENSUS_READS as u64 {
         return Err(BOOK_TOO_LARGE);
     }
     Ok(CensusSpans {
-        whole: high_water <= capacity,
         after: 0,
         high_water,
         capacity,
-        done: false,
+        // A book that has never held a voucher has nothing to count.
+        done: high_water == 0,
     })
 }
 
+/// The census requests of one window read, fixed before the first is sent: the
+/// spans of [`census_spans`]. [`Self::requests`] is the one count of them: what
+/// the read states beforehand ([`census_read_count`]) and what decides
+/// afterwards whether the marks are read again ([`count_window_only`]).
+#[derive(Clone, Debug)]
+pub(super) struct CensusPlan {
+    spans: CensusSpans,
+    requests: u64,
+}
+
+impl CensusPlan {
+    /// The plan for a book whose voucher mark is `high_water`, or
+    /// [`BOOK_TOO_LARGE`] before any request.
+    pub(super) fn new(high_water: u64, limits: WindowReadLimits) -> Result<Self, &'static str> {
+        let spans = census_spans(high_water, limits.census_capacity())?;
+        Ok(Self {
+            requests: spans.clone().count() as u64,
+            spans,
+        })
+    }
+
+    /// The number of census requests the plan sends.
+    pub(super) fn requests(&self) -> u64 {
+        self.requests
+    }
+
+    /// The span of each request, in order.
+    pub(super) fn spans(&self) -> impl Iterator<Item = AlterIdSpan> {
+        self.spans.clone()
+    }
+}
+
 /// See [`census_spans`].
+#[derive(Clone, Debug)]
 pub(super) struct CensusSpans {
-    whole: bool,
     after: u64,
     high_water: u64,
     capacity: u64,
@@ -2574,15 +2849,11 @@ pub(super) struct CensusSpans {
 }
 
 impl Iterator for CensusSpans {
-    type Item = Option<AlterIdSpan>;
+    type Item = AlterIdSpan;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
             return None;
-        }
-        if self.whole {
-            self.done = true;
-            return Some(None);
         }
         let through = self
             .after
@@ -2594,7 +2865,7 @@ impl Iterator for CensusSpans {
         };
         self.after = through;
         self.done = through >= self.high_water;
-        Some(Some(span))
+        Some(span)
     }
 }
 

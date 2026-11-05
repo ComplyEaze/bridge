@@ -28,6 +28,8 @@
 //!
 //! This module performs no I/O and holds no company identity. It decides
 //! nothing about a binding: it only finds names that could be the same master.
+//!
+//! [`twin_fold_keys`]: crate::master_binding::twin_fold_keys
 
 use std::collections::{BTreeMap, BTreeSet};
 

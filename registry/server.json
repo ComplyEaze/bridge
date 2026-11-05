@@ -3,7 +3,7 @@
   "name": "io.github.ComplyEaze/bridge-tally",
   "title": "ComplyEaze Bridge",
   "description": "Reads books; proposes vouchers from four Indian banks' statement PDFs; posting off by default.",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "websiteUrl": "https://bridge.complyeaze.com",
   "repository": {
     "url": "https://github.com/ComplyEaze/bridge",
@@ -13,16 +13,16 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.6.1/bridge-tally-mcp-v0.6.1-windows-x64.mcpb",
-      "fileSha256": "7812d8ad7b0ff6a07eac20828dfedaef4d50104bd5d679db3fc03c26e784c47a",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.7.0/bridge-tally-mcp-v0.7.0-windows-x64.mcpb",
+      "fileSha256": "291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec",
       "transport": {
         "type": "stdio"
       }
     },
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.6.1/bridge-tally-mcp-v0.6.1-macos-arm64.mcpb",
-      "fileSha256": "d886fb97adf24882115cab6a8c0d5904075b6efe5ea53cc68c21085441e195b9",
+      "identifier": "https://github.com/ComplyEaze/bridge/releases/download/mcp-v0.7.0/bridge-tally-mcp-v0.7.0-macos-arm64.mcpb",
+      "fileSha256": "4895dfa1a567526aa74114424af7769b597852fad1af8a6bfd7e6ad72b245a5f",
       "transport": {
         "type": "stdio"
       }

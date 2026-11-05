@@ -161,9 +161,15 @@ fn before_approval_with_currencies(currencies: String) -> Vec<ScenarioPlan> {
 /// numbering pair, and identity and mode again. The types in `manual` read
 /// Manual, the rest Automatic.
 fn numbering_read(manual: &[&str]) -> Vec<ScenarioPlan> {
-    let (masters, numbering) =
-        crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, manual);
-    let mut plans = paired(marks());
+    numbering_read_of(
+        marks(),
+        crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, manual),
+    )
+}
+
+/// The master mark read `mark` and the numbering read of `(masters, numbering)`.
+fn numbering_read_of(mark: String, (masters, numbering): (String, String)) -> Vec<ScenarioPlan> {
+    let mut plans = paired(mark);
     plans.extend([status(), xml(companies()), xml(companies())]);
     for body in [masters, numbering] {
         plans.extend([xml(body.clone()), status(), xml(body), status()]);
@@ -717,7 +723,7 @@ fn saved_batch_of_two(server: &Server) -> (ImportLedgerLine, Value) {
         second
             .entries
             .iter_mut()
-            .for_each(|entry| entry.amount = "7.25".into());
+            .for_each(|entry| entry.amount = ImportAmount::parse("7.25").unwrap());
     })
 }
 
@@ -1066,8 +1072,8 @@ async fn post_import_refuses_an_amendment_before_any_read_or_approval() {
     let mut amendment = original.clone();
     amendment.batch_id = "bridge-00000000-0000-4000-8000-000000000632".into();
     amendment.amends_batch_id = Some(original.batch_id.clone());
-    amendment.vouchers[0].entries[0].amount = "13.50".into();
-    amendment.vouchers[0].entries[1].amount = "13.50".into();
+    amendment.vouchers[0].entries[0].amount = ImportAmount::parse("13.50").unwrap();
+    amendment.vouchers[0].entries[1].amount = ImportAmount::parse("13.50").unwrap();
     let rendered = render_import_xml(
         "WR2 Unicode Lab",
         &amendment.vouchers,
@@ -1109,7 +1115,7 @@ async fn post_import_refuses_an_amendment_before_any_read_or_approval() {
 /// import lookup could take for it. Refused through the tool, under an
 /// approving script: no approval asked, no request after that catalogue read,
 /// no intent journaled. The twin is a test-local rewrite of the capture (an
-/// unrelated ledger renamed `Cash` plus CR LF), no evidence of Tally behaviour.
+/// unrelated ledger renamed `CASH` plus CR LF), no evidence of Tally behaviour.
 #[tokio::test]
 async fn a_folded_twin_refuses_the_post_before_any_approval() {
     let captured = catalogue();
@@ -1118,7 +1124,7 @@ async fn a_folded_twin_refuses_the_post_before_any_approval() {
         2,
         "name and NAME.LIST"
     );
-    let twinned = captured.replace("Bridge Nested Debtor WR4", "Cash&#13;&#10;");
+    let twinned = captured.replace("Bridge Nested Debtor WR4", "CASH&#13;&#10;");
     let mut plans = Vec::new();
     plans.extend(probe());
     plans.extend(verified_company());
@@ -1149,6 +1155,66 @@ async fn a_folded_twin_refuses_the_post_before_any_approval() {
     assert!(!String::from_utf8(journal(directory.path()))
         .unwrap()
         .contains("\"dispatch_intent\""));
+}
+
+/// #626: a pair that differs only by a line break reaches the person, on the
+/// shape it was measured on, and the text they are asked about names both
+/// ledgers. Declined here, so nothing is sent. The twin is the same kind of
+/// rewrite, no evidence of Tally behaviour.
+#[tokio::test]
+async fn a_line_break_pair_reaches_the_dialog_with_both_ledgers_named() {
+    let twinned = catalogue().replace("WR2 Sales", "Bridge Nested Debtor WR4&#13;&#10;");
+    let plans = bank_before_approval(twinned, groups());
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_bank_batch(&server, payment());
+    let scripted = ScriptedApproval::declining();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "import_approval_declined",
+        "{response}"
+    );
+    assert_eq!(observed.len(), expected);
+    let previews = scripted.previews();
+    assert_eq!(previews.len(), 1, "asked once");
+    let lines = previews[0].lines().collect::<Vec<_>>();
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Used: \"Bridge Nested Debtor WR4\", no line break"))
+            && lines
+                .iter()
+                .any(|line| line.starts_with("Not used: \"Bridge Nested Debtor WR4\", line break")),
+        "{}",
+        previews[0]
+    );
+}
+
+/// #626: the same pair on a Receipt, where it is the party: unmeasured, so the
+/// post refuses it as it refuses any twin, before any approval. A batch saved
+/// by an earlier build reaches this check.
+#[tokio::test]
+async fn a_line_break_pair_as_the_party_of_a_receipt_refuses_the_post() {
+    let twinned = catalogue().replace("WR2 Sales", "Bridge Nested Debtor WR4&#13;&#10;");
+    let plans = bank_before_approval(twinned, groups());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_bank_batch(&server, receipt());
+    let scripted = ScriptedApproval::declining();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"], "ledger_has_folded_twin",
+        "{response}"
+    );
+    assert!(scripted.previews().is_empty(), "never asked");
 }
 
 /// The same refusal for a twin reached through an alias: an unrelated ledger
@@ -1883,6 +1949,140 @@ async fn a_batch_recorded_before_its_cash_in_hand_ledgers_is_refused_before_any_
     assert!(observed.is_empty(), "{response}");
 }
 
+/// #2233: beside a Store package's copy of the data folder whose journal holds
+/// a batch, a post is refused before any dialog or Tally request, and nothing
+/// is recorded.
+#[tokio::test]
+async fn a_post_beside_a_second_journal_is_refused_before_any_request() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (_, args) = saved_bank_batch(&server, contra());
+    std::fs::write(
+        at.copy.join("agent-import-ledger.jsonl"),
+        crate::agent::agent_import::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let before = journal(&at.data);
+    let scripted = ScriptedApproval::approving();
+    let response = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{response}");
+    assert_eq!(
+        result["error"]["cause"],
+        SplitJournal::OtherHoldsBatches.cause(),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert!(scripted.previews().is_empty(), "approval must not be asked");
+    assert!(observed.is_empty(), "{response}");
+    assert_eq!(journal(&at.data), before);
+}
+
+/// #2233: a second journal made in a Store package's copy of the data folder
+/// while the dialog stands open is found again under the admission lock: the
+/// post is refused by its own under-lock variant before its intent, and the
+/// POST is never sent.
+#[tokio::test]
+async fn a_second_journal_made_while_the_dialog_is_open_is_refused_under_the_lock() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, SplitJournal, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let mut plans = before_approval();
+    let post_at = plans.len() + after_approval(xml(created_one())).len() - 1;
+    plans.extend(after_approval(xml(created_one())));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (line, args) = saved_batch(&server);
+    let other = at.copy.join("agent-import-ledger.jsonl");
+    let scripted = ScriptedApproval::approving_after(move || {
+        std::fs::write(
+            &other,
+            crate::agent::agent_import::local_data::tests::journal(true),
+        )
+        .unwrap();
+    });
+    let response = LOCAL_APP_DATA
+        .scope(
+            at.local.clone(),
+            SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
+        )
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    let refusal = UnderLockRefusal::JournalSplit(SplitJournal::OtherHoldsBatches.cause());
+    assert_eq!(
+        scripted.previews().len(),
+        1,
+        "the dialog was shown: {response}"
+    );
+    assert_eq!(result["error"]["code"], refusal.code(), "{response}");
+    assert_eq!(refusal.code(), IMPORT_JOURNAL_SPLIT);
+    assert_eq!(
+        result["error"]["cause"],
+        SplitJournal::OtherHoldsBatches.cause(),
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    assert_eq!(observed, post_at, "the POST is never sent: {response}");
+    let intents = String::from_utf8(journal(&at.data))
+        .unwrap()
+        .lines()
+        .map(|record| serde_json::from_str::<Value>(record).unwrap())
+        .filter(|record| {
+            record["record_type"] == "dispatch_intent"
+                && record["batch_id"] == line.batch_id.as_str()
+        })
+        .count();
+    assert_eq!(intents, 0, "no intent from this post: {response}");
+}
+
+/// #2233: a batch already dispatched still reconciles beside a second journal:
+/// `post_import` on it goes to the readback before the split-journal check,
+/// since a sent batch is reconciled, never refused into a rebuild.
+#[tokio::test]
+async fn a_dispatched_batch_beside_a_second_journal_still_reconciles() {
+    use crate::agent::agent_import::split_journal::{
+        tests::layout, IMPORT_JOURNAL_SPLIT, LOCAL_APP_DATA,
+    };
+    let at = layout();
+    let simulator = SequenceSimulator::spawn(with_sentinel(Vec::new())).unwrap();
+    let server = server_at(simulator.address(), &at.data);
+    let (line, args) = saved_batch(&server);
+    let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
+    {
+        let _lock = server.lock_import_admission().unwrap();
+        server
+            .append_import_record_while_admitted(&ledger::StatusRecord::dispatch_for(
+                &line, &native, None,
+            ))
+            .unwrap();
+    }
+    std::fs::write(
+        at.copy.join("agent-import-ledger.jsonl"),
+        crate::agent::agent_import::local_data::tests::journal(true),
+    )
+    .unwrap();
+    let response = LOCAL_APP_DATA
+        .scope(at.local.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator).len();
+    let result = &response["structuredContent"]["result"];
+    assert_ne!(result["error"]["code"], IMPORT_JOURNAL_SPLIT, "{response}");
+    assert_ne!(result["attempt_recorded"], json!(false), "{response}");
+    assert!(observed > 0, "the readback reads Tally: {response}");
+}
+
 /// #1234: a batch saved before the build recorded its bill-wise approvals is
 /// refused before any Tally request and must be rebuilt, as above.
 #[tokio::test]
@@ -2070,6 +2270,106 @@ async fn refused_busy_at_lease_send(lease_send: usize) {
         server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
         "post_refused_before_intent"
     );
+}
+
+/// #2142: a post whose own lock finds Tally still draining after a cut request
+/// is refused before its intent, like a busy lock: nothing recorded or sent,
+/// the approval lapsed, and the next step names the drain.
+#[tokio::test]
+async fn a_draining_endpoint_at_the_posts_own_lock_refuses_before_the_intent() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    // The POST is the last of the plans: its lock is the one found owed.
+    let post_send = plans.len() - 1;
+    plans.truncate(post_send);
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends(vec![post_send]),
+    );
+    let (line, args) = saved_batch(&server);
+    let response = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", args),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "tally_endpoint_draining",
+        "{response}"
+    );
+    assert_eq!(result["error"]["retry_after_s"], 10, "{response}");
+    assert_eq!(
+        result["error"]["next_step"],
+        super::DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+        "{response}"
+    );
+    assert_eq!(result["attempt_recorded"], false, "{response}");
+    // A refusal before the intent carries no dispatch: nothing was sent.
+    assert!(result["dispatch_response"].is_null(), "{response}");
+    assert!(result.get("dispatch").is_none(), "{response}");
+    assert_eq!(observed.len(), post_send, "no POST was sent: {response}");
+    assert!(!String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .contains("\"dispatch_intent\""));
+    assert_eq!(
+        server.post_approvals.lapse_note(&line.batch_id).unwrap()["reason"],
+        "post_refused_before_intent"
+    );
+}
+
+/// #2142: a batch post whose marks readback finds Tally draining, and again on
+/// its one retry, records the drain as the readback's cause; the verdict stays
+/// a doubt.
+#[tokio::test]
+async fn a_batch_post_whose_readback_found_tally_draining_names_it_in_its_doubt() {
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    let readback = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = server_at(simulator.address(), directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends(vec![readback, readback + 1]),
+    );
+    let (line, args) = saved_batch_of_two(&server);
+    let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let response = super::MARKS_READS
+        .scope(
+            std::sync::Arc::clone(&reads),
+            SCRIPTED_APPROVAL.scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            ),
+        )
+        .await;
+    // Read once, then once more after the refusal's own wait.
+    assert_eq!(reads.lock().unwrap().len(), 2, "{response}");
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["post_location"]["after_read_failure"], "tally_endpoint_draining",
+        "{response}"
+    );
+    // The readback, refused twice, sent no marks read; the post's one later
+    // read still went.
+    assert_eq!(observed.len(), readback + 1, "{response}");
+    let imports = server.imports_dir().unwrap();
+    let doubt: Value = serde_json::from_slice(
+        &fs::read(imports.join(format!("{}.batch_step_doubt.json", line.batch_id))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(doubt["cause"], "tally_endpoint_draining", "{doubt}");
+    assert_ne!(result["dispatch"]["state"], "posted_verified", "{response}");
 }
 
 #[tokio::test]
@@ -2608,6 +2908,24 @@ fn saved_captured_batch(server: &Server) -> Value {
 }
 
 fn saved_captured_line(server: &Server) -> ImportLedgerLine {
+    saved_captured_line_edited(server, |_| {})
+}
+
+/// The captured batch saved under `batch_id`, its one voucher's transaction id
+/// `txn_id`: the same voucher content, another row.
+fn saved_line_as(server: &Server, batch_id: &str, txn_id: &str) -> ImportLedgerLine {
+    saved_captured_line_edited(server, |line| {
+        line.batch_id = batch_id.to_string();
+        line.txn_ids = vec![txn_id.to_string()];
+        line.vouchers[0].bridge_txn_id = txn_id.to_string();
+    })
+}
+
+/// The captured batch, with `edit` applied before it is rendered and saved.
+fn saved_captured_line_edited(
+    server: &Server,
+    edit: impl FnOnce(&mut ImportLedgerLine),
+) -> ImportLedgerLine {
     let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
     let mut line: ImportLedgerLine = serde_json::from_value(json!({
         "batch_id":"bridge-6c79872c-aab6-4be5-a181-18182c8148be", "identity_scheme":"batch_v1",
@@ -2624,6 +2942,7 @@ fn saved_captured_line(server: &Server) -> ImportLedgerLine {
                 {"ledger":"Cash","amount":"12.61","side":"Cr"}]}]
     }))
     .unwrap();
+    edit(&mut line);
     let rendered = render_import_xml("WR2 Unicode Lab", &line.vouchers, &line.batch_id);
     line.sha256 = sha256_hex(rendered.as_bytes());
     bind_to_captured_catalogue(&mut line);
@@ -4414,6 +4733,8 @@ fn a_pending_mark_never_erases_a_doubt() {
 mod ack_tests;
 #[path = "agent_import_approval_tests.rs"]
 mod approval_tests;
+#[path = "agent_import_release_tests.rs"]
+mod release_tests;
 #[path = "agent_import_settle_tests.rs"]
 mod settle_tests;
 #[path = "agent_import_stop_tests.rs"]
@@ -4626,6 +4947,50 @@ fn before_approval_on_a_book_holding_a_twin() -> Vec<ScenarioPlan> {
     plans.extend(paired(a_hand_entered_twin_of_the_saved_row()));
     plans.extend(probe());
     plans
+}
+
+/// The reads up to the absence check, on the captured book: it holds the
+/// captured Journal, which a batch of the same row under another batch id
+/// matches by content.
+fn before_approval_on_the_captured_book() -> Vec<ScenarioPlan> {
+    let mut plans = Vec::new();
+    plans.extend(probe());
+    plans.extend(verified_company());
+    plans.extend(paired(marks()));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(paired(captured_posted_journal()));
+    plans.extend(probe());
+    plans
+}
+
+/// #2152: the post of the captured row under a batch id of its own names the
+/// transaction id that the build's test pins (`rebuild_warning_tests::TXN`, the
+/// one constant both read), on the same captured window. One server cannot build
+/// and then post here: the build harness and this one serve different company
+/// listings, and the post of a built batch is refused as
+/// `company_identity_mismatch` before it reads the book.
+#[tokio::test]
+async fn the_post_of_a_rebuilt_row_names_the_id_the_build_test_pins() {
+    let simulator =
+        SequenceSimulator::spawn(with_sentinel(before_approval_on_the_captured_book())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let rebuilt = "bridge-00000000-0000-4000-8000-000000002152";
+    saved_captured_line_edited(&server, |line| line.batch_id = rebuilt.into());
+    let refused = server
+        .call_tool(
+            "post_import",
+            json!({"company_guid":GUID,"batch_id":rebuilt}),
+        )
+        .await;
+    let _ = sent(simulator);
+    let error = &refused["structuredContent"]["result"]["error"];
+    assert_eq!(error["code"], "import_preexisting_identity", "{refused}");
+    assert_eq!(
+        error["preexisting_txn_ids"],
+        json!([crate::agent::agent_import::tests::rebuild_warning_tests::TXN]),
+        "{refused}"
+    );
 }
 
 /// A batch one of whose rows the book already holds is refused before the dialog
@@ -5718,7 +6083,7 @@ fn saved_journal_batch(server: &Server, amounts: &[&str]) -> (ImportLedgerLine, 
             voucher
                 .entries
                 .iter_mut()
-                .for_each(|entry| entry.amount = (*amount).into());
+                .for_each(|entry| entry.amount = ImportAmount::parse(amount).unwrap());
             voucher
         })
         .collect();
@@ -6321,6 +6686,7 @@ async fn a_clean_batch_of_five_says_all_five_are_confirmed() {
     assert_eq!(posted["isError"], json!(false), "{posted}");
     assert_eq!(result["dispatch"]["state"], "posted_verified", "{posted}");
     assert_eq!(result["counts"]["posted_verified"], 5, "{posted}");
+    assert!(result.get("dispatch_record").is_none(), "{posted}");
     assert_batch_counts(&posted, 5, 5, &[]);
     assert_eq!(
         batch_headline(&posted)["batch"]["verdict"],
@@ -6361,6 +6727,8 @@ async fn a_built_batch_never_posted_carries_no_headline() {
     let result = &verified["structuredContent"]["result"];
     assert_eq!(result["counts"]["not_found"], 1, "{verified}");
     assert!(result.get("dispatch").is_none(), "{verified}");
+    // Nothing was found, so nothing is said of who sent it.
+    assert!(result.get("dispatch_record").is_none(), "{verified}");
     assert_no_batch_headline(&verified);
 }
 
@@ -6373,6 +6741,59 @@ async fn a_batch_verified_after_a_hand_import_carries_no_headline() {
     assert_eq!(result["counts"]["posted_verified"], 1, "{verified}");
     assert!(result.get("dispatch").is_none(), "{verified}");
     assert_no_batch_headline(&verified);
+}
+
+/// #2152: a batch that verifies while the journal holds no dispatch for it says
+/// so, on the first page and on a later page served from the saved proof. The
+/// verdict is the one it had without the note.
+#[tokio::test]
+async fn a_verified_batch_with_no_dispatch_on_record_says_it_was_not_sent_by_bridge() {
+    let simulator = SequenceSimulator::spawn(with_sentinel(reconcile_readback())).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let args = saved_captured_batch(&server);
+    let verified = server.call_tool("verify_import", args.clone()).await;
+    let _ = sent(simulator);
+    let result = &verified["structuredContent"]["result"];
+    assert_eq!(
+        result["verification_status"], "posted_verified",
+        "{verified}"
+    );
+    assert_eq!(result["counts"]["posted_verified"], 1, "{verified}");
+    assert!(result.get("dispatch").is_none(), "{verified}");
+    assert_eq!(
+        result["dispatch_record"],
+        json!({
+            "state": "none_on_record",
+            "summary": "Found in the book, not sent by ComplyEaze Bridge: this computer's import journal holds no dispatch for this batch. A post made from another computer, or recorded in a journal since replaced by an older copy, would not show here. This does not change the verification status."
+        }),
+        "{verified}"
+    );
+    // A later page comes from the saved proof alone and says the same.
+    let mut next = args;
+    next["proof_sha256"] = result["proof"]["sha256"].clone();
+    let later = server.call_tool("verify_import", next).await;
+    assert_eq!(
+        later["structuredContent"]["result"]["dispatch_record"], result["dispatch_record"],
+        "{later}"
+    );
+}
+
+/// The same batch, read back after the journal recorded its dispatch, carries
+/// no such note: Bridge sent it.
+#[tokio::test]
+async fn a_verified_batch_with_a_dispatch_on_record_carries_no_not_sent_note() {
+    let (response, ..) = reconcile_with_masters_check(None, Vec::new()).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["dispatch"]["state"], "previous_attempt_reconciled",
+        "{response}"
+    );
+    assert_eq!(
+        result["verification_status"], "posted_verified",
+        "{response}"
+    );
+    assert!(result.get("dispatch_record").is_none(), "{response}");
 }
 
 // bridge#724: a voucher goes without a number, so its voucher type must read
@@ -6425,6 +6846,104 @@ async fn a_journal_into_a_manual_journal_type_is_refused_before_the_approval() {
         appended_kinds(&before, &journal(directory.path())),
         ["verification_status"]
     );
+}
+
+/// Duplicate numbers prevented do not admit a voucher without a number into a
+/// Manual type: a native post sends every voucher but an invoice without one, so
+/// the Journal is refused as under Manual alone, and nothing is asked or sent.
+#[tokio::test]
+async fn a_journal_into_a_manual_journal_type_preventing_duplicates_is_refused_before_the_approval()
+{
+    let plans = before_approval_numbering(numbering_read_of(
+        marks(),
+        crate::agent::agent_import::numbering_fixtures::manual_answers_preventing_duplicates(
+            GUID,
+            &["Journal"],
+        ),
+    ));
+    let expected = plans.len();
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(
+        result["error"]["code"], "import_voucher_numbering_not_automatic",
+        "{response}"
+    );
+    assert_eq!(
+        result["error"]["refused_types"],
+        json!([{"voucher_type":"Journal","observed":{"observation":"observed","method":"manual","duplicates":"prevented"}}]),
+        "{response}"
+    );
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert_eq!(observed.len(), expected, "nothing after the numbering read");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
+/// A voucher-type answer that is cut short fails the numbering read under the
+/// masters read's own code, not as a numbering refusal, and the dialog is never
+/// asked.
+#[tokio::test]
+async fn a_numbering_read_whose_answer_is_cut_short_fails_as_a_masters_read() {
+    let (masters, numbering) =
+        crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, &[]);
+    let cut = masters[..masters.len() / 2].to_string();
+    let plans = before_approval_numbering(numbering_read_of(marks(), (cut, numbering)));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let (_, args) = saved_batch(&server);
+    let scripted = ScriptedApproval::approving();
+    let response = SCRIPTED_APPROVAL
+        .scope(scripted.clone(), server.call_tool("post_import", args))
+        .await;
+    let _ = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["error"]["code"], "masters_read_failed", "{response}");
+    assert_ne!(result["attempt_recorded"], json!(true), "{response}");
+    assert!(scripted.counts().is_empty(), "the dialog is never asked");
+}
+
+/// The master mark read before the numbering read is in the refusal's evidence:
+/// a voucher mark of 100 for 10 makes each of the paired read's two answers one
+/// UTF-16 character, two bytes, longer, and the evidence four bytes larger.
+#[tokio::test]
+async fn the_master_mark_read_before_the_numbering_is_in_the_refusals_evidence() {
+    let mut bytes = Vec::new();
+    for mark in [marks_at(10), marks_at(100)] {
+        let plans = before_approval_numbering(numbering_read_of(
+            mark,
+            crate::agent::agent_import::numbering_fixtures::numbering_answers(GUID, &["Journal"]),
+        ));
+        let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+        let directory = tempfile::tempdir().unwrap();
+        let server = server_at(simulator.address(), directory.path());
+        let (_, args) = saved_batch(&server);
+        let response = SCRIPTED_APPROVAL
+            .scope(
+                ScriptedApproval::approving(),
+                server.call_tool("post_import", args),
+            )
+            .await;
+        let _ = sent(simulator);
+        assert_eq!(
+            response["structuredContent"]["result"]["error"]["code"],
+            "import_voucher_numbering_not_automatic",
+            "{response}"
+        );
+        bytes.push(
+            response["structuredContent"]["evidence"]["bytes"]
+                .as_u64()
+                .unwrap_or_else(|| panic!("the refusal carries its evidence: {response}")),
+        );
+    }
+    assert_eq!(bytes[1], bytes[0] + 4, "{bytes:?}");
 }
 
 /// The Journal type reads Automatic with its series set to renumber: refused
@@ -6803,12 +7322,13 @@ macro_rules! pilot_queue_block {
 // (fixtures/agent/pilot-lab/PROVENANCE.md), except that the two voucher-numbering
 // answers (X and Y) were read on 16 Oct 2026, after the book had moved on, and
 // are served DERIVED: their rows above the master mark 223 removed
-// (`pilot_types_as_of_the_round`). Two more are from 21 Oct 2026, after the book
-// gained ledgers: the ledger catalogue `k` and the rates read `Q`, which is the
-// read restricted to the parents of the invoice's ledgers (#1331) with the
-// HSN/SAC fields (#691). They are one coherent pair read in the same minute (the
-// scoped answer holds exactly the catalogue's ledgers under those parents),
-// paired here with the earlier answers of the same book (the 9 Oct listings,
+// (`pilot_types_as_of_the_round`). Two more come from 21 Oct 2026, after the
+// book gained ledgers: the ledger catalogue `k`, Tally's own bytes, and the
+// rates read `Q`, which is DERIVED: the lab's answer of that minute to the read
+// restricted to the parents of the invoice's ledgers (with the HSN/SAC fields,
+// #691) cut to the invoice's six ledgers (`lab_invoice_rates_hsn`), because the
+// code now names those ledgers by GUID (#1331) and that six-GUID request was
+// never sent to the lab. They are paired here with the earlier answers of the same book (the 9 Oct listings,
 // groups and tax units; the 12 Oct company object `O` and groups with HSN `G`;
 // the 16 Oct numbering answers `X` and `Y`, DERIVED above); the pairing was not
 // observed at one time. The order below is the order the
@@ -6816,8 +7336,8 @@ macro_rules! pilot_queue_block {
 // answers; it is not an order read off the code. Legend: s status probe, e
 // company list, m/M marks before/after the import, b book extent, c currencies,
 // L compliance listing, Q the same listing with each ledger's GST rate and
-// rounding, restricted to the parents of the invoice's ledgers and with the
-// HSN/SAC rows (21 Oct 2026), P paired listing, g groups, T
+// rounding and the HSN/SAC rows, restricted to the invoice's ledgers by GUID
+// (DERIVED, above), P paired listing, g groups, T
 // voucher types, N number read, k ledger catalogue, w/W the 1-Aug window
 // before/after, C tax units, O the company object (W16, read after the
 // classification admits), X the voucher types bounded by the master mark and Y
@@ -6848,7 +7368,9 @@ const PILOT_REQUEST_SHA256: &str =
 /// `pilot-lab-invoice-post-request`): the answer at a position is Tally's
 /// answer to that request and no other. X and Y are the requests the code
 /// renders, sent to the lab in the 16 Oct 2026 sitting (their answers are the
-/// numbering fixtures, served derived).
+/// numbering fixtures, served derived). Q is the exception to "Tally's answer
+/// to that request": it is the code's request, never sent with these GUIDs, and
+/// its answer is DERIVED from the answer to the four-parent request.
 fn pilot_request_sha256(letter: char) -> &'static str {
     match letter {
         'e' => "9df2a53f085dac2636e9435462b612c1487ec6f903677815036c9f39163f7dd8", // r01-company-extent.xml
@@ -6856,22 +7378,31 @@ fn pilot_request_sha256(letter: char) -> &'static str {
         'M' => "81892a744009b6cf462a6f8d2fd505e650f8ad022e1462b23414cf2b8b3d2d7c", // r02-marks.xml
         'b' => "eff1280ac2e8244c49855d4b178d3006fc31ad4e517d17941fcc25080a783c49", // r03-book-extent.xml
         'c' => "56e9306e2a5128da625ed35be222f790d69cc30ce34f5d76cb2ffd98c8727661", // r04-currencies.xml
-        'L' => "c283b511ac42ae19df3a1d23c21e41504afde8ae75f73a8666f4df7a9bfc6386", // r05-ledgers-compliance.xml
-        // The rates read restricted to the four parents (#1331) with the three
-        // HSN/SAC fields: the request the code renders, which the lab was
-        // sent on 21 Oct 2026 (req-1640-q1-hsn-rates-four-parents.xml).
-        'Q' => "3f5151473ba2c7a69a19fd7c0373fbed13b7dc890744a66976dfc961a3d2bcdc",
+        // The listing by GUID (#1331): the code's requests for this invoice's
+        // six ledgers, never sent to the lab with these GUIDs. The lab answered
+        // the same two requests naming five other ledgers
+        // (`lab/1331-scoped-masters-answers`), and the answers here are cut from
+        // its whole-book ones (`lab_invoice_listing`).
+        'L' => "5b55872145f7f3fa5504a79780cb3c94dcbb2a556e57e1087d6b94aa7025f671",
+        'P' => "6d2afdcba9e33f84a7aa80f90250974a8c0dcc1c416e945ed9ad3137169508d8",
+        // The rates read restricted to the invoice's ledgers by GUID (#1331):
+        // the code's request, never sent to the lab with these six GUIDs; the
+        // lab answered the same request naming five other ledgers on 31 Oct
+        // 2026, and a test derives this pin from that request
+        // (`LAB_INVOICE_GUID_RATES_SHA256`).
+        'Q' => super::super::tests::LAB_INVOICE_GUID_RATES_SHA256,
         'O' => "72d8cd921a2a89aa781cbd768d013e58f167c2dc5072249fa92df5bdad301648", // w14-company-object.xml
         'G' => "237bb6c383bb9c11221a89882d3a5924fc55643e49e6e539beec79ea62338e02", // w16-groups-hsn.xml
-        'P' => "71326bb05d54449f8aea5a6966450da70f4fc261f480e17a74feeee718ed8f0f", // r06-ledgers-paired.xml
         'g' => "20d147b548e716b876a013ec58593327a6b5b52ce20d68747c45d878dc98699f", // r07-groups.xml
         'T' => "c351d6c62a09ce5173355f3998ef12746f01aba253ea8bdc42664b1b9766fb00", // r08-voucher-types.xml
-        'N' => "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985", // r09-number-new-invoice.xml
+        // r09-number-new-invoice.xml with the e-invoice words added (DERIVED,
+        // `LAB_NUMBER_NEW_INVOICE_SHA256`).
+        'N' => super::super::tests::LAB_NUMBER_NEW_INVOICE_SHA256,
         'k' => "28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0", // r13-ledger-catalogue-v2.xml
         'w' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'W' => "a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7", // r15-verification-window.xml
         'C' => "c763f19d79b1e1736ecd17578fe5f353f9b1c4d781382073286484749f181a38", // r16-tax-units.xml
-        'R' => "352dfca912a53499f058643e61db4febc301f6b53b753de54d7f2aac475db9c1", // w8-readback-status-single.xml
+        'R' => "10f9711cc936c9c4d0f70bccb42b54cc10fbd5e7de11287737329cfe7ae56c21", // R-0010.xml of the 2162-S1 sheet
         'Z' => "b333f0dc819146ae24b2f434a28817e1d142eba0e0386f65bbc5484171b4b21e", // r14-invoice-post.xml
         'X' => "229f54c9de4cd51c2b76480129a9c6965314cd04b82d3d40d87f462167cce0d5", // r18-numbering-masters.xml
         'Y' => "e83a1df110db00e69509f75d1b39f1ed1a2932a7fc4038cd1d1db731d74e4276", // r19-numbering-series.xml
@@ -6977,11 +7508,13 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'M' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-marks-after-post.utf16le.xml"),
         'b' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-book-extent.utf16le.xml"),
         'c' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-currencies.utf16le.xml"),
-        'L' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-compliance.utf16le.xml"),
-        'Q' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledger-rates-scoped-hsn.utf16le.xml"),
+        // DERIVED: see `lab_invoice_listing`.
+        'L' => super::super::tests::lab_invoice_listing(),
+        // DERIVED: see `lab_invoice_rates_hsn`.
+        'Q' => super::super::tests::lab_invoice_rates_hsn(),
         'O' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-company-object.utf16le.xml"),
         'G' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups-hsn.utf16le.xml"),
-        'P' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-ledgers-paired.utf16le.xml"),
+        'P' => super::super::tests::lab_invoice_balances(),
         'g' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-groups.utf16le.xml"),
         'T' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-voucher-types.utf16le.xml"),
         'N' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"),
@@ -6990,7 +7523,7 @@ fn pilot_bytes(letter: char) -> Option<&'static [u8]> {
         'w' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-before-post.utf16le.xml"),
         'W' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-verification-window-after-post.utf16le.xml"),
         'C' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-tax-units.utf16le.xml"),
-        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"),
+        'R' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"),
         'Z' => include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-post-answer.utf16le.xml"),
         other => panic!("unknown kind {other}"),
     })
@@ -7307,6 +7840,50 @@ async fn a_cgst_line_six_paise_above_the_state_tax_line_is_refused_on_the_pilot_
     assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
 }
 
+/// The customer's registration row made Regular under the company's own GSTIN
+/// (`lab_invoice_listing_with_walk_in_gstin`, a stated edit of the captured
+/// listing): the tool refuses the invoice once the company's registration is
+/// read, names the customer and the next step, and writes no file. Tally
+/// listed such an invoice as uncertain (section 9.16).
+#[tokio::test]
+async fn a_customer_holding_the_companys_own_gstin_is_refused_through_build_import_xml() {
+    let listing = super::super::tests::lab_invoice_listing_with_walk_in_gstin("08ZZZZZ0000Z1ZQ");
+    let positions = PILOT_ORDER
+        .char_indices()
+        .filter(|(_, letter)| *letter == 'L')
+        .map(|(at, _)| at)
+        .collect();
+    let (simulator, server, directory) = pilot_lab_changed(
+        PILOT_ORDER,
+        &[Changed {
+            positions,
+            body: listing,
+        }],
+    );
+    let response = TEST_QUALIFIED_VOUCHER_TYPES
+        .scope(
+            PILOT_QUALIFIED,
+            server.call_tool(
+                "build_import_xml",
+                pilot_args("BRIDGE Walk-in", "25.02", "1051.00"),
+            ),
+        )
+        .await;
+    let observed = sent(simulator);
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["state"], "refused", "{response}");
+    assert_eq!(result["reason"], "invoice_not_admitted", "{response}");
+    let refusals = result["refusals"].as_array().unwrap();
+    assert_eq!(refusals.len(), 1, "{response}");
+    assert_eq!(refusals[0]["code"], "invoice_party_gstin_is_company_own");
+    assert!(refusals[0]["detail"].to_string().contains("BRIDGE Walk-in"));
+    assert!(refusals[0]["remediation"]
+        .as_str()
+        .is_some_and(|step| step.contains("company's own GSTIN")));
+    assert_eq!(observed.len(), PILOT_ORDER.find("CsCse").unwrap() + 5);
+    assert!(!directory.path().join("agent-import-ledger.jsonl").exists());
+}
+
 // ---- The queue re-reads the invoice's masters (#1337) ----
 //
 // The build and the re-reads before the post are the pilot lab's own answers.
@@ -7423,6 +8000,358 @@ async fn pilot_post_changed_in(order: &str, changes: &[Changed]) -> PilotRun {
     }
 }
 
+// ---- The oldest release that reads a Sales line (#2162 item 4) ----
+//
+// Sales keeps the one import journal (ADR 0004, the slice 4 amendment). Every
+// voucher of a batch line denies fields it does not know (the line itself does
+// not), so one line a release cannot read refuses the whole journal there. The
+// release notes name `mcp-v0.7.0` as the oldest release to install once Sales
+// is on: `mcp-v0.6.1` reads the line, but refuses the content review and the
+// person's settlement a Sales batch can gain. The tests below compare every
+// path, the line's own members included, so they hold a stricter bar than that
+// release's reader.
+
+/// Every field path of the Sales line `mcp-v0.7.0` wrote for this replay, run
+/// on that tag (`fcfb5ff6`) on 3 Nov 2026: [`journal_line_fields`] and a test
+/// that wrote `pilot_post_changed(&[])`'s `journal_after_build` to a file were
+/// added to this file on a checkout of the tag, that test run alone, and the
+/// written line's paths taken by [`journal_line_fields`]. The line itself is
+/// not kept: its batch id is a random identifier.
+const MCP_V0_7_0_SALES_LINE_FIELDS: &[&str] = &[
+    "/batch_id",
+    "/built_at",
+    "/cash_in_hand_ledgers",
+    "/company",
+    "/company/books_from",
+    "/company/company_number",
+    "/company/guid",
+    "/company/name",
+    "/company_guid",
+    "/date_from",
+    "/date_to",
+    "/endpoint_origin",
+    "/identity_scheme",
+    "/identity_scheme=batch_v1",
+    "/ledger_identities_3",
+    "/ledger_identities_3[]/guid",
+    "/ledger_identities_3[]/name",
+    "/on_account_approved",
+    "/pre_import_mark",
+    "/pre_import_mark/kind",
+    "/pre_import_mark/master_value",
+    "/pre_import_mark/value",
+    "/sha256",
+    "/status",
+    "/txn_ids",
+    "/vouchers",
+    "/vouchers[]/bridge_txn_id",
+    "/vouchers[]/date",
+    "/vouchers[]/entries",
+    "/vouchers[]/entries[]/amount",
+    "/vouchers[]/entries[]/ledger",
+    "/vouchers[]/entries[]/side",
+    "/vouchers[]/entries[]/side=Cr",
+    "/vouchers[]/entries[]/side=Dr",
+    "/vouchers[]/invoice",
+    "/vouchers[]/invoice/observed",
+    "/vouchers[]/invoice/observed/company_state",
+    "/vouchers[]/invoice/observed/party_bill_wise",
+    "/vouchers[]/invoice/observed/party_registration_type",
+    "/vouchers[]/invoice/observed/party_state",
+    "/vouchers[]/invoice/observed/sales_ledgers",
+    "/vouchers[]/invoice/observed/voucher_type_guid",
+    "/vouchers[]/invoice/place_of_supply",
+    "/vouchers[]/invoice/round_off_ledger",
+    "/vouchers[]/invoice/voucher_type_name",
+    "/vouchers[]/narration",
+    "/vouchers[]/reference",
+    "/vouchers[]/voucher_number",
+    "/vouchers[]/voucher_type",
+    "/vouchers[]/voucher_type=Sales",
+];
+
+/// The paths the replay never writes: its party is unregistered, with no HSN
+/// warning, no cash-in-hand answer and no approval. These are read from the
+/// tag's types at `fcfb5ff6`, not from a run: `InvoiceObserved`
+/// (`agent_import_invoice.rs:62`), `HsnWarning`, `HsnWarningCode` and
+/// `HsnLevel` (`agent_import_invoice_hsn.rs:324`, `:286`, `:91`),
+/// `CashInHandLedger` (`agent_import.rs:532`) and `OnAccountApproved`
+/// (`agent_import_bill_wise.rs:311`).
+const MCP_V0_7_0_FILLED_LINE_FIELDS: &[&str] = &[
+    "/cash_in_hand_ledgers[]/bridge_txn_id",
+    "/cash_in_hand_ledgers[]/ledger",
+    "/on_account_approved[]/ledger",
+    "/on_account_approved[]/party_digest",
+    "/vouchers[]/invoice/observed/hsn_warnings",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/characters",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_not_a_sac_for_services",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_not_digits",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_not_six_digits",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_sac_for_goods",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code=hsn_warning_type_of_supply_not_judged",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/ledger",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level/group",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level=company",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level=ledger",
+    "/vouchers[]/invoice/observed/party_gstin",
+];
+
+/// The string fields of a batch line that are enums in the journal's types,
+/// where a value the release does not know is refused as an unknown field is.
+/// A value is checked only when a line here writes it.
+const JOURNAL_LINE_ENUM_FIELDS: [&str; 5] = [
+    "/identity_scheme",
+    "/vouchers[]/voucher_type",
+    "/vouchers[]/entries[]/side",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/code",
+    "/vouchers[]/invoice/observed/hsn_warnings[]/level",
+];
+
+/// Each member's path in `value`, an array's items under `[]`, and each enum
+/// field's value as `path=value`.
+fn journal_line_fields(value: &Value, at: &str, fields: &mut std::collections::BTreeSet<String>) {
+    match value {
+        Value::Object(members) => {
+            for (key, member) in members {
+                let path = format!("{at}/{key}");
+                fields.insert(path.clone());
+                journal_line_fields(member, &path, fields);
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                journal_line_fields(item, &format!("{at}[]"), fields);
+            }
+        }
+        Value::String(text) if JOURNAL_LINE_ENUM_FIELDS.contains(&at) => {
+            fields.insert(format!("{at}={text}"));
+        }
+        _ => {}
+    }
+}
+
+/// The Sales line this build writes for the pilot lab's invoice holds no field
+/// and no enum value that `mcp-v0.7.0` did not write for the same invoice, so
+/// that release reads it. A field added to the line fails this: leave it out
+/// when it is empty, or raise the release ADR 0004 and the release notes name.
+/// `mcp-v0.6.0` does not know `sales_ledgers`, which the line holds.
+///
+/// The same line is then given what the replay never writes: a party GSTIN,
+/// one HSN warning of each code and level, and one item in each of the
+/// cash-in-hand and approval lists. It is read and written again by this
+/// build's own types, so a member added under any of them shows.
+#[tokio::test]
+async fn the_sales_line_this_build_writes_is_read_by_mcp_v0_7_0() {
+    let run = pilot_post_changed(&[]).await;
+    let journal = String::from_utf8(run.journal_after_build).unwrap();
+    let lines: Vec<&str> = journal.lines().collect();
+    assert_eq!(lines.len(), 1, "the build writes one line: {journal}");
+    let line: Value = serde_json::from_str(lines[0]).unwrap();
+    assert_eq!(line["vouchers"][0]["voucher_type"], "Sales");
+    let mut written = std::collections::BTreeSet::new();
+    journal_line_fields(&line, "", &mut written);
+    let mut released: std::collections::BTreeSet<String> = MCP_V0_7_0_SALES_LINE_FIELDS
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
+    let unknown: Vec<&String> = written.difference(&released).collect();
+    assert!(
+        unknown.is_empty(),
+        "fields mcp-v0.7.0 never wrote, so it refuses the journal: {unknown:?}"
+    );
+    assert!(written.contains("/vouchers[]/invoice/observed/sales_ledgers"));
+
+    let mut filled = line.clone();
+    let warning = |code: &str, level: Value| json!({"code": code, "ledger": "Sales", "level": level, "characters": 4});
+    let observed = &mut filled["vouchers"][0]["invoice"]["observed"];
+    observed["party_gstin"] = json!("registered");
+    observed["hsn_warnings"] = json!([
+        warning("hsn_warning_not_digits", json!("ledger")),
+        warning("hsn_warning_not_six_digits", json!("company")),
+        warning(
+            "hsn_warning_not_a_sac_for_services",
+            json!({"group": "Sales Sub"})
+        ),
+        warning("hsn_warning_sac_for_goods", json!("ledger")),
+        warning("hsn_warning_type_of_supply_not_judged", json!("ledger")),
+    ]);
+    filled["cash_in_hand_ledgers"] = json!([{
+        "bridge_txn_id": line["vouchers"][0]["bridge_txn_id"],
+        "ledger": "Cash",
+    }]);
+    filled["on_account_approved"] = json!([{"ledger": "Walk-in", "party_digest": "digest"}]);
+    let typed: ImportLedgerLine = serde_json::from_value(filled).unwrap();
+    let mut written = std::collections::BTreeSet::new();
+    journal_line_fields(&serde_json::to_value(&typed).unwrap(), "", &mut written);
+    let filled_fields: std::collections::BTreeSet<String> = MCP_V0_7_0_FILLED_LINE_FIELDS
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
+    let unwritten: Vec<&String> = filled_fields.difference(&written).collect();
+    assert!(unwritten.is_empty(), "the filled line lost: {unwritten:?}");
+    released.extend(filled_fields);
+    let unknown: Vec<&String> = written.difference(&released).collect();
+    assert!(
+        unknown.is_empty(),
+        "fields mcp-v0.7.0 does not know, so it refuses the journal: {unknown:?}"
+    );
+}
+
+/// The status record kinds `mcp-v0.7.0` reads, from its `StatusKind` at the
+/// tag (`fcfb5ff6`, `agent_import_ledger.rs`). A record of any other kind
+/// refuses the whole journal there.
+const MCP_V0_7_0_STATUS_KINDS: [&str; 8] = [
+    "verification_status",
+    "dispatch_intent",
+    "dispatch_response",
+    "post_span_verdict",
+    "stop_release",
+    "rollback_seen",
+    "content_review",
+    "person_settlement",
+];
+
+/// Every field path of a status record `mcp-v0.7.0` reads, from its
+/// `StatusRecord`, `DispatchResponse` and `PostedVoucherIdentity` at the tag
+/// (`fcfb5ff6`), each of which refuses a field it does not know. A response's
+/// `outcome` is read there without refusing one, so its members are not
+/// compared.
+const MCP_V0_7_0_STATUS_RECORD_FIELDS: &[&str] = &[
+    "/batch_id",
+    "/batch_sha256",
+    "/binding_refusal",
+    "/bindings",
+    "/bindings[]/bridge_txn_id",
+    "/bindings[]/guid",
+    "/bindings[]/master_id",
+    "/mark_read",
+    "/native_remote_id",
+    "/native_remote_ids",
+    "/native_request_sha256",
+    "/pre_post_voucher_mark",
+    "/proof",
+    "/record_type",
+    "/records_before_read",
+    "/release_seen",
+    "/response",
+    "/response/bytes",
+    "/response/outcome",
+    "/response/request_sha256",
+    "/response/response_sha256",
+    "/reviewed_binding",
+    "/status",
+];
+
+/// The whole release flow (#1038): a post read back verified, the restore
+/// seen by the release's own read, the release, then a fresh batch of the
+/// released row posted and read back verified. The one record it writes that
+/// `mcp-v0.7.0` cannot read is the release itself, which refuses the journal
+/// there (ADR 0018, the #1038 amendment). Every other record is walked: the
+/// batch lines hold no field and no enum value beyond those that release
+/// wrote for the Sales replay, with a Journal's `voucher_type`, which its
+/// `VoucherType` at the tag holds, and the status records no field beyond its
+/// `StatusRecord`'s. A kind or field added to this flow fails this: leave it
+/// out when it is empty, or raise the release the notes name.
+#[tokio::test]
+async fn a_release_flow_adds_only_row_release_to_what_mcp_v0_7_0_reads() {
+    let release_tests::Restored {
+        directory,
+        server,
+        simulator: _simulator,
+        line,
+    } = release_tests::posted_then_read(release_tests::rolled_back_reads(1)).await;
+    let released = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool(
+                "acknowledge_post_review",
+                json!({"company_guid":GUID,"batch_id":line.batch_id,"doubt":"rolled_back"}),
+            ),
+        )
+        .await;
+    assert_eq!(
+        released["structuredContent"]["result"]["state"], "rows_released",
+        "{released}"
+    );
+
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    plans.extend(probe());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let server = release_tests::moved_to(&server, simulator.address(), directory.path());
+    let fresh = saved_line_as(
+        &server,
+        &format!("bridge-{}", Uuid::new_v4()),
+        "BRIDGE_MCP_LIVE_20260906_A1",
+    );
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool(
+                "post_import",
+                json!({"company_guid":GUID,"batch_id":fresh.batch_id}),
+            ),
+        )
+        .await;
+    let _ = sent(simulator);
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
+    let records: Vec<Value> = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect();
+
+    let kinds: std::collections::BTreeSet<&str> = records
+        .iter()
+        .filter_map(|record| record["record_type"].as_str())
+        .collect();
+    let unknown: Vec<&&str> = kinds
+        .iter()
+        .filter(|kind| !MCP_V0_7_0_STATUS_KINDS.contains(*kind))
+        .collect();
+    assert_eq!(unknown, [&"row_release"], "{kinds:?}");
+
+    let mut known: std::collections::BTreeSet<String> = MCP_V0_7_0_SALES_LINE_FIELDS
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
+    known.insert("/vouchers[]/voucher_type=Journal".into());
+    let status_fields: std::collections::BTreeSet<String> = MCP_V0_7_0_STATUS_RECORD_FIELDS
+        .iter()
+        .map(|field| field.to_string())
+        .collect();
+    let mut walked = std::collections::BTreeSet::new();
+    for record in records
+        .iter()
+        .filter(|record| record["record_type"] != "row_release")
+    {
+        let mut written = std::collections::BTreeSet::new();
+        journal_line_fields(record, "", &mut written);
+        let unknown: Vec<&String> = if record.get("record_type").is_none() {
+            walked.insert(record["batch_id"].as_str().unwrap_or_default());
+            written.difference(&known).collect()
+        } else {
+            written
+                .difference(&status_fields)
+                .filter(|field| !field.starts_with("/response/outcome/"))
+                .collect()
+        };
+        assert!(
+            unknown.is_empty(),
+            "fields mcp-v0.7.0 does not know, so it refuses the journal: {unknown:?} in {record}"
+        );
+    }
+    assert!(walked.contains(line.batch_id.as_str()), "{walked:?}");
+    assert!(walked.contains(fresh.batch_id.as_str()), "{walked:?}");
+}
+
 /// The post was refused in the queue, loud and before anything was recorded or
 /// sent: exactly `requests` requests were made and the write was not, no
 /// dispatch intent was journaled, and the only record added is the one
@@ -7512,6 +8441,26 @@ async fn a_company_registration_that_lapsed_after_the_approval_is_refused_in_the
     );
 }
 
+/// The customer given the company's own GSTIN while the approval waited (its
+/// registration row in the queue's listing edited, as in the build test):
+/// refused under the admission's own code, not as a master that moved.
+/// SYNTHETIC answer: the captured listing with that one stated edit; it stands
+/// for a change, and is not Tally's answer to one.
+#[tokio::test]
+async fn a_customer_given_the_companys_gstin_after_the_approval_is_refused_in_the_queue() {
+    let run = pilot_post_changed(&[Changed {
+        positions: pilot_queue_positions('L'),
+        body: super::super::tests::lab_invoice_listing_with_walk_in_gstin("08ZZZZZ0000Z1ZQ"),
+    }])
+    .await;
+    let error = pilot_refused_in_the_queue(
+        &run,
+        "invoice_party_gstin_is_company_own",
+        PILOT_ORDER.find('Z').unwrap(),
+    );
+    assert_eq!(error["cause"], Value::Null, "{}", run.response);
+}
+
 /// Where the queue's re-read of the invoice's masters starts in `PILOT_ORDER`:
 /// the number of requests made when it begins.
 fn pilot_queue_start() -> usize {
@@ -7542,55 +8491,30 @@ async fn a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_i
     pilot_refused_in_the_queue(&run, "invoice_book_too_many_vouchers", pilot_queue_start());
 }
 
-/// A book over the master mark has its ledger count asked for, and that read is
-/// the only one of the invoice's sent; the post is refused before the listing,
-/// the rates, the voucher types, the number or the registration is read.
-///
-/// SYNTHETIC answer: there is no capture of the ledger count of the pilot lab,
-/// only of another company's (the size book's, Tally's own bytes in
-/// `company-ledger-count`). The answer here is that capture with the size
-/// book's name and GUID replaced by the pilot lab's, so that the row is the
-/// company's. It shows that the queue asks the count only when the master mark
-/// is over, reads nothing else of the invoice first, and judges the count with
-/// the build's limit. It does not show that Tally answers the count request for
-/// the pilot lab with 4,339, or at all: the unedited capture is judged under
-/// its own company's name in the precheck's unit test.
-///
-/// The binding marks are SYNTHETIC too: the captured marks with the master mark
-/// edited to 5,001, standing for a book whose masters grew past the gate's mark.
+/// A book past the marks the whole-book listing was held to is read and posted
+/// like any other (#1331): the listing names the invoice's ledgers, so the
+/// masters' mark decides nothing. SYNTHETIC answers: every captured answer that
+/// carries the master mark, edited to 900,000. It stands for a large book; it
+/// is not Tally's answer for one, and a post on one has not been run.
 #[tokio::test]
-async fn a_book_over_the_master_mark_has_only_its_ledger_count_read_before_the_refusal() {
-    let at = PILOT_ORDER.find(PILOT_QUEUE_ANCHOR).unwrap();
-    let marks = pilot_text('m');
-    let count = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/company-ledger-count.utf16le.xml"
-    ));
-    // The company's name occurs twice in the captured answer and its GUID once; an edit that matched fewer
-    // would leave the answer naming another company.
-    assert_eq!(count.matches("BRIDGE SIZE 2K").count(), 2);
-    let count = replaced_once(
-        &count.replace("BRIDGE SIZE 2K", "BRIDGE PILOT LAB"),
-        "f8dab51e-a5d9-49d5-9232-54a16c8b95bb",
-        PILOT_GUID,
-    );
-    // The queue's currency read, then the ledger count's paired read (K).
-    let start = pilot_queue_start();
-    let order = format!("{}eKsKse{}", &PILOT_ORDER[..start], &PILOT_ORDER[start..]);
-    let run = pilot_post_changed_in(
-        &order,
-        &[
-            Changed {
-                positions: vec![at],
-                body: replaced_once(&marks, " 223</ALTMSTID>", " 5001</ALTMSTID>"),
-            },
-            Changed {
-                positions: vec![start + 1, start + 3],
-                body: count,
-            },
-        ],
-    )
+async fn a_book_past_the_old_master_mark_is_posted_on_its_ledgers_alone() {
+    let run = pilot_post_changed(&['m', 'M', 'b'].map(|letter| {
+        Changed {
+            positions: PILOT_ORDER
+                .char_indices()
+                .filter_map(|(position, kind)| (kind == letter).then_some(position))
+                .collect(),
+            body: replaced_once(&pilot_text(letter), " 223</ALTMSTID>", " 900000</ALTMSTID>"),
+        }
+    }))
     .await;
-    pilot_refused_in_the_queue(&run, "invoice_book_too_large", start + 6);
+    let result = &run.response["structuredContent"]["result"];
+    assert_eq!(
+        result["verification_status"], "posted_verified",
+        "{}",
+        run.response
+    );
+    assert_eq!(run.observed.len(), PILOT_ORDER.len());
 }
 
 /// A currency master added while the approval waited is refused under its own
@@ -7669,7 +8593,7 @@ fn pilot_element<'a>(xml: &'a str, tag: &str) -> &'a str {
 /// changes.
 fn pilot_readback_uncertain() -> String {
     let included = captured(include_bytes!(
-        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
     ));
     let uncertain = captured(include_bytes!(
         "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-uncertain.utf16le.xml"
@@ -8069,4 +8993,160 @@ async fn an_unreadable_view_stops_the_send_of_a_statement_row() {
     );
     assert_eq!(observed.len(), 0);
     assert_eq!(journal(directory.path()), before);
+}
+
+/// #1050, a restore seen at the post: post A natively (its voucher mark 10
+/// before, one create, 11 after), then a restore puts the book back at 10, and
+/// a second batch B, of the same company at the same address, is posted with
+/// no verification between. B's aim reads 10, below the floor 11 that A had
+/// proved. Returns B's response, the journal's records, how many import
+/// requests B's simulator saw, A's batch id, and B's approval lapse note.
+async fn post_after_a_restore(
+    fail_the_record: bool,
+) -> (Value, Vec<Value>, usize, String, Option<Value>) {
+    // A: the whole native post, read back.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let directory = tempfile::tempdir().unwrap();
+    let server = server_at(simulator.address(), directory.path());
+    let first = saved_captured_batch(&server);
+    let first_batch = first["batch_id"].as_str().unwrap().to_string();
+    let posted = SCRIPTED_APPROVAL
+        .scope(
+            ScriptedApproval::approving(),
+            server.call_tool("post_import", first),
+        )
+        .await;
+    let _ = sent(simulator);
+    assert_eq!(
+        posted["structuredContent"]["result"]["dispatch"]["state"], "posted_verified",
+        "{posted}"
+    );
+    // B, at the same address: the journal's origin moves to the new simulator,
+    // as a verification on another simulator does.
+    let mut plans = before_approval();
+    plans.extend(after_approval(xml(created_one())));
+    plans.push(xml(company_marks(11, 50, "WR2 Unicode Lab")));
+    plans.extend(span_readback(untagged_posted_journal(), 11));
+    plans.extend(probe());
+    let simulator = SequenceSimulator::spawn(with_sentinel(plans)).unwrap();
+    let later = server_at(simulator.address(), directory.path());
+    let origin = super::super::super::canonical_loopback_origin(&server.settings.endpoint).unwrap();
+    let later_origin =
+        super::super::super::canonical_loopback_origin(&later.settings.endpoint).unwrap();
+    let text = String::from_utf8(journal(directory.path())).unwrap();
+    fs::write(
+        directory.path().join("agent-import-ledger.jsonl"),
+        text.replace(&origin, &later_origin),
+    )
+    .unwrap();
+    let records_before = text.lines().count();
+    let second = saved_line_as(
+        &later,
+        &crate::agent::agent_import::tests::sentinel_batch_id(0x1060),
+        "BRIDGE_MCP_LIVE_20260906_B1",
+    );
+    let args = json!({"company_guid":GUID,"batch_id":second.batch_id});
+    let call = SCRIPTED_APPROVAL.scope(
+        ScriptedApproval::approving(),
+        later.call_tool("post_import", args),
+    );
+    let response = if fail_the_record {
+        crate::agent::agent_import::TEST_ROLLBACK_AT_POST_APPEND_FAILS
+            .scope((), call)
+            .await
+    } else {
+        call.await
+    };
+    let observed = sent(simulator);
+    // An import request, in whichever encoding it was sent.
+    let is_import = |bytes: &[u8]| {
+        let units = bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>();
+        String::from_utf8_lossy(bytes).contains("Import Data")
+            || String::from_utf16_lossy(&units).contains("Import Data")
+    };
+    let posts = observed
+        .iter()
+        .filter(|request| is_import(&request.request_body))
+        .count();
+    let records = String::from_utf8(journal(directory.path()))
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert!(records.len() > records_before);
+    let lapse = later.post_approvals.lapse_note(&second.batch_id);
+    (response, records, posts, first_batch, lapse)
+}
+
+/// The record is written before B's dispatch intent, on A (the batch it
+/// covers: B has no intent yet), with the mark B's aim read and the journal
+/// count from before that read; B is sent, and its answer names A as covered.
+#[tokio::test]
+async fn a_restore_the_posts_aim_reads_is_recorded_before_its_intent() {
+    let (response, records, posts, first_batch, lapse) = post_after_a_restore(false).await;
+    // The approval was spent on the send: nothing lapsed.
+    assert!(lapse.is_none(), "{lapse:?}");
+    let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
+    assert_eq!(posts, 1, "B was sent once: {response}");
+    let seen = records
+        .iter()
+        .position(|record| record["record_type"] == "rollback_seen")
+        .unwrap_or_else(|| panic!("no rollback record: {response}"));
+    let intent = records
+        .iter()
+        .position(|record| {
+            record["record_type"] == "dispatch_intent" && record["batch_id"] == second_batch
+        })
+        .unwrap();
+    assert!(seen < intent, "recorded before B's intent");
+    assert_eq!(records[seen]["batch_id"], first_batch);
+    assert_eq!(records[seen]["mark_read"], 10);
+    assert!(records[seen]["records_before_read"].as_u64().unwrap() as usize <= seen);
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record["record_type"] == "rollback_seen")
+            .count(),
+        1
+    );
+    assert_eq!(
+        response["structuredContent"]["result"]["rollback_recorded_at_post"],
+        json!({"count": 1, "first": [first_batch]}),
+        "{response}"
+    );
+}
+
+/// A record that cannot be written refuses B before its intent, with the typed
+/// refusal: nothing is recorded for B and nothing is sent.
+#[tokio::test]
+async fn a_restore_the_post_cannot_record_refuses_it_with_nothing_sent() {
+    let (response, records, posts, _, lapse) = post_after_a_restore(true).await;
+    // Refused before the approval was spent: it lapsed unspent, so the next
+    // call asks the person again.
+    assert_eq!(
+        lapse.as_ref().map(|note| note["reason"].clone()),
+        Some(json!("post_refused_before_intent")),
+        "{lapse:?}"
+    );
+    let second_batch = crate::agent::agent_import::tests::sentinel_batch_id(0x1060);
+    assert_eq!(posts, 0, "nothing was sent: {response}");
+    assert_eq!(response["isError"], json!(true), "{response}");
+    assert_eq!(
+        response["structuredContent"]["result"]["error"]["code"],
+        crate::tally::approved_import::UnderLockRefusal::RollbackUnrecorded.code(),
+        "{response}"
+    );
+    assert!(!records.iter().any(|record| {
+        record["record_type"] == "dispatch_intent" && record["batch_id"] == second_batch
+    }));
+    assert!(!records
+        .iter()
+        .any(|record| record["record_type"] == "rollback_seen"));
 }

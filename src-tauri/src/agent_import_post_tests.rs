@@ -1477,7 +1477,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     .unwrap()
     .bind_selected(requested.clone())
     .unwrap();
-    let recheck = |catalogue: &str| {
+    let recheck_bound = |catalogue: &str, binding: &_| {
         recheck_import_admission(
             &line,
             &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
@@ -1486,12 +1486,13 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             catalogue,
             None,
             &single_currency,
-            &ledger_binding,
+            binding,
             InvoiceIdentity::ByNumber,
             None,
             None,
         )
     };
+    let recheck = |catalogue: &str| recheck_bound(catalogue, &ledger_binding);
     // Control: the captured catalogue holds no twin of any named ledger.
     recheck(&catalogue).expect("no twin, so the queued batch is admitted");
     assert_eq!(
@@ -1515,6 +1516,16 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     .is_empty());
     // In the queue, the recheck reads every voucher's ledgers again.
     let error = recheck(&twinned).expect_err("a twin of voucher 2's ledger must refuse the batch");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
+    // This batch is Journals, not the measured shape, so naming the other
+    // ledger in the binding does not let it on (#626).
+    let shown = twinned_parents
+        .bind_selected(requested.iter().cloned().chain(["Cash\r\n".to_string()]))
+        .unwrap();
+    let error = recheck_bound(&twinned, &shown).expect_err("not the measured shape");
     assert!(matches!(
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
@@ -1945,7 +1956,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let mut absent = line;
     absent.batch_id = "bridge-00000000-0000-4000-8000-000000000003".into();
     for entry in &mut absent.vouchers[0].entries {
-        entry.amount = "12.62".into();
+        entry.amount = ImportAmount::parse("12.62").unwrap();
     }
     recheck_import_admission(
         &absent,
@@ -2031,6 +2042,54 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             Some(ApprovedImportAdmissionError::AdmissionInconsistent)
         ));
     }
+
+    // A pair the dialog named goes on in the queue, on the measured shape: this
+    // Payment's debit ledger, its twin in the approved binding (#626). The same
+    // twin outside the binding is refused.
+    let debit = payment.vouchers[0]
+        .entries
+        .iter()
+        .find(|entry| entry.side == EntrySide::Dr)
+        .unwrap()
+        .ledger
+        .clone();
+    let twin = catalogue.replace("WR2 Sales", &format!("{debit}&#13;&#10;"));
+    let parents = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &twin,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap();
+    let named = payment.vouchers[0]
+        .entries
+        .iter()
+        .map(|entry| entry.ledger.clone())
+        .collect::<Vec<_>>();
+    let recheck_twin = |binding: &_| {
+        recheck_import_admission(
+            &payment,
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
+            &captured,
+            &captured,
+            &twin,
+            Some(&groups),
+            &single_currency,
+            binding,
+            InvoiceIdentity::ByNumber,
+            None,
+            None,
+        )
+    };
+    let shown = parents
+        .bind_selected(named.iter().cloned().chain([format!("{debit}\r\n")]))
+        .unwrap();
+    recheck_twin(&shown).expect("the pair the dialog named");
+    let unshown = parents.bind_selected(named).unwrap();
+    let error = recheck_twin(&unshown).expect_err("a twin the dialog did not name");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
 }
 
 #[test]
@@ -2104,8 +2163,8 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
 
     // The record is self-consistent; the file holds a different Journal.
     let mut other = line.vouchers.clone();
-    other[0].entries[0].amount = "99.00".into();
-    other[0].entries[1].amount = "99.00".into();
+    other[0].entries[0].amount = ImportAmount::parse("99.00").unwrap();
+    other[0].entries[1].amount = ImportAmount::parse("99.00").unwrap();
     fs::write(
         &path,
         render_import_xml("Synthetic Accounts", &other, &line.batch_id),
@@ -2202,12 +2261,12 @@ fn payment_with(parties: usize, name: impl Fn(usize) -> String) -> ImportLedgerL
     voucher.entries = (0..parties)
         .map(|index| ImportEntry {
             ledger: name(index),
-            amount: "1.00".into(),
+            amount: ImportAmount::parse("1.00").unwrap(),
             side: EntrySide::Dr,
         })
         .chain(std::iter::once(ImportEntry {
             ledger: "Cash".into(),
-            amount: format!("{parties}.00"),
+            amount: ImportAmount::parse(&format!("{parties}.00")).unwrap(),
             side: EntrySide::Cr,
         }))
         .collect();
@@ -4876,6 +4935,82 @@ fn a_name_that_spells_a_line_break_in_typed_characters_takes_no_mark() {
     );
 }
 
+fn line_break_twin(named: &str, other: &str) -> LineBreakTwin {
+    LineBreakTwin {
+        named: named.into(),
+        named_group: "Current Assets".into(),
+        other: other.into(),
+        other_group: "Bank Accounts".into(),
+    }
+}
+
+/// #626: every form of the dialog names both ledgers of a pair, each with its
+/// group, and which one the post uses, in either direction; the name is
+/// written bare, so the only marked name is one the voucher lines show.
+#[test]
+fn a_dialog_names_both_ledgers_of_a_line_break_pair_and_which_is_used() {
+    let (mut single, endpoint) = batch();
+    let plain = line_break_twin("Cash", "Cash\r\n");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&plain),
+    )
+    .unwrap()
+    .text;
+    let expected = [
+        r#"Used: "Cash", no line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", line break at its end, group "Bank Accounts""#,
+    ];
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines.windows(2).any(|shown| shown == expected), "{text}");
+    assert!(!text.contains("Line break"), "{text}");
+
+    single.vouchers[0].entries[1].ledger = "Cash\r\n".into();
+    refresh_batch_sha256(&mut single);
+    let broken = line_break_twin("Cash\r\n", "Cash");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&broken),
+    )
+    .unwrap()
+    .text;
+    for shown in [
+        r#"Used: "Cash", line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", no line break at its end, group "Bank Accounts""#,
+    ] {
+        assert!(text.lines().any(|line| line == shown), "{text}");
+    }
+
+    let (several, endpoint) = batch_of_every_type();
+    for form in [PreviewForm::Listed, PreviewForm::TotalsOnly] {
+        let text =
+            review_preview_with_twins(&several, &endpoint, form, std::slice::from_ref(&plain))
+                .unwrap()
+                .text;
+        assert!(text.contains(expected[0]), "{form:?}: {text}");
+        assert!(text.contains(expected[1]), "{form:?}: {text}");
+    }
+}
+
+/// #626: a group is Tally's text, so a dialog refuses one it could not show
+/// whole, as it refuses any other value.
+#[test]
+fn a_dialog_refuses_a_line_break_pair_whose_group_it_cannot_show() {
+    let (single, endpoint) = batch();
+    let mut twin = line_break_twin("Cash", "Cash\r\n");
+    twin.other_group = "Bank\nAccounts".into();
+    assert_eq!(
+        review_preview_with_twins(&single, &endpoint, PreviewForm::Listed, &[twin])
+            .err()
+            .as_deref(),
+        Some("import_review_layout_text")
+    );
+}
+
 /// An assistant's one-voucher text shows such a name quoted with its break
 /// written out and the mark before it, with the line that explains the mark
 /// once, under the entries and the On Account sentence and above the totals;
@@ -5329,6 +5464,57 @@ fn a_dialog_text_without_a_recorded_ledgers_mark_is_refused() {
     // The mark on another line does not stand in for this ledger's own.
     let elsewhere = marked.replace("On Account  \"Expense\"", "On Account  \"Rent\"");
     assert_eq!(seal(elsewhere).unwrap_err(), ON_ACCOUNT_UNMARKED);
+    // The refusal's code, as the caller is told it.
+    assert_eq!(ON_ACCOUNT_UNMARKED, "import_review_on_account_unmarked");
+    // The legend counts only as a line of its own, and the marked name only
+    // at the end of its line.
+    let legend_inside = marked.replace(ON_ACCOUNT_LEGEND, &format!("x {ON_ACCOUNT_LEGEND}"));
+    assert_eq!(seal(legend_inside).unwrap_err(), ON_ACCOUNT_UNMARKED);
+    let name_inside = marked.replace("On Account  \"Expense\"", "On Account  \"Expense\" x");
+    assert_eq!(seal(name_inside).unwrap_err(), ON_ACCOUNT_UNMARKED);
+}
+
+/// A recorded ledger whose name no dialog may show cannot be found marked in
+/// any text, so the text is refused, even when every other mark and the
+/// legend are there.
+#[test]
+fn a_recorded_ledger_whose_name_cannot_be_shown_refuses_the_text() {
+    let (mut line, endpoint) = batch();
+    approve_on_account(&mut line, &["Expense", "Cash"]);
+    let marked = admit_fresh_saved_voucher(&line, &endpoint).unwrap();
+    for voucher in &mut line.vouchers {
+        for entry in &mut voucher.entries {
+            if entry.ledger == "Expense" {
+                entry.ledger = "Expense\u{7}".into();
+            }
+        }
+    }
+    approve_on_account(&mut line, &["Expense\u{7}", "Cash"]);
+    assert!(ReviewLedgerName::parse("Expense\u{7}").is_err());
+    assert_eq!(
+        OnAccountMarks::of(&line).seal(&line, marked).err(),
+        Some(ON_ACCOUNT_UNMARKED.to_string())
+    );
+}
+
+/// Every voucher of a batch is checked for its marked ledgers, not only the
+/// first: a ledger approved On Account that only a later voucher names must
+/// still be marked.
+#[test]
+fn a_batch_text_is_refused_when_a_later_vouchers_recorded_ledger_is_unmarked() {
+    let (mut line, endpoint) = batch_of_every_type();
+    approve_on_account(&mut line, &["Party B"]);
+    assert!(line.vouchers[0]
+        .entries
+        .iter()
+        .all(|entry| entry.ledger != "Party B"));
+    let marked = review_preview_with(&line, &endpoint, &[]).unwrap();
+    assert!(marked.contains("On Account  \"Party B\""), "{marked}");
+    let unmarked = marked.replace("On Account  \"Party B\"", "\"Party B\"");
+    assert_eq!(
+        OnAccountMarks::of(&line).seal(&line, unmarked).err(),
+        Some(ON_ACCOUNT_UNMARKED.to_string())
+    );
 }
 
 /// A batch that carries the On Account legend withholds, on its voucher
@@ -5350,6 +5536,16 @@ fn a_narration_that_reads_like_the_on_account_legend_is_withheld_beside_it() {
     ] {
         assert_eq!(reads_like_the_legend(text), matched, "{text:?}");
         assert!(!reads_like_a_dialog_line(text), "{text:?}");
+    }
+    // A word character before "on" is a letter or digit in any script, or
+    // `_`; any whitespace, a no-break space among it, separates the words.
+    for (text, matched) in [
+        ("x_on account: 1", false),
+        ("caf\u{e9}on account: 1", false),
+        ("on\u{a0}account: 1", true),
+        ("on account\u{a0}: 1", true),
+    ] {
+        assert_eq!(reads_like_the_legend(text), matched, "{text:?}");
     }
     let (mut line, endpoint) = batch_of_every_type();
     line.vouchers[1].narration = Some("On Account: no ledger here is bill-wise".into());
@@ -5550,6 +5746,10 @@ fn each_master_refusal_reaches_the_caller_under_its_own_code() {
             UnderLockRefusal::MasterJournalUnavailable,
             "master_ledger_unavailable",
         ),
+        (
+            UnderLockRefusal::JournalSplit("other_journal_holds_batches"),
+            "import_journal_split",
+        ),
     ] {
         assert_eq!(refusal_code(&anyhow::Error::from(refusal)), code);
     }
@@ -5608,10 +5808,11 @@ fn the_voucher_recheck_given_a_masters_admission_refuses_and_aims_nothing() {
     let aimed = std::sync::Mutex::new(None::<u64>);
     let error = recheck_voucher_queue(
         QueuedAdmission::Masters {
-            item: &crate::tally::ledger_create_item::LedgerCreateItem::new(
+            batch: &crate::tally::ledger_create_item::LedgerCreateItem::new(
                 crate::tally::ledger_create_item::MasterName::new("Some Party").unwrap(),
                 crate::tally::ledger_create_item::AdmittedLedgerKind::Suspense,
-            ),
+            )
+            .into(),
             company: &crate::tally::VerifiedCompanyIdentity::test_fixture(
                 "Synthetic Accounts",
                 "00000000-0000-4000-8000-000000000002",
@@ -6350,4 +6551,95 @@ fn only_a_post_refusal_that_sent_nothing_carries_its_codes_next_step() {
         reconciliation_failure_payload("batch", Some(false), None, "voucher_text_invalid");
     attach_next_step(&mut payload, None, nothing_sent);
     assert!(payload["result"]["error"].get("next_step").is_none());
+}
+
+/// #2142: a drain the post's admission reads meet is not counted against the
+/// call's ceiling, so the ceiling and the most one call can spend draining stay
+/// under the host's limit of about 60 s (#485, #703).
+#[test]
+fn a_drain_keeps_a_post_under_the_host_limit() {
+    let worst = bridge_tally_transport::DrainPolicy::MEASURED.worst_per_call();
+    assert_eq!(worst, std::time::Duration::from_secs(11));
+    assert!(approval::CALL_CEILING + worst < std::time::Duration::from_secs(60));
+}
+
+/// #2142: a post refused before its attempt while Tally drains is told when to
+/// try again and what to do, by its own code.
+#[test]
+fn a_draining_refusal_before_the_attempt_names_its_own_next_step() {
+    for (code, retry, step) in [
+        (
+            "tally_endpoint_draining",
+            10,
+            DRAINING_BEFORE_ATTEMPT_NEXT_STEP,
+        ),
+        ("tally_endpoint_busy", 5, BUSY_BEFORE_ATTEMPT_NEXT_STEP),
+    ] {
+        let payload = reconciliation_failure_payload("batch", Some(false), None, code);
+        let error = &payload["result"]["error"];
+        assert_eq!(error["code"], code);
+        assert_eq!(error["retry_after_s"], retry, "{error}");
+        assert_eq!(error["next_step"], step, "{error}");
+    }
+    // After a post was sent, a draining readback keeps the verify step.
+    let payload =
+        reconciliation_failure_payload("batch", Some(true), None, "tally_endpoint_draining");
+    assert_eq!(
+        payload["result"]["error"]["next_step"],
+        BUSY_AFTER_POST_NEXT_STEP
+    );
+}
+
+/// #2142: a marks readback refused because Tally is draining is tried once more
+/// after the refusal's own wait, only when the call's ceiling has room for that
+/// wait, the retry's own drain and the rest of the post. Every read here finds
+/// the drain owed, just probed, so each is refused with nothing sent.
+#[tokio::test]
+async fn a_draining_marks_readback_is_retried_only_with_room_for_its_drain() {
+    use crate::endpoint_wire::wire_refusal;
+    use bridge_tally_transport::WireRefusal;
+    use std::time::{Duration, Instant};
+    let directory = tempfile::tempdir().unwrap();
+    let mut server = records_server(directory.path());
+    server.runtime = crate::tally::TallyRuntime::default().with_wire_gate_config(
+        crate::tally::TallyRuntime::default()
+            .wire_gate_config()
+            .clone()
+            .owe_at_sends((0..32).collect()),
+    );
+    let request = || {
+        crate::tally::agent_read_request::AgentReadRequest::parse(
+            super::super::super::read_profiles::render_agent_company_high_water("Test Co"),
+        )
+        .unwrap()
+    };
+    let reads_from = |call_started: Instant| {
+        let reads = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let read = MARKS_READS.scope(
+            std::sync::Arc::clone(&reads),
+            server.read_marks_after_post(request(), call_started),
+        );
+        async move {
+            let result = read.await;
+            let reads = reads.lock().unwrap().clone();
+            (result, reads)
+        }
+    };
+    let draining = |result: &anyhow::Result<String>| {
+        matches!(
+            wire_refusal(result.as_ref().expect_err("the read sends nothing")),
+            Some(WireRefusal::Draining { .. })
+        )
+    };
+    // With the whole call left: read, wait, read once more.
+    let (result, reads) = reads_from(Instant::now()).await;
+    assert!(draining(&result));
+    assert_eq!(reads.len(), 2, "one retry: {reads:?}");
+    // 25 s in: the wait and the retry would fit, but not with its drain.
+    let late = Instant::now()
+        .checked_sub(Duration::from_secs(25))
+        .unwrap_or_else(Instant::now);
+    let (result, reads) = reads_from(late).await;
+    assert!(draining(&result));
+    assert_eq!(reads, [None], "no retry");
 }

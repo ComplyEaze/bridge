@@ -49,6 +49,29 @@ pub(super) const AGENT_VOUCHER_FETCH: &str =
 GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLLEDGERENTRIES.*,\
 REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
 
+/// A voucher's e-invoice details, added to [`AGENT_VOUCHER_FETCH`] only when a `vouchers` call asks
+/// for them (#1378), so every other read's request stays the one the lab sent (protocol reference
+/// §8.2j).
+const AGENT_VOUCHER_E_INVOICE_WORDS: &str = ",IRN,IRNACKNO,IRNACKDATE";
+
+/// A voucher's GST and note details, added the same way (#2027, protocol reference §8.2k).
+const AGENT_VOUCHER_GST_WORDS: &str = ",PLACEOFSUPPLY,STATENAME,GSTREGISTRATIONTYPE,\
+GSTNATUREOFRETURN,VATPARTYTRANSRETURNNUMBER,VATPARTYTRANSRETURNDATE";
+
+/// A voucher's dispatch details and its Delivery Note list, sent only right after
+/// [`AGENT_VOUCHER_GST_WORDS`]: the request the lab answered (#2027, protocol reference §8.2l).
+const AGENT_VOUCHER_DISPATCH_WORDS: &str = ",BASICSHIPDOCUMENTNO,BASICSHIPPEDBY,\
+BASICFINALDESTINATION,EICHECKPOST,BILLOFLADINGNO,BILLOFLADINGDATE,BASICSHIPVESSELNO,\
+INVOICEDELNOTES.*";
+
+/// [`AGENT_VOUCHER_FETCH`] with `ALLINVENTORYENTRIES.*` in place of `ALLLEDGERENTRIES.*`, sent only
+/// by a `vouchers` call that asks for stock lines (#2016): the request captured on each kind of
+/// voucher it reads (protocol reference §8.2i).
+const AGENT_VOUCHER_STOCK_LINE_FETCH: &str =
+    "DATE,VOUCHERNUMBER,VOUCHERTYPENAME,PARTYLEDGERNAME,NARRATION,\
+GUID,ALTERID,MASTERID,ISCANCELLED,ISOPTIONAL,ISPOSTDATED,ALLINVENTORYENTRIES.*,\
+REFERENCE,ISINVOICE,PARTYGSTIN,REFERENCEDATE";
+
 /// The window read's list without `REFERENCEDATE`: the list every ledger-scoped window read the lab
 /// sent carried (the bill trail's, #1356, on two books), and the book-wide window reads it was
 /// compared with. [`AGENT_VOUCHER_FETCH`] added `REFERENCEDATE` later (#1363) and has not been
@@ -152,20 +175,71 @@ pub(super) fn render_agent_class_vouchers_in_span(
     )
 }
 
+/// [`render_agent_vouchers_in_span`] or, with `classes`, [`render_agent_class_vouchers_in_span`],
+/// naming `fields` as well, after the plain list and in one order.
+pub(super) fn render_agent_named_vouchers_in_span(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: Option<AlterIdSpan>,
+    fields: NamedVoucherFields,
+    classes: bool,
+) -> Result<String, String> {
+    let mut fetch = AGENT_VOUCHER_FETCH.to_string();
+    if fields.e_invoice == EInvoiceFields::Asked {
+        fetch.push_str(AGENT_VOUCHER_E_INVOICE_WORDS);
+    }
+    if fields.gst == VoucherGstFields::Asked {
+        fetch.push_str(AGENT_VOUCHER_GST_WORDS);
+        fetch.push_str(AGENT_VOUCHER_DISPATCH_WORDS);
+    }
+    render_windowed_vouchers(
+        company,
+        from,
+        to,
+        &span.map(AlterIdSpan::filter).unwrap_or_default(),
+        &fetch,
+        &if classes {
+            voucher_type_class_computes()
+        } else {
+            String::new()
+        },
+    )
+}
+
+/// The stock lines of a window's vouchers in place of their ledger entries, each row's voucher type
+/// resolved as [`render_agent_class_vouchers_in_span`] resolves it: which vouchers' lines are read
+/// depends on the type, and a type can be renamed.
+pub(super) fn render_agent_stock_line_vouchers_in_span(
+    company: &str,
+    from: &TallyDate,
+    to: &TallyDate,
+    span: Option<AlterIdSpan>,
+) -> Result<String, String> {
+    render_windowed_vouchers(
+        company,
+        from,
+        to,
+        &span.map(AlterIdSpan::filter).unwrap_or_default(),
+        AGENT_VOUCHER_STOCK_LINE_FETCH,
+        &voucher_type_class_computes(),
+    )
+}
+
 /// The pre-flight census of protocol reference §11c: one light row per voucher
-/// in the window, optionally only those whose AlterID falls in `span`.
+/// in the window whose AlterID falls in `span`.
 ///
 /// The `FETCH` is the one §12.7 qualified for the empty-partition witness, and
 /// the AlterID range is the segment filter the outstandings scanner sends. The
 /// date window keeps a census cheap; the span bounds the response by
 /// construction — with distinct AlterIDs it cannot return more than
-/// `span.through - span.after` rows — and is used whenever the book's mark is
-/// larger than one census (protocol reference §11c.3).
+/// `span.through - span.after` rows. Every census carries one: a census with no
+/// span cannot be rendered (protocol reference §11c.3, #2145).
 pub(super) fn render_agent_voucher_census(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    span: Option<AlterIdSpan>,
+    span: AlterIdSpan,
 ) -> Result<String, String> {
     render_voucher_census(company, VoucherScope::Book, from, to, span)
 }
@@ -187,7 +261,7 @@ pub(super) fn render_agent_ledger_census(
     to: &TallyDate,
     span: AlterIdSpan,
 ) -> Result<String, String> {
-    render_voucher_census(company, VoucherScope::Ledger(ledger), from, to, Some(span))
+    render_voucher_census(company, VoucherScope::Ledger(ledger), from, to, span)
 }
 
 /// The vouchers a windowed request reads: the book's, or one ledger's (#485). A ledger enters a
@@ -220,13 +294,13 @@ fn render_voucher_census(
     scope: VoucherScope<'_>,
     from: &TallyDate,
     to: &TallyDate,
-    span: Option<AlterIdSpan>,
+    span: AlterIdSpan,
 ) -> Result<String, String> {
     let (collection, type_element) =
         scope.collection("Bridge Agent Voucher Census", "Bridge Agent Ledger Census");
     let company = ValidatedCompanyName::new(company.to_string())
         .map_err(|_| "company_name_invalid".to_string())?;
-    let span_filter = span.map(AlterIdSpan::filter).unwrap_or_default();
+    let span_filter = span.filter();
     // A quoted `$$Date:"…"` literal takes only a date: XML escaping cannot
     // protect it, since Tally decodes `&quot;` before evaluating (#861).
     let (from, to) = (from.as_str(), to.as_str());
@@ -601,14 +675,6 @@ pub(super) fn invoice_voucher_types_read(company: &str) -> ReadRequest {
     ReadRequest(agent_import::invoice::render_voucher_types_request(company))
 }
 
-/// The company's own count of its ledgers, to size an invoice build on a book
-/// whose master mark is high.
-pub(super) fn invoice_ledger_count_read(company: &str) -> ReadRequest {
-    ReadRequest(
-        bridge_tally_protocol::outstandings_shared::render_company_ledger_count_request(company),
-    )
-}
-
 /// The vouchers carrying one invoice number in one financial year, with the
 /// measured per-row Sales-class compute, for the duplicate-number check.
 pub(super) fn invoice_number_read(
@@ -634,16 +700,16 @@ pub(super) fn invoice_readback_read(
 }
 
 /// The ledger listing with each ledger's GST rate and rounding, for the tax
-/// check of an invoice, restricted to the ledgers under one scope's parents
+/// check of an invoice, restricted to the ledgers the invoice names, by GUID
 /// (#1331). Its window is the invoice's financial year start and the invoice
 /// date.
 pub(super) fn invoice_ledger_rates_scoped_read(
     company: &str,
     window: (&TallyDate, &TallyDate),
-    part: &bridge_tally_protocol::parent_partition::ParentPart,
+    part: &bridge_tally_protocol::ledger_guid_part::LedgerGuidPart,
 ) -> ReadRequest {
     ReadRequest(
-        agent_import::invoice::render_ledger_rates_request_for_parents(company, window, part),
+        agent_import::invoice::render_ledger_rates_request_for_ledgers(company, window, part),
     )
 }
 
@@ -684,7 +750,7 @@ pub(super) fn voucher_census_read(
     company: &str,
     from: &TallyDate,
     to: &TallyDate,
-    span: Option<AlterIdSpan>,
+    span: AlterIdSpan,
 ) -> Result<ReadRequest, String> {
     render_agent_voucher_census(company, from, to, span).map(ReadRequest)
 }
@@ -799,10 +865,10 @@ mod sealed_read_tests {
     #[test]
     fn every_sealed_profile_renders_an_admitted_read_envelope() {
         let company = "Bridge Sealed Read Co";
-        let span = Some(AlterIdSpan {
+        let span = AlterIdSpan {
             after: 10,
             through: 20,
-        });
+        };
         let (from, to) = (tally_date("20260401"), tally_date("20260430"));
         let mut reads = vec![
             company_high_water_read(company),
@@ -817,13 +883,20 @@ mod sealed_read_tests {
             )
             .unwrap(),
         ];
+        let named = NamedVoucherFields {
+            e_invoice: EInvoiceFields::Asked,
+            gst: VoucherGstFields::Asked,
+        };
         for shape in [
             super::super::voucher_window::VoucherReadShape::ImportVerification,
             super::super::voucher_window::VoucherReadShape::Movement,
             super::super::voucher_window::VoucherReadShape::EntryWildcard,
             super::super::voucher_window::VoucherReadShape::ClassEntryWildcard,
+            super::super::voucher_window::VoucherReadShape::EntryWildcard.asking(named),
+            super::super::voucher_window::VoucherReadShape::ClassEntryWildcard.asking(named),
+            super::super::voucher_window::VoucherReadShape::ClassInventoryWildcard,
         ] {
-            for part_span in [None, span] {
+            for part_span in [None, Some(span)] {
                 reads
                     .push(voucher_window_part_read(shape, company, &from, &to, part_span).unwrap());
             }

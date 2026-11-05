@@ -512,7 +512,7 @@ pub struct LedgerNameRow {
     pub alter_id: u64,
 }
 
-/// Parses the V3 catalogue answer ([`crate::ReadOnlyProfile::StandardLedgerCatalogV3`])
+/// Parses the V3 catalogue answer ([`crate::xml_read_profiles::ReadOnlyProfile::StandardLedgerCatalogV3`])
 /// into the ledgers a new ledger's name is checked against, refusing what the
 /// V1 and V2 parsers would pass where a gap could hide a name: a row without an
 /// `ALTERID` or a `LANGUAGENAME.LIST`, an empty or unusable name or alias, and
@@ -571,6 +571,41 @@ pub fn parse_ledger_census_slice(
     expected_company_guid: &str,
     max_rows: u64,
 ) -> Result<Vec<String>, StandardLedgerCatalogError> {
+    parse_census_slice(xml, expected_company_guid, max_rows, b"LEDGER")
+}
+
+/// The stock-item GUIDs of one slice of a stock-item census: the response to
+/// [`crate::ledger_census::render_stock_item_census_slice_request`], read by the ledger census's
+/// rules with `STOCKITEM` rows (#1233). Tested on that request's answers as a lab script captured
+/// them (`STOCK_CAPTURE_PROVENANCE.md`); a read past the single-read mark has run through Bridge
+/// once, on one real book.
+pub fn parse_stock_item_census_slice(
+    xml: &str,
+    expected_company_guid: &str,
+    max_rows: u64,
+) -> Result<Vec<String>, StandardLedgerCatalogError> {
+    parse_census_slice(xml, expected_company_guid, max_rows, b"STOCKITEM")
+}
+
+/// The stock-group GUIDs of one slice of a stock-group census: the response to
+/// [`crate::ledger_census::render_stock_group_census_slice_request`], read by the ledger census's
+/// rules with `STOCKGROUP` rows (#1233). Tested on a captured answer, like the stock-item parser.
+pub fn parse_stock_group_census_slice(
+    xml: &str,
+    expected_company_guid: &str,
+    max_rows: u64,
+) -> Result<Vec<String>, StandardLedgerCatalogError> {
+    parse_census_slice(xml, expected_company_guid, max_rows, b"STOCKGROUP")
+}
+
+/// A census slice whose every row is a `row_tag` element; a row of any other tag is a response to
+/// another request and is refused.
+fn parse_census_slice(
+    xml: &str,
+    expected_company_guid: &str,
+    max_rows: u64,
+    row_tag: &[u8],
+) -> Result<Vec<String>, StandardLedgerCatalogError> {
     let marked = crate::mark_forbidden_numeric_references(xml);
     let xml = marked.as_ref();
     validate_export_response(xml).map_err(|_| StandardLedgerCatalogError::MalformedResponse)?;
@@ -588,6 +623,14 @@ pub fn parse_ledger_census_slice(
             Event::Start(element)
                 if path_eq(&path, &[b"ENVELOPE", b"BODY", b"DATA", b"COLLECTION"]) =>
             {
+                if !element
+                    .name()
+                    .as_ref()
+                    .as_bytes()
+                    .eq_ignore_ascii_case(row_tag)
+                {
+                    return Err(StandardLedgerCatalogError::MalformedResponse);
+                }
                 if guids.len() as u64 >= max_rows {
                     return Err(StandardLedgerCatalogError::BoundsViolation);
                 }
@@ -1391,7 +1434,7 @@ fn safe_standard_ledger_parent(value: &str) -> Option<String> {
     Some(value.to_string())
 }
 
-fn unsafe_display_character(value: char) -> bool {
+pub(crate) fn unsafe_display_character(value: char) -> bool {
     value.is_control() || deceptive_display_character(value)
 }
 

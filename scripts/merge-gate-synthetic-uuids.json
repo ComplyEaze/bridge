@@ -220,6 +220,890 @@
     {
       "uuid": "5193df0a-eeb7-49fb-88f9-03aae16e2eeb",
       "note": "bank-allocation identifier Tally gave the bank entry of the Journal of 16 May 2025 in the synthetic lab company BRIDGE COST KEY LAB, as it returned it in the read-only voucher capture of 27 October 2026 (lab branch lab/1231-cost-centre-keyed-allocation-answers at e4dc6e929536); it is the NAME of that entry's BANKALLOCATIONS.LIST"
+    },
+    {
+      "uuid": "021bda0c-b1b1-44c8-8279-5212ce87c9c7",
+      "note": "company identifier of the synthetic lab company BRIDGE ALIAS LAB, keyed on Tally's screen for a lab item on 21 Oct 2026 and used again for the ledger aliases row of 30 Oct 2026: the LEDGER rows of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/alias-lab-1688/*.utf16le.xml carry it as their company identifier and as the prefix of every ledger identifier; those answers are on lab branch lab/1688-ledger-aliases-answers at aa49368177ec"
+    },
+    {
+      "uuid": "17a10910-773c-42c6-bd66-7bba9a392536",
+      "note": "company identifier of the synthetic lab company BRIDGE AMEND LAB: the COMPANY row of src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-company-extent.utf16le.xml names the company beside this GUID (AMEND_NOW_CAPTURE_PROVENANCE.md), as the d3-* and wa1-* extents on master do"
+    },
+    {
+      "uuid": "bdd61666-ccbb-8ca8-bf60-14f696193240",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 1 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "06ded916-7ee5-872d-9e75-e17555346b1d",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 2 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "bc2db87f-33eb-8a8a-a6f5-7aa14fdf8e5c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 3 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "598bdf86-fb3a-86cb-aa0b-2ab8004fe6b3",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 4 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "8a21728c-8ec4-88ed-b7a1-2eb6cec66616",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 6 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "3c41041d-684d-809b-af7f-fdfebf8b0482",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 7 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d4cd9639-ab94-8c0b-acbe-eb1bf32f3d54",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 8 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "bde57d54-4252-8540-bb2c-36007305eab6",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 9 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "c342cf4c-819f-8937-8680-0478212eca16",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 10 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "f3520fc9-0fca-87b5-a990-db4f8edc3fd1",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 11 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d82ffbaa-c2fd-8d8d-abdb-67992415e78b",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 12 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "e9fa667f-a4e5-8df5-8ea7-828eb0c138bf",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 13 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "f112136d-fd32-86aa-9da6-25ea97a05bbf",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 14 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "9fc6f7f3-a5cd-83b9-9727-7a585b36d107",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 15 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "e59d0f3c-bd03-8ba0-b9fc-1b40d82c5035",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 16 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d276ff7d-fb6e-8c70-b334-81f0be7108cb",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 17 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "a384addf-741e-83a3-a497-cd2c5d275d42",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 18 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "f987a90b-700c-82e2-a793-228a94a0b9d3",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 19 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "64d6df97-1bdf-8d5d-952c-d77b3fdcbadb",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 20 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "2bbddff1-3d48-8640-b840-5820611a43ad",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 21 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "64ac6e43-9635-8604-9f2e-8bc8dc075035",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 22 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "5ceb23d1-c91e-89ef-960c-2c49022bd4b0",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 23 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "4720e61b-8056-8b41-83e1-4bab78a81b03",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 24 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "db0e8ad0-7b7d-8fcf-b75a-a63e8e884fc9",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 25 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "505060c8-f170-8e8c-949b-f595a4376386",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 26 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "a594ee2e-a50e-8eb1-bc2c-3f003793bc0d",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 27 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "4cef4019-fea4-83ed-a775-3c5a9dc7d17a",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 28 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "2dd0f40e-c51c-8600-b82c-d2b2f9886c0a",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 29 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "01bd181f-f759-8607-86f3-e3ccee787eff",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 30 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "2b81ca91-18ee-891a-aaf6-c826b5720d56",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 31 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "159f8037-5b6d-8205-87b9-2c4d43b3d7b8",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 32 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "7dbafe34-fe56-89eb-ac00-046f37fda376",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 33 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "19824f0a-8487-85e8-aefa-cd16d3046e66",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 34 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "cb2c7bb0-7c30-81e6-a7f8-b95cb486d377",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 35 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "ad2f194d-821b-8a1b-a8f7-aa67feccec9f",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 36 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "d246efb0-087c-8ef3-9586-a8c9160de238",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 37 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "8670f9ba-b945-89cd-baed-f000d9979f45",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 38 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "03c45c93-4061-8ac2-ae6a-96f02aa1cf1f",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 39 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "5f31d4a7-9897-843c-a783-7f26677d7155",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 40 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "577635d0-eb68-8513-b41c-e300e2234197",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 41 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "7b593ff0-40dc-8567-9b41-cd9b7477a439",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 42 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "bc39ddfd-b1eb-821b-a4b8-637da783d488",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 43 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "212d3cc4-0a9a-8ae0-9c9f-ade5a0dc3811",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 44 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "394e6f6a-d48e-8ec4-818c-5d454badcc8c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 45 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "6897f8ab-e108-86de-802a-9e95a9b86e6f",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 46 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "392abbff-8a33-88e4-a4e2-98bcdef1ceef",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 47 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "dc93e8cf-1bc0-80e0-842d-e0bc31d4a4ea",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 48 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "ab096c2b-18d1-83a0-83ee-76a3f3ac747c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 49 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "05f2080d-a329-8826-8ecc-b9c014d1da57",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 50 dated 1 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-d3-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "fb9eac30-a125-8dcc-b70d-027a147ce3d1",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Payment voucher number 16 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "01d76bfc-809d-8e4c-904b-aac461d0aa18",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 251 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "0fc0dde9-2be3-84f2-8f9c-8a739d68f730",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Payment voucher number 2 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "af6cf668-b7b6-8632-b248-e87f69beee1c",
+      "note": "narration marker, written as [BRIDGE:...] by ComplyEaze Bridge's own post, of the Journal voucher number 252 dated 3 April 2026 of the synthetic lab company BRIDGE AMEND LAB: the verification answer src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/amend-now-wa1-import-verification.utf16le.xml (AMEND_NOW_CAPTURE_PROVENANCE.md)"
+    },
+    {
+      "uuid": "5848d0ca-ed85-4c97-ab20-e045893a9803",
+      "note": "company identifier of the synthetic lab company BRIDGE LEDGERBOX CI LAB, as TallyPrime 7.2 returned it in the read-only marks and ledger reads of the two batch ledger-create rows of 29 October 2026 (lab branches lab/690-batch-ledger-create-l0-answers at 078db03e1f8b and lab/690-batch-ledger-create-l0b-answers at 5efb36d410f5); the ledger identifiers in those answers carry this value as their prefix, and pull request 2181's tests read it as L0_COMPANY"
+    },
+    {
+      "uuid": "1e5b2cd7-f5c6-4d51-adc9-53a4dfa370bb",
+      "note": "batch identifier, written by ComplyEaze Bridge's own build, of the synthetic lab company BRIDGE AMEND LAB: the captured batch d3-batch-journal.jsonl and d3-batch-import.xml under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/, public on master."
+    },
+    {
+      "uuid": "78ce4328-9c2a-4827-8584-821d6d656b40",
+      "note": "batch identifier, written by ComplyEaze Bridge's own build, of the synthetic lab company BRIDGE AMEND LAB: the captured batch wa1-payment-journal.jsonl and wa1-payment-import.xml under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/, public on master."
+    },
+    {
+      "uuid": "4e4af679-b48b-48ac-b9ca-71f3ea6a507d",
+      "note": "batch identifier, written by ComplyEaze Bridge's own build, of the synthetic lab company BRIDGE AMEND LAB: the captured batch l1-reentry-journal.jsonl and l1-reentry-import.xml under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/, public on master."
+    },
+    {
+      "uuid": "d0b6b9e8-9f2e-4863-b0f1-feac353fd9b0",
+      "note": "company identifier of the synthetic lab company BRIDGE NOTES LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/gst-note-fields-lab/ (pull request 2301; lab branches lab/2027-gst-note-fields-capture-answers at 07e3bc34, lab/2027-voucher-gst-fields-fetch-answers at 67039e2b and lab/2027-window-read-answers at 307427aa); the voucher identifiers in those captures and their parse records are this value with a suffix"
+    },
+    {
+      "uuid": "63292d7c-d541-42e5-aa9d-2ab5f8b993ff",
+      "note": "company identifier of the synthetic lab company BRIDGE REVIEW LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-* and review-hand-* (pull request 2308; lab branches lab/2210-census-answers at b52cd5ec and lab/2210-hand-import-answers at 42ac2167): the COMPANY row of review-lab-company-extent.utf16le.xml names it BRIDGE REVIEW LAB beside this GUID; the voucher and ledger identifiers in those captures, their parse records and the tests are this value with a suffix"
+    },
+    {
+      "uuid": "035c46cf-1a23-4744-b6f7-b24834f6f91b",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "0c37c807-1568-8242-9d8c-24422e0c99e1",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "0f0a6e45-1898-499c-a27c-013122c9d0de",
+      "note": "Bridge-written private REMOTEID of the single Payment's native post to BRIDGE REVIEW LAB: the native_remote_id in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "10604d2b-8476-438a-ac26-c9d33861c42b",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "11283b2f-f4ee-438b-a7c2-47a6eea7ae66",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "1a22614f-8c4c-82a0-8ea6-844a0c9daa9c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "1ac9a833-3a6f-81fc-87af-6808ea9b1eaa",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "1d10205a-fc83-8612-b3d4-3b664c5c907f",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "1da90721-b47f-4ce6-a110-981261ef2fbc",
+      "note": "Bridge-written batch identifier (after the bridge- prefix) of a synthetic batch built for BRIDGE REVIEW LAB: batch_id in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder) and a constant of src-tauri/src/agent_import_ack_tests.rs; generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "22489e9b-39f5-4510-99a0-dbaf58d62777",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "251e5c46-5eee-474a-93e6-2e07c7665bb4",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "2a7e5232-019f-4a6e-9069-1095389299b9",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "2ab4da20-18a2-8fcf-8056-b9118cce5dca",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "2ae3a1dc-252e-4c4c-b343-5a1ded7d002e",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "34120ec7-5ee4-4c12-b23d-b302098f766b",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "38872de8-105a-8730-ab62-7fe0f60cdd02",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "3a3de2f5-2eea-8e3b-826e-ef65a4a0581f",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "3b42f0fb-5577-8542-a2ee-5a40925d36d9",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "3b9c694f-b751-898c-8c34-c6c7ae508084",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "3bcddee9-ccca-43bb-8c7a-910626798e2f",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "3bf3852e-70de-8548-bed8-20ae5200994a",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "3c3f2089-9eb9-8c13-a04f-9870ea29260e",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "3d37727b-ac22-4dfd-9b29-cb59df3cd84c",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "3da4cb35-6a16-4e21-97db-373d394783f6",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "3e402820-dcd8-8bb3-a36d-5e27493aaed6",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "401a8d40-ed47-4a6b-b4b6-3dd1723c6c48",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "410f65b9-c1a5-8884-ae42-b52bbc04be68",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "411f1abe-7373-421c-8ef4-cadb16fc2b99",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "4222309b-b671-8629-a9d6-217f7342c701",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "4455c0c2-2a4b-4c03-b3a4-0df2b3d52ba9",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "475945e8-e76a-4bf3-b474-f41f708c46b3",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "47d65318-234e-8ac1-8c53-1c932f8c707a",
+      "note": "Bridge-written attribution identifier of the single Payment saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-payment-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "4aa10bb0-f126-8895-90e9-d4baa4265a46",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "4d317975-3991-4202-b97c-2d38be3c091a",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "4e5f3311-1885-8043-8d4d-1e013982b26b",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "4f19754f-03f8-8b29-a1b4-5bf25173f62b",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "4f993cf4-e362-83aa-a7ba-2e7a017135ed",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "51a5089e-c266-41b9-a720-109152506257",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "5515404d-540f-4942-af2a-59c3e8ffd01e",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "59d2bdff-c68a-43bb-9d88-f14c2f4342b2",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "5a432121-d140-89db-b5bb-078aacb94c58",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "5ad9d120-c49d-4973-a884-248d2d73ae38",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "5b2d4692-f97f-8396-a2a2-17a335400b9c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "5d2e2b46-7e80-85f6-933a-f78d4505aca6",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "5d7fb8a2-e894-8cff-9b14-39578178a4a8",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "61fda782-cb30-4773-b997-1cb2f4306d33",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "65045575-80d6-850d-b65b-eeeda610279c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "6808b48b-d347-4f15-9380-c1072d302e57",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "69fe2049-2aa1-44cf-a50b-97851b3136b3",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "6adf5441-e1e0-8c51-a735-b45177d1d74a",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "77c4359b-dc28-893c-af90-c4901b72af85",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "77c6cdc2-b4ab-80fe-bb8e-58f7ae6e980f",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "7d86e54d-edfa-81d0-ab4c-48d711deae23",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "7da5826b-05e4-495e-ad1d-2e7a7653a661",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "7e8c2548-2578-842e-a603-e35d0b106eec",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "85141d08-9460-8aab-b8bd-aa45b98969cf",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "85e4a3c7-b1f0-8b2b-ad01-2e4bb53aa39e",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "8d46e237-b8cf-8288-955d-533adb93ab32",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "8ede7ad8-fd40-8217-9af0-deffacc2cb44",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "8f369769-0f4e-8d7c-8379-e518712cb49c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "8f4e44d5-c30d-4f4f-b54e-dd6246d095dc",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "9303371c-bc02-818f-bf7b-2c036bf9e73c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "95c29871-1b7e-8c8c-8385-7811b715017e",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "9ad65ae6-d225-8640-bf2a-6646dc25a6f1",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "9b167c04-0061-4c61-b27b-3615acc68b64",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "9b6a372a-1580-8613-ab6d-53a518c4e6ab",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "9f0123d3-a49b-434a-8855-4bd7f60a6e00",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "9f04d72d-8422-87de-8df6-e911b9efe052",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "9fdc533f-0d93-4035-a144-099a1927ec95",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "a0f33803-be58-8c6e-8bf2-6aba814ea1dc",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "a3605219-9a08-858d-bd72-53557bcabe37",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "a5da5979-5f1a-860c-9bdb-d01037806804",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "a774c504-8779-4740-ba6e-86da9d62c676",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "a9adafd7-76dd-48a7-8fae-bb66c9d86423",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "b00d78d8-f98d-4175-9d79-0cd01ba34ac7",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "b16e6640-743f-4b51-95d1-a5f8f34ee654",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "b1e47452-7446-413b-94e9-b200b3634187",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "b7080fb9-5ad4-82e8-b8cd-1ad63a5bc5f5",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "b76eddee-4622-47a2-9e69-2370076d29e5",
+      "note": "Bridge-written batch identifier (after the bridge- prefix) of a synthetic batch built for BRIDGE REVIEW LAB: batch_id in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder) and a constant of src-tauri/src/agent_import_ack_tests.rs; generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "bac6063a-1212-4079-bcb9-f2ba81fa2da8",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "bb0b62ea-37b0-8a02-bae5-92671d300483",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "cd1535f6-af62-4f60-8602-a161d67e3695",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "cd40c9e3-755c-4132-8b81-79a486f4de30",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "d0eab705-b12e-4b72-91c0-d0b21a94a87d",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "d14a9ece-95d3-4fd7-a206-f5e48dfbb913",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "d317077f-1b6a-47c5-bb73-b9c3fbeb9611",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "d646b1f2-d3c6-82a7-9976-a0c606b28b21",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "d686317d-7b87-47c9-9718-2f9630e1ee3a",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "d71bcd46-04a9-4695-9b14-312f7b8ea7d9",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "d74f1803-22a0-8d80-a582-80b5891ef594",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "d7ebf038-14e9-4749-9654-5a0c2453cb21",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "dc138ab5-1394-4671-80d5-b163c4fc8825",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "de89c9ba-319e-411d-8e40-39bc263763d5",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "dfee0da3-0116-47bc-bf89-7d7f5cf3cd24",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "e15eeeb0-6cb9-4dd5-a21a-86313cc16f69",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "e1fcacbc-7bb1-4818-a104-fba21b994556",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "e4d2a94f-04a2-4dc9-913c-d9ed2697677f",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "ea666ebd-6dcc-88e6-b7df-947841d4a4d5",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "ee4f8c55-caba-86c1-8c73-4171373f35df",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "f0a398c5-9abb-4bb0-ba4c-ee2a5f10b3c7",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "f5d6cbdf-36b9-8925-bc29-ae75985c4d6c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "f6c97287-adf8-8d27-a7af-ee32c6ad1dab",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "f796bbf7-150e-8727-8b44-5004e2a8c2f5",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-batch-import.xml (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "fb8c5544-6b83-4703-bd2b-d5176f1d5b4c",
+      "note": "Bridge-written private REMOTEID of one voucher of the synthetic batch's native post to BRIDGE REVIEW LAB: an item of native_remote_ids in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-lab-journal.jsonl (pull request 2308; lab branch lab/2210-census-answers at b52cd5ec, copied untouched from the data folder); generated by post_import, never by Tally"
+    },
+    {
+      "uuid": "022d8538-d687-8bab-b41d-f880a645b3a8",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "09de4fec-ed33-8a22-a806-5a782fa3a353",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "16d1dd0a-2511-8def-9f60-44f3c77ad82d",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "17ea9e25-b215-8c97-90e1-4237f4a7bd71",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "1d845f66-e6c5-865d-868a-b58ff11a9b5e",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "1fa0ee30-0b73-86d7-9d74-7c292eaef52e",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "229380e6-cd98-89fd-83b0-f702069a92e1",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "244e58f0-6800-8a1b-949b-a6606311d7a3",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "245be088-fa34-8d01-84f3-f9086671e3e1",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "2d21b083-bf19-8ba2-8845-26ec89f9368c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "2ddd5e84-b121-829e-b787-f2b631ee2597",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "365a3850-7447-84c5-8bb9-adb473f62aac",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "37c1de72-9da0-850c-abb9-30f740864b1a",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "38e9da4e-ad00-83fc-bf74-deca2486b633",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "3d20177f-5b0d-8a73-bc28-4375e214bc15",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "4da0f1db-3918-87e4-b328-a43a76293ebd",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "4ed550f7-d5f9-80ad-a42e-7ea53f6f3f62",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "5572f085-4436-8cdf-ab14-1417bb0ea248",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "5ef73ea4-030d-8803-9026-7e39c6e79099",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "5f8b2a8a-8783-829d-bc0a-42e3c1ba4929",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "699709eb-571f-8e67-85f4-390dfd3e4387",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "6ec2025d-17b9-8660-9a3f-73b6a401f2b7",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "7133fa2d-4879-8dbd-95cd-2a2cccd2cca0",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "755797d5-67a2-8d7f-a51d-6cd5cac30ce4",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "79e8a367-c041-8dd1-8ef7-dcbdcb4a4ce1",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "7d149406-6e64-82ba-8379-bef6d57280b3",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "885fd468-fbdb-8e38-b965-ac17ca707e21",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "894ad5f5-b3a0-8766-9192-e47836b8bce1",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "8e18d334-d663-86ba-b66d-73300f7432d8",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "98e9dea2-8aac-854b-ba50-d5056e180387",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "9b97627a-362f-8ba7-b9b7-ad082ca55297",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "9ef36880-fe3e-8ae7-b446-a165fdbfb20a",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "a0638ccb-4ec8-8b09-94d4-71de8ba1d906",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "a2b21284-3151-8958-a69d-ce4a36ec867c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "a7afe1f7-e1a2-8e51-b447-0f528c724a57",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "aa91f08d-e5cb-8683-b64f-6567989427c6",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "afd0725d-960f-86b6-a895-55230d2af4e0",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "b0ed00be-31e4-8ebf-9f8f-0c6a4a2ad16f",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "c09c7ba6-755a-8674-bbe6-58e30ca76a31",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "c3160d0e-9fc0-48e5-8e5c-48ba0d502f94",
+      "note": "Bridge-written batch identifier (after the bridge- prefix) of the synthetic batch built for BRIDGE REVIEW LAB in the hand-import row: batch_id in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-journal.jsonl (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder) and a constant of src-tauri/src/agent_import_ack_tests.rs; generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "d6b25f03-e05f-8e9d-818b-71989f271a86",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "d8bcf5a4-4ef0-8831-8832-41e5cb2dd10f",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "d907d9da-be97-88fd-a1f3-bc70ab9aa537",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "da9bd53e-c0ae-8805-86bb-0f4b7b679102",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "e0fa4c24-6135-8c6d-be08-105cd108c36b",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "e63c8ebb-ceff-89be-9312-7585092d7d43",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "e7f445bf-e8b2-8e2c-820a-90eac3e2968b",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "eb5391bd-42a2-8d36-a0e4-0f043d9c0ad0",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "f71c5229-be47-8bec-9706-e5413d49229c",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "faa9c68f-8120-8d1c-9a75-31964e7f201b",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "fb7acdba-cf03-8986-9a00-3e9c36b72ff6",
+      "note": "Bridge-written attribution identifier of one voucher of the synthetic batch saved for BRIDGE REVIEW LAB and imported from that file by hand: the REMOTEID attribute and [BRIDGE:] narration marker in src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/review-hand-batch-import.xml, and the marker in the narration Tally returned in review-hand-import-verification.utf16le.xml (pull request 2308; lab branch lab/2210-hand-import-answers at 42ac2167, copied untouched from the data folder); generated by build_import_xml, never by Tally"
+    },
+    {
+      "uuid": "eb2f5190-292e-4ed8-bfd3-eace839fe699",
+      "note": "company identifier of the synthetic lab company BRIDGE EINVOICE LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab-dispatch/ (lab branches lab/2027-dispatch-answers at 6981790c and lab/2027-d2-answers at f3645218, in the pull request that adds the captures); the voucher identifiers in those captures are this value with a suffix"
+    },
+    {
+      "uuid": "92a7ef97-dd28-4286-b02c-c059fcb8690e",
+      "note": "company identifier of the synthetic lab company BRIDGE CLASS PURCHASE LAB, as TallyPrime 7.2 returned it in the capture under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/class-purchase-lab/ (lab branch lab/2057-b-answers at d9005ab3, in the pull request that adds the capture); the voucher identifier in that capture is this value with a suffix"
+    },
+    {
+      "uuid": "3c21f661-5517-4809-8e17-0ea4830a1453",
+      "note": "company identifier of the synthetic lab company BRIDGE ACCURACY LAB, created on Tally's screen on 4 November 2026 for row 738-A, as Tally returned it in that row's first marks read and in list_companies (lab branch lab/738-a-answers, once pushed); the ledger and voucher identifiers in that row's answers are this value with a suffix"
+    },
+    {
+      "uuid": "00f0c618-b0df-43bd-bd69-b4c7b92c616f",
+      "note": "company identifier of the synthetic lab company BRIDGE SFT LAB, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab/ (lab branch lab/699-sft-read-answers at 3e7e0e1a, in the pull request that adds the captures); the voucher identifiers in those captures are this value with a suffix"
+    },
+    {
+      "uuid": "2b1c9f4e-9d3a-4f71-8c2e-5a6b7c8d9e01",
+      "note": "hand-made batch id of the Rust agent tests: the suffix of the invented batch id bridge-2b1c9f4e-9d3a-4f71-8c2e-5a6b7c8d9e01, its last group counting 5a6b7c8d9e01, written by hand into agent_admission_tests.rs, agent_import_amend_tests.rs, agent_presence_tests.rs and agent_statement_tie_out_tests.rs on master and into the amends_batch_id case of the schema test in agent_import_text_tests.rs added by pull request 2337; it is in no lab answer, capture or fixture"
     }
   ]
 }

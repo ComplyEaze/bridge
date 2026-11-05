@@ -594,3 +594,117 @@ fn a_tagged_copy_beside_a_bound_voucher_is_a_duplicate() {
         "{result}"
     );
 }
+
+/// Sign-rule site 3 at the verification comparison copy (#1872): the comparison copies carry
+/// canonical amounts, so a batch saved with `0012.61` verifies against the captured row `12.61`
+/// exactly as the batch saved with `12.61` does, and the saved lexeme is not what is compared.
+#[test]
+fn a_batch_written_with_a_padded_amount_verifies_against_its_row() {
+    let (captured, mut line) = captured_journal_and_line();
+    let plain = verify_batch(&line, &captured, Attribution::Tag).unwrap();
+    assert_eq!(plain["counts"]["posted_verified"], 1, "{plain}");
+    for entry in &mut line.vouchers[0].entries {
+        assert_eq!(entry.amount.as_str(), "12.61");
+        entry.amount = ImportAmount::parse("0012.61").unwrap();
+    }
+    let padded = verify_batch(&line, &captured, Attribution::Tag).unwrap();
+    assert_eq!(padded["counts"], plain["counts"], "{padded}");
+    assert_eq!(
+        padded["vouchers"][0]["marker"],
+        plain["vouchers"][0]["marker"]
+    );
+    assert_eq!(
+        padded["vouchers"][0]["diffs"],
+        plain["vouchers"][0]["diffs"]
+    );
+}
+
+/// The derivation worked out by hand: SHA-256 of the JSON array text, its first
+/// sixteen bytes, the version nibble set to 8 and the variant bits to `10`, then
+/// written as 8-4-4-4-12 hex. It uses neither `serde_json` nor the `uuid`
+/// builder, so it holds the compatibility contract (a changed derivation would
+/// re-identify vouchers already posted) apart from the code it checks.
+fn identity_by_hand(batch_id: &str, txn_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let text = format!(r#"["bridge.mcp.import.v1","{batch_id}","{txn_id}"]"#);
+    let digest = Sha256::digest(text.as_bytes());
+    let mut bytes = [0u8; 16];
+    bytes.copy_from_slice(&digest[..16]);
+    bytes[6] = (bytes[6] & 0x0f) | 0x80;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    )
+}
+
+#[test]
+fn an_identity_is_the_first_sixteen_digest_bytes_of_the_domain_batch_and_label_array() {
+    for (batch_id, txn_id) in [
+        ("batch-render", "txn-001"),
+        ("bridge-78ce4328-9c2a-4827-8584-821d6d656b40", "W-A1-PAY"),
+        ("bridge-1e5b2cd7-f5c6-4d51-adc9-53a4dfa370bb", "D3-001"),
+        ("Batch", "Txn"),
+        ("a:b", "c"),
+        ("", ""),
+        ("batch", " padded "),
+    ] {
+        assert_eq!(
+            import_identity(batch_id, txn_id).to_string(),
+            identity_by_hand(batch_id, txn_id),
+            "{batch_id:?} {txn_id:?}"
+        );
+    }
+}
+
+/// `REMOTEID` and the `[BRIDGE:…]` marker of a Payment saved from a real run
+/// are the identity of the batch and label its journal line records.
+#[test]
+fn the_identity_of_a_captured_payment_is_the_one_its_live_run_saved() {
+    let journal = include_str!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-journal.jsonl"
+    );
+    let saved =
+        include_str!("../crates/bridge-tally-protocol/tests/fixtures/agent/wa1-payment-import.xml");
+    let line: ImportLedgerLine = serde_json::from_str(journal.lines().next().unwrap()).unwrap();
+    assert_eq!(line.vouchers.len(), 1);
+    let expected = import_identity(&line.batch_id, &line.vouchers[0].bridge_txn_id).to_string();
+    assert_eq!(expected, "fb9eac30-a125-8dcc-b70d-027a147ce3d1");
+    assert_eq!(saved.matches("REMOTEID=").count(), 1);
+    assert!(saved.contains(&format!("REMOTEID=\"{expected}\"")));
+    assert!(saved.contains(&format!("[BRIDGE:{expected}]")));
+    assert_eq!(line.attribution_tag(&line.vouchers[0]), expected);
+}
+
+/// A label is compared as written: case and surrounding space name another
+/// voucher, and the quote and backslash of the JSON array cannot be used to
+/// move text from one member to the next.
+#[test]
+fn a_batch_or_transaction_label_is_compared_as_written() {
+    let base = import_identity("bridge-abc", "Txn-1");
+    for (batch_id, txn_id) in [
+        ("BRIDGE-ABC", "Txn-1"),
+        (" bridge-abc", "Txn-1"),
+        ("bridge-abc ", "Txn-1"),
+        ("bridge-abc", "txn-1"),
+        ("bridge-abc", " Txn-1"),
+        ("bridge-abc", "Txn-1 "),
+        ("bridge-abc", "TXN-1"),
+    ] {
+        assert_ne!(
+            base,
+            import_identity(batch_id, txn_id),
+            "{batch_id:?} {txn_id:?}"
+        );
+    }
+    assert_ne!(
+        import_identity("a\",\"b", "c"),
+        import_identity("a", "b\",\"c")
+    );
+    assert_ne!(import_identity("a\\", "b"), import_identity("a", "\\b"));
+}

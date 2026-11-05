@@ -119,6 +119,17 @@ class MergeGateControls(unittest.TestCase):
             "exec " + shlex.quote(real_node) + ' "$@"\n'
         )
         node.chmod(node.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        # The pin-list retry waits between tries (#2179). With GATE_SLEEPS set, a wait is recorded there instead of slept.
+        real_sleep = shutil.which("sleep")
+        if not real_sleep:
+            raise RuntimeError("sleep is required for merge-gate controls")
+        sleep = cls.bin / "sleep"
+        sleep.write_text(
+            "#!/usr/bin/env bash\n"
+            'if [ -n "${GATE_SLEEPS:-}" ]; then printf \'%s\\n\' "$*" >>"$GATE_SLEEPS"; exit 0; fi\n'
+            "exec " + shlex.quote(real_sleep) + ' "$@"\n'
+        )
+        sleep.chmod(sleep.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
 
     @classmethod
     def git_in_repo(cls, *args):
@@ -172,10 +183,11 @@ class MergeGateControls(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge"):
+    def run_gate(self, scenario="pass", extra_args=(), cwd=None, repo="lamemustafa/bridge", env_extra=None):
         env = os.environ.copy()
         env["PATH"] = f"{self.bin}:{env['PATH']}"
         env["GATE_SCENARIO"] = scenario
+        env.update(env_extra or {})
         return subprocess.run(
             [str(self.script), "321", "--repo", repo, *extra_args],
             cwd=str(cwd) if cwd else ROOT,
@@ -226,7 +238,9 @@ class MergeGateControls(unittest.TestCase):
     # -- Compatibility-surface schema (schema 3 at head; 2 or 3 at the base) --
 
     def test_surface_fetch_failure_is_indeterminate(self):
-        self.assert_indeterminate("surface-fetch-fail", "could not read and validate compatibility surface at " + SHORT)
+        result = self.assert_indeterminate("surface-fetch-fail", "could not read and validate compatibility surface at " + SHORT)
+        # A failure with no HTTP status is not tried again, and the line names the commit and the error.
+        self.assertIn(SHORT + " (commit " + HEAD[:12] + ", after 1 try: controlled surface read failure)", result.stdout)
 
     def test_surface_malformed_is_indeterminate(self):
         self.assert_indeterminate("surface-malformed", "could not read and validate compatibility surface at " + SHORT)
@@ -316,7 +330,8 @@ class MergeGateControls(unittest.TestCase):
         self.assert_blocked("ack-path-not-a-repository-path", "has a line that is not a repository path")
 
     def test_an_unreadable_ack_is_indeterminate(self):
-        self.assert_indeterminate("ack-unreadable", "could not read " + ACK_PATH)
+        result = self.assert_indeterminate("ack-unreadable", "could not read " + ACK_PATH)
+        self.assertIn(SHORT + " (commit " + HEAD[:12] + ", after 1 try: controlled acknowledgement read failure)", result.stdout)
 
     def test_an_ack_with_no_pinned_path_touched_blocks(self):
         self.assert_blocked("ack-without-pinned-change", "no pinned path is touched, so no acknowledgement may be added")
@@ -380,7 +395,112 @@ class MergeGateControls(unittest.TestCase):
         self.assert_pass("history-out-of-order-then-dropped-declared", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_an_unreadable_pin_list_in_the_branch_history_is_indeterminate(self):
-        self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        result = self.assert_indeterminate("history-commit-list-unreadable", "could not read and parse the pin list at every commit of the PR")
+        # A failure with no HTTP status is not tried again, and the line names the commit and the error.
+        self.assertIn("(commit c1c1c1c1c1c1, after 1 try: controlled history surface read failure)", result.stdout)
+
+    # -- A pin-list read that fails and is tried again (#2179) ----------------------
+
+    def run_flaky(self, scenario):
+        """Run a flaky-read scenario; return the result, the waits the gate asked for, and the reads of the flaky commit."""
+        with tempfile.TemporaryDirectory(prefix="merge-gate-flaky-") as folder:
+            state, sleeps = Path(folder) / "calls", Path(folder) / "sleeps"
+            result = self.run_gate(scenario, env_extra={"GATE_STATE": str(state), "GATE_SLEEPS": str(sleeps)})
+            waits = sleeps.read_text().split() if sleeps.exists() else []
+            calls = int(state.read_text()) if state.exists() else 0
+        return result, waits, calls
+
+    def assert_flaky_passes(self, scenario):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("INDETERMINATE", result.stdout)
+        self.assertEqual((waits, calls), (["2"], 2), "one failed read, one wait of 2 s, then the read that answered")
+
+    def assert_flaky_not_retried(self, scenario, phrase):
+        result, waits, calls = self.run_flaky(scenario)
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn(phrase, result.stdout)
+        self.assertEqual((waits, calls), ([], 1), "a failure a second try cannot cure is not tried again")
+
+    def test_a_server_error_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-502-once")
+
+    def test_a_secondary_rate_limit_on_one_pin_list_read_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-rate-limit-once")
+
+    def test_a_404_for_one_of_the_prs_own_commits_is_tried_again_and_passes(self):
+        self.assert_flaky_passes("history-flaky-404-own-commit-once")
+
+    def test_three_failed_reads_stay_indeterminate_and_name_the_commit_and_the_status(self):
+        result, waits, calls = self.run_flaky("history-flaky-502-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertNotIn("MAY MERGE", result.stdout)
+        self.assertIn("could not read and parse the pin list at every commit of the PR", result.stdout)
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
+
+    def test_a_rate_limit_that_persists_names_its_first_error_line_with_the_account_id_masked(self):
+        result, waits, calls = self.run_flaky("history-flaky-rate-limit-always")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        # the error's first line is blank: the next one is printed, and its long digit run is masked
+        self.assertIn("(commit c1c1c1c1c1c1, HTTP 403, after 3 tries: gh: You have exceeded a secondary rate limit for user ID <n>. (HTTP 403))", result.stdout)
+        self.assertNotIn("12345678", result.stdout)
+        self.assertEqual((waits, calls), (["2", "4"], 3))
+
+    def test_a_403_that_is_not_a_rate_limit_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-403-not-a-rate-limit", "(commit c1c1c1c1c1c1, HTTP 403, after 1 try: ")
+
+    def test_a_404_for_a_commit_outside_the_pr_is_not_tried_again(self):
+        self.assert_flaky_not_retried("history-flaky-404-outside-the-pr", "(commit d2d2d2d2d2d2, HTTP 404, after 1 try: gh: Not Found (HTTP 404))")
+
+    # -- The other contents reads, tried again the same way (#2179) ------------------
+
+    # Each read: the commit it names (12 characters), the line that reports it, and how many times a run
+    # that passes reads that file at that commit (the branch history check reads the head's and the base
+    # tip's pin lists once more, and those reads answer at once).
+    OTHER_READS = {
+        "head-surface": (HEAD[:12], "could not read and validate compatibility surface at " + SHORT, 3),
+        "base-surface": ("a" * 12, "could not read and validate compatibility surface at base aaaaaaa", 3),
+        "merge-base-surface": ("b" * 12, "could not read and validate compatibility surface at merge base bbbbbbb", 2),
+        "ack": (HEAD[:12], "could not read " + ACK_PATH + " at " + SHORT, 2),
+    }
+
+    def assert_other_read_passes(self, read, kind):
+        result, waits, calls = self.run_flaky(read + "-flaky-" + kind)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MAY MERGE", result.stdout)
+        self.assertNotIn("INDETERMINATE", result.stdout)
+        self.assertEqual((waits, calls), (["2"], self.OTHER_READS[read][2]), "one failed read, one wait of 2 s, then reads that answered")
+
+    def test_a_server_error_on_any_other_contents_read_is_tried_again_and_passes(self):
+        for read in self.OTHER_READS:
+            with self.subTest(read=read):
+                self.assert_other_read_passes(read, "502-once")
+
+    def test_a_404_at_the_head_is_tried_again_and_passes(self):
+        for read in ("head-surface", "ack"):
+            with self.subTest(read=read):
+                self.assert_other_read_passes(read, "404-once")
+
+    def test_a_server_error_that_persists_on_any_other_contents_read_stays_indeterminate_and_names_it(self):
+        for read, (ref, line, _) in self.OTHER_READS.items():
+            with self.subTest(read=read):
+                result, waits, calls = self.run_flaky(read + "-flaky-502-always")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn("MAY MERGE", result.stdout)
+                self.assertIn(line + " (commit " + ref + ", HTTP 502, after 3 tries: gh: Server Error (HTTP 502))", result.stdout)
+                self.assertEqual((waits, calls), (["2", "4"], 3), "three tries, 2 s then 4 s apart, and no fourth")
+
+    def test_a_404_at_the_base_tip_or_the_merge_base_is_not_tried_again(self):
+        for read in ("base-surface", "merge-base-surface"):
+            ref, line, _ = self.OTHER_READS[read]
+            with self.subTest(read=read):
+                result, waits, calls = self.run_flaky(read + "-flaky-404-once")
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertNotIn("MAY MERGE", result.stdout)
+                self.assertIn(line + " (commit " + ref + ", HTTP 404, after 1 try: gh: Not Found (HTTP 404))", result.stdout)
+                self.assertEqual((waits, calls), ([], 1), "a 404 for a commit outside the PR is not tried again")
 
     def test_removed_pin_line_for_a_pin_that_is_kept_blocks(self):
         self.assert_blocked("pin-removed-line-for-a-kept-pin", "has removed-pin line(s) for pin(s) the PR does not remove: src/other.rs")
@@ -2811,6 +2931,113 @@ class MergeWrapperControls(unittest.TestCase):
                 result, calls = self.run_wrapper(args=args)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertEqual(calls, [])
+
+
+class PrivacyMutationRecordDigests(unittest.TestCase):
+    """A tax-audit mutation record's `"mutation"` and `"crate_tree"` values, 16 lowercase hex with at least one letter,
+    are masked before the counts, on a line that starts as the runner writes a record and on no other line. Any other
+    key, length or case, an all-digit value, and any other shape on the line are still scanned. Every value is built at
+    run time."""
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+        self.mobile = "".join(str(9 - index) for index in range(10))  # a ten-digit run led by a 9
+        self.with_phone = "a" + self.mobile + "bcdef"
+        self.with_run = run_of(12) + "abcd"
+
+    def line(self, mutation, crate_tree=None, key="mutation", extra=""):
+        crate_tree = self.with_run if crate_tree is None else crate_tree
+        return (
+            '  "C42-01": {"commit": "%s", "crate_tree": "%s", "killers": ["tests/registry.rs::a_test"], '
+            '"mode": "proof", "%s": "%s", "time": "2026-11-04T10:00:00+00:00", "verdict": "killed"%s},'
+            % (HEAD, crate_tree, key, mutation, extra)
+        )
+
+    def blockers(self, text):
+        return self.privacy.scan(text, HEAD)["blockers"]
+
+    def assert_blocked(self, text):
+        blockers = self.blockers(text)
+        self.assertTrue(any("long digit run" in b or "identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_a_records_line_with_digit_runs_in_both_digests_is_clean(self):
+        for text in (self.line(self.with_phone), self.line(self.with_run, self.with_phone)):
+            record = self.privacy.scan(text, HEAD)
+            self.assertEqual(record["blockers"] + record["indeterminate"], [], text)
+            self.assertIn("2 mutation-record digest(s) were masked", record["notes"])
+
+    def test_explain_locates_nothing_on_a_records_line_and_still_locates_another_key(self):
+        document = {"sources": [], "added": [
+            {"path": "parity/mutation-results.json", "line": 1, "text": self.line(self.with_phone)},
+            {"path": "parity/mutation-results.json", "line": 2, "text": self.line(self.with_phone, key="note")},
+        ]}
+        hits = self.privacy.explain(document, HEAD)["hits"]
+        self.assertEqual([hit["where"] for hit in hits], ["parity/mutation-results.json:2"], hits)
+
+    def test_a_phone_alone_in_a_mutation_field_still_blocks(self):
+        self.assert_blocked(self.line(self.mobile))
+
+    def test_an_all_digit_sixteen_character_value_still_blocks(self):
+        self.assert_blocked(self.line(run_of(16)))
+        self.assert_blocked(self.line(self.with_phone, run_of(16)))
+        self.assert_blocked(self.line(self.mobile + run_of(6)))
+
+    def test_the_same_value_under_another_key_or_in_another_form_still_blocks(self):
+        for text in (
+            self.line(self.with_phone, key="note"),
+            self.line(self.with_phone, key="mutations"),
+            self.line(self.with_phone.upper()),
+            self.line(self.with_phone + "0"),
+            self.line(self.with_phone[:-1]),
+            self.line(self.with_phone).replace('"mutation": "', '"mutation":"'),
+            self.line(self.with_phone).replace('"mutation": "', 'mutation: "'),
+            '{"mutation": "%s" }' % self.with_phone.replace("b", "", 1),
+            "mutation digest " + self.with_phone,
+        ):
+            self.assert_blocked(text)
+
+    def test_a_pan_or_gstin_elsewhere_on_the_line_still_blocks(self):
+        pan = "ABCDE" + "1234" + "F"
+        for extra in (', "party": "%s"' % pan, ', "gstin": "%s"' % ("07" + pan + "1Z5")):
+            text = self.line(self.with_phone, self.with_phone, extra=extra)
+            blockers = self.blockers(text)
+            self.assertTrue(any("1 identifier shape" in b for b in blockers), (text, blockers))
+
+    def test_the_same_key_and_value_off_a_records_line_still_blocks(self):
+        pair = '"mutation": "%s"' % self.with_phone
+        for text in (
+            "Mask %s in the records (#2352)" % pair,  # a pull request title
+            "Regenerate the records\n\nThe record now reads %s." % pair,  # a commit message
+            "    let record = r#\"{%s}\"#;" % pair,  # a Rust string literal
+            "docs/%s.md" % pair.replace('"', ""),  # a path
+            "docs/{%s}.md" % pair,  # a path keeping the quotes
+        ):
+            self.assert_blocked(text)
+            self.assertNotIn("1 mutation-record digest(s) were masked", self.privacy.scan(text, HEAD)["notes"], text)
+
+    def test_only_a_line_that_starts_as_a_record_is_masked(self):
+        record = self.line(self.with_phone, self.with_phone)
+        for text in (
+            "x" + record,  # text before the record id
+            record.replace(HEAD, HEAD[:-1]),  # a 39-hex commit
+            record.replace(HEAD, HEAD.upper()),  # an uppercase commit
+            record.replace('{"commit": ', '{ "commit": '),
+            record.replace('"C42-01": ', '"C42-01" : '),
+        ):
+            self.assert_blocked(text)
+        # Each line is anchored on its own: a record line after a title is masked, the title is not.
+        title = 'Mask "mutation": "%s" (#2352)' % self.with_phone
+        record_hits = self.privacy.scan(title + "\n" + record, HEAD)
+        self.assertIn("2 mutation-record digest(s) were masked", record_hits["notes"])
+        self.assert_blocked(title + "\n" + record)
+        self.assertEqual(self.blockers(record + "\n" + record), [])
+
+    def test_a_lowercase_pan_of_a_to_f_letters_is_masked_on_a_records_line_only(self):
+        pan = "abcde" + "1234" + "f" + "0" * 6  # a PAN's shape, lowercase, letters a-f only, padded to 16
+        self.assertEqual(self.blockers(self.line(pan, self.with_run)), [])
+        for text in (self.line(pan, self.with_run, key="note"), "party %s" % pan):
+            blockers = self.blockers(text)
+            self.assertTrue(any("identifier shape" in b for b in blockers), (text, blockers))
 
 
 if __name__ == "__main__":

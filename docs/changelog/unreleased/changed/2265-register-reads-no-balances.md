@@ -1,0 +1,1 @@
+- `sales_register`, `purchase_register` and `gst_by_ledger` no longer read ledger balances on a book with one currency, since they use no amount from them, so each call sends fewer requests to Tally (#2265).

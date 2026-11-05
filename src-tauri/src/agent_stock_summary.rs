@@ -13,7 +13,7 @@ const MAX_ITEM_FILTER: usize = 50;
 
 /// The longest GUID `items` may name, in characters; the published schema's
 /// `maxLength` is the same.
-const MAX_ITEM_GUID_CHARS: usize = 64;
+pub(super) const MAX_ITEM_GUID_CHARS: usize = 64;
 
 /// Beside `value_sum`, whenever `totals` is returned: the values were added with
 /// the signs Tally sent, and a negative value is a debit, which is stock held
@@ -315,12 +315,17 @@ impl Server {
 /// sixty-four characters and unique ignoring ASCII case. An unknown GUID is not
 /// an error here; the result lists it under `items_not_found`.
 fn item_filter(args: &Value) -> Result<Option<Vec<String>>, String> {
+    item_guids(args, MAX_ITEM_FILTER)
+}
+
+/// The item GUIDs named by `items`, under `item_filter`'s rules with at most `max` of them.
+pub(super) fn item_guids(args: &Value, max: usize) -> Result<Option<Vec<String>>, String> {
     let Some(value) = args.get("items") else {
         return Ok(None);
     };
     let invalid = || "argument_invalid:items".to_string();
     let values = value.as_array().ok_or_else(invalid)?;
-    if values.is_empty() || values.len() > MAX_ITEM_FILTER {
+    if values.is_empty() || values.len() > max {
         return Err(invalid());
     }
     let mut seen = HashSet::new();

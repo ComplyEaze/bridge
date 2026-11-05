@@ -1041,6 +1041,11 @@ impl Server {
         if args.get("doubt").and_then(Value::as_str) == Some("not_created") {
             return self.settle_not_created(args).await;
         }
+        // A batch a restore of the book covers has its rows released by the
+        // person, with a record of its own; nothing is sent (#1038).
+        if args.get("doubt").and_then(Value::as_str) == Some("rolled_back") {
+            return self.release_rolled_back_rows(args).await;
+        }
         let batch_id = required_string(args, "batch_id")?;
         let imports = self.imports_dir()?;
         let ledger::BatchSnapshot {

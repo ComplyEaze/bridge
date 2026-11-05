@@ -115,9 +115,9 @@ pub(super) fn review_preview(
             "it has no readable answer from Tally to the post".to_string()
         }
     };
-    let matched = result["counts"]["matching_content_observed"]
-        .as_u64()
-        .unwrap_or(0);
+    // A match that is cancelled or optional is not in the accounts, so the box
+    // never counts it as in the book, as the settle dialog does not.
+    let matched = verification::content_matches_in_the_accounts(&result["vouchers"]);
     let (noun, these) = if count == 1 {
         ("voucher", "this voucher")
     } else {
@@ -132,21 +132,7 @@ pub(super) fn review_preview(
             "in the batch",
         ),
     };
-    // Broken at spaces, then any word longer than a line broken where it
-    // reaches the limit, so a name without spaces cannot make the box refuse.
-    let wrap = |text: String| {
-        crate::tally::approved_import::wrapped(&text, 100)
-            .lines()
-            .flat_map(|line| {
-                line.chars()
-                    .collect::<Vec<_>>()
-                    .chunks(100)
-                    .map(|part| part.iter().collect::<String>())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
+    let wrap = crate::tally::approved_import::wrapped_to_fit;
     [
         wrap(format!(
             "THIS RECORDS ONLY THAT YOU CHECKED {} IN TALLY.",

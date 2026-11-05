@@ -30,7 +30,7 @@
 //!   item's `canonical_key` and `absence_key` with two of the master name
 //!   index's key functions; a caller building an intent cannot supply them. Whether two
 //!   names may be one master, inside a batch and against an open dispatch, is
-//!   computed from the names every time ([`NameKeys::may_be_one_master`]), so a
+//!   computed from the names every time ([`MasterNameKeys::may_be_one_master`]), so a
 //!   journal written before a fold widened is judged by the wider fold. Against
 //!   an open dispatch an equal recorded key also refuses: a key on disk can only
 //!   add a refusal. That keeps a fold narrowed by a later build from releasing an
@@ -42,11 +42,13 @@
 //!   failure is closed and loud, and a fold change has to weigh it.
 //! - An intent with no terminal verdict blocks every overlapping batch. The
 //!   terminal verdicts are `posted_verified`, `posted_into_existing_master`,
-//!   `master_write_located_elsewhere`, `posted_unattributed` and
-//!   `confirmed_absent`; the last two are decided only by a reconcile
-//!   (`agent_master_verdict.rs`). `confirmed_absent` is given when its paired
-//!   read-back shows the ledger absent, and a new batch for the same ledger then
-//!   needs a new approval: nothing is ever sent again automatically.
+//!   `master_write_located_elsewhere`, `posted_unattributed`,
+//!   `confirmed_absent` and `confirmed_absent_after_change`; the last three are
+//!   decided only by a reconcile (`agent_master_verdict.rs`). The two absent
+//!   states are given when the paired read-back shows the ledger absent (the
+//!   second after another master change moved the company's mark), and a new
+//!   batch for the same ledger then needs a new approval: nothing is ever sent
+//!   again automatically.
 //!   `posted_unattributed` is given when no answer from Tally is on file and the
 //!   ledger was found as sent, written by the first master change after the
 //!   mark the intent recorded.
@@ -73,9 +75,7 @@ use super::ledger::{self, MAX_RECORD_BYTES};
 use super::persistence::{self, RecordOnce};
 use super::{append_private_import_ledger, set_private_file, valid_batch_id};
 use crate::agent::{local_file, sha256_hex};
-use bridge_tally_core::master_binding::{
-    absence_key, canonical_master_key, letters_and_digits_key, twin_fold_keys,
-};
+use bridge_tally_core::master_binding::{absence_key, canonical_master_key, MasterNameKeys};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{BufRead, Read};
@@ -362,9 +362,26 @@ pub(super) enum MasterVerdictState {
     /// Settled, never verified: with Tally's answer lost, nothing shows that
     /// change was this create rather than a person keying the identical ledger.
     PostedUnattributed,
+    /// After an outcome was unknown, a paired read-back showed the ledger
+    /// absent, no pre-image master changed or missing, no ledger or group new
+    /// since the intent, and the company's master mark moved forward since the
+    /// intent (another master change, or the create and a later change to its
+    /// ledger). Whether the create ran is not known; the batch is closed and is
+    /// never sent again. Like `confirmed_absent`, it rests on the order Tally
+    /// serves requests in: a read sent after the create's send ended, once
+    /// answered, was served after the create.
+    ConfirmedAbsentAfterChange,
 }
 
 impl MasterVerdictState {
+    /// The two states that say the ledger is not in the book.
+    pub(super) fn is_absent(self) -> bool {
+        matches!(
+            self,
+            Self::ConfirmedAbsent | Self::ConfirmedAbsentAfterChange
+        )
+    }
+
     /// Whether the outcome of the write is settled: the first terminal verdict
     /// of a batch is its last, and it stops blocking later batches of the same
     /// ledgers. A verdict that asks for a person's reconciliation, or that
@@ -375,7 +392,8 @@ impl MasterVerdictState {
             | Self::PostedIntoExistingMaster
             | Self::MasterWriteLocatedElsewhere
             | Self::ConfirmedAbsent
-            | Self::PostedUnattributed => true,
+            | Self::PostedUnattributed
+            | Self::ConfirmedAbsentAfterChange => true,
             Self::ReconciliationRequired | Self::MastersAfterPostUnconfirmed => false,
         }
     }
@@ -537,9 +555,10 @@ pub(super) enum Invalid {
     /// A `posted_verified` verdict with no answer from Tally on record: a
     /// verified create needs Tally's counters, so its answer is appended first.
     VerifiedWithoutResponse,
-    /// A `confirmed_absent` verdict against an answer on record whose counters
-    /// say Tally created or altered something: absence is never concluded
-    /// against Tally's own count of a write.
+    /// A `confirmed_absent` or `confirmed_absent_after_change` verdict against
+    /// an answer on record whose counters say Tally created or altered
+    /// something: absence is never concluded against Tally's own count of a
+    /// write.
     AbsentAgainstCounters,
     /// A `posted_unattributed` verdict for a batch with an answer on record,
     /// with or without counters: that state exists only for an answer that was
@@ -555,7 +574,8 @@ pub(super) enum Invalid {
     ItemsMismatch,
     /// `posted_verified` or `posted_unattributed` for an item with no GUID.
     VerifiedWithoutGuid,
-    /// `confirmed_absent` for an item that names a GUID.
+    /// `confirmed_absent` or `confirmed_absent_after_change` for an item that
+    /// names a GUID.
     AbsentWithGuid,
 }
 
@@ -670,10 +690,10 @@ impl MasterBatch {
             return Err(Invalid::EmptyItems);
         }
         // Two names Tally might take for one master cannot go in one POST.
-        let mut seen: Vec<NameKeys> = Vec::with_capacity(self.items.len());
+        let mut seen: Vec<MasterNameKeys> = Vec::with_capacity(self.items.len());
         for item in &self.items {
             item.validate()?;
-            let keys = NameKeys::of(&item.name);
+            let keys = MasterNameKeys::of(&item.name);
             if seen.iter().any(|earlier| earlier.may_be_one_master(&keys)) {
                 return Err(Invalid::DuplicateName);
             }
@@ -756,9 +776,10 @@ impl MasterVerdict {
             items: batch
                 .items
                 .iter()
-                .map(|item| VerdictItem {
+                .enumerate()
+                .map(|(index, item)| VerdictItem {
                     name: item.name.clone(),
-                    guid: judgement.guid().map(str::to_string),
+                    guid: judgement.guid_of(index).map(str::to_string),
                     reason: reason.clone(),
                 })
                 .collect(),
@@ -808,15 +829,14 @@ impl MasterVerdict {
             | MasterVerdictState::PostedIntoExistingMaster
             | MasterVerdictState::MastersAfterPostUnconfirmed
             | MasterVerdictState::MasterWriteLocatedElsewhere
-            | MasterVerdictState::ConfirmedAbsent => false,
+            | MasterVerdictState::ConfirmedAbsent
+            | MasterVerdictState::ConfirmedAbsentAfterChange => false,
         };
         if all_found && self.items.iter().any(|item| item.guid.is_none()) {
             return Err(Invalid::VerifiedWithoutGuid);
         }
         // A ledger confirmed absent has no GUID to name.
-        if self.state == MasterVerdictState::ConfirmedAbsent
-            && self.items.iter().any(|item| item.guid.is_some())
-        {
+        if self.state.is_absent() && self.items.iter().any(|item| item.guid.is_some()) {
             return Err(Invalid::AbsentWithGuid);
         }
         Ok(())
@@ -932,9 +952,9 @@ impl MasterJournal {
     /// recorded an equal key. Every company's batches are compared: a batch is
     /// listed whatever company it belongs to.
     fn overlaps_open_dispatch(&self, batch_id: &str, items: &[IntentItem]) -> Vec<BlockingBatch> {
-        let new_items: Vec<(&IntentItem, NameKeys)> = items
+        let new_items: Vec<(&IntentItem, MasterNameKeys)> = items
             .iter()
-            .map(|item| (item, NameKeys::of(&item.name)))
+            .map(|item| (item, MasterNameKeys::of(&item.name)))
             .collect();
         self.batches
             .values()
@@ -943,7 +963,7 @@ impl MasterJournal {
                 state.intent.as_ref().is_some_and(|open| {
                     open.batch_id != batch_id
                         && open.items.iter().any(|held| {
-                            let held_keys = NameKeys::of(&held.name);
+                            let held_keys = MasterNameKeys::of(&held.name);
                             new_items.iter().any(|(new, new_keys)| {
                                 new.canonical_key == held.canonical_key
                                     || new.absence_key == held.absence_key
@@ -1094,7 +1114,7 @@ impl MasterJournal {
                     .as_ref()
                     .and_then(|response| response.counters)
                     .is_some_and(|counters| counters.created > 0 || counters.altered > 0);
-                if verdict.state == MasterVerdictState::ConfirmedAbsent && counted_a_write {
+                if verdict.state.is_absent() && counted_a_write {
                     return Err(MasterLedgerError::Invalid(Invalid::AbsentAgainstCounters));
                 }
                 if verdict.state == MasterVerdictState::PostedUnattributed
@@ -1138,37 +1158,6 @@ fn read_error(code: String) -> MasterLedgerError {
         "import_ledger_invalid" => MasterLedgerError::Invalid(Invalid::Unterminated),
         "import_ledger_record_too_large" => MasterLedgerError::RecordTooLarge,
         _ => MasterLedgerError::Unavailable,
-    }
-}
-
-/// The keys of one name for deciding whether Tally might take two names for one
-/// master, computed once per name.
-struct NameKeys {
-    canonical: String,
-    twin: [String; 3],
-    letters_and_digits: String,
-}
-
-impl NameKeys {
-    fn of(name: &str) -> Self {
-        Self {
-            canonical: canonical_master_key(name),
-            twin: twin_fold_keys(name),
-            letters_and_digits: letters_and_digits_key(name),
-        }
-    }
-
-    /// Two names may be one master when they agree on either key the master name
-    /// index matches on, or on any `twin_fold_keys` fold in any position. The
-    /// index's `absence_key` is twin key 2, so the twin comparison covers it;
-    /// the canonical key is compared on its own, because lowercasing and NFC do
-    /// not commute and a name can agree on it and on no twin key. The index's
-    /// letters-and-digits key is compared too, so two names in one batch that
-    /// differ only by a space or a symbol are refused as the book check would.
-    fn may_be_one_master(&self, other: &Self) -> bool {
-        self.canonical == other.canonical
-            || self.letters_and_digits == other.letters_and_digits
-            || self.twin.iter().any(|key| other.twin.contains(key))
     }
 }
 

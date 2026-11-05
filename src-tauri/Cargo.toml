@@ -1,6 +1,6 @@
 [package]
 name = "bridge"
-version = "0.6.1"
+version = "0.7.0"
 description = "ComplyEaze Bridge lets an AI assistant read from, and write to, the TallyPrime running on your own computer."
 authors = ["AXAL"]
 license = "Apache-2.0"
@@ -138,5 +138,5 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphic
 # not proof of the historical crash's sole cause.
 libsqlite3-sys = { version = "0.37.0", features = ["bundled-sqlcipher"] }
 objc2 = "0.6.4"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSApplication", "NSResponder"] }
-objc2-foundation = { version = "0.3.2", default-features = false }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSApplication", "NSAttributedString", "NSFont", "NSResponder", "NSScreen", "NSStringDrawing", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["NSArray", "NSDictionary", "NSGeometry", "NSObject", "NSString"] }

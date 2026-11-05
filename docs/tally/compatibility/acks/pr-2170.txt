@@ -1,0 +1,9 @@
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/date.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/ledger_currency.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/mod.rs
+src-tauri/crates/bridge-tally-protocol/src/native_outstandings/wire.rs
+src-tauri/crates/bridge-tally-protocol/src/native_stock_summary.rs
+src-tauri/crates/bridge-tally-protocol/src/outstandings_shared.rs
+src-tauri/crates/bridge-tally-protocol/src/standard_ledger_catalog.rs
+src-tauri/crates/bridge-tally-protocol/src/xml_text.rs
+reviewer: lamemustafa

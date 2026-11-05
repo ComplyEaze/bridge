@@ -765,7 +765,7 @@ fn tally_date(text: &str, part: &str) -> Result<TallyDate> {
 }
 
 /// Group name to parent group, `None` for a group directly under Tally's reserved root (or with
-/// no parent, or one of [`PRIMARY_GROUPS`]). Only the reserved-root marker form ends a chain
+/// no parent, or one of `PRIMARY_GROUPS`). Only the reserved-root marker form ends a chain
 /// ([`xml::is_reserved_root`]); a PARENT of `Primary` names a user group called that.
 pub fn load_groups(root: &Element) -> BTreeMap<String, Option<String>> {
     let mut out = BTreeMap::new();

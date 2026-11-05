@@ -5,8 +5,8 @@
 //! test-only seam, held open until a test answers it.
 use super::*;
 use crate::agent::agent_import::approval::{
-    ApprovalBinding, Begin, Joined, PostApprovals, PreviewForm, CALL_CEILING, MAX_KEPT_REFUSALS,
-    MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
+    ApprovalBinding, Begin, Joined, PostApprovals, PreviewForm, CALL_BUDGET, CALL_CEILING,
+    MAX_KEPT_REFUSALS, MEASURED_POST, MEASURED_REDEEM, MEASURED_REDEEM_VOUCHERS,
 };
 use crate::agent::agent_protocol::{run_post, serve_stdio, Framer, ToolCallEnd};
 use crate::tally::agent_read_request::AgentReadRequest;
@@ -571,27 +571,38 @@ async fn a_click_after_revocation_approves_nothing() {
 /// A call withdrawn while it waits on the dialog stops waiting at once,
 /// answers `request_cancelled` rather than `pending`, and closes the dialog it
 /// had started.
-// current_thread, which `closed()` relies on: the dialog's task finishes in
-// the poll that closes it, before this task runs again.
+// current_thread, which the check that the dialog closed relies on: the
+// dialog's task finishes in the poll that closes it, before this task runs
+// again.
+//
+// The call waits on the dialog under a timer, which in tests is 300 ms from the
+// call's start and never less than 50 ms. Once slow reads had used the 300 ms, a
+// withdrawal made from this task on the dialog's open signal could come after
+// that timer, and the call then answered `pending` (#2212). So the dialog
+// withdraws the call itself as it opens, on its own task, and first holds its
+// thread past the call's whole budget, as a slow runner would: the timer has
+// run out when the call looks at its wait again, and the withdrawal still
+// wins, since that wait is biased to it.
 #[tokio::test(flavor = "current_thread")]
 async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
     let simulator = SequenceSimulator::spawn(with_sentinel(before_approval())).unwrap();
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let (line, args) = saved_batch(&server);
-    let scripted = ScriptedApproval::held();
     let withdrawn = tokio_util::sync::CancellationToken::new();
+    let scripted = ScriptedApproval::held_after({
+        let withdrawn = withdrawn.clone();
+        move || {
+            std::thread::sleep(CALL_BUDGET + Duration::from_millis(10));
+            withdrawn.cancel();
+        }
+    });
     let post = crate::tally::runtime::TOOL_CANCELLATION.scope(
         withdrawn.clone(),
         SCRIPTED_APPROVAL.scope(scripted.clone(), server.call_tool("post_import", args)),
     );
-    let cancel = async {
-        scripted.opened().await;
-        withdrawn.cancel();
-    };
-    // A call that ends before its dialog opens leaves `cancel` waiting; the
-    // bound only stops a hang, since every wait here is on an event.
-    let (response, ()) = tokio::time::timeout(HANG_GUARD, async { tokio::join!(post, cancel) })
+    // The bound only stops a hang, since every wait here is on an event.
+    let response = tokio::time::timeout(HANG_GUARD, post)
         .await
         .expect("the withdrawn call stops");
     let observed = sent(simulator);
@@ -600,6 +611,8 @@ async fn a_call_withdrawn_while_it_waits_closes_its_dialog() {
         "request_cancelled",
         "{response}"
     );
+    assert_eq!(scripted.counts(), [1], "the post dialog opened once");
+    assert!(scripted.reviews().is_empty(), "no other dialog was asked");
     tokio::task::yield_now().await;
     assert!(!scripted.is_waiting(), "the dialog was closed");
     assert!(!server.post_approvals.holds(&line.batch_id));
@@ -2097,7 +2110,7 @@ fn the_agent_preview_says_when_the_post_happens() {
     second
         .entries
         .iter_mut()
-        .for_each(|entry| entry.amount = "7.25".into());
+        .for_each(|entry| entry.amount = ImportAmount::parse("7.25").unwrap());
     two.vouchers.push(second);
     let batch = agent_review_preview(&two, &endpoint).unwrap();
     assert!(batch.ends_with(&format!("\n{now}")), "{batch}");
@@ -2159,10 +2172,10 @@ fn journal_of(saved: &ImportLedgerLine, entries: usize) -> ImportLedgerLine {
     let mut lines = Vec::new();
     for _ in 0..entries - 1 {
         let mut entry = debit.clone();
-        entry.amount = "1.00".into();
+        entry.amount = ImportAmount::parse("1.00").unwrap();
         lines.push(entry);
     }
-    credit.amount = format!("{}.00", entries - 1);
+    credit.amount = ImportAmount::parse(&(format!("{}.00", entries - 1))).unwrap();
     lines.push(credit);
     line.vouchers[0].entries = lines;
     line.sha256 =
@@ -3038,7 +3051,7 @@ mod masters {
     }
 
     fn binding(item: &LedgerCreateItem) -> ApprovalBinding {
-        ApprovalBinding::masters(SHA, ORIGIN, &company(), item, PREVIEW)
+        ApprovalBinding::masters(SHA, ORIGIN, &company(), &item.clone().into(), PREVIEW)
     }
 
     fn marks() -> AgentReadRequest {
@@ -3095,7 +3108,7 @@ mod masters {
         let HeldRequest::Masters(held) = held else {
             panic!("a master approval comes back with its master request");
         };
-        assert_eq!(held.item(), &item());
+        assert_eq!(held.batch(), &item().into());
         assert_eq!(
             held.sha256(),
             bridge_tally_protocol::sha256_hex(held.xml().as_bytes())
@@ -3149,7 +3162,7 @@ mod masters {
             &line.sha256,
             line.endpoint_origin.as_deref().unwrap(),
             &company(),
-            &item(),
+            &item().into(),
             PREVIEW,
         );
         assert_ne!(voucher, masters);
@@ -3311,23 +3324,53 @@ mod masters {
             ),
             (
                 "digest",
-                ApprovalBinding::masters(&"0".repeat(64), ORIGIN, &company(), &base, PREVIEW),
+                ApprovalBinding::masters(
+                    &"0".repeat(64),
+                    ORIGIN,
+                    &company(),
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "endpoint",
-                ApprovalBinding::masters(SHA, "http://127.0.0.1:1", &company(), &base, PREVIEW),
+                ApprovalBinding::masters(
+                    SHA,
+                    "http://127.0.0.1:1",
+                    &company(),
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "company guid",
-                ApprovalBinding::masters(SHA, ORIGIN, &other_company, &base, PREVIEW),
+                ApprovalBinding::masters(
+                    SHA,
+                    ORIGIN,
+                    &other_company,
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "company name",
-                ApprovalBinding::masters(SHA, ORIGIN, &renamed_company, &base, PREVIEW),
+                ApprovalBinding::masters(
+                    SHA,
+                    ORIGIN,
+                    &renamed_company,
+                    &base.clone().into(),
+                    PREVIEW,
+                ),
             ),
             (
                 "preview",
-                ApprovalBinding::masters(SHA, ORIGIN, &company(), &base, "Another preview"),
+                ApprovalBinding::masters(
+                    SHA,
+                    ORIGIN,
+                    &company(),
+                    &base.clone().into(),
+                    "Another preview",
+                ),
             ),
         ];
         for (case, fresh) in fresh_bindings {
@@ -3457,7 +3500,12 @@ mod masters {
         let scripted = ScriptedApproval::approving();
         let dialog = SCRIPTED_APPROVAL
             .scope(scripted.clone(), async {
-                PendingPostApproval::ask_masters(item(), company(), PREVIEW.to_string(), marks())
+                PendingPostApproval::ask_masters(
+                    item().into(),
+                    company(),
+                    PREVIEW.to_string(),
+                    marks(),
+                )
             })
             .await;
         approvals

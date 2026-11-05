@@ -979,3 +979,24 @@ The owner's acceptance of condition 4 carries over unchanged: the overwritten le
 - Request order on another book or release, a repeat of either sitting, ledgers of other kinds or parents in one request, Gold, Education and other releases.
 
 **Rollback.** Reverting #2181 restores the one-ledger limit. The journal's format does not change: it already held one entry per item, now each with its own GUID, so a build from before #2181 still reads the file.
+
+## Amendment — owner decision, 2026-11-05: the port locks across a Store package's boundary (#1584)
+
+On a Microsoft Store install of Claude Desktop, Windows keeps the files the extension creates under `%LOCALAPPDATA%` in the package's own copy, so before #1641 a ComplyEaze Bridge process outside the package could take a Tally port's locks in another folder from the extension's (#1584). The cross-process lease of clause 8's map, the snapshot lease and the wire lock (#697) then serialised nothing between the two.
+
+**What is built (#1641).** Each port lock is a set of files taken all or none (`src-tauri/src/local_files/lock_set.rs`). On Windows the set is the old file under `<LocalAppData>\Bridge\agent` first, then one under `%USERPROFILE%\.complyeaze-bridge\coordination`, which Windows does not redirect (`local_files::paths::coordination_roots`). Every acquisition is a try-lock, and a busy file releases every file already taken before any pause. Elsewhere there is one root.
+
+**Decided: the AppData lock is kept for good on Windows** (the owner, 5 Nov 2026). It is not dropped on a version condition:
+
+- a build cannot measure which version runs on the other side of the package boundary;
+- an earlier build on the same side takes the AppData lock alone, so dropping it would split a pair that shares it today.
+
+The cost is one more open and lock per acquisition. An earlier unpackaged build and a newer packaged one still meet in different AppData folders: the profile lock does not reach that pair, which stays split until the earlier build is updated.
+
+**Why no Store sitting is owed.** Only the extension ships. The split needs a second Bridge process outside the package on the same PC, the desktop app installed normally or `bridge_mcp` run from a plain shell. A machine running only the extension takes every lock inside the package, in one folder. The contention rows against such a process (the extension against it both ways; the lease and snapshot lease as well as the wire lock; two shared holds; a no-holder control; the lock files created first by each side in turn) are owed if a second process ships beside the extension.
+
+**What it rests on.** `lab/1584-msix-paths-answers` at `7c330007`, on one Store install, with processes started inside and outside the package from a lab shell, not the extension itself: the profile wire lock refused the other side's request in both directions (`tally_endpoint_busy`), and the AppData wire lock alone stayed split. PARTIAL: one PC, one run.
+
+**Not measured.** An actual overlap before #1641 (the split is measured, the overlap it allowed is not); the extension as Claude Desktop starts it as an acquirer; whether a server Claude Desktop starts from a config entry also runs inside the package; whether the direct installer is also MSIX-packaged.
+
+**Rollback.** This amendment changes no code. Reverting #1641 restores one lock folder, and with it the split on a Store install.

@@ -5904,9 +5904,12 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
         "a new number does not get past this check, and ComplyEaze Bridge cannot post this sale yet: leave it out and tell the user so; do not enter it in Tally by hand"
     ));
     assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("tell the user and enter the invoice"));
-    // Case (3), an unconfirmed earlier batch: hand entry, and how it ends.
-    assert!(PREEXISTING_INVOICE_NEXT_STEP
-        .contains("cannot post it while that batch is unconfirmed: enter it in Tally by hand"));
+    // Case (3), an unconfirmed earlier batch: the same stated stop, and how it
+    // ends. A stop release does not end it (the owner's ruling on #1709).
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "cannot post it while that batch is unconfirmed: verify_import on that batch is the only way this refusal ends, and until it does, leave the invoice out and tell the user so; do not enter it in Tally by hand"
+    ));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("unconfirmed: enter it in Tally by hand"));
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("verify_import on it can confirm it"));
     // A busy journal is a retry, not a reason to enter anything by hand.
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(

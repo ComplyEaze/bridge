@@ -869,7 +869,7 @@ pub(in crate::agent) mod live_sft_lab {
         companies_xml_named("BRIDGE SFT LAB", &guid())
     }
 
-    fn identity() -> VerifiedCompanyIdentity {
+    pub(in crate::agent) fn identity() -> VerifiedCompanyIdentity {
         let companies =
             bridge_tally_protocol::parse_companies_from_collection(&companies()).unwrap();
         let observed = &companies[0];
@@ -989,6 +989,222 @@ pub(in crate::agent) mod live_sft_lab {
 
     /// The answers prove something about today's reader only while it still sends the requests
     /// they answered: each request, the company checks included, is byte for byte the one sent.
+    #[tokio::test]
+    async fn each_request_is_byte_for_byte_the_one_sent_live() {
+        let (book, observed) = read().await;
+        book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        let check = bytes("company-check.request");
+        for (index, request) in observed.iter().enumerate() {
+            let name = if index % 3 == 1 {
+                PARTS[index / 3]
+            } else {
+                "company-check"
+            };
+            let live = if name == "company-check" {
+                check.clone()
+            } else {
+                bytes(&format!("{name}.request"))
+            };
+            assert!(
+                request.request_body == live,
+                "request {index} ({name}) differs from the one sent live:\n{}\n{}",
+                text_of(&request.request_body),
+                text_of(&live)
+            );
+        }
+    }
+}
+
+/// The audit read over live answers of the same company after sheet 699-C16 keyed 19 more
+/// vouchers and ten ledgers (lab row C16-R, 4 Nov 2026; the bytes and their provenance are in the
+/// protocol crate's `tests/fixtures/agent/audit-read-sft-lab-c16r/PROVENANCE.md`). Under the
+/// production window limits the year is read in two voucher windows, split after 31 January 2026.
+/// The company list stands in as in [`live_sft_lab`].
+pub(in crate::agent) mod live_sft_lab_c16r {
+    use super::live_sft_lab::{companies, identity};
+    use super::*;
+
+    const FIXTURES: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/"
+    );
+
+    fn bytes(name: &str) -> Vec<u8> {
+        std::fs::read(format!("{FIXTURES}sft-lab-audit-{name}.utf16le.xml")).unwrap()
+    }
+
+    fn part(name: &str) -> String {
+        text_of(&bytes(name))
+    }
+
+    /// The reader's parts in the order it asks for them, each named by its fixture.
+    const PARTS: [&str; 11] = [
+        "marks",
+        "company-object",
+        "groups",
+        "ledgers",
+        "trial-balance",
+        "voucher-types",
+        "marks",
+        "census",
+        "vouchers-1",
+        "vouchers-2",
+        "marks",
+    ];
+
+    /// Each part between two company checks, as the reader sends them.
+    pub(in crate::agent) fn plans() -> Vec<ScenarioPlan> {
+        PARTS
+            .iter()
+            .flat_map(|name| [plan(companies()), plan(part(name)), plan(companies())])
+            .collect()
+    }
+
+    pub(in crate::agent) async fn read(
+    ) -> (Result<AuditBook, AuditReadFailure>, Vec<ObservedRequest>) {
+        let simulator = SequenceSimulator::spawn(plans()).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let book = read_audit_book(
+            &TallyRuntime::default(),
+            &config,
+            &identity(),
+            (&date("20250401"), &date("20260331")),
+            &AuditRoles {
+                cash_groups: vec!["Cash-in-Hand".to_string()],
+                bank_groups: vec!["Bank Accounts".to_string()],
+            },
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+        )
+        .await;
+        (book, simulator.finish().unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn every_part_a_live_tally_served_is_admitted_whole() {
+        let (book, observed) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        assert_eq!(audit.book.company_guid, super::live_sft_lab::guid());
+        // The counts the lab read back (C16-R's r5v): 53 vouchers on 23 ledgers.
+        assert_eq!(audit.book.vouchers.len(), 53);
+        assert_eq!(audit.book.ledgers.len(), 23);
+        assert_eq!(observed.len(), 33);
+    }
+
+    /// Clause 16(a) and (d)'s candidates on the live book, against key v3, worked by hand to the
+    /// rule from the sheet before any capture: twelve rows, one per voucher and credited head
+    /// ledger, and the vouchers, tax credits and ledgers left out, each counted. Measured against
+    /// the synthetic lab book only; the key is not a CA's, and no CA has worked this book.
+    #[tokio::test]
+    async fn clause16_lists_the_rows_key_v3_worked_by_hand_on_the_live_book() {
+        let (book, _) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        let rules = bridge_tax_audit::rules_for(&audit.engagement).unwrap();
+        let dump =
+            bridge_tax_audit::clause16_credits_on(&audit.engagement, &audit.book, &rules).unwrap();
+        let figure = |id: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("clause16_credits.{id}"))
+                .unwrap_or_else(|| panic!("no figure {id}"))
+                .clone()
+        };
+        let rows = [
+            (
+                "Capital SFT",
+                "Receipt 20 on 2025-06-30",
+                500_000,
+                "Bank SFT",
+            ),
+            (
+                "Advance SFT",
+                "Receipt 16 on 2025-07-01",
+                22_000_000,
+                "Cash",
+            ),
+            ("Loan SFT", "Receipt 18 on 2025-08-20", 23_000_000, "Cash"),
+            (
+                "Reserve C16",
+                "Receipt 22 on 2025-10-15",
+                700_000,
+                "Bank SFT",
+            ),
+            (
+                "Refund C16",
+                "Receipt 23 on 2025-10-20",
+                800_000,
+                "Bank SFT",
+            ),
+            ("Suspense C16", "Receipt 24 on 2025-10-25", 900_000, "Cash"),
+            ("Capital SFT", "Receipt 7 on 2025-11-01", 50_000_000, "Cash"),
+            (
+                "Reserve C16",
+                "Journal 3 on 2025-12-15",
+                400_000,
+                "Creditor C16",
+            ),
+            (
+                "Capital SFT",
+                "Receipt 25 on 2026-01-10",
+                650_000,
+                "Bank SFT",
+            ),
+            (
+                "Suspense C16",
+                "Journal 6 on 2026-01-31",
+                1_600_000,
+                "Party Four",
+            ),
+            // One ledger on two lines, 1,000 and 2,000 rupees: one row.
+            (
+                "Capital SFT",
+                "Receipt 29 on 2026-02-05",
+                300_000,
+                "Bank SFT",
+            ),
+            // A bank debit beside an expense debit keeps the voucher listed.
+            (
+                "Advance SFT",
+                "Receipt 28 on 2026-02-10",
+                2_000_000,
+                "Bank SFT, Expense C16",
+            ),
+        ];
+        assert_eq!(figure("rows")["value"], rows.len());
+        assert_eq!(figure("row_credit")["value"], 102_850_000);
+        for (index, (ledger, label, paise, debits)) in rows.iter().enumerate() {
+            let f = figure(&format!("row_{}", index + 1));
+            assert_eq!(f["value"], *paise, "{label}");
+            assert_eq!(
+                f["definition_text"],
+                format!("Credits to {ledger} on {label}; the voucher debits {debits}.")
+            );
+        }
+        // Journals 1, 2, 4, 5 and 7: every debit on an expense, the reserved profit and loss
+        // ledger or a fixed asset, Journal 7's beside tax.
+        assert_eq!(figure("excluded_vouchers")["value"], 5);
+        assert_eq!(figure("excluded_credit")["value"], 5_880_000);
+        // Payment 3 (tax withheld from a creditor) and Sales 14 (tax on a sale).
+        assert_eq!(figure("tax_left_out")["value"], 2);
+        assert_eq!(figure("tax_left_out_credit")["value"], 230_000);
+        // Grant C16, under a user group under Primary.
+        assert_eq!(figure("untested_ledgers")["value"], 1);
+        assert_eq!(figure("untested_credit")["value"], 1_500_000);
+        assert_eq!(dump["figures"].as_array().unwrap().len(), 8 + rows.len());
+        assert_eq!(dump["findings"][0]["confidence"], "judgement_required");
+        assert_eq!(
+            dump["findings"][0]["ask_client_text"],
+            serde_json::json!([])
+        );
+    }
+
+    /// The answers prove something about today's reader only while it still sends the requests
+    /// they answered: each request, the company checks, the census and both windows included, is
+    /// byte for byte the one sent.
     #[tokio::test]
     async fn each_request_is_byte_for_byte_the_one_sent_live() {
         let (book, observed) = read().await;

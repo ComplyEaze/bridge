@@ -778,3 +778,49 @@ async fn the_live_sft_lab_answers_give_the_result_the_lab_recorded() {
     // the 34 the lab's relay recorded.
     assert_eq!(one.simulator.unwrap().finish().unwrap().len(), 34);
 }
+
+/// The same over the live answers of the larger book (lab row C16-R), read in two voucher windows
+/// under the production limits. Measured against the synthetic lab book only.
+#[tokio::test]
+async fn the_live_sft_lab_c16r_answers_give_the_result_the_lab_recorded() {
+    use super::super::audit_read::tests::{live_sft_lab, live_sft_lab_c16r};
+    let status = || {
+        ScenarioPlan::new(Fixture::ProductStatus(ProductStatus::TallyPrime))
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let mut plans = vec![
+        plan(live_sft_lab::companies()),
+        status(),
+        plan(live_sft_lab::companies()),
+        status(),
+    ];
+    plans.extend(live_sft_lab_c16r::plans());
+    let one = serve(plans, Redaction::None);
+    // The arguments the lab sent in row C16-R, step R5 (`c16r/args-audit.json`).
+    let response = one
+        .server
+        .call_tool(
+            "audit_test_run",
+            json!({
+                "company_guid": live_sft_lab::guid(),
+                "from": "2025-04-01",
+                "to": "2026-03-31",
+                "test": "cash_44ab",
+                "cash_groups": ["Cash-in-Hand"],
+                "bank_groups": ["Bank Accounts"],
+            }),
+        )
+        .await;
+    let run = result(&response);
+    assert_eq!(run["state"], "completed");
+    let bytes = canonical(run);
+    // C16-R notes.txt, R5: "audit result canonical 2,671 B sha256 517b8c94...".
+    assert_eq!(bytes.len(), 2671, "{}", String::from_utf8_lossy(&bytes));
+    assert_eq!(
+        sha256_hex(&bytes),
+        "517b8c9493649eb17e8667ddde5cc6c6339170d6718926ef5cd67cb5d4eeb942"
+    );
+    // The paired company list (four requests), then eleven parts, each between two company
+    // checks: the 37 the lab's relay recorded.
+    assert_eq!(one.simulator.unwrap().finish().unwrap().len(), 37);
+}

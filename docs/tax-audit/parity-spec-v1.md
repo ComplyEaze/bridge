@@ -458,4 +458,4 @@ A test the reference has no module for is crate-first. It sits in `registry::CRA
 `PORTED`, so it has no reference golden and is not in `RUNNERS`; `parity/python_golden.py` names
 it in its own `CRATE_FIRST` and refuses it there, and `tests/registry.rs` checks that both lists
 agree. Its provenance note records it under the same heading, naming its books. The first is
-`clause42_sft` (#699).
+`clause42_sft` (#699), and the second `clause16_credits` (#699).

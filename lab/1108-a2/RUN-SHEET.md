@@ -85,7 +85,8 @@ past it are 8 lower in the build: `:4130` is `:4122` there.
 
 Over stdio, through the relay:
 - `BRIDGE_AGENT_ENABLE_WRITES=true`, `BRIDGE_TERMS_ACCEPTED=true`;
-- `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9002`;
+- `BRIDGE_TALLY_HOST=127.0.0.1`, `BRIDGE_TALLY_PORT=9003`. Port 9003 is used because 852-C2's
+  relay may still be listening on 9002, and no process is ended (Difference 4);
 - one new empty `BRIDGE_AGENT_DATA_DIR` for the whole row;
 - `BRIDGE_AGENT_ENABLE_BATCH_POST` absent (set, it refuses as `setting_retired`, `agent.rs:1425`);
 - `BRIDGE_AGENT_REDACTION` unset, so Tally's `LINEERROR` text is kept in the answer (`agent.rs:4130`).
@@ -170,6 +171,9 @@ One at a time. Every answer goes to a file. A file with no answer is a failed st
    - Record TallyPrime's release and edition as the screen shows them.
    - Run the census, check every file against `SHA256.txt`, and run
      `python3 -I check-relay.py relay.py` (EXPECT `0 failed`).
+   - **Nothing listens on port 9003.** This read changes nothing: `netstat -ano -p tcp | findstr ":9003"`, with
+     its whole output kept. EXPECT no line whose local address ends in `:9003`. Any such line, or a
+     netstat that does not run: record it and STOP. Never end the process that holds the port.
 
 1. **The first reads.** Send `flags`, `ledgers` and `vouchers`, each followed by `check_1108.py rows`.
    - `flags`: EXPECT ISINVENTORYON `Yes` and ISINTEGRATED `Yes`, else STOP.
@@ -197,7 +201,7 @@ One at a time. Every answer goes to a file. A file with no answer is a failed st
    - Record that ALTVCHID as **V0**. Anything else: STOP.
 
 5. **Relay and Bridge.**
-   - Start the relay: `python -I relay.py 9002 9001 C:\bridge-lab\1108a2\relay`. It stays up for
+   - Start the relay: `python -I relay.py 9003 9001 C:\bridge-lab\1108a2\relay`. It stays up for
      the whole row, and each import lands as `import-N` in that folder.
    - Start `bridge_mcp` as Build says.
    - `list_companies`: EXPECT THE COMPANY's GUID.

@@ -1,7 +1,7 @@
 # sha256  bytes  file  (LAB-COMMON.md, check-request-ids.py, check_1108.py and templates/* byte-equal to lab/1108-a1-stock-in-hand-journal at 72b54de8, templates/b-cash-journal.utf16le.xml being its requests/b-cash-journal.utf16le.xml; relay.py and check-relay.py byte-equal to lab/852-c2-screen-work at d2b5ccca; requests/ and batches/ from gen_requests.py)
 f50b500ac7ddb47b8fbf83724776360fd559a27996b047ed134226093f27014e  67  .gitattributes
 5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
-7d36400b988ace5537e9174956c306a87e7f8d2e652dd7cb18e9ea5d6a587191  21507  RUN-SHEET.md
+77aa26f66ba206672de9ebe220b9160b55e852de82e933e911c5ab7a008a3bf6  21929  RUN-SHEET.md
 9a8068485f2d5d9a415d294610794a496e9dec0363880b021bd3f2e1a1598d6b  6822  check-relay.py
 8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
 0898e7c15cfefb9a9ff14e3f1e07e5eea818e342afe75f43c14992fff9146436  5360  check_1108.py

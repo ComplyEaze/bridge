@@ -1,0 +1,4 @@
+Sheet folder check (lab/692-r2-carry-check at 92225cd0, before the run): every line of its SHA256.txt against the file's sha256
+.gitattributes  listed 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da  read 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da  equal: True
+RUN-SHEET.md  listed 03f3e5e8f8eb9738ea0e5d55167b1a271dfd29b4d2050a4b1adb192a9883c7da  read 03f3e5e8f8eb9738ea0e5d55167b1a271dfd29b4d2050a4b1adb192a9883c7da  equal: True
+check_r2_carry.py  listed 57978ea463362537699240696f45112d209aa0e072bfa493ee9bdc7d0979c149  read 57978ea463362537699240696f45112d209aa0e072bfa493ee9bdc7d0979c149  equal: True

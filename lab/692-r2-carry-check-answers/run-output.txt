@@ -1,0 +1,15 @@
+run (UTC): 2026-11-05T08:18:06Z
+command, from lab/692-r2-carry-check: python -I check_r2_carry.py <692 run's answers folder>
+exit 0
+r1-w1-pl.utf16le.xml: 1922 B, sha256 equal to the record
+r1-w2-ledgers.utf16le.xml: 13548 B, sha256 equal to the record
+r2-w1-pl.utf16le.xml: 1922 B, sha256 equal to the record
+r2-w2-ledgers.utf16le.xml: 13548 B, sha256 equal to the record
+  r1-w1-pl.utf16le.xml: Profit and Loss lines 6
+  r1-w2-ledgers.utf16le.xml: Profit & Loss A/c ledgers 1
+  r2-w2-ledgers.utf16le.xml: Profit & Loss A/c ledgers 1
+  r1-w1-pl.utf16le.xml: "Less: Closing Stock" lines 1
+  r2-w1-pl.utf16le.xml: "Less: Closing Stock" lines 1
+check 1, R2's year-2 P&L A/c opening == R1's year-1 nett: True  with the sign reversed: False
+check 2, R2's year-2 P&L A/c opening == R1's year-2 P&L A/c opening: True  with the sign reversed: False
+check 3, R2's year-1 closing stock != R1's: True

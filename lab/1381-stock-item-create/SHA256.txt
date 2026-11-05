@@ -1,0 +1,20 @@
+# sha256  bytes  file  (LAB-COMMON.md and check-request-ids.py byte-equal to lab/692-opening-stock at 991c3ec4; templates/ byte-equal to lab/690-batch-ledger-create-l0 at 83a5c989 requests/marks.utf16le.xml and requests/create-a.utf16le.xml; requests/ from gen_requests.py; requests/r2-copied.utf16le.xml is rendered on the lab PC and is not listed)
+f50b500ac7ddb47b8fbf83724776360fd559a27996b047ed134226093f27014e  67  .gitattributes
+5370c6d288cd0f54a4ac547c513ec1648dd8bec0ea5a327d46b0de519a6369c6  12062  LAB-COMMON.md
+bb10f36b79ef2cac976200ec8bb6e1e2549f75ecb5ac04853cf7a703d9b7c548  14991  RUN-SHEET.md
+8889de2ca4f171c7d4a1e98d63e9b3a5fa63ff879827ae2f8cc75a9025ddf6c1  4192  check-request-ids.py
+3ffce6880da51e6df8ea88af10488dc88c1c53fedd7803f54bd07b76beb5d90f  6142  check_1381.py
+b7119e338420abc64c10929986465938802e0a2eff327457c899742b7af4d35d  5061  gen_requests.py
+5cab24000f99b5ef3b272045a741c9715c42ac426d7fc4a6b364494a0a26059b  3872  make_r2.py
+7d4ef7088067770693257e968033f767ad9afd2c743b10cf5bc5ccbd175138e7  1152  requests/groups.utf16le.xml
+30238f3ad1625aa71c272ce507a7321b3eb2472715bfbda60535e04c4bd74f85  1338  requests/items.utf16le.xml
+5802b3feca930e569de996e5582299ad34f2515140b233a7140290f8f874552b  990  requests/marks.utf16le.xml
+1bef7c4a2df7567428763572b92087042fdfd2500756ddc9f7ed686116e9adce  978  requests/r1-name-unit.utf16le.xml
+fd678718607c67ebf13c6cbb6f68f17df1aede59d302ed2e98ab9f5d0654233b  2858  requests/r3-existing-name.utf16le.xml
+458854e297c40139f5eec0a43d33952996f8743a2febd1521ef6fbaac1777e20  978  requests/r4a-case.utf16le.xml
+7aa5f2e95aafdd0af98c750469548a242d101922c9045bf02e774b46c7d0d767  982  requests/r4b-spacing.utf16le.xml
+45b4103aadceebb8e30c5ea2dd617bc4905ba21921efa0e9f9231363e89a09f2  986  requests/r5a-absent-unit.utf16le.xml
+ce9844252db5b9394639dc70160f6c56a05dfafdb18a7a6812134f0765ff8afe  1054  requests/r5b-absent-group.utf16le.xml
+33f88bf29b0df6340a45d0767b5deeca5445f2134270ce49c911f2ca84a3102b  1096  requests/units.utf16le.xml
+6a2cfdaae54dfdb6f1477ba082f3fdfc8094f8c1111362bb06f35207fc4b2262  1738  templates/create-l0.utf16le.xml
+f143f14431611e0cae4311e5dba9f04a9926ab12e8fa83c78f96ccca45b58b2b  990  templates/marks-l0.utf16le.xml

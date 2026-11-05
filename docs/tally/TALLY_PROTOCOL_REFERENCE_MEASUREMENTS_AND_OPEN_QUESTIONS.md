@@ -293,6 +293,12 @@ request is predicted over a budget well below the cap.
      AlterID spans stops as soon as it has counted more vouchers than the allowance can hold at the
      default figure (the allowed requests times the vouchers one request holds at it, which every
      first plan uses), so that certain refusal costs no further census span (#945).
+     The spans are sent from the mark down, so a recent window, whose vouchers carry the book's
+     highest AlterIDs, reaches that point within its first spans; a window of old, unaltered
+     vouchers still reaches it late (#2372). A refusal decided from the census also carries
+     `reads.certainly_refused`: the shortest stretch of the window's days whose counted vouchers
+     alone exceed what the allowed requests carry, so any window containing it is refused too. It
+     proves a refusal, never a fit.
      The tax audit's read is the exception, because its period cannot be narrowed (#2173). It is
      refused on the count before any data part only when even the plan it would make after a first
      part measured at the floor (half the default figure, the lightest it can use) needs more than

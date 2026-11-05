@@ -1,0 +1,9 @@
+restore plan (2026-11-05T08:10:27Z)
+folder: <LAB_DIR>/backups/bkp
+file: TDBK1800_<company number>.001
+bytes: 14661545
+sha256: fdfdd659b87f2acadd492c949fc3ae756666a0eeb62a535a2b7fe1fc90fd0328
+company number: <company number>
+Restore Data Path: Tally's data folder
+list must show: BRIDGE CORPUS DENSE (<company number>), backup of 2026-11-05 13:25 local
+prompts expected, the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace ..." = Replace

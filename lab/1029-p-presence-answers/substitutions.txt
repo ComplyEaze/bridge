@@ -1,0 +1,13 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/s0-c2-netstat.txt: original 9212 B sha256 4f298d6a2d5a216cb59365e222f18f10be66345a9fdaacaad4b72ef4683c4c6b (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s0b-c2-netstat.txt: original 9196 B sha256 614c3f8b6105f0c59fbbce3e995c34d756e49cab718482dde1b3e881261d2a40 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s10-c2-netstat.txt: original 9919 B sha256 22308c05a42f6ef90a0e84321b0aaba44cf5aa78582edc472d618cd7d3f23671 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+agent-run/launch-env.json: original 165 B sha256 9b102561f05fc8c1cbd633acf4315147255a7176ad9f26683851b82042262378 (kept on the lab PC); 1 x -> <LAB_DIR>
+agent-run/server-stderr-20261105T080711Z.log: pushed as agent-run/server-stderr-20261105T080711Z.txt (the repository ignores *.log); bytes unchanged
+notes.txt: original 13825 B sha256 99e017911327bc6046ae1bab29ae09294b2c64ddeacaac748872acd93c5bb4a3 (kept on the lab PC); 2 x -> <LAB_DIR>; 3 x -> stop
+RESULTS.md: original 6565 B sha256 bbe3bfafa1846cd91d3e8f9b4ec833e9211d86956b2dbd9f8889f5c432926190 (kept on the lab PC); 1 x -> stop
+scripts/marks.py: original 3667 B sha256 053b90243de648ff92509f7f884adf371ca4b1ec1284aa7168a029bb24992539 (kept on the lab PC); 1 x -> <LAB_DIR>; 8 x -> stop
+scripts/restore-prep.py: original 2608 B sha256 642c41fcbd09d75fea2da6f726cd5c55062b03eb2b9306822381019ffea30729 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>; 2 x -> stop
+scripts/bk-record.py: original 1095 B sha256 8a459deb1569b22f98066efd0b26a6dce39b1ca5fc112564979d628518565af8 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/c2.py: original 1554 B sha256 59a45f8865b3f49153021208704984e5256f65fcb7fcca99bdf59f77d0c6f005 (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/cap.py: original 1049 B sha256 6db66b253fae8ee43d64d6f50fd8380d6b7f0b7e7dc367bb71c4786efcf67743 (kept on the lab PC); 2 x -> <LAB_DIR>

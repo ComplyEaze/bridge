@@ -1,0 +1,1 @@
+2026-11-05T08:10:18Z bridge_mcp.exe sha256 after the server stopped: 9bda7144f54e5ef68477b5ca30be33a17759de2e1ad756f840785c67bcab2dc0

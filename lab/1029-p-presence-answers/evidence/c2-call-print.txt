@@ -1,0 +1,4 @@
+005-c2.json: vouchers sent 2026-11-05T08:09:11.140Z secs 15.206 bytes 7820 isError False rpc False
+{'reason': None, 'state': 'complete', 'total': 2}
+snapshot {'master_alter_id': 331, 'voucher_alter_id': 29902, 'reused': False}
+rows [(None, None), (None, None)]

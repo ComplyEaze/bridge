@@ -1,0 +1,13 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backups/bkp/TDBK1800_<company number>.001 14661545 B fdfdd659b87f2acadd492c949fc3ae756666a0eeb62a535a2b7fe1fc90fd0328 (BK-P)
+restore-plan.txt 473 B 5d63f76281970b94a8d50c4ce41951956c7fb0ad5926e344b00b4ce73ea885a5 (lab copy: the company number, or a folder listing)
+company-folder-before.txt 1016 B 73f67a3bc8907170fc264eda9021944765b1a449134fa0b3b4112d54d1badeb0 (lab copy: the company number, or a folder listing)
+company-folder-after.txt 711 B 0a86aea21c7b36ca754b555bc57a927b80c009d0f19606e55e727c44b7d8c7eb (lab copy: the company number, or a folder listing)
+bkp-local.txt 205 B 66a370bfbffcb76919964fe4c418936c0d12d644dfe93428e8b616732ae52293 (lab copy: the company number, or a folder listing)
+agent-run/answers/000-list.json 1569 B efe394300800243a6cfbe7c08303411ecba286850723add58144657cf1ab848d (company number)
+agent-run/answers/001-status.json 1823 B 8e09656c2b876136fe942cea2905c89e412a7a05b60d3fe69ac5ec27cc81f238 (company number)
+agent-run/answers/002-vt.json 29595 B a442656fa3b8bc0d16d4d25e382800c38b38a0f7beb47d782dbd41f7abb0568f (company number)
+agent-run/answers/004-c1.json 6053 B 529f388060562d6e7d394e9446032899afacb78203a7394125a877af9ff70c54 (company number)
+agent-run/answers/005-c2.json 7820 B 80f98a266b40a2a3c436d92d5e9ca7829301bb8d28fef4a64a3c8d4e16f5cd25 (company number)
+agent-run/client.py 4687 B 0ed0bb03bafb4f7999fa69756ef1e529d0157d826dbec58110bb96e9a4075d63 (the 852-C1 client: its clientInfo name holds a desk word)
+stage-1029p.py 7567 B db854c77b397ea113f73fbac73e9109adfc7b0ea7fce32a04ba73594f945adf1 (this stage script: its patterns name the lab paths)

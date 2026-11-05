@@ -1,0 +1,2 @@
+2026-11-05T07:55:54Z <LAB_DIR>/backups/bkp after the backup: 1 file(s)
+TDBK1800_<company number>.001  14661545 B  sha256 fdfdd659b87f2acadd492c949fc3ae756666a0eeb62a535a2b7fe1fc90fd0328  local time 2026-11-05 13:25

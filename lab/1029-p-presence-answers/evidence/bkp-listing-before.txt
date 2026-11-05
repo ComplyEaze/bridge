@@ -1,0 +1,1 @@
+listing BEFORE of <LAB_DIR>/backups/bkp (new, created empty): 0 files

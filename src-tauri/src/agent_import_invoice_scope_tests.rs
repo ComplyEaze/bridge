@@ -590,37 +590,36 @@ fn a_fault_in_any_one_row_of_the_real_answer_is_refused_at_its_position() {
             edit(&mut changed);
             scope.prove(&changed)
         };
-        let moved = "differs_from_catalogue";
-        let cause = format!("ledger_scope_row_{moved}");
-        assert_eq!(each(&|r| r[at].parent = None), differs(&cause), "{at}");
+        let cause = "ledger_scope_row_differs_from_catalogue";
+        assert_eq!(each(&|r| r[at].parent = None), differs(cause), "{at}");
         assert_eq!(
             each(&|r| r[at].parent = Some("BRIDGE Elsewhere".to_string())),
-            differs(&cause),
+            differs(cause),
             "{at}"
         );
         assert_eq!(
             each(&|r| r[at].parent = r[at].parent.as_ref().map(|p| format!("{p} "))),
-            differs(&cause),
+            differs(cause),
             "{at}"
         );
         assert_eq!(
             each(&|r| r[at].parent = r[at].parent.as_ref().map(|p| recased(p))),
-            differs(&cause),
+            differs(cause),
             "{at}"
         );
         assert_eq!(
             each(&|r| r[at].name = "Renamed".to_string()),
-            differs(&cause),
+            differs(cause),
             "{at}"
         );
         assert_eq!(
             each(&|r| r[at].name = format!("{} ", r[at].name)),
-            differs(&cause),
+            differs(cause),
             "{at}"
         );
         assert_eq!(
             each(&|r| r[at].name = recased(&r[at].name)),
-            differs(&cause),
+            differs(cause),
             "{at}"
         );
         assert_eq!(

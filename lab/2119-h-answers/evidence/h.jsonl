@@ -1,0 +1,29 @@
+{"time":"2026-11-05T13:06:02.097Z","event":"started","pid":28620}
+{"time":"2026-11-05T13:06:03.385Z","event":"received","message":{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{"listChanged":true},"extensions":{"io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}}},"clientInfo":{"name":"local-agent-mode-sleep-2119h","version":"1.0.0"}},"jsonrpc":"2.0","id":0}}
+{"time":"2026-11-05T13:06:03.435Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/initialized"}}
+{"time":"2026-11-05T13:06:03.452Z","event":"received","message":{"method":"tools/list","jsonrpc":"2.0","id":1}}
+{"time":"2026-11-05T13:06:03.603Z","event":"started","pid":3760}
+{"time":"2026-11-05T13:06:09.740Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/roots/list_changed"}}
+{"time":"2026-11-05T13:06:11.769Z","event":"received","message":{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"extensions":{"io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}}},"clientInfo":{"name":"<client>","version":"0.1.0"}},"jsonrpc":"2.0","id":0}}
+{"time":"2026-11-05T13:06:12.165Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/initialized"}}
+{"time":"2026-11-05T13:06:12.257Z","event":"received","message":{"method":"tools/list","params":{},"jsonrpc":"2.0","id":1}}
+{"time":"2026-11-05T13:08:39.697Z","event":"received","message":{"method":"tools/call","params":{"name":"sleep","arguments":{"seconds":90}},"jsonrpc":"2.0","id":2}}
+{"time":"2026-11-05T13:09:39.715Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"SdkError: Request timed out"}}}
+{"time":"2026-11-05T13:09:39.729Z","event":"cancelled","id":2,"elapsed":59.968936,"reason":"SdkError: Request timed out"}
+{"time":"2026-11-05T13:18:04.772Z","event":"stdin_closed","running":0}
+{"time":"2026-11-05T13:18:05.283Z","event":"started","pid":24040}
+{"time":"2026-11-05T13:18:05.294Z","event":"received","message":{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{"listChanged":true},"extensions":{"io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}}},"clientInfo":{"name":"local-agent-mode-sleep-2119h","version":"1.0.0"}},"jsonrpc":"2.0","id":0}}
+{"time":"2026-11-05T13:18:05.300Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/initialized"}}
+{"time":"2026-11-05T13:18:05.303Z","event":"received","message":{"method":"tools/list","jsonrpc":"2.0","id":1}}
+{"time":"2026-11-05T13:18:05.309Z","event":"received","message":{"method":"tools/call","params":{"name":"sleep","arguments":{"seconds":90,"progress_every":10}},"jsonrpc":"2.0","id":2}}
+{"time":"2026-11-05T13:19:05.322Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"SdkError: Request timed out"}}}
+{"time":"2026-11-05T13:19:05.335Z","event":"cancelled","id":2,"elapsed":60.012868,"reason":"SdkError: Request timed out"}
+{"time":"2026-11-05T13:21:15.623Z","event":"stdin_closed","running":0}
+{"time":"2026-11-05T13:21:15.872Z","event":"started","pid":20932}
+{"time":"2026-11-05T13:21:15.882Z","event":"received","message":{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{"listChanged":true},"extensions":{"io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}}},"clientInfo":{"name":"local-agent-mode-sleep-2119h","version":"1.0.0"}},"jsonrpc":"2.0","id":0}}
+{"time":"2026-11-05T13:21:15.887Z","event":"received","message":{"jsonrpc":"2.0","method":"notifications/initialized"}}
+{"time":"2026-11-05T13:21:15.890Z","event":"received","message":{"method":"tools/list","jsonrpc":"2.0","id":1}}
+{"time":"2026-11-05T13:21:15.895Z","event":"received","message":{"method":"tools/call","params":{"name":"sleep","arguments":{"seconds":60}},"jsonrpc":"2.0","id":2}}
+{"time":"2026-11-05T13:22:15.905Z","event":"result_sent","id":2,"elapsed":60.002678}
+{"time":"2026-11-05T13:25:59.672Z","event":"received","message":{"method":"tools/call","params":{"name":"sleep","arguments":{"progress_every":10,"seconds":60}},"jsonrpc":"2.0","id":3}}
+{"time":"2026-11-05T13:26:59.692Z","event":"result_sent","id":3,"elapsed":60.009827}

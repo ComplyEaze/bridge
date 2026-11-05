@@ -1,0 +1,9 @@
+2026-11-05T13:05:14.978Z [sleep-2119h] [info] Initializing server... { metadata: undefined }
+2026-11-05T13:06:03.479Z [sleep-2119h] [info] Era probe verdict: legacy (exec path pinned — no sibling probe) { metadata: undefined }
+2026-11-05T13:06:03.498Z [sleep-2119h] [info] Using MCP server command: C:\Program Files\nodejs\node.exe with path: <PATH list removed>
+2026-11-05T13:06:03.504Z [sleep-2119h] [info] Server started and connected successfully { metadata: undefined }
+2026-11-05T13:06:11.779Z [sleep-2119h] [info] Message from client: method="initialize" id=0 params { metadata: undefined }
+2026-11-05T13:06:11.928Z [sleep-2119h] [info] Message from server: id=0 result { metadata: undefined }
+2026-11-05T13:06:12.145Z [sleep-2119h] [info] Message from client: method="notifications/initialized" { metadata: undefined }
+2026-11-05T13:06:12.176Z [sleep-2119h] [info] Message from client: method="tools/list" id=1 params { metadata: undefined }
+2026-11-05T13:06:12.334Z [sleep-2119h] [info] Message from server: id=1 result { metadata: undefined }

@@ -1,0 +1,6 @@
+Kept on the lab PC only, by name, size and sha256 (the configuration copy, screens, local notes and helpers; the originals of the masked copies are in substitutions.txt):
+desktop-config-before.json 9420 B f7a9ab6c732491f7f46f800b2238040dcc7ac594eb04cd8f4459ea38891b8c1d
+shots/s0-tally.png 72969 B c3c062289b502f77f7ab18d39adf972db46fd08d15b0bea4d9881182f42b4cc6
+capwin.ps1 1170 B 9529ada2e5eaf5091788f4f45cb303810fac7bc48bbcd4751aca3c12275ed2b5
+stage-2119h.py 5602 B 7723657a5d98b7caf944d567c7b8f29924418bf7525d2b8c0c43bb136eab1f75
+shots/s0b-tally-5nov.png 72654 B (the client book: client data, a PNG image; listed with the client-book raw captures, deleted at cycle end on the run lead's word)

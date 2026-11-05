@@ -1,0 +1,4 @@
+$ python -I check_1381.py diff r5a-items.utf16le.xml r5b-items.utf16le.xml
+exit 0
+rows before: 3  after: 3
+unchanged rows: 3

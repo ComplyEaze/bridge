@@ -1,0 +1,13 @@
+$ python -I check_1381.py import r5b-r5b-absent-group.utf16le.xml
+exit 0
+CREATED 0
+ALTERED 0
+DELETED 0
+COMBINED 0
+IGNORED 0
+ERRORS 0
+CANCELLED 0
+EXCEPTIONS 1
+LASTVCHID 0
+LASTMID 0
+LINEERROR "Stock Group 'SC Absent Group' does not exist!"

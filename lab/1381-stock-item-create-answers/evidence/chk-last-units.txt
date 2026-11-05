@@ -1,0 +1,6 @@
+$ python -I check_1381.py rows last-units.utf16le.xml
+exit 0
+rows: 1
+UNIT 'Nos' (3 characters) GUID <company guid>-000000ce
+  MASTERID '206'
+  ALTERID '208'

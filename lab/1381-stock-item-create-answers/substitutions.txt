@@ -1,0 +1,58 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+evidence/chk-base-groups.txt: original 398 B sha256 ddde51c2571966094d9c15afe6c6aee71983729e0149217134a102ee8dbaad85 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-base-items.txt: original 2059 B sha256 8e33e601bbf4722698deabf77b79d7f39718d753e5bebf1d04f27e83445592a6 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-base-marks.txt: original 145 B sha256 f4bcfaa1be28fece89b5344e4481b3bf286df92adcfa14c4484fb2ce37639ea9 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-base-units.txt: original 179 B sha256 e8cbbd0134efe8bcd1cc03d0cecad49046183b2e2ae1dfde3f3e652e89190e3b (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-last-groups.txt: original 398 B sha256 9268db565f6480d3a531050a7128b124de8f6dd806af15c3888f2d9fe4f97fc4 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-last-items-diff.txt: original 321 B sha256 63a917567737045e129499ade5c336098a382633260488a26852778ff5e3bcd8 (kept on the lab PC); the company GUID replaced in 2 place(s)
+evidence/chk-last-items.txt: original 4023 B sha256 114e016c539d81b60284c6124a23ebc124cfc13ca6a235e93b7e09d989d94979 (kept on the lab PC); the company GUID replaced in 3 place(s)
+evidence/chk-last-marks.txt: original 145 B sha256 896a2887835f47852ab6e1d041d9df531f141636b2b8a135a66635ae5c853f3a (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-last-units.txt: original 179 B sha256 8391de046f77f9643d60782a4e6b245116b0af0ed59bd7569d4c76aa27390642 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r1-diff.txt: original 223 B sha256 e07fe22bf933b197ebe0b75ef5cb87ef5c613ef2850991cf430e0772831c263b (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r1-items.txt: original 2407 B sha256 09bea5b22c8278c978294172919b363bf9c2b32fba7fe370fab5b84be5f371fc (kept on the lab PC); the company GUID replaced in 2 place(s)
+evidence/chk-r1b-marks.txt: original 144 B sha256 0e962e5d396c049dcf1be9cc2b35ef16b1b08a055c1101e10b254e22022eb13c (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r1post-marks.txt: original 147 B sha256 3bbb880b4c91389b42b1542a3a88c43c7b1fab781ae556bf5964f7cb720cb537 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r1pre-marks.txt: original 146 B sha256 d4aae2ed01d813d8f93a61947f910ef605b75ad0fff8209bb2eef9340814a816 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r2-diff.txt: original 219 B sha256 6fba397e498c9405e0aada821593854b04c9ee765d8ffa4213398994c81f11b9 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r2-items.txt: original 4352 B sha256 f41ff2a268b1d4badbbf2610a9b5b005009e3b78d33ace7e1b9c4844b1ffdc02 (kept on the lab PC); the company GUID replaced in 3 place(s)
+evidence/chk-r2post-marks.txt: original 147 B sha256 d9645149f4d79c97af090456006db154fab33380f89917966d3c75469e8a3efd (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r2pre-marks.txt: original 146 B sha256 67158cf002fb55e17809c41fad82f126b3663550d88cb94e26f50ab0db4a4d9a (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r3-diff.txt: original 3085 B sha256 223d6b7dc6a839d7388b10ac381e13aba6feb128eb3a38f3ee5a79efc7713435 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r3-items.txt: original 4020 B sha256 f7a4e2cadb3f054a86e4c91437fb728ada7615bb05b5e53775cebe715db74c67 (kept on the lab PC); the company GUID replaced in 3 place(s)
+evidence/chk-r3post-marks.txt: original 147 B sha256 4bb3dbc7a45c4b2b0d8e3ebc443451d89e143a7363249d7f403020aa2c63e270 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r3pre-marks.txt: original 146 B sha256 c274f1f78d4e7a3c23f7d5d94ff197612ee658134b977f0e43f5913e0271c7b7 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r4a-diff.txt: original 539 B sha256 1d95e9dfb037d70a5da8de6598ff62420542614bb3843bb8d67f5c8399c03678 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r4a-items.txt: original 4021 B sha256 2e1eb4daf67d600a1681f0397e70ce88d60e42c435701314d38c979145194fd4 (kept on the lab PC); the company GUID replaced in 3 place(s)
+evidence/chk-r4apost-marks.txt: original 148 B sha256 903cb5e4576991fdac49dacf89c6291423f82d4b51475c4ac18435bbca083d2b (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r4apre-marks.txt: original 147 B sha256 11db77f799001be30d87c68c79fd14fc970bdfd00516342f0cf77fed6a884617 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r4b-diff.txt: original 541 B sha256 b04635efb4975e164132e9818c7ea09d7315cbbcf3f34ca3b3935561a21f19a3 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r4b-items.txt: original 4022 B sha256 64d6438b570b0de6906306e23f76f55c16878bd946c3168721d7b32c84f7ce1d (kept on the lab PC); the company GUID replaced in 3 place(s)
+evidence/chk-r4bpost-marks.txt: original 148 B sha256 c102c785f214393949227279d9a07f9ab96a606a3b56bfc63a889892504bcde5 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r4bpre-marks.txt: original 147 B sha256 8b8bb4585d25b5cedd26303b2edcf2b67fd04554bb0e4c8ecc38fd84a62b382a (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r5a-items.txt: original 4022 B sha256 1c761b3075ddef1d787dd7232090911d2a160a4e4caacff98e192b76b194d714 (kept on the lab PC); the company GUID replaced in 3 place(s)
+evidence/chk-r5a-units.txt: original 178 B sha256 0c99f7368888832a6fb632b60b01997fbdd088f1d18bf32bd3fd0485acfb40c7 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r5apost-marks.txt: original 148 B sha256 1da752cc87ddc46759e2cc159c3f0c829eab5c25851dcc9f1b5c5f93bbbad621 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r5apre-marks.txt: original 147 B sha256 ef654af1533d858c1e5e1769d76d226564a88227a73f2a3f9a463be22ffe8bec (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r5b-groups.txt: original 397 B sha256 df8650bebf6e53128b80755831871a0c45f71520689d869c1ca1bb0bab85f8d3 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r5b-items.txt: original 4022 B sha256 3450be4832fb8f239b992d0b292465197a252d47397bf83803aa6ec76bc9a200 (kept on the lab PC); the company GUID replaced in 3 place(s)
+evidence/chk-r5bpost-marks.txt: original 148 B sha256 8b787ab7ee299b07691a2271cb83f79ae09c2f22f9b4a295145bdeecf6d08f58 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-r5bpre-marks.txt: original 147 B sha256 4b78c0f043faab758a7554ddaf2dd8b2ab7302124a95fb82e25c03a7f31f9992 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-rst-groups.txt: original 397 B sha256 fa941728668cbf5b40e5faedf4a4f14421c263a41fea2061777a3c437d796e88 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-rst-items.txt: original 2058 B sha256 bea5d6b2d983eb312c0eec54c32abecb01168a67e6ffcddc7415bafe3abed08f (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-rst-marks.txt: original 144 B sha256 5ae44242c255cfaa222e1ecf77f898975c8f777893e9b2901ef015a868a5979f (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-rst-units.txt: original 178 B sha256 c6e2effd94bbe06705511ccc03c24fd47c966c6ce658737f6814b028d6c93e1e (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-s2-groups.txt: original 396 B sha256 389940f16eaab96949e24060093436ddf5ffd565905f67ab47945f9efd8a3a19 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-s2-items.txt: original 2057 B sha256 aa1cdd8b331be2252db8c5d9d6648e65e888a7e5f48efcdea3a690a79b58ee87 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-s2-marks.txt: original 143 B sha256 f432524268a4c139912af2a93b662762993702b88163c993dbaa0af53d49eca4 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/chk-s2-units.txt: original 177 B sha256 870e1a8730c4365297a2a54448fd279b5f9359cc54b21b1f3e025a35e5425e64 (kept on the lab PC); the company GUID replaced in 1 place(s)
+evidence/close-c2-netstat.txt: original 9415 B sha256 5eff4a1421cd0cf14c5e27d94246a35f93a9e904b65f0039b23ea55363dbad2c (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s0-c2-netstat.txt: original 9206 B sha256 a964e1c682e01ac105c68628f6bb9ac8f6e9793be361d65434f514be5afb578f (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+evidence/s2-c2-netstat.txt: original 9115 B sha256 53969fbd33dcc01407c416358d7ad8bb0db27bca44d3182d0f4a3450fbc41947 (kept on the lab PC); an excerpt: only the port-9001 LISTENING lines kept
+notes.txt: original 18997 B sha256 097c507d8e978ed032c109dfd0d56177261e7b52dcc4eac5881bdbdbc2fbd32e (kept on the lab PC); 2 x -> <LAB_DIR>; 1 x -> stop
+scripts/send.py: original 3281 B sha256 a14e04d3f1e00c283ca952cffc3e72c7399b3b0393e6345cbd7606689c792f02 (kept on the lab PC); 1 x -> <LAB_DIR>; 9 x -> stop
+scripts/chk.py: original 2321 B sha256 12035e696742caf12eb5079e6502e6287a880d9cef6daa81098c680b8b39f7d6 (kept on the lab PC); 1 x -> <LAB_DIR>; 4 x -> stop
+scripts/write.py: original 1784 B sha256 e50debb6eeaa07b7bc6874813d361be931c467c6611b26f075d7d947c23aa8d2 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+scripts/restore-prep.py: original 2603 B sha256 c51d910f030f6c34357eb705129198f7e7615651cbb76a195ab32ca3de467452 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>; 2 x -> stop
+scripts/bk-record.py: original 1092 B sha256 e4c92e26e65a08c704c9193c4fb67f38d5d117e38391cd80b0f996984511b3ee (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/c2.py: original 1500 B sha256 41aba49955b923ea1178cab3be8ecc05db7e0ad85715cc39b7a278a2df82275c (kept on the lab PC); 1 x -> <LAB_DIR>
+scripts/cap.py: original 996 B sha256 9d9af0da77dcdc36206f42dfa4196e85f6b721cfe7ec5e627d824eff4db3c6e1 (kept on the lab PC); 2 x -> <LAB_DIR>

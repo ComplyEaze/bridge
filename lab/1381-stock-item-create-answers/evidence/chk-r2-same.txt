@@ -1,0 +1,8 @@
+$ python -I check_1381.py same r2-items.utf16le.xml "SC Sibling Goods" "SC Copied Goods"
+exit 0
+PARENT: same
+BASEUNITS: same
+GSTAPPLICABLE: same
+GSTTYPEOFSUPPLY: same
+GSTDETAILS.LIST: same
+HSNDETAILS.LIST: same

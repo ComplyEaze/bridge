@@ -1,0 +1,7 @@
+$ python -I check_1381.py diff r4a-items.utf16le.xml r4b-items.utf16le.xml
+exit 0
+rows before: 3  after: 3
+CHANGED 'SC Name Unit Only' (17 characters) <company guid>-000000d1 : ALTERID, LANGUAGENAME.LIST
+  ALTERID: '214'  ->  '215'
+  LANGUAGENAME.LIST: 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>sc name unit only</NAME></NAME.LIST></LANGUAGENAME.LIST>  ->  1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>SC Name  Unit Only</NAME></NAME.LIST></LANGUAGENAME.LIST>
+unchanged rows: 2

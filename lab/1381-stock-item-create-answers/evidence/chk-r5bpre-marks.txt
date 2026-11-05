@@ -1,0 +1,4 @@
+$ python -I check_1381.py marks r5bpre-marks.utf16le.xml
+exit 0
+COMPANY rows: 1
+  GUID <company guid> ALTVCHID  ALTMSTID 215

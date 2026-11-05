@@ -1,0 +1,4 @@
+$ python -I check_1381.py diff base-units.utf16le.xml rst-units.utf16le.xml
+exit 0
+rows before: 1  after: 1
+unchanged rows: 1

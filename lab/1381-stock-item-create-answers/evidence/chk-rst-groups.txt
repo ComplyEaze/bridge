@@ -1,0 +1,8 @@
+$ python -I check_1381.py rows rst-groups.utf16le.xml
+exit 0
+rows: 1
+STOCKGROUP 'SC Goods Group' (14 characters) GUID <company guid>-000000cf
+  MASTERID '207'
+  ALTERID '209'
+  LANGUAGENAME.LIST 1 element(s): <LANGUAGENAME.LIST><NAME.LIST TYPE='String'><NAME>SC Goods Group</NAME></NAME.LIST><LANGUAGEID TYPE='Number'>1033</LANGUAGEID></LANGUAGENAME.LIST>
+  PARENT 'Primary'

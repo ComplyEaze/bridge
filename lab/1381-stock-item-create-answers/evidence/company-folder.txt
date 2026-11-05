@@ -1,0 +1,2 @@
+2026-11-05T07:43:08Z before: THE COMPANY's data folder holds 24 files, 1105920 bytes in all (listing on the lab PC)
+2026-11-05T07:44:54Z after: THE COMPANY's data folder holds 15 files, 215552 bytes in all (listing on the lab PC)

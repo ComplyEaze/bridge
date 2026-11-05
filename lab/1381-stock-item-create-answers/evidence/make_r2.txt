@@ -1,0 +1,8 @@
+$ python -I make_r2.py <LAB_DIR>/answers/s2-items.utf16le.xml
+PARENT: copied, 45 characters
+BASEUNITS: copied, 40 characters
+GSTAPPLICABLE: copied, 60 characters
+GSTTYPEOFSUPPLY: copied, 54 characters
+GSTDETAILS.LIST: 1 copied, 1564 characters
+HSNDETAILS.LIST: 1 copied, 293 characters
+r2-copied.utf16le.xml: 5030 bytes, sha256 48d08a89c7debb59f14b4101eacf5109406f421b1c183e5520fff8cb5674d128

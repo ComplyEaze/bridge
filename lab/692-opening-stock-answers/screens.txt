@@ -1,0 +1,56 @@
+Screens of 692-R1 to R5, in words (yes/no and field records). TallyPrime 7.2 Silver, port 9001. THE COMPANY = BRIDGE TIEOUT E. Shots stay on the lab PC (SHA256.txt).
+
+Step 1, Company Creation (Select Company > Create Company)
+- Company Data Path: <Tally data folder>. Name BRIDGE TIEOUT E; Mailing Name followed it. Address empty. State Not Applicable. Country India. Pincode, Telephone, Fax, E-mail, Website empty; Mobile +91 as offered.
+- Financial year beginning from: typed 1-4-2024, shown 1-Apr-24. Books beginning from: offered 1-Apr-24, kept. Base Currency symbol (rupee sign) and Formal name INR, as offered.
+- 'Accept ?': yes.
+Step 1, Company Features (opened by Tally after the create, 'Company created successfully.')
+- As opened: Maintain Accounts Yes; Bill-wise Yes; Cost Centres No; Interest No; Maintain Inventory Yes; Integrate Accounts with Inventory Yes; multiple Price Levels No; Batches No (Expiry Date greyed No); Job Order No; Cost Tracking No; Job Costing No; Discount column No; separate Actual and Billed Quantity No; GST Yes; TDS No; TCS No; VAT No; Excise No; Service Tax No; Browser Access for Reports Yes; Tally.NET Services No; Payroll No; Payment Request No; multiple addresses No; Mark modified vouchers No.
+- Godowns: no godowns field is shown on this screen.
+- Changed: GST Yes to No. 'Accept ?': yes.
+- Gateway after: Current Period 1-Apr-24 to 31-Mar-25; Current Date Monday, 1-Apr-2024; 'No Vouchers Entered'.
+
+Step 3, masters (each by its screen's own accept)
+- Unit: Simple, Symbol Nos, decimal places 0.
+- Lab Item A, Lab Item B: Under Primary, Units Nos, no opening. Costing Method shown by More Details (Ctrl+I): Avg. Cost (both); not changed.
+- Lab Capital: Capital Account, opening Cr. Lab Bank: Bank Accounts (Bank Account Details shown, left as offered), opening Dr; Total Opening Balance then equal Dr and Cr, no difference.
+- Lab Supplier (Sundry Creditors) and Lab Customer (Sundry Debtors): Maintain balances bill-by-bill offered Yes, set to No; no opening.
+- Lab Sales (Sales Accounts) and Lab Purchase (Purchase Accounts): 'Inventory Values are affected' shown in More Details as Yes (Tally's default), not changed.
+- Lab Rent: Indirect Expenses.
+
+Steps 4 and 6, vouchers (each dated by F2 on the voucher screen)
+- Purchase and Sales opened in item-invoice form. After the party: a 'Party Details' screen with a 'Receipt Details' box (Purchase) or 'Dispatch Details' box (Sales), all empty, accepted blank (Ctrl+A); then a second 'Party Details' panel (party, mailing name, State Not Applicable, Country India) accepted as offered (Ctrl+A).
+- Payment: By/To lines; 'Bank Allocations' for Lab Bank opened (Cheque, Inst Date = voucher date), accepted with its defaults (Ctrl+A).
+- Tally numbers 2025-26's vouchers from 1 again per type.
+- Tally offered a rate on later item lines (the item's last rate); the sheet's rate was typed over it.
+
+Step 5, the period
+- Keys: Alt+F2 at the Gateway (the side bar shows only F2: Date and F3: Company). Tally shows a 'Change Period' box: From 1-4-2024, To 31-3-2025 before the change.
+- To typed 31-3-2026: Gateway Current Period 1-Apr-24 to 31-Mar-26. No prompt to create, split or open a year or to carry balances: none appeared.
+
+Step 7, Tally's screens
+- Stock Summary 1-4-2024 to 31-3-2025: two rows, no negative quantity: yes, none.
+- Stock Summary 1-4-2025 to 31-3-2026: two rows, no negative quantity: yes, none.
+- Balance Sheet as at 31-3-2026: a 'Difference in opening balances' line: NO. Lines shown: Capital Account, Loans (Liability), Current Liabilities, Profit & Loss A/c (sub-lines Opening Balance, with no amount shown, and Current Period), Current Assets; the two totals equal.
+
+Step 8, BK-E
+- Backup Companies opened with Backup Data Path C:\ (local); set by Specify Path to <LAB_DIR>\BK-E; THE COMPANY alone; 'Accept ?': yes. No other prompt.
+
+R2, costing method
+- Lab Item A, Stock Item Alteration > More Details > Costing Method: list At Zero Cost, Avg. Cost, FIFO, FIFO Perpetual, Last Purchase Cost, LIFO Annual, LIFO Perpetual, Monthly Avg. Cost, Std. Cost; changed Avg. Cost to FIFO; read back FIFO; 'Accept ?': yes.
+
+R3, negative stock
+- Lab Item C created (Primary, Nos, no opening).
+- Sales 10-Jan-2026, Lab Item C 3 Nos: on Enter after the quantity, Tally opened a box titled 'Warning': 'Negative stock.' / '(-)3 Nos' / 'Press any key to continue'. On the run lead's word one Enter cleared it; the cursor was then on the line's empty Rate; the rate was keyed and the voucher accepted; no other box.
+- Tally's Stock Summary 1-4-2025 to 31-3-2026: Lab Item C (-)3 Nos with no rate and no value.
+- Negative Stock Items (Stock Summary side bar, Exception Reports): one row, Lab Item C (-)3 Nos, no rate, no value.
+
+R4, a direct expense
+- Lab Freight In created under Direct Expenses. Payment 15-May-2025 By Lab Freight In, To Lab Bank; Bank Allocations accepted with defaults; 'Accept ?': yes.
+
+Restores (R2, R3, R4)
+- Shut THE COMPANY; Restore Data Path <Tally data folder>; source by Specify Path <LAB_DIR>\BK-E; the list showed BRIDGE TIEOUT E, THE COMPANY's number, 5-Nov-26 (12:19 pm); 'Accept ?': yes; 'Company data folder (<THE COMPANY's number>) already exists ... Replace ...': Replace. No other prompt.
+- After each load the Gateway shows Current Period 1-Apr-25 to 31-Mar-26 and Current Date Wednesday, 10-Dec-2025 (Tally's choice on load).
+
+Close
+- Alt+F2: period set back to 1-4-2024 to 31-3-2025 without a prompt; Tally then moved the Current Date to 31-Mar-2025; F2 (Date) set it to 1-4-2024 (as at step 0). Company > Shut: Select Company, none loaded.

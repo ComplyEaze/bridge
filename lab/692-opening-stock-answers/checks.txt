@@ -1,0 +1,240 @@
+== r1 w1 identities
+$ python -I identities.py <LAB_DIR>/answers/r1-w1-pl.utf16le.xml <LAB_DIR>/answers/r1-w1-bs.utf16le.xml <LAB_DIR>/answers/r1-w1-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r1 w1 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r1-w1-pl.utf16le.xml <LAB_DIR>/answers/r1-w1-stock-summary.utf16le.xml <LAB_DIR>/answers/r1-w1-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0
+== r1 w2 identities
+$ python -I identities.py <LAB_DIR>/answers/r1-w2-pl.utf16le.xml <LAB_DIR>/answers/r1-w2-bs.utf16le.xml <LAB_DIR>/answers/r1-w2-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r1 w2 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r1-w2-pl.utf16le.xml <LAB_DIR>/answers/r1-w2-stock-summary.utf16le.xml <LAB_DIR>/answers/r1-w2-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0
+== r1 w3 identities
+$ python -I identities.py <LAB_DIR>/answers/r1-w3-pl.utf16le.xml <LAB_DIR>/answers/r1-w3-bs.utf16le.xml <LAB_DIR>/answers/r1-w3-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r1 w3 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r1-w3-pl.utf16le.xml <LAB_DIR>/answers/r1-w3-stock-summary.utf16le.xml <LAB_DIR>/answers/r1-w3-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0
+== r1 w4 identities
+$ python -I identities.py <LAB_DIR>/answers/r1-w4-pl.utf16le.xml <LAB_DIR>/answers/r1-w4-bs.utf16le.xml <LAB_DIR>/answers/r1-w4-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r1 w4 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r1-w4-pl.utf16le.xml <LAB_DIR>/answers/r1-w4-stock-summary.utf16le.xml <LAB_DIR>/answers/r1-w4-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading): not checked, a line is missing, repeated or without its amount
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0
+== r1 carry w1 with w2
+$ python -I relations.py carry <LAB_DIR>/answers/r1-w1-pl.utf16le.xml <LAB_DIR>/answers/r1-w1-ledgers.utf16le.xml <LAB_DIR>/answers/r1-w2-pl.utf16le.xml <LAB_DIR>/answers/r1-w2-ledgers.utf16le.xml
+exit 0
+year 1:
+  "Less: Closing Stock" lines: 1
+year 2:
+  "Opening Stock" lines: 1
+year 2's opening stock == year 1's closing stock: True
+Profit & Loss A/c ledgers in year 2: 1
+ledgers of year 1 directly under a nominal primary group: 3
+year 2's Profit & Loss A/c opening == Tally's year-1 nett (sum of the main column): True  with the sign reversed: False
+year 2's Profit & Loss A/c opening == the year-1 ledgers' result (nominal closings): False  with the sign reversed: False
+== r5 w5 identities
+$ python -I identities.py <LAB_DIR>/answers/r5-w5-pl.utf16le.xml <LAB_DIR>/answers/r5-w5-bs.utf16le.xml <LAB_DIR>/answers/r5-w5-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r5 w5 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r5-w5-pl.utf16le.xml <LAB_DIR>/answers/r5-w5-stock-summary.utf16le.xml <LAB_DIR>/answers/r5-w5-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0
+== r2 w1 identities
+$ python -I identities.py <LAB_DIR>/answers/r2-w1-pl.utf16le.xml <LAB_DIR>/answers/r2-w1-bs.utf16le.xml <LAB_DIR>/answers/r2-w1-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r2 w1 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r2-w1-pl.utf16le.xml <LAB_DIR>/answers/r2-w1-stock-summary.utf16le.xml <LAB_DIR>/answers/r2-w1-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0
+== r2 w2 identities
+$ python -I identities.py <LAB_DIR>/answers/r2-w2-pl.utf16le.xml <LAB_DIR>/answers/r2-w2-bs.utf16le.xml <LAB_DIR>/answers/r2-w2-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r2 w2 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r2-w2-pl.utf16le.xml <LAB_DIR>/answers/r2-w2-stock-summary.utf16le.xml <LAB_DIR>/answers/r2-w2-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0
+== r2 carry w1 with w2
+$ python -I relations.py carry <LAB_DIR>/answers/r2-w1-pl.utf16le.xml <LAB_DIR>/answers/r2-w1-ledgers.utf16le.xml <LAB_DIR>/answers/r2-w2-pl.utf16le.xml <LAB_DIR>/answers/r2-w2-ledgers.utf16le.xml
+exit 0
+year 1:
+  "Less: Closing Stock" lines: 1
+year 2:
+  "Opening Stock" lines: 1
+year 2's opening stock == year 1's closing stock: True
+Profit & Loss A/c ledgers in year 2: 1
+ledgers of year 1 directly under a nominal primary group: 3
+year 2's Profit & Loss A/c opening == Tally's year-1 nett (sum of the main column): False  with the sign reversed: False
+year 2's Profit & Loss A/c opening == the year-1 ledgers' result (nominal closings): False  with the sign reversed: False
+== r3 w2 identities
+$ python -I identities.py <LAB_DIR>/answers/r3-w2-pl.utf16le.xml <LAB_DIR>/answers/r3-w2-bs.utf16le.xml <LAB_DIR>/answers/r3-w2-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 9  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r3 w2 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r3-w2-pl.utf16le.xml <LAB_DIR>/answers/r3-w2-stock-summary.utf16le.xml <LAB_DIR>/answers/r3-w2-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 6
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 0  with a sub amount: 0  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 3  rows without a value: 1
+stock summary total == closing stock line: not checked
+negative stock rows: 1  of them without a value: 1
+== r4 w2 identities
+$ python -I identities.py <LAB_DIR>/answers/r4-w2-pl.utf16le.xml <LAB_DIR>/answers/r4-w2-bs.utf16le.xml <LAB_DIR>/answers/r4-w2-ledgers.utf16le.xml <LAB_DIR>/answers/r1-groups.utf16le.xml
+exit 0
+opening/closing stock lines each present once: True
+ledger rows: 10  ledgers whose parent names Stock-in-Hand: 0
+identity 3 (ledger closings sum == -O): True
+Balance Sheet export balances (sum of its main amounts == 0 with assets negative): True
+opening stock line is a debit and closing a debit: True
+ledgers not classified by this script: 0
+identity 1 (Tally Current Assets - ledger Current Assets == C): True
+identity 2 (carried P&L line gap == O - C): True
+== r4 w2 relations window
+$ python -I relations.py window <LAB_DIR>/answers/r4-w2-pl.utf16le.xml <LAB_DIR>/answers/r4-w2-stock-summary.utf16le.xml <LAB_DIR>/answers/r4-w2-negative-stock.utf16le.xml
+exit 0
+Profit and Loss lines: 7
+  "Cost of Sales :" lines: 1
+  "Opening Stock" lines: 1
+  "Add: Purchase Accounts" lines: 1
+  "Less: Closing Stock" lines: 1
+  lines naming Direct Expenses: 1  with a sub amount: 1  with a main amount: 0
+relation 4 (Cost of Sales heading == opening + purchases + direct expenses in the sub column - closing): True
+stock summary rows: 2  rows without a value: 0
+stock summary total == closing stock line: True
+negative stock rows: 0  of them without a value: 0

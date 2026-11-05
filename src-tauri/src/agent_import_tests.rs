@@ -2690,6 +2690,34 @@ pub(super) fn lab_invoice_listing() -> &'static [u8] {
     )
 }
 
+/// DERIVED, not Tally's bytes: [`lab_invoice_listing`], as text, with the one
+/// dated registration row of `BRIDGE Walk-in` made Regular under `gstin`. The
+/// `GSTIN` element is put after `PLACEOFSUPPLY`, where Tally returned it for a
+/// Regular customer seeded on the same book (`lab/2162-s13a2-answers`, the
+/// `a-s3r-Q-rates` answer). Nothing else in the answer differs.
+pub(super) fn lab_invoice_listing_with_walk_in_gstin(gstin: &str) -> String {
+    let listing = utf16le(lab_invoice_listing());
+    let start = listing.find("<LEDGER NAME=\"BRIDGE Walk-in\"").unwrap();
+    let end = start + listing[start..].find("</LEDGER>").unwrap();
+    let mut row = listing[start..end].to_string();
+    for (from, to) in [
+        (
+            "<GSTREGISTRATIONTYPE TYPE=\"String\">Unregistered/Consumer</GSTREGISTRATIONTYPE>",
+            "<GSTREGISTRATIONTYPE TYPE=\"String\">Regular</GSTREGISTRATIONTYPE>".to_string(),
+        ),
+        (
+            "<PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY>",
+            format!(
+                "<PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><GSTIN TYPE=\"String\">{gstin}</GSTIN>"
+            ),
+        ),
+    ] {
+        assert_eq!(row.matches(from).count(), 1, "{from}");
+        row = row.replace(from, &to);
+    }
+    format!("{}{row}{}", &listing[..start], &listing[end..])
+}
+
 /// The compliance balance answer for `BP/26-27/0010` ([`listing_cut_to`]).
 pub(super) fn lab_invoice_balances() -> &'static [u8] {
     static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();

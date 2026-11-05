@@ -2335,7 +2335,7 @@ impl InvoiceJudge<'_> {
         let Some(registration_body) = answers.registration.as_deref() else {
             return Err(Verdict::Need(Need::Registration));
         };
-        let company_state = wire::parse_company_registration(
+        let registration = wire::parse_company_registration(
             registration_body,
             self.identity.company_guid(),
             &as_of,
@@ -2343,12 +2343,21 @@ impl InvoiceJudge<'_> {
         .map_err(|outcome| match outcome {
             wire::RegistrationOutcome::Refused(code) => refusing(refuse(code)),
             wire::RegistrationOutcome::Failed(code) => unusable(code),
-        })?
-        .state;
+        })?;
 
-        let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
+        let roles = classify_sales_invoice(voucher, &facts, &registration.state, &as_of)
             .map_err(Verdict::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
+        // A customer holding the company's own GSTIN: Tally lists such an
+        // invoice as uncertain (section 9.16). Both GSTINs are valid here (the
+        // classification checked the party's), so equal means byte-equal.
+        if matches!(&facts[party].gstin, GstinEvidence::InForce(gstin) if *gstin == registration.gstin)
+        {
+            return Err(refusing(refuse_ledger(
+                "invoice_party_gstin_is_company_own",
+                party,
+            )));
+        }
         let sales_ledgers: Vec<String> = roles
             .sales
             .iter()
@@ -2370,7 +2379,7 @@ impl InvoiceJudge<'_> {
             &facts[party].gstin,
             resolved.guid,
             bill_wise,
-            company_state,
+            registration.state,
             sales_ledgers,
             hsn_warnings,
         ))

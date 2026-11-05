@@ -720,6 +720,45 @@ async fn a_company_registration_that_cannot_be_issued_under_is_refused_and_an_un
     }
 }
 
+/// A Regular customer whose GSTIN in force is the company's own is refused
+/// once the registration is read (70 requests), with no observation: Tally
+/// listed such an invoice as uncertain (section 9.16). The same customer under
+/// another registration of the company's PAN, which Tally listed as included,
+/// is admitted. The pair is the one the lab measured; the listing is the
+/// captured one with the customer's registration row edited
+/// (`lab_invoice_listing_with_walk_in_gstin`).
+#[tokio::test]
+async fn a_customer_holding_the_companys_own_gstin_is_refused_and_another_registration_is_admitted()
+{
+    let walk_in = "BRIDGE Walk-in";
+    assert_eq!(pilot_tax_units().matches("08ZZZZZ0000Z1ZQ").count(), 2);
+    for (gstin, outcome, requests) in [
+        (
+            "08ZZZZZ0000Z1ZQ",
+            Err(vec![(
+                "invoice_party_gstin_is_company_own",
+                walk_in.to_string(),
+            )]),
+            70,
+        ),
+        ("08ZZZZZ0000Z3ZO", Ok(()), 76),
+    ] {
+        let (seen, voucher, sent) = admit_on(
+            pilot_lab_replacing('L', super::lab_invoice_listing_with_walk_in_gstin(gstin)),
+            pilot_invoice(walk_in, "BRIDGE Sales"),
+        )
+        .await;
+        assert_eq!(seen, outcome, "{gstin}");
+        assert_eq!(sent.len(), requests, "{gstin}");
+        let observed = voucher.invoice.as_ref().unwrap().observed.as_ref();
+        assert_eq!(observed.is_some(), outcome.is_ok(), "{gstin}");
+    }
+    assert!(
+        crate::agent::refusal_remediation("invoice_party_gstin_is_company_own")
+            .is_some_and(|step| step.contains("customer's GST registration details"))
+    );
+}
+
 /// A rate listing with no ledger row is a failed read under its own code, never
 /// "this ledger has no rate": the company's ledgers were listed just before it.
 /// The admission stops at that read (52 requests) and records no observation.

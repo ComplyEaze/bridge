@@ -1,0 +1,1382 @@
+{
+  "file": "src-tauri/src/agent_import_split_journal.rs",
+  "base_commit": "8db15086",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's own tests (agent_import_split_journal_tests.rs). killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A tool mutant is named as cargo-mutants --list names it, by line and column. A mutant whose edit does not compile is recorded as unviable with the compiler's reason, not as caught. The file guards Microsoft Store package copies of the data folder, which exist on Windows only. Every run was made on macOS, where the tests stand in for Windows through the test-only task-local LOCAL_APP_DATA (what admit reads as %LOCALAPPDATA%) and the layout helper, which lays out a package copy in a temporary folder; the Windows native job does not run mutants. The hand-written mutants (J01 to J85) change, one at a time: in refused_message, the two messages swapped between the arms, the test on the cause (no cause taking the could-not-tell message, negated, always true, always false) and each of the three causes in NOT_TOLD_CAUSES; the two message constants each made empty and each made the other's; in SplitJournal::cause, each of the five strings changed, and the strings of OwnNotLocated and CopyNotLocated swapped; in the From impl for ToolFailure, the code empty, the cause left out and the cause empty; the refusal code IMPORT_JOURNAL_SPLIT changed; in admit, the scripted %LOCALAPPDATA% never read (the test arm), the host's %LOCALAPPDATA% never asked for (the or_else dropped), the early return for no %LOCALAPPDATA% giving NoOtherJournal, and the resolver giving nothing, giving the path as spelt for an existing file (no canonicalize), and giving a path for a file that does not exist; in admit_at, the early return for a folder outside %LOCALAPPDATA% (NoOtherJournal, a refusal), packages not listed (NoOtherJournal, another refusal), the copies found dropped, the path of this side's journal (the folder itself), this side's journal never located, own.is_none() (as is_some(), always true, always false), the NotFound match (!=, every error taken as no journal, a not-a-directory error also taken, a permission-denied error also taken, the refusing arm emptied, the two arms swapped, the refusal given as OtherNotRead or CopyNotLocated), the loop over the copies (the first not examined, only the first examined, the last not examined, reversed), the copy's journal looked for at the copy folder or never located, the test of a copy being this side's own (&& as ||, each half alone, == as !=, is_some() as is_none(), and the continue dropped), unlocated (&& as ||, each half alone, negated, own.is_none(), located.is_some()), the journal read at the journal file's path, and the match arms (an absent journal refused, batches == 0 as !=, <= 1, > 0 and == 1, the guard dropped, the unlocated arm's cause as OtherNotRead, OtherHoldsBatches or OwnNotLocated, its guard negated, always true, always false, the arm deleted, moved after the Read arm, before the Absent arm, before the no-batch arm and after the NotRead arm, a journal with batches refused as OtherNotRead, an unreadable one as OtherHoldsBatches), and the final answer given as NotRedirected. Not mutated: the derive lists, the items' visibility, the doc comments, the test module's attribute and path, the wording of the two messages (no test asserts wording; the messages are mutated as a whole, to empty and to each other, and the tool replaces refused_message by \"\" and \"xyzzy\"), the order of the strings in NOT_TOLD_CAUSES, the 100 ms pause in the closure handed to read_journal (it changes nothing a test can read but elapsed time; the retry it separates is read_journal_at's, in another file), and the arm of admit marked #[cfg(not(test))] (let scripted = None), which is compiled out of every test build, so no test can reach it and no mutant of it was run; every edit above is one change, so none of the lists above is every possible change to the line it names. Nineteen edits (J14, J15, J17, J19, J26, J31, J32, J37, J38, J41, J42, J44, J45, J51, J54, J62, J67, J82 and J85) were changed to an equivalent edit of the same kind (a neighbouring spelling of the same change: another replacement string for a cause, String::from(\"\") for String::new(), Option::from(None) for None, the arm written in a block, || true and !true for true and false, the operands of || written the other way round, the same arm written with a block or a trailing comma, copy.as_path() for &copy, own == located for located == own, De Morgan's form of the negation, 0 != settlement.batches for the guard), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses; J26 needed a third spelling. J24 and J33 were first written without a type the compiler could infer (scripted alone; Vec::new()) and recorded as unviable; they were respelled (scripted.or(None::<PathBuf>); Vec::<PathBuf>::new()) and run again at base. In every run the file was byte for byte as at base_commit, checked after each restore (and, for the tool, after the run); the restore was a copy, never a rename. In the tool, hand and whole_set runs the test modules were as at base_commit; in survivors_again they are as this change leaves them.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 886,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_split_journal.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/agent::agent_import::split_journal::/) | test(/agent::agent_import::post::e2e_tests::/) | test(/agent::agent_import::desktop_journal_tests::/) | test(/agent::agent_import::tests::/)'",
+      "time": "2026-11-05T13:48:23Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 886,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/agent::agent_import::split_journal::/) | test(/agent::agent_import::post::e2e_tests::/) | test(/agent::agent_import::desktop_journal_tests::/) | test(/agent::agent_import::tests::/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 4923,
+      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 17 hand-written mutants the filtered run missed (the tool's run had no mutant missed); the unmutated baseline passed all 4923",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 18,
+      "command": "as the hand run with -E 'test(/agent::agent_import::split_journal::/)', for the 17 hand-written mutants that survived the whole_set run",
+      "tree": "base_commit with the tests this change adds"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 15,
+      "missed": 0,
+      "unviable": 6
+    },
+    "hand": {
+      "caught": 84,
+      "missed": 1,
+      "unviable": 0
+    },
+    "survived_at_base": {
+      "tool": 0,
+      "hand": 17
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 1
+    },
+    "accepted_not_equivalent": {
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "85:5 replace refused_message -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "85:5 replace refused_message -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "94:9 replace SplitJournal::cause -> &'static str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "94:9 replace SplitJournal::cause -> &'static str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "106:9 replace <impl From<SplitJournal> for super::ToolFailure>::from -> Self with Default::default()": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ToolFailure: std::default::Default` is not satisfied"
+    },
+    "115:5 replace admit -> Result<OneJournal, SplitJournal> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `OneJournal: std::default::Default` is not satisfied"
+    },
+    "143:5 replace admit_at -> Result<OneJournal, SplitJournal> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `OneJournal: std::default::Default` is not satisfied"
+    },
+    "154:27 replace match guard error.kind() == std::io::ErrorKind::NotFound with true in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "154:27 replace match guard error.kind() == std::io::ErrorKind::NotFound with false in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_with_no_batch_is_not_a_second_journal",
+      "killer_at": "base"
+    },
+    "154:40 replace == with != in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_with_no_batch_is_not_a_second_journal",
+      "killer_at": "base"
+    },
+    "160:26 replace && with || in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "160:37 replace == with != in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "165:39 replace && with || in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "169:13 delete match arm Journal::Absent in admit_at": {
+      "verdict": "unviable",
+      "reason": "does not compile: non-exhaustive patterns: `Journal::Absent` not covered"
+    },
+    "172:13 delete match arm Journal::Read(_) in admit_at": {
+      "verdict": "unviable",
+      "reason": "does not compile: non-exhaustive patterns: `Journal::Read(_)` not covered"
+    },
+    "173:13 delete match arm Journal::NotRead(_) in admit_at": {
+      "verdict": "unviable",
+      "reason": "does not compile: non-exhaustive patterns: `Journal::NotRead(_)` not covered"
+    },
+    "170:42 replace match guard settlement.batches == 0 with true in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "170:42 replace match guard settlement.batches == 0 with false in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "171:18 replace match guard unlocated with true in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "171:18 replace match guard unlocated with false in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "170:61 replace == with != in admit_at": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    }
+  },
+  "hand_mutations": {
+    "J01": {
+      "what": "refused_message: the two messages swapped between the arms",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "NOT_TOLD_MESSAGE\n    } else {\n        REFUSED_MESSAGE\n    }",
+          "to": "REFUSED_MESSAGE\n    } else {\n        NOT_TOLD_MESSAGE\n    }"
+        }
+      ],
+      "mutation": "d42fe2632aa3b0f43055b73622e4fc5e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J02": {
+      "what": "refused_message: no cause (None) takes the could-not-tell message (is_some_and -> is_none_or)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "cause.is_some_and(|cause| NOT_TOLD_CAUSES.contains(&cause))",
+          "to": "cause.is_none_or(|cause| NOT_TOLD_CAUSES.contains(&cause))"
+        }
+      ],
+      "mutation": "9fa3fa12573ea740a0547bcbea1b5d5e",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::the_message_follows_what_the_check_found",
+      "killer_at": "this_commit"
+    },
+    "J03": {
+      "what": "refused_message: the test on the cause negated",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "cause.is_some_and(|cause| NOT_TOLD_CAUSES.contains(&cause))",
+          "to": "cause.is_some_and(|cause| !NOT_TOLD_CAUSES.contains(&cause))"
+        }
+      ],
+      "mutation": "58fbefe2e82d91b9d52282e800dcee96",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J04": {
+      "what": "refused_message: every cause that is given takes the could-not-tell message",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "cause.is_some_and(|cause| NOT_TOLD_CAUSES.contains(&cause))",
+          "to": "cause.is_some_and(|_| true)"
+        }
+      ],
+      "mutation": "863d11870e1dbb7331de27dfbd987600",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J05": {
+      "what": "refused_message: no cause takes the could-not-tell message",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "cause.is_some_and(|cause| NOT_TOLD_CAUSES.contains(&cause))",
+          "to": "cause.is_some_and(|_| false)"
+        }
+      ],
+      "mutation": "0589db3be407715f4fbea1a9e7404ff4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J06": {
+      "what": "NOT_TOLD_CAUSES: the first cause changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "= [\n    \"package_copies_not_listed\",",
+          "to": "= [\n    \"changed\","
+        }
+      ],
+      "mutation": "40b19591b743d12f61b39192ea05dc57",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J07": {
+      "what": "NOT_TOLD_CAUSES: the second cause changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "\",\n    \"journal_not_located\",\n    \"package_copy",
+          "to": "\",\n    \"changed\",\n    \"package_copy"
+        }
+      ],
+      "mutation": "9c1797edb24e9a3fe28a837f49f1d82f",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::the_message_follows_what_the_check_found",
+      "killer_at": "this_commit"
+    },
+    "J08": {
+      "what": "NOT_TOLD_CAUSES: the third cause changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "    \"package_copy_journal_not_located\",\n];",
+          "to": "    \"changed\",\n];"
+        }
+      ],
+      "mutation": "fd1ebdbeaf8b97fdffb51c05bf6e460a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::the_message_follows_what_the_check_found",
+      "killer_at": "this_commit"
+    },
+    "J09": {
+      "what": "REFUSED_MESSAGE made empty",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "pub(super) const REFUSED_MESSAGE: &str = \"Nothing was posted. On this computer a Microsoft \\",
+          "to": "pub(super) const REFUSED_MESSAGE: &str = \"\";\nconst _KEPT: &str = \"Nothing was posted. On this computer a Microsoft \\"
+        }
+      ],
+      "mutation": "3600405cb30ece9ff7d2fc5f956b137a",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::the_message_follows_what_the_check_found",
+      "killer_at": "this_commit"
+    },
+    "J10": {
+      "what": "NOT_TOLD_MESSAGE made empty",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "const NOT_TOLD_MESSAGE: &str = \"Nothing was posted. ComplyEaze Bridge could not tell whether a \\",
+          "to": "const NOT_TOLD_MESSAGE: &str = \"\";\nconst _KEPT: &str = \"Nothing was posted. ComplyEaze Bridge could not tell whether a \\"
+        }
+      ],
+      "mutation": "04469c738ea24e674811af82dcda2053",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J11": {
+      "what": "REFUSED_MESSAGE made the same as NOT_TOLD_MESSAGE",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "pub(super) const REFUSED_MESSAGE: &str = \"Nothing was posted. On this computer a Microsoft \\",
+          "to": "pub(super) const REFUSED_MESSAGE: &str = NOT_TOLD_MESSAGE;\nconst _KEPT: &str = \"Nothing was posted. On this computer a Microsoft \\"
+        }
+      ],
+      "mutation": "ed9ed66449ecea863f235682f581b3c7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J12": {
+      "what": "NOT_TOLD_MESSAGE made the same as REFUSED_MESSAGE",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "const NOT_TOLD_MESSAGE: &str = \"Nothing was posted. ComplyEaze Bridge could not tell whether a \\",
+          "to": "const NOT_TOLD_MESSAGE: &str = REFUSED_MESSAGE;\nconst _KEPT: &str = \"Nothing was posted. ComplyEaze Bridge could not tell whether a \\"
+        }
+      ],
+      "mutation": "f2f7e3900c27b8597ef21069fe0fe7d2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J13": {
+      "what": "SplitJournal::cause: the string of Self::OtherHoldsBatches changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Self::OtherHoldsBatches => \"other_journal_holds_batches\",",
+          "to": "Self::OtherHoldsBatches => \"changed\","
+        }
+      ],
+      "mutation": "e88cfdd7b71c7b080d1ba8aa18a66793",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::each_refusal_names_its_code_and_cause_in_full",
+      "killer_at": "this_commit"
+    },
+    "J14": {
+      "what": "SplitJournal::cause: the string of Self::OtherNotRead changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Self::OtherNotRead => \"other_journal_not_read\",",
+          "to": "Self::OtherNotRead => \"altered\","
+        }
+      ],
+      "mutation": "43a72879cc1b93537bf6b4f4e894a46b",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::each_refusal_names_its_code_and_cause_in_full",
+      "killer_at": "this_commit"
+    },
+    "J15": {
+      "what": "SplitJournal::cause: the string of Self::PackagesNotListed changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Self::PackagesNotListed => \"package_copies_not_listed\",",
+          "to": "Self::PackagesNotListed => \"differs\","
+        }
+      ],
+      "mutation": "b8117f08d4d74b71a15ecf6c341c7e22",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J16": {
+      "what": "SplitJournal::cause: the string of Self::OwnNotLocated changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Self::OwnNotLocated => \"journal_not_located\",",
+          "to": "Self::OwnNotLocated => \"changed\","
+        }
+      ],
+      "mutation": "6479f38a9108b87050d1d72e8b388b69",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::each_refusal_names_its_code_and_cause_in_full",
+      "killer_at": "this_commit"
+    },
+    "J17": {
+      "what": "SplitJournal::cause: the string of Self::CopyNotLocated changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Self::CopyNotLocated => \"package_copy_journal_not_located\",",
+          "to": "Self::CopyNotLocated => \"altered\","
+        }
+      ],
+      "mutation": "68efee0d70c64383f55bb67653e3194d",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::each_refusal_names_its_code_and_cause_in_full",
+      "killer_at": "this_commit"
+    },
+    "J18": {
+      "what": "SplitJournal::cause: the strings of OwnNotLocated and CopyNotLocated swapped",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Self::OwnNotLocated => \"journal_not_located\",",
+          "to": "Self::OwnNotLocated => \"package_copy_journal_not_located\","
+        },
+        {
+          "from": "Self::CopyNotLocated => \"package_copy_journal_not_located\",",
+          "to": "Self::CopyNotLocated => \"journal_not_located\","
+        }
+      ],
+      "mutation": "39e2f8db52e8fe0e43d9089555c3a376",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::each_refusal_names_its_code_and_cause_in_full",
+      "killer_at": "this_commit"
+    },
+    "J19": {
+      "what": "From<SplitJournal> for ToolFailure: the code is empty",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Self::from(IMPORT_JOURNAL_SPLIT.to_string())",
+          "to": "Self::from(String::from(\"\"))"
+        }
+      ],
+      "mutation": "7c42aa0fb85e0df9b9110b86ab64fd93",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J20": {
+      "what": "From<SplitJournal> for ToolFailure: the cause is left out",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "failure.cause = Some(split.cause());",
+          "to": "failure.cause = None;"
+        }
+      ],
+      "mutation": "aad121235e2bc98fe94798af59c2a817",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J21": {
+      "what": "From<SplitJournal> for ToolFailure: the cause is empty",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "failure.cause = Some(split.cause());",
+          "to": "failure.cause = Some(\"\");"
+        }
+      ],
+      "mutation": "cfd52af608601a47e214db319a4cef6a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J22": {
+      "what": "IMPORT_JOURNAL_SPLIT: the code changed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "pub(super) const IMPORT_JOURNAL_SPLIT: &str = \"import_journal_split\";",
+          "to": "pub(super) const IMPORT_JOURNAL_SPLIT: &str = \"changed\";"
+        }
+      ],
+      "mutation": "7b7cfe827395dc7887ba1f2eb6c6942c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_second_journal_made_while_the_dialog_is_open_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "J23": {
+      "what": "admit: the scripted %LOCALAPPDATA% is never read (test arm)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "LOCAL_APP_DATA.try_with(Clone::clone).ok();",
+          "to": "None;"
+        }
+      ],
+      "mutation": "c34a47cbd8da848aa2ed558f1c9ed227",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J24": {
+      "what": "admit: the host's %LOCALAPPDATA% is never asked for (or_else dropped)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "scripted.or_else(local_data::local_app_data)",
+          "to": "scripted.or(None::<PathBuf>)"
+        }
+      ],
+      "mutation": "ba88f4f8c1268b104e078304d9a52124",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "J25": {
+      "what": "admit: no %LOCALAPPDATA% returns NoOtherJournal rather than NotRedirected",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "return Ok(OneJournal::NotRedirected);\n    };\n    admit_at",
+          "to": "return Ok(OneJournal::NoOtherJournal);\n    };\n    admit_at"
+        }
+      ],
+      "mutation": "cef7a66bc27e2121829cf17505e2d520",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::off_windows_the_check_is_inert",
+      "killer_at": "base"
+    },
+    "J26": {
+      "what": "admit: the resolver finds nothing (canonicalize replaced by None)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "std::fs::canonicalize(path).ok()",
+          "to": "Option::from(None)"
+        }
+      ],
+      "mutation": "25ace8647ef5cbf34d2bb06e859e23b6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J27": {
+      "what": "admit: the resolver says where a file is as it was spelt (no canonicalize)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "std::fs::canonicalize(path).ok()",
+          "to": "path.exists().then(|| path.to_path_buf())"
+        }
+      ],
+      "mutation": "2e10be4f09235ce28ff2043c42e4a0f4",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_that_is_this_sides_file_is_this_sides",
+      "killer_at": "this_commit"
+    },
+    "J28": {
+      "what": "admit: the resolver answers for a file that does not exist",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "std::fs::canonicalize(path).ok()",
+          "to": "Some(path.to_path_buf())"
+        }
+      ],
+      "mutation": "4ce72746d1e521fd3925083be574ea01",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_that_is_this_sides_file_is_this_sides",
+      "killer_at": "this_commit"
+    },
+    "J29": {
+      "what": "admit_at: a data folder outside %LOCALAPPDATA% returns NoOtherJournal",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "PackageCopies::NotUnderLocalAppData => return Ok(OneJournal::NotRedirected),",
+          "to": "PackageCopies::NotUnderLocalAppData => return Ok(OneJournal::NoOtherJournal),"
+        }
+      ],
+      "mutation": "ab8c2b90d42e53f4d51b13f9378f0d02",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_data_folder_elsewhere_is_not_redirected",
+      "killer_at": "base"
+    },
+    "J30": {
+      "what": "admit_at: a data folder outside %LOCALAPPDATA% is refused as packages not listed",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "PackageCopies::NotUnderLocalAppData => return Ok(OneJournal::NotRedirected),",
+          "to": "PackageCopies::NotUnderLocalAppData => return Err(SplitJournal::PackagesNotListed),"
+        }
+      ],
+      "mutation": "1369cbcfce6d43d0da4e199ee102682e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_data_folder_elsewhere_is_not_redirected",
+      "killer_at": "base"
+    },
+    "J31": {
+      "what": "admit_at: packages not listed returns NoOtherJournal",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "PackageCopies::NotListed => return Err(SplitJournal::PackagesNotListed),",
+          "to": "PackageCopies::NotListed => { return Ok(OneJournal::NoOtherJournal) }"
+        }
+      ],
+      "mutation": "e4eb4ff795f7b924f8460b9e3f1b064b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_with_no_second_journal_known_names_no_copy_to_post_from",
+      "killer_at": "base"
+    },
+    "J32": {
+      "what": "admit_at: packages not listed is refused as the own journal not located",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "PackageCopies::NotListed => return Err(SplitJournal::PackagesNotListed),",
+          "to": "PackageCopies::NotListed => { return Err(SplitJournal::OwnNotLocated) }"
+        }
+      ],
+      "mutation": "0cbb58766a3aa1e469e77d04b7f48a0d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_packages_folder_that_cannot_be_listed_is_refused",
+      "killer_at": "base"
+    },
+    "J33": {
+      "what": "admit_at: the package copies found are dropped",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "PackageCopies::Found(copies) => copies,",
+          "to": "PackageCopies::Found(_) => Vec::<PathBuf>::new(),"
+        }
+      ],
+      "mutation": "250848a31286b2fdaea2fe3cb9d3e23e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J34": {
+      "what": "admit_at: this side's journal path is the data folder itself",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let own_path = data_dir.join(JOURNAL_FILE);",
+          "to": "let own_path = data_dir.to_path_buf();"
+        }
+      ],
+      "mutation": "d9740d3621c1faf3fd21e86c72be056b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "J35": {
+      "what": "admit_at: this side's journal is never located",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let own = resolve(&own_path);",
+          "to": "let own: Option<PathBuf> = None;"
+        }
+      ],
+      "mutation": "21b9221e590e51dbce60d5e1503c8279",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J36": {
+      "what": "admit_at: own.is_none() -> own.is_some()",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_none() {",
+          "to": "if own.is_some() {"
+        }
+      ],
+      "mutation": "51ae07c418304e4716c853b3f7937c89",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J37": {
+      "what": "admit_at: own.is_none() -> true",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_none() {",
+          "to": "if own.is_none() || true {"
+        }
+      ],
+      "mutation": "8f4bb361092f5b676177f30ce14f390d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J38": {
+      "what": "admit_at: own.is_none() -> false (a journal not located is never looked for by name)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_none() {",
+          "to": "if !true {"
+        }
+      ],
+      "mutation": "147ff7cf7639b99fa07fef8fc558f8e2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "J39": {
+      "what": "admit_at: NotFound -> not NotFound (== -> !=)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}",
+          "to": "Err(error) if error.kind() != std::io::ErrorKind::NotFound => {}"
+        }
+      ],
+      "mutation": "8a0cb467501d8da95a5dd03fcd0f2e8d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_with_no_batch_is_not_a_second_journal",
+      "killer_at": "base"
+    },
+    "J40": {
+      "what": "admit_at: any error from symlink_metadata is taken as no journal",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}",
+          "to": "Err(_) => {}"
+        }
+      ],
+      "mutation": "0443164a3a9a8b85aae42128ed8710bd",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "J41": {
+      "what": "admit_at: a not-a-directory error also taken as no journal",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}",
+          "to": "Err(error) if error.kind() == std::io::ErrorKind::NotADirectory || error.kind() == std::io::ErrorKind::NotFound => {}"
+        }
+      ],
+      "mutation": "141b6b54b135fe888164a7c390ef89b8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "J42": {
+      "what": "admit_at: a permission-denied error also taken as no journal",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}",
+          "to": "Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied || error.kind() == std::io::ErrorKind::NotFound => {}"
+        }
+      ],
+      "mutation": "1974450efbc26ea361d156d701859da7",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_in_a_folder_that_denies_access_is_not_located",
+      "killer_at": "this_commit"
+    },
+    "J43": {
+      "what": "admit_at: a journal found by name, though not located, is taken as no journal (the refusing arm emptied)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ => return Err(SplitJournal::OwnNotLocated),",
+          "to": "_ => {}"
+        }
+      ],
+      "mutation": "237308c3ff8752c789bc2781cdb06a2d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "J44": {
+      "what": "admit_at: the NotFound arm refuses and every other result passes (arms swapped)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}\n            _ => return Err(SplitJournal::OwnNotLocated),",
+          "to": "Err(error) if error.kind() == std::io::ErrorKind::NotFound => { return Err(SplitJournal::OwnNotLocated) }\n            _ => (),"
+        }
+      ],
+      "mutation": "c956441c56965d24041ae05791f2e70f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_with_no_batch_is_not_a_second_journal",
+      "killer_at": "base"
+    },
+    "J45": {
+      "what": "admit_at: the refusal for a journal not located is OtherNotRead",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ => return Err(SplitJournal::OwnNotLocated),",
+          "to": "_ => { return Err(SplitJournal::OtherNotRead) }"
+        }
+      ],
+      "mutation": "1d01ba505852a52cccb651aa7fe06f38",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "J46": {
+      "what": "admit_at: the refusal for a journal not located is CopyNotLocated",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ => return Err(SplitJournal::OwnNotLocated),",
+          "to": "_ => return Err(SplitJournal::CopyNotLocated),"
+        }
+      ],
+      "mutation": "bbaf9546ef72d36070e255e01f3af343",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_journal_whose_presence_cannot_be_read_is_not_located",
+      "killer_at": "base"
+    },
+    "J47": {
+      "what": "admit_at: the first package copy is not looked at",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "for copy in copies {",
+          "to": "for copy in copies.into_iter().skip(1) {"
+        }
+      ],
+      "mutation": "1ed3622abaffa16e1bbf0dc38bab7f4a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J48": {
+      "what": "admit_at: only the first package copy is looked at",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "for copy in copies {",
+          "to": "for copy in copies.into_iter().take(1) {"
+        }
+      ],
+      "mutation": "1cb49b24cc37f9831c086f12f02f6d02",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::every_package_copy_is_looked_at_in_name_order",
+      "killer_at": "this_commit"
+    },
+    "J49": {
+      "what": "admit_at: the last package copy is not looked at",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "for copy in copies {",
+          "to": "for copy in copies.iter().rev().skip(1).rev().cloned() {"
+        }
+      ],
+      "mutation": "4a4514a0242185e5da6589873f6cb490",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J50": {
+      "what": "admit_at: the package copies are looked at in reverse name order",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "for copy in copies {",
+          "to": "for copy in copies.into_iter().rev() {"
+        }
+      ],
+      "mutation": "05be06d0548715bcc7af83e57d830ff5",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::every_package_copy_is_looked_at_in_name_order",
+      "killer_at": "this_commit"
+    },
+    "J51": {
+      "what": "admit_at: a copy's journal is looked for at the copy folder itself",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let located = resolve(&copy.join(JOURNAL_FILE));",
+          "to": "let located = resolve(copy.as_path());"
+        }
+      ],
+      "mutation": "1649c3fafd8dc5494634f5515454f90f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J52": {
+      "what": "admit_at: a copy's journal is never located",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let located = resolve(&copy.join(JOURNAL_FILE));",
+          "to": "let located: Option<PathBuf> = None;"
+        }
+      ],
+      "mutation": "06b81bc49694e1741a91171ab9daa4e0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J53": {
+      "what": "admit_at: a copy whose journal is this side's, or has the same location, ... && -> ||",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_some() && located == own {",
+          "to": "if own.is_some() || located == own {"
+        }
+      ],
+      "mutation": "f208c34ee16bd9bb9475f09406a69651",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J54": {
+      "what": "admit_at: the same-journal test without its own.is_some() half",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_some() && located == own {",
+          "to": "if own == located {"
+        }
+      ],
+      "mutation": "5e424b04258ad3b8f51e6394fedf5018",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_read_when_this_side_has_none",
+      "killer_at": "this_commit"
+    },
+    "J55": {
+      "what": "admit_at: the same-journal test without its located == own half",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_some() && located == own {",
+          "to": "if own.is_some() {"
+        }
+      ],
+      "mutation": "b950c1f39779a49127cefe56ad5a5bc7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J56": {
+      "what": "admit_at: located == own -> located != own",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_some() && located == own {",
+          "to": "if own.is_some() && located != own {"
+        }
+      ],
+      "mutation": "78a6dbb6590d67d4f81c0581e97996cf",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J57": {
+      "what": "admit_at: own.is_some() -> own.is_none() in the same-journal test",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "if own.is_some() && located == own {",
+          "to": "if own.is_none() && located == own {"
+        }
+      ],
+      "mutation": "d7c551fbdd318b73e91327b5bb37a258",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::inside_the_package_copy_is_this_sides_own_journal",
+      "killer_at": "base"
+    },
+    "J58": {
+      "what": "admit_at: the copy that is this side's own is read after all (continue dropped)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "            continue;\n",
+          "to": ""
+        }
+      ],
+      "mutation": "97f88a4641a45a846ca50ce17e9febbb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::inside_the_package_copy_is_this_sides_own_journal",
+      "killer_at": "base"
+    },
+    "J59": {
+      "what": "admit_at: unlocated with || (own.is_some() || located.is_none())",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let unlocated = own.is_some() && located.is_none();",
+          "to": "let unlocated = own.is_some() || located.is_none();"
+        }
+      ],
+      "mutation": "3d79e580d35ba01d17a16284ac83fa11",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J60": {
+      "what": "admit_at: unlocated without its own.is_some() half",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let unlocated = own.is_some() && located.is_none();",
+          "to": "let unlocated = located.is_none();"
+        }
+      ],
+      "mutation": "c823e5e2ca078dd442af6e983335dafe",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_read_when_this_side_has_none",
+      "killer_at": "this_commit"
+    },
+    "J61": {
+      "what": "admit_at: unlocated without its located.is_none() half",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let unlocated = own.is_some() && located.is_none();",
+          "to": "let unlocated = own.is_some();"
+        }
+      ],
+      "mutation": "6a92df0e271f26fc34601c45e7aca208",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J62": {
+      "what": "admit_at: unlocated negated",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let unlocated = own.is_some() && located.is_none();",
+          "to": "let unlocated = !own.is_some() || !located.is_none();"
+        }
+      ],
+      "mutation": "08baa92eb4a2679a84452cc54e544a8d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J63": {
+      "what": "admit_at: unlocated with own.is_none()",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let unlocated = own.is_some() && located.is_none();",
+          "to": "let unlocated = own.is_none() && located.is_none();"
+        }
+      ],
+      "mutation": "508dd4c0d04b5be6ff0826ff424a4606",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J64": {
+      "what": "admit_at: unlocated with located.is_some()",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "let unlocated = own.is_some() && located.is_none();",
+          "to": "let unlocated = own.is_some() && located.is_some();"
+        }
+      ],
+      "mutation": "a600a7dbb8a090091d7e3f16e525be03",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J65": {
+      "what": "admit_at: a copy's journal is read at the journal file path rather than the folder",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "local_data::read_journal(&copy, || {",
+          "to": "local_data::read_journal(&copy.join(JOURNAL_FILE), || {"
+        }
+      ],
+      "mutation": "c7caba6ca97616ceb4aaca43cad859a0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_post_beside_a_second_journal_is_refused_before_any_request",
+      "killer_at": "base"
+    },
+    "J66": {
+      "what": "admit_at: an absent journal is refused as OtherNotRead",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "            Journal::Absent => {}\n",
+          "to": "            Journal::Absent => return Err(SplitJournal::OtherNotRead),\n"
+        }
+      ],
+      "mutation": "15fc9deed607084cc61c23a31173ffe0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_second_journal_made_while_the_dialog_is_open_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "J67": {
+      "what": "admit_at: batches == 0 -> != 0",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Journal::Read(settlement) if settlement.batches == 0 => {}",
+          "to": "Journal::Read(settlement) if 0 != settlement.batches => {}"
+        }
+      ],
+      "mutation": "1814185a2bedf8bd2f5f5b53f36d9eca",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J68": {
+      "what": "admit_at: batches == 0 -> <= 1",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Journal::Read(settlement) if settlement.batches == 0 => {}",
+          "to": "Journal::Read(settlement) if settlement.batches <= 1 => {}"
+        }
+      ],
+      "mutation": "23a1a083d5c0b2b5d74280af74c739f0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J69": {
+      "what": "admit_at: batches == 0 -> > 0",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Journal::Read(settlement) if settlement.batches == 0 => {}",
+          "to": "Journal::Read(settlement) if settlement.batches > 0 => {}"
+        }
+      ],
+      "mutation": "246596bebe1cea80f1006f3ac640af55",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J70": {
+      "what": "admit_at: batches == 0 -> == 1",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Journal::Read(settlement) if settlement.batches == 0 => {}",
+          "to": "Journal::Read(settlement) if settlement.batches == 1 => {}"
+        }
+      ],
+      "mutation": "44b0e7e12ee277b6e667a401e2b08ee1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J71": {
+      "what": "admit_at: a journal that reads passes whatever its batches (guard dropped)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Journal::Read(settlement) if settlement.batches == 0 => {}",
+          "to": "Journal::Read(_) => {}"
+        }
+      ],
+      "mutation": "3c5919ebecc0c4bd981ac90e0634b484",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J72": {
+      "what": "admit_at: the unlocated arm refuses as OtherNotRead",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ if unlocated => return Err(SplitJournal::CopyNotLocated),",
+          "to": "_ if unlocated => return Err(SplitJournal::OtherNotRead),"
+        }
+      ],
+      "mutation": "6e4b8fa16751c6e43b7f4994a3d6d45f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J73": {
+      "what": "admit_at: the unlocated arm refuses as OtherHoldsBatches",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ if unlocated => return Err(SplitJournal::CopyNotLocated),",
+          "to": "_ if unlocated => return Err(SplitJournal::OtherHoldsBatches),"
+        }
+      ],
+      "mutation": "b9f822e2f48baf48f94347be6ee4f29a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J74": {
+      "what": "admit_at: the unlocated arm refuses as OwnNotLocated",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ if unlocated => return Err(SplitJournal::CopyNotLocated),",
+          "to": "_ if unlocated => return Err(SplitJournal::OwnNotLocated),"
+        }
+      ],
+      "mutation": "197ce6f749e4fa287705f670e28dc2a4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J75": {
+      "what": "admit_at: the unlocated arm's guard negated",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ if unlocated => return Err(SplitJournal::CopyNotLocated),",
+          "to": "_ if !unlocated => return Err(SplitJournal::CopyNotLocated),"
+        }
+      ],
+      "mutation": "8b9045ff3a411c36d21c6c5364ab6b23",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J76": {
+      "what": "admit_at: the unlocated arm's guard always true",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ if unlocated => return Err(SplitJournal::CopyNotLocated),",
+          "to": "_ if true => return Err(SplitJournal::CopyNotLocated),"
+        }
+      ],
+      "mutation": "9add325d4cc51724bf0046c7143e7dcb",
+      "verdict": "caught",
+      "killer": "agent::agent_import::desktop_journal_tests::a_journal_beside_a_second_journal_says_where_to_post_from",
+      "killer_at": "base"
+    },
+    "J77": {
+      "what": "admit_at: the unlocated arm's guard always false",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ if unlocated => return Err(SplitJournal::CopyNotLocated),",
+          "to": "_ if false => return Err(SplitJournal::CopyNotLocated),"
+        }
+      ],
+      "mutation": "d65c4de0b1cca0d601772b6503e72b19",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J78": {
+      "what": "admit_at: the unlocated arm deleted",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "_ if unlocated => return Err(SplitJournal::CopyNotLocated),\n",
+          "to": ""
+        }
+      ],
+      "mutation": "e76d784e6c7312aaf6e25e23dc0bc6a4",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J79": {
+      "what": "admit_at: the unlocated arm after the Read(_) arm",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "            _ if unlocated => return Err(SplitJournal::CopyNotLocated),\n            Journal::Read(_) => return Err(SplitJournal::OtherHoldsBatches),",
+          "to": "            Journal::Read(_) => return Err(SplitJournal::OtherHoldsBatches),\n            _ if unlocated => return Err(SplitJournal::CopyNotLocated),"
+        }
+      ],
+      "mutation": "80af0a6816546c738d48d65c71b166b8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J80": {
+      "what": "admit_at: the unlocated arm before the Absent arm",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "            Journal::Absent => {}\n",
+          "to": "            _ if unlocated => return Err(SplitJournal::CopyNotLocated),\n            Journal::Absent => {}\n"
+        }
+      ],
+      "mutation": "a01f00aacbae01c0358d07e888f72255",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_second_journal_made_while_the_dialog_is_open_is_refused_under_the_lock",
+      "killer_at": "base"
+    },
+    "J81": {
+      "what": "admit_at: the unlocated arm before the no-batch arm",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "            Journal::Read(settlement) if settlement.batches == 0 => {}",
+          "to": "            _ if unlocated => return Err(SplitJournal::CopyNotLocated),\n            Journal::Read(settlement) if settlement.batches == 0 => {}"
+        }
+      ],
+      "mutation": "a463696e68e6816cff4e76615d8c1a93",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J85": {
+      "what": "admit_at: the unlocated arm after the NotRead(_) arm (never reached)",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "            _ if unlocated => return Err(SplitJournal::CopyNotLocated),\n",
+          "to": ""
+        },
+        {
+          "from": "Journal::NotRead(_) => return Err(SplitJournal::OtherNotRead),",
+          "to": "Journal::NotRead(_) => return Err(SplitJournal::OtherNotRead),\n            _ if unlocated => return Err(SplitJournal::CopyNotLocated,),"
+        }
+      ],
+      "mutation": "6f5ff01a5bfaa3add76c562ca873d59b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    },
+    "J82": {
+      "what": "admit_at: a journal with batches is refused as OtherNotRead",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Journal::Read(_) => return Err(SplitJournal::OtherHoldsBatches),",
+          "to": "Journal::Read(_) => { return Err(SplitJournal::OtherNotRead) }"
+        }
+      ],
+      "mutation": "e96f795b3cfd9a92cf8ea8d20f9d344a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_post_beside_a_second_journal_is_refused_before_any_request",
+      "killer_at": "base"
+    },
+    "J83": {
+      "what": "admit_at: a journal that could not be read is refused as OtherHoldsBatches",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "Journal::NotRead(_) => return Err(SplitJournal::OtherNotRead),",
+          "to": "Journal::NotRead(_) => return Err(SplitJournal::OtherHoldsBatches),"
+        }
+      ],
+      "mutation": "88cb1080d234480b235dbf807403a09f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::what_cannot_be_told_is_refused",
+      "killer_at": "base"
+    },
+    "J84": {
+      "what": "admit_at: the final answer is NotRedirected",
+      "applied_to": "src-tauri/src/agent_import_split_journal.rs",
+      "edits": [
+        {
+          "from": "    Ok(OneJournal::NoOtherJournal)\n}",
+          "to": "    Ok(OneJournal::NotRedirected)\n}"
+        }
+      ],
+      "mutation": "4c52c9e19f95fa4fa849aa62ba501151",
+      "verdict": "caught",
+      "killer": "agent::agent_import::split_journal::tests::a_copy_journal_not_located_is_refused_under_its_own_cause",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "J24": {
+      "mutation": "ba88f4f8c1268b104e078304d9a52124",
+      "reason": "equivalent on the host the runs were made on: local_data::local_app_data() is None off Windows (held by off_windows_the_host_has_no_local_app_data), so with no scripted value scripted.or_else(local_app_data) is None as scripted alone is, and with one the or_else is never called; on Windows the two differ, since a call to admit with no scripted value would then meet the host's real %LOCALAPPDATA%, which no run here can show (the Windows native job runs the suite unmutated)"
+    }
+  }
+}

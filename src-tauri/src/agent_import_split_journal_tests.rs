@@ -188,3 +188,169 @@ fn each_refusal_is_one_code_with_its_own_cause() {
     );
     assert!(super::super::super::refusal_remediation(IMPORT_JOURNAL_SPLIT).is_some());
 }
+
+/// The second Store package's copy of the data folder, beside the first the
+/// layout made (package folders are read in name order).
+fn second_copy(at: &Layout) -> PathBuf {
+    let copy = at
+        .local
+        .join("Packages")
+        .join("Store.App_2")
+        .join("LocalCache")
+        .join("Local")
+        .join("Bridge")
+        .join("agent");
+    fs::create_dir_all(&copy).unwrap();
+    copy
+}
+
+/// Outside Claude Desktop, but Windows does not say where `hidden` is.
+fn not_saying(hidden: PathBuf) -> impl Fn(&Path) -> Option<PathBuf> {
+    move |path: &Path| {
+        if path == hidden {
+            None
+        } else {
+            outside(path)
+        }
+    }
+}
+
+/// Each refusal is the one code with its own cause, written out in full.
+#[test]
+fn each_refusal_names_its_code_and_cause_in_full() {
+    let causes = [
+        (
+            SplitJournal::OtherHoldsBatches,
+            "other_journal_holds_batches",
+        ),
+        (SplitJournal::OtherNotRead, "other_journal_not_read"),
+        (SplitJournal::PackagesNotListed, "package_copies_not_listed"),
+        (SplitJournal::OwnNotLocated, "journal_not_located"),
+        (
+            SplitJournal::CopyNotLocated,
+            "package_copy_journal_not_located",
+        ),
+    ];
+    assert_eq!(IMPORT_JOURNAL_SPLIT, "import_journal_split");
+    for (split, cause) in causes {
+        assert_eq!(split.cause(), cause);
+        let failure = super::super::ToolFailure::from(split);
+        assert_eq!(failure.code, "import_journal_split");
+        assert_eq!(failure.cause, Some(cause));
+    }
+}
+
+/// The message follows what the check found: no way to tell, for the three
+/// causes that found no second journal; where to post from, for the rest.
+#[test]
+fn the_message_follows_what_the_check_found() {
+    for cause in [
+        "package_copies_not_listed",
+        "journal_not_located",
+        "package_copy_journal_not_located",
+    ] {
+        assert_eq!(refused_message(Some(cause)), NOT_TOLD_MESSAGE, "{cause}");
+    }
+    for cause in ["other_journal_holds_batches", "other_journal_not_read"] {
+        assert_eq!(refused_message(Some(cause)), REFUSED_MESSAGE, "{cause}");
+    }
+    assert_eq!(refused_message(None), REFUSED_MESSAGE);
+    assert!(!REFUSED_MESSAGE.is_empty());
+    assert!(!NOT_TOLD_MESSAGE.is_empty());
+    assert_ne!(REFUSED_MESSAGE, NOT_TOLD_MESSAGE);
+}
+
+/// Every package copy is looked at, in name order: the first refusal found
+/// is the one given, whichever copy holds it.
+#[test]
+fn every_package_copy_is_looked_at_in_name_order() {
+    let at = layout();
+    let second = second_copy(&at);
+    let (first, batches, garbage) = (
+        at.copy.join(JOURNAL_FILE),
+        journal(true),
+        b"not a journal\n".to_vec(),
+    );
+    assert_eq!(at.admit(&outside), Ok(OneJournal::NoOtherJournal));
+    fs::write(second.join(JOURNAL_FILE), &batches).unwrap();
+    assert_eq!(at.admit(&outside), Err(SplitJournal::OtherHoldsBatches));
+    fs::write(&first, &batches).unwrap();
+    fs::remove_file(second.join(JOURNAL_FILE)).unwrap();
+    assert_eq!(at.admit(&outside), Err(SplitJournal::OtherHoldsBatches));
+    fs::write(second.join(JOURNAL_FILE), &garbage).unwrap();
+    assert_eq!(at.admit(&outside), Err(SplitJournal::OtherHoldsBatches));
+    fs::write(&first, &garbage).unwrap();
+    fs::write(second.join(JOURNAL_FILE), &batches).unwrap();
+    assert_eq!(at.admit(&outside), Err(SplitJournal::OtherNotRead));
+}
+
+/// With no journal of this side, a copy's journal Windows did not locate is
+/// still read, and refused for what it holds: there is no journal of this
+/// side it could be.
+#[test]
+fn a_copy_journal_not_located_is_read_when_this_side_has_none() {
+    let at = layout();
+    let hidden = not_saying(at.copy.join(JOURNAL_FILE));
+    fs::write(at.copy.join(JOURNAL_FILE), journal(true)).unwrap();
+    assert_eq!(at.admit(&hidden), Err(SplitJournal::OtherHoldsBatches));
+    fs::write(at.copy.join(JOURNAL_FILE), b"not a journal\n").unwrap();
+    assert_eq!(at.admit(&hidden), Err(SplitJournal::OtherNotRead));
+}
+
+/// Beside a journal of this side, a copy's journal that does not read, or that
+/// is absent, and that Windows did not locate: the first is refused under the
+/// not-located cause, the second is no refusal.
+#[test]
+fn an_unread_copy_journal_not_located_is_refused_and_an_absent_one_is_not() {
+    let at = layout();
+    fs::write(at.data.join(JOURNAL_FILE), journal(false)).unwrap();
+    assert_eq!(at.admit(&outside), Ok(OneJournal::NoOtherJournal));
+    fs::write(at.copy.join(JOURNAL_FILE), b"not a journal\n").unwrap();
+    let hidden = not_saying(at.copy.join(JOURNAL_FILE));
+    assert_eq!(at.admit(&hidden), Err(SplitJournal::CopyNotLocated));
+}
+
+/// A package copy whose journal is this side's own file under another name
+/// (a link here, as Windows redirects it) is this side's: not read, not
+/// refused. Held through `admit`, whose resolver is the operating system's.
+#[cfg(unix)]
+#[test]
+fn a_copy_journal_that_is_this_sides_file_is_this_sides() {
+    let at = layout();
+    fs::write(at.data.join(JOURNAL_FILE), journal(true)).unwrap();
+    std::os::unix::fs::symlink(at.data.join(JOURNAL_FILE), at.copy.join(JOURNAL_FILE)).unwrap();
+    let admitted = LOCAL_APP_DATA.sync_scope(at.local.clone(), || admit(&at.data));
+    assert_eq!(admitted, Ok(OneJournal::NoOtherJournal));
+}
+
+/// Whether this side's journal exists could not be read for want of access
+/// (not for want of the file): unknown, so refused as not located.
+#[cfg(unix)]
+#[test]
+fn a_journal_in_a_folder_that_denies_access_is_not_located() {
+    use std::os::unix::fs::PermissionsExt;
+    struct Reopen(PathBuf);
+    impl Drop for Reopen {
+        fn drop(&mut self) {
+            let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o755));
+        }
+    }
+    let at = layout();
+    fs::write(at.data.join(JOURNAL_FILE), journal(false)).unwrap();
+    let _reopen = Reopen(at.data.clone());
+    fs::set_permissions(&at.data, fs::Permissions::from_mode(0o000)).unwrap();
+    // The premise: this process is refused, as an ordinary user is.
+    let kind = fs::symlink_metadata(at.data.join(JOURNAL_FILE))
+        .unwrap_err()
+        .kind();
+    assert_eq!(kind, std::io::ErrorKind::PermissionDenied);
+    assert_eq!(at.admit(&outside), Err(SplitJournal::OwnNotLocated));
+}
+
+/// Off Windows there is no `%LOCALAPPDATA%` to ask the host for, which is what
+/// lets `admit` leave the host out of it when a test has scripted one.
+#[cfg(not(windows))]
+#[test]
+fn off_windows_the_host_has_no_local_app_data() {
+    assert_eq!(local_data::local_app_data(), None);
+}

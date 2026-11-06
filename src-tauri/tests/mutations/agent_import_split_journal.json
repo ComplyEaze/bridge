@@ -51,10 +51,10 @@
     },
     "equivalent": {
       "tool": 0,
-      "hand": 1
+      "hand": 0
     },
     "accepted_not_equivalent": {
-      "hand": 0
+      "hand": 1
     }
   },
   "tool_results": {
@@ -505,7 +505,7 @@
       ],
       "mutation": "ba88f4f8c1268b104e078304d9a52124",
       "verdict": "missed",
-      "equivalent": true
+      "equivalent": false
     },
     "J25": {
       "what": "admit: no %LOCALAPPDATA% returns NoOtherJournal rather than NotRedirected",
@@ -1376,7 +1376,7 @@
   "accepted_survivors": {
     "J24": {
       "mutation": "ba88f4f8c1268b104e078304d9a52124",
-      "reason": "equivalent on the host the runs were made on: local_data::local_app_data() is None off Windows (held by off_windows_the_host_has_no_local_app_data), so with no scripted value scripted.or_else(local_app_data) is None as scripted alone is, and with one the or_else is never called; on Windows the two differ, since a call to admit with no scripted value would then meet the host's real %LOCALAPPDATA%, which no run here can show (the Windows native job runs the suite unmutated)"
+      "reason": "not killed, and not equivalent: with no scripted value, admit takes %LOCALAPPDATA% only from local_data::local_app_data(), so this mutant answers NotRedirected whenever none is scripted. A release build has none (its arm sets scripted to None), so on Windows the mutant turns the check off. Off Windows local_app_data() is None (held by off_windows_the_host_has_no_local_app_data), and every test that reaches admit_at scripts %LOCALAPPDATA% through the task-local, so no run on the host used can kill it. A test that kills it has to run on Windows against the process's own %LOCALAPPDATA%; none is added here"
     }
   }
 }

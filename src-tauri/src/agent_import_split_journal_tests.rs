@@ -347,8 +347,8 @@ fn a_journal_in_a_folder_that_denies_access_is_not_located() {
     assert_eq!(at.admit(&outside), Err(SplitJournal::OwnNotLocated));
 }
 
-/// Off Windows there is no `%LOCALAPPDATA%` to ask the host for, which is what
-/// lets `admit` leave the host out of it when a test has scripted one.
+/// Off Windows the host gives no `%LOCALAPPDATA%`, so a run here cannot show
+/// whether `admit` asks the host for one when no test has scripted it.
 #[cfg(not(windows))]
 #[test]
 fn off_windows_the_host_has_no_local_app_data() {

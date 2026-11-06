@@ -354,3 +354,16 @@ fn a_journal_in_a_folder_that_denies_access_is_not_located() {
 fn off_windows_the_host_has_no_local_app_data() {
     assert_eq!(local_data::local_app_data(), None);
 }
+
+/// On Windows, with no `%LOCALAPPDATA%` scripted, `admit` asks the host for
+/// it: a data folder named under the host's own that does not exist is looked
+/// for among the package copies, not passed as never redirected. Nothing is
+/// written; the packages folder is only listed.
+#[cfg(windows)]
+#[test]
+fn on_windows_admit_asks_the_host_for_local_app_data() {
+    let host = local_data::local_app_data().expect("LOCALAPPDATA is set on Windows");
+    let data = host.join("BridgeSplitJournalTestAbsent").join("agent");
+    assert!(!data.exists());
+    assert_ne!(admit(&data), Ok(OneJournal::NotRedirected));
+}

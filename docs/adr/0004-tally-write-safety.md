@@ -729,7 +729,7 @@ amendment otherwise stands, and its safeguards, summary approval and outcome rul
 
 **What it cannot send:** IGST, cess, items, credit and debit notes, a reference of the caller's own (the reference written is the invoice number), new ledgers, batches of invoices, amendments, and anything a book's types, ledgers and company state do not establish.
 
-**Qualification.** Sales is not in the qualified list. Its shape rests on section 9.16 (observed by reads on one real book; its answers are held privately and are not in this repository); in one rehearsal two invoices built by ComplyEaze Bridge were posted and read back as built. Sales is qualified when what that rehearsal left owed is done, and the pull request records what is not measured.
+**Qualification (PARTIAL).** Sales is not in the qualified list. Its shape rests on section 9.16, which marks the 7 October rehearsal PARTIAL: its answers are not in this repository (six were removed in `4a3f2bb6`; the counters, verdicts, open-bill read and GSTR-1 screen were never committed). The 9 October captures of BRIDGE PILOT LAB, committed as the `pilot-lab` fixtures, show some of the same behaviour, and that section marks each such sentence VERIFIED on its own. In the rehearsal two invoices built by ComplyEaze Bridge were posted and read back as built. Sales is qualified when what that rehearsal left owed is done, and the pull request records what is not measured.
 
 ## Amendment — owner decision, 2026-10-08: the order of the GST Sales slices after the invoice core
 

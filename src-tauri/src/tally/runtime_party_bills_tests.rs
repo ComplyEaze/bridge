@@ -1,3 +1,8 @@
+//! The party bills read against a local socket serving captured answer bytes.
+#![allow(
+    clippy::disallowed_methods,
+    reason = "test double: a local socket serving captured bytes"
+)]
 use super::*;
 use bridge_tally_transport::TallyTransportError;
 use tokio::io::AsyncWriteExt;

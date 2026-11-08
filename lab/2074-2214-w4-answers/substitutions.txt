@@ -1,6 +1,6 @@
 The company number is X at equal length in raw files, bodies/ (whose names stay the sha256 of the originals), the drain copies and the creates answers, so sizes stand. company_number values go first in tool answers, by a JSON parser. Other replacements in text files, with counts:
-<company number>: 5
+<company number>: 7
 <lab client name>: 1
-<lab folder>: 12
+<lab folder>: 13
 <lab root>: 2
-stop: 5
+stop: 7

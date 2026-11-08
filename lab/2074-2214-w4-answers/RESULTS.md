@@ -1,6 +1,6 @@
 # Part W4, the export at the cut: results
 
-First line: **W4 as EXPECT: verified.** The app's mailing post was cut at 19.7 s. The export failed with the withheld message, and no file was written. After the cut no standard master post went out until D2's admitted STANDARD. D1 to D3 and Whole ran as an Xn: the read was owed, refused four times, admitted at call 5, and 175 of 175 rows were equal. The voucher mark rose by exactly 1535, the front's own count. The book is left rebuilt: restoring BK-2074-2214 by C6 waits for the run lead's word.
+First line: **W4 as EXPECT: verified.** The app's mailing post was cut at 19.7 s. The export failed with the withheld message, and no file was written. After the cut no standard master post went out until D2's admitted STANDARD. D1 to D3 and Whole ran as an Xn: the read was owed, refused four times, admitted at call 5, and 175 of 175 rows were equal. The voucher mark rose by exactly 1535, the front's own count. BK-2074-2214 was then restored by C6 on the run lead's word, and the marks are byte-equal to S0's.
 
 Sheet `lab/2074-2214-export-cut` at `7a49b5c1`, kit 11 of 11 OK by its `SHA256.txt` (checked again at the close). Build: the merge-queue run's artifact `unsigned-bundle-smoke-windows-latest` for head `1f5dc024`, 59,872,060 B, GitHub digest `sha256:a6eca6d0c8511c8f031f4a78c9227146a04680dfd97c755a9507e451f323d0b6`. The NSIS setup was run by the owner from Explorer into a real per-user folder, and the screen grant resolved to that folder. `bridge_mcp.exe` from the same bundle, sha256 `58860204d114ebb0cdab106f35d3753b9f42d36d7bdf10b9feb0f25bac4fecd6`, equal to the bundle's `binary_sha256`, unchanged at the close. Server 0.7.0. TallyPrime 7.2 Silver. Book BRIDGE BATCH LAB, synthetic. All times are UTC on 8 Nov 2026. Every number is read from its file here, and `evidence/notes-w4.txt` has each step.
 
@@ -44,14 +44,17 @@ The front was answered at 196132.796, 70.156 s after it was written. Each refuse
 - M1's runner halted once after create-003, when Tally lost focus to the app's window; the capture was looked at (the Gateway, no dialog), added as a known capture, and the run resumed at create-004.
 - The app first pointed at its own default port; it was set to 127.0.0.1:9002 in Settings, and Check Tally showed Reachable before W4.
 
-## Not done here (unverified)
+## Close (verified)
 
-- Close 3 to 5: the restore of BK-2074-2214 by C6, MARKS after it, `ledger_masters` basic on port 9001 and C10 wait for the run lead's word. The book is left with M 388 and V 2122.
+- Close 1 and 2: the server stopped by its stop file, the relay stopped, the app closed; the kit 11 of 11, the exe and the fronts unchanged.
+- Close 3, on the run lead's word: BK-2074-2214 restored by C6 (one file, 57,180 B, sha256 `99b80149...`; the Restore list read BRIDGE BATCH LAB alone, 3-Nov-26 9:03 am). Only "Accept ?" (Yes) and "Company data folder (<company number>) already exists ..." (Replace) came up. The company's data folder held 24 entries before and 23 after (`evidence/c6-datafolder-*.txt`); `evidence/restore-plan.txt` is the plan.
+- Close 4: MARKS `c6-marks` 224 / 87, 3,394 B, sha256 `566be20d...`, byte-equal to S0's. `ledger_masters` basic through a new server on port 9001 (`run3/`): total 11, snapshot 224 / 87.
+- C10: shut by Company > SHut; Tally at Select Company with no company loaded; one tally.exe owns 9001, nothing on 9002; GET /status 200. Deviation: the helper's C2 step also sends MARKS, so one MARKS read reached 9001 after the shut (answered at once, 0 COMPANY rows), against C10's "no XML request after the shut". Nothing else was sent.
 - Parts W1 to W3 and O were not part of this sitting.
 
 ## Files
 
-- `run2/answers/`: every tool answer (company_number redacted by a JSON parser); `run2/client-log.txt`, `launch-env.json`, the server's stderr.
+- `run2/answers/`: every tool answer (company_number redacted by a JSON parser); `run2/client-log.txt`, `launch-env.json`, the server's stderr. `run3/`: the Close 4 basic read on port 9001, the same way.
 - `relay/relay.jsonl`, `relay/bodies/` (named by the originals' sha256), `relay/front-1.answer`; `evidence/relay-events.txt` lists its events and master posts, parsed.
 - `debt/`: the drain record copies. `reads/`: the raw marks and creates reads. `answers-creates/`.
 - `evidence/`: `notes-w4.txt`, `notes.txt`, the runners' outputs. `scripts/`: the helpers.

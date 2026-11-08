@@ -16,6 +16,7 @@ c6fb7ce5ad41e1e0142a5b2359bfc9cc7c11f5bc4ab8e9c3b634b8ac5655650c  316323  run2/a
 d21c5de54675ab28a01c4347b931ae3736e8773753f5ce4ba26740efe69457ae  16962  run2/answers/015-xw4-D2-05-egress_log.json
 697aa3698e551a82c6d780a7ee1225758fb10c3ce6591c2551aec4e47ce01aa7  316323  run2/answers/016-xw4-whole.json
 753e21c618e9f5de2a88969772af7e18f52a208c7ead3d7e835797bce0527dec  16962  run2/answers/017-xw4-whole-egress_log.json
+62649b2b655a025c2528649b5a31b9d953dba782f3ee70e2544102edc751dbaf  4690  run3/answers/000-c-basic.json
 3a70c210184ffb58b089231cf9b4ae131cbecef8caa04a8fc01682746eb72499  3856  relay/bodies/3a70c210184ffb58b089231cf9b4ae131cbecef8caa04a8fc01682746eb72499
 93ea62b31fb5ff9dc8aeed53ee9d5f56f242390e1518dfac74398f18f2a91c25  4024  relay/bodies/93ea62b31fb5ff9dc8aeed53ee9d5f56f242390e1518dfac74398f18f2a91c25
 b935b87cceeb448b0c12b010106a7dc62566a6b23bf10fece91853a6666532a5  3864  relay/bodies/b935b87cceeb448b0c12b010106a7dc62566a6b23bf10fece91853a6666532a5
@@ -228,6 +229,7 @@ ab34e8317f81b54c9cf30ad119fc113ee1c12a12d85507a70024b75926f1fba6  151796  reques
 ea6ccc70348aa1620a87fc2775369c141aceeb0b0382fada88309f013047fe95  151796  requests/create-198.utf16le.xml  (generated request file, regenerable from the sheet)
 e92e279bca294be7c4f84dd70a2d90ed493835a38b339eed43abbfce5436f815  151796  requests/create-199.utf16le.xml  (generated request file, regenerable from the sheet)
 3c8fdf0877b6de52c01b250deaa79a857171786a9d576cb4d864f1303fc0b54d  151796  requests/create-200.utf16le.xml  (generated request file, regenerable from the sheet)
+78b649cd325b2576288025831fa6dbc6c5d7c202f89e110f87c0d8e255c1c5f6  72935  shots/c10-window.png  (window capture)
 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c  44393  shots/create-000.png  (window capture)
 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c  44393  shots/create-001.png  (window capture)
 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c  44393  shots/create-002.png  (window capture)
@@ -246,10 +248,12 @@ bb7d33cf8de3dec74a92eceb84ee1d9369a3626c1d93dc6c62f83042ae05836f  16467104  dl/b
 8074aaab16cd0e8a8bee9f9679a05674f17d1689ecd0ee2d53ca5d0e06e3aac5  710  dl/mcpb-smoke.json  (the downloaded artifact, by its sha256)
 804fd2d3bf3f7c9216e77b524f17eeb264d3623e0a5cd780535f5b13d17fc45d  25817088  dl/msi/Bridge_0.7.0_x64_en-US.msi  (the downloaded artifact, by its sha256)
 fbaeb337ab48ced4375cea980cd8ee7d765bb5251c1ad5d51e634536aea1c3e4  17905036  dl/nsis/Bridge_0.7.0_x64-setup.exe  (the downloaded artifact, by its sha256)
-f5d5f2c168413fa7f312034327b2469de39ce2d3cc4245b5af9db8f1a1ed5bcc  6296  stage_w4.py  (this stage script: it names the company number)
+b7c1efe1ec96199ebfc805dc8430ae43f11342300b74a66aa0134f4c17e3f865  6378  stage_w4.py  (this stage script: it names the company number)
 2f39e73e51bf194b1a0129028b87a01e60c337cb03f9d6f79f3be39bd5d2f174  57180  bk/TDBK1800_<company number>.001  (process, port or folder listing, the backup, or the server's own data folder)
 bbd86eddf095131b6551fd5d7b06af76bdaa9757fc456490982e23cf4b8ebd71  35830  data/agent-egress.jsonl  (process, port or folder listing, the backup, or the server's own data folder)
 ea20146609d5ab9aea436a3048c76e6bdaed804a1eea6c1895426092b2bc9643  90  data/terms-acceptance.jsonl  (process, port or folder listing, the backup, or the server's own data folder)
+af614504e0a57046d9d232ba6206ffae2855cf3d9519b4c07eafaf1730fbc78a  28824  evidence/c10-netstat.txt  (process, port or folder listing, the backup, or the server's own data folder)
+305bdac3c31a8cffcf02ffa145a51784c1d46c5f244ade46c52b0e7c0ff6d003  47  evidence/c10-tasklist.txt  (process, port or folder listing, the backup, or the server's own data folder)
 3511605a02442046d9b612cf4c689df9d0ededac1eab678df40df17fb06fbbc8  38025  evidence/p0-netstat.txt  (process, port or folder listing, the backup, or the server's own data folder)
 8aa82c205da0647878fc4ef97d4f0e8e0fc163b23d23573af03976f8b0167a81  47  evidence/p0-tasklist.txt  (process, port or folder listing, the backup, or the server's own data folder)
 148e9e36596a49b799169e75cfbfae2f58dc2d94705b9e6eced4109dcf92a1cc  180  evidence/s0-bk-after.txt  (process, port or folder listing, the backup, or the server's own data folder)

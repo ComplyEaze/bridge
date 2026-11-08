@@ -208,7 +208,10 @@ def present(path):
         root = ET.fromstring(decoded(path))
     except ET.ParseError as error:
         raise Failed("{}: does not parse ({})".format(path, error))
-    names = [e.get("NAME") or (e.findtext("NAME") or "") for e in root.iter("LEDGER")]
+    if root.tag != "ENVELOPE":
+        raise Failed("{}: the root is {!r}, not ENVELOPE".format(path, root.tag))
+    # Rows sit only under BODY/DATA/COLLECTION; BODY/DESC/CMPINFO carries a bare LEDGER count line, which is not a row.
+    names = [e.get("NAME") or (e.findtext("NAME") or "") for e in root.findall("./BODY/DATA/COLLECTION/LEDGER")]
     if not names:
         raise Failed("no LEDGER in the snapshot")
     out = []

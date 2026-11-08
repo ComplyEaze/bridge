@@ -214,3 +214,7 @@ On `lab/2377-b-answers`, with `SHA256.txt`:
 - a `RESULTS.md` holding the table above.
 
 Notes carry no user names and no machine paths beyond the lab folder. Commits carry no co-author or generated-with line. Send the sha first; push on the run coordinator's yes.
+
+## Deviation, 8 Nov 2026
+
+Part A's first sitting stopped at `pick`: the shared `ledgers()` of `l2377.py` walked the whole answer and reached the bare LEDGER count line under BODY/DESC/CMPINFO, which is not a row. `l2377.py` here is now byte-equal to the corrected copy on `lab/2377-sheet` at 3e865846, so every `tie` reads only BODY/DATA/COLLECTION/LEDGER under an ENVELOPE root. `present()` in `l2377b.py` reads the same rows: before, the count line counted as a name `""`, which met the "no LEDGER in the snapshot" guard when there was no row. No request changes. `SHA256.txt` carries the new hashes of `l2377.py`, `l2377b.py` and this file.

@@ -252,7 +252,7 @@ fn service_debiting(
     if line.on_account_approved.is_none() {
         // A record from before the bill-wise field had the older fields: the
         // post reaches its bill-wise check only past theirs.
-        line.ledger_identities = Some(Vec::new());
+        line.binding = LedgerBinding::bound(Some(Vec::new()));
         line.cash_in_hand_ledgers = Some(Vec::new());
     }
     super::super::ensure_private_directory(&root).unwrap();
@@ -415,7 +415,7 @@ async fn post_with_journals_at(at: &super::split_journal::tests::Layout) -> Valu
     std::fs::remove_dir(&at.data).unwrap();
     let (service, mut line) = service(at.data.clone());
     line.batch_id = "bridge-00000000-0000-4000-8000-000000000002".into();
-    line.ledger_identities = Some(Vec::new());
+    line.binding = LedgerBinding::bound(Some(Vec::new()));
     line.cash_in_hand_ledgers = Some(Vec::new());
     let xml = render_import_xml("Synthetic Accounts", &line.vouchers, &line.batch_id);
     line.sha256 = sha256_hex(xml.as_bytes());
@@ -452,7 +452,7 @@ async fn a_journal_whose_approval_window_is_too_large_says_so() {
     let directory = tempfile::tempdir().unwrap();
     let (service, mut line) = service(directory.path().join("agent"));
     line.batch_id = "bridge-00000000-0000-4000-8000-000000000004".into();
-    line.ledger_identities = Some(Vec::new());
+    line.binding = LedgerBinding::bound(Some(Vec::new()));
     line.cash_in_hand_ledgers = Some(Vec::new());
     let leg = |side: &str, amount: &str| {
         serde_json::from_value::<ImportEntry>(json!({"ledger":"Cash","amount":amount,"side":side}))

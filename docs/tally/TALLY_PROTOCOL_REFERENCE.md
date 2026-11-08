@@ -496,6 +496,9 @@ base revision.
 <a id="12a25-the-first-voucher-types-read-after-a-company-load-leaves-one-element-out-of-two-rows-the-second-read-has-it-partial"></a>
 
 [12a.25 The first voucher-types read after a company load leaves one element out of two rows; the second read has it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a25-the-first-voucher-types-read-after-a-company-load-leaves-one-element-out-of-two-rows-the-second-read-has-it-partial)
+<a id="12a26-a-cash-ledgers-day-end-balance-partial"></a>
+
+[12a.26 A cash ledger's day-end balance (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a26-a-cash-ledgers-day-end-balance-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

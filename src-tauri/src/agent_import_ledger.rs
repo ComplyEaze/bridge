@@ -1805,8 +1805,8 @@ fn scan_records_at(
             }
             Record::Status(Box::new(update))
         } else {
-            let batch: ImportLedgerLine =
-                serde_json::from_value(value).map_err(|_| "import_ledger_invalid".to_string())?;
+            let batch = ImportLedgerLine::from_journal(value)
+                .map_err(|refusal| refusal.code().to_string())?;
             if dispatched.contains_key(&batch.batch_id)
                 && latest.get(&batch.batch_id).map(|(sha256, _)| sha256) != Some(&batch.sha256)
             {

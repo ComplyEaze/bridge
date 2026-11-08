@@ -465,7 +465,7 @@ impl BuildLine {
             built_at: line.built_at.clone(),
             status: line.status.clone(),
             vouchers: BuildVoucher::of_vouchers(&line.vouchers),
-            ledger_identities: line.ledger_identities.clone(),
+            ledger_identities: line.binding.ledgers().map(<[_]>::to_vec),
             statement: line.statement.clone(),
             withdrawn: line.withdrawn_skips.iter().flatten().cloned().collect(),
         }

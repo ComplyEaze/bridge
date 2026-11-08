@@ -766,7 +766,7 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
         guid: format!("61c6de69-1748-461c-ad3f-162cb949df9f-{suffix}"),
     };
     assert_eq!(
-        saved.ledger_identities,
+        saved.binding.ledgers().map(<[_]>::to_vec),
         Some(vec![
             bound("Bridge Nested Debtor WR4", "000000d5"),
             bound("Cash", "0000001f"),
@@ -1437,7 +1437,7 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         voucher.voucher_type = voucher_type.clone();
         voucher.voucher_number = None;
         let line = ImportLedgerLine {
-            ledger_identities: None,
+            binding: LedgerBinding::Unbound,
             cash_in_hand_ledgers: Some(Vec::new()),
             on_account_approved: Some(Vec::new()),
             statement: None,
@@ -1748,6 +1748,7 @@ fn a_ledger_named_as_cash_in_hand_must_reach_cash_in_hand() {
         bridge_txn_id: "st-20260801-0000000000000001".into(),
         ledger: ledger.into(),
         cash_in_hand: true,
+        cash_out: false,
     };
     assert_eq!(
         answered_ledger_refusals(&[need("Cash")], &masters, 200_000),
@@ -1963,6 +1964,137 @@ async fn a_cash_answer_records_only_a_cash_in_hand_ledger_on_the_built_batch() {
         .unwrap()
         .batch;
     assert_eq!(saved.cash_in_hand_ledgers, Some(Vec::new()));
+}
+
+/// A deposit from the cash box, through the build, on a book of `balance` as
+/// Tally signs it. `WR2 Sales` is rewritten under Bank Accounts for the test.
+async fn deposit_build(balance: &str, built: bool) -> (Server, Value, tempfile::TempDir) {
+    let cycle = import_family_cycle_plans();
+    // The captured licensed list, as the read profile needs, under the number
+    // this cycle's company carries.
+    let company = match &mode_tests::licensed_import_probe()[1].fixture {
+        Fixture::SyntheticXml(body) => body.replace("> 100004<", "> 1<"),
+        other => panic!("the company answer is synthetic: {other:?}"),
+    };
+    let mut plans = bank_build_plans()
+        .into_iter()
+        .map(|mut plan| {
+            if let Fixture::SyntheticXml(body) = &plan.fixture {
+                if body.contains("<LEDGER NAME=\"WR2 Sales\"") {
+                    let moved = body.replace(
+                        "<PARENT TYPE=\"String\">Sales Accounts</PARENT>",
+                        "<PARENT TYPE=\"String\">Bank Accounts</PARENT>",
+                    );
+                    plan.fixture = Fixture::SyntheticXml(moved);
+                }
+            }
+            plan
+        })
+        .collect::<Vec<_>>();
+    let rest = plans.split_off(THROUGH_BANK_NUMBERING);
+    plans.extend(super::cash_projection::tests::cash_book_plans(
+        CAPTURED_GUID,
+        "1",
+        &company,
+        balance,
+    ));
+    if built {
+        plans.extend(cycle[10..16].to_vec());
+        plans.extend(rest);
+    }
+    let simulator = SequenceSimulator::spawn(plans).expect("build plan");
+    let directory = tempfile::tempdir().unwrap();
+    let server = bank_server(directory.path(), simulator.address().port());
+    let deposit = json!([{"bridge_txn_id":"txn-001","date":"2026-09-01","voucher_type":"Contra",
+        "entries":[{"ledger":"WR2 Sales","amount":"12.50","side":"Dr"},
+                   {"ledger":"Cash","amount":"12.50","side":"Cr"}]}]);
+    let args = cash_answer_proposals(
+        directory.path(),
+        deposit,
+        "Cash",
+        "own_cash_box",
+        "WR2 Sales",
+    );
+    let response = server
+        .call_tool_response("build_import_xml", args)
+        .await
+        .value;
+    (server, response, directory)
+}
+
+/// The names `mcp-v0.7.0` reads a batch's ledger binding from: its
+/// `ImportLedgerLine` at the tag (`fcfb5ff6`, `agent_import.rs:479`). It
+/// reads no `cash_projection`, and its post refuses a batch where it finds no
+/// binding as built before one (`agent_import_post.rs:811` there).
+const MCP_V0_7_0_BINDING_NAMES: [&str; 3] = [
+    "ledger_identities_3",
+    "ledger_identities_2",
+    "ledger_identities",
+];
+
+/// The journal line of a deposit from the cash box holds its binding only
+/// under a name `mcp-v0.7.0` does not read, so that release refuses to post
+/// the deposit instead of posting it without checking its cash book. A Sales
+/// or release line stays one it reads (the `mcp_v0_7_0` floor tests).
+#[tokio::test]
+async fn a_deposit_from_the_cash_box_builds_on_the_projected_book_and_records_it() {
+    let (server, response, directory) = deposit_build("-20.00", true).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["voucher_count"], 1, "{response}");
+    let projection = &result["cash_projection"];
+    assert_eq!(projection["from"], "20260901", "{response}");
+    assert_eq!(projection["to"], "20270331", "{response}");
+    let low = &projection["lowest_day_end_after_deposits"][0];
+    assert_eq!(low["ledger"], "Cash", "{response}");
+    assert_eq!(low["balance"], "7.5", "{response}");
+    let saved = server
+        .latest_import_snapshot(result["batch_id"].as_str().unwrap())
+        .unwrap()
+        .unwrap()
+        .batch;
+    assert_eq!(
+        saved.binding.cash_projection().cloned(),
+        Some(super::cash_projection::tests::unmoved_book_record("-20.00"))
+    );
+    let journal =
+        std::fs::read_to_string(directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    let lines = journal.lines().collect::<Vec<_>>();
+    assert_eq!(lines.len(), 1, "{journal}");
+    let line: Value = serde_json::from_str(lines[0]).unwrap();
+    for name in MCP_V0_7_0_BINDING_NAMES {
+        assert!(line.get(name).is_none(), "{name}: {line}");
+    }
+    assert_eq!(
+        line["ledger_identities_4"].as_array().map(Vec::len),
+        saved.binding.ledgers().map(<[_]>::len),
+        "{line}"
+    );
+    assert!(line["cash_projection"].is_object(), "{line}");
+}
+
+#[tokio::test]
+async fn a_deposit_the_book_cannot_carry_writes_no_file() {
+    let (server, response, _directory) = deposit_build("-5.00", false).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["reason"], "cash_projection_negative", "{response}");
+    assert_eq!(result["date"], "20260901", "{response}");
+    assert_eq!(result["balance"], "-7.5", "{response}");
+    let files = fs::read_dir(server.imports_dir().unwrap())
+        .unwrap()
+        .filter(|entry| {
+            let name = entry.as_ref().unwrap().file_name();
+            name.to_string_lossy().ends_with(".xml")
+        })
+        .count();
+    assert_eq!(files, 0, "{response}");
+}
+
+#[tokio::test]
+async fn a_book_already_below_zero_is_refused_as_that() {
+    let (_server, response, _directory) = deposit_build("5.00", false).await;
+    let result = &response["structuredContent"]["result"];
+    assert_eq!(result["reason"], "cash_book_already_negative", "{response}");
+    assert_eq!(result["balance"], "-5", "{response}");
 }
 
 /// The requirement binds the voucher actually built: a record naming Cash for
@@ -3533,8 +3665,9 @@ fn outflow_skip_record() -> Value {
 
 fn guid_of(batch: &ImportLedgerLine, name: &str) -> String {
     batch
-        .ledger_identities
-        .iter()
+        .binding
+        .ledgers()
+        .into_iter()
         .flatten()
         .find(|bound| bound.name == name)
         .unwrap_or_else(|| panic!("{name} is not bound"))

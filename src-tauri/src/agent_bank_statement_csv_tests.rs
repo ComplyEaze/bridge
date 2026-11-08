@@ -9,7 +9,7 @@ const CLOSING: &str = "\"Closing Balance\",\"as on 31/03/2026 INR 11,249.50\"";
 const ROW_ONE: &str = "\"1\",\"02-04-2025 10:15:00\",\"02-04-2025\",\"UPI/SYNTHETIC PAYER\",\"SYN 000001\",\"1,500.00\",\"CR\",\"11,500.00\",\"CR\"";
 const ROW_TWO: &str = "\"2\",\"03-04-2025 09:00:01\",\"03-04-2025\",\"NEFT/SYNTHETIC SUPPLIER\",\"\",\"250.50\",\"DR\",\"11,249.50\",\"CR\"";
 
-const ACCOUNT_LINE: &str = "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"000000004321\"";
+const ACCOUNT_LINE: &str = "\"1 SYNTHETIC ROAD\",\"\",\"\",\"\",\"Account No.\",\"0000004321\"";
 const OPENING: &str = "10,000.00";
 const CLOSING_FIGURE: &str = "11,249.50";
 

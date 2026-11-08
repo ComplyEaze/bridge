@@ -1,0 +1,11 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. Each is the whole primary screen, 1920x1080, except the two s0-list-crop files, which are crops of the company list.
+shots/s0-before.png 420761 B 3d5bd6f722343369aa644e020006076a0ad6e0f0b5c81db37a62dbc64864dc42
+shots/s0-gateway.png 386776 B 0cf9d4448e917ce59d7470c8e74b537e0f144e67d1db4ed7486ffe4a48dc8554
+shots/s0-list-crop-1.png 66505 B e951b2b7678159452645b249557bec0af68113ae95371621cac06cfb146e72e1
+shots/s0-list-crop-2.png 4636 B 318a68c242d19c020f8e00d3da97fc5c83ca505c5022382e703d8c7cc70515e7
+shots/s6-after-unknown.png 383799 B 14e5fb9c9a7db98f7f9f2b11700fa52ce511d9158c21b938fad5b4e6b03b970f
+shots/s6r-before-repeat-2.png 345153 B 40836f82b154eab19486373c2bad3a842e52b9ee28dc97896af3f6e34ba4ab42
+shots/s6r-before-repeat.png 219704 B 6b464376024f25cca9b9405e653d8c4caa04ba9efc57d88e469a6e3aff55316b
+shots/s8-gateway.png 364846 B 081242e6e1f9b24ef45a240791d8264d104b884d8d9a044bb0137776d4e6f048
+shots/s9-after-shut.png 381548 B 707e6354c124db71c0b99ad268f3ad62ffa29727a5e54406841c944800cc2346
+shots/s9-shut-prompt.png 363694 B c4969c8358486ec1832c1bc64e60c9e2605510b64b2eb0d0b05abc572d2c66e3

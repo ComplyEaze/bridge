@@ -1,0 +1,2 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason:
+stage_a.py 6776 B 71fbfbfd1bc0298da0e8ac2861eeddf405e7ba19379de62e02070a417390fc1f (this stage script: its patterns name the lab paths)

@@ -1,0 +1,9 @@
+== tie s3-lo-p1-0331-a vs s2-snap-0331
+sum_billcl -26000.00 ledger_closing -26000.00 equal
+exit 0
+== tie s3-lo-p1-0331-b vs s2-snap-0331
+sum_billcl -26000.00 ledger_closing -26000.00 equal
+exit 0
+== tie s3-lo-p1-0731 vs s2-snap-0731
+sum_billcl -37000.00 ledger_closing -37000.00 equal
+exit 0

@@ -1,0 +1,8 @@
+== s7-lo-case lo
+bills 6 on_account 1 sum_billcl -26000.00 other_tags -
+exit 0
+s7-lo-case byte-equal to s3-lo-p1-0331-a
+== s7-lo-space lo
+bills 6 on_account 1 sum_billcl -26000.00 other_tags -
+exit 0
+s7-lo-space byte-equal to s3-lo-p1-0331-a

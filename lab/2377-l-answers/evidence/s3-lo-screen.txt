@@ -1,0 +1,35 @@
+== s3-lo-p1-0331-a lo
+bills 6 on_account 1 sum_billcl -26000.00 other_tags -
+exit 0
+== s3-lo-p1-0331-a screen
+screen rows 6 total pending 26000.00 Dr
+row 1 date 20250331 ref OB-1 opening 10000.00 Dr pending 10000.00 Dr due 31-Mar-25 overdue 365
+row 2 date 20250410 ref INV-1 opening 20000.00 Dr pending 12000.00 Dr due 10-Apr-25 overdue 355
+row 3 date 20250520 ref ADV-1 opening 3000.00 Cr pending 3000.00 Cr due 20-May-25 overdue 315
+row 4 date 20250715 ref INV-2 opening 5000.00 Dr pending 3000.00 Dr due 15-Jul-25 overdue 259
+row 5 date 20250901 ref CN-1 opening 600.00 Cr pending 600.00 Cr due 1-Sep-25 overdue 211
+row 6 date 20260331 ref On Account opening 4600.00 Dr pending 4600.00 Dr due - overdue -
+exit 0
+== s3-lo-p1-0331-b lo
+bills 6 on_account 1 sum_billcl -26000.00 other_tags -
+exit 0
+== s3-lo-p1-0331-b screen
+screen rows 6 total pending 26000.00 Dr
+row 1 date 20250331 ref OB-1 opening 10000.00 Dr pending 10000.00 Dr due 31-Mar-25 overdue 365
+row 2 date 20250410 ref INV-1 opening 20000.00 Dr pending 12000.00 Dr due 10-Apr-25 overdue 355
+row 3 date 20250520 ref ADV-1 opening 3000.00 Cr pending 3000.00 Cr due 20-May-25 overdue 315
+row 4 date 20250715 ref INV-2 opening 5000.00 Dr pending 3000.00 Dr due 15-Jul-25 overdue 259
+row 5 date 20250901 ref CN-1 opening 600.00 Cr pending 600.00 Cr due 1-Sep-25 overdue 211
+row 6 date 20260331 ref On Account opening 4600.00 Dr pending 4600.00 Dr due - overdue -
+exit 0
+== s3-lo-p1-0731 lo
+bills 5 on_account 1 sum_billcl -37000.00 other_tags -
+exit 0
+== s3-lo-p1-0731 screen
+screen rows 5 total pending 37000.00 Dr
+row 1 date 20250331 ref OB-1 opening 10000.00 Dr pending 10000.00 Dr due 31-Mar-25 overdue 122
+row 2 date 20250410 ref INV-1 opening 20000.00 Dr pending 20000.00 Dr due 10-Apr-25 overdue 112
+row 3 date 20250520 ref ADV-1 opening 3000.00 Cr pending 3000.00 Cr due 20-May-25 overdue 72
+row 4 date 20250715 ref INV-2 opening 5000.00 Dr pending 5000.00 Dr due 15-Jul-25 overdue 16
+row 5 date 20250731 ref On Account opening 5000.00 Dr pending 5000.00 Dr due - overdue -
+exit 0

@@ -1,0 +1,7 @@
+Pushed copies of the lab's own text, and the netstat reads, that differ from the files kept on the lab PC, with what changed (no other captured file is altered):
+evidence/s0-netstat.txt: original 8147 B sha256 c181680779fae62281514c5ed8c2512ed11113cbf6e6bb17e0f75a4c67d2f0e6 (kept on the lab PC); only the port-9001 LISTENING lines and the time and exit lines kept
+evidence/s9-netstat.txt: original 30889 B sha256 0871b901e2b727023a2227912a4bfd3ba0561fac69999cd83ae8fa6043ad4c46 (kept on the lab PC); only the port-9001 LISTENING lines and the time and exit lines kept
+notes.txt: original 7995 B sha256 9d5c1515cad1c8d474265f166b5cc7c9dce7ca395e28e44d8ab094c080fe2892 (kept on the lab PC); 1 x -> <PART_B_DIR>; 3 x -> stop; 1 x -> <desktop client>
+sendlog.txt: original 4653 B sha256 d8e0053ee86532e0cc0bcbab64c73ba00c1094899931174ed5d613939b904e81 (kept on the lab PC); 2 x -> stop
+send2377.py: original 2367 B sha256 446254e19474435d3810555b111a52f170478d32518b65d6887a107c57699cb3 (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop
+c2.ps1: original 1321 B sha256 a2b319f54baaabfc250321bbcea7c51e1f6d90b9946334c39e32c439f14b47bc (kept on the lab PC); 1 x -> <LAB_DIR>

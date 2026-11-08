@@ -1,0 +1,2 @@
+time: 2026-11-08T08:41:07Z
+folder C:\lab\2377-b\backup-1 exists: True; created 2026-11-08T08:38:57Z; entries: 0

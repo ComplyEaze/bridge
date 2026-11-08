@@ -1,0 +1,4 @@
+parties 120; admitted 120
+top1 bills 250 lo-top1.utf16le.xml 1196 c0abe3465c3c7b6c6d1cd71e724cad67c012bdcd6164777db8036b2d0c9fae81
+top2 bills 250 lo-top2.utf16le.xml 1196 b8ea9d9314e5477f837b527a587e4cf4386c332860ec52248db4ac22091c9240
+top3 bills 250 lo-top3.utf16le.xml 1196 06ee3de5a7024b05a5613b3d754b42cbd42da5acb5cff28ae23ea22a503840a8

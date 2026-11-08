@@ -1,0 +1,8 @@
+restore-plan.txt, written 2026-11-08T09:19:42Z
+Backup folder: C:\lab\2377-b\backup-1 (entries: 1)
+Backup file: TDBK1800_<company number>.001, 33477 B, sha256 1ca0ec4600368a0479d5d3cff8c235a7aca532565e93e39290575282b164cffe (equal to B3), written 2026-11-08T08:45:11Z (14:15 IST, 8 Nov 2026: the Restore list should show that backup)
+THE COMPANY: BRIDGE BILLTRAIL LAB, number <company number>, GUID 9ab5002c-e910-4242-83e4-a27cc490600b
+Restore Data Path: Tally's data folder, <Tally data folder>
+Source: Specify Path, C:\lab\2377-b\backup-1; select THE COMPANY only; screenshot before accepting
+Prompts expected, and the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ..." = Replace
+Check: backup sha256 equal to B3 and the folder holds that one file only

@@ -1,0 +1,17 @@
+amp absent 'L5 Amp & Co' len 11
+angle absent 'L5 Angle <A>' len 12
+dquote absent 'L5 Quote "Q"' len 12
+squote absent "L5 O'Neil" len 9
+dollar absent 'L5 Dollar $1' len 12
+dollar2 absent 'L5 $$Name' len 9
+hash absent 'L5 Hash #1' len 10
+colon absent 'L5 Colon: A' len 11
+dot absent 'L5 Dot Co.' len 10
+dash absent 'L5 Dash-Co' len 10
+comma absent 'L5 Comma, A' len 11
+paren absent 'L5 Paren (A)' len 12
+slash absent 'L5 Slash A/B' len 12
+nonascii absent 'L5 Café' len 7
+trail absent 'L5 Trail ' len 9
+l7 absent 'L7 Party' len 8
+income absent 'L5 Income' len 9

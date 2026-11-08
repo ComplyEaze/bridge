@@ -599,12 +599,12 @@ fn cash_entry(
         ));
     }
     let voucher_type = match answer {
-        CashAnswer::BusinessCash => VoucherType::Contra,
+        CashAnswer::BusinessCash | CashAnswer::OwnCashBox => VoucherType::Contra,
         CashAnswer::OwnerUse => VoucherType::Payment,
         CashAnswer::CustomerPaidIn | CashAnswer::OwnerBroughtIn => VoucherType::Receipt,
         CashAnswer::DontKnow if movement.outward() => VoucherType::Payment,
         CashAnswer::DontKnow => VoucherType::Receipt,
-        CashAnswer::PaidToSomeone | CashAnswer::OwnCashBox | CashAnswer::UnbookedCashSales => {
+        CashAnswer::PaidToSomeone | CashAnswer::UnbookedCashSales => {
             return Err(Refusal::at_row(
                 "cash_answer_not_built",
                 number,

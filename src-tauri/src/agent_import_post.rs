@@ -831,7 +831,7 @@ impl Server {
             // Decidable from the record alone, so refused after the file check
             // and before any Tally request (#239): a batch saved before Bridge
             // recorded its ledgers' GUIDs has nothing to check them against.
-            if line.ledger_identities.is_none() {
+            if line.binding.ledgers().is_none() {
                 return Err(BuildBindingRefusal::Unbound.code().to_string().into());
             }
             // Nor can a batch saved before Bridge recorded the ledgers its bank
@@ -1003,19 +1003,17 @@ impl Server {
             // The same ledgers must still carry the GUIDs the build bound them
             // to (#239): a name alone cannot tell a ledger renamed and replaced
             // under its old name between build and post.
-            admit_build_binding(line.ledger_identities.as_deref(), &ledger_binding).map_err(
-                |refusal| {
-                    if let BuildBindingRefusal::Changed(ledgers) = &refusal {
-                        // Before the list is cut to the few a refusal names.
-                        ledgers_changed = Some(in_batch_order(
-                            ledgers.clone(),
-                            &payload.vouchers,
-                            |ledger| ledger.as_str(),
-                        ));
-                    }
-                    ToolFailure::from(refusal.code().to_string())
-                },
-            )?;
+            admit_build_binding(line.binding.ledgers(), &ledger_binding).map_err(|refusal| {
+                if let BuildBindingRefusal::Changed(ledgers) = &refusal {
+                    // Before the list is cut to the few a refusal names.
+                    ledgers_changed = Some(in_batch_order(
+                        ledgers.clone(),
+                        &payload.vouchers,
+                        |ledger| ledger.as_str(),
+                    ));
+                }
+                ToolFailure::from(refusal.code().to_string())
+            })?;
             // The other ledger of each shown pair joins the binding, so the
             // approval and the queue's GUID check hold it too, and the queue
             // refuses a twin this dialog did not name.
@@ -1096,6 +1094,19 @@ impl Server {
                     cash_in_hand_refused = Some(refused);
                     return Err("cash_ledger_not_cash_in_hand".to_string().into());
                 }
+                // The book the deposit was projected on must still be the book
+                // (#1761). This asks before the dialog; the read is repeated
+                // after the answer, and from there to the send nothing watches
+                // the book.
+                if let Some(record) = line.binding.cash_projection() {
+                    let evidence =
+                        Box::pin(self.cash_book_unmoved(&identity, &company.name, record))
+                            .await
+                            .map_err(|failure| {
+                                ToolFailure::from(failure).with_prior_evidence(accumulated.clone())
+                            })?;
+                    accumulated = combine_evidence(accumulated.clone(), evidence);
+                }
                 Some(
                     crate::tally::agent_read_request::AgentReadRequest::parse(
                         native_group_snapshot_read(&company.name).into_xml(),
@@ -1107,7 +1118,7 @@ impl Server {
                 .as_deref()
                 .is_some_and(|recorded| !recorded.is_empty())
             {
-                // A cash-in-hand ledger rides only on a business-cash Contra,
+                // A cash-in-hand ledger rides only on a Contra out of cash,
                 // a bank voucher: one recorded without one would skip the
                 // check above, so the record is refused as inconsistent (#815).
                 return Err("import_post_admission_inconsistent".to_string().into());
@@ -1238,6 +1249,17 @@ impl Server {
                         .map_err(|failure| failure.with_prior_evidence(accumulated.clone()))?;
                         accumulated = combine_evidence(accumulated.clone(), evidence);
                         invoice_plan = Some(plan);
+                    }
+                    // And a deposit's cash book, with the approval unspent (#1761).
+                    if let Some(record) = line.binding.cash_projection() {
+                        let evidence =
+                            Box::pin(self.cash_book_unmoved(&identity, &company.name, record))
+                                .await
+                                .map_err(|failure| {
+                                    ToolFailure::from(failure)
+                                        .with_prior_evidence(accumulated.clone())
+                                })?;
+                        accumulated = combine_evidence(accumulated.clone(), evidence);
                     }
                     let (taken, request, held) =
                         self.post_approvals.take_for_dispatch(batch_id, &binding)?;

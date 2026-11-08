@@ -40,7 +40,7 @@ fn identical_batch() -> (ImportLedgerLine, Vec<ReadVoucher>) {
         })
         .collect();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,

@@ -929,6 +929,34 @@ fn a_journal_line_with_a_signed_amount_is_shown_as_invalid() {
     assert!(waited);
 }
 
+/// A line whose ledger binding disagrees with its cash projection is refused by its own code
+/// (#1761), and the report shows it as it shows an invalid line, naming that line.
+#[test]
+fn the_report_names_the_line_of_a_binding_that_disagrees_with_its_projection() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("agent-import-ledger.jsonl");
+    let first = String::from_utf8(journal(false)).unwrap();
+    let with_id =
+        |id: &str| first.replacen("\"batch_id\":\"b1\"", &format!("\"batch_id\":\"{id}\""), 1);
+    assert_eq!(first.matches("\"vouchers\":").count(), 1, "{first}");
+    let projection = format!(
+        "\"cash_projection\":{{\"ledgers\":[\"Cash\"],\"from\":\"20260901\",\
+         \"to\":\"20270331\",\"book_sha256\":\"{}\"}},\"vouchers\":",
+        "0".repeat(64)
+    );
+    let bad = with_id("b2").replacen("\"vouchers\":", &projection, 1);
+    let journal_text = format!("{first}{bad}{}", with_id("b3"));
+    assert_eq!(
+        super::super::ledger::settlement(std::io::Cursor::new(journal_text.as_bytes())).map(drop),
+        Err(super::super::IMPORT_LEDGER_BINDING_MISMATCH.to_string())
+    );
+    write(&path, journal_text.as_bytes());
+    assert_eq!(
+        read_journal_at(directory.path(), || {}),
+        (Journal::NotRead(JOURNAL_INVALID), Some(2))
+    );
+}
+
 /// The report names the line it refused, and only the report does (#1872). A bad amount sits
 /// between two good lines; the field is the 1-based line, and a journal that reads has none.
 /// A half-written last line is named too: it is the line after the last whole one.

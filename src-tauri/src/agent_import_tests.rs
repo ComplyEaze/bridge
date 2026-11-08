@@ -481,7 +481,7 @@ fn concurrent_verifications_publish_one_proof_and_status_under_one_admission() {
     };
     let server = Server::new(settings.clone());
     let initial = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -607,7 +607,7 @@ fn the_journal_decides_between_an_older_builds_proof_and_a_saved_one() {
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -745,7 +745,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -851,7 +851,7 @@ fn duplicate_detection_uses_stable_voucher_identity_independently_of_remote_id()
 fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -943,7 +943,7 @@ fn verification_masks_entry_diffs_and_duplicate_fingerprints_before_release() {
 fn verification_reports_absence_divergence_and_duplicate_fingerprints() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1121,7 +1121,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
     });
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1159,7 +1159,7 @@ fn unwritable_ledger_path_removes_the_written_import_file() {
 fn unrelated_window_duplicates_do_not_block_a_verified_batch() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1395,7 +1395,7 @@ fn the_markdown_proof_fences_the_company_name() {
 fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1491,7 +1491,7 @@ fn a_cancelled_copy_of_a_batch_marker_is_refused_before_the_duplicate_check() {
 fn fingerprint_only_verification_requires_a_post_mark_voucher() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1565,7 +1565,7 @@ fn fingerprint_only_verification_requires_a_post_mark_voucher() {
 fn content_only_box(cancelled: bool, optional: bool) -> String {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1659,7 +1659,7 @@ fn fingerprint_fallback_consumes_an_observed_voucher_once_per_batch() {
     let mut duplicate = input.vouchers[0].clone();
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1726,7 +1726,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
     let mut duplicate = input.vouchers[0].clone();
     duplicate.bridge_txn_id = "txn-duplicate".to_string();
     let mut line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1800,7 +1800,7 @@ fn tagged_matches_are_reserved_and_consumed_independently_of_batch_order() {
 fn narration_tag_verification_requires_a_post_mark_voucher() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1870,7 +1870,7 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     }
     payload_verdict(&input).expect("leading zeros satisfy the input contract");
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -1970,7 +1970,7 @@ fn a_batch_voucher_is_matched_by_the_canonical_form_of_its_amounts() {
 fn verified_import_vouchers_require_observed_effective_accounting_flags() {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -4151,7 +4151,7 @@ async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads(
         audit_enabled: false,
     });
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,
@@ -5766,7 +5766,7 @@ fn shipped_write_path_round_trips_a_party_ledger_crlf() {
 fn divergent_verification() -> Value {
     let input = admitted_payload();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,

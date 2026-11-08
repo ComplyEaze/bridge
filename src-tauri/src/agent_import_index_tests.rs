@@ -41,7 +41,7 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
         })
         .collect::<Vec<_>>();
     let line = ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
         on_account_approved: Some(Vec::new()),
         statement: None,

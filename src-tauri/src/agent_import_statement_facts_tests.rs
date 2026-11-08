@@ -195,7 +195,7 @@ impl Build {
         .unwrap();
         line.amends_batch_id = self.amends.map(batch_id);
         line.endpoint_origin = self.endpoint.map(str::to_string);
-        line.ledger_identities = self.identities.as_ref().map(|identities| {
+        line.binding = LedgerBinding::bound(self.identities.as_ref().map(|identities| {
             identities
                 .iter()
                 .map(|(name, guid)| BoundLedger {
@@ -203,7 +203,7 @@ impl Build {
                     guid: (*guid).into(),
                 })
                 .collect()
-        });
+        }));
         line.statement = self.statement.as_ref().map(statement_record);
         line.withdrawn_skips = (!self.withdrawn.is_empty()).then(|| self.withdrawn.clone());
         if self.placed {
@@ -2424,7 +2424,7 @@ fn the_binding_is_written_as_ledger_identities_3_only() {
     assert!(written.get("ledger_identities").is_none(), "{written}");
     assert!(written.get("statement").is_none(), "{written}");
     let reread: ImportLedgerLine = serde_json::from_value(written).unwrap();
-    assert_eq!(reread.ledger_identities, line.ledger_identities);
+    assert_eq!(reread.binding, line.binding);
 }
 
 #[test]
@@ -2439,10 +2439,7 @@ fn a_binding_written_under_an_earlier_name_is_still_read() {
             .unwrap();
         value[earlier] = binding;
         let reread: ImportLedgerLine = serde_json::from_value(value).unwrap();
-        assert_eq!(
-            reread.ledger_identities, line.ledger_identities,
-            "{earlier}"
-        );
+        assert_eq!(reread.binding, line.binding, "{earlier}");
     }
 }
 

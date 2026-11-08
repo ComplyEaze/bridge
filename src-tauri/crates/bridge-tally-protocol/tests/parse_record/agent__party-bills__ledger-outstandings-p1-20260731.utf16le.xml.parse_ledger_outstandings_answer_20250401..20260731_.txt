@@ -1,0 +1,94 @@
+# fixture: tests/fixtures/agent/party-bills/ledger-outstandings-p1-20260731.utf16le.xml
+# parser: parse_ledger_outstandings_answer(20250401..20260731)
+# source: captured
+Ok(PartyBillsAnswer {
+    bills: [
+        PartyBill {
+            reference: Bill(
+                "OB-1",
+            ),
+            bill_date: TallyDate(
+                "20250331",
+            ),
+            closing: ExactDecimal(
+                "-10000.00",
+            ),
+            due_date: Some(
+                TallyDate(
+                    "20250331",
+                ),
+            ),
+            overdue_days: Some(
+                122,
+            ),
+        },
+        PartyBill {
+            reference: Bill(
+                "INV-1",
+            ),
+            bill_date: TallyDate(
+                "20250410",
+            ),
+            closing: ExactDecimal(
+                "-20000.00",
+            ),
+            due_date: Some(
+                TallyDate(
+                    "20250410",
+                ),
+            ),
+            overdue_days: Some(
+                112,
+            ),
+        },
+        PartyBill {
+            reference: Bill(
+                "ADV-1",
+            ),
+            bill_date: TallyDate(
+                "20250520",
+            ),
+            closing: ExactDecimal(
+                "3000.00",
+            ),
+            due_date: Some(
+                TallyDate(
+                    "20250520",
+                ),
+            ),
+            overdue_days: Some(
+                72,
+            ),
+        },
+        PartyBill {
+            reference: Bill(
+                "INV-2",
+            ),
+            bill_date: TallyDate(
+                "20250715",
+            ),
+            closing: ExactDecimal(
+                "-5000.00",
+            ),
+            due_date: Some(
+                TallyDate(
+                    "20250715",
+                ),
+            ),
+            overdue_days: Some(
+                16,
+            ),
+        },
+        PartyBill {
+            reference: OnAccount,
+            bill_date: TallyDate(
+                "20250731",
+            ),
+            closing: ExactDecimal(
+                "-5000.00",
+            ),
+            due_date: None,
+            overdue_days: None,
+        },
+    ],
+})

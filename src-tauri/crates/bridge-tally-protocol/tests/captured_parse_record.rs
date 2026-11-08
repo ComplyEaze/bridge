@@ -30,6 +30,7 @@ use bridge_tally_protocol::native_masters::{parse_native_masters, NativeMasterKi
 use bridge_tally_protocol::native_month_register::parse_native_month_register;
 use bridge_tally_protocol::native_negative_ledgers::parse_native_negative_ledgers;
 use bridge_tally_protocol::native_negative_stock::parse_native_negative_stock;
+use bridge_tally_protocol::native_outstandings::parse_ledger_outstandings_answer;
 use bridge_tally_protocol::native_outstandings::{
     parse_company_currency, parse_company_currency_name,
     parse_compliance_ledger_snapshot_for_company, parse_currency_master_list,
@@ -250,6 +251,14 @@ fn bills(text: &str, books_from: &str, as_of: &str) -> String {
     ))
 }
 
+fn party_bills(text: &str, books_from: &str, as_of: &str) -> String {
+    typed(parse_ledger_outstandings_answer(
+        text,
+        &date(books_from),
+        &date(as_of),
+    ))
+}
+
 fn cash_flow(text: &str, from: &str, to: &str) -> String {
     let window = WholeMonthWindow::new(DateBoundaryProfile::ModeAgnostic, date(from), date(to))
         .expect("a whole-month window copied from a test");
@@ -424,6 +433,67 @@ fn masters(kind: NativeMasterKind, text: &str, guid: &str) -> String {
 }
 
 const ROWS: &[Row] = &[
+    // src/native_outstandings/party_bills_tests.rs (#2377): one synthetic book's answers.
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-p1-20260331.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20250401..20260331)",
+        parse: |_, text| party_bills(text, "20250401", "20260331"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-p1-20260731.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20250401..20260731)",
+        parse: |_, text| party_bills(text, "20250401", "20260731"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-unknown-party.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20250401..20260331)",
+        parse: |_, text| party_bills(text, "20250401", "20260331"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-ampersand.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20250401..20260331)",
+        parse: |_, text| party_bills(text, "20250401", "20260331"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-trailing-space.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20250401..20260331)",
+        parse: |_, text| party_bills(text, "20250401", "20260331"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-outstandings-two-on-account.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_ledger_outstandings_answer(20250401..20260331)",
+        parse: |_, text| party_bills(text, "20250401", "20260331"),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-p1-20260331.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-p1-20260731.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-ampersand.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
+    Row {
+        fixture: "tests/fixtures/agent/party-bills/ledger-snapshot-trailing-space.utf16le.xml",
+        source: Source::Captured,
+        parser: "parse_native_ledger_snapshot",
+        parse: |_, text| typed(parse_native_ledger_snapshot(text)),
+    },
     // tests/company_ledger_count.rs
     Row {
         fixture: "tests/fixtures/agent/company-ledger-count.utf16le.xml",

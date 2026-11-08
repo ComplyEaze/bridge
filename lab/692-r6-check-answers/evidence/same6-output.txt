@@ -1,0 +1,19 @@
+Step 1, w4 against w2:
+  1a: r1-w4-stock-summary (962 B, rows 2, rows with a quantity and no value 0) against r1-w2-stock-summary (962 B, rows 2, without a value 0): top-level elements 4 and 4; element for element equal: yes
+  1b: r1-w4-negative-stock (46 B, rows 0, rows with a quantity and no value 0) against r1-w2-negative-stock (46 B, rows 0, without a value 0): top-level elements 0 and 0; element for element equal: yes
+Step 2, w5 against w2:
+  2a: r5-w5-stock-summary (962 B, rows 2, rows with a quantity and no value 0) against r1-w2-stock-summary (962 B, rows 2, without a value 0): top-level elements 4 and 4; element for element equal: yes
+  2b: r5-w5-negative-stock (46 B, rows 0, rows with a quantity and no value 0) against r1-w2-negative-stock (46 B, rows 0, without a value 0): top-level elements 0 and 0; element for element equal: yes
+Step 3, R3's row without a value:
+  r3-w2-stock-summary (1394 B): rows 3; rows with a quantity and no value 1; EXPECT 1: met
+  r3-w2-negative-stock (482 B), for the record: rows 1; rows with a quantity and no value 1
+  r1-w1-stock-summary (966 B), for the record: rows 2; rows with a quantity and no value 0
+  r1-w3-stock-summary (962 B), for the record: rows 2; rows with a quantity and no value 0
+Step 4, the requests against the shipped envelope:
+  company: one name in all five requests (15 characters escaped)
+  w1-stock-summary (BOM yes, 377 characters) against the shipped request as of 20250331 (period 20240401 to 20250331): equal: yes [the sheet's step 4]
+  w2-stock-summary (BOM yes, 377 characters) against the shipped request as of 20260331 (period 20250401 to 20260331): equal: yes [the sheet's step 4]
+  w3-stock-summary (BOM yes, 377 characters) against the shipped request as of 20250930 (period 20250401 to 20250930): equal: yes [the sheet's step 4]
+  w4-stock-summary (BOM yes, 377 characters) against the shipped request as of 20260331 (period 20250401 to 20260331): equal: NO [for the record (the sheet expects a different start)]
+  w5-stock-summary (BOM yes, 377 characters) against the shipped request as of 20260331 (period 20250401 to 20260331): equal: NO [for the record (the sheet expects a different start)]
+Summary: step 1 equal; step 2 equal; step 3 1 (EXPECT 1)

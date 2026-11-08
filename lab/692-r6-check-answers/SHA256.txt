@@ -1,0 +1,25 @@
+# What this row read (sha256  bytes  name)
+993f460cf1f8602045bad0167dd74d484652aed333f8c4548071dee8c99c27e5  5533  sheet lab/692-r6/RUN-SHEET.md
+5ca75217dddff3e8bcf0f5a8fc50c993a28d768ab126d5d6941d83a8a634bb3c  966  answers/r1-w1-stock-summary.utf16le.xml (kept on the lab PC)
+d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  962  answers/r1-w2-stock-summary.utf16le.xml (kept on the lab PC)
+8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3  46  answers/r1-w2-negative-stock.utf16le.xml (kept on the lab PC)
+d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  962  answers/r1-w3-stock-summary.utf16le.xml (kept on the lab PC)
+d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  962  answers/r1-w4-stock-summary.utf16le.xml (kept on the lab PC)
+8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3  46  answers/r1-w4-negative-stock.utf16le.xml (kept on the lab PC)
+d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  962  answers/r5-w5-stock-summary.utf16le.xml (kept on the lab PC)
+8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3  46  answers/r5-w5-negative-stock.utf16le.xml (kept on the lab PC)
+d3aa11ff3dd19c66dd25d5af60bc5c4e89f7340a2b074d4f858f29c7176cb5c6  1394  answers/r3-w2-stock-summary.utf16le.xml (kept on the lab PC)
+6c318484ea3a0375d6a6ec11e5c2ee9c5b89a99e1b637d5a4abd49336e7aa2d1  482  answers/r3-w2-negative-stock.utf16le.xml (kept on the lab PC)
+4858719b75654c13019f7d1fb2f95c9f6b9d87d1f7c96107b714b9e18ea536ef  756  lab/692-opening-stock/requests/w1-stock-summary.utf16le.xml (09287f70)
+0e6394a6e7e197e2761dc7120324560d66dd7240fb51b00fe69bd7306ded4a12  756  lab/692-opening-stock/requests/w2-stock-summary.utf16le.xml (09287f70)
+b4c18c44f657dc861b7d2b436e2f5f79957bafade7c717d2883d34876fcad02d  756  lab/692-opening-stock/requests/w3-stock-summary.utf16le.xml (09287f70)
+bff533b3bae1258348859f76606084151b1ba364fff40704e076b5c2ba8be751  756  lab/692-opening-stock/requests/w4-stock-summary.utf16le.xml (09287f70)
+7385c48735a46035611c09f0a1d5621ce501c8d2662c9afa9ff3f46939539b7e  756  lab/692-opening-stock/requests/w5-stock-summary.utf16le.xml (09287f70)
+# What this branch commits (sha256  bytes  file)
+705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da  8  .gitattributes
+15c8404325ce11fbefb4612bae2e321b6d052b4e7df66129ff8e58fc7a9299fd  4304  RESULTS.md
+ef1fdac1171eb43d6a8a32b4a228e88707f5727a08f6c90e528964d4024d26f9  1114  check0.py
+39f24042c439bbcbe6c88b29a12574a643b0fd9c7b601de13cedfb41740bf6ec  1206  notes.txt
+3c6c7a3330e65b8303f4dae30a648f1cd41aeb3c56f3c0b7cfcd0366ad8c5621  5794  same6.py
+43c25426cb1928a83775287d7da5e24f4a6d6f37019fa44edd5ef3e98cc7c577  2247  evidence/same6-output.txt
+8496642d6a2418abcde9158322b2ab5dab306074848bdc092294203fd653d6a1  2086  evidence/step0-check.txt

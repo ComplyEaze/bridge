@@ -1,0 +1,11 @@
+answers/r1-w1-stock-summary.utf16le.xml: 966 B 5ca75217dddff3e8bcf0f5a8fc50c993a28d768ab126d5d6941d83a8a634bb3c  listed (966, '5ca75217dddff3e8bcf0f5a8fc50c993a28d768ab126d5d6941d83a8a634bb3c')  equal: yes
+answers/r1-w2-stock-summary.utf16le.xml: 962 B d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  listed (962, 'd981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a')  equal: yes
+answers/r1-w2-negative-stock.utf16le.xml: 46 B 8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3  listed (46, '8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3')  equal: yes
+answers/r1-w3-stock-summary.utf16le.xml: 962 B d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  listed (962, 'd981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a')  equal: yes
+answers/r1-w4-stock-summary.utf16le.xml: 962 B d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  listed (962, 'd981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a')  equal: yes
+answers/r1-w4-negative-stock.utf16le.xml: 46 B 8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3  listed (46, '8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3')  equal: yes
+answers/r5-w5-stock-summary.utf16le.xml: 962 B d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  listed (962, 'd981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a')  equal: yes
+answers/r5-w5-negative-stock.utf16le.xml: 46 B 8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3  listed (46, '8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3')  equal: yes
+answers/r3-w2-stock-summary.utf16le.xml: 1394 B d3aa11ff3dd19c66dd25d5af60bc5c4e89f7340a2b074d4f858f29c7176cb5c6  listed (1394, 'd3aa11ff3dd19c66dd25d5af60bc5c4e89f7340a2b074d4f858f29c7176cb5c6')  equal: yes
+answers/r3-w2-negative-stock.utf16le.xml: 482 B 6c318484ea3a0375d6a6ec11e5c2ee9c5b89a99e1b637d5a4abd49336e7aa2d1  listed (482, '6c318484ea3a0375d6a6ec11e5c2ee9c5b89a99e1b637d5a4abd49336e7aa2d1')  equal: yes
+10 files, 10 equal, 0 not

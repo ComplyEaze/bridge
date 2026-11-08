@@ -22,6 +22,12 @@ fn bill_json(bill: &PartyBill) -> Value {
     })
 }
 
+/// The resolved spelling as the name sent, or `party_name_not_admitted`.
+fn admitted_party(party: &str) -> Result<LedgerScopeName, ToolFailure> {
+    LedgerScopeName::new(party)
+        .map_err(|_| ToolFailure::from("party_name_not_admitted".to_string()))
+}
+
 impl Server {
     /// The `open_bills` detail. Its arguments are checked before any read; then the
     /// company's marks, the party resolved from the ledger catalogue, the paired
@@ -61,18 +67,15 @@ impl Server {
             .await
             .map_err(|failure| late(failure, &evidence))?;
         evidence = combine_evidence(evidence, read);
-        let (_, party) =
+        let (resolved, party) =
             resolve_catalogue_ledger_or_refuse(&catalogue, party_argument, self.settings.redaction)
                 .map_err(|failure| late(failure, &evidence))?;
-        // The book's own name is what is sent, and only a name `LedgerScopeName`
-        // admits (DESIGN deviation of 8 Nov 2026). A trailing space, which Tally
-        // trims on create, is among its refusals.
-        let scope = LedgerScopeName::new(&party).map_err(|_| {
-            late(
-                ToolFailure::from("party_name_not_admitted".to_string()),
-                &evidence,
-            )
-        })?;
+        // What is sent is the spelling the ledger's voucher rows carry, which the
+        // resolver returns, and only a name `LedgerScopeName` admits (DESIGN
+        // deviation of 8 Nov 2026). A trailing space, which Tally trims on
+        // create, is among its refusals. A row spelling the snapshot does not
+        // carry fails closed as `party_not_in_book`.
+        let scope = admitted_party(&party).map_err(|failure| late(failure, &evidence))?;
         let load = self
             .runtime
             .fetch_party_bills(self.tally_config(), &identity, scope, to.clone())
@@ -102,9 +105,9 @@ impl Server {
             "basis": "tally_ledger_outstandings",
             "detail": OPEN_BILLS_DETAIL,
             "party": redact_value(party_name_value(party.clone()), self.settings.redaction),
+            "ledger_match": ledger_match_json(&resolved, &party, self.settings.redaction),
             "as_of": to.as_str(),
             "books_from": load.books_from.as_str(),
-            "no_open_bills": load.read.has_no_open_bills(),
             "bills": bills,
             "on_account": on_account,
             "checks": {
@@ -116,7 +119,8 @@ impl Server {
                 "Read through Tally's Ledger Outstandings for one party: the bills Tally lists for that ledger at as_of, each with its balance at that date, a debit as a negative amount",
                 "Told only when the bills, On Account rows included, sum to the ledger's closing balance at as_of, read from the books' first day; a party whose bills do not is refused, never answered in part",
                 "An On Account row is told by its reference text, which Tally writes as On Account; a real bill given that reference would be read as On Account (not measured)",
-                "Measured on one synthetic book on TallyPrime 7.2: a receivable party at two dates and parties with one bill each; a payable party, a party with bill-wise off, a foreign-currency ledger and a party with no open bills were not measured",
+                "Measured on one synthetic book on TallyPrime 7.2: a receivable party at two dates and parties with one bill each; a payable party, a party with bill-wise off and a foreign-currency ledger were not measured",
+                "What Tally answers for a party with no open bills is not measured, so an answer with no rows is refused (party_bills_no_rows_not_established), never told as no open bills",
                 "The party name sent is the book's own ledger name, and only one of ASCII letters, digits and single inner spaces; any other name is refused before anything is sent",
             ],
         });
@@ -131,3 +135,7 @@ impl Server {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "agent_party_bills_tests.rs"]
+mod tests;

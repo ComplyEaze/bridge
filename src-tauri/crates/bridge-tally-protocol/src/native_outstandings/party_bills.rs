@@ -101,51 +101,36 @@ impl PartyBillsAnswer {
                 ledger_closing: ledger_closing.clone(),
             });
         }
+        // What Tally answers for a bill-wise party with no open bills is not
+        // measured, so an answer with no rows is not told as one (P1).
         if self.bills.is_empty() {
-            return Ok(PartyBillsRead(Tie::NoOpenBills));
+            return Err(PartyBillsRefusal::NoRowsNotEstablished);
         }
         let (on_account, bills) = self
             .bills
             .into_iter()
             .partition(|bill| bill.reference == PartyBillReference::OnAccount);
-        Ok(PartyBillsRead(Tie::Tied { bills, on_account }))
+        Ok(PartyBillsRead { bills, on_account })
     }
 }
 
-/// A party's open bills that tie to its ledger. Only [`PartyBillsAnswer::tie`]
-/// makes one.
+/// A party's open bills that tie to its ledger, with at least one row. Only
+/// [`PartyBillsAnswer::tie`] makes one.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PartyBillsRead(Tie);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Tie {
-    Tied {
-        bills: Vec<PartyBill>,
-        on_account: Vec<PartyBill>,
-    },
-    NoOpenBills,
+pub struct PartyBillsRead {
+    bills: Vec<PartyBill>,
+    on_account: Vec<PartyBill>,
 }
 
 impl PartyBillsRead {
-    /// The named bills; empty for [`Self::has_no_open_bills`].
+    /// The named bills.
     pub fn bills(&self) -> &[PartyBill] {
-        match &self.0 {
-            Tie::Tied { bills, .. } => bills,
-            Tie::NoOpenBills => &[],
-        }
+        &self.bills
     }
 
     /// The On Account rows.
     pub fn on_account(&self) -> &[PartyBill] {
-        match &self.0 {
-            Tie::Tied { on_account, .. } => on_account,
-            Tie::NoOpenBills => &[],
-        }
-    }
-
-    /// No row at all, and a ledger that closes at zero.
-    pub fn has_no_open_bills(&self) -> bool {
-        matches!(self.0, Tie::NoOpenBills)
+        &self.on_account
     }
 }
 
@@ -161,6 +146,9 @@ pub enum PartyBillsRefusal {
     /// The snapshot's closing balance was empty.
     LedgerClosingNotRead,
     ArithmeticOverflow,
+    /// No row, against a ledger that closes at zero: the answer for a party
+    /// with no open bills is not yet captured, so this one is not told.
+    NoRowsNotEstablished,
 }
 
 impl PartyBillsRefusal {
@@ -169,6 +157,7 @@ impl PartyBillsRefusal {
             Self::Untied { .. } => "party_bills_untied",
             Self::LedgerClosingNotRead => "party_ledger_closing_not_read",
             Self::ArithmeticOverflow => "party_bills_overflow",
+            Self::NoRowsNotEstablished => "party_bills_no_rows_not_established",
         }
     }
 }

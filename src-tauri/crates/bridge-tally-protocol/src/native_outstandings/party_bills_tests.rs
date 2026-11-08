@@ -101,7 +101,6 @@ fn a_party_s_bills_tie_to_its_ledger_closing_at_two_dates() {
         let read = parsed
             .tie(closing(snapshot, "Lab Party P1").as_ref())
             .expect("ties");
-        assert!(!read.has_no_open_bills());
         let both = [read.bills(), read.on_account()].concat();
         assert!(total(&both).numeric_eq(&amount(expected)), "{lo}");
     }
@@ -172,21 +171,18 @@ fn an_unknown_party_s_empty_body_never_parses_as_zero_bills() {
     );
 }
 
+/// Review P2-3: what Tally answers for a bill-wise party with no open bills is
+/// not captured, so no answer shape is asserted here. Whatever parses to no
+/// rows is refused against a zero closing, and is untied against any other.
 #[test]
-fn an_envelope_with_no_rows_is_no_open_bills_only_for_a_zero_closing() {
-    let empty = parse_ledger_outstandings_answer(
-        "<ENVELOPE>\n</ENVELOPE>",
-        &books_from(),
-        &date("20260331"),
-    )
-    .expect("an envelope parses");
-    assert!(empty
-        .clone()
-        .tie(Some(&ExactDecimal::zero()))
-        .expect("zero closing")
-        .has_no_open_bills());
+fn no_rows_are_never_told_as_no_open_bills() {
+    let none = || PartyBillsAnswer { bills: Vec::new() };
     assert_eq!(
-        empty.tie(Some(&amount("-100.00"))),
+        none().tie(Some(&ExactDecimal::zero())),
+        Err(PartyBillsRefusal::NoRowsNotEstablished)
+    );
+    assert_eq!(
+        none().tie(Some(&amount("-100.00"))),
         Err(PartyBillsRefusal::Untied {
             bills_total: ExactDecimal::zero(),
             ledger_closing: amount("-100.00"),

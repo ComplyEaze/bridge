@@ -117,3 +117,7 @@ Part C of S7 is running. Its twelve-month sums replace this table's derived buil
 - The refusal codes' final names, and the remedy text.
 - Whether the index also serves the post-check (`folded_number`, `agent_import_verification.rs`). It reads the same rows.
 - The pair ruling (section 3).
+
+## Deviation, 8 Nov 2026
+
+Section 1 lists the row's `ALTERID` in the index. Y0's fetch list carries none, so that field needs the one-field change of row L3a (`lab/2162-ix/ROW.md`). Freshness rests on the company marks, not on row AlterIDs, so the rest stands.

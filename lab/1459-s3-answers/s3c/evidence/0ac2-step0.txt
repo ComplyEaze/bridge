@@ -1,0 +1,9 @@
+0ac2 2026-11-06T08:13Z (after the owner's change and restart). the recorded grant held (its yes on 6ab7ce11 about 08:12Z; grant to 20:00 IST 6 Nov = 14:30Z).
+Windows: Microsoft Windows NT 10.0.19045.0, DisplayVersion 22H2 (as 0ac).
+C1: BRIDGE CORPUS DENSE loaded alone by the owner after the restart (nothing keyed by the lab).
+C2 screenshot (shots\0ac2-screen.png, 117776 B, sha256 308b7f01d14f4a4b34cc677c4cf135d0babcd385bc1ac0c57b6c37fe11bde1ce, 08:13:31Z, whole screen 1536x864, Tally already in front, nothing keyed or clicked): Gateway of Tally, TallyPrime SILVER, one company BRIDGE CORPUS DENSE, current period 1-Apr-25 to 31-Mar-26, current date Tuesday, 31-Mar-2026, date of last entry 31-Mar-26; no dialog, no half-entered screen; no Educational mode. Tally windowed.
+C2 a: tasklist (cmd.exe, 2>&1): one line tally.exe, pid 12672; exit 0 (0ac2-tasklist.txt).
+C2 b: netstat -ano (cmd.exe, 2>&1): TCP 0.0.0.0:9001 LISTENING 12672 and [::]:9001 LISTENING 12672; 35 LISTENING lines in all; exit 0 (0ac2-netstat-raw.txt, kept local).
+C2 c: curl.exe GET /status at 08:13:48Z: exit 0, status 200, 51 bytes, body sha256 65541597... (equal to 0ac's) (0ac2-status.txt, 0ac2-status.body).
+C2 d: at 0ec.
+Result: passed.

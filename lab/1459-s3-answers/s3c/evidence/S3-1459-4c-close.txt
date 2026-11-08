@@ -1,0 +1,16 @@
+﻿S3-1459-4c close, 2026-11-08 (UTC times).
+06:58:28Z bridge_mcp.exe (Get-CimInstance Win32_Process): only 14208 and 6468, parent 17400 (<desktop client>.exe), both ExecutablePath = the 0.7.0 extension's bin\x86_64-pc-windows-msvc\bridge_mcp.exe under LA\<desktop client>-Data\<family-lower>\<desktop client> Extensions\local.mcpb.complyeaze-contributors.bridge-tally, sha256 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d. EXPECT met.
+06:58:47Z pre-shut screen (DPI-aware capture, full 1920x1080 frame): Tally Gateway, BRIDGE CORPUS DENSE the one company, current date Tuesday, 31-Mar-2026 (as at step 0; this item did not change it), no dialog.
+C10 shut, about 06:59Z, by Tally's own menu: click K: Company on the menu band; click "SHut" (shown with Ctrl+F3); the Shut Company field held BRIDGE CORPUS DENSE; Enter. Tally then showed Select Company with no company loaded; no prompt. Keys pressed in Tally by the lab: Enter, once (the C10 act).
+06:59:49Z no-company screen captured (full frame). The Select Company screen does not show the current date; the date was 31-Mar-2026 just before the shut.
+C2 a (about 06:59:55Z): cmd.exe tasklist /FI "IMAGENAME eq tally.exe" /FO CSV /NH 2>&1, exit 0: one line, tally.exe 12672.
+C2 b: cmd.exe netstat -ano 2>&1, exit 0, 287 lines: TCP 0.0.0.0:9001 and [::]:9001 LISTENING 12672; 34 other LISTENING lines.
+07:00:09.80Z..07:00:09.88Z GET /status (curl.exe) to 127.0.0.1:9001: exit 0, 200, 51 B, CONTENT-LENGTH 51. No XML request sent after the shut.
+Left as is: the 0.7.0 extension installed; Terms, posting and tax audit as the owner left them (posting off); port 9001. No earlier extension put back by this sheet; the owner's word on that not yet taken. The lab master-build server entry stays off (the owner may turn it back on after the sitting).
+Files:
+S3-1459-4c-tasklist.txt 149 B c3ca6b343c7e353cb7c0d975f52c47d18433ff503d655a61de7788f502f91a74
+S3-1459-4c-netstat.txt 21446 B 72a1ae40bc332130af5789d521ed819cfeb1e16a265ebd348ab3f36a5473c4b0
+S3-1459-4c-status.txt 51 B 655415972de8e54d65743a548e00c2218810683fc0c4cab76cf6ea97ff1d3800
+S3-1459-4c-status.headers.txt 130 B 103743ec081980e5be713e310cf850a1997b40d82ce213812df437627d5d9827
+shots (local only): S3-1459-4c-before-shut.png 299642 B 5e3b04ecab04c7c84c104f2f19f091f88bb7b3a8f60b6115f86c5ec35e9d3f82; S3-1459-4c-no-company.png 322543 B 86a58a57d2a0b7272692c85fcb2fd4e90467c82f9f790f3383b415678de432db
+EXPECT met (all lines).

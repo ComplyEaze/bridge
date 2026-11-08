@@ -1,0 +1,6 @@
+﻿2026-11-08T07:00:02.8073785Z cmd: netstat -ano 2>&1  exit 0
+Active Connections
+  Proto  Local Address          Foreign Address        State           PID
+  TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       12672
+  TCP    [::]:9001              [::]:0                 LISTENING       12672
+(36 LISTENING lines in the full output, kept on the lab PC by sha256)

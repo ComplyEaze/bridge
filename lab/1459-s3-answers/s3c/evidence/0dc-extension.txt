@@ -1,0 +1,17 @@
+0dc 2026-11-06T08:15Z to 08:17Z.
+Settings, Extensions screenshot: NOT TAKEN. The screen tools cannot see or drive the desktop client's own window, and the lab does not navigate it; read by eye at O1 with the owner. Terms, posting, tax audit, host and port as found: not read (U).
+Get-CimInstance Win32_Process -Filter "Name='bridge_mcp.exe'" at 08:15:27Z: 4 processes, no error.
+  13776 parent 15576, created 06-11-2026 12:37:12 IST, <installed extension>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+  3660  parent 15576, created 06-11-2026 12:37:32 IST, <installed extension>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe
+  15424 parent 15576, created 06-11-2026 12:37:12 IST, <lab PC path>
+  9280  parent 15576, created 06-11-2026 12:37:32 IST, <lab PC path>
+  <installed extension> = LA\<desktop client>-Data\<family>\<desktop client> Extensions\local.mcpb.complyeaze-contributors.bridge-tally (opens from in).
+Parent chain: 15576 <desktop client>.exe (C:\Program Files\WindowsApps\<package folder 4.23118.0.0>\app\<desktop client>.exe) -> 9144 explorer.exe -> 2376 (not found).
+DIFFERS FROM EXPECT: besides the extension's two processes, two processes of a lab master build (master-fd6f7c0d) run under the same <desktop client>.exe (a second Bridge server registered in the desktop client). Recorded; nothing ended.
+Package re-read 08:15:47Z: one package, <family>, Version 4.23118.0.0, SignatureKind Developer (0bc read 4.16336.0.0 before the restart: the package updated across it; the family is unchanged).
+Hashes (from in):
+  1e41e039fbf3daaf6be5a3c8e2f5e0bd1245a745abc5e78349fd83ce678224c1  26503168  installed extension bridge_mcp.exe (manifest.json "version": "0.6.0")
+  63641231787492201133443cb1a887705c7137f495a9205ffd33c2d0068f7484  34049024  master-fd6f7c0d bridge_mcp.exe
+Installed extension is NOT 0.7.0 (expected 48d2f743..., 32,705,536 B): O1 to O4 are needed.
+BUILD (for O2): the lab PC's copy <lab PC path> 15,598,419 B sha256 291a4ed9... equal; copied to ROOT\bundle\ (empty before) at 08:16:54Z, equal; zip copy expanded to bundle\x\ at 08:17:04Z: bridge_mcp.exe 48d2f7430b26... 32,705,536 B equal; pdfium.dll 79d4676b656c... 7,211,520 B equal; manifest.json 524f49ad... 8,297 B.
+Result: hold at O1 (the owner's acts).

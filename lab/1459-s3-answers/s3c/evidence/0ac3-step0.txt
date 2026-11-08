@@ -1,0 +1,5 @@
+0ac3 2026-11-08T04:56Z (read-only; two days after 0ac2, before O1b). the recorded grant until 22:00 IST 8 Nov. Last boot 2026-11-06 12:09 IST (no restart since 0ac2).
+C2 screenshot (shots\0ac3-screen.png, 130418 B, sha256 d7474f7304567eb8cd879763cd772e7eba7462dcc4d804ef7cd22b30180a45c7, 04:56:17Z, Tally brought forward by AppActivate, nothing keyed): Gateway of Tally, SILVER, one company BRIDGE CORPUS DENSE, current date Tuesday, 31-Mar-2026, no dialog; the desktop client's window covers the right edge (capture stays local).
+C2 a: tasklist one tally.exe pid 12672, exit 0. C2 b: netstat 9001 LISTENING on 12672 (both lines), 37 LISTENING lines, exit 0. C2 c: GET /status 04:56:44Z exit 0, 200, 51 B (body as 0ac).
+Result: passed.
+0dc repeat 04:56:52Z: 2 bridge_mcp.exe, both the lab master build master-fd6f7c0d (63641231...): 15424 (since 6 Nov 12:37:12) and 22152 (created 8 Nov 10:23:56 IST, replacing 9280), parent <desktop client>.exe 15576. No extension process; the <desktop client> Extensions folder lists no manifest.json (file tool). Consistent with O1 done.

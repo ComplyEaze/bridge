@@ -1,0 +1,9 @@
+0ac 2026-11-05T19:20Z. the recorded grant for S3c held (its yes on df2fe83d about 19:18Z; grant to 10:00 IST 6 Nov = 04:30Z).
+Windows: Microsoft Windows NT 10.0.19045.0, DisplayVersion 22H2.
+C1: BRIDGE CORPUS DENSE loaded alone, as the owner left it (nothing keyed by the lab).
+C2 screenshot (shots\0ac-screen.png, 49415 B, sha256 12f7d260d77f3be54229262672f0bfadf66da9bd5a06122a900c12e19772395b, 19:20:13Z, whole screen 1536x864 with Tally brought to the front by WScript.Shell AppActivate, nothing keyed): Gateway of Tally, TallyPrime SILVER, one company BRIDGE CORPUS DENSE, current period 1-Apr-25 to 31-Mar-26, current date Tuesday, 31-Mar-2026, date of last entry 31-Mar-26; no dialog, no half-entered screen; no Educational mode shown. The capture is byte-equal to the S3b 0a capture of 5 Nov (the same Gateway screen, Tally full screen).
+C2 a: tasklist (cmd.exe, 2>&1): one line tally.exe, pid 18208; exit 0 (0ac-tasklist.txt).
+C2 b: netstat -ano (cmd.exe, 2>&1): TCP 0.0.0.0:9001 LISTENING 18208 and [::]:9001 LISTENING 18208; 36 LISTENING lines in all; exit 0 (0ac-netstat-raw.txt, kept local).
+C2 c: curl.exe GET /status at 19:20:39Z: exit 0, status 200, 51 bytes, body sha256 65541597... (0ac-status.txt, 0ac-status.body).
+C2 d: at 0ec (the sheet's difference 1).
+Result: passed.

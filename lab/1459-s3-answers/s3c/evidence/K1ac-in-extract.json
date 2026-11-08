@@ -1,0 +1,281 @@
+{
+ "_extract": "Public extract of the probe output kept on the lab PC (K1ac-in.json, 554199 B, sha256 e7d896a74d6eaa136003b2317c4fdce8a985b484b92418ebe7af9bf5fab2a5cc). Listing names are left out; each listing keeps its total and the count of names it showed. Each vol|id pair is replaced by the first 12 hex digits of the sha256 of vol|id.",
+ "step": "K1ac",
+ "side": "in",
+ "utc": "2026-11-05T19:21:27.1194290Z",
+ "pid": 7908,
+ "parent_pid": 17784,
+ "package_family": "none",
+ "lock_key": "a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01",
+ "shell_path": "C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+ "written": "LA\\<probe folder>\\34e7f032-in.txt",
+ "paths": {
+  "R": {
+   "path": "LA\\Bridge\\agent",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Bridge\\agent",
+   "opened": "\\\\?\\LA\\Bridge\\agent",
+   "nt": "LA\\Bridge\\agent",
+   "volid": "19b6b5b5aa43",
+   "bytes": null
+  },
+  "Q": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent",
+   "volid": "19b6b5b5aa43",
+   "bytes": null
+  },
+  "P": {
+   "path": "<home>\\.complyeaze-bridge\\coordination",
+   "state": "opens",
+   "final": "\\\\?\\<home>\\.complyeaze-bridge\\coordination",
+   "opened": "\\\\?\\<home>\\.complyeaze-bridge\\coordination",
+   "nt": "<home>\\.complyeaze-bridge\\coordination",
+   "volid": "804a588ab1a3",
+   "bytes": null
+  },
+  "X": {
+   "path": "LA\\<probe folder>",
+   "state": "opens",
+   "final": "\\\\?\\LA\\<probe folder>",
+   "opened": "\\\\?\\LA\\<probe folder>",
+   "nt": "LA\\<probe folder>",
+   "volid": "0f00a3236adf",
+   "bytes": null
+  },
+  "XQ": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\<probe folder>",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\<probe folder>",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\<probe folder>",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\<probe folder>",
+   "volid": "0f00a3236adf",
+   "bytes": null
+  },
+  "KA": {
+   "path": "ROOT\\ka.txt",
+   "state": "opens",
+   "final": "\\\\?\\ROOT\\ka.txt",
+   "opened": "\\\\?\\ROOT\\ka.txt",
+   "nt": "ROOT\\ka.txt",
+   "volid": "1405e94e87ef",
+   "bytes": 31
+  },
+  "R-imports": {
+   "path": "LA\\Bridge\\agent\\imports",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Bridge\\agent\\imports",
+   "opened": "\\\\?\\LA\\Bridge\\agent\\imports",
+   "nt": "LA\\Bridge\\agent\\imports",
+   "volid": "09f6c05bb55c",
+   "bytes": null
+  },
+  "R-leases": {
+   "path": "LA\\Bridge\\agent\\native-dispatch-leases",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Bridge\\agent\\native-dispatch-leases",
+   "opened": "\\\\?\\LA\\Bridge\\agent\\native-dispatch-leases",
+   "nt": "LA\\Bridge\\agent\\native-dispatch-leases",
+   "volid": "bb0a1bfef5b2",
+   "bytes": null
+  },
+  "R-journal": {
+   "path": "LA\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "volid": "8fa4a72837ae",
+   "bytes": 175278
+  },
+  "R-K.lock": {
+   "path": "LA\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "volid": "5f7b8ee871e7",
+   "bytes": 0
+  },
+  "R-K.snapshot.lock": {
+   "path": "LA\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.snapshot.lock",
+   "state": "absent",
+   "bytes": null
+  },
+  "R-K.wire.lock": {
+   "path": "LA\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "volid": "12bff026df8f",
+   "bytes": 0
+  },
+  "Q-imports": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\imports",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\imports",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\imports",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\imports",
+   "volid": "09f6c05bb55c",
+   "bytes": null
+  },
+  "Q-leases": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases",
+   "volid": "bb0a1bfef5b2",
+   "bytes": null
+  },
+  "Q-journal": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\agent-import-ledger.jsonl",
+   "volid": "8fa4a72837ae",
+   "bytes": 175278
+  },
+  "Q-K.lock": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "volid": "5f7b8ee871e7",
+   "bytes": 0
+  },
+  "Q-K.snapshot.lock": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.snapshot.lock",
+   "state": "absent",
+   "bytes": null
+  },
+  "Q-K.wire.lock": {
+   "path": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "state": "opens",
+   "final": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "opened": "\\\\?\\LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "nt": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "volid": "12bff026df8f",
+   "bytes": 0
+  },
+  "P-imports": {
+   "path": "<home>\\.complyeaze-bridge\\coordination\\imports",
+   "state": "absent",
+   "bytes": null
+  },
+  "P-leases": {
+   "path": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases",
+   "state": "opens",
+   "final": "\\\\?\\<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases",
+   "opened": "\\\\?\\<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases",
+   "nt": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases",
+   "volid": "7dfecb377e94",
+   "bytes": null
+  },
+  "P-journal": {
+   "path": "<home>\\.complyeaze-bridge\\coordination\\agent-import-ledger.jsonl",
+   "state": "absent",
+   "bytes": null
+  },
+  "P-K.lock": {
+   "path": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "state": "opens",
+   "final": "\\\\?\\<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "opened": "\\\\?\\<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "nt": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.lock",
+   "volid": "f9d34f9120c8",
+   "bytes": 0
+  },
+  "P-K.snapshot.lock": {
+   "path": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.snapshot.lock",
+   "state": "absent",
+   "bytes": null
+  },
+  "P-K.wire.lock": {
+   "path": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "state": "opens",
+   "final": "\\\\?\\<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "opened": "\\\\?\\<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "nt": "<home>\\.complyeaze-bridge\\coordination\\native-dispatch-leases\\a905deaa97bc7d8acb82123c4057a3890b174daf0295ee5c10be17f6fa0f0a01.wire.lock",
+   "volid": "e9027bd0de07",
+   "bytes": 0
+  }
+ },
+ "lease_counts": {
+  "R-leases": {
+   "total": 2901,
+   "dot_lock": 2853,
+   "snapshot_lock": 42,
+   "wire_lock": 6,
+   "other": 0,
+   "error": null
+  },
+  "Q-leases": {
+   "total": 2901,
+   "dot_lock": 2853,
+   "snapshot_lock": 42,
+   "wire_lock": 6,
+   "other": 0,
+   "error": null
+  },
+  "P-leases": {
+   "total": 2710,
+   "dot_lock": 2663,
+   "snapshot_lock": 38,
+   "wire_lock": 6,
+   "other": 3,
+   "error": null
+  }
+ },
+ "listings": {
+  "R": {
+   "folder": "LA\\Bridge\\agent",
+   "total": 7,
+   "names_shown": 7,
+   "build_publication_shown": 0,
+   "error": null
+  },
+  "Q": {
+   "folder": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent",
+   "total": 7,
+   "names_shown": 7,
+   "build_publication_shown": 0,
+   "error": null
+  },
+  "R-imports": {
+   "folder": "LA\\Bridge\\agent\\imports",
+   "total": 380,
+   "names_shown": 200,
+   "build_publication_shown": 0,
+   "error": null
+  },
+  "Q-imports": {
+   "folder": "LA\\Packages\\<family>\\LocalCache\\Local\\Bridge\\agent\\imports",
+   "total": 379,
+   "names_shown": 200,
+   "build_publication_shown": 0,
+   "error": null
+  },
+  "X": {
+   "folder": "LA\\<probe folder>",
+   "total": 6,
+   "names_shown": 6,
+   "build_publication_shown": 0,
+   "error": null
+  },
+  "XQ": {
+   "folder": "LA\\Packages\\<family>\\LocalCache\\Local\\<probe folder>",
+   "total": 4,
+   "names_shown": 4,
+   "build_publication_shown": 0,
+   "error": null
+  }
+ },
+ "extra": []
+}

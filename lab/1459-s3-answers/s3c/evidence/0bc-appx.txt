@@ -1,0 +1,14 @@
+0bc 2026-11-05T19:21:13.5022786Z
+Get-AppxPackage | Where-Object Name -like '*<desktop client>*': count 1
+
+
+Name              : <desktop client>
+PackageFamilyName : <family>
+Version           : 4.16336.0.0
+SignatureKind     : Developer
+InstallLocation   : C:\Program Files\WindowsApps\<package folder 4.16336.0.0>
+
+
+
+Version equals lab/1584-msix-paths-answers (4.4212.0.0): no (4.16336.0.0).
+Result: passed (exactly one package).

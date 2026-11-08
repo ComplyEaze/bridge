@@ -1,0 +1,13 @@
+Screen captures, kept on the lab PC only, by name, size and sha256:
+shots/0ac-screen.png 49415 B 12f7d260d77f3be54229262672f0bfadf66da9bd5a06122a900c12e19772395b
+shots/0ac2-screen.png 117776 B 308b7f01d14f4a4b34cc677c4cf135d0babcd385bc1ac0c57b6c37fe11bde1ce
+shots/0ac3-screen.png 130418 B d7474f7304567eb8cd879763cd772e7eba7462dcc4d804ef7cd22b30180a45c7
+shots/0ec-halt-screen.png 88723 B 0b80388ae07c6fca7a5cdd03541a526e97a24d4dc114554bfe1677a99cd7f4c8
+shots/0ec2-gateway.png 49428 B 3d46cddd0ca0c576cd24bc6d8741622281f12765b1a932a37a2ca2d9e5ab78d2
+shots/S3-1459-1c-answer.png 85555 B e27849ae183ccaafab518e12643d30117da2540fa748d0d180f460bff13a6084
+shots/S3-1459-1c-tally-before.png 49428 B 3d46cddd0ca0c576cd24bc6d8741622281f12765b1a932a37a2ca2d9e5ab78d2
+shots/S3-1459-3c-explorer.png 204451 B 9dcd317a31da23bd07c54a9ea43aa01dbbfa836450dff0785a499f7cb86dffce
+shots/S3-1459-3c-explorer2.png 195263 B 04c3a4a5fe2042e2ff544a5c6a90cb7c88935e2cae31d1713e4a090a9bdfcec3
+shots/S3-1459-4c-before-shut.png 299642 B 5e3b04ecab04c7c84c104f2f19f091f88bb7b3a8f60b6115f86c5ec35e9d3f82
+shots/S3-1459-4c-no-company.png 322543 B 86a58a57d2a0b7272692c85fcb2fd4e90467c82f9f790f3383b415678de432db
+Up to S3-1459-3c the captures are 1536x864 frames of the top-left part of the screen (display scaling); from S3-1459-4c they are DPI-aware full 1920x1080 frames.

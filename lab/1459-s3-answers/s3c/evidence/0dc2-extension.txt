@@ -1,0 +1,6 @@
+O4 (owner act): the recorded yes about 05:06Z; the owner quit the desktop client and started it again; the owner's word 'RESTARTED <desktop client>' reached the lab by 05:31Z. The <desktop client>.exe count between quit and start: not read (as agreed with the requester). The lab session survived the restart. New <desktop client>.exe 5040 (parent explorer 9144), created 2026-11-08 11:00:12 IST, C:\Program Files\WindowsApps\<package folder 4.23118.0.0>\app\<desktop client>.exe.
+0dc2 2026-11-08T05:31:54Z: Get-CimInstance bridge_mcp.exe: 2 processes, no error.
+  16808 parent 5040, created 11:00:18 IST, <installed extension>\bin\x86_64-pc-windows-msvc\bridge_mcp.exe, sha256 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d
+  10640 parent 5040, created 11:00:41 IST, same path, same sha256
+  Parent chain: 5040 <desktop client>.exe (WindowsApps) -> 9144 explorer.exe.
+EXPECT met: only the extension's bridge_mcp.exe, at 48d2f743 (0.7.0, installed manifest version 0.7.0); the lab master-build server is not running. Settings as the owner set at O3 (Terms ticked by the owner, posting and tax audit off, port 9001; host as found): by the owner's word, no screenshot (the desktop client's own window).

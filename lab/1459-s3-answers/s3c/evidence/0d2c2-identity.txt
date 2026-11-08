@@ -1,0 +1,6 @@
+0d2c2 2026-11-08T05:32Z. The same instrument as 0d2c (lab/1569-p-run-sheet B6, Add-Type W2.Q; one PID per fresh shell; run from the lab session's own shell), after O4, for the 0.7.0 extension.
+Known answer 1 05:32:13Z: <desktop client>.exe 5040 (WindowsApps, 4.23118.0.0): handle non-zero, 122, True. Met.
+Known answer 2 05:32:20Z: own $PID 19260: handle non-zero, 15700, True. Met.
+16808 bridge_mcp.exe (0.7.0, 48d2f743), parent 5040, 05:32:26Z: handle non-zero, 15700, True.
+10640 bridge_mcp.exe (0.7.0, 48d2f743), parent 5040, 05:32:32Z: handle non-zero, 15700, True.
+Result (a record): the installed 0.7.0 extension's processes have NO package identity (15700), as the 0.6.0 ones at 0d2c.

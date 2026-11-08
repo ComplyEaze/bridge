@@ -1,0 +1,9 @@
+0d2c 2026-11-06T08:18Z. PACKAGE IDENTITY OF THE SERVER, the instrument of lab/1569-p-run-sheet WINDOWS-1569-P.md step B6 (read at 4ad9491f), text as written (Add-Type -Namespace W2 -Name Q ...; OpenProcess(0x1000,...); GetPackageFullName(h, ref len, null); CloseHandle). Run from the lab session's own shell (package_family none, measured at K1ac and K1cc), not a Start-menu shell; each check in a new shell process (Add-Type then one PID), one at a time.
+Known answer 1 08:18:03Z: <desktop client>.exe 15576 (C:\Program Files\WindowsApps\<package folder 4.23118.0.0>\app\<desktop client>.exe): handle non-zero, 122, CloseHandle True. EXPECT 122: met.
+Known answer 2 08:18:11Z: this shell's own $PID 3420: handle non-zero, 15700, True. EXPECT 15700: met.
+Reading valid (both known answers hold).
+13776 bridge_mcp.exe (installed extension 0.6.0), parent 15576, 08:18:20Z: handle non-zero, 15700, True.
+3660  bridge_mcp.exe (installed extension 0.6.0), parent 15576, 08:18:27Z: handle non-zero, 15700, True.
+15424 bridge_mcp.exe (lab master build master-fd6f7c0d), parent 15576, 08:18:36Z: handle non-zero, 15700, True.
+9280  bridge_mcp.exe (lab master build master-fd6f7c0d), parent 15576, 08:18:44Z: handle non-zero, 15700, True.
+Result (a record, not an EXPECT): every bridge_mcp.exe started by the desktop client has NO package identity (15700), on the installed 0.6.0 extension. To be read again for the 0.7.0 extension after O1 to O4.

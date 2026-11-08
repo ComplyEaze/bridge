@@ -1139,7 +1139,7 @@ def state():
 
     elif scenario in {"lockfile-integrity", "lockfile-integrity-outside-lockfile"}:
         # #2367: one pnpm resolution line whose base64 body holds an identifier-shaped run (built from parts).
-        path = "frontend/pnpm-lock.yaml" if scenario == "lockfile-integrity" else "docs/example.md"
+        path = "pnpm-lock.yaml" if scenario == "lockfile-integrity" else "docs/example.md"
         body = "Q" * 30 + "AB" + "CDE" + "12" + "34" + "F" + "Q" * 46
         s["files"] = [{"filename": path, "status": "added", "additions": 1, "deletions": 0}]
         s["changed_files_expected"] = 1

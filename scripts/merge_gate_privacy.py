@@ -37,15 +37,15 @@ RECORD_LINE_RE = re.compile(r'^[ \t]*"[A-Za-z0-9_-]{1,32}": \{"commit": "[0-9a-f
 RECORD_DIGEST_RE = re.compile(r'("(?:mutation|crate_tree)": ")(?=[0-9a-f]{0,15}[a-f])[0-9a-f]{16}(")')
 # #2367: a registry integrity value in a JavaScript lockfile is base64, so the hex digest mask above never covers it, and
 # its random body can hold an identifier-shaped run that no change in the pull request can alter. It is masked as a digest
-# only where three things hold: the added line belongs to a lockfile named in LOCKFILE_NAMES (by its last path component);
-# the value is in the exact form the lockfile writes, `resolution: {integrity: <value>` (pnpm) or `"integrity": "<value>`
-# (npm), and is followed by the form's own closing character; and the value is `sha512-` with its 86 base64 characters and
+# only where three things hold: the added line belongs to the repository's one lockfile, at exactly the path in
+# LOCKFILE_PATHS (a file of that name anywhere else is scanned as before, so a new lockfile cannot carry an exemption in);
+# the value is in the exact form pnpm writes, `resolution: {integrity: <value>`, and is followed by `}` or `,`; and the value is `sha512-` with its 86 base64 characters and
 # `==`, or `sha256-` with 43 and `=`. Anything else in a lockfile, and any such text in another file, is scanned as before.
-LOCKFILE_NAMES = frozenset(("pnpm-lock.yaml", "package-lock.json", "npm-shrinkwrap.json"))
+LOCKFILE_PATHS = frozenset(("pnpm-lock.yaml",))
 LOCKFILE_INTEGRITY_RE = re.compile(
-    r"(?:(?<=resolution: \{integrity: )|(?<=\"integrity\": \"))"
+    r"(?<=resolution: \{integrity: )"
     r"(?:sha512-[A-Za-z0-9+/]{86}==|sha256-[A-Za-z0-9+/]{43}=)"
-    r"(?=[},\"])"
+    r"(?=[},])"
 )
 ASCII_ALNUM = frozenset("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 PLACEHOLDER_RE = re.compile(r"^(X+|Z+)\d+(X|Z)?$|^\d{2}(X+|Z+)\d+[0-9A-Z]*$", re.I)
@@ -521,8 +521,8 @@ def mask_record_digests(text):
 
 
 def is_lockfile(path):
-    """Whether `path`'s last component is one of LOCKFILE_NAMES."""
-    return path.rsplit("/", 1)[-1] in LOCKFILE_NAMES
+    """Whether `path` is exactly one of LOCKFILE_PATHS, the repository's own lockfile."""
+    return path in LOCKFILE_PATHS
 
 
 def mask_lockfile_integrity(path, text):

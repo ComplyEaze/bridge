@@ -3143,19 +3143,20 @@ class PrivacyLockfileIntegrity(unittest.TestCase):
         self.assert_blocks(self.privacy.scan(self.pnpm_line(), HEAD))
 
     def test_a_pnpm_integrity_value_in_a_pnpm_lockfile_passes(self):
-        record, masked = self.record("frontend/pnpm-lock.yaml", self.pnpm_line())
+        record, masked = self.record("pnpm-lock.yaml", self.pnpm_line())
         self.assert_clean(record)
         self.assertEqual(masked, 1)
 
-    def test_an_npm_integrity_value_in_an_npm_lockfile_passes(self):
+    def test_an_npm_integrity_value_is_not_masked(self):
+        # Only pnpm's root lockfile is exempt: npm's form is scanned as before, in any file.
         line = '      "integrity": "sha512-' + self.body() + '==",'
-        for path in ("package-lock.json", "web/npm-shrinkwrap.json"):
+        for path in ("package-lock.json", "web/npm-shrinkwrap.json", "pnpm-lock.yaml"):
             record, masked = self.record(path, line)
-            self.assert_clean(record)
-            self.assertEqual(masked, 1, path)
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, path)
 
     def test_the_same_line_outside_a_lockfile_still_blocks(self):
-        for path in ("docs/notes.md", "pnpm-lock.yaml.md", "scripts/pnpm-lock.yaml.bak"):
+        for path in ("docs/notes.md", "pnpm-lock.yaml.md", "scripts/pnpm-lock.yaml.bak", "sub/pnpm-lock.yaml", "frontend/pnpm-lock.yaml", "./pnpm-lock.yaml"):
             record, masked = self.record(path, self.pnpm_line())
             self.assert_blocks(record)
             self.assertEqual(masked, 0, path)

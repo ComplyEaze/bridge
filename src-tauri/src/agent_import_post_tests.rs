@@ -3085,6 +3085,13 @@ fn a_binding_whose_name_disagrees_with_its_projection_does_not_parse() {
         .remove("cash_projection");
     let mut under_both_names = deposit;
     under_both_names["ledger_identities_3"] = ledgers;
+    // A bad amount alone, under a binding that agrees, is a line that does not parse.
+    let mut amount_only = serde_json::to_value(&line).unwrap();
+    amount_only["vouchers"][0]["entries"][0]["amount"] = json!("-1.00");
+    assert_eq!(
+        ImportLedgerLine::from_journal(amount_only).map(drop),
+        Err(BatchLineRefusal::Unreadable),
+    );
     for (written, mismatch) in [
         (
             under_the_old_name,
@@ -3113,7 +3120,38 @@ fn a_binding_whose_name_disagrees_with_its_projection_does_not_parse() {
             Err(IMPORT_LEDGER_BINDING_MISMATCH.to_string()),
             "{written}"
         );
+        // and a mismatch is named before another defect of the same line
+        let mut also_a_bad_amount = written.clone();
+        also_a_bad_amount["vouchers"][0]["entries"][0]["amount"] = json!("-1.00");
+        assert_eq!(
+            ImportLedgerLine::from_journal(also_a_bad_amount).map(drop),
+            Err(BatchLineRefusal::Binding(mismatch)),
+        );
     }
+    // Two earlier names for the binding are a line that does not parse, as before.
+    let (mut line, _) = batch();
+    line.binding = LedgerBinding::bound(Some(recorded(&[("Cash", "g")])));
+    let mut two_earlier = serde_json::to_value(&line).unwrap();
+    two_earlier["ledger_identities_2"] = two_earlier["ledger_identities_3"].clone();
+    assert_eq!(
+        ImportLedgerLine::from_journal(two_earlier.clone()).map(drop),
+        Err(BatchLineRefusal::Unreadable),
+    );
+    assert_eq!(
+        super::super::ledger::read_snapshot(
+            std::io::Cursor::new(format!("{two_earlier}\n").as_bytes()),
+            None
+        )
+        .map(drop),
+        Err("import_ledger_invalid".to_string()),
+    );
+    // The new code tells the person what the old one does.
+    let step = crate::agent::refusal_remediation(IMPORT_LEDGER_BINDING_MISMATCH);
+    assert!(step.is_some());
+    assert_eq!(
+        step,
+        crate::agent::refusal_remediation("import_ledger_invalid")
+    );
 }
 
 /// A batch an earlier release saved, as that release journaled it (a captured

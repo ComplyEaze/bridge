@@ -991,6 +991,7 @@ impl ImportLedgerLine {
     /// A batch line as the journal holds it. The binding is read first, so a
     /// name that disagrees with the projection is told apart from a line that
     /// does not parse; two earlier names for it do not parse.
+    // A binding mismatch is named before any other defect on the line; both refuse the whole history.
     fn from_journal(value: Value) -> Result<Self, BatchLineRefusal> {
         let record =
             LedgerBindingRecord::deserialize(&value).map_err(|_| BatchLineRefusal::Unreadable)?;

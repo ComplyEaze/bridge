@@ -191,14 +191,13 @@ impl Lineage {
             // whether or not it was ever imported.
             let mut matching = Vec::new();
             for (batch_id, recorded) in self.versions(txn_id) {
-                let recorded = canonical_import_voucher(recorded)?;
                 let entries_match =
-                    expected_entry_fingerprint(&recorded) == actual_entry_fingerprint(&row);
+                    canonical_entry_fingerprint(recorded) == actual_entry_fingerprint(&row);
                 // The narration is compared too (#1608): the import rewrites it,
                 // so an edit to it in Tally is a change the amendment would
                 // overwrite.
                 let diffs = voucher_diffs(
-                    &recorded,
+                    recorded,
                     &row,
                     entries_match,
                     WrittenNarration::Tagged(&tag),
@@ -271,14 +270,6 @@ impl Lineage {
             Err(refused)
         })
     }
-}
-
-fn canonical_import_voucher(voucher: &ImportVoucher) -> Result<ImportVoucher, String> {
-    let mut voucher = voucher.clone();
-    for entry in &mut voucher.entries {
-        entry.amount = canonical_verification_amount(&entry.amount)?;
-    }
-    Ok(voucher)
 }
 
 fn canonical_read_voucher(voucher: &ReadVoucher) -> Result<ReadVoucher, String> {

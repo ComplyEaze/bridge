@@ -54,6 +54,8 @@ every position, the SHA-256 of the request ComplyEaze Bridge sent against the re
 | `w18-ledger-catalogue-v2.utf16le.xml` | 25,010 | `873803dd0ab3eab2e0a4dc315afb109f40e11fe3b81cf96fc915c04a8df97a6c` | `answers/aw18-ledger-catalogue-v2.xml` (W18) | `r13-ledger-catalogue-v2.xml` (`28a47c26a29fa799856c112b71e19076946d4c0f85a6dcc65f5cdafe0e1e1bd0`) | the 18 ledgers with identities and bill-wise flags |
 | `w18b-verification-window.utf16le.xml` | 87,884 | `b42a98cd6268f7ee4f4d589b68c777d96d7243a0657b20126d90cd1ac6128093` | `answers/aw18b-verification-window.xml` (W18b) | `r15-verification-window.xml` (`a40f220e631d1c1d0ad0028e1f52f651288af6098f8960bff0aa5e24f3ca02e7`) | the 1-Aug-2026 window: eleven vouchers, `BP/26-27/0001` to `0011` |
 
+`w18-number-0040.utf16le.xml` now answers a derived request (partial, #2162 item 8): the code sends `workorder/w18-number-0040.xml` with `IRN, IRNACKNO, IRNACKDATE` added to its fetch list, never sent to this book, and this answer was captured without them, so on it the build claims no IRN. It rests on R1 of `lab/2162-irn-read-answers` (9a20049b) on another book, where the words changed nothing else in the answer; see `../pilot-lab/PROVENANCE.md`. `W18_NUMBER_SHA256` is a derived pin, not a capture.
+
 ## The to-date of two listings (measured, W18c)
 
 The lab was first asked `r05` and `r06` with `SVTODATE`

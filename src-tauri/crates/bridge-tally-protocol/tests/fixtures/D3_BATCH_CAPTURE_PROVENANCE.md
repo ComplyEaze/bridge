@@ -46,19 +46,16 @@ answer captured for the unspanned census may not stand in for it (#899). The bat
 therefore no longer reads this capture: the book was read again on 30 Oct 2026 with the census spanned
 (`AMEND_NOW_CAPTURE_PROVENANCE.md`), and that test now reads it and pins the book as it is now.
 
-Six tests in `agent_import_ack_tests.rs` still replay this capture, so its unspanned census answers the spanned request
-`(0, 1469]`: `an_unnamed_review_is_refused_when_its_read_finishes_a_second_doubt`,
-`an_unnamed_review_goes_ahead_when_its_read_finishes_the_check_unchanged`,
-`an_unnamed_review_is_refused_when_its_second_read_finishes_a_second_doubt`,
-`a_named_review_goes_ahead_when_its_read_finishes_a_second_doubt`,
-`a_review_of_an_earlier_doubt_does_not_answer_for_the_doubt_a_read_finishes` and
-`a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown`. By the rule above, that is a stand-in. None of
-them pins the census request, and each needs the batch reading back whole and matched, a state the book no longer
-holds: on the 30 Oct capture each review is refused `ack_readback_not_matched` before the check it tests (measured for
-the first and the fifth), and the hand-imported batch's premise is all 50 vouchers matching. The census holds its 50
-vouchers at ALTERIDs 1420 to 1469, all inside the span, so a spanned answer of the batch's state would carry the same
-rows, but it was never captured. Whether these six may keep this answer, or wait for a new capture of that state, is
-for the maintainers to decide on #2145.
+Six tests in `agent_import_ack_tests.rs` replayed this capture after #2145, its unspanned census standing in for the
+spanned request `(0, 1469]`. Each needs a batch reading back whole and matched, which this book no longer holds. The five
+tests of a review whose read finishes the masters check now read the census row's capture of another synthetic book,
+whose census was spanned and sent (`REVIEW_LAB_CAPTURE_PROVENANCE.md`), and so does the review that binds all fifty
+vouchers, which #2145 had dropped.
+
+`a_hand_imported_batch_with_a_duplicate_reads_unverified_in_the_markdown` replayed this capture too, its census a
+stand-in and its unmarked copy of D3-005 derived in memory. It now reads the hand-import row's capture on the census
+row's book, a batch imported from its saved file with an unmarked copy entered beside it in Tally, its census spanned
+and sent (`REVIEW_LAB_CAPTURE_PROVENANCE.md`). No test serves this capture's census for the spanned request now.
 
 The lab sent the recorded request and the spanned one to the same book on 30 Oct 2026 (`lab/2145-spanned-census-captures-answers`
 at `993d96bc`), after the book had moved on: its voucher mark read 1829. Three of the capture's vouchers now carry ALTERIDs

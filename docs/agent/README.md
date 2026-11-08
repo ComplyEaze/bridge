@@ -50,7 +50,7 @@ identity, party or open-bill details, and amounts. An unset
 `BRIDGE_AGENT_REDACTION` defaults to `none`; `mask_parties` shortens party and ledger
 names, bank account numbers and the address lines of a ledger's details to their first two and last two characters (a name of
 four characters or fewer becomes `…`; in `stock_summary` it also masks stock item names
-and stock-group parents, and in `stock_by_godown` godown and item names; GUIDs and Tally's reserved root stay plain) and `drop_narration`
+and stock-group parents, in `stock_by_batch` item, godown and batch names, and in `stock_by_godown` godown and item names; in `vouchers`' `dispatch` it masks `dispatched_through`, `carrier` and `vehicle_no`; GUIDs and Tally's reserved root stay plain) and `drop_narration`
 drops narrations. Neither setting hides amounts, company names, dates, references, PAN,
 GSTIN, IFSC, MSME or Udyam registration numbers, a stock item's HSN codes (an HSN description is masked under `mask_parties`) or contact details, and the bank statement tool's `account_last4` (the last
 four digits of the statement's account number) is sent under every setting. Set the
@@ -110,6 +110,7 @@ The ordinary default tools, in name order:
 - `read_evidence`
 - `sales_register`
 - `statement_tie_out`
+- `stock_by_batch`
 - `stock_by_godown`
 - `stock_summary`
 - `tally_status`
@@ -125,7 +126,7 @@ The ordinary default tools, in name order:
 `local_data_report` were added in release 0.4.0; `sales_register` was added in release
 0.4.2. `cash_flow` was added in release 0.5.0. `company_features`, `gst_status`, `month_register`, `statement_tie_out` and `voucher_read_cost` were added in
 release 0.6.0. `audit_test_run`, `gst_uncertain_vouchers`, `negative_ledgers` and `negative_stock` were added in release 0.6.1; `audit_test_run` is
-not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_godown` is in the source after release 0.7.0 and is not in a published build yet. `local_data_report` (also
+not a default tool: it is listed only when its setting is on (below). `gst_by_counter_ledger` was added in release 0.7.0. `stock_by_batch` and `stock_by_godown` are in the source after release 0.7.0 and are not in a published build yet. `local_data_report` (also
 `bridge_mcp --local-data-report [--show-paths]` on the command line) is a
 read-only report of what Bridge keeps in its agent data folder: per class
 (journal, import files, proofs, review records, approval notes, bank
@@ -145,19 +146,20 @@ recorded checking in Tally (`acknowledge_post_review` with `doubt` set to
 `content_only`), still not settled and never verified; `not_settled_restored`
 counts the native posts a recorded restore covers (bridge#1050), not settled
 whatever their latest status reads; they never read `posted_verified` again,
-and nothing in ComplyEaze Bridge clears that count yet, so they stay there, in
-no other count, with their rows held: check them in Tally;
+so they stay there, in no other count, with their rows held, until a person
+releases their rows: check them in Tally;
 none of these overlaps
 `not_settled_no_response`, `not_settled_binding_refused` or `not_settled_not_verified`;
 `settled_by_person` counts the native posts Tally answered as creating none of their vouchers that a person
-settled (`acknowledge_post_review` with `doubt` set to `not_created`), which are in none of the `not_settled`
-counts),
+settled (`acknowledge_post_review` with `doubt` set to `not_created`), and `released_by_person` the covered
+posts whose rows a person released (`doubt` set to `rolled_back`, bridge#1038), which are in none of the
+`not_settled` counts),
 batches with no recorded dispatch that were never found posted
 (`no_dispatch_never_verified`: this includes a batch imported by hand whose verification is incomplete, which may well be in Tally, so no
 deletion may rest on it), and interrupted-write folders that Bridge must recover
 before it builds or reads. A journal it could not read is reported as
 `journal_unreadable` (could not be opened), `journal_read_failed` or
-`journal_invalid` (refused twice, 100 ms apart), never as absent. It reads the
+`journal_invalid` (refused twice, 100 ms apart; the report then names the 1-based `line` of the journal that was refused), never as absent. It reads the
 journal without the admission lock, names no file path (the command line adds the
 folder paths, where their files are, the journal's location and any package
 copy of the folder only with `--show-paths`), and does not cover files outside this
@@ -195,6 +197,9 @@ byte count, completeness reason, and truncation state. A refused call returns
 puts `error` directly in `structuredContent`, with no `result`). Where a runtime
 refusal has a typed, data-free reason, the error also carries `cause`, which names why
 (for example `company_base_currency_undetermined` beside `party_ledger_master_read_failed`).
+The party ledger read is several requests, so a refusal where one of them failed also carries
+`failed_request`, which names it: `base_currency`, `book_extent`, `ledger_count`, `ledger_catalogue`,
+`ledger_master`, `ledger_balance` or `groups`.
 A read whose two paired halves differ, because the book changed while Bridge was reading it,
 carries `native_report_pair_changed` or a cause specific to that read (for example
 `masters_collection_changed` or `party_ledger_balance_changed`). A voucher-window part that is not admitted
@@ -557,6 +562,12 @@ where the series printed none, or `{"unrecognised": "<raw text>"}` for any other
 text, a blank one included. A Manual series printed `Auto Retain` as well on
 both books read, which is not the numbering in force there, so it is not
 returned for one.
+The voucher-types collection pair is read once more when its first pair disagrees (Tally leaves
+an element out of the first read after a company is loaded; protocol reference 12a.25): the
+answer then carries `first_pair_differed`, the first pair's request and response digests
+(`RuntimeReadEvidence::combine` digests over the pair's two reads, not the hash of either read
+or of the request) and its byte count (the sum of both reads), and a second pair that disagrees
+too refuses as `masters_collection_changed`.
 A type found in one answer only (`masters_numbering_names_differ`), or a GUID
 and name that disagree between the two answers
 (`masters_numbering_identity_differs`), refuses the whole read; so does the
@@ -1041,7 +1052,15 @@ entry on a ledger under Duties & Taxes whose master carries a recognised GST dut
   not look, such as an item invoice of a shape not measured whose purchase ledger is in an inventory allocation), `sales_ledger_present`,
   `gst_on_both_sides` (reverse-charge and set-off journals), `other_ledgers_present` (any other group, such as Current
   Assets or Stock-in-Hand), `no_creditor_party` (such as a GST challan payment),
-  `no_counter_ledger` or `several_counter_ledgers`.
+  `no_counter_ledger` or `several_counter_ledgers`; or
+- **set aside as `bill_already_opened`**, decided across the window after the others: a Purchase whose Sundry
+  Creditors entry is `Agst Ref` to a bill another attributed Purchase of the window opened (`New Ref`) on the same
+  party ledger, when its counter-ledger amount and every tax head equal the opener's. It is a supplier invoice keyed
+  twice; the opener stays attributed. A Purchase that also opens a bill of its own is never taken as a copy.
+
+`agst_ref_purchase` lists, at most 100, every other attributed Purchase that is `Agst Ref` to a bill: a supplementary
+invoice, a copy whose amounts differ, or a bill opened before the window. Each stays counted, so the CA checks it. A
+Debit Note or Journal against a bill is neither set aside nor listed by this (bridge#2069).
 
 `counter_ledgers` gives, per ledger, its `ledger_guid` (Tally's GUID of the ledger), its predefined `group`, its `parent` (masked like a ledger name when it is a group
 the book named), `vouchers`, `debit_side_tax` (negative, as
@@ -1123,6 +1142,43 @@ book of TallyPrime 7.1 Silver, once before and once after one Accept As Is, whic
 unregistered buyer of its Sales invoices. Not measured: item invoices, a registered buyer, credit notes or other
 Sales-class types, foreign currency, the amount of a post-dated voucher, an Accept As Is of several vouchers at once,
 Gold and other releases.
+
+### Stock by godown and batch (`stock_by_batch`)
+
+Use `stock_by_batch` with `company_guid`, `as_of` (a month's last day, as for `stock_summary`) and
+`items` (1 to 20 stock item GUIDs, each once, as `stock_summary` returns them; 20 is a chosen limit, since
+each item is one request sent after the last) for Tally's own Stock Query
+of each item: its quantity in each godown and batch at `as_of`. Quantities only: the report carries no
+value, rate, expiry or manufacturing date, and its last-purchase and last-sale groups are not returned.
+
+Each item's lines are tied as a whole to its closing quantity in Tally's stock item list for the same
+period, and its `state` says how: `tied`, `differs` (both sides are returned, `lines_total` and
+`closing`, and neither is adjusted), `not_comparable` (`closing_unread` for an item with an alternate
+unit, whose closing Tally writes in both units while Stock Query writes the base unit only;
+`units_differ`), `no_stock` (Tally's empty answer beside a closing of zero)
+or `no_movement` (the empty answer beside no closing at all, which does not say the item holds none).
+Tally sends the same empty answer for an item with no stock, one that never moved and a name it does
+not know, so it is never read as zero on its own. An item can also be `item_not_found`,
+`name_unmeasured` (its name holds a character no capture showed Stock Query selecting by, so nothing
+is sent for it), `refused` with `code` (the answer could not be read, or was over 262,144 bytes:
+`stock_query_answer_too_large`; the other items are still read), `not_read` with `code` (the send failed
+or timed out) or `not_sent`. A failed send stops the reads: the result is `partial`, `stopped` names
+the code, and the book was not checked for change after the items already read.
+
+`godowns` adds each godown's lines, by their positions in `lines`; it is compared with nothing and is
+not Tally's Godown Summary. Godown and batch names are compared as sent, so two that differ only in case
+are two. No line is compared with any voucher: a Stock Journal moves stock between godowns without an
+invoice goods line. `batch_wise` is the company's setting; with it off every line reads `Primary Batch`.
+The 262,144-byte limit is a choice, not a measurement: the largest answer measured is 3,152 bytes,
+and an item's lines grow with the godowns and batches that hold its stock, which no other read bounds.
+
+The read uses `stock_summary`'s bracket and its admission of the stock items, under this tool's own
+codes: `stock_by_batch_too_large` (with `size`), `stock_by_batch_census_refused`,
+`stock_by_batch_item_count_company_higher` and `stock_by_batch_bound_premise_violated` (each with
+`error.cause`), `stock_by_batch_as_of_not_measured`, `stock_by_batch_as_of_before_books`,
+`stock_by_batch_as_of_in_future`, `stock_by_batch_education_unqualified` and `stock_not_enabled`. A
+book that changed refuses as `stock_by_batch_extent_changed`. Measured on TallyPrime 7.2 on one
+synthetic book.
 
 ### Stock by godown (`stock_by_godown`)
 
@@ -1694,8 +1750,17 @@ or vouchers.
   delete moves the master mark is unmeasured. A difference refuses as
   `voucher_window_changed_during_read` or `ledger_snapshot_drifted` and releases
   no rows. A voucher that names a ledger the masters do not list refuses the
-  same way; one the compliance read set aside for its currency refuses as
-  `register_ledger_currency_excluded`.
+  same way. A ledger the compliance read set aside for its currency is
+  classified by its master like any other (#683).
+- **Foreign-currency vouchers.** A voucher whose amounts Tally stored as
+  currency composites is read at its rupee figure, as `vouchers` reads it. One
+  that cannot be read (its entries do not net to zero, or its symbol is not one
+  of the book's Currency masters) is checked against the window's dates and the
+  masters like any other. One of the register's own classes is then listed in
+  `withheld_vouchers` with `withheld_total`, and the window is `partial` with
+  reason `foreign_currency_amount_unparsed`, or `company_currency_probe_failed`
+  when the book's base could not be read; one of another class is listed apart by
+  its ledgers as any voucher of that class is.
 - **Not measured.** A UI-typed purchase; item invoices whose purchase ledger sits
   in an inventory allocation (`taxable_entries` may be empty for them); books
   with several currencies; any GSTIN, a `REFERENCEDATE` on a sale, or cancelled, optional or
@@ -2291,9 +2356,15 @@ composite, such as `-$ 100.00 @ I₹ 86/$  = -I₹ 8600.00` on TallyPrime 7.1 an
   decimal nor an exact composite still refuses the whole window. So does a
   composite whose foreign and base amounts carry opposite signs, unless the
   foreign amount is zero: a voucher entry's two amounts share one sign.
+- **`voucher_presence` reads it the same way** and matches proposals on the
+  rupee amount. It sends the same window request as `vouchers`, and the base
+  read only for a window that holds a composite. A voucher it cannot read so
+  refuses the call as `foreign_currency_amount_unparsed`: presence never passes
+  over a voucher whose amounts it could not compare. A base read that fails
+  refuses it as `company_currency_probe_failed`, so a retry can still read it.
 - **Every other voucher reader still refuses such a window** (for example
-  `voucher_presence`, `ledger_movement`, verify_import and the Bridge app's
-  voucher screen), because each of them sums, matches or verifies amounts.
+  `ledger_movement`, verify_import and the Bridge app's voucher screen),
+  because each of them sums, matches or verifies amounts.
 
 ### Bill allocations in voucher reads
 
@@ -2339,6 +2410,51 @@ bank ledger ([reference §9.13](../tally/TALLY_PROTOCOL_REFERENCE.md), the scope
 Committed captures of a synthetic book's Payments carry the bank on some rows and the party on others. So the
 counterparty of a Receipt, Payment or Contra is read from the voucher's `amounts`, not from `party`. `verify_import`
 does not compare the field for a Receipt, Payment or Contra.
+
+### E-invoice details in `vouchers` (#1378)
+
+With `include_e_invoice: true`, a row of `vouchers` for an invoice, or for any voucher that carries a detail, holds
+`e_invoice`: `irn`, `ack_no` and `ack_date`, each `{"state":"present","value":...}`, `{"state":"absent"}` (asked for and empty) or
+`{"state":"not_reported"}` (this book or release did not send it). `ack_date` is `YYYYMMDD`; one that is not a date
+refuses the read (`voucher_irn_ack_date_invalid`). Every other read sends the request it did before. ComplyEaze Bridge never asks Tally
+to generate, cancel or upload an e-invoice. Measured on one synthetic book with details keyed by hand; a voucher
+the portal issued was not read (protocol reference 8.2j).
+
+### Stock lines in `vouchers` (#2016)
+
+With `stock_lines: true`, `vouchers` sends a request that returns each voucher's stock in place of its ledger entries, so
+`amounts` is empty. A row holds `stock_lines`, each line with `direction` (`in` or `out`), `stock_item`, the two quantities,
+`rate`, `amount` and `batches`, each field `absent`, `empty` or a value as in `goods_lines`; or `stock_lines_unreadable` with
+the reason. An empty amount is not zero: the captured Stock Journal's in side has none. Lines are read for a Stock Journal,
+Delivery Note, Receipt Note and Credit Note. For a Stock Journal this is the only read of its stock; for the notes it adds
+`direction`. Any other row carries `stock_lines_not_read`, and `kinds_not_read` counts them by voucher type, including a type
+made under a note or Credit Note. A Stock Journal, Delivery Note or Receipt Note that answers no line reads as
+`stock_lines_unreadable` with `stock_line_missing`. A Credit Note can be accounts only, so its `stock_lines` may be `[]`, which
+says only that this read returned no line, not that no stock moved. On one book a cancelled Delivery Note answered an empty
+list, so a cancelled voucher's `stock_lines` may be `[]` beside `cancelled: true`; the read treats a cancelled Stock Journal,
+Receipt Note or Credit Note the same way, which is unverified. An optional Delivery Note answered its line. `ledger`, `amount`, `suspense_tagged`, `summarise_by`,
+`bank_allocations`, `goods_lines`, `include_gst_details` and `include_e_invoice` need ledger entries, and each is refused as
+`voucher_stock_lines_excludes_<argument>`. `stock_summary_tie` is always `not_compared`, with the reason beside it. No totals
+are given (protocol reference 8.2i).
+
+### GST and note details in `vouchers` (#2027)
+
+With `include_gst_details: true`, a row of `vouchers` for an invoice, or for any voucher that carries a detail, also holds
+`voucher_gst`: `place_of_supply`, `party_state`, `registration_type`, `note_reason`, `party_note_number` and `party_note_date`,
+each stated as `e_invoice` states its details. `party_note_date` is `YYYYMMDD`; one that is not a date refuses the read
+(`voucher_party_note_date_invalid`). A note's original invoice is its `reference` and `reference_date`, and the party's own note is
+`party_note_number` and `party_note_date`. Reads without this argument or `include_e_invoice` send the request they did before.
+Measured on one synthetic book, one voucher of each kind, with one party in another state: not unregistered parties, exports
+or a note without an original invoice (protocol reference 8.2k).
+
+The same argument also adds `dispatch`, stated the same way: `doc_no` (Dispatch Doc No.), `dispatched_through`, `destination`,
+`carrier` (Carrier Name/Agent), `lading_no` and `lading_date` (Bill of Lading/LR-RR No. and its date, `YYYYMMDD`; one that is not
+a date refuses the read as `voucher_lading_date_invalid`), `vehicle_no` (Motor Vehicle No.) and `delivery_notes` (Delivery Note
+No(s)). `delivery_notes` is present with a list of `{number, date}` in the order keyed, each stated the same way, or absent when
+the voucher has none; a date is `YYYYMMDD`, and one that is not refuses the read as `voucher_delivery_note_date_invalid`. Under
+`mask_parties`, `dispatched_through`, the carrier and the vehicle number are masked as a party name is; the rest, Delivery Notes
+included, stay as the book has them. Measured on one synthetic book: one Sales invoice and one Credit Note with the details, and
+two Sales invoices with one and two Delivery Notes (protocol reference 8.2l).
 
 ### Cost-centre allocations in voucher reads
 
@@ -2417,9 +2533,9 @@ its ledger entry. Without the argument, and in every other answer that returns a
 key is not there; the parse reads the lines either way.
 
 - **Invoice vouchers.** In the captures Tally sent a goods line under a ledger entry only on an invoice-mode voucher; the read does not test the voucher's invoice flag and shows the lines of any entry that carries them. A Stock
-  Journal answered an empty entry list in the one read of it (TallyPrime 7.2; that answer is not committed, and no
-  committed capture holds a Stock Journal), and a Delivery Note, Receipt Note, Physical Stock or Manufacturing
-  Journal is not captured, so an entry or a voucher without the key may still have moved stock.
+  Journal has no goods line in this read, and a captured Delivery Note, Receipt Note or Credit Note has one but with no
+  direction; `stock_lines` reads all four. A Physical Stock or Manufacturing Journal is not captured, so an entry or a
+  voucher without the key may still have moved stock.
 - **Held pages.** The goods lines are parsed on every voucher read, so they count toward the 64 MiB of a held window
   (see "What is held" above) whether or not the argument is given: a window rich in goods lines may not be held, and a
   later page then reads it again.
@@ -2510,13 +2626,23 @@ posting setting covers both, in the MCPB extension and on the command line (#109
      each carries its comparison rule; even a single candidate still requires a
      decision. For every reason,
      render `candidate_count_is_lower_bound` as "at least N", never an exact total.
-   - `missing` — no live ledger matched. Bridge never creates masters.
+   - `missing` — no live ledger matched. `validate_masters` creates nothing.
+     When master writes are on, a missing ledger of a kind they admit can be
+     created with `prepare_ledger_creates` and `post_ledger_creates`, after the
+     person approves it (see "Approved voucher posting" below); otherwise it is
+     created in Tally.
    - A `missing` or `near_miss` row without `folded_twins` whose name is,
      character for character, an alias of exactly one live ledger also carries
      `alias_of`, that ledger's name as Tally lists it. The row is still not
      bound and Bridge never sends an alias: replace the name with `alias_of`
      only after an operator confirms that ledger is the one meant, then run
      `validate_masters` again.
+   - A ledger with a twin is refused as `ledger_has_folded_twin`, with one
+     exception (#626): two ledgers that differ only by a trailing line break,
+     named by one's exact bytes on the debit side alone of a Payment, off
+     bill-wise, the shape measured. The batch may not name both. The approval
+     dialog names both ledgers, each with its group, and says which one the
+     post uses, and a twin that appears after approval is refused.
 3. Call `build_import_xml` with the payload. It checks exact decimal balance,
    company date extent, live masters, and local journal integrity,
    repeats the full catalogue to reject intervening changes, then writes `<data_dir>/imports/<batch_id>.xml` and records an append-only
@@ -2598,8 +2724,8 @@ refused as `proposals_legacy` (parse the statement again).
   the check did not run, is answered without it and its envelope is marked
   `truncated`: `state` (`computed`, or
   `not_established` when the view could not be computed or the section was cut
-  to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired` and
-  `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
+  to fit), `skips_paired`, `skips_open`, `open`, `open_omitted`, `retired`,
+  `day_reads` where days were read, and `next_steps`. Each open row is a `bridge_txn_id`, a date and a state, with a
   `batch_id` where one is involved: `not_found`, `tally_unchecked`, `ambiguous`,
   `other_side_unverified`, `held_elsewhere`, `posted_against_skip`, `matched_unconfirmed`,
   `reference_differs`, `reversed_same_day`, `not_established`, or
@@ -2609,30 +2735,62 @@ refused as `proposals_legacy` (parse the statement again).
   through ComplyEaze Bridge, was verified for that day, and holds no Contra of
   the row's day, amount, ledgers and direction that is not already paired, or
   matched by date, with another row, whatever its reference, and that
-  ComplyEaze Bridge read every voucher of that day in Tally and found no Contra
-  between the two accounts. No read of a whole day of Tally exists yet, so no row
-  says `not_found` yet (#1392). A row pairs by an
-  equal reference, or by an equal date (k = 0 until two real statements of one
-  transfer have been measured), so a Contra the other bank printed on another
-  day is not matched.
+  ComplyEaze Bridge read every voucher of the row's date and of the day either
+  side in Tally and found no entry on the other account's ledger, in a voucher of
+  any type (#1392). A row pairs by an equal reference, or by an equal date
+  (k = 0 until two real statements of one transfer have been measured), so a
+  Contra the other bank printed on another day is not matched. A voucher dated
+  further away, a transfer that passes through another ledger over more days and
+  one split across vouchers are not looked for, so the step still has the
+  assistant tell the person what was read and keep the skip, withdrawn on one side
+  only when the person confirms that no entry in Tally carries the transfer.
+- **How the days are read.** A build, and a statement of only skipped rows,
+  read the days of their `tally_unchecked` rows from Tally under the admission
+  lock and before anything is written: each row's date and the day either side,
+  newest row first, a row's three days taken whole or not at all, at most four
+  dates a call within 31 days of the newest. A date is read in full only when its
+  census counted it, no voucher was withheld and no row is dated another day. A
+  date that holds no voucher counts only beside a read date of the same window
+  that holds one. That departs from `vouchers`, which leaves an empty window
+  `partial` (`empty_window_wider_read_nonempty`) when only the days beside it hold
+  rows, since those rows give no independent count of the window (#985). A date
+  read here gives none either: its census and its vouchers request carry the same
+  one-day filter. It is taken as read on its own two answers agreeing, beside a
+  date read whole in the same call; no capture shows Tally answering an empty
+  census for a date that holds vouchers, and none rules it out, so this is
+  partial confidence; the maintainers accepted it for day reads (#1392), and
+  without it no row could read `not_found`. One risk remains: a company closed
+  between one date's marks read and its census could read as an empty date. The
+  result stays report-only, and a person confirms any withdrawal. Ledger names are compared exactly as Tally
+  sent them, and a date whose entries name a ledger the call's ledger list does
+  not hold rules nothing out. No date is read for a book whose voucher mark needs
+  more than one census request a day. Each read is one window of one date: the
+  marks, one census and the vouchers parts, of which there are at most
+  `MAX_PLANNED_READS` (128). The section's `day_reads` gives how many dates were
+  read in full with a voucher (`whole`) and with none (`empty`), and each other
+  planned date with its cause (`kept`); the call's evidence holds every answer
+  that came back, including those of a read that then failed.
 - **What `tally_unchecked` claims.** Only the first half of that: the other
   account's statement holds no such Contra, and whether Tally holds one is not
-  established, because ComplyEaze Bridge did not read every voucher of that day in
-  Tally, so a Contra entered in Tally directly is not in its records. Every row that
-  would be `not_found` is `tally_unchecked` until a whole-day read exists. The
-  assistant reads that day's vouchers with `vouchers` and looks for a voucher of
-  the Contra voucher class, or of any other type such as a Journal or Payment,
-  that carries the row's amount on the bank ledger the other account's statement
-  was built for (and reads its narration where it was not dropped). It tells the
-  person what it found, and keeps the skip; it does not look for a voucher dated
-  another day or booked against another ledger, a transfer may print on different
-  days, and a masked ledger name can read like another, so it compares amounts and
-  dates too. A skip is withdrawn, on one side only, solely on the person's
-  confirmation that no entry in Tally carries the transfer (`withdraw_skips`, as
-  for any open row), and the step says not to book the transfer in Tally another
-  way, because a later post of the other statement would book it twice. Reading
-  the day sends its vouchers to the AI provider: `mask_parties` shortens party and
-  ledger names, `drop_narration` drops narrations, and neither hides amounts.
+  established, because ComplyEaze Bridge did not read every voucher of the row's
+  date and of the day either side in Tally, or could not name a ledger it needed,
+  or found an entry on the other account's ledger within a day of the date, which
+  it does not compare with the row. The assistant reads the vouchers of that date
+  and of the day either side with `vouchers` and looks for a voucher of the
+  Contra voucher class, or of any other type such as a Journal, Payment or
+  Receipt, that carries the row's amount on the bank ledger the other account's
+  statement was built for, or on a ledger a transfer may pass through (and reads
+  its narration where it was not dropped). It tells the person what it found, and
+  keeps the skip; it does not look for a voucher dated further away or booked
+  against another ledger, a transfer may print on different days, and a masked
+  ledger name can read like another, so it compares amounts and dates too. A skip
+  is withdrawn, on one side only, solely on the person's confirmation that no
+  entry in Tally carries the transfer (`withdraw_skips`, as for any open row),
+  and the step says not to book the transfer in Tally another way, because a
+  later post of the other statement would book it twice. The assistant's read
+  of those days sends their vouchers to the AI provider (ComplyEaze Bridge's own
+  day reads send only `day_reads`): `mask_parties` shortens party and ledger
+  names, `drop_narration` drops narrations, and neither hides amounts.
 - **What `restored` means.** A batch that a restore ComplyEaze Bridge recorded
   covers (see `verify_import`, `book_rolled_back`) is never found posted or
   verified for the transfer check, whatever its last status: a row it holds
@@ -2726,8 +2884,8 @@ refused as `proposals_legacy` (parse the statement again).
   whatever the batch's status. A skip naming one of those ledgers that a single
   verified Contra matches by date on such a day is `matched_unconfirmed`, never
   paired. A skip with no candidate is `tally_unchecked` (or `not_found` after a
-  whole-day read of Tally) only where the other account's windows still hold its
-  day, and otherwise `not_established`;
+  read of its date and the day either side in Tally) only where the other
+  account's windows still hold its day, and otherwise `not_established`;
   `reference_differs` and `reversed_same_day` are decided before either. A
   Contra with no statement record inside a statement's own builds blocks the
   same way; another voucher there does not.
@@ -3181,8 +3339,10 @@ Both absent states rest on the order Tally serves requests in: the read that fin
 the name absent is sent after the create's send ended, and Tally has been seen to
 serve such a read only after the create had run. That was seen on TallyPrime 7.2
 Silver, for ledger creates, with every request on a new connection and with the
-create, the read or both on a reused connection, behind a long read, and with every
-request on a new connection behind a long import (#2176). Their answers carry
+create, the read or both on a reused connection, behind a long read, and behind a
+long import with every request on a new connection or with the create on a reused
+connection and the read on a new one (#2176). That last pattern is the one seen from
+ComplyEaze Bridge's own post and reconcile. The answers of both states carry
 `verification.basis` `read_after_send_order`. So ComplyEaze Bridge gives either
 absent state only when the read-back's Tally reports TallyPrime 7.2, licensed,
 Silver or Gold: Gold is the same product with multi-user access, so the edition
@@ -3557,8 +3717,8 @@ rolled back, and a covered Sales invoice batch stops that company's invoices
 until it is released; a repair or rewrite of the company's data that lowered the
 voucher mark (not measured) would be recorded the same way. An older build refuses a journal holding the record: do not
 downgrade after posting. Bridge still records those rows as posted, so a rebuilt batch holding
-them is refused as `import_txn_already_posted`; re-entering them in that book is
-the person's decision. The result's `post_span_binding` names the binding's
+them is refused as `import_txn_already_posted` until a person releases them
+(below). The result's `post_span_binding` names the binding's
 `state`: `bound`, `refused` with its `code`, `unsettled` with its `code` (for
 example `binding_effective_date_not_observed`, when the read left out a
 Payment, Receipt or Contra's effective date: never refused for it, and decided
@@ -3626,6 +3786,32 @@ a later answer from Tally with an outcome, a binding or a recorded rollback of t
 written when the batch's records change while the dialog is open (`ack_changed_while_reviewing`). A build older
 than this record refuses the whole import journal once one is written, as for a stop release: do not downgrade
 after recording one.
+
+A native post that reads `book_rolled_back` keeps its rows held, since its vouchers may be gone and ComplyEaze
+Bridge cannot tell whether they are. Once the person has checked in Tally that none of its vouchers is in the
+book, including any keyed again with other figures, `acknowledge_post_review` with `doubt` set to `rolled_back`
+releases its rows (bridge#1038), in its own dialog (`--confirm-row-release`, titled to release the batch's rows),
+which the model cannot answer and which lists every voucher of the batch. It is admitted only for a batch sent
+natively with its voucher mark recorded before the POST (`ack_batch_not_posted` for a batch never sent), holding
+only Journal, Payment and Receipt vouchers (`ack_release_type_not_admitted`: a Sales invoice or a Contra is also
+held by readers a release does not reach), whose vouchers the dialog can all list, at most ten, each shown within
+the dialog's limits (`ack_release_vouchers_not_listed`), while a recorded rollback covers it, as a fresh readback
+reports (`book_rolled_back`; `ack_rolled_back_not_established` otherwise; `ack_already_recorded` while one stands).
+The dialog shows the voucher mark that rollback's verification read, below the mark the post left, and says the
+mark may read higher now: a newer backup restored since can read at or above it. The record, in
+the import journal, names the cover it rests on and the batch's company and endpoint; it changes nothing in Tally
+and no status or verdict, removes no record and sends nothing. The batch keeps its record and still reads
+`book_rolled_back`; `verify_import` reports the release as `row_release`, with its own `next_step`, and
+`local_data_report` counts the batch as `released_by_person` instead of `not_settled_restored`. Its one effect is
+that the batch no longer holds its rows for a build or a post (`import_txn_already_posted`), so they can be built
+again as a new batch, which is checked against the book and approved like any other, and whose binding may take a
+voucher GUID the released batch had bound, as a restored book can give the next voucher; a skip of one of those rows
+in a statement is still refused (`skip_row_already_posted`). The person is the only guard against a voucher keyed
+again with any difference: the fresh post's book check matches by content and does not see it. A release is
+never undone. Nothing is written when the batch's records change, or its cover changes, while the dialog is open
+(`ack_changed_while_reviewing`). A build older than this record refuses the whole import journal once one is
+written: do not install a release older than the one that ships it; to recover, install that release or a later
+one again, and never edit the journal by hand.
 
 A voucher of an untagged native post that was not bound (its binding refused or
 its response lost), and that its content no longer finds (for example after an
@@ -3984,7 +4170,9 @@ Per tool:
 - `vouchers` (`src-tauri/src/agent_vouchers.rs`):
   1. the company read;
   2. the ledger catalogue (if `ledger`);
-  3. the window read, which always reads the marks;
+  3. the window read, which always reads the marks, then, only when the window holds a
+     foreign-currency composite (#683), the book's base-currency read (22 requests, as for
+     `voucher_presence`); a failure of that read leaves those vouchers withheld;
   4. the corroboration (if no rows);
   5. the ledger catalogue again (if `ledger`);
   6. the voucher-type catalogue (if a named type selected nothing).
@@ -4006,7 +4194,10 @@ Per tool:
      the read's own code, `masters_education_unqualified`). The check reads the numbering as it
      is now, holds for the moment of the read, and does not know how existing vouchers were
      numbered when they were entered;
-  4. the window read;
+  4. the window read, then, only when the window holds a foreign-currency composite (#683), the
+     book's base-currency read (22 requests: identity, the extent pair, the currency masters, the
+     same with `ORIGINALNAME` and the company's `CURRENCYNAME`, each a pair, the extent pair and
+     identity again); a failure of that read refuses the call as `company_currency_probe_failed`;
   5. the corroboration (if empty);
   6. the ledger catalogue again.
 

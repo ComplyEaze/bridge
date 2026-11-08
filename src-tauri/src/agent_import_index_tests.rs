@@ -24,7 +24,7 @@ fn captured_derived_large_verification_preserves_tag_and_fallback_multiplicity()
             .iter()
             .map(|entry| ImportEntry {
                 ledger: entry.ledger.clone(),
-                amount: entry.amount.trim_start_matches('-').into(),
+                amount: ImportAmount::parse(entry.amount.trim_start_matches('-')).unwrap(),
                 side: if entry.is_deemed_positive == "Yes" {
                     EntrySide::Dr
                 } else {
@@ -362,15 +362,12 @@ fn the_hand_re_entry_carries_the_cancelled_vouchers_fingerprint() {
     );
     let line: ImportLedgerLine =
         serde_json::from_str(journal.lines().next().expect("the built batch")).unwrap();
-    let mut built = line
+    let built = line
         .vouchers
         .iter()
         .find(|voucher| voucher.bridge_txn_id == "L1A-050")
         .expect("L1A-050")
         .clone();
-    for entry in &mut built.entries {
-        entry.amount = canonical_verification_amount(&entry.amount).unwrap();
-    }
     let expected = expected_fingerprint(&built);
     assert_eq!(observed_fingerprint(&row_at(1790), None), expected);
     assert_ne!(observed_fingerprint(&row_at(1789), None), expected);

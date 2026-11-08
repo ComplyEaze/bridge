@@ -1275,24 +1275,8 @@ fn a_contra_that_is_not_two_ledgers_either_side_is_left_out_and_counted() {
         &[(N2, "100.00", "Dr"), (N2, "100.00", "Cr")],
         "20260901",
     );
-    let zero = voucher(
-        &st(94),
-        "Contra",
-        &[(N2, "0.00", "Dr"), (N1, "0", "Cr")],
-        "20260901",
-    );
-    let negative = voucher(
-        &st(95),
-        "Contra",
-        &[(N2, "-5", "Dr"), (N1, "-5", "Cr")],
-        "20260901",
-    );
-    let unreadable = voucher(
-        &st(96),
-        "Contra",
-        &[(N2, "x", "Dr"), (N1, "x", "Cr")],
-        "20260901",
-    );
+    // A zero, signed or unreadable amount is not a line a journal can hold (#1872): the
+    // type refuses it where the journal is read (`ImportAmount::parse`).
     // two bound ledgers that are one ledger
     let same_guid = voucher(
         &st(97),
@@ -1308,8 +1292,7 @@ fn a_contra_that_is_not_two_ledgers_either_side_is_left_out_and_counted() {
         "20260901",
     );
     let all = [
-        three_legs, both_debit, unequal, one_ledger, zero, negative, unreadable, same_guid,
-        third_bank,
+        three_legs, both_debit, unequal, one_ledger, same_guid, third_bank,
     ];
     for (index, rejected) in all.iter().enumerate() {
         let txn = rejected["bridge_txn_id"].as_str().unwrap().to_string();
@@ -1337,7 +1320,7 @@ fn equal_amounts_may_differ_in_scale() {
         .voucher(voucher(
             &st(111),
             "Contra",
-            &[(N2, "100.0", "Dr"), (N1, "100.00", "Cr")],
+            &[(N2, "0100.00", "Dr"), (N1, "100.00", "Cr")],
             "20260901",
         ))
         .facts(facts(B2).contra(&st(111), None));

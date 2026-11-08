@@ -2,6 +2,7 @@
 use super::*;
 use bridge_tally_core::book_presence::WindowRead;
 use bridge_tally_core::TallyDate;
+use bridge_tally_protocol::native_outstandings::IdentifiedBaseCurrency;
 use std::collections::BTreeSet;
 
 impl Server {
@@ -29,6 +30,10 @@ pub(super) struct VoucherPageKey {
     /// them cannot serve a page that asks for them, and one read with them is not held for a call
     /// that does not, so the bytes held without the argument are unchanged.
     gst_details: GstDetailsShown,
+    /// Whether the window was read naming the e-invoice details (#1378), held apart as above.
+    e_invoice: EInvoiceFields,
+    /// Whether the window was read for stock lines (#2016), which holds no ledger entries.
+    stock_lines: StockLines,
 }
 
 impl VoucherPageKey {
@@ -49,12 +54,26 @@ impl VoucherPageKey {
             search: search.cloned(),
             summary: None,
             gst_details: GstDetailsShown::Withheld,
+            e_invoice: EInvoiceFields::NotAsked,
+            stock_lines: StockLines::NotAsked,
         }
     }
 
     /// The same question asked with or without each entry's GST details.
     pub(super) fn with_gst_details(mut self, gst: GstDetailsShown) -> Self {
         self.gst_details = gst;
+        self
+    }
+
+    /// The same question asked with or without the e-invoice details.
+    pub(super) fn with_e_invoice(mut self, e_invoice: EInvoiceFields) -> Self {
+        self.e_invoice = e_invoice;
+        self
+    }
+
+    /// The same question asked for stock lines.
+    pub(super) fn with_stock_lines(mut self, stock_lines: StockLines) -> Self {
+        self.stock_lines = stock_lines;
         self
     }
 
@@ -324,6 +343,33 @@ pub(super) fn summary_failure(code: String) -> ToolFailure {
     }
 }
 
+/// Why stock lines are not compared with the Stock Summary (protocol reference §8.2i).
+const STOCK_TIE_NOT_COMPARED: &str = "no read returns the Stock Summary's inward and outward quantities; on one book a Delivery Note moved its item's closing quantity there and no value. Do not sum lines across kinds: a note and its invoice can be the same goods";
+
+/// What a stock-line read says of the whole window, on every page: the kinds whose lines it did
+/// not read, with how many vouchers of each, and that nothing was compared.
+fn stock_line_extra(rows: &[Value]) -> Vec<(&'static str, Value)> {
+    let mut not_read = std::collections::BTreeMap::<String, usize>::new();
+    for row in rows
+        .iter()
+        .filter(|row| row["stock_lines_not_read"] == true)
+    {
+        let kind = row["voucher_type"].as_str().unwrap_or_default().to_string();
+        *not_read.entry(kind).or_default() += 1;
+    }
+    vec![
+        (
+            "kinds_not_read",
+            not_read
+                .into_iter()
+                .map(|(kind, vouchers)| json!({"voucher_type": kind, "vouchers": vouchers}))
+                .collect(),
+        ),
+        ("stock_summary_tie", json!("not_compared")),
+        ("stock_summary_tie_reason", json!(STOCK_TIE_NOT_COMPARED)),
+    ]
+}
+
 /// What one page of a `vouchers` result holds: the vouchers, or with `summarise_by` the
 /// buckets (#1230), and the fields only the second carries.
 pub(super) struct PageBody {
@@ -343,6 +389,7 @@ pub(super) fn render_page_body(
     summary: Option<&SummaryRequest>,
     (offset, limit): (usize, usize),
     shown: (BankAllocationsShown, GoodsLinesShown, GstDetailsShown),
+    stock_lines: StockLines,
 ) -> Result<PageBody, ToolFailure> {
     let Some(request) = summary else {
         let items = page_items(server, rows, (offset, limit), shown);
@@ -352,7 +399,10 @@ pub(super) fn render_page_body(
             truncated: offset.saturating_add(items.len()) < rows.len(),
             items,
             total: rows.len(),
-            extra: Vec::new(),
+            extra: match stock_lines {
+                StockLines::Asked => stock_line_extra(rows),
+                StockLines::NotAsked => Vec::new(),
+            },
         });
     };
     let summary = voucher_summary::summarise(rows, request).map_err(summary_failure)?;
@@ -548,6 +598,8 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             GoodsLinesShown::from_args(args)?,
             GstDetailsShown::from_args(args)?,
         );
+        let e_invoice = EInvoiceFields::from_args(args)?;
+        let stock_lines = StockLines::from_args(args)?;
         // A type GUID that is not this company's cannot name any of its
         // types: refused rather than answered with an empty selection.
         if let Some(VoucherTypeSelector::Guid(type_guid)) = &type_selector {
@@ -576,6 +628,8 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             )
             .with_summary(summary_group)
             .with_gst_details(shown.2)
+            .with_e_invoice(e_invoice)
+            .with_stock_lines(stock_lines)
         });
         let mut earlier_snapshot = None;
         if let Some(key) = &page_key {
@@ -665,11 +719,17 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         };
         // A type filter asks Tally to resolve each row's type in the same
         // response (bridge#625); every other call sends the request unchanged.
-        let shape = if type_selector.is_some() {
+        let shape = if stock_lines == StockLines::Asked {
+            VoucherReadShape::ClassInventoryWildcard
+        } else if type_selector.is_some() {
             VoucherReadShape::ClassEntryWildcard
         } else {
             VoucherReadShape::EntryWildcard
-        };
+        }
+        .asking(NamedVoucherFields {
+            e_invoice,
+            gst: VoucherGstFields::following(shown.2),
+        });
         let read = server
             .read_entry_window_rows(
                 &identity,
@@ -689,7 +749,7 @@ pub(crate) async fn selected_voucher_operation_for_verified(
         let counted = read.counted();
         // A withheld voucher goes through every date, ledger and type check as
         // a row with no amounts, and is set aside only after them (#674).
-        let voucher_rows = server.read_withheld_composites(&identity, read.rows, &mut accumulated).await;
+        let (voucher_rows, _) = server.read_withheld_composites(&identity, read.rows, &mut accumulated).await;
         let rows = voucher_rows.into_iter().map(VoucherRow::into_filter_row).collect();
         let mut rows = validate_then_filter_voucher_rows(rows, from.as_str(), to.as_str(), None)?;
         let empty_window = if rows.is_empty() {
@@ -846,7 +906,14 @@ pub(crate) async fn selected_voucher_operation_for_verified(
             selected_ledger: selected_ledger.clone(),
             placements: placements.clone(),
         });
-        let body = render_page_body(server, &rows, summary.as_ref(), (offset, limit), shown)?;
+        let body = render_page_body(
+            server,
+            &rows,
+            summary.as_ref(),
+            (offset, limit),
+            shown,
+            stock_lines,
+        )?;
         let (mut payload, truncated) = voucher_page_payload(
             &company,
             result_state,
@@ -1015,6 +1082,7 @@ impl Server {
             summary.as_ref(),
             (offset, limit),
             shown,
+            key.stock_lines,
         )?;
         if let (Some(reason), Some(evidence)) = (snapshot.reason, accumulated.as_mut()) {
             evidence.reason_code = Some(reason.to_string());
@@ -1156,12 +1224,13 @@ impl Server {
         // be, and this read uses the entry wildcard: it is bounded like any
         // other windowed read rather than trusted to be small.
         let wider = self
-            .read_entry_wildcard_window(
+            .read_entry_window_shaped(
                 identity,
                 company,
                 &wider_from,
                 &wider_to,
                 known_marks,
+                (VoucherReadShape::EntryWildcard, VoucherComposites::Refuse),
                 SmallBooks::Skip,
             )
             .await
@@ -1174,7 +1243,11 @@ impl Server {
             Some(prior) => combine_evidence(prior, wider.all_evidence()),
             None => wider.all_evidence(),
         };
-        let wider_rows = wider.rows;
+        let wider_rows = wider
+            .rows
+            .into_iter()
+            .map(VoucherRow::into_filter_row)
+            .collect();
         let found = validate_then_filter_voucher_rows(
             wider_rows,
             wider_from.as_str(),
@@ -1238,32 +1311,6 @@ impl Server {
 }
 
 impl Server {
-    /// A bounded read of the entry-wildcard voucher window (`render_agent_vouchers`)
-    /// shared by `voucher_presence` and the empty-window corroboration. Rows
-    /// are parsed per part and returned in date order; validating them is the
-    /// caller's job, over the union. `small_books` is whether a book that fits
-    /// one request is counted first (#1029).
-    pub(super) async fn read_entry_wildcard_window(
-        &self,
-        identity: &VerifiedCompanyIdentity,
-        company: &str,
-        from: &TallyDate,
-        to: &TallyDate,
-        known_marks: Option<CompanyMarks>,
-        small_books: SmallBooks,
-    ) -> Result<WindowReadOutcome<Value>, ToolFailure> {
-        self.read_entry_window_shaped(
-            identity,
-            company,
-            from,
-            to,
-            known_marks,
-            VoucherReadShape::EntryWildcard,
-            small_books,
-        )
-        .await
-    }
-
     /// The `vouchers` window in either entry-wildcard shape, parsed under
     /// `composites` (#674), with each entry's GST details when `gst` shows them (#2027).
     #[allow(clippy::too_many_arguments)]
@@ -1291,33 +1338,50 @@ impl Server {
     }
 
     /// The window's rows, each voucher withheld for a composite read under the book's classified
-    /// base where that can be done (#683). The base is read only for a window that holds one, and
-    /// a book whose base is not established leaves them withheld.
-    async fn read_withheld_composites(
+    /// base where that can be done (#683), and the cause a voucher still withheld is under. A book
+    /// whose base is not established, or whose base read fails, leaves them withheld; a failed
+    /// read is told apart, as `voucher_presence` tells it apart (#2314).
+    pub(super) async fn read_withheld_composites(
         &self,
         identity: &VerifiedCompanyIdentity,
         rows: Vec<VoucherRow>,
         accumulated: &mut Option<Evidence>,
-    ) -> Vec<VoucherRow> {
-        if !rows.iter().any(VoucherRow::is_withheld) {
-            return rows;
+    ) -> (Vec<VoucherRow>, &'static str) {
+        match self.composite_base(identity, &rows, accumulated).await {
+            Ok(Some(book)) => (
+                rows.into_iter().map(|row| row.read_under(&book)).collect(),
+                WITHHELD_FOREIGN_CURRENCY,
+            ),
+            Ok(None) => (rows, WITHHELD_FOREIGN_CURRENCY),
+            Err(_) => (rows, "company_currency_probe_failed"),
         }
-        let Ok(currency) = self
-            .runtime
-            .detect_classified_base_currency_with_extent(self.tally_config(), identity)
-            .await
-        else {
-            return rows;
-        };
-        accumulate_evidence(accumulated, evidence_from_runtime_read(currency.evidence()));
-        let Some(book) = currency.inr_base() else {
-            return rows;
-        };
-        rows.into_iter().map(|row| row.read_under(&book)).collect()
     }
 
-    /// [`Self::read_entry_wildcard_window`] in either entry-wildcard shape:
-    /// plain, or with each row's voucher type resolved (bridge#625).
+    /// The book's INR base to read the window's composites under (#683), read only for a window
+    /// that holds a withheld voucher: `None` for one that holds none, or for a book whose base is
+    /// not established as INR.
+    pub(super) async fn composite_base(
+        &self,
+        identity: &VerifiedCompanyIdentity,
+        rows: &[VoucherRow],
+        accumulated: &mut Option<Evidence>,
+    ) -> anyhow::Result<Option<IdentifiedBaseCurrency>> {
+        if !rows.iter().any(VoucherRow::is_withheld) {
+            return Ok(None);
+        }
+        let currency = self
+            .runtime
+            .detect_classified_base_currency_with_extent(self.tally_config(), identity)
+            .await?;
+        accumulate_evidence(accumulated, evidence_from_runtime_read(currency.evidence()));
+        Ok(currency.inr_base())
+    }
+
+    /// A bounded read of the voucher window (`render_agent_vouchers`) in either entry-wildcard
+    /// shape: plain, or with each row's voucher type resolved (bridge#625). Rows are parsed per
+    /// part under `composites` and returned in date order; validating them is the caller's job,
+    /// over the union. `small_books` is whether a book that fits one request is counted first
+    /// (#1029).
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn read_entry_window_shaped(
         &self,
@@ -1326,9 +1390,9 @@ impl Server {
         from: &TallyDate,
         to: &TallyDate,
         known_marks: Option<CompanyMarks>,
-        shape: VoucherReadShape,
+        (shape, composites): (VoucherReadShape, VoucherComposites),
         small_books: SmallBooks,
-    ) -> Result<WindowReadOutcome<Value>, ToolFailure> {
+    ) -> Result<WindowReadOutcome<VoucherRow>, ToolFailure> {
         let limits = WindowReadLimits::for_shape(shape);
         let limits = match small_books {
             SmallBooks::Skip => limits,
@@ -1342,7 +1406,17 @@ impl Server {
             shape,
             WindowPlanSource::Estimate { known_marks },
             limits,
-            |xml| parse_agent_rows(xml, identity.company_guid()),
+            |xml| match composites {
+                VoucherComposites::Withhold => parse_agent_rows_withholding_reading_gst(
+                    xml,
+                    identity.company_guid(),
+                    GstDetailsShown::Withheld,
+                    shape.named_fields(),
+                    shape.stock_lines(),
+                ),
+                VoucherComposites::Refuse => parse_agent_rows(xml, identity.company_guid())
+                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
+            },
         )
         .await
     }
@@ -1395,13 +1469,21 @@ async fn read_entry_window_rows_reading_gst<R: WindowReader>(
         WindowPlanSource::Estimate { known_marks: None },
         WindowReadLimits::for_shape(shape).counting_small_books(),
         |xml| match composites {
-            VoucherComposites::Withhold => {
-                parse_agent_rows_withholding_reading_gst(xml, identity.company_guid(), gst)
-            }
-            VoucherComposites::Refuse => {
-                parse_agent_rows_reading_gst(xml, identity.company_guid(), gst)
-                    .map(|rows| rows.into_iter().map(VoucherRow::Read).collect())
-            }
+            VoucherComposites::Withhold => parse_agent_rows_withholding_reading_gst(
+                xml,
+                identity.company_guid(),
+                gst,
+                shape.named_fields(),
+                shape.stock_lines(),
+            ),
+            VoucherComposites::Refuse => parse_agent_rows_reading_gst(
+                xml,
+                identity.company_guid(),
+                gst,
+                shape.named_fields(),
+                shape.stock_lines(),
+            )
+            .map(|rows| rows.into_iter().map(VoucherRow::Read).collect()),
         },
     )
     .await
@@ -1415,7 +1497,7 @@ const MAX_WITHHELD_LISTED: usize = 100;
 /// as `candidates` are bounded. Like theirs, the quarter counts each entry's
 /// serialized bytes, not the MCP text copy of the payload, which repeats them
 /// escaped. `withheld_total` stays exact.
-fn listed_withheld(withheld: &[Value], response_budget_bytes: usize) -> Vec<Value> {
+pub(super) fn listed_withheld(withheld: &[Value], response_budget_bytes: usize) -> Vec<Value> {
     let budget = response_budget_bytes / 4;
     let mut used = 0usize;
     let mut listed = Vec::new();

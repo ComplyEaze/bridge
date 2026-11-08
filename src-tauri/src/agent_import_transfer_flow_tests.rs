@@ -4,7 +4,7 @@
 //! and every row, amount and reference is invented.
 use super::bank_tests::{
     bank_build_plans, bank_server, captured_bank_payload, record, skip_only_plans, statement_v2,
-    two_bank_plans,
+    two_bank_plans, THROUGH_BANK_NUMBERING,
 };
 use super::*;
 
@@ -166,6 +166,12 @@ async fn run(directory: &Path, plans: Vec<ScenarioPlan>, args: Value) -> Value {
 
 fn admission_plans() -> Vec<ScenarioPlan> {
     two_bank_plans()[..REFUSED_AT_ADMISSION].to_vec()
+}
+
+/// A day read of a `tally_unchecked` row's window (#1392), refused at its first
+/// request: the row stays `tally_unchecked`.
+fn day_read_refused() -> ScenarioPlan {
+    ScenarioPlan::new(Fixture::SyntheticXml("<ENVELOPE/>".into())).with_http_status(500)
 }
 
 fn journal(directory: &Path) -> Server {
@@ -1409,6 +1415,7 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
             skip_only_plans(),
             two_bank_plans(),
             skip_only_plans(),
+            vec![day_read_refused()],
             admission_plans(),
         ]
         .concat(),
@@ -1433,7 +1440,7 @@ async fn a_row_without_a_reference_pairs_by_date_beside_a_row_of_another_referen
     assert_eq!(section["skips_open"], 1, "{again}");
     assert_eq!(
         open_rows(section),
-        // no day of Tally has been read, so the absence is not claimed
+        // the row's day was asked for and refused, so the absence is not claimed
         vec![open_row(skipped_row(), "tally_unchecked", None)],
         "{again}"
     );
@@ -1551,20 +1558,34 @@ async fn a_transfer_posted_inline_leaves_the_other_skip_not_established_rather_t
     let directory = tempfile::tempdir().unwrap();
     let rig = Rig::new(
         directory.path(),
-        [skip_only_plans(), skip_only_plans(), two_bank_plans()].concat(),
+        [
+            skip_only_plans(),
+            skip_only_plans(),
+            vec![day_read_refused()],
+            two_bank_plans(),
+        ]
+        .concat(),
     );
     rig.build(a_skips(directory.path(), &[(skipped_row(), None)]))
         .await;
     let mut b_skip = record(b_skipped(), json!("skipped"), BANK_A, "inflow", false);
     b_skip["reference"] = Value::Null;
-    rig.build(statement_v2(
-        directory.path(),
-        BANK_B,
-        window(),
-        json!([]),
-        json!([b_skip]),
-    ))
-    .await;
+    // both statements now cover the day, so the skips' day is asked for
+    let recorded = rig
+        .build(statement_v2(
+            directory.path(),
+            BANK_B,
+            window(),
+            json!([]),
+            json!([b_skip]),
+        ))
+        .await;
+    assert!(
+        open_rows(&recorded["transfers"])
+            .iter()
+            .all(|row| row["state"] == "tally_unchecked"),
+        "{recorded}"
+    );
     let built = rig
         .build(json!({"company_guid": CAPTURED_GUID,
             "vouchers": [contra_voucher(b_skipped())], "withdraw_skips": [b_skipped()]}))
@@ -2690,4 +2711,206 @@ async fn a_batch_with_a_found_status_keeps_its_withdrawal_at_send() {
         "{:?}",
         refusal.map(|refusal| refusal.reason())
     );
+}
+
+/// A build reads its rows' windows after the mark and the numbering read and
+/// before the catalogue repeat and the write (#1392): the scripted refusal is
+/// answered to the first day read in that place, the build is written, and its
+/// row stays `tally_unchecked` with the planned days kept.
+#[tokio::test]
+async fn a_build_reads_its_rows_days_before_the_catalogue_repeat_and_the_write() {
+    fn b_skipped() -> &'static str {
+        static TEXT: std::sync::LazyLock<String> =
+            std::sync::LazyLock::new(|| format!("st-20260901-{}b3", padn(0, 14)));
+        &TEXT
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let mut build = two_bank_plans();
+    build.insert(THROUGH_BANK_NUMBERING, day_read_refused());
+    let rig = Rig::new(directory.path(), [skip_only_plans(), build].concat());
+    // bank B's statement of only a skipped row covers the day
+    let mut b_skip = record(b_skipped(), json!("skipped"), BANK_A, "inflow", false);
+    b_skip["reference"] = Value::Null;
+    rig.build(statement_v2(
+        directory.path(),
+        BANK_B,
+        window(),
+        json!([]),
+        json!([b_skip]),
+    ))
+    .await;
+    // bank A's statement books a Contra of another amount and skips a row: the
+    // skip has no candidate, so its window is asked for
+    let mut voucher = contra_voucher(booked());
+    for entry in voucher["entries"].as_array_mut().unwrap() {
+        entry["amount"] = json!("99.00");
+    }
+    let mut contra = record(
+        booked(),
+        json!({"voucher": "Contra"}),
+        BANK_B,
+        "outflow",
+        false,
+    );
+    contra["amount"] = json!("99.00");
+    contra["reference"] = Value::Null;
+    let answer = rig
+        .server
+        .call_tool_response(
+            "build_import_xml",
+            statement_v2(
+                directory.path(),
+                BANK_A,
+                window(),
+                json!([voucher]),
+                json!([contra, skip_record(BANK_A, skipped_row(), None)]),
+            ),
+        )
+        .await
+        .value["structuredContent"]
+        .clone();
+    let built = &answer["result"];
+    assert!(built["batch_id"].is_string(), "{built}");
+    // a read refused before any answer came back adds nothing to the evidence:
+    // what the evidence holds of a failed read is the answers that came back
+    assert_eq!(answer["evidence"]["state"], "complete", "{answer}");
+    let section = &built["transfers"];
+    assert!(
+        open_rows(section).contains(&open_row(skipped_row(), "tally_unchecked", None)),
+        "{built}"
+    );
+    let kept = section["day_reads"]["kept"].as_array().unwrap();
+    assert_eq!(
+        kept.iter()
+            .map(|day| day["date"].clone())
+            .collect::<Vec<_>>(),
+        [json!("20260902"), json!("20260901"), json!("20260831")]
+    );
+    assert_ne!(kept[0]["cause"], "day_read_not_attempted");
+    assert_eq!(kept[1]["cause"], "day_read_not_attempted");
+    rig.finish();
+}
+
+/// The lab run's book through the tool (#1392). Bank A's statement skips its 13
+/// April row as carried by Bank B's Contra, and Bank B's statement skips its own
+/// row of the transfer the other way. Once both statements cover the day, the
+/// second record reads the window of 12 to 14 April: Bank A's row is
+/// `not_found` and Bank B's is `tally_unchecked`, as 13 April holds an entry on
+/// Bank A. The company's identity answers are synthetic; the catalogue and every
+/// day read are the captures.
+#[tokio::test]
+async fn a_skip_only_record_renders_not_found_from_the_lab_runs_captured_days() {
+    use crate::agent::transfer_pairing::tests::whole_day::{
+        run_day, utf16, LAB, LAB_GUID, T_CAT2, T_M2,
+    };
+    fn row(bank: &str) -> String {
+        format!("st-20260413-{}{bank}", padn(0, 14))
+    }
+    let company = format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><COLLECTION><COMPANY NAME=\"{LAB}\"><GUID>{LAB_GUID}</GUID><COMPANYNUMBER>1</COMPANYNUMBER><BOOKSFROM>20260401</BOOKSFROM></COMPANY></COLLECTION></DATA></BODY></ENVELOPE>");
+    let plan = |body: String| {
+        ScenarioPlan::new(Fixture::SyntheticXml(body))
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_framing(ResponseFraming::ContentLength)
+    };
+    let status = || {
+        ScenarioPlan::new(Fixture::ProductStatus(
+            tally_protocol_simulator::ProductStatus::TallyPrime,
+        ))
+        .with_framing(ResponseFraming::ContentLength)
+    };
+    // one identity-bracketed, paired read
+    let bracketed = |answer: String| {
+        vec![
+            plan(company.clone()),
+            plan(answer.clone()),
+            status(),
+            plan(answer),
+            status(),
+            plan(company.clone()),
+        ]
+    };
+    let record_plans = || {
+        [
+            vec![
+                plan(company.clone()),
+                status(),
+                plan(company.clone()),
+                status(),
+            ],
+            bracketed(utf16(T_CAT2)),
+        ]
+        .concat()
+    };
+    let mut plans = [record_plans(), record_plans(), bracketed(utf16(T_M2))].concat();
+    for day in [14, 13, 12] {
+        for (_, answer) in run_day(day) {
+            plans.extend(bracketed(utf16(answer)));
+        }
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let statement = |bank: &str, other: &str, txn: &str, direction: &str| {
+        let mut skip = record(txn, json!("skipped"), other, direction, false);
+        skip["date"] = json!("2026-04-13");
+        skip["reference"] = Value::Null;
+        let mut args = statement_v2(
+            directory.path(),
+            bank,
+            json!({"from": "2026-04-02", "to": "2026-04-29"}),
+            json!([]),
+            json!([skip]),
+        );
+        args["company_guid"] = json!(LAB_GUID);
+        args
+    };
+    let rig = Rig::new(directory.path(), plans);
+    let call = |args: Value| async {
+        rig.server
+            .call_tool_response("build_import_xml", args)
+            .await
+            .value["structuredContent"]
+            .clone()
+    };
+    let first = call(statement(
+        "TLab Bank A",
+        "TLab Bank B",
+        &row("a1"),
+        "outflow",
+    ))
+    .await;
+    assert_eq!(first["result"]["state"], "skips_recorded", "{first}");
+    let lab_row =
+        |id: String, state: &str| json!({"bridge_txn_id": id, "date": "20260413", "state": state});
+    assert_eq!(
+        open_rows(&first["result"]["transfers"]),
+        vec![lab_row(row("a1"), "not_established")],
+        "{first}"
+    );
+    let second = call(statement(
+        "TLab Bank B",
+        "TLab Bank A",
+        &row("b1"),
+        "inflow",
+    ))
+    .await;
+    assert_eq!(second["result"]["state"], "skips_recorded", "{second}");
+    let section = &second["result"]["transfers"];
+    assert_eq!(
+        open_rows(section),
+        vec![
+            lab_row(row("a1"), "not_found"),
+            lab_row(row("b1"), "tally_unchecked"),
+        ],
+        "{second}"
+    );
+    assert_eq!(
+        section["day_reads"],
+        json!({"whole": 1, "empty": 2, "kept": []})
+    );
+    // the second record's evidence holds the marks and the three days it read
+    assert!(
+        second["evidence"]["bytes"].as_u64().unwrap()
+            > first["evidence"]["bytes"].as_u64().unwrap(),
+        "{first} {second}"
+    );
+    rig.finish();
 }

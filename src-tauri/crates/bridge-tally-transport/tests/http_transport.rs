@@ -155,6 +155,50 @@ async fn decoded_only_transport_streams_expected_utf16_without_retaining_wire_bo
     }
 }
 
+/// A send's own response limit refuses an answer past it under that limit, where the policy's
+/// would have taken it, and an answer at it is returned whole; a limit above the policy's is held
+/// to the policy's.
+#[tokio::test]
+async fn a_sends_own_response_limit_refuses_past_it_and_never_exceeds_the_policy() {
+    const ROOM: usize = 4096;
+    let plan = ScenarioPlan::new(Fixture::SyntheticXml("A".repeat(40)))
+        .with_encoding(WireEncoding::Utf16Le)
+        .with_framing(ResponseFraming::ContentLength);
+    let bytes = plan.response_bytes().len();
+    assert!(bytes < ROOM);
+    for (send_limit, policy_limit, refused_at) in [
+        (bytes - 1, ROOM, Some(bytes - 1)),
+        (bytes, ROOM, None),
+        (ROOM, bytes - 1, Some(bytes - 1)),
+    ] {
+        let simulator = Simulator::spawn(plan.clone()).expect("spawn loopback simulator");
+        let transport = TallyHttpTransport::with_policy(
+            endpoint(&simulator),
+            policy(policy_limit, Duration::from_secs(2)),
+        )
+        .expect("build limited transport");
+        let result = transport
+            .post_xml_decoded_within("<E />".to_owned(), send_limit)
+            .await;
+        match refused_at {
+            Some(limit) => assert!(
+                matches!(
+                    result,
+                    Err(TallyTransportError::ResponseTooLarge { limit: refused, .. }) if refused == limit
+                ),
+                "{send_limit} under {policy_limit}: {result:?}"
+            ),
+            None => assert_eq!(
+                result
+                    .expect("an answer at the limit is returned")
+                    .encoded_bytes(),
+                bytes
+            ),
+        }
+        drop(simulator);
+    }
+}
+
 #[tokio::test]
 async fn decoded_only_transport_enforces_decoded_cap_during_streaming() {
     const LIMIT: usize = 100;

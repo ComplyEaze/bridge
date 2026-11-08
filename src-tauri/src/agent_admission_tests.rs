@@ -109,6 +109,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "read_evidence",
         "sales_register",
         "statement_tie_out",
+        "stock_by_batch",
         "stock_by_godown",
         "stock_summary",
         "tally_status",
@@ -1840,9 +1841,21 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// Creating several ledgers in one request added 259 bytes to the master-writes list alone,
 /// measured on the merged tree: the lists are 205,920, 231,813, 234,322 and 239,699 bytes,
 /// leaving margins of 1,580, 1,687, 1,678 and 1,301.
+/// `stock_by_batch` (#2018), in the default list, adds 1,714 bytes to each list: on the merged
+/// tree they measure 207,634, 233,527, 236,036 and 241,413, over by 134, 27, 36 and 413. Each
+/// budget went up by 1,400. The e-invoice argument (#1378) and the review of a twin ledger (#626)
+/// add 362 bytes between them, leaving margins of 904, 1,011, 1,002 and 625 once all have landed.
+/// The release of a rolled-back batch's rows (#1038) adds the `rolled_back` doubt to
+/// `acknowledge_post_review`, which only the three lists with posting on hold. With its first
+/// text, 212 bytes (198 of description, 14 of enum value), the lists measured 208,571,
+/// 234,676, 237,185 and 242,562 on 3 Nov 2026, so its base measures 208,571, 234,464, 236,973
+/// and 242,350: merges since the margins above took the rest. Its review fixes add 45 bytes of
+/// description, so with it the lists measured 208,571, 234,721, 237,230 and 242,607 the same
+/// day, the last 207 over its old budget. That budget went up by 500, leaving margins of
+/// 329, 179, 170 and 293.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [207_500, 233_500, 236_000, 241_000];
+const TOOL_LIST_BUDGETS: [usize; 4] = [208_900, 234_900, 237_400, 242_900];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

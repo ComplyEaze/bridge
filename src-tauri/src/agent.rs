@@ -10,8 +10,8 @@ use bridge_tally_protocol::xml_text::escape_text as xml_escape;
 #[path = "agent_import.rs"]
 mod agent_import;
 pub use crate::tally::approved_import::{
-    run_confirmation, run_masters_confirmation, run_release_confirmation, run_review_confirmation,
-    run_settle_confirmation,
+    run_confirmation, run_masters_confirmation, run_release_confirmation,
+    run_release_rows_confirmation, run_review_confirmation, run_settle_confirmation,
 };
 pub(crate) use agent_import::desktop_journal_review as desktop_journal;
 
@@ -72,6 +72,8 @@ use ledger_candidates::{
 mod ledgers;
 #[path = "agent_masters.rs"]
 mod masters;
+#[path = "agent_stock_by_batch.rs"]
+mod stock_by_batch;
 #[path = "agent_stock_summary.rs"]
 mod stock_summary;
 use ledgers::{ListingKind, ListingSnapshot, ListingSnapshots};
@@ -283,10 +285,14 @@ fn mark_entry_party_names(entry: &mut Value) {
             mark_party_field(allocation, "category");
         }
     }
-    // A goods line's item, godown and batch, for the reason the masters tool masks item and
-    // godown names: a supplier-named item or a job-work godown can carry a party's name, and
-    // a batch name is whatever text was typed (#2015).
-    if let Some(lines) = entry.get_mut("goods_lines").and_then(Value::as_array_mut) {
+    mark_goods_line_party_names(entry, "goods_lines");
+}
+
+/// A goods line's item, godown and batch, for the reason the masters tool masks item and
+/// godown names: a supplier-named item or a job-work godown can carry a party's name, and
+/// a batch name is whatever text was typed (#2015).
+fn mark_goods_line_party_names(holder: &mut Value, list: &str) {
+    if let Some(lines) = holder.get_mut(list).and_then(Value::as_array_mut) {
         for line in lines {
             mark_party_field(line, "stock_item");
             if let Some(batches) = line.get_mut("batches").and_then(Value::as_array_mut) {
@@ -419,6 +425,17 @@ fn mark_voucher_party_names(mut voucher: Value) -> Value {
     if let Some(entries) = voucher.get_mut("amounts").and_then(Value::as_array_mut) {
         for entry in entries {
             mark_entry_party_names(entry);
+        }
+    }
+    mark_goods_line_party_names(&mut voucher, "stock_lines");
+    // The transporter, the carrier and the vehicle number name or identify a business or person
+    // other than the book's own; the other dispatch details stay as the book has them, as place of
+    // supply does.
+    if let Some(dispatch) = voucher.get_mut("dispatch") {
+        for field in ["dispatched_through", "carrier", "vehicle_no"] {
+            if let Some(state) = dispatch.get_mut(field) {
+                mark_party_field(state, "value");
+            }
         }
     }
     voucher
@@ -856,6 +873,8 @@ struct ReadDetail {
     /// The first Trial Balance row that does not add up, for a statement refusal (#692). Its
     /// ledger is shown as a party name, so `mask_parties` masks it.
     inconsistent_row: Option<crate::reports::statements::RowGap>,
+    /// Which request of the party ledger read failed (#2265). A code from a closed set.
+    failed_request: Option<&'static str>,
 }
 
 /// See [`ReadDetail::window_scope`]: whether the refusal is that of the read by the party's ledger
@@ -923,6 +942,19 @@ impl ToolFailure {
         self
     }
 
+    /// A read-count refusal with the stretch its census proves refused. Nothing
+    /// changes on any other failure.
+    fn with_certainly_refused(mut self, stretch: Option<CertainlyRefused>) -> Self {
+        if let Some(reads) = self
+            .read_detail
+            .as_mut()
+            .and_then(|detail| detail.planned_reads.as_mut())
+        {
+            reads.certainly_refused = stretch;
+        }
+        self
+    }
+
     fn with_window_scope(mut self, report: ScopeReport) -> Self {
         self.read_detail
             .get_or_insert_with(Box::default)
@@ -946,11 +978,24 @@ impl ToolFailure {
 
 /// A window read refused as needing more requests than one call may spend:
 /// `needed_at_least` (exact when the plan was made, a lower bound when the
-/// census stopped early) against `allowed`.
+/// census stopped early) against `allowed`, and, when the refusal was decided
+/// from the census, the stretch of days it proves refused (#2372).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct PlannedReads {
     needed_at_least: usize,
     allowed: usize,
+    certainly_refused: Option<CertainlyRefused>,
+}
+
+/// The shortest stretch of a refused window's days whose counted vouchers
+/// alone are more than the allowed reads carry, so that any window containing
+/// it is refused too (`voucher_window::certainly_refused`). Dates and counts only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct CertainlyRefused {
+    from: NaiveDate,
+    to: NaiveDate,
+    vouchers_counted: u64,
+    vouchers_allowed_at_most: u64,
 }
 
 /// The reason a partial read gave, carried by a refusal that needed a complete
@@ -1006,6 +1051,20 @@ fn unsupported_parent_refusal(error: &anyhow::Error) -> Option<u64> {
     })
 }
 
+/// The stock-item read's refusal, from either stock tool: `stock_by_batch` carries the shared
+/// one inside its own error, under its own codes, so its size and cause are read through it.
+fn stock_item_read_refusal<'a>(
+    cause: &'a (dyn std::error::Error + 'static),
+) -> Option<&'a crate::tally::runtime::StockSummaryReadError> {
+    cause
+        .downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        .or_else(|| {
+            cause
+                .downcast_ref::<crate::tally::runtime::StockByBatchReadError>()
+                .map(|error| &error.0)
+        })
+}
+
 fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
     error.chain().find_map(|cause| {
         if let Some(crate::tally::runtime::MastersReadError::TooLarge {
@@ -1028,7 +1087,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
             estimated_bytes,
             limit_bytes,
             limit_master_alter_id,
-        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        }) = stock_item_read_refusal(cause)
         {
             return Some(ReadSize {
                 master_alter_id: *master_alter_id,
@@ -1044,7 +1103,7 @@ fn read_size_refusal(error: &anyhow::Error) -> Option<ReadSize> {
             estimated_bytes,
             limit_bytes,
             limit_items,
-        }) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        }) = stock_item_read_refusal(cause)
         {
             return Some(ReadSize {
                 master_alter_id: *master_alter_id,
@@ -1248,7 +1307,7 @@ fn runtime_refusal_cause(error: &anyhow::Error) -> Option<&'static str> {
         if let Some(
             crate::tally::runtime::StockSummaryReadError::PremiseViolated(reason)
             | crate::tally::runtime::StockSummaryReadError::CensusRefused(reason),
-        ) = cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
+        ) = stock_item_read_refusal(cause)
         {
             return Some(reason);
         }
@@ -1439,19 +1498,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              and ledger_movement do not support it yet (#716). Retrying this read refuses \
              again.",
         ),
-        "register_ledger_currency_excluded" => Some(
-            "A voucher in this window touches a ledger that the compliance read of the ledger \
-             masters set aside because it is kept in another currency (or its balance is a \
-             currency composite), so the purchase or sales register cannot classify the voucher and refuses \
-             the whole window rather than leave it out. Narrow from and to so the window holds \
-             no such voucher, or read it with `vouchers`. Retrying the same window refuses \
-             again.",
-        ),
         "gst_by_ledger_window_partial" => Some(
             "The voucher window was read but could not be checked against a separate count of its \
-             vouchers, so gst_by_counter_ledger gives no totals for it rather than totals that may \
-             be short. purchase_register for the same window returns the rows it read, marked \
-             partial.",
+             vouchers, or holds a voucher whose foreign-currency amounts could not be read, so \
+             gst_by_counter_ledger gives no totals for it rather than totals that may be short. \
+             purchase_register for the same window returns the rows it read, marked partial, \
+             and lists any voucher it withheld.",
         ),
         "register_master_mark_unavailable" => Some(
             "Tally did not report the company's master-alteration mark, which the purchase and sales \
@@ -1540,7 +1592,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         ),
         // The stock summary read's own size refusal (`size` carries the mark, and the counted
         // items when the census counted them, #1233).
-        "stock_summary_too_large" => Some(
+        "stock_summary_too_large" | "stock_by_batch_too_large" => Some(
             "The company holds more stock items than one read is admitted for: with \
              `size.counted_items`, the census counted them, and an assumed worst-case row for \
              each is over ComplyEaze Bridge's response budget (`size.limit_bytes`; at most \
@@ -1548,7 +1600,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              refuses; retrying this call refuses again.",
         ),
         // #1233: the census that counts a book past the single-read mark could not finish.
-        "stock_summary_census_refused" => Some(
+        "stock_summary_census_refused" | "stock_by_batch_census_refused" => Some(
             "ComplyEaze Bridge could not count the company's stock items or stock groups, so no \
              request for stock items was sent; `error.cause` names why (a census slice holding \
              more rows than its span, a GUID twice, no item found, or an answer that did not \
@@ -1564,7 +1616,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              no stock request was sent. A larger book refuses; retrying this call refuses again.",
         ),
         // #1233: Tally counts more stock items than the census found.
-        "stock_summary_item_count_company_higher" => Some(
+        "stock_summary_item_count_company_higher" | "stock_by_batch_item_count_company_higher" => Some(
             "Tally's own stock item count is higher than ComplyEaze Bridge counted, so a read \
              sized from that count could be too small and none was sent. An item may have been \
              added during the call: call again once; if it refuses again, the count cannot be \
@@ -1615,6 +1667,12 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // The stock summary's date refusal: it costs no Tally request.
         "stock_summary_as_of_not_measured" => Some(
             "stock_summary reads only an `as_of` that is the last day of a month, and no \
+             request was sent. Ask for the last day of that month, or of another month; \
+             retrying the same date refuses again.",
+        ),
+        // The stock-by-batch read's date refusal: it costs no Tally request.
+        "stock_by_batch_as_of_not_measured" => Some(
+            "stock_by_batch reads only an `as_of` that is the last day of a month, and no \
              request was sent. Ask for the last day of that month, or of another month; \
              retrying the same date refuses again.",
         ),
@@ -1683,6 +1741,7 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         | "currency_to_master_extent_changed"
         | "masters_extent_changed"
         | "month_register_extent_changed"
+        | "stock_by_batch_extent_changed"
         | "stock_by_godown_extent_changed"
         | "stock_summary_extent_changed" => Some(
             "The company's books changed in Tally while this call was being read, so the call \
@@ -1944,6 +2003,19 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              Read this company with Tally's own reports, or split the company in Tally so \
              that each part's books are smaller.",
         ),
+        // A window that needs more data requests than one call may spend
+        // (protocol reference §11c): the count proves a refusal, never a fit,
+        // so the step names a narrower window and promises nothing about it.
+        "voucher_window_too_many_reads" => Some(
+            "This date window holds more vouchers than one call may read (`reads.needed_at_least` \
+             requests against `reads.allowed`), so nothing was returned. Ask for a narrower \
+             window. Where `reads.certainly_refused` is given, any window that contains its \
+             `from` to `to` is refused again, because ComplyEaze Bridge already counted more \
+             vouchers on those days than the allowed requests carry; a window that avoids them \
+             is not promised to fit. On a very large book (a voucher history of about a million) \
+             read one day per call, and a longer period a day at a time. For a period's totals, \
+             use trial_balance instead of reading its vouchers.",
+        ),
         // The `outstandings` party detail (#945) refuses, never cuts, an answer
         // over its row limit; each kind has its own code and its own remedy.
         "trail_too_large" => Some(
@@ -2042,6 +2114,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              batch for this invoice was sent, run verify_import on it. Only if it is another \
              invoice, tell the user the number is in use and ask which invoice number to \
              use. Do not pick another number yourself.",
+        ),
+        "invoice_number_already_used_with_irn" => Some(
+            "GST rule 46(b) needs an invoice number to be unique in the financial year (1 April \
+             to 31 March), and the read of that year's Sales vouchers found this number already \
+             in use on a voucher that carries an IRN, so the number belongs to an e-invoice and \
+             ComplyEaze Bridge refuses it. The voucher that has the number may be this same \
+             invoice, already in the book: open it in Tally first, and if an earlier batch for \
+             this invoice was sent, run verify_import on it. Only if it is another invoice, tell \
+             the user the number is in use and ask which invoice number to use. Do not pick \
+             another number yourself.",
         ),
         // The control beside the number read (`NumberAbsence`): a read that
         // matches nothing must never pass as a number not in use.
@@ -2209,6 +2291,27 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              read as unregistered. Ask the user to check the invoice date and the date the \
              customer's GST registration applies from in Tally. Then build again.",
         ),
+        "invoice_party_bill_wise_not_supported" => Some(
+            "This customer keeps its balance bill by bill in Tally, and ComplyEaze Bridge does not \
+             post an invoice to such a customer: Tally can apply it to a bill of the same name the \
+             customer already holds, even a settled one. Nothing was written to Tally. Ask the \
+             user to enter this invoice in Tally, or, if the customer's bills are not tracked, to \
+             turn off its bill-by-bill setting in Tally and build again.",
+        ),
+        "invoice_party_gstin_is_company_own" => Some(
+            "This customer's ledger in Tally holds the company's own GSTIN, and Tally lists an \
+             invoice to such a customer as uncertain in GSTR-1, so ComplyEaze Bridge does not post \
+             it. Nothing was written to Tally. Ask the user to check the GSTIN in the customer's GST \
+             registration details in Tally: if the customer has its own GSTIN, correct it there and \
+             build again; if the sale is to the company itself, it is not a Sales invoice to post \
+             here.",
+        ),
+        "invoice_party_bill_wise_unknown" => Some(
+            "Tally's ledger list did not name this customer's ledger exactly once, so whether it \
+             keeps its balance bill by bill is not known and the invoice was not built. Nothing \
+             was written to Tally. Check that the customer's ledger name matches Tally's exactly, \
+             then build again.",
+        ),
         "invoice_ledger_parent_unnameable"
         | "invoice_ledger_guid_unnameable"
         | "invoice_ledger_scope_unplannable" => Some(
@@ -2248,13 +2351,16 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
              written. Build once more; if the refusal repeats, tell the user this invoice has to \
              be entered in Tally itself.",
         ),
-        "import_invoice_figures_unreadable" => Some(
-            "An invoice of this batch has an amount or a date ComplyEaze Bridge cannot read, so \
-             it cannot check that invoice against the other batches this computer has sent. This \
-             can come before a post or while verifying a batch that may already be in Tally, so \
-             do not build or send it again on this answer alone: look for the invoice in Tally \
-             first, and if it is not there, tell the user this invoice has to be entered in \
-             Tally itself.",
+        // Given by the journal reader for any line it cannot read (#1872); the local data report
+        // names that line. The skip-only file's reader wraps it as `skip_file_unreadable`, and the
+        // master journal's maps it to its own error, so neither shows this text.
+        "import_ledger_invalid" => Some(
+            "ComplyEaze Bridge cannot read its import journal, so the import tools are stopped \
+             for every company on this computer until that is put right. Do not edit or delete \
+             the file, and do not build, post or verify again on this answer: a wrong edit can \
+             lose the record of a batch that was already sent. Tell the user to run the local \
+             data report, which names the line of the journal that cannot be read, and to send \
+             the journal file and that report to support.",
         ),
         // A date argument a caller can correct. `TallyDate` admits years 0001
         // to 9999, and the edge codes come from widening an empty window past
@@ -2571,6 +2677,10 @@ impl ToolFailure {
         }) {
             error.safe_code()
         } else if let Some(error) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<crate::tally::runtime::StockByBatchReadError>()
+        }) {
+            error.safe_code()
+        } else if let Some(error) = error.chain().find_map(|cause| {
             cause.downcast_ref::<crate::tally::runtime::StockSummaryReadError>()
         }) {
             error.safe_code()
@@ -2661,6 +2771,8 @@ impl ToolFailure {
                 .and_then(|error| error.bill_row())
                 .map(|(report, row)| BillRowRef { report, row })
         });
+        let failed_request =
+            crate::tally::runtime::failed_ledger_request(&error).map(|request| request.code());
         Self {
             code: code.to_string(),
             evidence,
@@ -2671,9 +2783,10 @@ impl ToolFailure {
             unsupported_parent_ledgers: unsupported_parent_refusal(&error),
             unanswered: unanswered_cause(&error),
             candidates: None,
-            read_detail: bill_row.map(|bill_row| {
+            read_detail: (bill_row.is_some() || failed_request.is_some()).then(|| {
                 Box::new(ReadDetail {
-                    bill_row: Some(bill_row),
+                    bill_row,
+                    failed_request,
                     ..ReadDetail::default()
                 })
             }),
@@ -3062,6 +3175,7 @@ impl Server {
                     unplaced_ledger,
                     window_scope,
                     inconsistent_row,
+                    failed_request,
                 ) = read_detail
                     .map(|detail| {
                         (
@@ -3071,9 +3185,15 @@ impl Server {
                             detail.unplaced_ledger,
                             detail.window_scope,
                             detail.inconsistent_row,
+                            detail.failed_request,
                         )
                     })
                     .unwrap_or_default();
+                if let Some(request) = failed_request {
+                    if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
+                        error["failed_request"] = json!(request);
+                    }
+                }
                 if let Some(row) = inconsistent_row {
                     if self.settings.max_bytes >= REMEDIATION_MIN_RESPONSE_BUDGET {
                         error["ledger"] = party_name_value(row.ledger);
@@ -3104,6 +3224,14 @@ impl Server {
                             "needed_at_least": reads.needed_at_least,
                             "allowed": reads.allowed,
                         });
+                        if let Some(stretch) = reads.certainly_refused {
+                            error["reads"]["certainly_refused"] = json!({
+                                "from": stretch.from.format("%Y%m%d").to_string(),
+                                "to": stretch.to.format("%Y%m%d").to_string(),
+                                "vouchers_counted": stretch.vouchers_counted,
+                                "vouchers_allowed_at_most": stretch.vouchers_allowed_at_most,
+                            });
+                        }
                     }
                 }
                 if let Some(scope) = window_scope {
@@ -3342,6 +3470,7 @@ impl Server {
                 in_own_frame(|| self.register(register::RegisterKind::Sales, args)).await
             }
             "statement_tie_out" => in_own_frame(|| self.statement_tie_out(args)).await,
+            "stock_by_batch" => in_own_frame(|| self.stock_by_batch(args)).await,
             "stock_by_godown" => in_own_frame(|| self.stock_by_godown(args)).await,
             "stock_summary" => in_own_frame(|| self.stock_summary(args)).await,
             "tally_status" => {

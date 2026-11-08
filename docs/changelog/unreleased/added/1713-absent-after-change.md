@@ -5,8 +5,9 @@
   Before, such a batch stayed `reconciliation_required` for good and held its name in every company. Both absent states
   now say what they rest on (`verification.basis` `read_after_send_order`): a read sent after the create's send ended
   was served after the create, seen for requests on new connections and with the create, the read or both on a reused
-  one (#1713, #2176). That was seen on licensed TallyPrime 7.2 only, on Silver, so both absent states, `confirmed_absent`
-  included, are now given only there, with the product exactly TallyPrime: on another product, another release,
+  one (#1713, #2176). That was seen on licensed TallyPrime 7.2 Silver, so both absent states, `confirmed_absent` included,
+  are now given only on licensed TallyPrime 7.2, Silver or Gold (no row ran on Gold, the same product with multi-user
+  access), with the product exactly TallyPrime: on another product, another release,
   Education or a Tally whose release is not known, a later call whose read finds the name absent leaves the batch open
   and its name held, with a reason naming what is not covered. Before, `confirmed_absent` was given on any Tally. **This
   changes behaviour on TallyPrime 7.1 and Education:** a batch there whose answer was lost and whose name a later

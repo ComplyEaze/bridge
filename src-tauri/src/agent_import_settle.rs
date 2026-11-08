@@ -110,21 +110,7 @@ pub(super) fn settle_preview(line: &ImportLedgerLine, result: &Value) -> String 
     } else {
         ("vouchers", "these vouchers", "each voucher")
     };
-    // Broken at spaces, then any word longer than a line broken where it
-    // reaches the limit, so a name without spaces cannot make the box refuse.
-    let wrap = |text: String| {
-        crate::tally::approved_import::wrapped(&text, 100)
-            .lines()
-            .flat_map(|line| {
-                line.chars()
-                    .collect::<Vec<_>>()
-                    .chunks(100)
-                    .map(|part| part.iter().collect::<String>())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    };
+    let wrap = crate::tally::approved_import::wrapped_to_fit;
     let mut lines = vec![
         wrap(format!(
             "THIS CLOSES THE BATCH. COMPLYEAZE BRIDGE NEVER SENDS {} AGAIN.",

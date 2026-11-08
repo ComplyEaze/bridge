@@ -991,8 +991,15 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
         assert!(text.contains("For any other voucher: if Tally rejected that batch"));
         assert!(text.contains("nothing in ComplyEaze Bridge puts it in the book yet"));
         assert!(!text.contains("enter the voucher in Tally"));
-        // A batch a restore may have emptied is no route either, and is said so (#1038).
+        // A batch a restore may have emptied is no route either, and is said so,
+        // unless a person releases its rows (#1038).
         assert!(text.contains("when verify_import reports that batch book_rolled_back"));
+        assert!(text.contains(
+            "unless it holds only Journal, Payment and Receipt vouchers and the release dialog \
+             can list them all (at most ten, each within its limits): then the user may check \
+             in Tally that none of them is in the book, including any keyed again with other \
+             figures, and release its rows (acknowledge_post_review, doubt rolled_back)"
+        ));
     }
     let build = super::super::super::BUILD_TXN_ALREADY_POSTED_NEXT_STEP;
     assert!(build.contains("never build it again under a new bridge_txn_id to retry it"));
@@ -1000,7 +1007,8 @@ fn the_already_posted_texts_send_a_declined_invoice_again_under_its_number() {
     // The post's text no longer forbids the one rebuild it now advises.
     let post = super::super::TXN_ALREADY_POSTED_NEXT_STEP;
     assert!(post.contains(
-        "Never rebuild a row to retry it, except an invoice released as described above."
+        "Never rebuild a row to retry it, except an invoice released as described above or a \
+         row whose batch's rows were released so."
     ));
 }
 

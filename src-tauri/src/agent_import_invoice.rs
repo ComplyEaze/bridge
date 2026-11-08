@@ -322,7 +322,7 @@ pub(super) fn gstin_state(gstin: &str) -> Option<&'static str> {
     state_name_for_code(gstin.get(..2)?)
 }
 
-/// Paise of a plain two-decimal amount (`valid_2dp_amount` has run).
+/// Paise of a plain two-decimal amount (an `ImportAmount` has been parsed).
 fn paise(amount: &str) -> Option<i128> {
     let (whole, fraction) = amount.split_once('.')?;
     if fraction.len() != 2 {
@@ -490,9 +490,12 @@ fn sales_rate_milli(row: &wire::LedgerRateRow, as_of: &str) -> Result<i128, &'st
 }
 
 /// What a tax ledger must say for the invoice to be checked against its rate:
-/// its own rate of tax is the one the sales ledgers give, and it rounds
-/// nothing (the measured ledgers read "Not Applicable" and 0). A ledger that
-/// reads anything else, or nothing, was not measured.
+/// its own rate of tax is the one the sales ledgers give, it rounds nothing
+/// (the measured ledgers read "Not Applicable" and 0), and its GST rows carry
+/// no rate. No tax ledger in a capture has a rate in those rows, so how Tally
+/// reads one beside the ledger's own rate is not known; a row of elements the
+/// lab did not read could hold one. A ledger that reads anything else, or
+/// nothing, was not measured.
 fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'static str> {
     let own = row.rate_of_tax_calculation.as_deref().and_then(rate_milli);
     if own != Some(half_milli) {
@@ -502,6 +505,17 @@ fn tax_ledger_refusal(row: &wire::LedgerRateRow, half_milli: i128) -> Option<&'s
         || row.rounding_limit.as_deref() != Some("0")
     {
         return Some("invoice_tax_ledger_rounding_unsupported");
+    }
+    let rated = |gst: &wire::GstRow| {
+        gst.unmeasured
+            || gst
+                .states
+                .iter()
+                .flat_map(|state| &state.heads)
+                .any(|head| head.rate.is_some())
+    };
+    if row.gst_rows.iter().any(rated) {
+        return Some("invoice_tax_ledger_gst_rate_unmeasured");
     }
     None
 }
@@ -560,7 +574,9 @@ impl InvoiceNumber {
 /// What Tally returned is the build's to record, never the caller's: refused
 /// on the way in. A saved batch carries it (and `admit_saved` requires it), so
 /// this runs only on a caller's payload.
-pub(super) fn refuse_supplied_observed<D>(vouchers: &[ImportVoucher<D>]) -> Result<(), String> {
+pub(super) fn refuse_supplied_observed<D: super::PayloadDate>(
+    vouchers: &[ImportVoucher<D>],
+) -> Result<(), String> {
     if vouchers.iter().any(|voucher| {
         voucher
             .invoice
@@ -587,7 +603,7 @@ pub(super) fn refuse_invoice_amendment(vouchers: &[ImportVoucher]) -> Result<(),
 
 /// Structural validation of a Sales invoice, before any read. Everything that
 /// needs a master waits for `classify_sales_invoice`.
-pub(super) fn validate_invoice_voucher<D>(voucher: &ImportVoucher<D>) -> Result<(), String> {
+pub(super) fn validate_invoice_voucher(voucher: &ImportVoucher) -> Result<(), String> {
     if !voucher.voucher_type.is_invoice() {
         // A non-invoice voucher must not carry invoice detail.
         return match voucher.invoice {
@@ -856,9 +872,17 @@ pub(super) fn classify_sales_invoice(
             }
             // A New Ref is written exactly when the party is bill-wise and never
             // otherwise (an allocation on a non-bill-wise ledger is dropped
-            // silently). So the flag must be known, but either value admits.
-            if fact.bill_wise.is_none() {
-                refusals.push(refuse_ledger("invoice_party_bill_wise_unknown", name));
+            // silently). So the flag must be known, and only a party that is
+            // not bill-wise admits: Tally applies a New Ref to a bill of the
+            // same name the customer already holds, settled ones included, and
+            // the build does not read those bills (voucher-writes reference
+            // §9.16, "A bill of the same name").
+            match fact.bill_wise {
+                None => refusals.push(refuse_ledger("invoice_party_bill_wise_unknown", name)),
+                Some(true) => {
+                    refusals.push(refuse_ledger("invoice_party_bill_wise_not_supported", name))
+                }
+                Some(false) => {}
             }
         }
     }
@@ -871,7 +895,7 @@ pub(super) fn classify_sales_invoice(
         cgst_index.expect("checked"),
         state_index.expect("checked"),
     );
-    let amount = |index: usize| paise(&voucher.entries[index].amount);
+    let amount = |index: usize| paise(voucher.entries[index].amount.as_str());
     let lines = sales
         .iter()
         .map(|index| amount(*index))
@@ -1427,7 +1451,7 @@ fn invoice_readback_differences(
         .entries
         .iter()
         .map(|entry| {
-            let value = paise(&entry.amount).unwrap_or(i128::MIN);
+            let value = paise(entry.amount.as_str()).unwrap_or(i128::MIN);
             match entry.side {
                 EntrySide::Dr => key(&entry.ledger, -value, true),
                 EntrySide::Cr => key(&entry.ledger, value, false),
@@ -1457,7 +1481,7 @@ fn invoice_readback_differences(
         .entries
         .iter()
         .find(|entry| entry.ledger == party)
-        .and_then(|entry| paise(&entry.amount))
+        .and_then(|entry| paise(entry.amount.as_str()))
         .map(|value| -value);
     let allocation_ok = read.legs.iter().all(|leg| {
         if leg.ledger == party && observed.party_bill_wise {
@@ -1583,6 +1607,8 @@ enum GstStatusDifference {
     Excluded,
     /// All three flags No: the return does not list it at all.
     NotInReturn,
+    /// Tally marks it post-dated, whatever its three flags state.
+    PostDated,
     /// A person accepted it as it stands (Accept As Is).
     Overridden,
     /// The flags came back in a combination that states no status.
@@ -1597,6 +1623,7 @@ impl GstStatusDifference {
             Self::Uncertain => "gst_status_uncertain",
             Self::Excluded => "gst_status_excluded",
             Self::NotInReturn => "gst_status_not_in_return",
+            Self::PostDated => "gst_status_post_dated",
             Self::Overridden => "gst_status_overridden",
             Self::Unreadable => "gst_status_unreadable",
             Self::NotReported => "gst_status_not_reported",
@@ -1615,31 +1642,34 @@ impl GstStatusDifference {
 }
 
 /// What Tally's own GSTR-1 says of the posted invoice, through the GST status
-/// read's own readings of the four flags (`status_of_flags`, `overridden_of`).
-/// Only an invoice the return lists as included, and that no one accepted as
-/// it stands, is clean (§9.16). A flag that did not come back is never a pass.
+/// read's own reading of the voucher (`status_of_voucher`, `overridden_of`).
+/// Only an invoice the return lists as included, that is not post-dated, and
+/// that no one accepted as it stands, is clean (§9.16). A flag that did not
+/// come back is never a pass.
 fn gst_status_differences(fields: &BTreeMap<String, String>) -> Vec<GstStatusDifference> {
-    use super::super::gst_status::{overridden_of, status_of_flags, FlagStatus};
+    use super::super::gst_status::{overridden_of, status_of_voucher, GstStatus};
     let flag = |name: &str| fields.get(name).map(String::as_str);
-    // `status_of_flags` reads the three status flags only, so it never states a cancelled,
-    // optional or post-dated invoice (the status tool decides those from `ISCANCELLED`,
-    // `ISOPTIONAL` and `ISPOSTDATED` first). A cancelled or optional invoice is refused
-    // earlier, by the field comparison, which wants both flags `No`. A post-dated one is
-    // not: the read-back does not fetch `ISPOSTDATED`, so an invoice a person marks
-    // post-dated after the post reads included here and stays verified (on master's status
-    // read the flag reads Yes on such a voucher and its three flags still read included).
-    // Fetching it changes the request the lab answered, so it needs a lab answer first: the
-    // follow-up fetches `ISPOSTDATED` and decides the state with `status_of_voucher`.
-    let status = match status_of_flags(
-        flag("VCHGSTSTATUSISINCLUDED"),
-        flag("VCHGSTSTATUSISUNCERTAIN"),
-        flag("VCHGSTSTATUSISEXCLUDED"),
-    ) {
-        Ok(FlagStatus::Included) => None,
-        Ok(FlagStatus::Uncertain) => Some(GstStatusDifference::Uncertain),
-        Ok(FlagStatus::Excluded) => Some(GstStatusDifference::Excluded),
-        Ok(FlagStatus::NotInReturn) => Some(GstStatusDifference::NotInReturn),
-        Err(code) => Some(GstStatusDifference::unread(code)),
+    // A post-dated invoice reads its three flags included (lab, 3 Nov 2026), so the state
+    // comes from `ISPOSTDATED` first. A cancelled or optional invoice is refused by the
+    // field comparison, which wants both flags `No`, so it adds no second finding here.
+    // The request names `ISPOSTDATED`, so an answer without it did not report the state.
+    let status = match flag("ISPOSTDATED").map(|_| {
+        status_of_voucher(
+            flag("ISCANCELLED"),
+            flag("ISOPTIONAL"),
+            flag("ISPOSTDATED"),
+            flag("VCHGSTSTATUSISINCLUDED"),
+            flag("VCHGSTSTATUSISUNCERTAIN"),
+            flag("VCHGSTSTATUSISEXCLUDED"),
+        )
+    }) {
+        None => Some(GstStatusDifference::NotReported),
+        Some(Ok(GstStatus::Included | GstStatus::Cancelled | GstStatus::Optional)) => None,
+        Some(Ok(GstStatus::Uncertain)) => Some(GstStatusDifference::Uncertain),
+        Some(Ok(GstStatus::Excluded)) => Some(GstStatusDifference::Excluded),
+        Some(Ok(GstStatus::NotInReturn)) => Some(GstStatusDifference::NotInReturn),
+        Some(Ok(GstStatus::PostDated)) => Some(GstStatusDifference::PostDated),
+        Some(Err(code)) => Some(GstStatusDifference::unread(code)),
     };
     let overridden = match overridden_of(flag("ISGSTOVERRIDDEN")) {
         Ok(false) => None,
@@ -1830,6 +1860,10 @@ pub(super) fn party_bill_wise_in(
 /// The party ledger of an invoice that will carry a New Ref. Its entry is
 /// written with a bill allocation, so it does not land On Account and needs
 /// no On Account approval (#1234); every other leg is judged as before.
+/// Since `classify_sales_invoice` refuses a bill-wise party, this, the New Ref
+/// render and the read-back's bill-wise branch serve only batches saved before
+/// that refusal, which the re-judge then refuses; they stay for a later read
+/// of the customer's bills.
 pub(super) fn new_ref_party(voucher: &ImportVoucher) -> Option<&str> {
     // Only an invoice has one, whatever detail another voucher may carry.
     if !voucher.voucher_type.is_invoice() {
@@ -2255,10 +2289,14 @@ impl InvoiceJudge<'_> {
             .map_err(|code| Verdict::Failed(code.to_string()))?
             != 0
         {
-            return Err(refusing(refuse_value(
-                "invoice_number_already_used",
-                &number,
-            )));
+            let code = if wire::sales_holder_has_irn(number_body)
+                .map_err(|code| Verdict::Failed(code.to_string()))?
+            {
+                "invoice_number_already_used_with_irn"
+            } else {
+                "invoice_number_already_used"
+            };
+            return Err(refusing(refuse_value(code, &number)));
         }
         // 3c. "No voucher carries this number" is believed only beside a
         // control: the same read for an invoice this company is known to hold
@@ -2297,7 +2335,7 @@ impl InvoiceJudge<'_> {
         let Some(registration_body) = answers.registration.as_deref() else {
             return Err(Verdict::Need(Need::Registration));
         };
-        let company_state = wire::parse_company_registration(
+        let registration = wire::parse_company_registration(
             registration_body,
             self.identity.company_guid(),
             &as_of,
@@ -2305,12 +2343,21 @@ impl InvoiceJudge<'_> {
         .map_err(|outcome| match outcome {
             wire::RegistrationOutcome::Refused(code) => refusing(refuse(code)),
             wire::RegistrationOutcome::Failed(code) => unusable(code),
-        })?
-        .state;
+        })?;
 
-        let roles = classify_sales_invoice(voucher, &facts, &company_state, &as_of)
+        let roles = classify_sales_invoice(voucher, &facts, &registration.state, &as_of)
             .map_err(Verdict::Refused)?;
         let party = &voucher.entries[roles.party].ledger;
+        // A customer holding the company's own GSTIN: Tally lists such an
+        // invoice as uncertain (section 9.16). Both GSTINs are valid here (the
+        // classification checked the party's), so equal means byte-equal.
+        if matches!(&facts[party].gstin, GstinEvidence::InForce(gstin) if *gstin == registration.gstin)
+        {
+            return Err(refusing(refuse_ledger(
+                "invoice_party_gstin_is_company_own",
+                party,
+            )));
+        }
         let sales_ledgers: Vec<String> = roles
             .sales
             .iter()
@@ -2332,7 +2379,7 @@ impl InvoiceJudge<'_> {
             &facts[party].gstin,
             resolved.guid,
             bill_wise,
-            company_state,
+            registration.state,
             sales_ledgers,
             hsn_warnings,
         ))
@@ -2626,10 +2673,7 @@ pub(super) fn render_sales_invoice_xml(
     let number = voucher.voucher_number.as_deref()?;
     let party_entry = party_entry(voucher)?;
     let leg = |entry: &ImportEntry, bill: bool| {
-        let signed = match entry.side {
-            EntrySide::Dr => format!("-{}", entry.amount),
-            EntrySide::Cr => entry.amount.clone(),
-        };
+        let signed = entry.amount.signed_lexeme(&entry.side);
         let allocation = if bill {
             format!(
                 "<BILLALLOCATIONS.LIST><NAME>{}</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>{signed}</AMOUNT></BILLALLOCATIONS.LIST>",

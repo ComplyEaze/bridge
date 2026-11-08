@@ -4,7 +4,8 @@ use crate::endpoint_wire::WireGateConfig;
 use crate::reports::party_ledger_master::{BalanceDateBasis, PartyLedgerMasterSource};
 use crate::tally::connection::canonical_loopback_origin;
 use crate::tally::connection::{
-    ComplianceRead, ComplianceScope, NativePairedRead, PairedReadValidationError,
+    ComplianceRead, ComplianceScope, LedgerReadRequest, LedgerRequestFailed, NativePairedRead,
+    PairedReadValidationError,
 };
 use crate::tally::connector::SealedReadRequest;
 use crate::tally::runtime_control::{
@@ -76,6 +77,16 @@ pub(crate) use stock_summary::StockSummaryReadError;
 #[cfg(test)]
 #[path = "runtime_stock_summary_tests.rs"]
 mod stock_summary_tests;
+
+#[path = "runtime_stock_by_batch.rs"]
+mod stock_by_batch;
+#[cfg(test)]
+pub(crate) use stock_by_batch::STOCK_QUERY_ANSWER_MAX_BYTES;
+pub(crate) use stock_by_batch::{StockByBatchItem, StockByBatchRead, StockByBatchReadError};
+
+#[cfg(test)]
+#[path = "runtime_stock_by_batch_tests.rs"]
+mod stock_by_batch_tests;
 
 #[path = "runtime_negative_stock.rs"]
 mod negative_stock;
@@ -813,6 +824,17 @@ pub(crate) struct RuntimeReadFailure {
     source: anyhow::Error,
 }
 
+/// The request of the party ledger read that failed (#2265). Context is found by downcast from
+/// the error it wraps, and not from a concrete error around it, so each `RuntimeReadFailure` in
+/// the chain is opened.
+pub(crate) fn failed_ledger_request(error: &anyhow::Error) -> Option<LedgerReadRequest> {
+    error
+        .chain()
+        .filter_map(|cause| cause.downcast_ref::<RuntimeReadFailure>())
+        .find_map(|failure| failure.source.downcast_ref::<LedgerRequestFailed>())
+        .map(|failed| failed.request)
+}
+
 pub(crate) fn with_read_evidence(
     source: anyhow::Error,
     prior: RuntimeReadEvidence,
@@ -1323,6 +1345,10 @@ pub(crate) struct PartyLedgerMasterListing {
         Vec<bridge_tally_protocol::native_outstandings::ForeignCurrencyLedger>,
     /// Base-currency ledgers set aside because a balance is a currency composite.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// The set-aside ledgers' master records, which only a register reads (#683).
+    pub(crate) set_aside_masters: Vec<
+        bridge_tally_protocol::ParsedSourceRecord<bridge_tally_protocol::PartyLedgerMasterRecord>,
+    >,
     /// Whether the census that counted the book was checked against the
     /// company's own ledger count (#938); `None` when no census ran.
     pub(crate) count_cross_check: Option<crate::tally::connection::CountCrossCheck>,
@@ -1898,7 +1924,9 @@ async fn read_classified_currency_with_extent(
         bracket_verified_company_identity(client, identity).await?;
         let extent = client.fetch_company_book_extent(identity).await?;
         let (currency_count, identified) =
-            read_classified_currency(client, identity, &mut evidence).await?;
+            read_classified_currency(client, identity, &mut evidence)
+                .await
+                .map_err(|error| LedgerReadRequest::BaseCurrency.failed(error))?;
         let closing_extent = client.fetch_company_book_extent(identity).await?;
         if closing_extent != extent {
             return Err(anyhow::Error::new(
@@ -1945,6 +1973,7 @@ fn party_ledger_listing(
     let groups = source.groups.clone();
     let foreign = source.foreign_currency_ledgers_excluded.clone();
     let mixed = source.mixed_currency_ledgers_excluded.clone();
+    let set_aside_masters = source.set_aside_masters.clone();
     let count_cross_check = source.count_cross_check;
     // The master request's SVFROMDATE (the admitted BOOKSFROM): each opening is as of it.
     let opening_as_of = source.from.clone();
@@ -1972,6 +2001,7 @@ fn party_ledger_listing(
         groups,
         foreign_currency_ledgers_excluded: foreign,
         mixed_currency_ledgers_excluded: mixed,
+        set_aside_masters,
         count_cross_check,
         opening_as_of,
         extent: currency_read.extent.clone(),

@@ -1478,7 +1478,7 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     .unwrap()
     .bind_selected(requested.clone())
     .unwrap();
-    let recheck = |catalogue: &str| {
+    let recheck_bound = |catalogue: &str, binding: &_| {
         recheck_import_admission(
             &line,
             &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
@@ -1487,12 +1487,13 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
             catalogue,
             None,
             &single_currency,
-            &ledger_binding,
+            binding,
             InvoiceIdentity::ByNumber,
             None,
             None,
         )
     };
+    let recheck = |catalogue: &str| recheck_bound(catalogue, &ledger_binding);
     // Control: the captured catalogue holds no twin of any named ledger.
     recheck(&catalogue).expect("no twin, so the queued batch is admitted");
     assert_eq!(
@@ -1516,6 +1517,16 @@ fn a_folded_twin_named_only_by_a_later_voucher_refuses_the_batch() {
     .is_empty());
     // In the queue, the recheck reads every voucher's ledgers again.
     let error = recheck(&twinned).expect_err("a twin of voucher 2's ledger must refuse the batch");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
+    // This batch is Journals, not the measured shape, so naming the other
+    // ledger in the binding does not let it on (#626).
+    let shown = twinned_parents
+        .bind_selected(requested.iter().cloned().chain(["Cash\r\n".to_string()]))
+        .unwrap();
+    let error = recheck_bound(&twinned, &shown).expect_err("not the measured shape");
     assert!(matches!(
         error.downcast_ref::<ApprovedImportAdmissionError>(),
         Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
@@ -1946,7 +1957,7 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
     let mut absent = line;
     absent.batch_id = "bridge-00000000-0000-4000-8000-000000000003".into();
     for entry in &mut absent.vouchers[0].entries {
-        entry.amount = "12.62".into();
+        entry.amount = ImportAmount::parse("12.62").unwrap();
     }
     recheck_import_admission(
         &absent,
@@ -2032,6 +2043,54 @@ fn queued_absence_recheck_distinguishes_an_attributed_journal_from_a_new_candida
             Some(ApprovedImportAdmissionError::AdmissionInconsistent)
         ));
     }
+
+    // A pair the dialog named goes on in the queue, on the measured shape: this
+    // Payment's debit ledger, its twin in the approved binding (#626). The same
+    // twin outside the binding is refused.
+    let debit = payment.vouchers[0]
+        .entries
+        .iter()
+        .find(|entry| entry.side == EntrySide::Dr)
+        .unwrap()
+        .ledger
+        .clone();
+    let twin = catalogue.replace("WR2 Sales", &format!("{debit}&#13;&#10;"));
+    let parents = crate::tally::standard_ledger_catalog::parse_import_catalog_as_v1(
+        &twin,
+        "WR2 Unicode Lab",
+        company_guid,
+    )
+    .unwrap();
+    let named = payment.vouchers[0]
+        .entries
+        .iter()
+        .map(|entry| entry.ledger.clone())
+        .collect::<Vec<_>>();
+    let recheck_twin = |binding: &_| {
+        recheck_import_admission(
+            &payment,
+            &crate::tally::VerifiedCompanyIdentity::test_fixture("WR2 Unicode Lab", company_guid),
+            &captured,
+            &captured,
+            &twin,
+            Some(&groups),
+            &single_currency,
+            binding,
+            InvoiceIdentity::ByNumber,
+            None,
+            None,
+        )
+    };
+    let shown = parents
+        .bind_selected(named.iter().cloned().chain([format!("{debit}\r\n")]))
+        .unwrap();
+    recheck_twin(&shown).expect("the pair the dialog named");
+    let unshown = parents.bind_selected(named).unwrap();
+    let error = recheck_twin(&unshown).expect_err("a twin the dialog did not name");
+    assert!(matches!(
+        error.downcast_ref::<ApprovedImportAdmissionError>(),
+        Some(ApprovedImportAdmissionError::LedgerFoldedTwin)
+    ));
 }
 
 #[test]
@@ -2105,8 +2164,8 @@ async fn a_saved_xml_file_that_differs_from_the_record_is_refused_before_tally()
 
     // The record is self-consistent; the file holds a different Journal.
     let mut other = line.vouchers.clone();
-    other[0].entries[0].amount = "99.00".into();
-    other[0].entries[1].amount = "99.00".into();
+    other[0].entries[0].amount = ImportAmount::parse("99.00").unwrap();
+    other[0].entries[1].amount = ImportAmount::parse("99.00").unwrap();
     fs::write(
         &path,
         render_import_xml("Synthetic Accounts", &other, &line.batch_id),
@@ -2203,12 +2262,12 @@ fn payment_with(parties: usize, name: impl Fn(usize) -> String) -> ImportLedgerL
     voucher.entries = (0..parties)
         .map(|index| ImportEntry {
             ledger: name(index),
-            amount: "1.00".into(),
+            amount: ImportAmount::parse("1.00").unwrap(),
             side: EntrySide::Dr,
         })
         .chain(std::iter::once(ImportEntry {
             ledger: "Cash".into(),
-            amount: format!("{parties}.00"),
+            amount: ImportAmount::parse(&format!("{parties}.00")).unwrap(),
             side: EntrySide::Cr,
         }))
         .collect();
@@ -4902,6 +4961,82 @@ fn a_name_that_spells_a_line_break_in_typed_characters_takes_no_mark() {
     );
 }
 
+fn line_break_twin(named: &str, other: &str) -> LineBreakTwin {
+    LineBreakTwin {
+        named: named.into(),
+        named_group: "Current Assets".into(),
+        other: other.into(),
+        other_group: "Bank Accounts".into(),
+    }
+}
+
+/// #626: every form of the dialog names both ledgers of a pair, each with its
+/// group, and which one the post uses, in either direction; the name is
+/// written bare, so the only marked name is one the voucher lines show.
+#[test]
+fn a_dialog_names_both_ledgers_of_a_line_break_pair_and_which_is_used() {
+    let (mut single, endpoint) = batch();
+    let plain = line_break_twin("Cash", "Cash\r\n");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&plain),
+    )
+    .unwrap()
+    .text;
+    let expected = [
+        r#"Used: "Cash", no line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", line break at its end, group "Bank Accounts""#,
+    ];
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(lines.windows(2).any(|shown| shown == expected), "{text}");
+    assert!(!text.contains("Line break"), "{text}");
+
+    single.vouchers[0].entries[1].ledger = "Cash\r\n".into();
+    refresh_batch_sha256(&mut single);
+    let broken = line_break_twin("Cash\r\n", "Cash");
+    let text = review_preview_with_twins(
+        &single,
+        &endpoint,
+        PreviewForm::Listed,
+        std::slice::from_ref(&broken),
+    )
+    .unwrap()
+    .text;
+    for shown in [
+        r#"Used: "Cash", line break at its end, group "Current Assets""#,
+        r#"Not used: "Cash", no line break at its end, group "Bank Accounts""#,
+    ] {
+        assert!(text.lines().any(|line| line == shown), "{text}");
+    }
+
+    let (several, endpoint) = batch_of_every_type();
+    for form in [PreviewForm::Listed, PreviewForm::TotalsOnly] {
+        let text =
+            review_preview_with_twins(&several, &endpoint, form, std::slice::from_ref(&plain))
+                .unwrap()
+                .text;
+        assert!(text.contains(expected[0]), "{form:?}: {text}");
+        assert!(text.contains(expected[1]), "{form:?}: {text}");
+    }
+}
+
+/// #626: a group is Tally's text, so a dialog refuses one it could not show
+/// whole, as it refuses any other value.
+#[test]
+fn a_dialog_refuses_a_line_break_pair_whose_group_it_cannot_show() {
+    let (single, endpoint) = batch();
+    let mut twin = line_break_twin("Cash", "Cash\r\n");
+    twin.other_group = "Bank\nAccounts".into();
+    assert_eq!(
+        review_preview_with_twins(&single, &endpoint, PreviewForm::Listed, &[twin])
+            .err()
+            .as_deref(),
+        Some("import_review_layout_text")
+    );
+}
+
 /// An assistant's one-voucher text shows such a name quoted with its break
 /// written out and the mark before it, with the line that explains the mark
 /// once, under the entries and the On Account sentence and above the totals;
@@ -5786,16 +5921,21 @@ fn an_invoice_met_in_the_book_gets_its_own_next_step_and_names_the_unsettled_bat
     assert!(unread["result"]["error"]
         .get("unsettled_batch_id")
         .is_none());
-    // The invoice text never leaves a person at a dead end or offers to nudge
-    // a figure: where a new number cannot help it says to enter the invoice by
-    // hand, and it forbids changing the number, date, ledger, amount or side.
-    // Case (2), a match by figures alone: a new number cannot help.
+    // The invoice text never offers to nudge a figure: it forbids changing the
+    // number, date, ledger, amount or side.
+    // Case (2), a match by figures alone: a new number cannot help, and the
+    // sale is left out with the user told, as the rows step leaves out a
+    // second real row. A stated stop, never a hand entry (#1709).
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
-        "a new number does not get past this check: tell the user and enter the invoice in Tally by hand"
+        "a new number does not get past this check, and ComplyEaze Bridge cannot post this sale yet: leave it out and tell the user so; do not enter it in Tally by hand"
     ));
-    // Case (3), an unconfirmed earlier batch: hand entry, and how it ends.
-    assert!(PREEXISTING_INVOICE_NEXT_STEP
-        .contains("cannot post it while that batch is unconfirmed: enter it in Tally by hand"));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("tell the user and enter the invoice"));
+    // Case (3), an unconfirmed earlier batch: the same stated stop, and how it
+    // ends. A stop release does not end it (the owner's ruling on #1709).
+    assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(
+        "cannot post it while that batch is unconfirmed: verify_import on that batch is the only way this refusal ends, and until it does, leave the invoice out and tell the user so; do not enter it in Tally by hand"
+    ));
+    assert!(!PREEXISTING_INVOICE_NEXT_STEP.contains("unconfirmed: enter it in Tally by hand"));
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains("verify_import on it can confirm it"));
     // A busy journal is a retry, not a reason to enter anything by hand.
     assert!(PREEXISTING_INVOICE_NEXT_STEP.contains(

@@ -1,0 +1,1 @@
+- `vouchers` with `include_gst_details` also says, for each invoice, its place of supply, the party's state and registration type, and on a note the reason and the party's own note number and date: each present with its value, absent, or not reported by this book or release (#2027).

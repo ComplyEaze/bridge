@@ -676,8 +676,8 @@ fn a_voucher_journal_line_in_the_master_journal_is_refused() {
         "pre_import_mark": {"kind": "company_high_water", "value": 1, "master_value": 1},
         "vouchers": [{"bridge_txn_id": "txn", "date": "20260901", "voucher_type": "Journal",
             "narration": "n", "reference": null, "voucher_number": null, "entries": [
-                {"ledger": "Cash", "amount": "1", "side": "Dr"},
-                {"ledger": "Synthetic Ledger", "amount": "1", "side": "Cr"}]}]
+                {"ledger": "Cash", "amount": "1.00", "side": "Dr"},
+                {"ledger": "Synthetic Ledger", "amount": "1.00", "side": "Cr"}]}]
     });
     assert_eq!(
         read(&format!("{voucher_batch}\n")).unwrap_err(),
@@ -710,8 +710,8 @@ fn appending_master_records_leaves_the_voucher_journal_byte_for_byte() {
         "pre_import_mark": {"kind": "company_high_water", "value": 1, "master_value": 1},
         "vouchers": [{"bridge_txn_id": "txn", "date": "20260901", "voucher_type": "Journal",
             "narration": "n", "reference": null, "voucher_number": null, "entries": [
-                {"ledger": "Cash", "amount": "1", "side": "Dr"},
-                {"ledger": "Synthetic Ledger", "amount": "1", "side": "Cr"}]}]
+                {"ledger": "Cash", "amount": "1.00", "side": "Dr"},
+                {"ledger": "Synthetic Ledger", "amount": "1.00", "side": "Cr"}]}]
     })
     .to_string()
         + "\n";

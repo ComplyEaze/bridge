@@ -7,7 +7,8 @@ use std::collections::BTreeSet;
 
 use bridge_tally_core::{ExactDecimal, TallyDate};
 use bridge_tally_protocol::{
-    PartyLedgerMasterFieldObservation, PartyLedgerMasterFields, TallyNamedMaster,
+    ParsedSourceRecord, PartyLedgerMasterFieldObservation, PartyLedgerMasterFields,
+    PartyLedgerMasterRecord, TallyNamedMaster,
 };
 use serde::Serialize;
 
@@ -88,6 +89,10 @@ pub(crate) struct PartyLedgerMasterSource {
     /// Base-currency ledgers left out of `rows` because a balance of theirs
     /// is a currency composite (bridge#551). Empty on a book with one master.
     pub(crate) mixed_currency_ledgers_excluded: Vec<String>,
+    /// The master records of the ledgers in the two lists above, their openings left unparsed:
+    /// what a register needs to classify a voucher entry on one (#683). No balance is read from
+    /// them.
+    pub(crate) set_aside_masters: Vec<ParsedSourceRecord<PartyLedgerMasterRecord>>,
     /// Whether the census that counted a book whose mark is past its catalogue
     /// was checked against the company's own ledger count (#938); `None` when
     /// no census ran.

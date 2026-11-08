@@ -184,10 +184,10 @@ fn saved(wire: &ImportPayload<String>) -> ImportPayload {
         vouchers: wire
             .vouchers
             .iter()
-            .cloned()
             .map(|voucher| {
                 let date = normalized_date(&voucher.date).expect("a valid sample date");
-                voucher.dated(date)
+                let entries = voucher.parsed_entries().expect("a sample amount");
+                voucher.admitted(date, entries)
             })
             .collect(),
         amends_batch_id: wire.amends_batch_id.clone(),
@@ -668,7 +668,7 @@ fn schema_balance_matcher_rendering_and_ledger_append_are_fail_closed() {
     let input = admitted_payload();
     payload_verdict(&input).expect("valid payload");
     let mut unbalanced = input.clone();
-    unbalanced.vouchers[0].entries[1].amount = "12.49".to_string();
+    unbalanced.vouchers[0].entries[1].amount = ImportAmount::parse("12.49").unwrap();
     assert_eq!(
         payload_verdict(&unbalanced),
         Err("voucher_not_balanced".to_string())
@@ -1879,7 +1879,7 @@ fn narration_tag_verification_requires_a_post_mark_voucher() {
 fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let mut input = admitted_payload();
     for entry in &mut input.vouchers[0].entries {
-        entry.amount = "0012.50".to_string();
+        entry.amount = ImportAmount::parse("0012.50").unwrap();
     }
     payload_verdict(&input).expect("leading zeros satisfy the input contract");
     let line = ImportLedgerLine {
@@ -1942,6 +1942,42 @@ fn verification_compares_amounts_numerically_and_preserves_real_divergence() {
     let result = verify_observed_batch(&line, &[divergent]).expect("numeric divergence");
     assert_eq!(result["vouchers"][0]["status"], "posted_divergent");
     assert_eq!(result["vouchers"][0]["alter_id"], 11);
+    // The entry differences show the batch's amount in canonical form, as the book's side is
+    // (#1872): `0012.50` is `12.5` there, not the text it was saved with.
+    let diffs = result["vouchers"][0]["diffs"].as_array().unwrap();
+    let entries = diffs
+        .iter()
+        .find_map(|diff| diff.get("entries"))
+        .expect("the entries differ");
+    assert_eq!(entries["expected"][0]["amount"], "12.5");
+    assert_eq!(entries["expected"][1]["amount"], "12.5");
+}
+
+/// The fingerprint production matches by is the canonical one (#1872): a batch voucher saved
+/// with `0012.50` is `12.5`, signed as a debit `-12.5`, and equals the same voucher saved as
+/// `12.50`. The pin in `agent_import_amount_pin_tests.rs` holds the received-text function
+/// beside it.
+#[test]
+fn a_batch_voucher_is_matched_by_the_canonical_form_of_its_amounts() {
+    let voucher = |amount: &str| {
+        let mut voucher = admitted_payload().vouchers[0].clone();
+        for entry in &mut voucher.entries {
+            entry.amount = ImportAmount::parse(amount).unwrap();
+        }
+        voucher
+    };
+    assert_eq!(
+        canonical_entry_fingerprint(&voucher("0012.50")),
+        ["Bank|12.5|No", "Expense|-12.5|Yes"]
+    );
+    assert_eq!(
+        canonical_entry_fingerprint(&voucher("0012.50")),
+        canonical_entry_fingerprint(&voucher("12.50"))
+    );
+    assert_ne!(
+        canonical_entry_fingerprint(&voucher("12.50")),
+        canonical_entry_fingerprint(&voucher("12.51"))
+    );
 }
 
 #[test]
@@ -2669,6 +2705,34 @@ pub(super) fn lab_invoice_listing() -> &'static [u8] {
     )
 }
 
+/// DERIVED, not Tally's bytes: [`lab_invoice_listing`], as text, with the one
+/// dated registration row of `BRIDGE Walk-in` made Regular under `gstin`. The
+/// `GSTIN` element is put after `PLACEOFSUPPLY`, where Tally returned it for a
+/// Regular customer seeded on the same book (`lab/2162-s13a2-answers`, the
+/// `a-s3r-Q-rates` answer). Nothing else in the answer differs.
+pub(super) fn lab_invoice_listing_with_walk_in_gstin(gstin: &str) -> String {
+    let listing = utf16le(lab_invoice_listing());
+    let start = listing.find("<LEDGER NAME=\"BRIDGE Walk-in\"").unwrap();
+    let end = start + listing[start..].find("</LEDGER>").unwrap();
+    let mut row = listing[start..end].to_string();
+    for (from, to) in [
+        (
+            "<GSTREGISTRATIONTYPE TYPE=\"String\">Unregistered/Consumer</GSTREGISTRATIONTYPE>",
+            "<GSTREGISTRATIONTYPE TYPE=\"String\">Regular</GSTREGISTRATIONTYPE>".to_string(),
+        ),
+        (
+            "<PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY>",
+            format!(
+                "<PLACEOFSUPPLY TYPE=\"String\">Rajasthan</PLACEOFSUPPLY><GSTIN TYPE=\"String\">{gstin}</GSTIN>"
+            ),
+        ),
+    ] {
+        assert_eq!(row.matches(from).count(), 1, "{from}");
+        row = row.replace(from, &to);
+    }
+    format!("{}{row}{}", &listing[..start], &listing[end..])
+}
+
 /// The compliance balance answer for `BP/26-27/0010` ([`listing_cut_to`]).
 pub(super) fn lab_invoice_balances() -> &'static [u8] {
     static BYTES: std::sync::OnceLock<Vec<u8>> = std::sync::OnceLock::new();
@@ -2738,6 +2802,64 @@ fn the_lab_invoice_rates_request_is_the_captured_one_with_its_guids() {
             .flat_map(u16::to_le_bytes)
             .collect::<Vec<_>>();
         assert_eq!(crate::agent::sha256_hex(&bytes), pinned);
+    }
+}
+
+/// The sha256 of the number reads the code sends for `BP/26-27/0010`,
+/// `BP/26-27/0001` and the W18 invoice's `BP/26-27/0040`: the lab's
+/// `r09-number-new-invoice.xml`, `r10-number-control-k0.xml` and
+/// `w18-number-0040.xml` with `IRN, IRNACKNO, IRNACKDATE` added to the
+/// fetch list (DERIVED: the requests with those words were not sent to this
+/// book, and the answers replayed to them were captured without them; on
+/// another book the words changed nothing else in the answer,
+/// `lab/2162-irn-read-answers` R1, #2162 item 8).
+pub(super) const LAB_NUMBER_NEW_INVOICE_SHA256: &str =
+    "fa77d18300e04e0aeb542c664aa4f1390e43a5c08442d6329f6a0352714c3e9d";
+pub(super) const LAB_NUMBER_CONTROL_SHA256: &str =
+    "9750f0fffe721ba905ffaeb9ebf2e3b84d503eebe39112fcb400393bdeac6b49";
+pub(super) const W18_NUMBER_SHA256: &str =
+    "ec2a6c29deb324d0c14302ff4456b8a28a8f5e12cfab5b358a5ee9265f0e3726";
+
+#[test]
+fn the_lab_number_reads_are_the_sent_ones_with_the_e_invoice_words() {
+    let window = (stored_date("20260401"), stored_date("20270331"));
+    let sha256 = |request: &str| {
+        let sent = [0xFF, 0xFE]
+            .into_iter()
+            .chain(request.encode_utf16().flat_map(u16::to_le_bytes))
+            .collect::<Vec<u8>>();
+        crate::agent::sha256_hex(&sent)
+    };
+    for (number, sent, pinned) in [
+        (
+            "BP/26-27/0010",
+            "aa6e7a3ae50bd13d6eff60ffac89bd713f084a49512667edcc6d40fee0ca3985",
+            LAB_NUMBER_NEW_INVOICE_SHA256,
+        ),
+        (
+            "BP/26-27/0001",
+            "90d188e7089852c411516ef36617dfc3a157df76cfc1787b1985804833ff31e6",
+            LAB_NUMBER_CONTROL_SHA256,
+        ),
+        (
+            "BP/26-27/0040",
+            "84f6b7228f3e8c94d028c302c289ed7f99d9076eb45b4b0676adcbc67dc497d8",
+            W18_NUMBER_SHA256,
+        ),
+    ] {
+        let rendered = invoice::render_invoice_number_request(
+            "BRIDGE PILOT LAB",
+            &invoice::InvoiceNumber::parse(number).unwrap(),
+            (&window.0, &window.1),
+        );
+        let words = ", IRN, IRNACKNO, IRNACKDATE</FETCH>";
+        assert_eq!(rendered.matches(words).count(), 1, "{number}");
+        assert_eq!(
+            sha256(&rendered.replace(words, "</FETCH>")),
+            sent,
+            "{number}"
+        );
+        assert_eq!(sha256(&rendered), pinned, "{number}");
     }
 }
 
@@ -4013,10 +4135,13 @@ mod verify_mode_tests;
 mod identity_tests;
 
 #[path = "agent_import_amend_tests.rs"]
-mod amend_tests;
+pub(super) mod amend_tests;
 
 #[path = "agent_import_text_tests.rs"]
 mod text_tests;
+
+#[path = "agent_import_rebuild_warning_tests.rs"]
+pub(super) mod rebuild_warning_tests;
 
 #[tokio::test]
 async fn dispatched_verification_requires_its_saved_endpoint_before_tally_reads() {
@@ -5134,6 +5259,7 @@ fn a_name_folding_equal_to_two_live_ledgers_is_reported_whichever_it_names() {
                 requested: requested.to_string(),
                 live,
                 through_alias: Default::default(),
+                has_alias: false,
             }],
             "{requested:?}"
         );
@@ -5198,6 +5324,100 @@ fn a_twin_needing_both_folds_is_still_found() {
         );
         assert_eq!(twins.len(), 1, "{requested:?}");
         assert_eq!(twins[0].live.len(), 2, "{requested:?}");
+    }
+}
+
+/// #626: a pair is admitted only when it is two ledgers differing by exactly a
+/// trailing CR LF, the name equals one of them byte for byte, the batch does not
+/// name the other, no alias folds equal, and both groups were read.
+#[test]
+fn only_one_exact_name_with_one_line_break_twin_is_a_line_break_pair() {
+    fn pair(
+        requested: &str,
+        batch: &[&str],
+        catalogue: &[(&str, Option<&str>)],
+        aliases: &[(&str, &str)],
+    ) -> Option<LineBreakTwin> {
+        let batch = batch.iter().map(ToString::to_string).collect::<Vec<_>>();
+        let twins = folded_twins(
+            &[requested.to_string()],
+            catalogue.iter().copied(),
+            aliases.iter().copied(),
+        );
+        let found = twins.first().expect("a family");
+        let admitted = found.line_break_twin(&batch);
+        assert_eq!(
+            refused_twins(twins.clone(), &batch).is_empty(),
+            admitted.is_some()
+        );
+        admitted
+    }
+    let plain = ("Cash", Some("Cash-in-Hand"));
+    let broken = ("Cash\r\n", Some("Bank Accounts"));
+    for catalogue in [[plain, broken], [broken, plain]] {
+        assert_eq!(
+            pair("Cash", &["Cash"], &catalogue, &[]),
+            Some(LineBreakTwin {
+                named: "Cash".into(),
+                named_group: "Cash-in-Hand".into(),
+                other: "Cash\r\n".into(),
+                other_group: "Bank Accounts".into(),
+            })
+        );
+        assert_eq!(
+            pair("Cash\r\n", &["Cash\r\n"], &catalogue, &[]),
+            Some(LineBreakTwin {
+                named: "Cash\r\n".into(),
+                named_group: "Bank Accounts".into(),
+                other: "Cash".into(),
+                other_group: "Cash-in-Hand".into(),
+            })
+        );
+    }
+    type Row<'a> = (
+        &'a str,
+        &'a [&'a str],
+        &'a [(&'a str, Option<&'a str>)],
+        &'a [(&'a str, &'a str)],
+    );
+    let refused: [Row; 8] = [
+        // Equal to neither ledger: only a fold reaches them.
+        ("CASH", &["CASH"], &[plain, broken], &[]),
+        // The batch names both, so no line can say which one it uses.
+        ("Cash", &["Cash", "Cash\r\n"], &[plain, broken], &[]),
+        // A third ledger in the family.
+        ("Cash", &["Cash"], &[plain, broken, ("CASH", None)], &[]),
+        // The two differ by more than the line break.
+        (
+            "Cash",
+            &["Cash"],
+            &[plain, ("cash\r\n", Some("Bank Accounts"))],
+            &[],
+        ),
+        // Neither is a plain name, so "no line break" would be false of both.
+        (
+            "Cash\r\n",
+            &["Cash\r\n"],
+            &[broken, ("Cash\r\n\r\n", Some("Bank Accounts"))],
+            &[],
+        ),
+        // An alias of a member, and a ledger in the family through an alias.
+        ("Cash", &["Cash"], &[plain, broken], &[("Cash", "CASH")]),
+        (
+            "Cash",
+            &["Cash"],
+            &[plain, ("Other", Some("Bank Accounts"))],
+            &[("Other", "Cash\r\n")],
+        ),
+        // A group that was not read cannot be shown.
+        ("Cash", &["Cash"], &[plain, ("Cash\r\n", None)], &[]),
+    ];
+    for (requested, batch, catalogue, aliases) in refused {
+        assert_eq!(
+            pair(requested, batch, catalogue, aliases),
+            None,
+            "{requested:?} {batch:?} {catalogue:?} {aliases:?}"
+        );
     }
 }
 
@@ -5644,7 +5864,7 @@ fn the_name_field_list_covers_every_name_a_verification_marks() {
     // first sales line names a group source, which no capture fills.
     let readback = String::from_utf16(
         &include_bytes!(
-            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+            "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
         )
         .chunks_exact(2)
         .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
@@ -6718,6 +6938,7 @@ fn a_folded_twin_under_the_reserved_root_shows_the_root_as_tally_sent_it() {
             ("Profit &amp; Loss A/c".to_string(), None),
         ],
         through_alias: Default::default(),
+        has_alias: false,
     };
     let shown = folded_live_ledgers_json(&twins);
     assert_eq!(shown[0]["parent"], "&#4; Primary");

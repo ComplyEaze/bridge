@@ -7,7 +7,7 @@
 //! closing at the last; the ledger's vouchers give the days between. They must
 //! agree. Tally counts a post-dated voucher in a closing dated after it, whatever
 //! its current date, and the voucher window lists it on its own date, so the two
-//! tie (`docs/tally/TALLY_PROTOCOL_REFERENCE.md` §12a.25).
+//! tie (`docs/tally/TALLY_PROTOCOL_REFERENCE.md` §12a.26).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -68,8 +68,7 @@ pub(super) fn outflows_of(
         outflows.push(CashOutflow {
             ledger: need.ledger.clone(),
             date: voucher.date.clone(),
-            amount: ExactDecimal::parse(entry.amount.clone())
-                .map_err(|_| "voucher_amount_invalid".to_string())?,
+            amount: entry.amount.decimal().clone(),
         });
     }
     Ok(outflows)

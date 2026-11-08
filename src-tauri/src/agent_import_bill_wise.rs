@@ -151,7 +151,12 @@ pub(super) fn bill_wise_parties(
                     .entries
                     .iter()
                     .filter(|candidate| candidate.ledger == ledger)
-                    .map(|candidate| (candidate.side.clone(), candidate.amount.clone()))
+                    .map(|candidate| {
+                        (
+                            candidate.side.clone(),
+                            candidate.amount.as_str().to_string(),
+                        )
+                    })
                     .collect(),
             });
         }
@@ -245,7 +250,7 @@ pub(super) fn batch_content_digest(vouchers: &[ImportVoucher]) -> [u8; 32] {
                 side,
             } = entry;
             encoder.field(ledger.as_bytes());
-            encoder.field(amount.as_bytes());
+            encoder.field(amount.as_str().as_bytes());
             encoder.field(side_text(side));
         }
     }

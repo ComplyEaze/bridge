@@ -3,8 +3,8 @@
 //! report carries no value, rate, expiry or manufacturing date for a batch. What was measured, and
 //! what was not, is in the protocol reference, measurements part, §12a.23.
 //!
-//! No read sends this request yet: the tool that does comes later (#2018). The parser is closed
-//! on the elements captured and fails closed with a typed error (AGENTS.md P3); an item name
+//! The `stock_by_batch` tool sends this request (#2018). The parser is closed on the elements
+//! captured and fails closed with a typed error (AGENTS.md P3); an item name
 //! enters a request only as a [`MeasuredItemName`], whose alphabet is the one captured (P2, P7).
 use crate::native_masters::{
     read_text, refuse_error_element, upper, within_name_bound, NativeMastersError,

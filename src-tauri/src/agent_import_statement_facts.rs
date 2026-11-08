@@ -510,7 +510,7 @@ impl BuildVoucher {
                     .iter()
                     .map(|entry| BuildEntry {
                         ledger: entry.ledger.clone(),
-                        amount: entry.amount.clone(),
+                        amount: entry.amount.as_str().to_string(),
                         side: entry.side.clone(),
                     })
                     .collect(),

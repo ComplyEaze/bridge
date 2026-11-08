@@ -38,6 +38,39 @@ pub enum Bank {
     Bob,
 }
 
+/// What [`crate::proposals::build`] reads of a statement's rows. A PDF [`Bank`] and a CSV layout
+/// ([`crate::csv_edge::CsvLayout`]) each give their own.
+pub trait RowGrammar: Copy {
+    fn parse_date(self, text: &str) -> Option<Date>;
+    /// The date format, for refusal messages.
+    fn date_format(self) -> &'static str;
+    fn party(self, row: &Row) -> String;
+    fn reference(self, row: &Row) -> (String, String);
+    fn transfer_reference(self, row: &Row) -> Option<BankReference>;
+    fn instrument(self, row: &Row) -> Option<String>;
+}
+
+impl RowGrammar for Bank {
+    fn parse_date(self, text: &str) -> Option<Date> {
+        Bank::parse_date(self, text)
+    }
+    fn date_format(self) -> &'static str {
+        Bank::date_format(self)
+    }
+    fn party(self, row: &Row) -> String {
+        Bank::party(self, row)
+    }
+    fn reference(self, row: &Row) -> (String, String) {
+        Bank::reference(self, row)
+    }
+    fn transfer_reference(self, row: &Row) -> Option<BankReference> {
+        Bank::transfer_reference(self, row)
+    }
+    fn instrument(self, row: &Row) -> Option<String> {
+        Bank::instrument(self, row)
+    }
+}
+
 /// How a layout's rows are read off the page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Layout {

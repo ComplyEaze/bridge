@@ -1108,6 +1108,10 @@
     {
       "uuid": "5342454a-478e-4d59-a663-16ec7b8c84a8",
       "note": "company identifier of the synthetic lab company BRIDGE CASHDAY LAB, created on Tally's screen for #1761 with ten hand-keyed vouchers, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/ (lab branch lab/1761-s1-cash-day-end-answers at c8689a8a, in pull request 2294); the COMPANY_GUID constant of agent_cash_projection_tests.rs in that pull request names it, and the ledger and voucher identifiers in those captures are this value with a suffix"
+    },
+    {
+      "uuid": "ffa928f6-5934-48e2-bbd6-474936e71546",
+      "note": "company identifier of the synthetic lab company BRIDGE TIEOUT E, made for #692's opening-stock run, as Tally returned it in the ten ledger and group answers of that run on 5 Nov 2026 (listed in kept-local.txt on lab branch lab/692-opening-stock-fixtures at 2f776b59, whose other 39 answers carry no identifier); the ledger and group identifiers in those answers are this value with a suffix"
     }
   ]
 }

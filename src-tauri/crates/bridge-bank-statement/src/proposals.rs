@@ -14,7 +14,7 @@
 //! to name. It never reaches Tally except through Bridge's own derivation.
 
 use crate::bank::{
-    Bank, BankReference, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES,
+    BankReference, RowGrammar, BALANCE, CREDIT, DATE, DEBIT, NARRATION, PARSER_CATEGORIES,
     PARSER_SENTINELS,
 };
 use crate::cash::{CashAnswer, CashAnswers, CashMovement, PURPOSE_NOT_CONFIRMED};
@@ -275,7 +275,7 @@ pub fn coverage(dates: &[Date], from: Option<Date>, to: Option<Date>) -> Option<
 
 /// One row read as a movement of money, or `None` when it does not read as one
 /// (the build refuses such a row if it lies in the window).
-fn movement(row: &Row, bank: Bank, number: usize) -> Option<(Date, String, bool)> {
+fn movement(row: &Row, bank: impl RowGrammar, number: usize) -> Option<(Date, String, bool)> {
     let date = bank.parse_date(strip(row.get(DATE)))?;
     let debit = money(row.get(DEBIT), DEBIT, number).ok()?;
     let credit = money(row.get(CREDIT), CREDIT, number).ok()?;
@@ -288,7 +288,7 @@ fn movement(row: &Row, bank: Bank, number: usize) -> Option<(Date, String, bool)
 
 /// For each row, whether another row of the statement moved the same amount the
 /// other way on the same date.
-fn reversed_same_day(rows: &[Row], bank: Bank) -> Vec<bool> {
+fn reversed_same_day(rows: &[Row], bank: impl RowGrammar) -> Vec<bool> {
     let moves: Vec<Option<(Date, String, bool)>> = rows
         .iter()
         .enumerate()
@@ -623,7 +623,7 @@ fn cash_entry(
 /// Proposals and a record per statement row, in printed order (`build`).
 pub fn build(
     rows: &[Row],
-    bank: Bank,
+    bank: impl RowGrammar,
     mapping: &Mapping,
     options: &BuildOptions<'_>,
 ) -> Result<Build, Refusal> {

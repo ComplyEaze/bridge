@@ -5490,6 +5490,106 @@
       "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2377",
       "sha256": "00b538866cc8327666694432575889e787dde4d5c6c496d799d3b1914406477c",
       "size": 1636
+    },
+    {
+      "blob": "95f179b38fe053953ac91ccf516d117112cb9ff1",
+      "capture_id": "r1-groups.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r1-groups.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "229b04263df16d8438ba21af7797e2445d460ffd555c51cc2b5a35f974736095",
+      "size": 54286
+    },
+    {
+      "blob": "634e7fe052b10816f8746f16da2eaf037c0e7f94",
+      "capture_id": "r1-w1-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r1-w1-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "07e9f385637f9e2cf50dd0faf799207b2ec5de22a6b1da19ccb8cd9ddcec8869",
+      "size": 13526
+    },
+    {
+      "blob": "a64f35c5f62eaf1bab8591e9b6bab68d88a6df8a",
+      "capture_id": "r1-w2-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r1-w2-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "c5bd41fd0816b3dd75d3f003ee4d7900a1eba27722dd91b786034807a6fa4286",
+      "size": 13548
+    },
+    {
+      "blob": "4ab9a488985ad06ef57381c36c38ec21a50a4143",
+      "capture_id": "r1-w3-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r1-w3-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "2a2878575ad318b157e3b335ffb1ae304d9e505e65a980e94503d0ba9eb9778b",
+      "size": 13508
+    },
+    {
+      "blob": "93937eb463210dcea75af9cb5fef7dcc4550645b",
+      "capture_id": "r1-w4-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r1-w4-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "666daa320f1c4a3502ccca68f731d095cb09fc1a343b0325abda2cd602a81ca0",
+      "size": 13462
+    },
+    {
+      "blob": "4b4bf95101e0b7fb3181f2f4de57cdb11c95df36",
+      "capture_id": "r2-w1-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r2-w1-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "8437286da7ab2e27ff2b40677bc96b87bd5b9eb3ec52da36c05e0e6ff5c1bd16",
+      "size": 13526
+    },
+    {
+      "blob": "b7cb9fdbda038dfad19c6e69b28e210b5cc92bce",
+      "capture_id": "r2-w2-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r2-w2-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "f08f2ae27f89f29fb9df84f94a1184d6b4db3000c663da490c0a2d4bea0b75d8",
+      "size": 13548
+    },
+    {
+      "blob": "6e13bd2603782d5678baecbaca07ced92d446cd6",
+      "capture_id": "r3-w2-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r3-w2-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "6bca6a373285605d1a74a470742b23b9c3038b9f085e053b09bdebb7ff525933",
+      "size": 13542
+    },
+    {
+      "blob": "726afbd3f30f938f7c30964ec667c49863734822",
+      "capture_id": "r4-w2-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r4-w2-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "d59c98c7437eab71908fdc4b0031af34da4398ac47695cb58b4c46e72fb6e3d3",
+      "size": 14724
+    },
+    {
+      "blob": "28fd1dd25e0d62fa325e04f35816aa4b369e61b2",
+      "capture_id": "r5-w5-ledgers.utf16le.xml",
+      "company": "BRIDGE TIEOUT E",
+      "lab_ref": "lab branch lab/692-opening-stock-fixtures at 24645c57, each blob equal to its line in lab/692-opening-stock-answers SHA256.txt at 09287f70",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r5-w5-ledgers.utf16le.xml",
+      "seed_basis": "synthetic lab book of the 5 Nov 2026 opening-stock run for #692; see lab/692-opening-stock-answers RESULTS.md at 09287f70",
+      "sha256": "b2d0519cc1d25b5eac8a0ddc15318d58818fa9aaba97e4bf3ac81a87785f533f",
+      "size": 13532
     }
   ]
 }

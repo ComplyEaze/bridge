@@ -5052,26 +5052,6 @@
       "size": 3926
     },
     {
-      "blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
-      "capture_id": "ledger-outstandings-unknown-party.utf16le.xml",
-      "company": "BRIDGE BILLTRAIL LAB",
-      "lab_ref": "lab branch lab/2377-l-answers at a2be6d96",
-      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-unknown-party.utf16le.xml",
-      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2377",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "size": 0
-    },
-    {
-      "blob": "dadb1e8f0299450d913f481a07bd3d9a6349c8ff",
-      "capture_id": "ledger-outstandings-unknown-party.headers.txt",
-      "company": "BRIDGE BILLTRAIL LAB",
-      "lab_ref": "lab branch lab/2377-l-answers at a2be6d96",
-      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/party-bills/ledger-outstandings-unknown-party.headers.txt",
-      "seed_basis": "synthetic lab book; see agent/party-bills/PROVENANCE.md in the pull request for issue 2377",
-      "sha256": "547c40c5c5f4e011efd4f95175768b2ae81f0dfd351f7e36d0b3b9821a584e0b",
-      "size": 77
-    },
-    {
       "blob": "390e048747e55a1120e470d153704c97548c7726",
       "capture_id": "ledger-outstandings-ampersand.utf16le.xml",
       "company": "BRIDGE BILLTRAIL LAB",

@@ -1,0 +1,46 @@
+# fixture: tests/fixtures/opening-stock-tieout-e/r1-w3-stock-summary.utf16le.xml
+# parser: parse_native_stock_summary_report
+# source: captured
+Ok(Lines {
+    total: Some(
+        ExactDecimal(
+            "-1411.18",
+        ),
+    ),
+    present: 2,
+    empty: 0,
+    lines: [
+        NativeReportLine {
+            name: "Lab Item A",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "7",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            amount: Some(
+                ExactDecimal(
+                    "-811.18",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Lab Item B",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "10",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            amount: Some(
+                ExactDecimal(
+                    "-600.00",
+                ),
+            ),
+        },
+    ],
+})

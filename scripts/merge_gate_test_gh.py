@@ -1137,6 +1137,22 @@ def state():
             "+a harmless last line\n"
         )
 
+    elif scenario in {"lockfile-integrity", "lockfile-integrity-outside-lockfile"}:
+        # #2367: one pnpm resolution line whose base64 body holds an identifier-shaped run (built from parts).
+        path = "frontend/pnpm-lock.yaml" if scenario == "lockfile-integrity" else "docs/example.md"
+        body = "Q" * 30 + "AB" + "CDE" + "12" + "34" + "F" + "Q" * 46
+        s["files"] = [{"filename": path, "status": "added", "additions": 1, "deletions": 0}]
+        s["changed_files_expected"] = 1
+        s["diff"] = (
+            "diff --git a/" + path + " b/" + path + "\n"
+            "new file mode 100644\n"
+            "index 0000000..1111111\n"
+            "--- /dev/null\n"
+            "+++ b/" + path + "\n"
+            "@@ -0,0 +1 @@\n"
+            "+    resolution: {integrity: sha512-" + body + "==}\n"
+        )
+
     elif scenario in {"merge-commit-conflict-comment-block", "merge-commit-conflict-block-customer-address"}:
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = dict(DEFAULT_COMMIT["commit"])

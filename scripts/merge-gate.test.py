@@ -829,6 +829,16 @@ class MergeGateControls(unittest.TestCase):
         self.assertNotIn("12345" + "678901", result.stdout + result.stderr)
         self.assertNotIn("harmless", result.stdout)
 
+    def test_a_lockfile_integrity_value_is_masked_as_a_digest(self):
+        # #2367: the gate's own exit code is the finding's kind (0 passes, 1 blocks).
+        result = self.assert_pass("lockfile-integrity")
+        self.assertIn("1 lockfile integrity value(s) were masked as generated digests", result.stdout)
+
+    def test_the_same_integrity_line_outside_a_lockfile_still_blocks(self):
+        result = self.run_gate("lockfile-integrity-outside-lockfile")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertNotIn("lockfile integrity value(s) were masked", result.stdout)
+
     def test_a_privacy_hit_in_pr_metadata_is_located_by_source_and_line(self):
         result = self.assert_blocked("privacy-email-blocker", "customer email shape")
         self.assertIn("at pr-title:1: privacy scan found 1 customer email shape(s)", result.stdout)
@@ -3099,6 +3109,87 @@ class PrivacyMutationRecordDigests(unittest.TestCase):
         for text in (self.line(pan, self.with_run, key="note"), "party %s" % pan):
             blockers = self.blockers(text)
             self.assertTrue(any("identifier shape" in b for b in blockers), (text, blockers))
+
+
+class PrivacyLockfileIntegrity(unittest.TestCase):
+    """#2367: a registry integrity value in a JavaScript lockfile is masked as a generated digest, only in a lockfile and
+    only in the exact form the lockfile writes; anything else in a lockfile, and the same text elsewhere, is scanned as
+    before. Each assertion is on the kind of finding (the record's buckets), never on message text. The identifier-shaped
+    run is built from parts, because this file is scanned like any other added text."""
+
+    RUN = "AB" + "CDE" + "12" + "34" + "F"
+
+    def setUp(self):
+        self.privacy = load_privacy_module()
+
+    def body(self, length=86):
+        return "Q" * 30 + self.RUN + "Q" * (length - 30 - len(self.RUN))
+
+    def pnpm_line(self):
+        return "    resolution: {integrity: sha512-" + self.body() + "==}"
+
+    def record(self, path, text):
+        lines, masked = self.privacy.mask_lockfile_payload([{"path": path, "text": text}])
+        return self.privacy.scan("\n".join(lines), HEAD), masked
+
+    def assert_clean(self, record):
+        self.assertEqual((record["blockers"], record["indeterminate"]), ([], []), record)
+
+    def assert_blocks(self, record):
+        self.assertTrue(record["blockers"], record)
+        self.assertEqual(record["indeterminate"], [], record)
+
+    def test_the_unmasked_integrity_line_blocks_as_the_issue_reports(self):
+        self.assert_blocks(self.privacy.scan(self.pnpm_line(), HEAD))
+
+    def test_a_pnpm_integrity_value_in_a_pnpm_lockfile_passes(self):
+        record, masked = self.record("frontend/pnpm-lock.yaml", self.pnpm_line())
+        self.assert_clean(record)
+        self.assertEqual(masked, 1)
+
+    def test_an_npm_integrity_value_in_an_npm_lockfile_passes(self):
+        line = '      "integrity": "sha512-' + self.body() + '==",'
+        for path in ("package-lock.json", "web/npm-shrinkwrap.json"):
+            record, masked = self.record(path, line)
+            self.assert_clean(record)
+            self.assertEqual(masked, 1, path)
+
+    def test_the_same_line_outside_a_lockfile_still_blocks(self):
+        for path in ("docs/notes.md", "pnpm-lock.yaml.md", "scripts/pnpm-lock.yaml.bak"):
+            record, masked = self.record(path, self.pnpm_line())
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, path)
+
+    def test_an_identifier_shape_in_another_lockfile_field_still_blocks(self):
+        for line in ("    version: " + self.RUN, "    tarball: " + self.RUN):
+            record, masked = self.record("pnpm-lock.yaml", line)
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, line)
+
+    def test_a_value_not_in_the_exact_form_still_blocks(self):
+        for line in (
+            "    resolution: {integrity: sha512-" + self.body(85) + "==}",  # one character short
+            "    resolution: {integrity: sha512-" + self.body() + "==QQ}",  # runs past the value
+            "    resolution: {integrity: sha1-" + self.body() + "==}",  # another algorithm
+            "    integrity: sha512-" + self.body() + "==",  # not inside the resolution form
+        ):
+            record, masked = self.record("pnpm-lock.yaml", line)
+            self.assert_blocks(record)
+            self.assertEqual(masked, 0, line)
+
+    def test_the_rest_of_an_integrity_line_is_still_scanned(self):
+        line = self.pnpm_line()[:-1] + ", tarball: " + self.RUN + "}"
+        record, masked = self.record("pnpm-lock.yaml", line)
+        self.assert_blocks(record)
+        self.assertEqual(masked, 1)
+
+    def test_explain_masks_by_each_line_s_own_path(self):
+        document = {"sources": [], "added": [
+            {"path": "pnpm-lock.yaml", "line": 7, "text": self.pnpm_line()},
+            {"path": "docs/notes.md", "line": 3, "text": self.pnpm_line()},
+        ]}
+        located = self.privacy.explain(document, HEAD)
+        self.assertEqual([hit["where"] for hit in located["hits"]], ["docs/notes.md:3"])
 
 
 if __name__ == "__main__":

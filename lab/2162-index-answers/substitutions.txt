@@ -1,0 +1,11 @@
+Pushed copies of the lab's own text, and the netstat reads, that differ from the files kept on the lab PC, with what changed (no other captured file is altered):
+evidence/b13-netstat.txt: original 28143 B sha256 78ed6cc746cb0e55a63593168d6fb8b076ad4dd22d1853be21041e8df6b183f9 (kept on the lab PC); only the port-9001 LISTENING lines and the time and exit lines kept
+evidence/d5-netstat.txt: original 27118 B sha256 92cc72a79d6d0345f33f0e668c9d2fd46f79407a626b4de9e7766353cd604512 (kept on the lab PC); only the port-9001 LISTENING lines and the time and exit lines kept
+evidence/p0-netstat.txt: original 41816 B sha256 0e92d14c6d3490f995a3e9bc76f0751d07441def60d4038612677607ea78c235 (kept on the lab PC); only the port-9001 LISTENING lines and the time and exit lines kept
+notes.txt: original 20292 B sha256 c4508e04af62979502e63c20e0bcf4cc08e44611f52862a6b49c10723d4f88f9 (kept on the lab PC); 2 x -> number of digits
+restore-plan.txt: original 792 B sha256 803a2d273b8f7cb8a2e1fe5f8d9d42b80f8320a03740236125034c18f3eaf423 (kept on the lab PC); <company number> replaced in 3 place(s); 1 x -> <Tally data folder>
+b10.py: original 2383 B sha256 e093b8e02507b24aade8ba25522dbd8b6f98b5d5dea17d85bbb238bd8d7554be (kept on the lab PC); <company number> replaced in 1 place(s); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+c2.ps1: original 1382 B sha256 beb11cade098cac10b7e6c999cd6fcdaddd2f0f679c5e2b0e259f28f7447496d (kept on the lab PC); 1 x -> <LAB_DIR>
+d3.py: original 1465 B sha256 1acc66faec492f4010688a83df667738889af64bbf919ad9119426ce0226d009 (kept on the lab PC); 1 x -> <LAB_DIR>; 2 x -> stop
+mk.py: original 1544 B sha256 37306a48d97f42ec372766bc9b08a399692ae1faa6e1023ec96619c6ce681004 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> stop
+startup_check.py: original 2693 B sha256 3be9231221ebf8ee9dedce32cdd40de9a1148e87cef88bd61615bfeff1f893e9 (kept on the lab PC); 1 x -> <Tally data folder>

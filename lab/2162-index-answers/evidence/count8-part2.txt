@@ -1,0 +1,57 @@
+a-p2-A-Y0-year.xml: 117992 bytes, sha256 f8ccb3ca4631c5af446a9ad802094febed88f6756fa54ebc7707be581f3ad278
+  rows 41
+  row bytes: total 114474, the rest of the answer 3518; per row min 2768, max 2812, mean 2792
+  BRIDGEVCHISSALES: 'Yes' 35; 'No' 6
+  VOUCHERTYPENAME: 'BRIDGE Sales' 33; 'Receipt' 4; 'Purchase' 2; 'BRIDGE Sales Two' 1; 'BRIDGE Sales Z1' 1
+  ISCANCELLED: 'No' 40; 'Yes' 1
+  DATE: first 20260801, last 20260915, distinct 10
+  IRN: once in 41 rows, not empty in 0
+  IRNACKNO: once in 41 rows, not empty in 0
+  IRNACKDATE: once in 41 rows, not empty in 0
+  Sales-class rows 35: distinct numbers 35, distinct folded 35, rows whose folded number another Sales-class row also has 0
+  row 1: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-p3-L3a-pilot.xml: 121512 bytes, sha256 e99b7954e184734379339978e383e79368eff1ab2c6b03bfab80f932521f3287
+  rows 41
+  row bytes: total 117994, the rest of the answer 3518; per row min 2854, max 2898, mean 2878
+  BRIDGEVCHISSALES: 'Yes' 35; 'No' 6
+  VOUCHERTYPENAME: 'BRIDGE Sales' 33; 'Receipt' 4; 'Purchase' 2; 'BRIDGE Sales Two' 1; 'BRIDGE Sales Z1' 1
+  ISCANCELLED: 'No' 40; 'Yes' 1
+  DATE: first 20260801, last 20260915, distinct 10
+  IRN: once in 41 rows, not empty in 0
+  IRNACKNO: once in 41 rows, not empty in 0
+  IRNACKDATE: once in 41 rows, not empty in 0
+  Sales-class rows 35: distinct numbers 35, distinct folded 35, rows whose folded number another Sales-class row also has 0
+  row 1: 2882 bytes, 26 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2884 bytes, 26 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2884 bytes, 26 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-p5-L3b-pilot.xml: 17524 bytes, sha256 58c338a7195cbdcf8032b9f94b8d8cbf82afab5ff12f555f783707d2e9481a9e
+  rows 5
+  row bytes: total 14438, the rest of the answer 3086; per row min 2880, max 2892, mean 2888
+  BRIDGEVCHISSALES: 'Yes' 5
+  VOUCHERTYPENAME: 'BRIDGE Sales' 4; 'BRIDGE Sales Two' 1
+  ISCANCELLED: 'No' 4; 'Yes' 1
+  DATE: first 20260820, last 20260822, distinct 3
+  IRN: once in 5 rows, not empty in 0
+  IRNACKNO: once in 5 rows, not empty in 0
+  IRNACKDATE: once in 5 rows, not empty in 0
+  Sales-class rows 5: distinct numbers 5, distinct folded 5, rows whose folded number another Sales-class row also has 0
+  row 1: 2880 bytes, 26 children, DATE='20260820' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='Yes' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2886 bytes, 26 children, DATE='20260820' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2892 bytes, 26 children, DATE='20260821' VOUCHERNUMBER='<8 chars>' VOUCHERTYPENAME='BRIDGE Sales Two' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-pm1-M-pilot.xml: 3394 bytes, sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+  COMPANY GUIDs 1; the dense book's: no; ALTVCHID ['68']; ALTMSTID ['245']
+a-pm6-M-pilot.xml: 3394 bytes, sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+  COMPANY GUIDs 1; the dense book's: no; ALTVCHID ['68']; ALTMSTID ['245']
+a-pm7-M-pilot.xml: 3394 bytes, sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+  COMPANY GUIDs 1; the dense book's: no; ALTVCHID ['68']; ALTMSTID ['245']
+A-Y0-year.xml: not a name timed.py writes; skipped
+a-p3-L3a-pilot.xml against a-p2-A-Y0-year.xml: rows 41 and 41; rows with one numeric ALTERID 41; equal less ALTERID: yes
+a-p5-L3b-pilot.xml against the rows of a-p3-L3a-pilot.xml with ALTERID above 58: rows 5 and 5; element for element equal: yes
+a-p2-A-Y0-year.xml: curl 0, HTTP 200, first byte 0.121393 s, curl total 0.122833 s, wall 0.17 s, 117992 bytes
+a-p3-L3a-pilot.xml: curl 0, HTTP 200, first byte 0.078055 s, curl total 0.079034 s, wall 0.14 s, 121512 bytes
+a-p5-L3b-pilot.xml: curl 0, HTTP 200, first byte 0.074566 s, curl total 0.075140 s, wall 0.11 s, 17524 bytes
+a-pm1-M-pilot.xml: curl 0, HTTP 200, first byte 0.005835 s, curl total 0.006430 s, wall 0.05 s, 3394 bytes
+a-pm6-M-pilot.xml: curl 0, HTTP 200, first byte 0.004686 s, curl total 0.005501 s, wall 0.03 s, 3394 bytes
+a-pm7-M-pilot.xml: curl 0, HTTP 200, first byte 0.005739 s, curl total 0.006329 s, wall 0.07 s, 3394 bytes

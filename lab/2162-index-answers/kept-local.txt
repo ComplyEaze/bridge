@@ -1,0 +1,7 @@
+Kept on the lab PC by the sheet and the run lead's standing rules, by size and sha256, with the reason:
+run/s6-Y0-year.xml 83742646 B 1db925db90f703148e76c2971f6bd9ad1fc2980cb5f81c14d0e6ca5f6e8c78b6 (S6's kept answer, copied beside count8.py for D2's check; over the sheet's 10 MB)
+4b58d5fcbdbac84e69d74348a89d501d2f4b6f1d2cc49777ddd16a8aa71289ea (a capture taken while Tally's start-up company was loaded, in P6: by sha256 only)
+e5063b1204318a7c9c692f416b755f1b8e9e36937f4527308166665cf9a9b8b9 (a capture taken while Tally's start-up company was loaded, in P6: by sha256 only)
+1415bc4e259d3f60dfa258a41a15d74b2e622222e533310328099c644661993f (a capture taken while Tally's start-up company was loaded, in P6: by sha256 only)
+stage_ix.py 9052 B 83c3e732cf273e2968ff51c16ceae761efd9c2c74b445c1393a110609412ae5e (this stage script: its patterns name the lab paths)
+run/: the lab copies of the kit's requests and scripts, byte-equal to lab/2162-ix/ at bdd16647 (its SHA256.txt, 16 of 16)

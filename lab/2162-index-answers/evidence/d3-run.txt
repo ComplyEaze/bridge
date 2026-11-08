@@ -1,0 +1,38 @@
+l501 exit 0 2026-11-08T11:19:00.177Z	2026-11-08T11:19:03.604Z	B-Y0-month.xml	a-l501-B-Y0-month.xml	curl 0	200 3.086489 3.221433 6792322
+dm2 exit 0 2026-11-08T11:19:04.132Z	2026-11-08T11:19:04.219Z	M-dense.xml	a-dm2-M-dense.xml	curl 0	200 0.022231 0.023086 3406
+dm2 byte-equal to dm1
+l502 exit 0 2026-11-08T11:19:04.961Z	2026-11-08T11:19:07.088Z	B-Y0-month.xml	a-l502-B-Y0-month.xml	curl 0	200 1.977422 2.051239 6792322
+dm3 exit 0 2026-11-08T11:19:07.413Z	2026-11-08T11:19:07.456Z	M-dense.xml	a-dm3-M-dense.xml	curl 0	200 0.005339 0.005963 3406
+dm3 byte-equal to dm1
+l503 exit 0 2026-11-08T11:19:07.892Z	2026-11-08T11:19:10.470Z	B-Y0-month.xml	a-l503-B-Y0-month.xml	curl 0	200 2.470562 2.522728 6792322
+dm4 exit 0 2026-11-08T11:19:11.195Z	2026-11-08T11:19:11.241Z	M-dense.xml	a-dm4-M-dense.xml	curl 0	200 0.006920 0.008708 3406
+dm4 byte-equal to dm1
+l504 exit 0 2026-11-08T11:19:11.551Z	2026-11-08T11:19:13.834Z	B-Y0-month.xml	a-l504-B-Y0-month.xml	curl 0	200 2.116510 2.203409 6792322
+dm5 exit 0 2026-11-08T11:19:14.251Z	2026-11-08T11:19:14.311Z	M-dense.xml	a-dm5-M-dense.xml	curl 0	200 0.007768 0.008525 3406
+dm5 byte-equal to dm1
+l505 exit 0 2026-11-08T11:19:14.704Z	2026-11-08T11:19:17.303Z	B-Y0-month.xml	a-l505-B-Y0-month.xml	curl 0	200 2.500722 2.544910 6792322
+dm6 exit 0 2026-11-08T11:19:17.911Z	2026-11-08T11:19:18.117Z	M-dense.xml	a-dm6-M-dense.xml	curl 0	200 0.010754 0.011382 3406
+dm6 byte-equal to dm1
+l506 exit 0 2026-11-08T11:19:18.609Z	2026-11-08T11:19:21.476Z	B-Y0-month.xml	a-l506-B-Y0-month.xml	curl 0	200 2.712255 2.757520 6792322
+dm7 exit 0 2026-11-08T11:19:21.808Z	2026-11-08T11:19:21.888Z	M-dense.xml	a-dm7-M-dense.xml	curl 0	200 0.038824 0.039971 3406
+dm7 byte-equal to dm1
+l507 exit 0 2026-11-08T11:19:22.189Z	2026-11-08T11:19:24.263Z	B-Y0-month.xml	a-l507-B-Y0-month.xml	curl 0	200 1.866381 2.040532 6792322
+dm8 exit 0 2026-11-08T11:19:24.566Z	2026-11-08T11:19:24.608Z	M-dense.xml	a-dm8-M-dense.xml	curl 0	200 0.005396 0.006012 3406
+dm8 byte-equal to dm1
+l508 exit 0 2026-11-08T11:19:24.941Z	2026-11-08T11:19:26.782Z	B-Y0-month.xml	a-l508-B-Y0-month.xml	curl 0	200 1.754784 1.796308 6792322
+dm9 exit 0 2026-11-08T11:19:27.106Z	2026-11-08T11:19:27.145Z	M-dense.xml	a-dm9-M-dense.xml	curl 0	200 0.007148 0.007951 3406
+dm9 byte-equal to dm1
+l509 exit 0 2026-11-08T11:19:27.429Z	2026-11-08T11:19:29.381Z	B-Y0-month.xml	a-l509-B-Y0-month.xml	curl 0	200 1.876627 1.918368 6792322
+dm10 exit 0 2026-11-08T11:19:29.705Z	2026-11-08T11:19:29.744Z	M-dense.xml	a-dm10-M-dense.xml	curl 0	200 0.008150 0.008840 3406
+dm10 byte-equal to dm1
+l510 exit 0 2026-11-08T11:19:30.027Z	2026-11-08T11:19:32.007Z	B-Y0-month.xml	a-l510-B-Y0-month.xml	curl 0	200 1.912199 1.938953 6792322
+dm11 exit 0 2026-11-08T11:19:32.311Z	2026-11-08T11:19:32.355Z	M-dense.xml	a-dm11-M-dense.xml	curl 0	200 0.005968 0.006438 3406
+dm11 byte-equal to dm1
+l511 exit 0 2026-11-08T11:19:32.739Z	2026-11-08T11:19:35.410Z	B-Y0-month.xml	a-l511-B-Y0-month.xml	curl 0	200 2.564622 2.621527 6792322
+dm12 exit 0 2026-11-08T11:19:36.255Z	2026-11-08T11:19:36.472Z	M-dense.xml	a-dm12-M-dense.xml	curl 0	200 0.012151 0.013139 3406
+dm12 byte-equal to dm1
+l512 exit 0 2026-11-08T11:19:37.133Z	2026-11-08T11:19:39.269Z	B-Y0-month.xml	a-l512-B-Y0-month.xml	curl 0	200 1.976910 2.030249 6792322
+dm13 exit 0 2026-11-08T11:19:39.586Z	2026-11-08T11:19:39.627Z	M-dense.xml	a-dm13-M-dense.xml	curl 0	200 0.007469 0.007967 3406
+dm13 byte-equal to dm1
+D3 done: 12 month reads, 12 marks reads byte-equal to dm1
+exit 0

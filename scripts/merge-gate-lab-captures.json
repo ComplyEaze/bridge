@@ -4890,6 +4890,126 @@
       "seed_basis": "synthetic lab book; see agent/audit-read-sft-lab-c16r/PROVENANCE.md in the pull request that adds the capture",
       "sha256": "687bfeb4655a286ee10fdf5d1a8dae72b8126052332bfee90756301b62db327c",
       "size": 428818
+    },
+    {
+      "blob": "feaea7ae674274b22416a3e9974f71217dfee165",
+      "capture_id": "trial-balance-to-20250402.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250402.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "6069616e5a860376901bf349166cf3865e474a86316d9790d23c293fb43515a2",
+      "size": 11334
+    },
+    {
+      "blob": "10ef62c5f63068d5e8fcb016c65471f598325a5b",
+      "capture_id": "trial-balance-to-20250403.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250403.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "63c1e789b80c07c8d2bfdf7033c8fd7fcc6a97ca886038f31a72e12f0ebf4c34",
+      "size": 11354
+    },
+    {
+      "blob": "868d30a92582a792a12bf72526edee7e1f3e2f35",
+      "capture_id": "trial-balance-to-20250404.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250404.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "f6950fdaf49c296cd27efa7c0373c9b39744d4941d635a73f9e835eb2a691e05",
+      "size": 11376
+    },
+    {
+      "blob": "cdb2c6f82ebe191097a33a0617610d38ebf4cc3f",
+      "capture_id": "trial-balance-to-20250405.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250405.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "5fe2ccf8f136f8c5f082826ad8146dde3f9da924fb5ad460e860147b0f641947",
+      "size": 11380
+    },
+    {
+      "blob": "78857fe33215d0790d0ea5035c154cb075979319",
+      "capture_id": "trial-balance-to-20250407.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250407.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "daed10f193933795f859a6e4974006cae7d0280ad38e747532cb94cd7d78572a",
+      "size": 11390
+    },
+    {
+      "blob": "78857fe33215d0790d0ea5035c154cb075979319",
+      "capture_id": "trial-balance-to-20250408.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250408.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "daed10f193933795f859a6e4974006cae7d0280ad38e747532cb94cd7d78572a",
+      "size": 11390
+    },
+    {
+      "blob": "78857fe33215d0790d0ea5035c154cb075979319",
+      "capture_id": "trial-balance-to-20250409.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250409.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "daed10f193933795f859a6e4974006cae7d0280ad38e747532cb94cd7d78572a",
+      "size": 11390
+    },
+    {
+      "blob": "b1e9cf6a6d36abdb90e54e98ac724c6d39a769fd",
+      "capture_id": "trial-balance-to-20250410.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250410.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "22ddefc18b6044929693b91ec987d2ea756090eecce25d60083fb198ae22b579",
+      "size": 11402
+    },
+    {
+      "blob": "0510479b06a9b9e48d8c4d0c1882e9bb4c134b0f",
+      "capture_id": "trial-balance-to-20250411.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250411.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "716521f356a231996d3b917edec72bdf247962f9341d0dd9b8b58b9829ec12e3",
+      "size": 11406
+    },
+    {
+      "blob": "94c46eac2cb658c397271f54896a2985d09b0d19",
+      "capture_id": "trial-balance-to-20250425.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250425.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "07c18deab8725a06951ace81230c41991ab02a227a22346b1a13772bedde6532",
+      "size": 11388
+    },
+    {
+      "blob": "94c46eac2cb658c397271f54896a2985d09b0d19",
+      "capture_id": "trial-balance-to-20250430.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/trial-balance-to-20250430.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "07c18deab8725a06951ace81230c41991ab02a227a22346b1a13772bedde6532",
+      "size": 11388
+    },
+    {
+      "blob": "f1159fd3b5589149472c3c9ee4263e927a232bad",
+      "capture_id": "window-20250401-20250430.utf16le.xml",
+      "company": "BRIDGE CASHDAY LAB",
+      "lab_ref": "lab branch lab/1761-s1-cash-day-end-answers at c8689a8a",
+      "path": "src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/window-20250401-20250430.utf16le.xml",
+      "seed_basis": "synthetic lab book; see agent/cash-day-end/PROVENANCE.md in pull request 2294",
+      "sha256": "2d2fdfe340984f43c8c98346faa5fe15c7a9272f4078206e227090848a3552ea",
+      "size": 290296
     }
   ]
 }

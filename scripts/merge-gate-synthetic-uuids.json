@@ -1104,6 +1104,10 @@
     {
       "uuid": "2b1c9f4e-9d3a-4f71-8c2e-5a6b7c8d9e01",
       "note": "hand-made batch id of the Rust agent tests: the suffix of the invented batch id bridge-2b1c9f4e-9d3a-4f71-8c2e-5a6b7c8d9e01, its last group counting 5a6b7c8d9e01, written by hand into agent_admission_tests.rs, agent_import_amend_tests.rs, agent_presence_tests.rs and agent_statement_tie_out_tests.rs on master and into the amends_batch_id case of the schema test in agent_import_text_tests.rs added by pull request 2337; it is in no lab answer, capture or fixture"
+    },
+    {
+      "uuid": "5342454a-478e-4d59-a663-16ec7b8c84a8",
+      "note": "company identifier of the synthetic lab company BRIDGE CASHDAY LAB, created on Tally's screen for #1761 with ten hand-keyed vouchers, as TallyPrime 7.2 returned it in the captures under src-tauri/crates/bridge-tally-protocol/tests/fixtures/agent/cash-day-end/ (lab branch lab/1761-s1-cash-day-end-answers at c8689a8a, in pull request 2294); the COMPANY_GUID constant of agent_cash_projection_tests.rs in that pull request names it, and the ledger and voucher identifiers in those captures are this value with a suffix"
     }
   ]
 }

@@ -134,13 +134,13 @@ test("an unexpected job in the release workflow is refused", () => {
 // makes one change a weaker rule would let through; the unmodified tree has exactly five allowed flags.
 const CI_FILE = ".github/workflows/ci.yml";
 const FLAG = "        continue-on-error: true";
-const UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a";
-const TIMINGS = `${FLAG}\n        uses: ${UPLOAD} # v7.0.1\n        with:\n          name: native-compiler-timings`;
+const UPLOAD = "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9";
+const TIMINGS = `${FLAG}\n        uses: ${UPLOAD} # v7.0.2\n        with:\n          name: native-compiler-timings`;
 const TEST_TIMINGS_STEP = [
   "      - name: Retain macOS per-test timings",
   "        if: ${{ always() && runner.os == 'macOS' && steps.native-tests.outcome == 'success' }}",
   FLAG,
-  `        uses: ${UPLOAD} # v7.0.1`,
+  `        uses: ${UPLOAD} # v7.0.2`,
   "        with:",
   "          name: native-test-timings-macos-shard-${{ matrix.shard }}",
   "          path: src-tauri/target/nextest/default/junit.xml",
@@ -161,7 +161,7 @@ for (const [name, change, messages] of [
   ["a flag moved from an allowed step to another step", (text) => text.replace(TIMINGS, TIMINGS.slice(FLAG.length + 1)).replace(AFTER_NATIVE_PIN, `${AFTER_NATIVE_PIN}${FLAG}\n`), [UPLOAD_SHAPE]],
   ["an id on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, `${FLAG}\n        id: timings`)), [UPLOAD_SHAPE]],
   ["an expression instead of true on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace(FLAG, "        continue-on-error: ${{ always() }}")), [ONLY_EXACT, UPLOAD_SHAPE]],
-  ["a different upload action on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace("043fb46d", "043fb46e")), [UPLOAD_SHAPE]],
+  ["a different upload action on an allowed step", (text) => text.replace(TIMINGS, TIMINGS.replace("cf430e03", "cf430e04")), [UPLOAD_SHAPE]],
   // The per-test timings report carries a failing test's panic text, so it is uploaded only after a passing test step.
   ["the per-test timings upload without its passing-test condition", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace(" && steps.native-tests.outcome == 'success'", "")), [UPLOAD_SHAPE]],
   ["the per-test timings upload on every operating system", (text) => text.replace(TEST_TIMINGS_STEP, TEST_TIMINGS_STEP.replace(" && runner.os == 'macOS'", "")), [UPLOAD_SHAPE]],
@@ -179,7 +179,7 @@ test("diagnostics uploads: an allowed step moved to another job is refused altho
     "      - name: Retain native compiler timings",
     "        if: ${{ always() }}",
     FLAG,
-    `        uses: ${UPLOAD} # v7.0.1`,
+    `        uses: ${UPLOAD} # v7.0.2`,
     "        with:",
     "          name: native-compiler-timings-${{ matrix.os }}-shard-${{ matrix.shard }}",
     "          path: src-tauri/target/cargo-timings/*.html",

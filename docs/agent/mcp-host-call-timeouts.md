@@ -25,8 +25,9 @@ Confidence markers follow `docs/tally/TALLY_PROTOCOL_REFERENCE.md`.
 | Claude Code CLI (`claude -p`), default settings | 2.1.285, macOS | 90, 300, 900 (this server); 150 (earlier server, 30 Sep) | none up to 900 | not reached | n/a: no call was abandoned | not tested: no timeout reached | partial, one run each |
 | Claude Code CLI, per-server `timeout` of 60000 ms in `.mcp.json` | 2.1.285, macOS | none (150 s was cut) | 150 s call cut at 60.0 s, with and without progress every 10 s | `MCP server ... timed out after 60s` | received (reason `SdkError: Request timed out`) | no: progress every 10 s did not reset it | partial, one run each (30 Sep, earlier server, see #703) |
 | Claude Code in the Code tab of the Claude desktop app, default settings | 2.1.284, macOS | 150 (earlier server, 30 Sep) | none up to 150 | not reached | n/a: no call was abandoned | not tested | partial, one run, run by hand |
+| Claude Code in the Code tab of the Claude desktop app, default settings | desktop app 4.4212.0.0 with Claude Code 2.1.309, Windows | none (90 s was cut) | 90 s call cut at 60.0 s, plain and with progress every 10 s | `Error: Request timed out` | received (reason `SdkError: Request timed out`) | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
 | Claude Desktop (chat app) | macOS | not measured | | | | | |
-| Claude Desktop (chat app) | Windows | not measured | | | | | |
+| Claude Desktop (chat app) | 4.4212.0.0, Windows | none (60 s was cut) | 60 s call cut at about 60 s, plain and with progress every 10 s | an error that the device did not respond within 60 s | not received: the server sent its result 3 ms and 10 ms after the error | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
 | a third-party client | | not measured | | | | | |
 
 **Claude Code, details.** Each call carried `_meta.progressToken` (equal to the request id) and
@@ -45,6 +46,15 @@ reached. `MCP_TOOL_TIMEOUT` was not measured.
 The 30 Sep runs (rows 2 and 3 and the 150 s default run) used an earlier dev server, outside the
 repository, with the same one-tool shape; their logs are not kept here, and the figures are quoted
 from the #703 thread (comments of 30 Sep, 09:13 and 09:16 UTC).
+
+**Claude desktop app on Windows, details** (#2119; answers on `lab/2119-h-answers` at `dfaf2737`).
+Both tabs end one tool call at about 60 s, and neither sent a `progressToken` on any of the four
+calls, so no progress was sent and progress cannot extend a call there. The Code tab sends
+`notifications/cancelled` at 60 s. The chat app's wait for the computer running the server ends at
+60 s without a cancellation, and the app's own server log holds no line for either call. The
+90 s and longer chat calls were not sent, because the climb stops at the first call cut. A chat
+call just under 60 s is not measured, and whether the chat app's timer runs from the call or from
+the answer to its tool prompt is not told apart. One sitting, one PC, one app version.
 
 This does not explain the abandonment at about 60 s that #703 records on another setup: the
 likeliest explanation is a configured timeout or an older build (unverified; nothing records which

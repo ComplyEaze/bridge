@@ -1,0 +1,512 @@
+a-a1-A-M-marks.xml: 3394 bytes, sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+  COMPANY GUIDs 1; the book's: no; ALTVCHID ['68']; ALTMSTID ['245']
+a-a2-A-Y0-year.xml: 117992 bytes, sha256 f8ccb3ca4631c5af446a9ad802094febed88f6756fa54ebc7707be581f3ad278
+  rows 41
+  row bytes: total 114474, the rest of the answer 3518; per row min 2768, max 2812, mean 2792
+  BRIDGEVCHISSALES: 'Yes' 35; 'No' 6
+  VOUCHERTYPENAME: 'BRIDGE Sales' 33; 'Receipt' 4; 'Purchase' 2; 'BRIDGE Sales Two' 1; 'BRIDGE Sales Z1' 1
+  ISCANCELLED: 'No' 40; 'Yes' 1
+  DATE: first 20260801, last 20260915, distinct 10
+  IRN: once in 41 rows, not empty in 0
+  IRNACKNO: once in 41 rows, not empty in 0
+  IRNACKDATE: once in 41 rows, not empty in 0
+  Sales-class rows 35: distinct numbers 35, distinct folded 35, rows whose folded number another Sales-class row also has 0
+  row 1: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-a3-A-Y1-year.xml: 101286 bytes, sha256 937fa773c24a23fe21f9833658b4b573e5c8f8aca12dd28810971bb6816d5795
+  rows 35
+  row bytes: total 97840, the rest of the answer 3446; per row min 2778, max 2812, mean 2795
+  BRIDGEVCHISSALES: 'Yes' 35
+  VOUCHERTYPENAME: 'BRIDGE Sales' 33; 'BRIDGE Sales Two' 1; 'BRIDGE Sales Z1' 1
+  ISCANCELLED: 'No' 34; 'Yes' 1
+  DATE: first 20260801, last 20260915, distinct 8
+  IRN: once in 35 rows, not empty in 0
+  IRNACKNO: once in 35 rows, not empty in 0
+  IRNACKDATE: once in 35 rows, not empty in 0
+  Sales-class rows 35: distinct numbers 35, distinct folded 35, rows whose folded number another Sales-class row also has 0
+  row 1: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2798 bytes, 25 children, DATE='20260801' VOUCHERNUMBER='<13 chars>' VOUCHERTYPENAME='BRIDGE Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-a4-A-M-marks.xml: 3394 bytes, sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+  COMPANY GUIDs 1; the book's: no; ALTVCHID ['68']; ALTMSTID ['245']
+a-b0-M-marks.xml: 3406 bytes, sha256 fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['29900']; ALTMSTID ['328']
+a-b1-B-Y1-month.xml: 6792322 bytes, sha256 9262740a99747d24b5dca947cef3e5224160032a15e8ba7be3923a120a40aaa9
+  rows 2430
+  row bytes: total 6760136, the rest of the answer 32186; per row min 2766, max 2784, mean 2782
+  BRIDGEVCHISSALES: 'Yes' 2430
+  VOUCHERTYPENAME: 'Sales' 2430
+  ISCANCELLED: 'No' 2430
+  DATE: first 20250401, last 20250430, distinct 30
+  IRN: once in 2430 rows, not empty in 0
+  IRNACKNO: once in 2430 rows, not empty in 0
+  IRNACKDATE: once in 2430 rows, not empty in 0
+  Sales-class rows 2430: distinct numbers 2430, distinct folded 2430, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-b2-B-Y0-month.xml: 6792322 bytes, sha256 9262740a99747d24b5dca947cef3e5224160032a15e8ba7be3923a120a40aaa9
+  rows 2430
+  row bytes: total 6760136, the rest of the answer 32186; per row min 2766, max 2784, mean 2782
+  BRIDGEVCHISSALES: 'Yes' 2430
+  VOUCHERTYPENAME: 'Sales' 2430
+  ISCANCELLED: 'No' 2430
+  DATE: first 20250401, last 20250430, distinct 30
+  IRN: once in 2430 rows, not empty in 0
+  IRNACKNO: once in 2430 rows, not empty in 0
+  IRNACKDATE: once in 2430 rows, not empty in 0
+  Sales-class rows 2430: distinct numbers 2430, distinct folded 2430, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-b3-B-Y1-month.xml: 6792322 bytes, sha256 9262740a99747d24b5dca947cef3e5224160032a15e8ba7be3923a120a40aaa9
+  rows 2430
+  row bytes: total 6760136, the rest of the answer 32186; per row min 2766, max 2784, mean 2782
+  BRIDGEVCHISSALES: 'Yes' 2430
+  VOUCHERTYPENAME: 'Sales' 2430
+  ISCANCELLED: 'No' 2430
+  DATE: first 20250401, last 20250430, distinct 30
+  IRN: once in 2430 rows, not empty in 0
+  IRNACKNO: once in 2430 rows, not empty in 0
+  IRNACKDATE: once in 2430 rows, not empty in 0
+  Sales-class rows 2430: distinct numbers 2430, distinct folded 2430, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-b4-B-Y0-month.xml: 6792322 bytes, sha256 9262740a99747d24b5dca947cef3e5224160032a15e8ba7be3923a120a40aaa9
+  rows 2430
+  row bytes: total 6760136, the rest of the answer 32186; per row min 2766, max 2784, mean 2782
+  BRIDGEVCHISSALES: 'Yes' 2430
+  VOUCHERTYPENAME: 'Sales' 2430
+  ISCANCELLED: 'No' 2430
+  DATE: first 20250401, last 20250430, distinct 30
+  IRN: once in 2430 rows, not empty in 0
+  IRNACKNO: once in 2430 rows, not empty in 0
+  IRNACKDATE: once in 2430 rows, not empty in 0
+  Sales-class rows 2430: distinct numbers 2430, distinct folded 2430, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c0-C-N1-2025-04.xml: 5804 bytes, sha256 0f84867880f898e114e111ee2f7e2e6cfd76dc093f986ff303abf74f0b648e9e
+  rows 1
+  row bytes: total 2766, the rest of the answer 3038; per row min 2766, max 2766, mean 2766
+  BRIDGEVCHISSALES: 'Yes' 1
+  VOUCHERTYPENAME: 'Sales' 1
+  ISCANCELLED: 'No' 1
+  DATE: first 20250401, last 20250401, distinct 1
+  IRN: once in 1 rows, not empty in 0
+  IRNACKNO: once in 1 rows, not empty in 0
+  IRNACKDATE: once in 1 rows, not empty in 0
+  Sales-class rows 1: distinct numbers 1, distinct folded 1, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c01a-C-Y0-2025-04.xml: 6792322 bytes, sha256 9262740a99747d24b5dca947cef3e5224160032a15e8ba7be3923a120a40aaa9
+  rows 2430
+  row bytes: total 6760136, the rest of the answer 32186; per row min 2766, max 2784, mean 2782
+  BRIDGEVCHISSALES: 'Yes' 2430
+  VOUCHERTYPENAME: 'Sales' 2430
+  ISCANCELLED: 'No' 2430
+  DATE: first 20250401, last 20250430, distinct 30
+  IRN: once in 2430 rows, not empty in 0
+  IRNACKNO: once in 2430 rows, not empty in 0
+  IRNACKDATE: once in 2430 rows, not empty in 0
+  Sales-class rows 2430: distinct numbers 2430, distinct folded 2430, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c01b-C-Y0-2025-04.xml: 6792322 bytes, sha256 9262740a99747d24b5dca947cef3e5224160032a15e8ba7be3923a120a40aaa9
+  rows 2430
+  row bytes: total 6760136, the rest of the answer 32186; per row min 2766, max 2784, mean 2782
+  BRIDGEVCHISSALES: 'Yes' 2430
+  VOUCHERTYPENAME: 'Sales' 2430
+  ISCANCELLED: 'No' 2430
+  DATE: first 20250401, last 20250430, distinct 30
+  IRN: once in 2430 rows, not empty in 0
+  IRNACKNO: once in 2430 rows, not empty in 0
+  IRNACKDATE: once in 2430 rows, not empty in 0
+  Sales-class rows 2430: distinct numbers 2430, distinct folded 2430, rows whose folded number another Sales-class row also has 0
+  row 1: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='1' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='2' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2766 bytes, 25 children, DATE='20250401' VOUCHERNUMBER='3' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c02a-C-Y0-2025-05.xml: 7115402 bytes, sha256 24e77bd2ac87b2485cbc02448a0dd3f25e130c88980a5f821297182376721248
+  rows 2542
+  row bytes: total 7081872, the rest of the answer 33530; per row min 2784, max 2786, mean 2786
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20250501, last 20250531, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2784 bytes, 25 children, DATE='20250501' VOUCHERNUMBER='2431' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2784 bytes, 25 children, DATE='20250501' VOUCHERNUMBER='2432' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2784 bytes, 25 children, DATE='20250501' VOUCHERNUMBER='2433' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c02b-C-Y0-2025-05.xml: 7115402 bytes, sha256 24e77bd2ac87b2485cbc02448a0dd3f25e130c88980a5f821297182376721248
+  rows 2542
+  row bytes: total 7081872, the rest of the answer 33530; per row min 2784, max 2786, mean 2786
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20250501, last 20250531, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2784 bytes, 25 children, DATE='20250501' VOUCHERNUMBER='2431' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2784 bytes, 25 children, DATE='20250501' VOUCHERNUMBER='2432' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2784 bytes, 25 children, DATE='20250501' VOUCHERNUMBER='2433' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c03a-C-Y0-2025-06.xml: 6886106 bytes, sha256 7b0217d9a736be0d05cec03df7b302f42bc20245920ad386655994862f6d56d6
+  rows 2460
+  row bytes: total 6853560, the rest of the answer 32546; per row min 2786, max 2786, mean 2786
+  BRIDGEVCHISSALES: 'Yes' 2460
+  VOUCHERTYPENAME: 'Sales' 2460
+  ISCANCELLED: 'No' 2460
+  DATE: first 20250601, last 20250630, distinct 30
+  IRN: once in 2460 rows, not empty in 0
+  IRNACKNO: once in 2460 rows, not empty in 0
+  IRNACKDATE: once in 2460 rows, not empty in 0
+  Sales-class rows 2460: distinct numbers 2460, distinct folded 2460, rows whose folded number another Sales-class row also has 0
+  row 1: 2786 bytes, 25 children, DATE='20250601' VOUCHERNUMBER='4973' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2786 bytes, 25 children, DATE='20250601' VOUCHERNUMBER='4974' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2786 bytes, 25 children, DATE='20250601' VOUCHERNUMBER='4975' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c03b-C-Y0-2025-06.xml: 6886106 bytes, sha256 7b0217d9a736be0d05cec03df7b302f42bc20245920ad386655994862f6d56d6
+  rows 2460
+  row bytes: total 6853560, the rest of the answer 32546; per row min 2786, max 2786, mean 2786
+  BRIDGEVCHISSALES: 'Yes' 2460
+  VOUCHERTYPENAME: 'Sales' 2460
+  ISCANCELLED: 'No' 2460
+  DATE: first 20250601, last 20250630, distinct 30
+  IRN: once in 2460 rows, not empty in 0
+  IRNACKNO: once in 2460 rows, not empty in 0
+  IRNACKDATE: once in 2460 rows, not empty in 0
+  Sales-class rows 2460: distinct numbers 2460, distinct folded 2460, rows whose folded number another Sales-class row also has 0
+  row 1: 2786 bytes, 25 children, DATE='20250601' VOUCHERNUMBER='4973' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2786 bytes, 25 children, DATE='20250601' VOUCHERNUMBER='4974' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2786 bytes, 25 children, DATE='20250601' VOUCHERNUMBER='4975' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c04a-C-Y0-2025-07.xml: 7115542 bytes, sha256 472fd2db4cb560a3b2d275a12e0bc28cf0d06d692cc8c2da3ce6a84213f66502
+  rows 2542
+  row bytes: total 7082012, the rest of the answer 33530; per row min 2786, max 2786, mean 2786
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20250701, last 20250731, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2786 bytes, 25 children, DATE='20250701' VOUCHERNUMBER='7433' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2786 bytes, 25 children, DATE='20250701' VOUCHERNUMBER='7434' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2786 bytes, 25 children, DATE='20250701' VOUCHERNUMBER='7435' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c04b-C-Y0-2025-07.xml: 7115542 bytes, sha256 472fd2db4cb560a3b2d275a12e0bc28cf0d06d692cc8c2da3ce6a84213f66502
+  rows 2542
+  row bytes: total 7082012, the rest of the answer 33530; per row min 2786, max 2786, mean 2786
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20250701, last 20250731, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2786 bytes, 25 children, DATE='20250701' VOUCHERNUMBER='7433' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2786 bytes, 25 children, DATE='20250701' VOUCHERNUMBER='7434' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2786 bytes, 25 children, DATE='20250701' VOUCHERNUMBER='7435' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c05a-C-Y0-2025-08.xml: 7125610 bytes, sha256 ad10df5bbb6721b6f73a450ae6f09dc220642bf6e6f2d888a21323649ea1286d
+  rows 2542
+  row bytes: total 7092080, the rest of the answer 33530; per row min 2786, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20250801, last 20250831, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2786 bytes, 25 children, DATE='20250801' VOUCHERNUMBER='9975' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2786 bytes, 25 children, DATE='20250801' VOUCHERNUMBER='9976' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2786 bytes, 25 children, DATE='20250801' VOUCHERNUMBER='9977' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c05b-C-Y0-2025-08.xml: 7125610 bytes, sha256 ad10df5bbb6721b6f73a450ae6f09dc220642bf6e6f2d888a21323649ea1286d
+  rows 2542
+  row bytes: total 7092080, the rest of the answer 33530; per row min 2786, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20250801, last 20250831, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2786 bytes, 25 children, DATE='20250801' VOUCHERNUMBER='9975' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2786 bytes, 25 children, DATE='20250801' VOUCHERNUMBER='9976' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2786 bytes, 25 children, DATE='20250801' VOUCHERNUMBER='9977' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c06a-C-Y0-2025-09.xml: 6895946 bytes, sha256 216d09caf7d95dffd5630035036fac9098ee720b7decfa78f6aec164d3037a75
+  rows 2460
+  row bytes: total 6863400, the rest of the answer 32546; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2460
+  VOUCHERTYPENAME: 'Sales' 2460
+  ISCANCELLED: 'No' 2460
+  DATE: first 20250901, last 20250930, distinct 30
+  IRN: once in 2460 rows, not empty in 0
+  IRNACKNO: once in 2460 rows, not empty in 0
+  IRNACKDATE: once in 2460 rows, not empty in 0
+  Sales-class rows 2460: distinct numbers 2460, distinct folded 2460, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20250901' VOUCHERNUMBER='12517' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20250901' VOUCHERNUMBER='12518' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20250901' VOUCHERNUMBER='12519' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c06b-C-Y0-2025-09.xml: 6895946 bytes, sha256 216d09caf7d95dffd5630035036fac9098ee720b7decfa78f6aec164d3037a75
+  rows 2460
+  row bytes: total 6863400, the rest of the answer 32546; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2460
+  VOUCHERTYPENAME: 'Sales' 2460
+  ISCANCELLED: 'No' 2460
+  DATE: first 20250901, last 20250930, distinct 30
+  IRN: once in 2460 rows, not empty in 0
+  IRNACKNO: once in 2460 rows, not empty in 0
+  IRNACKDATE: once in 2460 rows, not empty in 0
+  Sales-class rows 2460: distinct numbers 2460, distinct folded 2460, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20250901' VOUCHERNUMBER='12517' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20250901' VOUCHERNUMBER='12518' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20250901' VOUCHERNUMBER='12519' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c07a-C-Y0-2025-10.xml: 7125710 bytes, sha256 912f9e9c38c4a01e6d497f696659165615548b1481c704898384ebe8e5bed362
+  rows 2542
+  row bytes: total 7092180, the rest of the answer 33530; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20251001, last 20251031, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20251001' VOUCHERNUMBER='14977' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20251001' VOUCHERNUMBER='14978' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20251001' VOUCHERNUMBER='14979' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c07b-C-Y0-2025-10.xml: 7125710 bytes, sha256 912f9e9c38c4a01e6d497f696659165615548b1481c704898384ebe8e5bed362
+  rows 2542
+  row bytes: total 7092180, the rest of the answer 33530; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20251001, last 20251031, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20251001' VOUCHERNUMBER='14977' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20251001' VOUCHERNUMBER='14978' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20251001' VOUCHERNUMBER='14979' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c08a-C-Y0-2025-11.xml: 6895946 bytes, sha256 4c0c5946eedf2a32fd179e26e9eccbad3994ad5fa49bbff05659c3718c44a2c0
+  rows 2460
+  row bytes: total 6863400, the rest of the answer 32546; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2460
+  VOUCHERTYPENAME: 'Sales' 2460
+  ISCANCELLED: 'No' 2460
+  DATE: first 20251101, last 20251130, distinct 30
+  IRN: once in 2460 rows, not empty in 0
+  IRNACKNO: once in 2460 rows, not empty in 0
+  IRNACKDATE: once in 2460 rows, not empty in 0
+  Sales-class rows 2460: distinct numbers 2460, distinct folded 2460, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20251101' VOUCHERNUMBER='17519' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20251101' VOUCHERNUMBER='17520' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20251101' VOUCHERNUMBER='17521' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c08b-C-Y0-2025-11.xml: 6895946 bytes, sha256 4c0c5946eedf2a32fd179e26e9eccbad3994ad5fa49bbff05659c3718c44a2c0
+  rows 2460
+  row bytes: total 6863400, the rest of the answer 32546; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2460
+  VOUCHERTYPENAME: 'Sales' 2460
+  ISCANCELLED: 'No' 2460
+  DATE: first 20251101, last 20251130, distinct 30
+  IRN: once in 2460 rows, not empty in 0
+  IRNACKNO: once in 2460 rows, not empty in 0
+  IRNACKDATE: once in 2460 rows, not empty in 0
+  Sales-class rows 2460: distinct numbers 2460, distinct folded 2460, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20251101' VOUCHERNUMBER='17519' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20251101' VOUCHERNUMBER='17520' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20251101' VOUCHERNUMBER='17521' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c09a-C-Y0-2025-12.xml: 7125710 bytes, sha256 2edde291ade18c582c34afb2a7ee1553a6ed04d9b794c3b3e93df375f2cd49e0
+  rows 2542
+  row bytes: total 7092180, the rest of the answer 33530; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20251201, last 20251231, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20251201' VOUCHERNUMBER='19979' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20251201' VOUCHERNUMBER='19980' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20251201' VOUCHERNUMBER='19981' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c09b-C-Y0-2025-12.xml: 7125710 bytes, sha256 2edde291ade18c582c34afb2a7ee1553a6ed04d9b794c3b3e93df375f2cd49e0
+  rows 2542
+  row bytes: total 7092180, the rest of the answer 33530; per row min 2790, max 2790, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20251201, last 20251231, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20251201' VOUCHERNUMBER='19979' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20251201' VOUCHERNUMBER='19980' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20251201' VOUCHERNUMBER='19981' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c10a-C-Y0-2026-01.xml: 7125834 bytes, sha256 9ccb6d10a7cdd1685869de25a03b0c3de92f59ae66742025b7cb256659e8892d
+  rows 2542
+  row bytes: total 7092304, the rest of the answer 33530; per row min 2790, max 2792, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20260101, last 20260131, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20260101' VOUCHERNUMBER='22521' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20260101' VOUCHERNUMBER='22522' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20260101' VOUCHERNUMBER='22523' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c10b-C-Y0-2026-01.xml: 7125834 bytes, sha256 9ccb6d10a7cdd1685869de25a03b0c3de92f59ae66742025b7cb256659e8892d
+  rows 2542
+  row bytes: total 7092304, the rest of the answer 33530; per row min 2790, max 2792, mean 2790
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20260101, last 20260131, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2790 bytes, 25 children, DATE='20260101' VOUCHERNUMBER='22521' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2790 bytes, 25 children, DATE='20260101' VOUCHERNUMBER='22522' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2790 bytes, 25 children, DATE='20260101' VOUCHERNUMBER='22523' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c11a-C-Y0-2026-02.xml: 6441010 bytes, sha256 e811c83df1fa548cdea85d798fe0a7671fc8acd6893d31a9778a0c2889966ae3
+  rows 2296
+  row bytes: total 6410432, the rest of the answer 30578; per row min 2792, max 2792, mean 2792
+  BRIDGEVCHISSALES: 'Yes' 2296
+  VOUCHERTYPENAME: 'Sales' 2296
+  ISCANCELLED: 'No' 2296
+  DATE: first 20260201, last 20260228, distinct 28
+  IRN: once in 2296 rows, not empty in 0
+  IRNACKNO: once in 2296 rows, not empty in 0
+  IRNACKDATE: once in 2296 rows, not empty in 0
+  Sales-class rows 2296: distinct numbers 2296, distinct folded 2296, rows whose folded number another Sales-class row also has 0
+  row 1: 2792 bytes, 25 children, DATE='20260201' VOUCHERNUMBER='25063' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2792 bytes, 25 children, DATE='20260201' VOUCHERNUMBER='25064' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2792 bytes, 25 children, DATE='20260201' VOUCHERNUMBER='25065' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c11b-C-Y0-2026-02.xml: 6441010 bytes, sha256 e811c83df1fa548cdea85d798fe0a7671fc8acd6893d31a9778a0c2889966ae3
+  rows 2296
+  row bytes: total 6410432, the rest of the answer 30578; per row min 2792, max 2792, mean 2792
+  BRIDGEVCHISSALES: 'Yes' 2296
+  VOUCHERTYPENAME: 'Sales' 2296
+  ISCANCELLED: 'No' 2296
+  DATE: first 20260201, last 20260228, distinct 28
+  IRN: once in 2296 rows, not empty in 0
+  IRNACKNO: once in 2296 rows, not empty in 0
+  IRNACKDATE: once in 2296 rows, not empty in 0
+  Sales-class rows 2296: distinct numbers 2296, distinct folded 2296, rows whose folded number another Sales-class row also has 0
+  row 1: 2792 bytes, 25 children, DATE='20260201' VOUCHERNUMBER='25063' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2792 bytes, 25 children, DATE='20260201' VOUCHERNUMBER='25064' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2792 bytes, 25 children, DATE='20260201' VOUCHERNUMBER='25065' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c12a-C-Y0-2026-03.xml: 7130794 bytes, sha256 34039b4d4e7a26ca72046c4d1248ab4dd78f158b6af0f936dc25928631c1cfa0
+  rows 2542
+  row bytes: total 7097264, the rest of the answer 33530; per row min 2792, max 2792, mean 2792
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20260301, last 20260331, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2792 bytes, 25 children, DATE='20260301' VOUCHERNUMBER='27359' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2792 bytes, 25 children, DATE='20260301' VOUCHERNUMBER='27360' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2792 bytes, 25 children, DATE='20260301' VOUCHERNUMBER='27361' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-c12b-C-Y0-2026-03.xml: 7130794 bytes, sha256 34039b4d4e7a26ca72046c4d1248ab4dd78f158b6af0f936dc25928631c1cfa0
+  rows 2542
+  row bytes: total 7097264, the rest of the answer 33530; per row min 2792, max 2792, mean 2792
+  BRIDGEVCHISSALES: 'Yes' 2542
+  VOUCHERTYPENAME: 'Sales' 2542
+  ISCANCELLED: 'No' 2542
+  DATE: first 20260301, last 20260331, distinct 31
+  IRN: once in 2542 rows, not empty in 0
+  IRNACKNO: once in 2542 rows, not empty in 0
+  IRNACKDATE: once in 2542 rows, not empty in 0
+  Sales-class rows 2542: distinct numbers 2542, distinct folded 2542, rows whose folded number another Sales-class row also has 0
+  row 1: 2792 bytes, 25 children, DATE='20260301' VOUCHERNUMBER='27359' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 2: 2792 bytes, 25 children, DATE='20260301' VOUCHERNUMBER='27360' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+  row 3: 2792 bytes, 25 children, DATE='20260301' VOUCHERNUMBER='27361' VOUCHERTYPENAME='Sales' ISCANCELLED='No' BRIDGEVCHISSALES='Yes', IRN:1x0 IRNACKNO:1x0 IRNACKDATE:1x0
+a-cend-M-marks.xml: 3406 bytes, sha256 fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['29900']; ALTMSTID ['328']
+A-M-marks.xml: not a name timed.py writes; skipped
+A-Y0-year.xml: not a name timed.py writes; skipped
+A-Y1-year.xml: not a name timed.py writes; skipped
+a-b1-B-Y1-month.xml against a-b3-B-Y1-month.xml: rows 2430 and 2430; element for element equal: yes
+a-b2-B-Y0-month.xml against a-b4-B-Y0-month.xml: rows 2430 and 2430; element for element equal: yes
+a-c01a-C-Y0-2025-04.xml against a-c01b-C-Y0-2025-04.xml: rows 2430 and 2430; element for element equal: yes
+a-c02a-C-Y0-2025-05.xml against a-c02b-C-Y0-2025-05.xml: rows 2542 and 2542; element for element equal: yes
+a-c03a-C-Y0-2025-06.xml against a-c03b-C-Y0-2025-06.xml: rows 2460 and 2460; element for element equal: yes
+a-c04a-C-Y0-2025-07.xml against a-c04b-C-Y0-2025-07.xml: rows 2542 and 2542; element for element equal: yes
+a-c05a-C-Y0-2025-08.xml against a-c05b-C-Y0-2025-08.xml: rows 2542 and 2542; element for element equal: yes
+a-c06a-C-Y0-2025-09.xml against a-c06b-C-Y0-2025-09.xml: rows 2460 and 2460; element for element equal: yes
+a-c07a-C-Y0-2025-10.xml against a-c07b-C-Y0-2025-10.xml: rows 2542 and 2542; element for element equal: yes
+a-c08a-C-Y0-2025-11.xml against a-c08b-C-Y0-2025-11.xml: rows 2460 and 2460; element for element equal: yes
+a-c09a-C-Y0-2025-12.xml against a-c09b-C-Y0-2025-12.xml: rows 2542 and 2542; element for element equal: yes
+a-c10a-C-Y0-2026-01.xml against a-c10b-C-Y0-2026-01.xml: rows 2542 and 2542; element for element equal: yes
+a-c11a-C-Y0-2026-02.xml against a-c11b-C-Y0-2026-02.xml: rows 2296 and 2296; element for element equal: yes
+a-c12a-C-Y0-2026-03.xml against a-c12b-C-Y0-2026-03.xml: rows 2542 and 2542; element for element equal: yes
+a-a3-A-Y1-year.xml against the Sales-class rows of a-a2-A-Y0-year.xml: rows 35 and 35 (of 41); element for element equal: yes
+a-b1-B-Y1-month.xml against the Sales-class rows of a-b2-B-Y0-month.xml: rows 2430 and 2430 (of 2430); element for element equal: yes
+a-b1-B-Y1-month.xml against the Sales-class rows of a-b4-B-Y0-month.xml: rows 2430 and 2430 (of 2430); element for element equal: yes
+a-b3-B-Y1-month.xml against the Sales-class rows of a-b2-B-Y0-month.xml: rows 2430 and 2430 (of 2430); element for element equal: yes
+a-b3-B-Y1-month.xml against the Sales-class rows of a-b4-B-Y0-month.xml: rows 2430 and 2430 (of 2430); element for element equal: yes
+a-c0-C-N1-2025-04.xml against the rows of a-c01a-C-Y0-2025-04.xml numbered '1': rows 1 and 1; element for element equal: yes
+a-c0-C-N1-2025-04.xml against the rows of a-c01b-C-Y0-2025-04.xml numbered '1': rows 1 and 1; element for element equal: yes
+a-c01a-C-Y0-2025-04.xml: month 202504, rows 2430, rows dated outside the month 0
+a-c02a-C-Y0-2025-05.xml: month 202505, rows 2542, rows dated outside the month 0
+a-c03a-C-Y0-2025-06.xml: month 202506, rows 2460, rows dated outside the month 0
+a-c04a-C-Y0-2025-07.xml: month 202507, rows 2542, rows dated outside the month 0
+a-c05a-C-Y0-2025-08.xml: month 202508, rows 2542, rows dated outside the month 0
+a-c06a-C-Y0-2025-09.xml: month 202509, rows 2460, rows dated outside the month 0
+a-c07a-C-Y0-2025-10.xml: month 202510, rows 2542, rows dated outside the month 0
+a-c08a-C-Y0-2025-11.xml: month 202511, rows 2460, rows dated outside the month 0
+a-c09a-C-Y0-2025-12.xml: month 202512, rows 2542, rows dated outside the month 0
+a-c10a-C-Y0-2026-01.xml: month 202601, rows 2542, rows dated outside the month 0
+a-c11a-C-Y0-2026-02.xml: month 202602, rows 2296, rows dated outside the month 0
+a-c12a-C-Y0-2026-03.xml: month 202603, rows 2542, rows dated outside the month 0
+months answered 12 of 12, distinct 12; rows over them 29900; S6's Y0-year rows 29900; equal: yes
+a-a1-A-M-marks.xml: curl 0, HTTP 200, first byte 0.007718 s, curl total 0.008435 s, wall 0.05 s, 3394 bytes
+a-a2-A-Y0-year.xml: curl 0, HTTP 200, first byte 0.114347 s, curl total 0.115457 s, wall 0.14 s, 117992 bytes
+a-a3-A-Y1-year.xml: curl 0, HTTP 200, first byte 0.094070 s, curl total 0.095109 s, wall 0.12 s, 101286 bytes
+a-a4-A-M-marks.xml: curl 0, HTTP 200, first byte 0.006457 s, curl total 0.007016 s, wall 0.04 s, 3394 bytes
+a-b0-M-marks.xml: curl 0, HTTP 200, first byte 0.008003 s, curl total 0.008909 s, wall 0.05 s, 3406 bytes
+a-b1-B-Y1-month.xml: curl 0, HTTP 200, first byte 1.941049 s, curl total 1.984322 s, wall 2.01 s, 6792322 bytes
+a-b2-B-Y0-month.xml: curl 0, HTTP 200, first byte 1.519449 s, curl total 1.544739 s, wall 1.58 s, 6792322 bytes
+a-b3-B-Y1-month.xml: curl 0, HTTP 200, first byte 1.486535 s, curl total 1.545905 s, wall 1.58 s, 6792322 bytes
+a-b4-B-Y0-month.xml: curl 0, HTTP 200, first byte 1.575137 s, curl total 1.620355 s, wall 1.66 s, 6792322 bytes
+a-c0-C-N1-2025-04.xml: curl 0, HTTP 200, first byte 1.265906 s, curl total 1.266656 s, wall 1.30 s, 5804 bytes
+a-c01a-C-Y0-2025-04.xml: curl 0, HTTP 200, first byte 3.025582 s, curl total 3.072250 s, wall 3.21 s, 6792322 bytes
+a-c01b-C-Y0-2025-04.xml: curl 0, HTTP 200, first byte 2.212112 s, curl total 2.260998 s, wall 2.31 s, 6792322 bytes
+a-c02a-C-Y0-2025-05.xml: curl 0, HTTP 200, first byte 1.533559 s, curl total 1.594347 s, wall 1.60 s, 7115402 bytes
+a-c02b-C-Y0-2025-05.xml: curl 0, HTTP 200, first byte 0.561127 s, curl total 0.585274 s, wall 0.60 s, 7115402 bytes
+a-c03a-C-Y0-2025-06.xml: curl 0, HTTP 200, first byte 0.886699 s, curl total 0.912187 s, wall 0.92 s, 6886106 bytes
+a-c03b-C-Y0-2025-06.xml: curl 0, HTTP 200, first byte 0.759756 s, curl total 0.770732 s, wall 0.78 s, 6886106 bytes
+a-c04a-C-Y0-2025-07.xml: curl 0, HTTP 200, first byte 0.944906 s, curl total 0.979642 s, wall 0.99 s, 7115542 bytes
+a-c04b-C-Y0-2025-07.xml: curl 0, HTTP 200, first byte 0.567814 s, curl total 0.597608 s, wall 0.62 s, 7115542 bytes
+a-c05a-C-Y0-2025-08.xml: curl 0, HTTP 200, first byte 0.992825 s, curl total 1.008173 s, wall 1.03 s, 7125610 bytes
+a-c05b-C-Y0-2025-08.xml: curl 0, HTTP 200, first byte 0.613597 s, curl total 0.649196 s, wall 0.67 s, 7125610 bytes
+a-c06a-C-Y0-2025-09.xml: curl 0, HTTP 200, first byte 0.814330 s, curl total 0.826785 s, wall 0.84 s, 6895946 bytes
+a-c06b-C-Y0-2025-09.xml: curl 0, HTTP 200, first byte 0.585178 s, curl total 0.610261 s, wall 0.62 s, 6895946 bytes
+a-c07a-C-Y0-2025-10.xml: curl 0, HTTP 200, first byte 0.859381 s, curl total 0.875326 s, wall 0.89 s, 7125710 bytes
+a-c07b-C-Y0-2025-10.xml: curl 0, HTTP 200, first byte 0.593495 s, curl total 0.622742 s, wall 0.63 s, 7125710 bytes
+a-c08a-C-Y0-2025-11.xml: curl 0, HTTP 200, first byte 1.015525 s, curl total 1.045888 s, wall 1.05 s, 6895946 bytes
+a-c08b-C-Y0-2025-11.xml: curl 0, HTTP 200, first byte 0.560471 s, curl total 0.586091 s, wall 0.60 s, 6895946 bytes
+a-c09a-C-Y0-2025-12.xml: curl 0, HTTP 200, first byte 0.771788 s, curl total 0.798516 s, wall 0.81 s, 7125710 bytes
+a-c09b-C-Y0-2025-12.xml: curl 0, HTTP 200, first byte 0.557960 s, curl total 0.595689 s, wall 0.60 s, 7125710 bytes
+a-c10a-C-Y0-2026-01.xml: curl 0, HTTP 200, first byte 0.836271 s, curl total 0.863724 s, wall 0.89 s, 7125834 bytes
+a-c10b-C-Y0-2026-01.xml: curl 0, HTTP 200, first byte 0.562468 s, curl total 0.581051 s, wall 0.60 s, 7125834 bytes
+a-c11a-C-Y0-2026-02.xml: curl 0, HTTP 200, first byte 0.768323 s, curl total 0.792371 s, wall 0.80 s, 6441010 bytes
+a-c11b-C-Y0-2026-02.xml: curl 0, HTTP 200, first byte 0.519596 s, curl total 0.538918 s, wall 0.55 s, 6441010 bytes
+a-c12a-C-Y0-2026-03.xml: curl 0, HTTP 200, first byte 0.863332 s, curl total 0.873867 s, wall 0.88 s, 7130794 bytes
+a-c12b-C-Y0-2026-03.xml: curl 0, HTTP 200, first byte 0.576484 s, curl total 0.618230 s, wall 0.63 s, 7130794 bytes
+a-cend-M-marks.xml: curl 0, HTTP 200, first byte 0.004012 s, curl total 0.007280 s, wall 0.02 s, 3406 bytes

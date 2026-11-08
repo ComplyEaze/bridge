@@ -1,0 +1,4 @@
+Pushed copies of the lab's own text that differ from the files kept on the lab PC, with what changed (no captured file is altered):
+folder_list.py: original 1272 B sha256 f1944f2261512ad854fe7f6b3acf4f2659371f3c3f728dc0da0b0874216c92f5 (kept on the lab PC); 1 x -> <LAB_DIR>; 1 x -> <Tally data folder>
+ladder.ps1: original 2397 B sha256 7e6cee49c3823cfb0d0513b5777bc6e3b7f1d6cdae6dd66de43312bb37be346c (kept on the lab PC); 1 x -> <LAB_DIR>
+results_table.py: original 2106 B sha256 8b4791a35ae90e0dbb2886704f16130c232c8775affb3c7013a609d07777a991 (kept on the lab PC); 1 x -> <LAB_DIR>

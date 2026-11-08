@@ -1,0 +1,6 @@
+a-a1-A-M-marks.xml: 3394 bytes, sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+  COMPANY GUIDs 1; the book's: no; ALTVCHID ['68']; ALTMSTID ['245']
+A-M-marks.xml: not a name timed.py writes; skipped
+A-Y0-year.xml: not a name timed.py writes; skipped
+A-Y1-year.xml: not a name timed.py writes; skipped
+a-a1-A-M-marks.xml: curl 0, HTTP 200, first byte 0.007718 s, curl total 0.008435 s, wall 0.05 s, 3394 bytes

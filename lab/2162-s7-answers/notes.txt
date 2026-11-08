@@ -1,0 +1,72 @@
+Row 2162-S7 notes (UTC). Sheet lab/2162-s7 at b63accd9: SHA256.txt 25 of 25 equal (sha256 and size). 2026-11-08T07:15:28Z the kit copied to <LAB_DIR>/run, byte-equal (diff 0). No ComplyEaze Bridge build. The installed 0.7.0 extension's two connector servers (bridge_mcp, launched by the desktop client) are left running and untouched, as in S6; this session makes no ComplyEaze Bridge connector call from step 0 to the close. Grant: until 22:00 IST 8 Nov.
+2026-11-08T07:15Z..07:16:47Z A step 0: Tally (one tally.exe, pid 12672, on 9001) showed Select Company with no company loaded (after S3c's close). Click on the Select Company field; typed the filter BRIDGE PILOT LAB: one row (shots/a0-filter.png 341,162 B 14833485...). The first Enter was refused by the screen tool (the desktop client's window had keyboard focus; no key reached Tally; shots/a0-gateway.png 311,724 B 942e271d... still shows the filtered list). Click on the field again, Enter: Gateway BRIDGE PILOT LAB alone, period 1-Apr-26 to 31-Mar-27, Current Date Tuesday, 15-Sep-2026, last entry 15-Sep-26, SILVER (no Education mode), Gateway note "(e) Data exceptions exist" (Tally's own marker beside the company, not a dialog); no prompt (shots/a0-gateway2.png 342,224 B d7d96ed9..., DPI-aware 1920x1080). Tally release: tally.exe FileVersion 1.1.7.2 (TallyPrime 7.2). PC date 2026-11-08 12:46:47 IST.
+2026-11-08T07:17:03Z a1 (A-M-marks.xml): curl 0, 200, 3,394 B, total 0.008 s; one COMPANY with a GUID, BRIDGE PILOT LAB, GUID 6b43e498-430c-4d5c-bfef-d32e2ab93c85 = the GUID of S5's count.py (the same book); ALTVCHID 68, ALTMSTID 245 (= S5's marks). count7.py output evidence/count-a1.txt. (count7.py's "the book's: no" compares with the DENSE GUID it carries for parts B and C.)
+2026-11-08T07:17:54Z a2 (A-Y0-year.xml): curl 0, 200, 117,992 B, first byte 0.114 s, total 0.115 s; 41 rows (row bytes 2,768 to 2,812, mean 2,792); BRIDGEVCHISSALES Yes 35, No 6; types BRIDGE Sales 33, Receipt 4, Purchase 2, BRIDGE Sales Two 1, BRIDGE Sales Z1 1; cancelled 1; dates 20260801 to 20260915. Both classes present: a3 measures the cut. count7 output evidence/count-a2.txt.
+2026-11-08T07:18:12Z a3 (A-Y1-year.xml), one send, watched: curl 0, 200, 101,286 B, first byte 0.094 s, total 0.095 s; 35 rows, all BRIDGEVCHISSALES Yes (BRIDGE Sales 33, BRIDGE Sales Two 1, BRIDGE Sales Z1 1; cancelled 1); count7: a3 against the Sales-class rows of a2: 35 and 35 (of 41), element for element equal: yes; no non-Sales row in a3. Screen at 07:18:13Z (shots/a3-after.png 343,502 B 9fc2ca03..., full frame): Gateway of Tally, BRIDGE PILOT LAB, no dialog, no other window. count7 output evidence/count-a3.txt.
+2026-11-08T07:18:31Z a4 (A-M-marks.xml): curl 0, 200, 3,394 B, total 0.007 s; sha256 8a0c4268... byte-equal to a1 (ALTVCHID 68, ALTMSTID 245). count7 output evidence/count-a4.txt. About 07:18:45Z Shut Company by Tally's own menu: click K: Company on the menu band; click SHut (Ctrl+F3); the Shut Company field held BRIDGE PILOT LAB; Enter. Select Company, no company loaded, no prompt (shots/a4-no-company.png 385,227 B 10ce14e8..., 07:19:06Z). Part A done.
+2026-11-08T07:19:06Z B step 5 (before load): THE BOOK's data folder (BRIDGE CORPUS DENSE, found by its name in Company.1800) with the company shut: 20 files (EXPECT 20) (evidence/b-shut-folder-list.txt).
+2026-11-08T07:19:30Z..07:20:06Z B step 5: click on the Select Company field; the first typing of the filter went through the clipboard and did not reach Tally (field empty, top row highlighted; nothing pressed; shots/b0-filter.png 378,561 B 497a3ac1..., shows the company list, kept local). Click again; typed BRIDGE CORPUS then DENSE: one row (shots/b0-filter2.png 349,942 B 2105b7d1...). Enter: Gateway BRIDGE CORPUS DENSE alone, period 1-Apr-25 to 31-Mar-26, Current Date Tuesday, 31-Mar-2026, last entry 31-Mar-26, SILVER; no prompt (shots/b0-gateway.png 354,374 B a824d101...).
+2026-11-08T07:20:18Z folder loaded: 23 files (EXPECT 23) (evidence/b-loaded-folder-list.txt). b0 (M-marks.xml): curl 0, 200, 3,406 B, total 0.009 s; the book's GUID: yes; ALTVCHID 29900, ALTMSTID 328 (EXPECT met). count7 output evidence/count-b0.txt.
+2026-11-08T07:20:28.478Z b1 (B-Y1-month.xml, Y1 first, the first year read of this sitting on this book): curl 0, 200, 6,792,322 B, first byte 1.941 s, total 1.984 s; 2,430 rows, all Sales class; dates 20250401 to 20250430. count7 output evidence/count-b1.txt.
+2026-11-08T07:20:41.026Z b2 (B-Y0-month.xml): curl 0, 200, 6,792,322 B, first byte 1.519 s, total 1.545 s; sha256 9262740a... byte-equal to b1; 2,430 rows; count7: b1 against the Sales-class rows of b2: 2430 and 2430, element for element equal: yes. count7 output evidence/count-b2.txt.
+2026-11-08T07:20:53.530Z b3 (B-Y1-month.xml again): curl 0, 200, 6,792,322 B, first byte 1.487 s, total 1.546 s; sha256 9262740a... = b1; b1 against b3: element for element equal: yes. count7 output evidence/count-b3.txt.
+2026-11-08T07:21:07.785Z b4 (B-Y0-month.xml again): curl 0, 200, 6,792,322 B, first byte 1.575 s, total 1.620 s; sha256 9262740a... = b2; b2 against b4: element for element equal: yes. count7 output evidence/count-b4.txt. Part B done.
+2026-11-08T07:21:32.573Z c0 (C-N1-2025-04.xml, the control, narrow): curl 0, 200, 5,804 B, first byte 1.266 s, total 1.267 s; 1 row, Sales, VOUCHERNUMBER 1 (EXPECT 1 row). count7 output evidence/count-c0.txt. Part B answers b1 to b4 are byte-equal to S6's a-s3-Y0-month.xml (9262740a..., 6,792,322 B). Part C step 11 run by ladder.ps1 (one send at a time; the sheet's ladder rule).
+2026-11-08T07:22:08.432Z c01a (C-Y0-2025-04.xml): curl 0, HTTP 200, first byte 3.025582 s, total 3.072250 s, 6792322 B.
+LADDER: c01a total 3.07225 s <= 15 s and 6792322 B <= 24 MiB: go on.
+2026-11-08T07:22:12.097Z c01b (C-Y0-2025-04.xml): curl 0, HTTP 200, first byte 2.212112 s, total 2.260998 s, 6792322 B.
+count7 after c01 exit 0 (evidence/count-c01.txt).
+2026-11-08T07:22:29.350Z c02a (C-Y0-2025-05.xml): curl 0, HTTP 200, first byte 1.533559 s, total 1.594347 s, 7115402 B.
+LADDER: c02a total 1.594347 s <= 15 s and 7115402 B <= 24 MiB: go on.
+2026-11-08T07:22:31.056Z c02b (C-Y0-2025-05.xml): curl 0, HTTP 200, first byte 0.561127 s, total 0.585274 s, 7115402 B.
+count7 after c02 exit 0 (evidence/count-c02.txt).
+2026-11-08T07:22:37.468Z c03a (C-Y0-2025-06.xml): curl 0, HTTP 200, first byte 0.886699 s, total 0.912187 s, 6886106 B.
+LADDER: c03a total 0.912187 s <= 15 s and 6886106 B <= 24 MiB: go on.
+2026-11-08T07:22:38.508Z c03b (C-Y0-2025-06.xml): curl 0, HTTP 200, first byte 0.759756 s, total 0.770732 s, 6886106 B.
+count7 after c03 exit 0 (evidence/count-c03.txt).
+2026-11-08T07:22:46.632Z c04a (C-Y0-2025-07.xml): curl 0, HTTP 200, first byte 0.944906 s, total 0.979642 s, 7115542 B.
+LADDER: c04a total 0.979642 s <= 15 s and 7115542 B <= 24 MiB: go on.
+2026-11-08T07:22:47.734Z c04b (C-Y0-2025-07.xml): curl 0, HTTP 200, first byte 0.567814 s, total 0.597608 s, 7115542 B.
+count7 after c04 exit 0 (evidence/count-c04.txt).
+2026-11-08T07:22:57.051Z c05a (C-Y0-2025-08.xml): curl 0, HTTP 200, first byte 0.992825 s, total 1.008173 s, 7125610 B.
+LADDER: c05a total 1.008173 s <= 15 s and 7125610 B <= 24 MiB: go on.
+2026-11-08T07:22:58.183Z c05b (C-Y0-2025-08.xml): curl 0, HTTP 200, first byte 0.613597 s, total 0.649196 s, 7125610 B.
+count7 after c05 exit 0 (evidence/count-c05.txt).
+2026-11-08T07:23:10.748Z c06a (C-Y0-2025-09.xml): curl 0, HTTP 200, first byte 0.814330 s, total 0.826785 s, 6895946 B.
+LADDER: c06a total 0.826785 s <= 15 s and 6895946 B <= 24 MiB: go on.
+2026-11-08T07:23:11.712Z c06b (C-Y0-2025-09.xml): curl 0, HTTP 200, first byte 0.585178 s, total 0.610261 s, 6895946 B.
+count7 after c06 exit 0 (evidence/count-c06.txt).
+2026-11-08T07:23:24.624Z c07a (C-Y0-2025-10.xml): curl 0, HTTP 200, first byte 0.859381 s, total 0.875326 s, 7125710 B.
+LADDER: c07a total 0.875326 s <= 15 s and 7125710 B <= 24 MiB: go on.
+2026-11-08T07:23:25.623Z c07b (C-Y0-2025-10.xml): curl 0, HTTP 200, first byte 0.593495 s, total 0.622742 s, 7125710 B.
+count7 after c07 exit 0 (evidence/count-c07.txt).
+2026-11-08T07:23:39.824Z c08a (C-Y0-2025-11.xml): curl 0, HTTP 200, first byte 1.015525 s, total 1.045888 s, 6895946 B.
+LADDER: c08a total 1.045888 s <= 15 s and 6895946 B <= 24 MiB: go on.
+2026-11-08T07:23:40.987Z c08b (C-Y0-2025-11.xml): curl 0, HTTP 200, first byte 0.560471 s, total 0.586091 s, 6895946 B.
+count7 after c08 exit 0 (evidence/count-c08.txt).
+2026-11-08T07:23:57.050Z c09a (C-Y0-2025-12.xml): curl 0, HTTP 200, first byte 0.771788 s, total 0.798516 s, 7125710 B.
+LADDER: c09a total 0.798516 s <= 15 s and 7125710 B <= 24 MiB: go on.
+2026-11-08T07:23:57.974Z c09b (C-Y0-2025-12.xml): curl 0, HTTP 200, first byte 0.557960 s, total 0.595689 s, 7125710 B.
+count7 after c09 exit 0 (evidence/count-c09.txt).
+2026-11-08T07:24:15.100Z c10a (C-Y0-2026-01.xml): curl 0, HTTP 200, first byte 0.836271 s, total 0.863724 s, 7125834 B.
+LADDER: c10a total 0.863724 s <= 15 s and 7125834 B <= 24 MiB: go on.
+2026-11-08T07:24:16.079Z c10b (C-Y0-2026-01.xml): curl 0, HTTP 200, first byte 0.562468 s, total 0.581051 s, 7125834 B.
+count7 after c10 exit 0 (evidence/count-c10.txt).
+2026-11-08T07:24:35.174Z c11a (C-Y0-2026-02.xml): curl 0, HTTP 200, first byte 0.768323 s, total 0.792371 s, 6441010 B.
+LADDER: c11a total 0.792371 s <= 15 s and 6441010 B <= 24 MiB: go on.
+2026-11-08T07:24:36.091Z c11b (C-Y0-2026-02.xml): curl 0, HTTP 200, first byte 0.519596 s, total 0.538918 s, 6441010 B.
+count7 after c11 exit 0 (evidence/count-c11.txt).
+2026-11-08T07:24:56.186Z c12a (C-Y0-2026-03.xml): curl 0, HTTP 200, first byte 0.863332 s, total 0.873867 s, 7130794 B.
+LADDER: c12a total 0.873867 s <= 15 s and 7130794 B <= 24 MiB: go on.
+2026-11-08T07:24:57.185Z c12b (C-Y0-2026-03.xml): curl 0, HTTP 200, first byte 0.576484 s, total 0.618230 s, 7130794 B.
+count7 after c12 exit 0 (evidence/count-c12.txt).
+Part C: all twelve months sent twice.
+2026-11-08T07:25Z part C count7 (evidence/count-c12.txt): each month's two sends element for element equal (12 of 12); c0 against the rows of c01a and c01b numbered 1: 1 and 1, equal: yes; every month 0 rows dated outside it; months answered 12 of 12, distinct 12; rows over them 29,900 = S6's Y0-year 29,900: equal: yes. Ladder: every first send under 15 s and 24 MiB; nothing stopped by the ladder.
+2026-11-08T07:25:40Z cend (M-marks.xml): curl 0, HTTP 200, first byte 0.004012 s, total 0.007280 s, 3406 B; sha256 fcc9086dfa112813c447d23e98eb4500c9a1badbe983d3f8d0c0ceff11dc8430 = b0: byte-equal: yes.
+2026-11-08T07:26Z count7 after cend exit 0 (evidence/count-cend.txt): a-cend-M-marks.xml 3406 B, sha256 fcc9086d... = a-b0-M-marks.xml; every earlier check unchanged.
+2026-11-08T07:26:30Z full-frame capture shots/cend-before-shut.png 1920x1080 344056 B c27bfbafa763191721a299f6bbdbf5f3414500f8002a25e19ad549c067331112: Gateway, BRIDGE CORPUS DENSE the one company loaded, no dialog.
+2026-11-08T07:27Z shut by Tally's own menu: click K: Company; click SHut (Ctrl+F3); the Shut Company list held one line, BRIDGE CORPUS DENSE, highlighted; Return. Tally showed Select Company with no company loaded and no prompt.
+2026-11-08T07:28:10Z full-frame capture shots/cend-no-company.png 1920x1080 374290 B 0079307337f83686b64305b661da0585eec1bd4b1ae8032e18c8e039035b05a1 (shows the company list: stays local).
+2026-11-08T07:28:14Z folder count after the shut (evidence/cend-folder-list.txt): 20 files, 151,994,880 B: EXPECT 20 met. Against b-shut (07:19:06Z): same 20 names and sizes; only TACCESS, TCMPSCHACCESS, TCMPSCHSTATE and TSTATE have new times.
+2026-11-08T07:28Z tasklist: one tally.exe, 12672, exit 0. netstat: 9001 LISTENING on 12672 (IPv4 and IPv6). One tally.exe owns 9001: met.
+2026-11-08T07:30Z part C sums (from the twenty-four logs): first sends, curl total 13.643 s (first byte 13.313 s); second sends, curl total 9.017 s (first byte 8.670 s). Largest month by bytes: c12, March 2026, 2,542 rows, 7,130,794 B, 0.874 s first and 0.618 s second. Largest first send by seconds: c01a, April 2025, 2,430 rows, 6,792,322 B, 3.072 s. Largest month by rows: 2,542 (May, Jul, Aug, Oct, Dec, Jan, Mar).

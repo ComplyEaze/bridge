@@ -1,0 +1,4 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason:
+run/a-c04a-C-Y0-2025-07.xml 7115542 B 472fd2db4cb560a3b2d275a12e0bc28cf0d06d692cc8c2da3ce6a84213f66502 (holds a figure the gate's private set matches: a synthetic voucher number and master id)
+run/a-c04b-C-Y0-2025-07.xml 7115542 B 472fd2db4cb560a3b2d275a12e0bc28cf0d06d692cc8c2da3ce6a84213f66502 (holds a figure the gate's private set matches: a synthetic voucher number and master id)
+stage_s7.py 6271 B 083a55855fa5a05ccbf2dfe8863c4b610bdd776222b58127e82f5037d0d3f538 (this stage script: its patterns name the lab paths)

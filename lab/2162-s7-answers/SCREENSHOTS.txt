@@ -1,0 +1,11 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. Each is the whole primary screen, 1920x1080, unless noted.
+shots/a0-filter.png 341162 B 1483348501df7f78fc73b4e4ca3e1d14a890353ebe951d589b948a1dcc1961c6
+shots/a0-gateway.png 311724 B 942e271d83fef66a448e1dfbd2cdc9108809596a331cdb6bdc743e3a6dcf70e7
+shots/a0-gateway2.png 342224 B d7d96ed92ac911e5b0bd6f1573655614090f38bc800faad4ffccbeb871f261a1
+shots/a3-after.png 343502 B 9fc2ca039bc5642715e6376ff26aaf46dd9418f9f7abd59c12e62fb84b7256ff
+shots/a4-no-company.png 385227 B 10ce14e86333f76468f60bbbfd3c3cbe62709a8ca37f186f7d1323d778c88096
+shots/b0-filter.png 378561 B 497a3ac163c5fb2b4da21e7eeefa407da6ebdd29f882bbcf607d6a25e3584af4
+shots/b0-filter2.png 349942 B 2105b7d1b41ab229196ebf20030e60c80abc6fbb6ffd326eb20c08fe0eedb045
+shots/b0-gateway.png 354374 B a824d10110bef6af791fa6680db99b9e5933e423686ea448490220457b3472bd
+shots/cend-before-shut.png 344056 B c27bfbafa763191721a299f6bbdbf5f3414500f8002a25e19ad549c067331112
+shots/cend-no-company.png 374290 B 0079307337f83686b64305b661da0585eec1bd4b1ae8032e18c8e039035b05a1

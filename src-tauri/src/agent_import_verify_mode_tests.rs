@@ -34,7 +34,7 @@ async fn verification_qualifies_absence_without_hiding_positive_historical_rows(
             .iter()
             .map(|entry| ImportEntry {
                 ledger: entry.ledger.clone(),
-                amount: entry.amount.trim_start_matches('-').into(),
+                amount: ImportAmount::parse(entry.amount.trim_start_matches('-')).unwrap(),
                 side: if entry.is_deemed_positive == "Yes" {
                     EntrySide::Dr
                 } else {

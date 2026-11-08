@@ -289,6 +289,216 @@ async fn mcp_outstandings_report_base_currency_ledgers_only_on_forex() {
     }
 }
 
+/// A labelled edit of the captured FOREX receivable report: its 14 rupee bills
+/// removed, keeping the four bills of its three dollar ledgers, so that every
+/// row belongs to a ledger the read sets aside, as on a book whose only bills
+/// are a dollar party's (bridge#2071).
+fn forex_receivable_with_only_the_dollar_ledgers_bills() -> Vec<u8> {
+    let captured: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/bills_receivable_forex_live.utf16le.xml"
+    );
+    let text = String::from_utf16(
+        &captured
+            .chunks_exact(2)
+            .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let (rows, trailer) = text.split_at(text.find("</ENVELOPE>").unwrap());
+    let row_start = " <BILLFIXED>";
+    let mut rows = rows.split(row_start);
+    let mut edited = rows.next().unwrap().to_string();
+    let rows = rows.collect::<Vec<_>>();
+    assert_eq!(rows.len(), 18);
+    let dollar = ["BRIDGE FX DEBTOR A", "FX USD Debtor 01", "FX USD Debtor 02"];
+    for row in rows {
+        if dollar
+            .iter()
+            .any(|party| row.contains(&format!("<BILLPARTY>{party}</BILLPARTY>")))
+        {
+            edited.push_str(row_start);
+            edited.push_str(row);
+        }
+    }
+    assert_eq!(edited.matches(row_start).count(), 4);
+    edited.push_str(trailer);
+    edited.encode_utf16().flat_map(u16::to_le_bytes).collect()
+}
+
+/// A labelled edit of the captured FOREX ledger list: the four rupee debtors'
+/// closing balances cleared, so that on the edited receivable report no ledger
+/// the read keeps carries a balance, as on a plain book whose only party is a
+/// dollar party (bridge#2071).
+fn forex_ledgers_with_the_rupee_debtors_at_zero() -> Vec<u8> {
+    let captured: &[u8] = include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+    );
+    let mut text = String::from_utf16(
+        &captured
+            .chunks_exact(2)
+            .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    for (ledger, balance) in [
+        ("BRIDGE INR DEBTOR A", "-3000.00"),
+        ("FX Party 01", "-11500.00"),
+        ("FX Party 02", "-9500.00"),
+        ("FX Party 03", "-10500.00"),
+    ] {
+        let start = text.find(&format!("<LEDGER NAME=\"{ledger}\"")).unwrap();
+        let length = text[start..].find("</LEDGER>").unwrap();
+        let edited = text[start..start + length].replace(
+            &format!(">{balance}</CLOSINGBALANCE>"),
+            ">0.00</CLOSINGBALANCE>",
+        );
+        assert_ne!(edited, text[start..start + length]);
+        text.replace_range(start..start + length, &edited);
+    }
+    text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+}
+
+/// bridge#2071: the plain book. Every bill and every balance is a set-aside
+/// ledger's, so no ledger left carries a balance and the reason is the
+/// effective-date one, and the answer still names what it set aside.
+#[tokio::test]
+async fn mcp_outstandings_name_the_set_aside_ledgers_on_a_book_with_no_other_balance() {
+    let response = forex_outstandings(
+        None,
+        &forex_receivable_with_only_the_dollar_ledgers_bills(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        &forex_ledgers_with_the_rupee_debtors_at_zero(),
+        "20250930",
+        Redaction::None,
+        json!({}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let result = &response["structuredContent"]["result"];
+    let unconfirmed =
+        crate::warning_codes::WarningCode::NativeOutstandingsAsOfUnconfirmedWithoutEffectiveDateEvidence
+            .as_str();
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(
+        result["partial_reasons"],
+        json!([unconfirmed, "foreign_currency_ledgers_excluded"])
+    );
+    assert_eq!(result["foreign_currency_ledgers_excluded"]["count"], 3);
+}
+
+/// bridge#2071: when every bill belongs to a ledger the read sets aside, no
+/// row is left to confirm the as-of date by, so every figure is withheld. The
+/// answer gives that reason, and still names the set-aside ledgers as it does
+/// when it gives the other ledgers' figures.
+#[tokio::test]
+async fn mcp_outstandings_name_the_set_aside_ledgers_when_they_hold_every_bill() {
+    let response = forex_outstandings(
+        None,
+        &forex_receivable_with_only_the_dollar_ledgers_bills(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ),
+        "20250930",
+        Redaction::None,
+        json!({}),
+    )
+    .await;
+    assert_eq!(response["isError"], false, "{response}");
+    let content = &response["structuredContent"];
+    let result = &content["result"];
+    let unconfirmed =
+        crate::warning_codes::WarningCode::NativeOutstandingsAsOfUnconfirmedWithoutBillReferences
+            .as_str();
+    assert_eq!(result["state"], "partial", "{result}");
+    assert_eq!(result["partial_reason"], unconfirmed);
+    assert_eq!(
+        result["partial_reasons"],
+        json!([unconfirmed, "foreign_currency_ledgers_excluded"])
+    );
+    assert_eq!(content["evidence"]["state"], "partial");
+    assert_eq!(
+        content["evidence"]["reason_code"],
+        format!("{unconfirmed}+foreign_currency_ledgers_excluded")
+    );
+    for figure in [
+        "base_currency_ledgers",
+        "totals",
+        "open_bills",
+        "unallocated",
+    ] {
+        assert!(result.get(figure).is_none(), "{figure} in {result}");
+    }
+    let excluded = &result["foreign_currency_ledgers_excluded"];
+    assert_eq!(excluded["count"], 3);
+    assert_eq!(
+        excluded["ledgers"],
+        json!([
+            {"ledger": "BRIDGE FX DEBTOR A", "currency": "$"},
+            {"ledger": "FX USD Debtor 01", "currency": "$"},
+            {"ledger": "FX USD Debtor 02", "currency": "$"},
+        ])
+    );
+    assert_eq!(result["base_currency_ledgers_mixed_excluded"]["count"], 0);
+}
+
+/// The withheld answer's lists are paged with no figures beside them, so it
+/// carries the page's offset: a response cap that trims a later page resumes
+/// after the rows it kept, and the names stay masked.
+#[tokio::test]
+async fn a_trimmed_later_page_of_the_set_aside_ledgers_resumes_after_its_rows() {
+    let response = forex_outstandings(
+        None,
+        &forex_receivable_with_only_the_dollar_ledgers_bills(),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/groups_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/bills_payable_forex_live.utf16le.xml"
+        ),
+        include_bytes!(
+            "../crates/bridge-tally-protocol/tests/fixtures/ledgers_currency_forex_live.utf16le.xml"
+        ),
+        "20250930",
+        Redaction::MaskParties,
+        json!({"offset": 1, "limit": 2}),
+    )
+    .await;
+    let result = response["structuredContent"]["result"].clone();
+    assert_eq!(result["offset"], 1, "{result}");
+    let excluded = &result["foreign_currency_ledgers_excluded"];
+    assert_eq!(
+        excluded["ledgers"].as_array().unwrap().len(),
+        2,
+        "{excluded}"
+    );
+    assert!(!result.to_string().contains("FX USD Debtor"), "{result}");
+    let whole = json!({"result": result});
+    let size = whole.to_string().len();
+    let (trimmed, truncated, _) = enforce_response_byte_cap(whole, size - 1).unwrap();
+    assert!(truncated);
+    let excluded = &trimmed["result"]["foreign_currency_ledgers_excluded"];
+    assert_eq!(
+        excluded["ledgers"].as_array().unwrap().len(),
+        1,
+        "{excluded}"
+    );
+    assert_eq!(excluded["next_offset"], 2, "{excluded}");
+    for absent in ["open_bills", "unallocated"] {
+        assert!(trimmed["result"].get(absent).is_none(), "{trimmed}");
+    }
+}
+
 /// bridge#642: a book with several Currency masters but no ledger kept in
 /// another currency, where only rupee ledgers with a composite value are set
 /// aside, is still partial: never Complete with a party silently missing. It is

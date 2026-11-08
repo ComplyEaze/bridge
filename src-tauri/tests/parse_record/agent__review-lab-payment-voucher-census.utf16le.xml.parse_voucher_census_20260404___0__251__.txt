@@ -1,0 +1,10 @@
+# fixture: agent/review-lab-payment-voucher-census.utf16le.xml
+# parser: parse_voucher_census(20260404, (0, 251])
+# source: captured
+Ok([
+    CensusRow {
+        day: 2026-04-04,
+        alter_id: 251,
+        guid: "63292d7c-d541-42e5-aa9d-2ab5f8b993ff-000000fb",
+    },
+])

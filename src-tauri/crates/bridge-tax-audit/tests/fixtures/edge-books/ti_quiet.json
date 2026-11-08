@@ -1,0 +1,683 @@
+{
+ "comment": "A firm's book of near misses: tds_payees and partners_40b_194t raise findings, and none of them gives tds_interest_201 a row, so its golden is byte-identical to ti_empty's. q01-q04 credit Birch Haulage (s.194C) three sums of exactly Rs 30,000 and one of Rs 10,000, exactly Rs 1,00,000 in all: not over. q05 (optional), q06 (cancelled) and q07 (post-dated) credit it Rs 35,000 each and are not in the books population. q08 credits Cedar Estates (s.194-I) exactly Rs 50,000 in May, q09 and q10 exactly Rs 50,000 in June: not over. q11 credits Dogwood Associates (s.194J, professional) exactly Rs 50,000: not over. q12 credits Elm Surveyors Rs 80,000 on a s.194J ledger with no category recorded: tds_payees lists it under a fact other than 'credited', so the caller passes it by. q13 credits Fir Agency (s.194H) exactly Rs 20,000: not over. q14 is a goods invoice carrying Rs 60,000 of carriage: the goods-invoice bucket, never a payee row. q15 is a Contra. q16 credits Hazel Movers Rs 48,000 beside Rs 4,000 on Tax Suspense, a Duties & Taxes ledger not classified as TDS payable: tds_payees lists it as possibly over, under a fact other than 'credited'. q17 credits Ivy Cartage Rs 29,900 and Juniper Freight Rs 24,000 on one voucher with Rs 1,100 on TDS on Contracts, which is classified as TDS payable: with that TDS counted whole Ivy Cartage is over the single-sum limit, so tds_payees lists it with a 'credited' fact, but no credit of its own attracts TDS, so it has no tranche and no row; Juniper Freight stays within the limit. q18 pays Rs 5,000 in cash with a nil line to Hazel Movers. q19 credits the one partner interest of exactly Rs 20,000: not over; partners_40b_194t raises its s.194T question because s.40(b) is not computed, and the partner has no tranche and no row.",
+ "groups": {
+  "Capital Account": null,
+  "Current Assets": null,
+  "Bank Accounts": "Current Assets",
+  "Cash-in-Hand": "Current Assets",
+  "Current Liabilities": null,
+  "Duties & Taxes": "Current Liabilities",
+  "Sundry Creditors": "Current Liabilities",
+  "Direct Expenses": null,
+  "Indirect Expenses": null,
+  "Purchase Accounts": null,
+  "Sales Accounts": null
+ },
+ "ledgers": [
+  {
+   "name": "Carriage Outward",
+   "chain": [
+    "Direct Expenses"
+   ],
+   "guid": "ti_quiet-ledger-00b"
+  },
+  {
+   "name": "Workshop Rent",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_quiet-ledger-01b"
+  },
+  {
+   "name": "Legal Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_quiet-ledger-02b"
+  },
+  {
+   "name": "Survey Fees",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_quiet-ledger-03b"
+  },
+  {
+   "name": "Sales Commission",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_quiet-ledger-04b"
+  },
+  {
+   "name": "Interest to Partners",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_quiet-ledger-05b"
+  },
+  {
+   "name": "Partner Salary",
+   "chain": [
+    "Indirect Expenses"
+   ],
+   "guid": "ti_quiet-ledger-06b"
+  },
+  {
+   "name": "Purchases",
+   "chain": [
+    "Purchase Accounts"
+   ],
+   "guid": "ti_quiet-ledger-07b"
+  },
+  {
+   "name": "Birch Haulage",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-08b"
+  },
+  {
+   "name": "Cedar Estates",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-09b"
+  },
+  {
+   "name": "Dogwood Associates",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-10b"
+  },
+  {
+   "name": "Elm Surveyors",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-11b"
+  },
+  {
+   "name": "Fir Agency",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-12b"
+  },
+  {
+   "name": "Gum Suppliers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-13b"
+  },
+  {
+   "name": "Hazel Movers",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-14b"
+  },
+  {
+   "name": "Ivy Cartage",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-15b"
+  },
+  {
+   "name": "Juniper Freight",
+   "chain": [
+    "Sundry Creditors",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-16b"
+  },
+  {
+   "name": "Tax Suspense",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-17b"
+  },
+  {
+   "name": "TDS on Contracts",
+   "chain": [
+    "Duties & Taxes",
+    "Current Liabilities"
+   ],
+   "guid": "ti_quiet-ledger-18b"
+  },
+  {
+   "name": "Kapok Capital",
+   "chain": [
+    "Capital Account"
+   ],
+   "guid": "ti_quiet-ledger-19b"
+  },
+  {
+   "name": "Main Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_quiet-ledger-20b"
+  },
+  {
+   "name": "Petty Cash",
+   "chain": [
+    "Cash-in-Hand",
+    "Current Assets"
+   ],
+   "guid": "ti_quiet-ledger-21b"
+  },
+  {
+   "name": "Second Bank",
+   "chain": [
+    "Bank Accounts",
+    "Current Assets"
+   ],
+   "guid": "ti_quiet-ledger-22b"
+  }
+ ],
+ "tb": [
+  {
+   "ledger": "Carriage Outward",
+   "opening": 0,
+   "debit": 26000000,
+   "credit": 0,
+   "closing": 26000000
+  },
+  {
+   "ledger": "Workshop Rent",
+   "opening": 0,
+   "debit": 10000000,
+   "credit": 0,
+   "closing": 10000000
+  },
+  {
+   "ledger": "Legal Fees",
+   "opening": 0,
+   "debit": 10200000,
+   "credit": 0,
+   "closing": 10200000
+  },
+  {
+   "ledger": "Survey Fees",
+   "opening": 0,
+   "debit": 8000000,
+   "credit": 0,
+   "closing": 8000000
+  },
+  {
+   "ledger": "Sales Commission",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Interest to Partners",
+   "opening": 0,
+   "debit": 2000000,
+   "credit": 0,
+   "closing": 2000000
+  },
+  {
+   "ledger": "Purchases",
+   "opening": 0,
+   "debit": 20000000,
+   "credit": 0,
+   "closing": 20000000
+  },
+  {
+   "ledger": "Birch Haulage",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000000,
+   "closing": -10000000
+  },
+  {
+   "ledger": "Cedar Estates",
+   "opening": 0,
+   "debit": 0,
+   "credit": 10000000,
+   "closing": -10000000
+  },
+  {
+   "ledger": "Dogwood Associates",
+   "opening": 0,
+   "debit": 0,
+   "credit": 5000000,
+   "closing": -5000000
+  },
+  {
+   "ledger": "Elm Surveyors",
+   "opening": 0,
+   "debit": 0,
+   "credit": 8000000,
+   "closing": -8000000
+  },
+  {
+   "ledger": "Fir Agency",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2000000,
+   "closing": -2000000
+  },
+  {
+   "ledger": "Gum Suppliers",
+   "opening": 0,
+   "debit": 0,
+   "credit": 26000000,
+   "closing": -26000000
+  },
+  {
+   "ledger": "Hazel Movers",
+   "opening": 0,
+   "debit": 0,
+   "credit": 4800000,
+   "closing": -4800000
+  },
+  {
+   "ledger": "Ivy Cartage",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2990000,
+   "closing": -2990000
+  },
+  {
+   "ledger": "Juniper Freight",
+   "opening": 0,
+   "debit": 0,
+   "credit": 2400000,
+   "closing": -2400000
+  },
+  {
+   "ledger": "Tax Suspense",
+   "opening": 0,
+   "debit": 0,
+   "credit": 400000,
+   "closing": -400000
+  },
+  {
+   "ledger": "TDS on Contracts",
+   "opening": 0,
+   "debit": 0,
+   "credit": 110000,
+   "closing": -110000
+  },
+  {
+   "ledger": "Kapok Capital",
+   "opening": -90000000,
+   "debit": 0,
+   "credit": 2000000,
+   "closing": -92000000
+  },
+  {
+   "ledger": "Main Bank",
+   "opening": 90000000,
+   "debit": 0,
+   "credit": 4000000,
+   "closing": 86000000
+  },
+  {
+   "ledger": "Petty Cash",
+   "opening": 0,
+   "debit": 0,
+   "credit": 500000,
+   "closing": -500000
+  }
+ ],
+ "vouchers": [
+  {
+   "guid": "ti-q01",
+   "date": "2025-04-08",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Carriage Outward",
+     3000000
+    ],
+    [
+     "Birch Haulage",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q02",
+   "date": "2025-06-09",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Carriage Outward",
+     3000000
+    ],
+    [
+     "Birch Haulage",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q03",
+   "date": "2025-08-11",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Carriage Outward",
+     3000000
+    ],
+    [
+     "Birch Haulage",
+     -3000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q04",
+   "date": "2025-10-13",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Carriage Outward",
+     1000000
+    ],
+    [
+     "Birch Haulage",
+     -1000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q05",
+   "date": "2025-11-03",
+   "base_type": "Journal",
+   "status": "optional",
+   "lines": [
+    [
+     "Carriage Outward",
+     3500000
+    ],
+    [
+     "Birch Haulage",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q06",
+   "date": "2025-11-04",
+   "base_type": "Journal",
+   "status": "cancelled",
+   "lines": [
+    [
+     "Carriage Outward",
+     3500000
+    ],
+    [
+     "Birch Haulage",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q07",
+   "date": "2026-03-30",
+   "base_type": "Journal",
+   "status": "postdated",
+   "lines": [
+    [
+     "Carriage Outward",
+     3500000
+    ],
+    [
+     "Birch Haulage",
+     -3500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q08",
+   "date": "2025-05-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Workshop Rent",
+     5000000
+    ],
+    [
+     "Cedar Estates",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q09",
+   "date": "2025-06-05",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Workshop Rent",
+     2500000
+    ],
+    [
+     "Cedar Estates",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q10",
+   "date": "2025-06-25",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Workshop Rent",
+     2500000
+    ],
+    [
+     "Cedar Estates",
+     -2500000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q11",
+   "date": "2025-07-07",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Legal Fees",
+     5000000
+    ],
+    [
+     "Dogwood Associates",
+     -5000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q12",
+   "date": "2025-07-21",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Survey Fees",
+     8000000
+    ],
+    [
+     "Elm Surveyors",
+     -8000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q13",
+   "date": "2025-08-18",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Sales Commission",
+     2000000
+    ],
+    [
+     "Fir Agency",
+     -2000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q14",
+   "date": "2025-09-02",
+   "base_type": "Purchase",
+   "lines": [
+    [
+     "Purchases",
+     20000000
+    ],
+    [
+     "Carriage Outward",
+     6000000
+    ],
+    [
+     "Gum Suppliers",
+     -26000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q15",
+   "date": "2025-09-15",
+   "base_type": "Contra",
+   "lines": [
+    [
+     "Carriage Outward",
+     4000000
+    ],
+    [
+     "Main Bank",
+     -4000000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q16",
+   "date": "2025-10-06",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Legal Fees",
+     5200000
+    ],
+    [
+     "Hazel Movers",
+     -4800000
+    ],
+    [
+     "Tax Suspense",
+     -400000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q17",
+   "date": "2025-10-20",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Carriage Outward",
+     5500000
+    ],
+    [
+     "Ivy Cartage",
+     -2990000
+    ],
+    [
+     "Juniper Freight",
+     -2400000
+    ],
+    [
+     "TDS on Contracts",
+     -110000
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q18",
+   "date": "2025-11-10",
+   "base_type": "Payment",
+   "lines": [
+    [
+     "Carriage Outward",
+     500000
+    ],
+    [
+     "Petty Cash",
+     -500000
+    ],
+    [
+     "Hazel Movers",
+     0
+    ]
+   ]
+  },
+  {
+   "guid": "ti-q19",
+   "date": "2026-03-31",
+   "base_type": "Journal",
+   "lines": [
+    [
+     "Interest to Partners",
+     2000000
+    ],
+    [
+     "Kapok Capital",
+     -2000000
+    ]
+   ]
+  }
+ ],
+ "tests": [
+  "tds_payees",
+  "partners_40b_194t",
+  "tds_interest_201"
+ ],
+ "entity_type": "firm",
+ "nature_by_ledger": {
+  "Carriage Outward": "194C",
+  "Workshop Rent": "194I",
+  "Legal Fees": "194J",
+  "Survey Fees": "194J",
+  "Sales Commission": "194H"
+ },
+ "s194j_category_by_ledger": {
+  "Legal Fees": "professional"
+ },
+ "tds_payable_ledgers": [
+  "TDS on Contracts"
+ ],
+ "partners": {
+  "kapok": {
+   "capital_ledgers": [
+    "Kapok Capital"
+   ],
+   "interest_ledger": "Interest to Partners",
+   "remuneration_ledger": "Partner Salary"
+  }
+ },
+ "deed": {
+  "interest_rate_bp": 1200
+ }
+}

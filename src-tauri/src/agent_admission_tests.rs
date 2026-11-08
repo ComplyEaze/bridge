@@ -108,6 +108,7 @@ fn every_shipped_tool_is_classified_annotated_and_says_what_it_writes() {
         "read_evidence",
         "sales_register",
         "statement_tie_out",
+        "stock_by_batch",
         "stock_by_godown",
         "stock_summary",
         "tally_status",
@@ -1828,13 +1829,37 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// leaving margins of 720, 904, 406 and 290. Its review fixes then added 64 bytes to every
 /// list, 30 in its `as_of` text and 34 in its description, counted from the text rather
 /// than measured, which leaves margins of 656, 840, 342 and 226 before any other change.
-/// On 2 Nov 2026 `parse_bank_statement_csv` (#1320) became a tool that writes proposals and took
-/// the arguments of `parse_bank_statement`, added 3,350 bytes to each list. The lists measure 210,246, 236,240, 238,738 and 243,854, the
-/// last clause's 52 bytes counted from the text, over every budget. Each budget went up by 4,000,
-/// leaving margins of 1,254, 1,260, 762 and 646.
+/// On 2 Nov 2026 master measured 206,855, 232,849, 235,347 and 240,463 bytes, derived from
+/// measured merges by their known deltas. The outstandings withheld clause and the two
+/// changes waiting behind it add 334 bytes between them, which puts the last two lists
+/// over by 181 and 297. Those two budgets went up by 500, leaving margins of 319
+/// and 203 once all three have landed; the first two lists stay within theirs.
+/// Also on 2 Nov 2026, provenance detail came out of the `vouchers`, `masters`, `ledger_masters`
+/// and `post_import` texts, 1,298 bytes off the first list and 1,424 off the other three. On the
+/// merged tree the lists measure 205,920, 231,813, 234,322 and 239,440 bytes, leaving margins of
+/// 1,580, 1,687, 1,678 and 1,560. The budgets stay: that room is for the changes behind it.
+/// Creating several ledgers in one request added 259 bytes to the master-writes list alone,
+/// measured on the merged tree: the lists are 205,920, 231,813, 234,322 and 239,699 bytes,
+/// leaving margins of 1,580, 1,687, 1,678 and 1,301.
+/// `stock_by_batch` (#2018), in the default list, adds 1,714 bytes to each list: on the merged
+/// tree they measure 207,634, 233,527, 236,036 and 241,413, over by 134, 27, 36 and 413. Each
+/// budget went up by 1,400. The e-invoice argument (#1378) and the review of a twin ledger (#626)
+/// add 362 bytes between them, leaving margins of 904, 1,011, 1,002 and 625 once all have landed.
+/// The release of a rolled-back batch's rows (#1038) adds the `rolled_back` doubt to
+/// `acknowledge_post_review`, which only the three lists with posting on hold. With its first
+/// text, 212 bytes (198 of description, 14 of enum value), the lists measured 208,571,
+/// 234,676, 237,185 and 242,562 on 3 Nov 2026, so its base measures 208,571, 234,464, 236,973
+/// and 242,350: merges since the margins above took the rest. Its review fixes add 45 bytes of
+/// description, so with it the lists measured 208,571, 234,721, 237,230 and 242,607 the same
+/// day, the last 207 over its old budget. That budget went up by 500, leaving margins of
+/// 329, 179, 170 and 293.
+/// On 8 Nov 2026 `parse_bank_statement_csv` (#1320) became a tool that writes proposals and took
+/// the arguments of `parse_bank_statement`. On the tree merged with master the lists measure
+/// 212,131, 238,281, 240,790 and 246,167 bytes, over every budget by 3,231, 3,381, 3,390 and
+/// 3,267. Each budget went up by 4,000, leaving margins of 769, 619, 610 and 733.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
-const TOOL_LIST_BUDGETS: [usize; 4] = [211_500, 237_500, 239_500, 244_500];
+const TOOL_LIST_BUDGETS: [usize; 4] = [212_900, 238_900, 241_400, 246_900];
 const _: () = {
     let ceiling = super::super::agent_protocol::CONTROL_RESPONSE_MAX_BYTES;
     assert!(TOOL_LIST_BUDGETS[0] < ceiling);

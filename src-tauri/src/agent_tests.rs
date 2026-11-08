@@ -881,6 +881,10 @@ fn mask_parties_walks_every_tool_sample_response_without_leaking_party_names() {
             ),
         ),
         (
+            "stock_by_batch",
+            json!({"result":{"items":[{"guid":"g-1","name":party_name("Customer One"),"state":"tied","lines":[{"godown":party_name("Supplier Two"),"batch":{"kind":"named","name":party_name("Customer One")},"quantity":{"amount":"5","unit":"Nos"}}],"godowns":[{"lines":[0],"quantity":{"amount":"5","unit":"Nos"},"source":"stock_query_lines_added"}]}]}}),
+        ),
+        (
             "stock_by_godown",
             json!({"result":{"godowns":[{"godown":party_name("Customer One"),"value":"5.00"}],"root_items":[{"item":party_name("Supplier Two"),"state":"tied","godowns":[{"godown":party_name("Customer One"),"value":"5.00"}]}]}}),
         ),
@@ -2501,9 +2505,20 @@ async fn simulator_company_read_records_evidence_while_down_endpoint_is_typed() 
 
 #[tokio::test]
 async fn voucher_read_evidence_uses_utf16_transport_bytes() {
-    let captured_vouchers = include_str!(
+    // The captured vouchers carry AlterIDs 101602 and 101603. Every census is spanned to the
+    // company's mark (#2145), so they are given the AlterIDs 1 and 2 under the synthetic mark of 2
+    // this test serves; nothing else in the capture changes, and each edit is checked to apply.
+    let captured = include_str!(
         "../crates/bridge-tally-protocol/tests/fixtures/unit_a_optional_voucher_live.xml"
     );
+    let mut captured_vouchers = captured.to_string();
+    for (from, to) in [("101602", "1"), ("101603", "2")] {
+        let from = format!("<ALTERID TYPE=\"Number\"> {from}</ALTERID>");
+        assert_eq!(captured_vouchers.matches(&from).count(), 1, "{from}");
+        captured_vouchers =
+            captured_vouchers.replace(&from, &format!("<ALTERID TYPE=\"Number\"> {to}</ALTERID>"));
+    }
+    let captured_vouchers = captured_vouchers.as_str();
     let company_bytes = include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/native-licensed-companies.utf16le.xml");
     let company_xml = String::from_utf16(
         &company_bytes

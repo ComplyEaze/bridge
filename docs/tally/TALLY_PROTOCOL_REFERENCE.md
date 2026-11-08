@@ -165,6 +165,19 @@ base revision.
 <a id="82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books"></a>
 
 [8.2i Goods lines on a voucher's ledger entry — **VERIFIED 2026-10-14; TallyPrime 7.1, two synthetic books**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82i-goods-lines-on-a-vouchers-ledger-entry--verified-2026-10-14-tallyprime-71-two-synthetic-books)
+<a id="82j-irn-irnackno-irnackdate-on-the-voucher-fetch--partial-2026-11-02-tallyprime-72-one-synthetic-book"></a>
+
+[8.2j `IRN`, `IRNACKNO`, `IRNACKDATE` on the voucher `FETCH` — **PARTIAL 2026-11-02; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82j-irn-irnackno-irnackdate-on-the-voucher-fetch--partial-2026-11-02-tallyprime-72-one-synthetic-book)
+<a id="82k-a-vouchers-gst-and-note-details-on-the-voucher-fetch--partial-2026-10-28-tallyprime-72-one-synthetic-book"></a>
+
+[8.2k A voucher's GST and note details on the voucher `FETCH` — **PARTIAL 2026-10-28; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82k-a-vouchers-gst-and-note-details-on-the-voucher-fetch--partial-2026-10-28-tallyprime-72-one-synthetic-book)
+<a id="82l-a-vouchers-dispatch-details-on-the-voucher-fetch--partial-2026-11-04-tallyprime-72-one-synthetic-book"></a>
+
+[8.2l A voucher's dispatch details on the voucher `FETCH` — **PARTIAL 2026-11-04; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82l-a-vouchers-dispatch-details-on-the-voucher-fetch--partial-2026-11-04-tallyprime-72-one-synthetic-book)
+<a id="82m-an-item-purchase-keyed-through-a-voucher-class--partial-2026-11-04-tallyprime-72-one-synthetic-book"></a>
+
+[8.2m An item Purchase keyed through a voucher class — **PARTIAL 2026-11-04; TallyPrime 7.2, one synthetic book**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#82m-an-item-purchase-keyed-through-a-voucher-class--partial-2026-11-04-tallyprime-72-one-synthetic-book)
+
 <a id="83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance"></a>
 
 [8.3 GST duty head — the vocabulary is irregular and `TAXTYPE` qualifies it — **VERIFIED 2026-09-12; single instance**](./TALLY_PROTOCOL_REFERENCE_READS_AND_DATES.md#83-gst-duty-head--the-vocabulary-is-irregular-and-taxtype-qualifies-it--verified-2026-09-12-single-instance)
@@ -480,6 +493,9 @@ base revision.
 <a id="12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost"></a>
 
 [12a.24 The Godown Summary gives godown totals, and the exploded Stock Summary values a root item per godown at that godown's own cost](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a24-the-godown-summary-gives-godown-totals-and-the-exploded-stock-summary-values-a-root-item-per-godown-at-that-godowns-own-cost)
+<a id="12a25-the-first-voucher-types-read-after-a-company-load-leaves-one-element-out-of-two-rows-the-second-read-has-it-partial"></a>
+
+[12a.25 The first voucher-types read after a company load leaves one element out of two rows; the second read has it (PARTIAL)](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#12a25-the-first-voucher-types-read-after-a-company-load-leaves-one-element-out-of-two-rows-the-second-read-has-it-partial)
 <a id="13-open-questions"></a>
 
 [13. Open questions](./TALLY_PROTOCOL_REFERENCE_MEASUREMENTS_AND_OPEN_QUESTIONS.md#13-open-questions)

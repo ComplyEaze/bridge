@@ -453,3 +453,9 @@ is for porting a test, not for changing one already ported. Every change to an e
 declared divergence, never a quiet change: it has its own invented test book (a unit test on typed
 inputs, or an edge book), and the test's provenance note records it under a "Declared behaviour
 difference" heading, naming that book.
+
+A test the reference has no module for is crate-first. It sits in `registry::CRATE_FIRST`, not
+`PORTED`, so it has no reference golden and is not in `RUNNERS`; `parity/python_golden.py` names
+it in its own `CRATE_FIRST` and refuses it there, and `tests/registry.rs` checks that both lists
+agree. Its provenance note records it under the same heading, naming its books. The first is
+`clause42_sft` (#699), and the second `clause16_credits` (#699).

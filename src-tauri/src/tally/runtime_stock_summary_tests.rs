@@ -4,19 +4,23 @@
 //! extent (4), company flags (4), stock items (4), Stock Summary (4), closing
 //! extent (4), identity and mode again (3).
 use super::stock_summary::{
-    admit_stock_summary_size, check_stock_premise, stock_summary_period, StockSummaryRead,
+    admit_counted_stock, admit_stock_summary_size, check_stock_premise,
+    stock_report_worst_line_bytes, stock_summary_period, CountedAdmission, StockSummaryRead,
 };
 use super::trial_balance_tests::{
     companies as captured_companies, config, decode, education, extents as captured_extents, pair,
     status, xml, GUID,
 };
 use super::*;
+use bridge_tally_protocol::ledger_census::{
+    render_stock_item_census_slice_request, CensusLimits, CensusPlan, StockItems,
+};
 use bridge_tally_protocol::native_masters::MASTERS_RESPONSE_BUDGET_BYTES;
 use bridge_tally_protocol::native_stock_summary::{
     parse_native_stock_summary_report, render_company_inventory_flags_request,
     render_native_stock_summary_request, stock_item_worst_row_bytes, NativeFlag,
     NativeItemCountCrossCheck, NativeItemCountStatus, NativeStockError, NativeStockGate,
-    NativeStockReport, StockSummaryAsOf,
+    NativeStockItemCount, NativeStockReport, StockSummaryAsOf,
 };
 use bridge_tally_protocol::xml_read_profiles::{ValidatedCompanyName, ValidatedDateRange};
 use tally_protocol_simulator::{ObservedRequest, ScenarioPlan, SequenceSimulator};
@@ -487,31 +491,359 @@ async fn a_book_at_the_edge_reads_and_one_past_it_is_refused_before_the_items_re
     ));
     assert_eq!(observed.len(), WHOLE_READ);
 
+    // One past the edge, the mark no longer admits the read and the stock-item census starts
+    // (#1233): one slice, (0, 875]. Its answer here is an empty slice as Tally sends it, so the
+    // census found no item and refuses, and nothing after it is sent: no stock item and no
+    // report request.
     let mark = edge + 1;
-    let (result, observed) = run(Book::at_mark(mark).through_flags()).await;
+    let mut plans = Book::at_mark(mark).through_flags();
+    plans.push(xml(empty_census_slice()));
+    // The extent read again before the census's refusal is returned.
+    pair(&mut plans, xml(extent_with_mark(mark)));
+    let (result, observed) = run(plans).await;
     let error = result.err().expect("refused");
     assert!(
         matches!(
             cause::<StockSummaryReadError>(&error),
-            Some(StockSummaryReadError::TooLarge {
-                master_alter_id,
-                estimated_bytes: 16_009_000,
-                limit_bytes: 16_000_000,
-                limit_master_alter_id: 874,
-            }) if *master_alter_id == mark
+            Some(StockSummaryReadError::CensusRefused(
+                "stock_item_span_census_empty"
+            ))
         ),
         "{error:?}"
     );
     assert_eq!(
         cause::<StockSummaryReadError>(&error).map(StockSummaryReadError::safe_code),
-        Some("stock_summary_too_large")
+        Some("stock_summary_census_refused")
     );
-    // The mode probe, identity, the opening extent and the flags: no stock item
-    // and no report request.
-    assert_eq!(observed.len(), AT_FLAGS);
+    assert_eq!(observed.len(), AT_FLAGS + 1 + 4);
+    let census = CensusPlan::<StockItems>::new(
+        mark,
+        CensusLimits {
+            slice_width: 4_000,
+            max_slices: 100,
+        },
+    )
+    .unwrap();
+    let name = identity().display_name().to_string();
+    assert!(was_sent(
+        &observed,
+        &render_stock_item_census_slice_request(&name, &census.slices()[0])
+    ));
     let [_, items, report] = sent_requests();
     assert!(!was_sent(&observed, &items));
     assert!(!was_sent(&observed, &report));
+}
+
+/// A census answer captured on BRIDGE STOCK LAB, its company GUID (and so every row's GUID
+/// prefix) read as the test company's, as `items()` does for the shape lab's items.
+fn stock_lab_census(name: &str) -> String {
+    let path = format!(
+        "{}/crates/bridge-tally-protocol/tests/fixtures/{name}.utf16le.xml",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    decode(&std::fs::read(path).unwrap()).replace("1edb9b05-8d35-4c0c-9959-dce655730463", GUID)
+}
+
+/// A book past the single-read mark, counted by its two censuses, then read as before through the
+/// closing extent: the census answers are the 55-item and three-group slices captured on BRIDGE
+/// STOCK LAB (#1233).
+fn counted(mark: u64, items_census: String, flags: String) -> Vec<ScenarioPlan> {
+    let book = Book {
+        flags,
+        ..Book::at_mark(mark)
+    };
+    counted_book(&book, items_census)
+}
+
+/// As [`counted`], with every read but the censuses answered from `book`.
+fn counted_book(book: &Book, items_census: String) -> Vec<ScenarioPlan> {
+    let mut plans = book.through_flags();
+    plans.push(xml(items_census));
+    plans.push(xml(stock_lab_census(
+        "stock_group_census_slice_stock_lab_0_300_live",
+    )));
+    pair(&mut plans, xml(book.items.clone()));
+    pair(&mut plans, xml(book.report.clone()));
+    pair(&mut plans, xml(book.closing_extent.clone()));
+    plans
+}
+
+/// Past the mark the whole read was admitted for, the stock-item and stock-group censuses run,
+/// and their counts (55 items, 3 groups) admit the same item read, which ties as before.
+#[tokio::test]
+async fn a_book_past_the_mark_is_counted_then_read_whole() {
+    let mark = 875;
+    let mut plans = counted(
+        mark,
+        stock_lab_census("stock_item_census_slice_stock_lab_200_300_live"),
+        flags(),
+    );
+    let companies = xml(companies());
+    plans.extend([companies.clone(), status(), companies]);
+    let (result, observed) = run(plans).await;
+    let gate = result.map(|(read, _)| read.gate);
+    assert!(
+        matches!(gate, Ok(NativeStockGate::ValueTotalMatched { .. })),
+        "{:?}",
+        gate.err()
+    );
+    // The whole read and the two census slices, (0, 875] each.
+    assert_eq!(observed.len(), WHOLE_READ + 2);
+    let limits = CensusLimits {
+        slice_width: 4_000,
+        max_slices: 100,
+    };
+    let name = identity().display_name().to_string();
+    assert!(was_sent(
+        &observed,
+        &render_stock_item_census_slice_request(
+            &name,
+            &CensusPlan::<StockItems>::new(mark, limits)
+                .unwrap()
+                .slices()[0]
+        )
+    ));
+    assert!(was_sent(
+        &observed,
+        &bridge_tally_protocol::ledger_census::render_stock_group_census_slice_request(
+            &name,
+            &CensusPlan::<bridge_tally_protocol::ledger_census::StockGroups>::new(mark, limits)
+                .unwrap()
+                .slices()[0]
+        )
+    ));
+}
+
+/// The census with five of its 55 rows, against Tally's own count set to five: the read is
+/// admitted on five items, returns the book's eleven, and refuses on the census's count after
+/// the closing extent.
+#[tokio::test]
+async fn a_counted_read_returning_more_rows_than_the_census_refuses() {
+    let full = stock_lab_census("stock_item_census_slice_stock_lab_200_300_live");
+    let rows: Vec<_> = full
+        .match_indices("<STOCKITEM ")
+        .map(|(at, _)| at)
+        .collect();
+    assert_eq!(rows.len(), 55);
+    // Keep the first five rows: cut from the sixth row's start to the collection's end.
+    let end = full.find("</COLLECTION>").unwrap();
+    let five = format!("{}{}", &full[..rows[5]], &full[end..]);
+    let flags = replaced(
+        &flags(),
+        "<NUMSTOCKITEMS TYPE=\"Number\"> 11</NUMSTOCKITEMS>",
+        "<NUMSTOCKITEMS TYPE=\"Number\"> 5</NUMSTOCKITEMS>",
+    );
+    let (result, observed) = run(counted(875, five, flags)).await;
+    let error = result.err().expect("refused");
+    assert!(
+        matches!(
+            cause::<StockSummaryReadError>(&error),
+            Some(StockSummaryReadError::PremiseViolated(
+                "stock_rows_exceed_census_count"
+            ))
+        ),
+        "{error:?}"
+    );
+    assert_eq!(observed.len(), AT_CLOSING_EXTENT + 2);
+}
+
+/// The censuses count 55 items and three groups, so the report is admitted at 58 worst-case
+/// lines. The captured report, with blanks between its elements past that estimate, refuses on
+/// the report's admitted size after the closing extent is read; a closing extent that moved is
+/// reported as moved instead.
+#[tokio::test]
+async fn a_counted_report_larger_than_its_admitted_estimate_refuses_after_the_closing_extent() {
+    let estimate = 58 * stock_report_worst_line_bytes();
+    // Two bytes a character on the wire, so half the estimate in blanks is over it.
+    let blanks = " ".repeat(usize::try_from(estimate / 2).unwrap());
+    let padded = replaced(&report(), "<ENVELOPE>", &format!("<ENVELOPE>{blanks}"));
+    for (closing_mark, moved) in [(875, false), (876, true)] {
+        let book = Book {
+            report: padded.clone(),
+            closing_extent: extent_with_mark(closing_mark),
+            ..Book::at_mark(875)
+        };
+        let census = stock_lab_census("stock_item_census_slice_stock_lab_200_300_live");
+        let (result, observed) = run(counted_book(&book, census)).await;
+        let error = result.err().expect("refused");
+        if moved {
+            assert!(
+                matches!(
+                    cause::<PairedReadValidationError>(&error),
+                    Some(PairedReadValidationError::StockSummaryExtent)
+                ),
+                "{error:?}"
+            );
+            assert!(cause::<StockSummaryReadError>(&error).is_none());
+        } else {
+            assert!(
+                matches!(
+                    cause::<StockSummaryReadError>(&error),
+                    Some(StockSummaryReadError::PremiseViolated(
+                        "stock_report_over_admitted_bytes"
+                    ))
+                ),
+                "{error:?}"
+            );
+        }
+        assert_eq!(observed.len(), AT_CLOSING_EXTENT + 2);
+    }
+}
+
+/// Tally's own count above the census refuses before any item request, and the extent is read
+/// again first, so a book that moved is reported as moved instead.
+#[tokio::test]
+async fn a_census_below_tallys_count_refuses_after_the_extent_is_read_again() {
+    let full = stock_lab_census("stock_item_census_slice_stock_lab_200_300_live");
+    let rows: Vec<_> = full
+        .match_indices("<STOCKITEM ")
+        .map(|(at, _)| at)
+        .collect();
+    let end = full.find("</COLLECTION>").unwrap();
+    let five = format!("{}{}", &full[..rows[5]], &full[end..]);
+    for (closing_mark, moved) in [(875, false), (876, true)] {
+        let mut plans = Book::at_mark(875).through_flags();
+        plans.push(xml(five.clone()));
+        pair(&mut plans, xml(extent_with_mark(closing_mark)));
+        let (result, observed) = run(plans).await;
+        let error = result.err().expect("refused");
+        if moved {
+            assert!(
+                matches!(
+                    cause::<PairedReadValidationError>(&error),
+                    Some(PairedReadValidationError::StockSummaryExtent)
+                ),
+                "{error:?}"
+            );
+        } else {
+            assert!(
+                matches!(
+                    cause::<StockSummaryReadError>(&error),
+                    Some(StockSummaryReadError::ItemCountCompanyHigher {
+                        company: 11,
+                        census: 5
+                    })
+                ),
+                "{error:?}"
+            );
+        }
+        // No group census, no item and no report request.
+        assert_eq!(observed.len(), AT_FLAGS + 1 + 4);
+    }
+}
+
+/// An empty census slice as Tally answered it on BRIDGE STOCK LAB (a slice past every item). An
+/// empty answer names no company.
+fn empty_census_slice() -> String {
+    decode(include_bytes!(
+        "../../crates/bridge-tally-protocol/tests/fixtures/stock_item_census_slice_stock_lab_empty_live.utf16le.xml"
+    ))
+}
+
+/// Past the mark the single read is admitted for, the censuses' counts admit it (#1233): up to
+/// 874 counted items, whatever the mark, with the report sized from the items and stock groups.
+#[test]
+fn a_counted_book_is_admitted_up_to_the_items_one_read_holds() {
+    let admitted = admit_counted_stock(50_000, 874, 10, NativeStockItemCount::Reported(874))
+        .expect("874 counted items fit");
+    assert_eq!(
+        admitted,
+        CountedAdmission {
+            items: 874,
+            items_estimate: 15_990_704,
+            report_estimate: 884 * 5_208,
+        }
+    );
+    assert!(matches!(
+        admit_counted_stock(50_000, 875, 10, NativeStockItemCount::Reported(875)),
+        Err(error @ StockSummaryReadError::TooManyItems {
+            master_alter_id: 50_000,
+            counted_items: 875,
+            estimated_bytes: 16_009_000,
+            limit_bytes: 16_000_000,
+            limit_items: 874,
+        }) if error.safe_code() == "stock_summary_too_large"
+    ));
+}
+
+/// The report's top-level lines are at most the items and stock groups together: at 5,208 bytes
+/// a line (PARTIAL), 3,072 lines fit the budget and 3,073 do not.
+#[test]
+fn the_report_is_sized_from_the_counted_items_and_groups() {
+    assert_eq!(stock_report_worst_line_bytes(), 5_208);
+    assert!(admit_counted_stock(10_000, 10, 3_062, NativeStockItemCount::Reported(10)).is_ok());
+    assert!(matches!(
+        admit_counted_stock(10_000, 10, 3_063, NativeStockItemCount::Reported(10)),
+        Err(error @ StockSummaryReadError::ReportTooLarge {
+            counted_lines: 3_073,
+            estimated_bytes: 16_004_184,
+            limit_bytes: 16_000_000,
+        }) if error.safe_code() == "stock_summary_report_too_large"
+    ));
+}
+
+/// Every master holds its own AlterID at or under the mark, so counts above it cannot be: they
+/// refuse, never admit.
+#[test]
+fn a_census_count_above_the_mark_refuses_rather_than_admits() {
+    for (items, groups) in [(1_001, 0), (0, 1_001), (600, 401)] {
+        assert!(
+            matches!(
+                admit_counted_stock(1_000, items, groups, NativeStockItemCount::Reported(items)),
+                Err(StockSummaryReadError::PremiseViolated(
+                    "stock_census_exceeds_master_mark"
+                ))
+            ),
+            "{items} items and {groups} groups under a mark of 1,000"
+        );
+    }
+    assert!(admit_counted_stock(1_000, 600, 400, NativeStockItemCount::Reported(600)).is_ok());
+}
+
+/// Tally's own item count only refuses: above the census it refuses, at or below it (or absent)
+/// it admits, and the gate compares it with the rows read later.
+#[test]
+fn tallys_item_count_only_refuses_a_census_that_counted_fewer() {
+    assert!(matches!(
+        admit_counted_stock(5_000, 100, 5, NativeStockItemCount::Reported(101)),
+        Err(error @ StockSummaryReadError::ItemCountCompanyHigher { company: 101, census: 100 })
+            if error.safe_code() == "stock_summary_item_count_company_higher"
+    ));
+    for count in [
+        NativeStockItemCount::Reported(100),
+        NativeStockItemCount::Reported(99),
+        NativeStockItemCount::Unavailable,
+    ] {
+        assert!(
+            admit_counted_stock(5_000, 100, 5, count).is_ok(),
+            "{count:?}"
+        );
+    }
+}
+
+/// After the read, the rows may not outnumber the census and the report may not outgrow its
+/// estimate.
+#[test]
+fn a_counted_read_checks_its_rows_and_its_report_against_what_it_was_admitted_on() {
+    let admitted = CountedAdmission {
+        items: 10,
+        items_estimate: 182_960,
+        report_estimate: 1_000,
+    };
+    assert!(admitted.check_items(10).is_ok());
+    assert!(matches!(
+        admitted.check_items(11),
+        Err(StockSummaryReadError::PremiseViolated(
+            "stock_rows_exceed_census_count"
+        ))
+    ));
+    assert!(admitted.check_report(1_000).is_ok());
+    assert!(matches!(
+        admitted.check_report(1_001),
+        Err(StockSummaryReadError::PremiseViolated(
+            "stock_report_over_admitted_bytes"
+        ))
+    ));
 }
 
 #[tokio::test]

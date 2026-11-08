@@ -183,6 +183,32 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       a group total cannot be given, are shortened under `mask_parties`.
     - A voucher's reference date (the `reference_date` field) is a date, the
       same under every setting.
+    - An invoice's e-invoice details (the `e_invoice` field `vouchers` adds with
+      `include_e_invoice`: the IRN, the acknowledgement number and its date) are
+      sent as the book has them under every setting.
+    - A voucher's stock lines (the `stock_lines` field `vouchers` adds when asked:
+      direction, item, quantities, rate, amount, godown and batch) are sent only
+      for a call that asks. Item, godown and batch names are masked under
+      `mask_parties`, as a goods line's are.
+    - A voucher's GST and note details (the `voucher_gst` field `vouchers` adds
+      with `include_gst_details`: its place of supply, the party's state and
+      registration type, a note's reason, and the party's own note number and
+      date) are sent as the book has them under every setting, as `reference`
+      and `party_gstin` are.
+    - A voucher's dispatch details (the `dispatch` field `vouchers` adds with
+      `include_gst_details`: the dispatch document number, how it was
+      dispatched, the destination, the carrier, the bill of lading or LR-RR
+      number and its date, and the motor vehicle number) are sent as the book
+      has them, except that how it was dispatched (usually the transporter's
+      name), the carrier and the vehicle number, which name or identify a
+      business or person other than the book's own, are masked under
+      `mask_parties` as a party name is: `mark_voucher_party_names`
+      (`src-tauri/src/agent.rs:434`) marks them for every `vouchers` row
+      (`src-tauri/src/agent_vouchers.rs:274`), and `redact_value` masks the
+      marked values. The destination, both document numbers and the date stay
+      as place of supply does, and so does each Delivery Note's number and date
+      (`delivery_notes`), the book's own document as the dispatch document number
+      is.
     - The cost centre and cost category lists (two new kinds of the masters
       read) send each one's name, its parent (a cost centre's parent is another
       cost centre or the top level), its category for a cost centre, three
@@ -221,6 +247,13 @@ made for 0.5.1. A server started by hand with `BRIDGE_TERMS_ACCEPTED` set to
       chose (`kind`) and the report's name, the window's dates, and for each
       month, Tally's debit, credit and closing amounts. It holds no
       party, ledger or narration, and `mask_parties` has nothing to shorten in it.
+    - The stock-by-batch read (`stock_by_batch`) sends the company name and
+      its identifier and the date, and for each item asked for, its name
+      (shortened under `mask_parties`), its identifier, its closing quantity
+      in Tally's stock item list, and Tally's quantity per godown and batch,
+      each godown and named batch shortened under `mask_parties`. The
+      quantities are not masked under any setting. It holds no values, rates
+      or narrations.
     - The stock-by-godown read (`stock_by_godown`) sends the company name and
       its identifier and the dates, each godown's name (shortened under
       `mask_parties`), value and quantity, and for each item directly under
@@ -400,23 +433,25 @@ Desktop opened the file there with the same sha256. The command-line report
 Windows location in the table above, unless you set another data folder); beside
 it, where the files directly in that folder are as Windows reports each file
 (`folder_file_locations` and `lock_folder_file_locations`, read from the first
-64 files by name, with how many were read of how many; not the files in its
-subfolders, such as `imports`; the listing stops at 100,000 entries, and
-`listing_capped` says so; a lock folder's `native-dispatch-leases` that is
-itself a link is not entered and reads `link_not_followed`); the import
-journal's own location (`journal_path`; a journal file that is itself a link is
-shown as built, its target not followed, with `journal_path_state`
-`link_not_followed`); and, on Windows, each copy of the data folder inside a
-Store app's package that exists (`package_copies`). It does not print a folder
-where Windows reports the folder itself to be: once both folders existed,
-Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed the
-second folder's files. Seen from inside Claude Desktop, a file both copies held
-named the second folder and a file only `%LOCALAPPDATA%\Bridge\agent` held named
-that folder; from outside, every file named `%LOCALAPPDATA%\Bridge\agent`. So a
-file in both copies is shown only by the copy that side reads, and a file in one
-copy by that copy. `package_copies` is what shows that the second copy exists,
-and a terminal outside Claude Desktop does not see that copy as part of the
-folder. The report does not record which side ran it; run from inside Claude
+64 files by name (when the listing is capped, among the entries listed), with
+how many were read of how many; not the files in its subfolders, such as
+`imports`; the listing stops at 100,000 entries, and `listing_capped` says so; a
+lock folder's `native-dispatch-leases` that is itself a link is not entered and
+reads `link_not_followed`); the import journal's own location (`journal_path`; a
+journal file that is itself a link is shown as built, its target not followed,
+with `journal_path_state` `link_not_followed`; a data folder that is itself a
+link, or a link in a folder above the journal or the lease folder, is still
+followed, as the report follows it); and, on Windows, each copy of the data
+folder inside a Store app's package that exists (`package_copies`). It does not
+print a folder where Windows reports the folder itself to be: once both folders
+existed, Windows named `%LOCALAPPDATA%\Bridge\agent` for a view that also showed
+the second folder's files. Seen from inside Claude Desktop, a file both copies
+held named the second folder and a file only `%LOCALAPPDATA%\Bridge\agent` held
+named that folder; from outside, every file named `%LOCALAPPDATA%\Bridge\agent`.
+So a file in both copies is shown only by the copy that side reads, and a file
+in one copy by that copy. `package_copies` is what shows that the second copy
+exists, and a terminal outside Claude Desktop does not see that copy as part of
+the folder. The report does not record which side ran it; run from inside Claude
 Desktop on that computer, `package_copies` and the data folder's file locations
 would both name the second folder (inferred from the lab's probe, not from a run
 of this report), so such a run cannot tell whether `%LOCALAPPDATA%\Bridge\agent`
@@ -430,6 +465,15 @@ probe making the same Windows call), and `package_copies`, which lists
 one computer (#1459) the second folder held a receipt log, the terms record,
 the import journal, the saved batch files (`imports/`), the bank-statement
 proposals, a lock file and the lock folder (`native-dispatch-leases/`).
+Because each side's journal checks see only its own batches, on Windows
+`build_import_xml` and `post_import` refuse (`import_journal_split`) while a
+Store app's copy of the data folder holds an import journal, other than the one
+the running process uses, with a batch; neither journal is moved, merged or
+deleted (#2233). Seen from inside Claude Desktop, a journal in
+`%LOCALAPPDATA%\Bridge\agent` is hidden behind the package's own copy, so only
+the side outside Claude Desktop is refused by it. Ledger creates, which keep
+their own journal, are not covered. **Not measured:** this refusal on a real
+computer.
 Microsoft's documentation says that uninstalling or resetting a Store app
 (here Claude Desktop itself; this is not the removal of the extension that
 section 8 describes) removes that second folder and everything in it.

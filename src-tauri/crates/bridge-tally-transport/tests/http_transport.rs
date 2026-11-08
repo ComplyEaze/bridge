@@ -155,6 +155,50 @@ async fn decoded_only_transport_streams_expected_utf16_without_retaining_wire_bo
     }
 }
 
+/// A send's own response limit refuses an answer past it under that limit, where the policy's
+/// would have taken it, and an answer at it is returned whole; a limit above the policy's is held
+/// to the policy's.
+#[tokio::test]
+async fn a_sends_own_response_limit_refuses_past_it_and_never_exceeds_the_policy() {
+    const ROOM: usize = 4096;
+    let plan = ScenarioPlan::new(Fixture::SyntheticXml("A".repeat(40)))
+        .with_encoding(WireEncoding::Utf16Le)
+        .with_framing(ResponseFraming::ContentLength);
+    let bytes = plan.response_bytes().len();
+    assert!(bytes < ROOM);
+    for (send_limit, policy_limit, refused_at) in [
+        (bytes - 1, ROOM, Some(bytes - 1)),
+        (bytes, ROOM, None),
+        (ROOM, bytes - 1, Some(bytes - 1)),
+    ] {
+        let simulator = Simulator::spawn(plan.clone()).expect("spawn loopback simulator");
+        let transport = TallyHttpTransport::with_policy(
+            endpoint(&simulator),
+            policy(policy_limit, Duration::from_secs(2)),
+        )
+        .expect("build limited transport");
+        let result = transport
+            .post_xml_decoded_within("<E />".to_owned(), send_limit)
+            .await;
+        match refused_at {
+            Some(limit) => assert!(
+                matches!(
+                    result,
+                    Err(TallyTransportError::ResponseTooLarge { limit: refused, .. }) if refused == limit
+                ),
+                "{send_limit} under {policy_limit}: {result:?}"
+            ),
+            None => assert_eq!(
+                result
+                    .expect("an answer at the limit is returned")
+                    .encoded_bytes(),
+                bytes
+            ),
+        }
+        drop(simulator);
+    }
+}
+
 #[tokio::test]
 async fn decoded_only_transport_enforces_decoded_cap_during_streaming() {
     const LIMIT: usize = 100;
@@ -269,6 +313,28 @@ async fn truncated_declared_body_is_never_partial_success() {
         TallyTransportError::ResponseTruncated | TallyTransportError::ResponseReadFailed
     ));
     simulator.finish().expect("finish truncated simulator");
+}
+
+/// A body that stalls after its head is cut by the same deadline, and told as one (#2214: the
+/// party/ledger master export decides by the transport's error whether to read again).
+#[tokio::test]
+async fn whole_request_deadline_covers_a_body_that_stalls_after_its_head() {
+    let (simulator, result) = post_synthetic(
+        // Chunks of 32 bytes, as the wire-gate test reads: the first carries the encoding's mark.
+        ScenarioPlan::new(Fixture::ExportStatusOne)
+            .with_encoding(WireEncoding::Utf16Le)
+            .with_delivery(Delivery::SlowBody {
+                chunk_bytes: 32,
+                delay: Duration::from_millis(150),
+            }),
+        Some(policy(1024, Duration::from_millis(30))),
+        "<E />",
+    )
+    .await;
+    let error = result.expect_err("a stalled body must time out");
+    assert_eq!(error, TallyTransportError::RequestTimedOut);
+    simulator.cancel();
+    simulator.finish().expect("cancel slow simulator");
 }
 
 #[tokio::test]

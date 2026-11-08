@@ -129,3 +129,12 @@ One variable a row (P6), on synthetic books, each with a backup and a restore. R
 1. **What existing component could do this:** the paired read and the dispatch path, `xml_escape`, the identity bracket and marks check, the ledger catalogue and its party rule, the GUID-filtered ledger snapshot, and the native outstandings date parser.
 2. **What is deleted:** for a party's open bills, the whole-book Bills read that `bill_trail` and `unadjusted` wait on is not sent. Nothing in code is deleted in this slice.
 3. **What breaks if it is not built:** on a large book at a year-end date, no party's outstanding can be read through Bridge. Master's 20 s refusal stays the known limit.
+
+## Deviation, 8 Nov 2026: the party name reuses `LedgerScopeName`
+
+Section 1 proposed a closed alphabet of its own for the party name. The build reuses master's `LedgerScopeName` instead (`bridge-tally-protocol/src/ledger_scope.rs:65-94`): one type, not a second one with its own rules (P2, P4).
+
+- **What it admits** is narrower than section 1's proposal: ASCII letters, ASCII digits and single inner spaces. A name with a word that a TDL formula reads as an operator (`FORMULA_WORDS`, `ledger_scope.rs:28-34`) is refused as well. The marks `. , - ( ) /` that section 1 would have admitted are refused, with every other character, until L5 measures them.
+- **Each refusal** of `LedgerScopeName::new` (empty, too long, a character, the spacing, an operator word) becomes `party_name_not_admitted`, before anything is sent.
+- **The fit is wide on purpose.** The type guards `CHILDOF`, which takes a formula. Here the name is the text of a static variable, so the operator-word refusal may refuse names this report would read as names. The cost of that is a refusal, never a wrong read.
+- **If L5 admits more marks for this report,** the wider rule is a separate type for this request. `LedgerScopeName` is not widened, because widening it would also widen `CHILDOF`.

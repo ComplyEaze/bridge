@@ -2,9 +2,8 @@ use super::*;
 
 fn batch() -> ImportLedgerLine {
     ImportLedgerLine {
-        ledger_identities: None,
+        binding: LedgerBinding::Unbound,
         cash_in_hand_ledgers: Some(Vec::new()),
-        cash_projection: None,
         on_account_approved: Some(Vec::new()),
         statement: None,
         withdrawn_skips: None,

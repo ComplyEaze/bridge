@@ -296,7 +296,7 @@ fn bind_to_captured_catalogue(line: &mut ImportLedgerLine) {
     .unwrap()
     .bind_selected(requested_ledger_names(&payload))
     .unwrap();
-    line.ledger_identities = Some(
+    line.binding = LedgerBinding::bound(Some(
         binding
             .pairs()
             .map(|(name, guid)| BoundLedger {
@@ -304,7 +304,7 @@ fn bind_to_captured_catalogue(line: &mut ImportLedgerLine) {
                 guid: guid.to_string(),
             })
             .collect(),
-    );
+    ));
 }
 
 /// A built, never-dispatched batch for the captured laboratory company, with
@@ -1573,7 +1573,13 @@ fn saved_bank_line(
     bind_to_captured_catalogue(&mut line);
     line.cash_in_hand_ledgers = serde_json::from_value(cash_in_hand).unwrap();
     line.on_account_approved = serde_json::from_value(on_account).unwrap();
-    line.cash_projection = cash_projection;
+    if let Some(projection) = cash_projection {
+        let ledgers = line.binding.ledgers().expect("bound above").to_vec();
+        line.binding = LedgerBinding::CashBox {
+            ledgers,
+            projection,
+        };
+    }
     server.append_import_ledger(&line).unwrap();
     fs::write(
         server
@@ -3879,7 +3885,7 @@ async fn refused_by_build_binding_under(
     let directory = tempfile::tempdir().unwrap();
     let server = server_redacting(simulator.address(), directory.path(), redaction);
     let (mut line, args) = saved_batch(&server);
-    line.ledger_identities = identities;
+    line.binding = LedgerBinding::bound(identities);
     server.append_import_ledger(&line).unwrap();
     let scripted = ScriptedApproval::approving();
     let result = if desktop {
@@ -4008,7 +4014,7 @@ async fn a_replaced_ledger_is_reported_before_a_flag_that_changed() {
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let (mut line, args) = saved_batch(&server);
-    line.ledger_identities = Some(vec![
+    line.binding = LedgerBinding::bound(Some(vec![
         BoundLedger {
             name: "Cash".into(),
             guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000ff".into(),
@@ -4017,7 +4023,7 @@ async fn a_replaced_ledger_is_reported_before_a_flag_that_changed() {
             name: "WR2 Sales".into(),
             guid: "61c6de69-1748-461c-ad3f-162cb949df9f-000000d0".into(),
         },
-    ]);
+    ]));
     server.append_import_ledger(&line).unwrap();
     let result = SCRIPTED_APPROVAL
         .scope(
@@ -4141,7 +4147,7 @@ async fn a_dispatched_batch_without_identities_still_reconciles() {
     let directory = tempfile::tempdir().unwrap();
     let server = server_at(simulator.address(), directory.path());
     let (mut line, args) = saved_batch(&server);
-    line.ledger_identities = None;
+    line.binding = LedgerBinding::bound(None);
     server.append_import_ledger(&line).unwrap();
     let native = native_post_request(&line, RemoteIds::from_ids(vec![Uuid::new_v4()])).unwrap();
     {

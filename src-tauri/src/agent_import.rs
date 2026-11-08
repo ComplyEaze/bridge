@@ -497,33 +497,14 @@ pub(super) struct ImportLedgerLine {
     pre_import_mark: PreImportMark,
     vouchers: Vec<ImportVoucher>,
     /// Each ledger the batch names, with the GUID the build's own catalogue
-    /// read bound it to (bridge#239). A post refuses when any of them now
-    /// resolves to another GUID. Absent on records built before this field
-    /// existed: such a batch is refused for posting and must be rebuilt.
-    ///
-    /// Written as `ledger_identities_4`. Releases 0.3.0 to 0.4.2 read only
-    /// `ledger_identities`, the releases after them only `ledger_identities_2`,
-    /// and the next only `ledger_identities_3`; each finds none here and refuses the batch as
-    /// built before this record (`import_batch_predates_ledger_binding`),
-    /// which is their one refusal of a record they cannot check. They do not
-    /// read `statement` or the records below, so without this they would
-    /// post a batch this build saved without the checks those records feed.
-    /// Both earlier names are still read, for a batch one of them saved. No
-    /// writer may write two names: a record carrying two does not parse, and
-    /// the journal reader refuses the whole history on a record it cannot
-    /// parse. When a record is added to or removed from a saved
-    /// batch, write this one under a new name again and keep every earlier
-    /// name as an alias: `a_saved_batch_holds_exactly_these_records` stops
-    /// compiling, or fails, until that is looked at.
-    #[serde(
-        default,
-        rename = "ledger_identities_4",
-        alias = "ledger_identities_3",
-        alias = "ledger_identities_2",
-        alias = "ledger_identities",
-        skip_serializing_if = "Option::is_none"
-    )]
-    ledger_identities: Option<Vec<BoundLedger>>,
+    /// read bound it to (bridge#239), and on a deposit from the cash box the
+    /// cash book it was built on (#1761). A post refuses when any ledger now
+    /// resolves to another GUID, or when that book has moved. Absent on records
+    /// built before the binding existed: such a batch is refused for posting
+    /// and must be rebuilt. Which name it is written under is the type's, not
+    /// the writer's: see [`LedgerBinding`].
+    #[serde(flatten)]
+    binding: LedgerBinding,
     /// Each ledger a bank cash answer named as cash in hand, with the voucher
     /// it was answered for (#815). The build refused any outside Cash-in-Hand,
     /// and a post checks each again before approval and in the queue, since a
@@ -532,11 +513,6 @@ pub(super) struct ImportLedgerLine {
     /// refused for posting and must be rebuilt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cash_in_hand_ledgers: Option<Vec<CashInHandLedger>>,
-    /// The cash book a deposit from the cash box was built on (#1761). A post
-    /// reads that book again before approval and refuses if it has moved.
-    /// Absent on every batch without such a deposit.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    cash_projection: Option<cash_projection::CashProjectionRecord>,
     /// Each bill-wise ledger (`ISBILLWISEON` Yes) for which the caller supplied
     /// an approval, with the digest that tied it to this batch's exact content
     /// (#1234). Bridge cannot tell whether a person said yes: the digest is a
@@ -859,6 +835,162 @@ fn annotate_alias_of(
 }
 
 const FOLDED_TWIN_NEXT_STEP: &str = "No file was written. Each ledger in ledger_twins has at least one other live ledger whose name differs from it only by case, spacing, dashes, slashes or quotes, or a trailing line break. Tally's import also matches names loosely, and which of them it would post to is not established, so ComplyEaze Bridge names none of them. Have an operator rename ledgers in Tally until no two in each group fold equal (a ledger listed with through_alias is in its group only because of an alias of it: change or remove that alias), then run validate_masters and build again.";
+
+/// A batch's ledger binding, and on a deposit from the cash box the cash book
+/// projection it was built on (#1761). One type holds both because the name
+/// the binding is written under follows from the projection, so no writer can
+/// pick it.
+///
+/// Without a projection the binding is written as `ledger_identities_3`, the
+/// name `mcp-v0.7.0` reads, so that release reads and posts the batch as it
+/// did (the journal floor tests in `agent_import_post_e2e_tests.rs`). With
+/// one it is written as `ledger_identities_4` beside `cash_projection`.
+/// Releases 0.3.0 to 0.4.2 read only `ledger_identities`, the releases after
+/// them only `ledger_identities_2`, and those up to `mcp-v0.7.0` only
+/// `ledger_identities_3`; none reads `_4` or `cash_projection`, so each finds
+/// no binding on a deposit from the cash box and refuses it as built before
+/// this record (`import_batch_predates_ledger_binding`), which is their one
+/// refusal of a record they cannot check. Without the second name they would
+/// post the deposit with no check of its cash book.
+///
+/// Every earlier name is still read, for a batch one of them saved. A line
+/// holding two names, `_4` without a projection, or a projection without
+/// `_4` does not parse: no build writes one, and the journal reader refuses
+/// the whole history on a record it cannot parse. When a record is added to
+/// or removed from a saved batch, give the binding a new written name on the
+/// batches that carry it and keep every earlier name as an alias:
+/// `a_saved_batch_holds_exactly_these_records` stops compiling, or fails,
+/// until that is looked at.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(try_from = "LedgerBindingRecord")]
+enum LedgerBinding {
+    /// Built before the binding existed.
+    Unbound,
+    /// Written as `ledger_identities_3`.
+    Bound(Vec<BoundLedger>),
+    /// Written as `ledger_identities_4`, with the projection as
+    /// `cash_projection`. A post reads that book again before approval and
+    /// refuses if it has moved.
+    CashBox {
+        ledgers: Vec<BoundLedger>,
+        projection: cash_projection::CashProjectionRecord,
+    },
+}
+
+impl LedgerBinding {
+    /// The binding of a build: with a projection exactly when the batch holds
+    /// a deposit from the cash box.
+    fn of_build(
+        ledgers: Vec<BoundLedger>,
+        projection: Option<cash_projection::CashProjectionRecord>,
+    ) -> Self {
+        match projection {
+            Some(projection) => Self::CashBox {
+                ledgers,
+                projection,
+            },
+            None => Self::Bound(ledgers),
+        }
+    }
+
+    /// The bound ledgers, `None` on a batch built before the binding.
+    fn ledgers(&self) -> Option<&[BoundLedger]> {
+        match self {
+            Self::Unbound => None,
+            Self::Bound(ledgers) | Self::CashBox { ledgers, .. } => Some(ledgers),
+        }
+    }
+
+    /// The cash book projection a deposit from the cash box was built on.
+    fn cash_projection(&self) -> Option<&cash_projection::CashProjectionRecord> {
+        match self {
+            Self::CashBox { projection, .. } => Some(projection),
+            Self::Unbound | Self::Bound(_) => None,
+        }
+    }
+}
+
+#[cfg(test)]
+impl LedgerBinding {
+    /// What a build without a projection binds, `None` as built before the
+    /// binding.
+    fn bound(ledgers: Option<Vec<BoundLedger>>) -> Self {
+        ledgers.map_or(Self::Unbound, Self::Bound)
+    }
+}
+
+/// The written names of a [`LedgerBinding`], read before the type admits them.
+#[derive(Deserialize)]
+struct LedgerBindingRecord {
+    #[serde(
+        default,
+        rename = "ledger_identities_3",
+        alias = "ledger_identities_2",
+        alias = "ledger_identities"
+    )]
+    bound: Option<Vec<BoundLedger>>,
+    #[serde(default, rename = "ledger_identities_4")]
+    cash_box: Option<Vec<BoundLedger>>,
+    #[serde(default)]
+    cash_projection: Option<cash_projection::CashProjectionRecord>,
+}
+
+impl TryFrom<LedgerBindingRecord> for LedgerBinding {
+    type Error = &'static str;
+
+    fn try_from(record: LedgerBindingRecord) -> Result<Self, Self::Error> {
+        match (record.bound, record.cash_box, record.cash_projection) {
+            (None, None, None) => Ok(Self::Unbound),
+            (Some(ledgers), None, None) => Ok(Self::Bound(ledgers)),
+            (None, Some(ledgers), Some(projection)) => Ok(Self::CashBox {
+                ledgers,
+                projection,
+            }),
+            _ => Err("a ledger binding no build writes"),
+        }
+    }
+}
+
+impl Serialize for LedgerBinding {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        #[derive(Serialize)]
+        struct Written<'a> {
+            #[serde(
+                rename = "ledger_identities_3",
+                skip_serializing_if = "Option::is_none"
+            )]
+            bound: Option<&'a [BoundLedger]>,
+            #[serde(
+                rename = "ledger_identities_4",
+                skip_serializing_if = "Option::is_none"
+            )]
+            cash_box: Option<&'a [BoundLedger]>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            cash_projection: Option<&'a cash_projection::CashProjectionRecord>,
+        }
+        let written = match self {
+            Self::Unbound => Written {
+                bound: None,
+                cash_box: None,
+                cash_projection: None,
+            },
+            Self::Bound(ledgers) => Written {
+                bound: Some(ledgers),
+                cash_box: None,
+                cash_projection: None,
+            },
+            Self::CashBox {
+                ledgers,
+                projection,
+            } => Written {
+                bound: None,
+                cash_box: Some(ledgers),
+                cash_projection: Some(projection),
+            },
+        };
+        written.serialize(serializer)
+    }
+}
 
 /// One ledger name and the GUID it was bound to at build time.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -1829,7 +1961,10 @@ impl Server {
                 status: "built".to_string(),
                 pre_import_mark: mark,
                 vouchers: payload.vouchers,
-                ledger_identities: Some(build_binding),
+                binding: LedgerBinding::of_build(
+                    build_binding,
+                    projection.as_ref().map(|held| held.record().clone()),
+                ),
                 cash_in_hand_ledgers: Some(
                     resolved
                         .cash_ledgers
@@ -1841,7 +1976,6 @@ impl Server {
                         })
                         .collect(),
                 ),
-                cash_projection: projection.as_ref().map(|held| held.record().clone()),
                 on_account_approved: Some(on_account_approved),
                 statement: statement_record,
                 withdrawn_skips,
@@ -2632,8 +2766,9 @@ impl Server {
                                     == "posted_verified" =>
                         {
                             let bound = line
-                                .ledger_identities
-                                .iter()
+                                .binding
+                                .ledgers()
+                                .into_iter()
                                 .flatten()
                                 .map(|bound| (bound.name.clone(), bound.guid.clone()))
                                 .collect::<Vec<_>>();

@@ -766,7 +766,7 @@ async fn a_multi_entry_receipt_builds_through_tools_call_and_says_it_is_unqualif
         guid: format!("61c6de69-1748-461c-ad3f-162cb949df9f-{suffix}"),
     };
     assert_eq!(
-        saved.ledger_identities,
+        saved.binding.ledgers().map(<[_]>::to_vec),
         Some(vec![
             bound("Bridge Nested Debtor WR4", "000000d5"),
             bound("Cash", "0000001f"),
@@ -1437,9 +1437,8 @@ async fn a_bank_batch_verifies_through_the_rewrites_tally_makes_to_it() {
         voucher.voucher_type = voucher_type.clone();
         voucher.voucher_number = None;
         let line = ImportLedgerLine {
-            ledger_identities: None,
+            binding: LedgerBinding::Unbound,
             cash_in_hand_ledgers: Some(Vec::new()),
-            cash_projection: None,
             on_account_approved: Some(Vec::new()),
             statement: None,
             withdrawn_skips: None,
@@ -2023,9 +2022,23 @@ async fn deposit_build(balance: &str, built: bool) -> (Server, Value, tempfile::
     (server, response, directory)
 }
 
+/// The names `mcp-v0.7.0` reads a batch's ledger binding from: its
+/// `ImportLedgerLine` at the tag (`fcfb5ff6`, `agent_import.rs:479`). It
+/// reads no `cash_projection`, and its post refuses a batch where it finds no
+/// binding as built before one (`agent_import_post.rs:811` there).
+const MCP_V0_7_0_BINDING_NAMES: [&str; 3] = [
+    "ledger_identities_3",
+    "ledger_identities_2",
+    "ledger_identities",
+];
+
+/// The journal line of a deposit from the cash box holds its binding only
+/// under a name `mcp-v0.7.0` does not read, so that release refuses to post
+/// the deposit instead of posting it without checking its cash book. A Sales
+/// or release line stays one it reads (the `mcp_v0_7_0` floor tests).
 #[tokio::test]
 async fn a_deposit_from_the_cash_box_builds_on_the_projected_book_and_records_it() {
-    let (server, response, _directory) = deposit_build("-20.00", true).await;
+    let (server, response, directory) = deposit_build("-20.00", true).await;
     let result = &response["structuredContent"]["result"];
     assert_eq!(result["voucher_count"], 1, "{response}");
     let projection = &result["cash_projection"];
@@ -2040,9 +2053,23 @@ async fn a_deposit_from_the_cash_box_builds_on_the_projected_book_and_records_it
         .unwrap()
         .batch;
     assert_eq!(
-        saved.cash_projection,
+        saved.binding.cash_projection().cloned(),
         Some(super::cash_projection::tests::unmoved_book_record("-20.00"))
     );
+    let journal =
+        std::fs::read_to_string(directory.path().join("agent-import-ledger.jsonl")).unwrap();
+    let lines = journal.lines().collect::<Vec<_>>();
+    assert_eq!(lines.len(), 1, "{journal}");
+    let line: Value = serde_json::from_str(lines[0]).unwrap();
+    for name in MCP_V0_7_0_BINDING_NAMES {
+        assert!(line.get(name).is_none(), "{name}: {line}");
+    }
+    assert_eq!(
+        line["ledger_identities_4"].as_array().map(Vec::len),
+        saved.binding.ledgers().map(<[_]>::len),
+        "{line}"
+    );
+    assert!(line["cash_projection"].is_object(), "{line}");
 }
 
 #[tokio::test]
@@ -3638,8 +3665,9 @@ fn outflow_skip_record() -> Value {
 
 fn guid_of(batch: &ImportLedgerLine, name: &str) -> String {
     batch
-        .ledger_identities
-        .iter()
+        .binding
+        .ledgers()
+        .into_iter()
         .flatten()
         .find(|bound| bound.name == name)
         .unwrap_or_else(|| panic!("{name} is not bound"))

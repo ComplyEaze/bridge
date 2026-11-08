@@ -195,7 +195,7 @@ impl Build {
         .unwrap();
         line.amends_batch_id = self.amends.map(batch_id);
         line.endpoint_origin = self.endpoint.map(str::to_string);
-        line.ledger_identities = self.identities.as_ref().map(|identities| {
+        line.binding = LedgerBinding::bound(self.identities.as_ref().map(|identities| {
             identities
                 .iter()
                 .map(|(name, guid)| BoundLedger {
@@ -203,7 +203,7 @@ impl Build {
                     guid: (*guid).into(),
                 })
                 .collect()
-        });
+        }));
         line.statement = self.statement.as_ref().map(statement_record);
         line.withdrawn_skips = (!self.withdrawn.is_empty()).then(|| self.withdrawn.clone());
         if self.placed {
@@ -2416,38 +2416,30 @@ fn the_checks_against_the_batch_line() {
 // ---- the journal record ------------------------------------------------------------
 
 #[test]
-fn the_binding_is_written_as_ledger_identities_4_only() {
+fn the_binding_is_written_as_ledger_identities_3_only() {
     let line = build(1).voucher(payment(&st(1), "1.00")).line();
     let written = serde_json::to_value(&line).unwrap();
-    assert!(written.get("ledger_identities_4").is_some(), "{written}");
-    assert!(written.get("ledger_identities_3").is_none(), "{written}");
+    assert!(written.get("ledger_identities_3").is_some(), "{written}");
     assert!(written.get("ledger_identities_2").is_none(), "{written}");
     assert!(written.get("ledger_identities").is_none(), "{written}");
     assert!(written.get("statement").is_none(), "{written}");
     let reread: ImportLedgerLine = serde_json::from_value(written).unwrap();
-    assert_eq!(reread.ledger_identities, line.ledger_identities);
+    assert_eq!(reread.binding, line.binding);
 }
 
 #[test]
 fn a_binding_written_under_an_earlier_name_is_still_read() {
     let line = build(1).voucher(payment(&st(1), "1.00")).line();
-    for earlier in [
-        "ledger_identities_3",
-        "ledger_identities_2",
-        "ledger_identities",
-    ] {
+    for earlier in ["ledger_identities_2", "ledger_identities"] {
         let mut value = serde_json::to_value(&line).unwrap();
         let binding = value
             .as_object_mut()
             .unwrap()
-            .remove("ledger_identities_4")
+            .remove("ledger_identities_3")
             .unwrap();
         value[earlier] = binding;
         let reread: ImportLedgerLine = serde_json::from_value(value).unwrap();
-        assert_eq!(
-            reread.ledger_identities, line.ledger_identities,
-            "{earlier}"
-        );
+        assert_eq!(reread.binding, line.binding, "{earlier}");
     }
 }
 

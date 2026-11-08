@@ -2661,19 +2661,19 @@ fn a_post_admits_only_the_ledgers_its_build_bound() {
 fn a_record_without_ledger_identities_reads_as_built_before_binding() {
     // An older record, exactly as it was serialized: no `ledger_identities`.
     let (mut line, _) = batch();
-    line.ledger_identities = None;
+    line.binding = LedgerBinding::bound(None);
     let json = serde_json::to_value(&line).unwrap();
     assert!(json.get("ledger_identities").is_none(), "{json}");
     assert!(json.get("ledger_identities_2").is_none(), "{json}");
     assert!(json.get("ledger_identities_3").is_none(), "{json}");
     assert!(json.get("ledger_identities_4").is_none(), "{json}");
     let reread: ImportLedgerLine = serde_json::from_value(json).unwrap();
-    assert_eq!(reread.ledger_identities, None);
+    assert_eq!(reread.binding, LedgerBinding::Unbound);
     // And a current record keeps them across a round trip.
-    line.ledger_identities = Some(recorded(&[("Cash", "g")]));
+    line.binding = LedgerBinding::bound(Some(recorded(&[("Cash", "g")])));
     let reread: ImportLedgerLine =
         serde_json::from_value(serde_json::to_value(&line).unwrap()).unwrap();
-    assert_eq!(reread.ledger_identities, line.ledger_identities);
+    assert_eq!(reread.binding, line.binding);
 }
 
 /// Every key of a saved batch, by its path in the record, with every optional
@@ -2701,22 +2701,25 @@ fn record_key_paths(value: &Value, at: &str, into: &mut std::collections::BTreeS
 }
 
 /// A saved batch holds exactly these records, and its ledger binding is
-/// written as `ledger_identities_4`, never as the `ledger_identities_3` of the
-/// last release before `cash_projection`, the `ledger_identities_2` that the
-/// releases after 0.4.2 read or the `ledger_identities` that releases 0.3.0 to
-/// 0.4.2 read. Those releases refuse a batch with no binding they can
-/// read and know nothing of the cash-in-hand, bill-wise and statement records,
-/// so this name is what keeps them from posting a batch saved here without
-/// those checks (ADR 0004).
+/// written as `ledger_identities_3`, or as `ledger_identities_4` on a deposit
+/// from the cash box, which alone carries `cash_projection`; never as the
+/// `ledger_identities_2` that the releases after 0.4.2 read or the
+/// `ledger_identities` that releases 0.3.0 to 0.4.2 read. Those releases
+/// refuse a batch with no binding they can read and know nothing of the
+/// cash-in-hand, bill-wise and statement records, so this name is what keeps
+/// them from posting a batch saved here without those checks (ADR 0004).
+/// Releases up to `mcp-v0.7.0` read `_3` and know nothing of the projection,
+/// so `_4` is what keeps them from posting a deposit whose cash book they
+/// cannot check, while every other batch stays one they read.
 ///
 /// `withdrawn_skips` was added in the same unreleased change as `statement`
 /// and the `_3` name, so no release holds `_3` without it.
 ///
 /// If this test stops compiling or its list has to change because a field
 /// was added, removed or renamed, the releases before that change will not
-/// read the new record either: give the binding a new written name again
-/// (`ledger_identities_5`, keeping every earlier name as a `serde` alias) in
-/// the same change, and update the name here. A release that cannot check a
+/// read the new record either: give the binding a new written name again on
+/// the batches that carry the record (keeping every earlier name as a `serde`
+/// alias) in the same change, and update the name here. A release that cannot check a
 /// batch must find no binding in it.
 ///
 /// The destructurings name every field and have no `..`, so a field added to
@@ -2753,20 +2756,26 @@ fn a_saved_batch_holds_exactly_these_records() {
             status: _,
             pre_import_mark,
             vouchers,
-            ledger_identities,
+            binding,
             cash_in_hand_ledgers,
-            cash_projection,
             on_account_approved,
             statement,
             withdrawn_skips: _,
         } = line;
-        if let Some(CashProjectionRecord {
-            ledgers: _,
-            from: _,
-            to: _,
-            book_sha256: _,
-        }) = cash_projection
-        {}
+        let ledgers = match binding {
+            LedgerBinding::Unbound => None,
+            LedgerBinding::Bound(ledgers) => Some(ledgers),
+            LedgerBinding::CashBox {
+                ledgers,
+                projection:
+                    CashProjectionRecord {
+                        ledgers: _,
+                        from: _,
+                        to: _,
+                        book_sha256: _,
+                    },
+            } => Some(ledgers),
+        };
         if let Some(ImportCompanyTuple {
             name: _,
             guid: _,
@@ -2824,7 +2833,7 @@ fn a_saved_batch_holds_exactly_these_records() {
                 } = entry;
             }
         }
-        for bound in ledger_identities.iter().flatten() {
+        for bound in ledgers.into_iter().flatten() {
             let BoundLedger { name: _, guid: _ } = bound;
         }
         for cash in cash_in_hand_ledgers.iter().flatten() {
@@ -2871,7 +2880,7 @@ fn a_saved_batch_holds_exactly_these_records() {
     }
     let (mut line, _) = batch();
     line.amends_batch_id = Some("bridge-00000000-0000-4000-8000-000000000009".into());
-    line.ledger_identities = Some(recorded(&[("Cash", "g")]));
+    line.binding = LedgerBinding::bound(Some(recorded(&[("Cash", "g")])));
     line.cash_in_hand_ledgers =
         serde_json::from_value(json!([{"bridge_txn_id":"journal-test","ledger":"Cash"}])).unwrap();
     line.on_account_approved =
@@ -2913,12 +2922,6 @@ fn a_saved_batch_holds_exactly_these_records() {
         }],
     }));
     line.withdrawn_skips = Some(vec![format!("st-20260901-{}", padn(2, 16))]);
-    line.cash_projection = Some(CashProjectionRecord {
-        ledgers: vec!["Cash".into()],
-        from: TallyDate::parse("20260901").unwrap(),
-        to: TallyDate::parse("20270331").unwrap(),
-        book_sha256: "0".repeat(64),
-    });
     every_field_is_named(&line);
     let written = serde_json::to_value(&line).unwrap();
     let mut paths = std::collections::BTreeSet::new();
@@ -2932,11 +2935,6 @@ fn a_saved_batch_holds_exactly_these_records() {
             "cash_in_hand_ledgers",
             "cash_in_hand_ledgers[].bridge_txn_id",
             "cash_in_hand_ledgers[].ledger",
-            "cash_projection",
-            "cash_projection.book_sha256",
-            "cash_projection.from",
-            "cash_projection.ledgers",
-            "cash_projection.to",
             "company",
             "company.books_from",
             "company.company_number",
@@ -2947,9 +2945,9 @@ fn a_saved_batch_holds_exactly_these_records() {
             "date_to",
             "endpoint_origin",
             "identity_scheme",
-            "ledger_identities_4",
-            "ledger_identities_4[].guid",
-            "ledger_identities_4[].name",
+            "ledger_identities_3",
+            "ledger_identities_3[].guid",
+            "ledger_identities_3[].name",
             "on_account_approved",
             "on_account_approved[].ledger",
             "on_account_approved[].party_digest",
@@ -3012,9 +3010,86 @@ fn a_saved_batch_holds_exactly_these_records() {
         ],
         "{written}"
     );
-    let reread: ImportLedgerLine = serde_json::from_value(written).unwrap();
-    assert_eq!(reread.ledger_identities, line.ledger_identities);
+    let reread: ImportLedgerLine = serde_json::from_value(written.clone()).unwrap();
+    assert_eq!(reread.binding, line.binding);
     assert_eq!(reread.statement, line.statement);
+
+    // A deposit from the cash box: the binding moves to the new name and the
+    // projection is the one record added.
+    line.binding = LedgerBinding::CashBox {
+        ledgers: recorded(&[("Cash", "g")]),
+        projection: CashProjectionRecord {
+            ledgers: vec!["Cash".into()],
+            from: TallyDate::parse("20260901").unwrap(),
+            to: TallyDate::parse("20270331").unwrap(),
+            book_sha256: "0".repeat(64),
+        },
+    };
+    every_field_is_named(&line);
+    let deposit = serde_json::to_value(&line).unwrap();
+    let mut deposit_paths = std::collections::BTreeSet::new();
+    record_key_paths(&deposit, "", &mut deposit_paths);
+    let bound_paths = [
+        "ledger_identities_3",
+        "ledger_identities_3[].guid",
+        "ledger_identities_3[].name",
+    ];
+    let mut expected: std::collections::BTreeSet<String> = paths
+        .iter()
+        .filter(|path| !bound_paths.contains(&path.as_str()))
+        .cloned()
+        .collect();
+    expected.extend(
+        [
+            "cash_projection",
+            "cash_projection.book_sha256",
+            "cash_projection.from",
+            "cash_projection.ledgers",
+            "cash_projection.to",
+            "ledger_identities_4",
+            "ledger_identities_4[].guid",
+            "ledger_identities_4[].name",
+        ]
+        .map(String::from),
+    );
+    assert_eq!(deposit_paths, expected, "{deposit}");
+    let reread: ImportLedgerLine = serde_json::from_value(deposit).unwrap();
+    assert_eq!(reread.binding, line.binding);
+}
+
+/// No build writes a binding whose name disagrees with its projection, and a
+/// line holding one does not parse, so the journal reader refuses it.
+#[test]
+fn a_binding_whose_name_disagrees_with_its_projection_does_not_parse() {
+    let (mut line, _) = batch();
+    line.binding = LedgerBinding::CashBox {
+        ledgers: recorded(&[("Cash", "g")]),
+        projection: CashProjectionRecord {
+            ledgers: vec!["Cash".into()],
+            from: TallyDate::parse("20260901").unwrap(),
+            to: TallyDate::parse("20270331").unwrap(),
+            book_sha256: "0".repeat(64),
+        },
+    };
+    let deposit = serde_json::to_value(&line).unwrap();
+    let ledgers = deposit["ledger_identities_4"].clone();
+    let mut under_the_old_name = deposit.clone();
+    let fields = under_the_old_name.as_object_mut().unwrap();
+    fields.remove("ledger_identities_4");
+    fields.insert("ledger_identities_3".into(), ledgers.clone());
+    let mut without_its_projection = deposit.clone();
+    without_its_projection
+        .as_object_mut()
+        .unwrap()
+        .remove("cash_projection");
+    let mut under_both_names = deposit;
+    under_both_names["ledger_identities_3"] = ledgers;
+    for written in [under_the_old_name, without_its_projection, under_both_names] {
+        assert!(
+            serde_json::from_value::<ImportLedgerLine>(written.clone()).is_err(),
+            "{written}"
+        );
+    }
 }
 
 /// A batch an earlier release saved, as that release journaled it (a captured
@@ -3033,7 +3108,7 @@ fn a_batch_an_earlier_release_saved_keeps_its_ledger_binding() {
         .len();
     assert!(bound > 0);
     let line: ImportLedgerLine = serde_json::from_value(captured).unwrap();
-    assert_eq!(line.ledger_identities.as_ref().map(Vec::len), Some(bound));
+    assert_eq!(line.binding.ledgers().map(<[_]>::len), Some(bound));
     assert_eq!(line.cash_in_hand_ledgers, None);
     assert_eq!(line.on_account_approved, None);
     let rewritten = serde_json::to_value(&line).unwrap();
@@ -3043,11 +3118,11 @@ fn a_batch_an_earlier_release_saved_keeps_its_ledger_binding() {
         "{rewritten}"
     );
     assert!(
-        rewritten.get("ledger_identities_3").is_none(),
+        rewritten.get("ledger_identities_4").is_none(),
         "{rewritten}"
     );
     assert_eq!(
-        rewritten["ledger_identities_4"].as_array().map(Vec::len),
+        rewritten["ledger_identities_3"].as_array().map(Vec::len),
         Some(bound)
     );
 }

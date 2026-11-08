@@ -831,7 +831,7 @@ impl Server {
             // Decidable from the record alone, so refused after the file check
             // and before any Tally request (#239): a batch saved before Bridge
             // recorded its ledgers' GUIDs has nothing to check them against.
-            if line.ledger_identities.is_none() {
+            if line.binding.ledgers().is_none() {
                 return Err(BuildBindingRefusal::Unbound.code().to_string().into());
             }
             // Nor can a batch saved before Bridge recorded the ledgers its bank
@@ -1003,19 +1003,17 @@ impl Server {
             // The same ledgers must still carry the GUIDs the build bound them
             // to (#239): a name alone cannot tell a ledger renamed and replaced
             // under its old name between build and post.
-            admit_build_binding(line.ledger_identities.as_deref(), &ledger_binding).map_err(
-                |refusal| {
-                    if let BuildBindingRefusal::Changed(ledgers) = &refusal {
-                        // Before the list is cut to the few a refusal names.
-                        ledgers_changed = Some(in_batch_order(
-                            ledgers.clone(),
-                            &payload.vouchers,
-                            |ledger| ledger.as_str(),
-                        ));
-                    }
-                    ToolFailure::from(refusal.code().to_string())
-                },
-            )?;
+            admit_build_binding(line.binding.ledgers(), &ledger_binding).map_err(|refusal| {
+                if let BuildBindingRefusal::Changed(ledgers) = &refusal {
+                    // Before the list is cut to the few a refusal names.
+                    ledgers_changed = Some(in_batch_order(
+                        ledgers.clone(),
+                        &payload.vouchers,
+                        |ledger| ledger.as_str(),
+                    ));
+                }
+                ToolFailure::from(refusal.code().to_string())
+            })?;
             // The other ledger of each shown pair joins the binding, so the
             // approval and the queue's GUID check hold it too, and the queue
             // refuses a twin this dialog did not name.
@@ -1100,7 +1098,7 @@ impl Server {
                 // (#1761). This asks before the dialog; the read is repeated
                 // after the answer, and from there to the send nothing watches
                 // the book.
-                if let Some(record) = &line.cash_projection {
+                if let Some(record) = line.binding.cash_projection() {
                     let evidence =
                         Box::pin(self.cash_book_unmoved(&identity, &company.name, record))
                             .await
@@ -1253,7 +1251,7 @@ impl Server {
                         invoice_plan = Some(plan);
                     }
                     // And a deposit's cash book, with the approval unspent (#1761).
-                    if let Some(record) = &line.cash_projection {
+                    if let Some(record) = line.binding.cash_projection() {
                         let evidence =
                             Box::pin(self.cash_book_unmoved(&identity, &company.name, record))
                                 .await

@@ -1854,9 +1854,12 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// day, the last 207 over its old budget. That budget went up by 500, leaving margins of
 /// 329, 179, 170 and 293.
 /// One party's open bills (#2377) add the `open_bills` detail to `outstandings`: 113 bytes, 13
-/// of enum value and 100 of description. With it the lists measured 208,841, 234,991, 237,500
-/// and 242,877 on 8 Nov 2026, the middle two over by 91 and 100. Those two budgets went up by
-/// 500, leaving margins of 59, 409, 400 and 23.
+/// of enum value and 100 of description, to lists that stood at 208,728, 234,878, 237,387 and
+/// 242,764 before it (each measured size below less 113). Those base sizes are 157 bytes above
+/// the sizes in the entry before this one: other changes merged between the two measurements.
+/// With it the lists measured 208,841, 234,991, 237,500 and 242,877 on 8 Nov 2026, the middle
+/// two over by 91 and 100. Those two budgets went up by 500, leaving margins of 59, 409, 400 and
+/// 23.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [208_900, 235_400, 237_900, 242_900];

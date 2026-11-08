@@ -18,6 +18,20 @@ are synthetic. Part A only read; Part B made its parties and bills behind a back
 Tests: `src/native_outstandings/party_bills_tests.rs` parses each answer and ties it to its ledger's closing; the parse
 record keeps what each parser returns.
 
+Confidence, with the markers of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`: PARTIAL for every finding here. Each was
+observed live, with request and answer captured, but on one synthetic book, one release and one edition, in two
+sittings on one day; Bridge's own transport did not send these requests.
+
+Protocol behaviour these captures record, for the declared reference part (P9). Each is PARTIAL on the scope above, and
+none is yet in a declared part of `docs/tally/TALLY_PROTOCOL_REFERENCE.md`, which is a pinned file and is changed in a
+pull request of its own:
+- `Ledger Outstandings` with a `LedgerName` no ledger carries answers HTTP 200, `RESPSTATUS: 1`, `CONTENT-LENGTH: 0`,
+  no `Content-Type` and no body, twice, with a healthy `/status` between (`ledger-outstandings-unknown-party.*`).
+- A ledger made with a trailing space in its name is held without it, and the `List of Ledgers` snapshot names it so
+  (`ledger-snapshot-trailing-space.utf16le.xml`).
+- Of two On Account rows on one party, the second leaves `BILLDUE` and `BILLOVERDUE` empty
+  (`ledger-outstandings-two-on-account.utf16le.xml`).
+
 Not established: Bridge's own transport against a live Tally for this report (curl sent it); a payable party; a party
 with bill-wise off; a foreign-currency ledger; a real bill whose reference is the text `On Account`; a party with no
 open bills; other releases, editions, a client book.
@@ -33,5 +47,5 @@ open bills; other releases, editions, a client book.
 | `ledger-outstandings-ampersand.utf16le.xml` | 846 | `75b96699bb2902437a3eb5040eb857ce3edc26912c7cf641c0b9b3d19a6564c8` | Part B `answers/b5-amp-r-lo.answer.xml` | `L5 Amp & Co` (sent escaped): one bill, -100.00 |
 | `ledger-snapshot-ampersand.utf16le.xml` | 12,822 | `6d8fbc6d496f94c0c653a1ee302bd19d9d4bc0f18e34c2a7cc852208eeb4e6ce` | Part B `answers/b5-amp-snap.answer.xml` | the snapshot after that party was made; it closes at -100.00 |
 | `ledger-outstandings-trailing-space.utf16le.xml` | 852 | `72b8f02a2aae65f8a8125ce66a04d8d4fda1df5e4e9e8bcbd01000a3e8b7a086` | Part B `answers/b5-trail-r-lo.answer.xml` | `L5 Trail ` sent with its trailing space: the party's one bill, -100.00 |
-| `ledger-snapshot-trailing-space.utf16le.xml` | 29,934 | `5f78ea690df025c61bdceaf3b73b568b3fc06c81de67805a5b1df1ca57720123` | Part B `answers/b5-trail-snap.answer.xml` | the snapshot after it: Tally holds the party as `L5 Trail`, without the space |
+| `ledger-snapshot-trailing-space.utf16le.xml` | 29,934 | `5f78ea690df025c61bdceaf3b73b568b3fc06c81de67805a5b1df1ca57720123` | Part B `answers/b5-trail-snap.answer.xml` | the whole book's snapshot after it, 22 ledgers: Tally holds the party as `L5 Trail`, without the space |
 | `ledger-outstandings-two-on-account.utf16le.xml` | 1,636 | `00b538866cc8327666694432575889e787dde4d5c6c496d799d3b1914406477c` | Part B `answers/b6-r-lo.answer.xml` | `L7 Party` with two On Account rows, -100.00 and -50.00; the second leaves BILLDUE and BILLOVERDUE empty |

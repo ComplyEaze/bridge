@@ -27,7 +27,7 @@ Confidence markers follow `docs/tally/TALLY_PROTOCOL_REFERENCE.md`.
 | Claude Code in the Code tab of the Claude desktop app, default settings | 2.1.284, macOS | 150 (earlier server, 30 Sep) | none up to 150 | not reached | n/a: no call was abandoned | not tested | partial, one run, run by hand |
 | Claude Code in the Code tab of the Claude desktop app, default settings | desktop app 4.4212.0.0 with Claude Code 2.1.309, Windows | none (90 s was cut) | 90 s call cut at 60.0 s, plain and with progress every 10 s | `Error: Request timed out` | received (reason `SdkError: Request timed out`) | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
 | Claude Desktop (chat app) | macOS | not measured | | | | | |
-| Claude Desktop (chat app) | 4.4212.0.0, Windows | none (60 s was cut) | 60 s call cut at about 60 s, plain and with progress every 10 s | an error that the device did not respond within 60 s | not received: the server sent its result 3 ms and 10 ms after the error | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
+| Claude Desktop (chat app) | 4.4212.0.0, Windows | none (60 s was cut) | 60 s call cut at about 60 s, plain and with progress every 10 s | an error that the device did not respond within 60 s | none logged: the server finished at 60.003 s and 60.010 s after receiving each call | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
 | a third-party client | | not measured | | | | | |
 
 **Claude Code, details.** Each call carried `_meta.progressToken` (equal to the request id) and
@@ -48,17 +48,25 @@ repository, with the same one-tool shape; their logs are not kept here, and the 
 from the #703 thread (comments of 30 Sep, 09:13 and 09:16 UTC).
 
 **Claude desktop app on Windows, details** (#2119; answers on `lab/2119-h-answers` at `dfaf2737`).
-Both tabs end one tool call at about 60 s, and neither sent a `progressToken` on any of the four
-calls, so no progress was sent and progress cannot extend a call there. The Code tab sends
-`notifications/cancelled` at 60 s. The chat app's wait for the computer running the server ends at
-60 s without a cancellation, and the app's own server log holds no line for either call. The
-90 s and longer chat calls were not sent, because the climb stops at the first call cut. A chat
-call just under 60 s is not measured, and whether the chat app's timer runs from the call or from
-the answer to its tool prompt is not told apart. One sitting, one PC, one app version.
+Both tabs end one tool call at about 60 s. Neither sent a `progressToken` on any of the four
+calls, so the server could send no progress, and whether progress would extend a call there cannot
+be tested (inferred: without a token it cannot). The Code tab sends `notifications/cancelled` at
+60 s. On the chat app, no cancellation was logged, and the app's own server log holds no line for
+either call. The 90 s and longer chat calls were not sent, because the climb stops at the first call
+cut.
 
-This does not explain the abandonment at about 60 s that #703 records on another setup: the
-likeliest explanation is a configured timeout or an older build (unverified; nothing records which
-it was). The open rows of the table are the next hosts to measure.
+Limits:
+- one sitting, one PC, one app version;
+- the Code tab was called only at N = 90, and the chat app only at N = 60, so a call just under 60 s
+  is not measured on either tab;
+- the chat calls came from new chats typed by a person, who also answered each tool prompt, and
+  whether the chat app's timer runs from the call or from that answer is not told apart;
+- a chat call counts as cut by the app's error text and the absence of a cancellation; no client
+  clock recorded when the app gave up.
+
+The abandonment at about 60 s that #703 records on another setup is not explained by the macOS
+rows above. A configured timeout, an older build, or a default like the Windows one measured here
+could each account for it (unverified; nothing records which host or settings it was). The open rows of the table are the next hosts to measure.
 
 ## Measuring a host
 

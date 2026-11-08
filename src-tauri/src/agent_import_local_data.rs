@@ -575,7 +575,10 @@ fn read_journal_once(path: &Path) -> (Journal, Option<usize>) {
     let line = std::cell::Cell::new(0);
     match super::ledger::settlement_at(std::io::BufReader::new(file), &line) {
         Ok(settlement) => (Journal::Read(settlement), None),
-        Err(reason) if reason == "import_ledger_invalid" => {
+        Err(reason)
+            if reason == "import_ledger_invalid"
+                || reason == super::IMPORT_LEDGER_BINDING_MISMATCH =>
+        {
             (Journal::NotRead(JOURNAL_INVALID), Some(line.get()))
         }
         Err(_) => (Journal::NotRead(JOURNAL_READ_FAILED), None),

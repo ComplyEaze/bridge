@@ -3058,7 +3058,8 @@ fn a_saved_batch_holds_exactly_these_records() {
 }
 
 /// No build writes a binding whose name disagrees with its projection, and a
-/// line holding one does not parse, so the journal reader refuses it.
+/// line holding one does not parse. The journal reader refuses it by its own
+/// code, so it is told apart from a line that does not parse at all.
 #[test]
 fn a_binding_whose_name_disagrees_with_its_projection_does_not_parse() {
     let (mut line, _) = batch();
@@ -3084,9 +3085,32 @@ fn a_binding_whose_name_disagrees_with_its_projection_does_not_parse() {
         .remove("cash_projection");
     let mut under_both_names = deposit;
     under_both_names["ledger_identities_3"] = ledgers;
-    for written in [under_the_old_name, without_its_projection, under_both_names] {
+    for (written, mismatch) in [
+        (
+            under_the_old_name,
+            LedgerBindingMismatch::ProjectionWithoutName,
+        ),
+        (
+            without_its_projection,
+            LedgerBindingMismatch::NameWithoutProjection,
+        ),
+        (under_both_names, LedgerBindingMismatch::TwoNames),
+    ] {
         assert!(
             serde_json::from_value::<ImportLedgerLine>(written.clone()).is_err(),
+            "{written}"
+        );
+        assert_eq!(
+            ImportLedgerLine::from_journal(written.clone()).map(drop),
+            Err(BatchLineRefusal::Binding(mismatch)),
+            "{written}"
+        );
+        // the journal reader refuses the whole history on it, by its own code
+        let text = format!("{written}\n");
+        assert_eq!(
+            super::super::ledger::read_snapshot(std::io::Cursor::new(text.as_bytes()), None)
+                .map(drop),
+            Err(IMPORT_LEDGER_BINDING_MISMATCH.to_string()),
             "{written}"
         );
     }

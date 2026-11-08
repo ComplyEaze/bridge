@@ -856,7 +856,8 @@ const FOLDED_TWIN_NEXT_STEP: &str = "No file was written. Each ledger in ledger_
 /// Every earlier name is still read, for a batch one of them saved. A line
 /// holding two names, `_4` without a projection, or a projection without
 /// `_4` does not parse: no build writes one, and the journal reader refuses
-/// the whole history on a record it cannot parse. When a record is added to
+/// the whole history on it, as `import_ledger_binding_mismatch` rather than
+/// the `import_ledger_invalid` of a line it cannot parse. When a record is added to
 /// or removed from a saved batch, give the binding a new written name on the
 /// batches that carry it and keep every earlier name as an alias:
 /// `a_saved_batch_holds_exactly_these_records` stops compiling, or fails,
@@ -935,8 +936,23 @@ struct LedgerBindingRecord {
     cash_projection: Option<cash_projection::CashProjectionRecord>,
 }
 
+/// The journal's refusal of a batch line whose binding no build writes, apart
+/// from `import_ledger_invalid` for a line that does not parse.
+const IMPORT_LEDGER_BINDING_MISMATCH: &str = "import_ledger_binding_mismatch";
+
+/// How a written binding disagrees with the line's projection.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+enum LedgerBindingMismatch {
+    #[error("the binding is written under `ledger_identities_4` and an earlier name")]
+    TwoNames,
+    #[error("`ledger_identities_4` is written without a `cash_projection`")]
+    NameWithoutProjection,
+    #[error("a `cash_projection` is written without `ledger_identities_4`")]
+    ProjectionWithoutName,
+}
+
 impl TryFrom<LedgerBindingRecord> for LedgerBinding {
-    type Error = &'static str;
+    type Error = LedgerBindingMismatch;
 
     fn try_from(record: LedgerBindingRecord) -> Result<Self, Self::Error> {
         match (record.bound, record.cash_box, record.cash_projection) {
@@ -946,8 +962,40 @@ impl TryFrom<LedgerBindingRecord> for LedgerBinding {
                 ledgers,
                 projection,
             }),
-            _ => Err("a ledger binding no build writes"),
+            (Some(_), Some(_), _) => Err(LedgerBindingMismatch::TwoNames),
+            (None, Some(_), None) => Err(LedgerBindingMismatch::NameWithoutProjection),
+            (_, None, Some(_)) => Err(LedgerBindingMismatch::ProjectionWithoutName),
         }
+    }
+}
+
+/// Why the journal reader refuses a batch line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum BatchLineRefusal {
+    /// Its binding is one no build writes.
+    Binding(LedgerBindingMismatch),
+    /// It does not parse as a batch line.
+    Unreadable,
+}
+
+impl BatchLineRefusal {
+    fn code(self) -> &'static str {
+        match self {
+            Self::Binding(_) => IMPORT_LEDGER_BINDING_MISMATCH,
+            Self::Unreadable => "import_ledger_invalid",
+        }
+    }
+}
+
+impl ImportLedgerLine {
+    /// A batch line as the journal holds it. The binding is read first, so a
+    /// name that disagrees with the projection is told apart from a line that
+    /// does not parse; two earlier names for it do not parse.
+    fn from_journal(value: Value) -> Result<Self, BatchLineRefusal> {
+        let record =
+            LedgerBindingRecord::deserialize(&value).map_err(|_| BatchLineRefusal::Unreadable)?;
+        LedgerBinding::try_from(record).map_err(BatchLineRefusal::Binding)?;
+        serde_json::from_value(value).map_err(|_| BatchLineRefusal::Unreadable)
     }
 }
 

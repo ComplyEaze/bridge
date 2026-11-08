@@ -1,0 +1,1331 @@
+{
+  "file": "src-tauri/src/agent_import_amount.rs",
+  "base_commit": "88b78c97",
+  "about": "Every mutant was applied to the file as it is at base_commit, which the change that adds this record does not change: it adds only tests, to the test module of the file's own tests (agent_import_amount_tests.rs). killer is the first test nextest reported failing (it stops at the first failure, with tests running in parallel, so another failing test may be reported first on another run). killer_at says where that test function exists: base, or this_commit for a test the change that adds this record adds. A test that exists at base may still kill only through cases that change adds to it: before_this_change gives the verdict at base where it differs. Each mutant that survived its filtered run at base was run again at base against every bridge test (the whole_set run, with no filter and nextest's --no-fail-fast, the approval stand-in example built) before it was called a survivor. Every survivor left at this_commit is listed in accepted_survivors with its reason: an equivalent one is marked equivalent. A hand-written mutant's mutation id is the first 32 hex digits of the SHA-256 of its edits in order, each as its from text, a NUL byte, its to text and a NUL byte, in UTF-8. Each edit's from text occurs exactly once in the file at base_commit, and applied_to names the file it was applied to. A65 is two edits (each of signed_lexeme and signed_canonical given the other's body); each from text is the other's to text, so they are applied together to the text at base_commit, not one after the other. A tool mutant is named as cargo-mutants --list names it, by line and column. A mutant whose edit does not compile is recorded as unviable with the compiler's reason, not as caught. The file has no platform-specific code; every run was made on macOS. The hand-written mutants (A01 to A79) change, one at a time: in parse, the split (at ',' instead of '.'; at the last dot with rsplit_once; a text with no dot read as (text, \"\") and as two empty parts), the digits closure (all as any; is_ascii_digit as is_ascii_alphanumeric, is_ascii_hexdigit and is_ascii; negated; the same test over chars; over chars with is_numeric; always true; always false), the four-part condition (each of its four conditions dropped and each negated; each of its three || as && and all three together; fractional.len() != 2 as < 2, > 2, != 1, != 3, <= 2 and >= 2 and counted in characters; the whole condition never true and always true), the ExactDecimal::parse line (its error taken as zero; the lexeme kept as the whole part only, rebuilt from the two parts and with its leading zeros trimmed; its error falling back to parsing the whole part alone), the is_zero test (dropped, negated, always true), the canonical form (the lexeme itself; the lexeme added to itself; zero subtracted instead of added; zero alone; the add error taken as the lexeme) and the struct built (the lexeme field holding the canonical form, the canonical field holding the lexeme, the two swapped); as_str returning the canonical form and an empty string; canonical returning the received text and an empty string; decimal returning the canonical form; signed (the Dr and Cr arms swapped; a debit with no sign, with a plus sign and with the minus after the text; a credit with a minus sign, with a plus sign and empty); signed_lexeme signing the canonical form, signed_canonical signing the received text, and the two swapped; Display writing the canonical form and nothing; Serialize writing the canonical form and an empty string; Deserialize trimming the text, skipping the amount rules (ExactDecimal::parse alone) and reading every text as 12.50; PayloadAmount for String trimming the text, refusing every text and reading every text as 12.50; PayloadAmount for ImportAmount re-parsed from its canonical form and from its received text, refusing every amount and reading every amount as 12.50. Not mutated: the derive lists, the items' visibility, the doc comments and the comment in parse, the test module's attribute and path, the generic bounds of PayloadAmount, and the error text of NotAnImportAmount (its wording and the 256 it names: no test asserts wording; the refusal is held as the typed value NotAnImportAmount); every edit above is one change, so none of the lists above is every possible change to the line it names. 20 edits (A05, A06, A09, A16, A17, A22, A23, A26, A34, A38, A39, A44, A45, A46, A47, A52, A55, A60, A71 and A73) were changed to an equivalent edit of the same kind (a neighbouring spelling of the same change: De Morgan's form of a negation, the operands of an && written the other way round or in brackets, == false for a negation, false written for a dropped condition, !false for true, a method called through its path, the same replacement string written another way, a block or an or_else for an unwrap_or_else), because the first spelling gave a mutation id holding a run of eight or more decimal digits, which the privacy scan refuses; A22, A23, A45 and A73 needed a second or third spelling. Of the 79, 63 were caught at base; 16 survived the filtered run and the whole_set run: 15 are equivalent (each changes a check that ExactDecimal::parse, which runs next on the same text, repeats, or changes how an answer is reached without changing it; the reason is in accepted_survivors, and the premises on ExactDecimal and on parse are held by tests this change adds) and one, A70 (Deserialize trimming the text), is killed by a test this change adds. In every run the file was byte for byte as at base_commit, checked after each restore (and, for the tool, after the run); the restore was a copy, never a rename. In the tool, hand and whole_set runs the test modules were as at base_commit; in survivors_again they are as this change leaves them.",
+  "runs": [
+    {
+      "run": "tool",
+      "tests_at": "base",
+      "tests_matching_filter": 1969,
+      "tool": "cargo-mutants 27.1.0",
+      "command": "cargo mutants --in-place -p bridge --file src/agent_import_amount.rs --test-tool nextest --cargo-arg=--locked --timeout 900 --no-shuffle -- -E 'test(/agent::agent_import::/) | test(/agent::statement_tie_out::/)'",
+      "time": "2026-11-06T10:15:05Z",
+      "tree": "base_commit"
+    },
+    {
+      "run": "hand",
+      "tests_at": "base",
+      "tests_matching_filter": 1969,
+      "command": "each mutant's edits applied as exact text, then cargo nextest run --locked -p bridge -E 'test(/agent::agent_import::/) | test(/agent::statement_tie_out::/)'",
+      "tree": "base_commit"
+    },
+    {
+      "run": "whole_set",
+      "tests_at": "base",
+      "tests_run": 4931,
+      "command": "as the hand run with every bridge test (cargo nextest run --locked -p bridge --no-fail-fast -E 'all()'), for the 16 hand-written mutants the filtered run missed (the tool's run had no mutant missed); the unmutated baseline passed all 4931",
+      "tree": "base_commit"
+    },
+    {
+      "run": "survivors_again",
+      "tests_at": "this_commit",
+      "tests_matching_filter": 12,
+      "command": "as the hand run with -E 'test(/agent::agent_import::amount::/)', for the 16 hand-written mutants that survived the whole_set run",
+      "tree": "base_commit with the tests this change adds"
+    }
+  ],
+  "summary": {
+    "tool": {
+      "caught": 17,
+      "missed": 0,
+      "unviable": 6
+    },
+    "hand": {
+      "caught": 64,
+      "missed": 15,
+      "unviable": 0
+    },
+    "survived_at_base": {
+      "tool": 0,
+      "hand": 16
+    },
+    "equivalent": {
+      "tool": 0,
+      "hand": 15
+    },
+    "accepted_not_equivalent": {
+      "hand": 0
+    }
+  },
+  "tool_results": {
+    "28:9 replace ImportAmount::parse -> Result<Self, NotAnImportAmount> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ImportAmount: std::default::Default` is not satisfied"
+    },
+    "30:72 replace || with && in ImportAmount::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "30:47 replace || with && in ImportAmount::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "30:29 replace || with && in ImportAmount::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "30:32 delete ! in ImportAmount::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+      "killer_at": "base"
+    },
+    "30:67 replace != with == in ImportAmount::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_binds_every_voucher_and_refuses_a_partial_read",
+      "killer_at": "base"
+    },
+    "30:75 delete ! in ImportAmount::parse": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more",
+      "killer_at": "base"
+    },
+    "47:9 replace ImportAmount::as_str -> &str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "47:9 replace ImportAmount::as_str -> &str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "53:9 replace ImportAmount::canonical -> &str with \"\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "53:9 replace ImportAmount::canonical -> &str with \"xyzzy\"": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "58:9 replace ImportAmount::decimal -> &ExactDecimal with Box::leak(Box::new(Default::default()))": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `bridge_tally_core::ExactDecimal: std::default::Default` is not satisfied"
+    },
+    "64:9 replace ImportAmount::signed_lexeme -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "64:9 replace ImportAmount::signed_lexeme -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "70:9 replace ImportAmount::signed_canonical -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "70:9 replace ImportAmount::signed_canonical -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "74:9 replace ImportAmount::signed -> String with String::new()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "74:9 replace ImportAmount::signed -> String with \"xyzzy\".into()": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "83:9 replace <impl fmt::Display for ImportAmount>::fmt -> fmt::Result with Ok(Default::default())": {
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::the_received_text_and_the_canonical_form_are_both_held",
+      "killer_at": "base"
+    },
+    "89:9 replace <impl Serialize for ImportAmount>::serialize -> Result<S::Ok, S::Error> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `<S as Serializer>::Ok: std::default::Default` is not satisfied"
+    },
+    "95:9 replace <impl Deserialize<'de> for ImportAmount>::deserialize -> Result<Self, D::Error> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ImportAmount: std::default::Default` is not satisfied"
+    },
+    "108:9 replace <impl PayloadAmount for String>::import_amount -> Result<ImportAmount, NotAnImportAmount> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ImportAmount: std::default::Default` is not satisfied"
+    },
+    "114:9 replace <impl PayloadAmount for ImportAmount>::import_amount -> Result<ImportAmount, NotAnImportAmount> with Ok(Default::default())": {
+      "verdict": "unviable",
+      "reason": "does not compile: the trait bound `ImportAmount: std::default::Default` is not satisfied"
+    }
+  },
+  "hand_mutations": {
+    "A01": {
+      "what": "parse: the amount split at ',' instead of '.'",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "text.split_once('.').ok_or(NotAnImportAmount)?;",
+          "to": "text.split_once(',').ok_or(NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "38da235ed33f7470b5fa2c62fcfe6103",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+      "killer_at": "base"
+    },
+    "A02": {
+      "what": "parse: the amount split at the last '.' (rsplit_once)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "text.split_once('.').ok_or(NotAnImportAmount)?;",
+          "to": "text.rsplit_once('.').ok_or(NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "4714bfc166d0c416e9fe8d07ae056196",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A03": {
+      "what": "parse: text with no '.' taken as (text, \"\") instead of refused at the split (ok_or -> unwrap_or)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "text.split_once('.').ok_or(NotAnImportAmount)?;",
+          "to": "text.split_once('.').unwrap_or((text, \"\"));"
+        }
+      ],
+      "mutation": "65dd4d04816ccfbe291e55cf305db889",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A04": {
+      "what": "parse: text with no '.' taken as two empty parts instead of refused at the split",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "text.split_once('.').ok_or(NotAnImportAmount)?;",
+          "to": "text.split_once('.').unwrap_or((\"\", \"\"));"
+        }
+      ],
+      "mutation": "b6fac4d0757cd42fdf7f739368f8eb12",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A05": {
+      "what": "digits: all -> any",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "!part.bytes().all(|byte| !byte.is_ascii_digit())"
+        }
+      ],
+      "mutation": "e6be91ffa49b2053c717509de53cf08b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_amount_is_written_as_received_and_read_by_parse",
+      "killer_at": "base"
+    },
+    "A06": {
+      "what": "digits: is_ascii_digit -> is_ascii_alphanumeric",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.bytes().all(|byte| byte.is_ascii_alphabetic() || byte.is_ascii_digit())"
+        }
+      ],
+      "mutation": "82db4592ef1544e77c079fef78858dea",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A07": {
+      "what": "digits: is_ascii_digit -> is_ascii_hexdigit",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.bytes().all(|byte| byte.is_ascii_hexdigit())"
+        }
+      ],
+      "mutation": "4effb68129bebcefe67e97698d00431b",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A08": {
+      "what": "digits: is_ascii_digit -> is_ascii",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.bytes().all(|byte| byte.is_ascii())"
+        }
+      ],
+      "mutation": "6e5007858edd4943ec4703573c535280",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A09": {
+      "what": "digits: is_ascii_digit negated",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.bytes().all(|byte| byte.is_ascii_digit() == false)"
+        }
+      ],
+      "mutation": "13fc7e3821cb8af6809c066f99ae18d2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+      "killer_at": "base"
+    },
+    "A10": {
+      "what": "digits: bytes -> chars (same test on characters)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.chars().all(|byte| byte.is_ascii_digit())"
+        }
+      ],
+      "mutation": "d095057e77cabc6bcad180c21ae63966",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A11": {
+      "what": "digits: bytes -> chars and is_ascii_digit -> is_numeric (Unicode digits and numerals)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.chars().all(|byte| byte.is_numeric())"
+        }
+      ],
+      "mutation": "64e98899ab6dd5903357dc0ee477ba09",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A12": {
+      "what": "digits: every part is digits (closure always true)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.bytes().all(|_| true)"
+        }
+      ],
+      "mutation": "9181fe21982d97a02d6e0ab7a2b171fe",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A13": {
+      "what": "digits: no part is digits (closure always false)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "part.bytes().all(|byte| byte.is_ascii_digit())",
+          "to": "part.bytes().all(|_| false)"
+        }
+      ],
+      "mutation": "bc7e864db636362ae3bcf0a8572cbc65",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+      "killer_at": "base"
+    },
+    "A14": {
+      "what": "parse: the whole.is_empty() condition dropped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if !digits(whole) || fractional.len() != 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "8c7524a23e81fe9b5d31d2161bb74831",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A15": {
+      "what": "parse: the !digits(whole) condition dropped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || fractional.len() != 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "928bae31053b78f6ea615c60650cb156",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_amount_is_written_as_received_and_read_by_parse",
+      "killer_at": "base"
+    },
+    "A16": {
+      "what": "parse: the fractional.len() != 2 condition dropped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || false || !digits(fractional) {"
+        }
+      ],
+      "mutation": "fa3c5f0fc18fbb2615a82d33b09b8c2e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A17": {
+      "what": "parse: the !digits(fractional) condition dropped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || false {"
+        }
+      ],
+      "mutation": "b7b74f1d4bc00fb8daf838e2fd89ffe1",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A18": {
+      "what": "parse: whole.is_empty() negated",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if !whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "d8b99d6ec88d7af8f2d3672de828b918",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+      "killer_at": "base"
+    },
+    "A19": {
+      "what": "parse: !digits(whole) negated",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || digits(whole) || fractional.len() != 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "1471dd561484c7009ee1a4c388d2ab89",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_kind_whose_verdict_is_pending_reads_pending",
+      "killer_at": "base"
+    },
+    "A20": {
+      "what": "parse: fractional.len() != 2 negated (== 2)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() == 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "5e37edf2e660a85353c296e7be6b6b4a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_of_three_byte_names_is_refused_past_7000_bytes",
+      "killer_at": "base"
+    },
+    "A21": {
+      "what": "parse: !digits(fractional) negated",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || digits(fractional) {"
+        }
+      ],
+      "mutation": "a3b376f68db65eb14ebf20b2376c57a6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_of_three_byte_names_is_refused_past_7000_bytes",
+      "killer_at": "base"
+    },
+    "A22": {
+      "what": "parse: the first || of the condition as &&",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if (whole.is_empty() && !digits(whole)) || fractional.len() != 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "be89fa73fa917ea472d8633e4b1f1eb9",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A23": {
+      "what": "parse: the second || of the condition as &&",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || (fractional.len() != 2 && !digits(whole)) || !digits(fractional) {"
+        }
+      ],
+      "mutation": "e7f9990d5d76c8c65b40bd24f294b89d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A24": {
+      "what": "parse: the third || of the condition as &&",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 && !digits(fractional) {"
+        }
+      ],
+      "mutation": "7fb8da258226ddfaf3c3945ac7d26f6e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A25": {
+      "what": "parse: all three || of the condition as &&",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() && !digits(whole) && fractional.len() != 2 && !digits(fractional) {"
+        }
+      ],
+      "mutation": "dce36d3e290bb279b78b5e1e7c0fe2be",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A26": {
+      "what": "parse: fractional.len() != 2 as < 2",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || 2 > fractional.len() || !digits(fractional) {"
+        }
+      ],
+      "mutation": "41751cb5b67b20de9779e32fca56187d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A27": {
+      "what": "parse: fractional.len() != 2 as > 2",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() > 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "1e79ba3a421c7159b1f8ee9be04f7416",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A28": {
+      "what": "parse: fractional.len() != 2 as != 1",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() != 1 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "23e9afb61dcea04d293cb1bdae31b91d",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more",
+      "killer_at": "base"
+    },
+    "A29": {
+      "what": "parse: fractional.len() != 2 as != 3",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() != 3 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "73a04d9c926a606d0b11cfe94984f7d3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_bound_to_another_batch_company_guid_or_field_list_reads_stale",
+      "killer_at": "base"
+    },
+    "A30": {
+      "what": "parse: fractional.len() != 2 as <= 2",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() <= 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "50e3b39e6aff11dde151260e68a8de82",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_shows_a_line_break_at_the_end_of_a_ledger_name",
+      "killer_at": "base"
+    },
+    "A31": {
+      "what": "parse: fractional.len() != 2 as >= 2",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.len() >= 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "8113fd144bdc7cf2675c736b8720b0c1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+      "killer_at": "base"
+    },
+    "A32": {
+      "what": "parse: fractional.len() != 2 counted in characters, not bytes",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if whole.is_empty() || !digits(whole) || fractional.chars().count() != 2 || !digits(fractional) {"
+        }
+      ],
+      "mutation": "191968b3a022f62af80672b1a228f10a",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A33": {
+      "what": "parse: the four-part condition never true",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "4cc4643e32e6ff1ec5b24a90ec0d8e9b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_signed_or_misshapen_amount_is_not_an_import_amount",
+      "killer_at": "base"
+    },
+    "A34": {
+      "what": "parse: the four-part condition always true",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if whole.is_empty() || !digits(whole) || fractional.len() != 2 || !digits(fractional) {",
+          "to": "if !false {"
+        }
+      ],
+      "mutation": "093958e8a131083d8fe49bd9ccfea7f0",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more",
+      "killer_at": "base"
+    },
+    "A35": {
+      "what": "parse: an ExactDecimal::parse error taken as zero (unwrap_or_else zero)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ExactDecimal::parse(text.to_string()).map_err(|_| NotAnImportAmount)?;",
+          "to": "ExactDecimal::parse(text.to_string()).unwrap_or_else(|_| ExactDecimal::zero());"
+        }
+      ],
+      "mutation": "5c3d17ece442a73c085bcf857e76ccee",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A36": {
+      "what": "parse: the lexeme kept is the whole part only",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ExactDecimal::parse(text.to_string()).map_err(|_| NotAnImportAmount)?;",
+          "to": "ExactDecimal::parse(whole.to_string()).map_err(|_| NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "0ef69fd31610b4948c749ae03eea8643",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A37": {
+      "what": "parse: the lexeme kept is rebuilt from the two parts",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ExactDecimal::parse(text.to_string()).map_err(|_| NotAnImportAmount)?;",
+          "to": "ExactDecimal::parse(format!(\"{whole}.{fractional}\")).map_err(|_| NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "6406efcaad4d0221034a2a14f8ba9ac2",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A38": {
+      "what": "parse: the lexeme kept has its leading zeros trimmed",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ExactDecimal::parse(text.to_string()).map_err(|_| NotAnImportAmount)?;",
+          "to": "ExactDecimal::parse(text.trim_start_matches(\"0\").to_string()).map_err(|_| NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "53d7c68f5fa8abd5fac206c477b37aa2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A39": {
+      "what": "parse: an ExactDecimal::parse error falls back to parsing the whole part alone",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ExactDecimal::parse(text.to_string()).map_err(|_| NotAnImportAmount)?;",
+          "to": "ExactDecimal::parse(text.to_string()).or_else(|_| ExactDecimal::parse(String::from(whole))).map_err(|_| NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "9d8ca75892aa9625d21046b3771a48e5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_import_amount_is_a_positive_two_decimal_number_in_at_most_256_bytes",
+      "killer_at": "base"
+    },
+    "A40": {
+      "what": "parse: the is_zero refusal dropped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if lexeme.is_zero() {",
+          "to": "if false {"
+        }
+      ],
+      "mutation": "1b468113edd48c4de5b6331d135d20f2",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_import_amount_is_a_positive_two_decimal_number_in_at_most_256_bytes",
+      "killer_at": "base"
+    },
+    "A41": {
+      "what": "parse: the is_zero test negated",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if lexeme.is_zero() {",
+          "to": "if !lexeme.is_zero() {"
+        }
+      ],
+      "mutation": "5d909c77a0703caffa82dd7d0b24e872",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_covers_only_its_own_doubt_and_names_a_changed_voucher",
+      "killer_at": "base"
+    },
+    "A42": {
+      "what": "parse: every amount refused as zero",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "if lexeme.is_zero() {",
+          "to": "if true {"
+        }
+      ],
+      "mutation": "625fbf4f5986a5cbf1c31268d9a29068",
+      "verdict": "caught",
+      "killer": "agent::agent_import::ack::tests::a_batch_review_line_fits_at_exactly_100_characters_and_not_one_more",
+      "killer_at": "base"
+    },
+    "A43": {
+      "what": "parse: the canonical form is the lexeme (no checked_add)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "let canonical = lexeme\n            .checked_add(&ExactDecimal::zero())\n            .map_err(|_| NotAnImportAmount)?;",
+          "to": "let canonical = lexeme.clone();"
+        }
+      ],
+      "mutation": "30135e42c4b8535ff5e47fd45c94571c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A44": {
+      "what": "parse: the canonical form adds the lexeme to itself",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "let canonical = lexeme\n            .checked_add(&ExactDecimal::zero())\n            .map_err(|_| NotAnImportAmount)?;",
+          "to": "let canonical = lexeme\n            .checked_add(&lexeme.clone())\n            .map_err(|_| NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "eaa43f99d0fb86a631394c6e69463a1c",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A45": {
+      "what": "parse: the canonical form is lexeme minus zero (checked_subtract)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "let canonical = lexeme\n            .checked_add(&ExactDecimal::zero())\n            .map_err(|_| NotAnImportAmount)?;",
+          "to": "let canonical = ExactDecimal::checked_subtract(&lexeme, &ExactDecimal::zero())\n            .map_err(|_error| NotAnImportAmount)?;"
+        }
+      ],
+      "mutation": "a93e1dddfb8c4c43f292e6028caa7f88",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A46": {
+      "what": "parse: the canonical form is zero plus zero",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "let canonical = lexeme\n            .checked_add(&ExactDecimal::zero())\n            .map_err(|_| NotAnImportAmount)?;",
+          "to": "let canonical = ExactDecimal::zero().clone();"
+        }
+      ],
+      "mutation": "a73afc76068e1e2502dc507fbdc989d1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A47": {
+      "what": "parse: a checked_add error taken as the lexeme (map_err -> unwrap_or_else)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": ".checked_add(&ExactDecimal::zero())\n            .map_err(|_| NotAnImportAmount)?;",
+          "to": ".checked_add(&ExactDecimal::zero())\n            .or_else(|_| Ok::<_, NotAnImportAmount>(lexeme.clone()))?;"
+        }
+      ],
+      "mutation": "eb0391938bf5991394e95b695ae62c22",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A48": {
+      "what": "parse: the lexeme field holds the canonical form",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Ok(Self { lexeme, canonical })",
+          "to": "Ok(Self { lexeme: canonical.clone(), canonical })"
+        }
+      ],
+      "mutation": "f8b835b217ad7be05fedac4ead17191f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A49": {
+      "what": "parse: the canonical field holds the lexeme",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Ok(Self { lexeme, canonical })",
+          "to": "Ok(Self { canonical: lexeme.clone(), lexeme })"
+        }
+      ],
+      "mutation": "fd1e7fdc44ad8d8c3e4b17bf87ded8f8",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A50": {
+      "what": "parse: the two fields swapped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Ok(Self { lexeme, canonical })",
+          "to": "Ok(Self { lexeme: canonical, canonical: lexeme })"
+        }
+      ],
+      "mutation": "d8763a3a8c1c66f50c0e2465dc929c27",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A51": {
+      "what": "as_str: returns the canonical form",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "self.lexeme.as_str()\n    }",
+          "to": "self.canonical.as_str()\n    }"
+        }
+      ],
+      "mutation": "87542ce4cfc91b67582b956eacf92405",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A52": {
+      "what": "canonical: returns the received text",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "self.canonical.as_str()\n    }",
+          "to": "self.as_str()\n    }"
+        }
+      ],
+      "mutation": "18c4aeeeeee19d9852838a3d36eb7eb1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A53": {
+      "what": "decimal: returns the canonical form",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "pub(super) fn decimal(&self) -> &ExactDecimal {\n        &self.lexeme",
+          "to": "pub(super) fn decimal(&self) -> &ExactDecimal {\n        &self.canonical"
+        }
+      ],
+      "mutation": "bfacefd473182e50146c22ae27477f3e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::the_received_text_and_the_canonical_form_are_both_held",
+      "killer_at": "base"
+    },
+    "A54": {
+      "what": "as_str: returns an empty string",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "self.lexeme.as_str()\n    }",
+          "to": "\"\"\n    }"
+        }
+      ],
+      "mutation": "40d9c89e0414285bacfd75e9b7627d84",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A55": {
+      "what": "canonical: returns an empty string",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "self.canonical.as_str()\n    }",
+          "to": "<&str>::default()\n    }"
+        }
+      ],
+      "mutation": "1caa38d563d13d582a92cb76d0df9632",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A56": {
+      "what": "signed: the Dr and Cr arms swapped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "EntrySide::Dr => format!(\"-{text}\"),\n            EntrySide::Cr => text.to_string(),",
+          "to": "EntrySide::Dr => text.to_string(),\n            EntrySide::Cr => format!(\"-{text}\"),"
+        }
+      ],
+      "mutation": "48c33e60b977acb6e7954c8008d4365e",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A57": {
+      "what": "signed: a debit has no sign",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "EntrySide::Dr => format!(\"-{text}\"),",
+          "to": "EntrySide::Dr => text.to_string(),"
+        }
+      ],
+      "mutation": "0d70c6020c8a3076eea50e90c785f5f7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A58": {
+      "what": "signed: a debit has a plus sign",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "EntrySide::Dr => format!(\"-{text}\"),",
+          "to": "EntrySide::Dr => format!(\"+{text}\"),"
+        }
+      ],
+      "mutation": "25ae1386cee49f687ea7deb058f30504",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A59": {
+      "what": "signed: a debit has the minus sign after the text",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "EntrySide::Dr => format!(\"-{text}\"),",
+          "to": "EntrySide::Dr => format!(\"{text}-\"),"
+        }
+      ],
+      "mutation": "bddb1965ea7f1dc48e182a8b62d87b9f",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A60": {
+      "what": "signed: a credit has a minus sign",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "EntrySide::Cr => text.to_string(),",
+          "to": "EntrySide::Cr => \"-\".to_string() + text,"
+        }
+      ],
+      "mutation": "a774b7a663fd011afa192dcd52fc60a5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A61": {
+      "what": "signed: a credit has a plus sign",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "EntrySide::Cr => text.to_string(),",
+          "to": "EntrySide::Cr => format!(\"+{text}\"),"
+        }
+      ],
+      "mutation": "9a4569f24b0a83816cfbe0882900c8f7",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A62": {
+      "what": "signed: a credit is empty",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "EntrySide::Cr => text.to_string(),",
+          "to": "EntrySide::Cr => String::new(),"
+        }
+      ],
+      "mutation": "f6922162e0311b8cbdd51d6db6b093a3",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A63": {
+      "what": "signed_lexeme: signs the canonical form",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Self::signed(self.as_str(), side)",
+          "to": "Self::signed(self.canonical(), side)"
+        }
+      ],
+      "mutation": "9018d312d44b366636ab8180a28db6e5",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A64": {
+      "what": "signed_canonical: signs the received text",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Self::signed(self.canonical(), side)",
+          "to": "Self::signed(self.as_str(), side)"
+        }
+      ],
+      "mutation": "2cd7802469cbeb16d938a045fb103a9a",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A65": {
+      "what": "signed_lexeme and signed_canonical swapped",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Self::signed(self.as_str(), side)",
+          "to": "Self::signed(self.canonical(), side)"
+        },
+        {
+          "from": "Self::signed(self.canonical(), side)",
+          "to": "Self::signed(self.as_str(), side)"
+        }
+      ],
+      "mutation": "f2471ec49fda7cf566de2e4ac164307b",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::a_debit_is_signed_in_the_form_each_caller_uses",
+      "killer_at": "base"
+    },
+    "A66": {
+      "what": "Display: writes the canonical form",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "formatter.write_str(self.as_str())",
+          "to": "formatter.write_str(self.canonical())"
+        }
+      ],
+      "mutation": "9d765a72eb985136e3b08a832b6770d6",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::the_received_text_and_the_canonical_form_are_both_held",
+      "killer_at": "base"
+    },
+    "A67": {
+      "what": "Display: writes nothing",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "formatter.write_str(self.as_str())",
+          "to": "formatter.write_str(\"\")"
+        }
+      ],
+      "mutation": "eab29bc0639f395688d5f6af1e823945",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::the_received_text_and_the_canonical_form_are_both_held",
+      "killer_at": "base"
+    },
+    "A68": {
+      "what": "Serialize: writes the canonical form",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "serializer.serialize_str(self.as_str())",
+          "to": "serializer.serialize_str(self.canonical())"
+        }
+      ],
+      "mutation": "0d2211000e1e26fa44070e978b6598df",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_amount_is_written_as_received_and_read_by_parse",
+      "killer_at": "base"
+    },
+    "A69": {
+      "what": "Serialize: writes an empty string",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "serializer.serialize_str(self.as_str())",
+          "to": "serializer.serialize_str(\"\")"
+        }
+      ],
+      "mutation": "c2cab822fe009b4c7ed02ad5debf5e15",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_amount_is_written_as_received_and_read_by_parse",
+      "killer_at": "base"
+    },
+    "A70": {
+      "what": "Deserialize: the text trimmed before parse",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Self::parse(&text).map_err(serde::de::Error::custom)",
+          "to": "Self::parse(text.trim()).map_err(serde::de::Error::custom)"
+        }
+      ],
+      "mutation": "8fe839411f15ece0313448a6d9f31096",
+      "verdict": "caught",
+      "before_this_change": "missed",
+      "killer": "agent::agent_import::amount::tests::whitespace_round_an_amount_is_refused_where_it_is_read_and_where_it_is_admitted",
+      "killer_at": "this_commit"
+    },
+    "A71": {
+      "what": "Deserialize: the amount rules skipped (ExactDecimal::parse alone)",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Self::parse(&text).map_err(serde::de::Error::custom)",
+          "to": "ExactDecimal::parse(text)\n            .map_err(serde::de::Error::custom)\n            .map(|lexeme| Self {\n                lexeme: lexeme.clone(),\n                canonical: lexeme,\n            })"
+        }
+      ],
+      "mutation": "6cd1b2891ca32b81e65a48d619a09645",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_amount_is_written_as_received_and_read_by_parse",
+      "killer_at": "base"
+    },
+    "A72": {
+      "what": "Deserialize: every text read as 12.50",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Self::parse(&text).map_err(serde::de::Error::custom)",
+          "to": "Self::parse(\"12.50\").map_err(serde::de::Error::custom)"
+        }
+      ],
+      "mutation": "51df0d7e41f9ae4a9bc1093caf83bf89",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::an_amount_is_written_as_received_and_read_by_parse",
+      "killer_at": "base"
+    },
+    "A73": {
+      "what": "PayloadAmount for String: the text trimmed before parse",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ImportAmount::parse(self)",
+          "to": "ImportAmount::parse(self.trim_start().trim_end())"
+        }
+      ],
+      "mutation": "ac0a45f4fcb1120ed1b4efecb922e257",
+      "verdict": "caught",
+      "killer": "agent::agent_import::tests::amount_pin_tests::an_amount_no_released_build_wrote_is_refused_as_voucher_entry_invalid",
+      "killer_at": "base"
+    },
+    "A74": {
+      "what": "PayloadAmount for String: every text refused",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ImportAmount::parse(self)",
+          "to": "Err(NotAnImportAmount)"
+        }
+      ],
+      "mutation": "8ef83fa0571d3f6ffe06f3262d280546",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::both_stages_of_an_amount_reach_an_import_amount",
+      "killer_at": "base"
+    },
+    "A75": {
+      "what": "PayloadAmount for String: every text read as 12.50",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "ImportAmount::parse(self)",
+          "to": "ImportAmount::parse(\"12.50\")"
+        }
+      ],
+      "mutation": "ce9081c40fe24874c2537ffb6b572fb1",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::both_stages_of_an_amount_reach_an_import_amount",
+      "killer_at": "base"
+    },
+    "A76": {
+      "what": "PayloadAmount for ImportAmount: re-parsed from its canonical form",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Ok(self.clone())",
+          "to": "ImportAmount::parse(self.canonical())"
+        }
+      ],
+      "mutation": "09ae2da3e4034a6b062156c6fbc353ea",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::both_stages_of_an_amount_reach_an_import_amount",
+      "killer_at": "base"
+    },
+    "A77": {
+      "what": "PayloadAmount for ImportAmount: re-parsed from its received text",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Ok(self.clone())",
+          "to": "ImportAmount::parse(self.as_str())"
+        }
+      ],
+      "mutation": "3b153d7fc58675dacfe00c3dcd2ee4d5",
+      "verdict": "missed",
+      "equivalent": true
+    },
+    "A78": {
+      "what": "PayloadAmount for ImportAmount: every admitted amount refused",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Ok(self.clone())",
+          "to": "Err(NotAnImportAmount)"
+        }
+      ],
+      "mutation": "fbce05b4ff77e8d31b64f0ddf7d5d852",
+      "verdict": "caught",
+      "killer": "agent::agent_import::amount::tests::both_stages_of_an_amount_reach_an_import_amount",
+      "killer_at": "base"
+    },
+    "A79": {
+      "what": "PayloadAmount for ImportAmount: every admitted amount read as 12.50",
+      "applied_to": "src-tauri/src/agent_import_amount.rs",
+      "edits": [
+        {
+          "from": "Ok(self.clone())",
+          "to": "ImportAmount::parse(\"12.50\")"
+        }
+      ],
+      "mutation": "d9813b067a8a045ee31451fd39fa3bca",
+      "verdict": "caught",
+      "killer": "agent::agent_import::post::e2e_tests::a_book_over_the_voucher_mark_after_the_approval_is_refused_before_any_invoice_read",
+      "killer_at": "base"
+    }
+  },
+  "accepted_survivors": {
+    "A02": {
+      "mutation": "4714bfc166d0c416e9fe8d07ae056196",
+      "reason": "equivalent: with one dot rsplit_once and split_once give the same two parts, and with none both give nothing; with two or more dots the first split leaves a dot in the fractional part and the last leaves one in the whole part, and the digits test refuses a part holding a dot either way, so every text gets the same answer. Held by a_text_with_two_dots_is_not_an_import_amount, whose texts split differently at the first and the last dot"
+    },
+    "A03": {
+      "mutation": "65dd4d04816ccfbe291e55cf305db889",
+      "reason": "equivalent: a text with no dot is refused at the split; read as (text, \"\") its fractional part has length 0, which the length test refuses, so every text gets the same answer"
+    },
+    "A04": {
+      "mutation": "b6fac4d0757cd42fdf7f739368f8eb12",
+      "reason": "equivalent: a text with no dot is refused at the split; read as two empty parts its whole part is empty, which the first condition refuses, so every text gets the same answer"
+    },
+    "A06": {
+      "mutation": "82db4592ef1544e77c079fef78858dea",
+      "reason": "equivalent: the digits test is kept for what ExactDecimal::parse does not refuse, a leading minus in the whole part, and is_ascii_alphanumeric refuses it as is_ascii_digit does; what it lets through that is_ascii_digit refuses (letters) is refused by ExactDecimal::parse. ExactDecimal::parse refuses every text that is not ASCII digits except for one leading minus (held by exact_decimal_refuses_what_parse_relies_on_it_for) and by a_part_that_is_not_ascii_digits_is_not_an_import_amount"
+    },
+    "A07": {
+      "mutation": "4effb68129bebcefe67e97698d00431b",
+      "reason": "equivalent: is_ascii_hexdigit refuses a minus as is_ascii_digit does, and lets through only the letters a to f in either case, which ExactDecimal::parse refuses. ExactDecimal::parse refuses every text that is not ASCII digits except for one leading minus (held by exact_decimal_refuses_what_parse_relies_on_it_for) and by a_part_that_is_not_ascii_digits_is_not_an_import_amount"
+    },
+    "A10": {
+      "mutation": "d095057e77cabc6bcad180c21ae63966",
+      "reason": "equivalent: the same test on characters: a character is an ASCII digit exactly when its one byte is, and every byte of a longer character is above 0x7f, so a part is all digits by one reading exactly when it is by the other"
+    },
+    "A11": {
+      "mutation": "64e98899ab6dd5903357dc0ee477ba09",
+      "reason": "equivalent: is_numeric refuses a minus as is_ascii_digit does, and lets through Unicode numerals, which ExactDecimal::parse refuses, a fractional part of one numeral two bytes long ('13.٥', '13.²') included although it passes the length test. ExactDecimal::parse refuses every text that is not ASCII digits except for one leading minus (held by exact_decimal_refuses_what_parse_relies_on_it_for) and by a_part_that_is_not_ascii_digits_is_not_an_import_amount"
+    },
+    "A14": {
+      "mutation": "8c7524a23e81fe9b5d31d2161bb74831",
+      "reason": "equivalent: a text with nothing before the dot is refused by ExactDecimal::parse, which requires a non-empty whole part (held by exact_decimal_refuses_what_parse_relies_on_it_for with '.50'), so the same error comes one step later"
+    },
+    "A17": {
+      "mutation": "b7b74f1d4bc00fb8daf838e2fd89ffe1",
+      "reason": "equivalent: a fractional part of two bytes that are not both ASCII digits is refused by ExactDecimal::parse, so the same error comes one step later. ExactDecimal::parse refuses every text that is not ASCII digits except for one leading minus (held by exact_decimal_refuses_what_parse_relies_on_it_for) and by a_part_that_is_not_ascii_digits_is_not_an_import_amount"
+    },
+    "A32": {
+      "mutation": "191968b3a022f62af80672b1a228f10a",
+      "reason": "equivalent: len() and chars().count() differ only for a fractional part with a non-ASCII character, which the digits test refuses either way (held by a_part_that_is_not_ascii_digits_is_not_an_import_amount with '13.٥', one character of two bytes, and '13.٥٠')"
+    },
+    "A35": {
+      "mutation": "5c3d17ece442a73c085bcf857e76ccee",
+      "reason": "equivalent: an error from ExactDecimal::parse taken as zero is refused as zero by the is_zero test that follows, with the same NotAnImportAmount (held by exact_decimal_refuses_what_parse_relies_on_it_for, which asserts ExactDecimal::zero().is_zero())"
+    },
+    "A37": {
+      "mutation": "6406efcaad4d0221034a2a14f8ba9ac2",
+      "reason": "equivalent: split_once('.') splits at the first dot, so whole + '.' + fractional is the text byte for byte; the received text is held by the_received_text_and_the_canonical_form_are_both_held"
+    },
+    "A45": {
+      "mutation": "a93e1dddfb8c4c43f292e6028caa7f88",
+      "reason": "equivalent: ExactDecimalAccumulator::subtract of a value whose digits are all zero calls combine with the same sign, digits and scale as add of it, so checked_subtract(&zero) and checked_add(&zero) give the same form for every lexeme; held for the forms in the_canonical_form_is_worked_out_without_failure_at_the_longest_amount"
+    },
+    "A47": {
+      "mutation": "eb0391938bf5991394e95b695ae62c22",
+      "reason": "equivalent: checked_add(&zero) fails only if the form it works out is longer than 256 bytes or is not a decimal; the form drops leading zeros and trailing decimal zeros and keeps a zero before the dot, so for a text of at most 256 bytes with a non-empty whole part it is never longer than the text, and the error cannot occur. Held at the limit by the_canonical_form_is_worked_out_without_failure_at_the_longest_amount (a 256-byte amount keeps its canonical form) and by the 256-byte case of an_import_amount_is_a_positive_two_decimal_number_in_at_most_256_bytes"
+    },
+    "A77": {
+      "mutation": "3b153d7fc58675dacfe00c3dcd2ee4d5",
+      "reason": "equivalent: an ImportAmount is built only by parse, and parse of its received text is itself (same lexeme, same canonical form), so re-parsing returns an equal value and never an error. Held by an_admitted_amount_parsed_again_from_its_received_text_is_itself"
+    }
+  }
+}

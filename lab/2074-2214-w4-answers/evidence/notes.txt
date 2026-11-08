@@ -1,0 +1,21 @@
+2026-11-08T12:46:27.093Z p0 step 0: capture 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c
+   a. tasklist exit 0: 1 line(s): ['"tally.exe","21948","Console","1","1,52,808 K"']
+   b. netstat exit 0: 9001 LISTENING lines 2, PIDs ['21948'], tally PID 21948, other LISTENING lines 34
+2026-11-08T12:46:31.702Z p0 GET /status | curl 0 "200 51" 
+2026-11-08T12:46:31.778Z p0-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3394"  CL 3394 | answer 3394 B sha256 566be20d6ab91d0faba27f68f4b57bb7e3106c8afd08f6fd19a1181652d2442a | 0.047 s | ok True
+   MARKS p0-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 224 ALTVCHID 87
+2026-11-08T12:50:18.937Z s0-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3394"  CL 3394 | answer 3394 B sha256 566be20d6ab91d0faba27f68f4b57bb7e3106c8afd08f6fd19a1181652d2442a | 0.063 s | ok True
+   MARKS s0-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 224 ALTVCHID 87
+2026-11-08T12:50:26.098Z a1-create-probe req create-probe.utf16le.xml sha256 4306185903f545b7257b446773198d385ebdc97c7f22489f6275cc9aecea5ff2 bytes 964 | curl 0 "200 3834"  CL 3834 | answer 3834 B sha256 e7fe54bbee05d72a47f50de4f626a1904f1e4c9afc3f3fb8cbca46cf77baf060 | 0.218 s | ok True
+2026-11-08T12:50:26.853Z a1-marks-probe req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3394"  CL 3394 | answer 3394 B sha256 830c28390a9a9c17653c291651af6e8bc8c3ee986f0f696d7d25409a09bb7b92 | 0.078 s | ok True
+   MARKS a1-marks-probe: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 225 ALTVCHID 87
+2026-11-08T13:02:17.975Z f0-marks-before req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3398"  CL 3398 | answer 3398 B sha256 92a2d7880cbc85ab11e5c073f54278bb7d693808aff6479c9f72ba62a83436a9 | 0.062 s | ok True
+   MARKS f0-marks-before: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 386 ALTVCHID 87
+2026-11-08T13:02:18.444Z f0-front-ledgers req front-ledgers.xml sha256 df4bea913566eb3cc10ed5b0ee9314f21262d26e6458044ae53c3b48b6dd6d1b bytes 1380 | curl 0 "200 538"  CL 538 | answer 538 B sha256 9cca0f382ec8c2448cdebb3b2fafb9f6d1aaad12600867ddec73a36a401b7320 | 0.391 s | ok True
+2026-11-08T13:02:19.267Z f0-marks-after req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3398"  CL 3398 | answer 3398 B sha256 065e79485e7abbbe384a234612560f6d1e821084e5fc8b2bd10fa7c7e9d7621e | 0.046 s | ok True
+   MARKS f0-marks-after: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 388 ALTVCHID 87
+2026-11-08T13:02:30.171Z f0-front-probe req front-probe.xml sha256 d79395e8817c93b46723f0c11227574da5d764c08fb19410087a188b8ae9790c bytes 583280 | curl 0 "200 546"  CL 546 | answer 546 B sha256 676c53153ad1064fe238dcbae4641ac6da2f706b44fd3fd364912bd4f4d53970 | 16.281 s | ok True
+2026-11-08T13:02:46.782Z f0-probe-marks-after req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3414"  CL 3414 | answer 3414 B sha256 692201f00735dcf2f3834c140d34975b4b0d88a79776b00e46773451651a1fb6 | 0.047 s | ok True
+   MARKS f0-probe-marks-after: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 388 ALTVCHID 587
+2026-11-08T13:08:27.434Z xw4-7-marks req marks.utf16le.xml sha256 539ca283638c2013df5445da0035df47eb2d7a08a4ccdae8f9858e22ed358f8d bytes 976 | curl 0 "200 3422"  CL 3422 | answer 3422 B sha256 9d5e5d15c540d8d37dd1e99f20779c58941481e96dfef6cf25c0ddca16d9f6b7 | 0.047 s | ok True
+   MARKS xw4-7-marks: GUID a30f23c3-4819-4334-96ab-ffa6fba70976 (THE COMPANY True) ALTMSTID 388 ALTVCHID 2122

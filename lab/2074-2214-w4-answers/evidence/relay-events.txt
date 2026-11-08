@@ -1,0 +1,26 @@
+relay.jsonl parsed: every event line, and every request line whose post is a master read (1736 B standard, 1784 B mailing), with its line number. Lines 1 to 469 are before W4 was armed.
+1 {"event": "listening", "port": 9002, "tally_port": 9001, "utc": "2026-11-08T13:03:23Z", "at": 195850.25}
+92 {"conn": 1, "request": 30, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330314, "answer_sha256": "cc3283295c889cfbd8c72cb7ae7b65cd36ec78445bd678019a27531da2aec1a3", "utc": "2026-11-08T13:03:57Z", "at": 195884.437}
+98 {"conn": 1, "request": 32, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330314, "answer_sha256": "cc3283295c889cfbd8c72cb7ae7b65cd36ec78445bd678019a27531da2aec1a3", "utc": "2026-11-08T13:03:57Z", "at": 195884.531}
+233 {"conn": 3, "request": 26, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330314, "answer_sha256": "cc3283295c889cfbd8c72cb7ae7b65cd36ec78445bd678019a27531da2aec1a3", "utc": "2026-11-08T13:05:57Z", "at": 196004.593}
+239 {"conn": 3, "request": 28, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330314, "answer_sha256": "cc3283295c889cfbd8c72cb7ae7b65cd36ec78445bd678019a27531da2aec1a3", "utc": "2026-11-08T13:05:57Z", "at": 196004.671}
+536 {"event": "front_send", "front": 1, "bytes": 1793044, "sent_sha256": "93142582aeb2858517c7ec5f4ea5fb586964e81a36232adce36ce6ca7ec57808", "utc": "2026-11-08T13:06:55Z", "at": 196062.64}
+537 {"event": "front_written", "front": 1, "utc": "2026-11-08T13:06:55Z", "at": 196062.64}
+538 {"event": "forwarded", "conn": 4, "request": 83, "sent": 1784, "front": 1, "utc": "2026-11-08T13:06:55Z", "at": 196062.953}
+539 {"event": "bridge_cut", "conn": 4, "request": 83, "sent": 1784, "sent_sha256": "99cf89a6d90239211af81ec7e4770f65fdf1d766528260c35a60964fc70422bb", "utc": "2026-11-08T13:07:15Z", "at": 196082.64}
+540 {"event": "close", "conn": 4, "requests": 83, "utc": "2026-11-08T13:07:15Z", "at": 196082.64}
+542 {"event": "bridge_cut", "conn": 3, "request": 45, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-08T13:07:21Z", "at": 196088.203}
+543 {"event": "close", "conn": 3, "requests": 45, "utc": "2026-11-08T13:07:21Z", "at": 196088.265}
+546 {"event": "bridge_cut", "conn": 5, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-08T13:07:36Z", "at": 196103.906}
+547 {"event": "close", "conn": 5, "requests": 1, "utc": "2026-11-08T13:07:36Z", "at": 196103.906}
+550 {"event": "bridge_cut", "conn": 6, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-08T13:07:52Z", "at": 196119.5}
+551 {"event": "close", "conn": 6, "requests": 1, "utc": "2026-11-08T13:07:52Z", "at": 196119.5}
+554 {"event": "front_first_byte", "front": 1, "utc": "2026-11-08T13:08:05Z", "at": 196132.796}
+555 {"event": "front_answered", "front": 1, "answered": 550, "utc": "2026-11-08T13:08:05Z", "at": 196132.796}
+556 {"event": "bridge_cut", "conn": 7, "request": 1, "sent": 0, "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "utc": "2026-11-08T13:08:07Z", "at": 196134.734}
+557 {"event": "close", "conn": 7, "requests": 1, "utc": "2026-11-08T13:08:07Z", "at": 196134.75}
+645 {"conn": 8, "request": 29, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330320, "answer_sha256": "8ef36ce538de73953e99aabb83c0eb24ae10abf981deea943c5709748326ecb9", "utc": "2026-11-08T13:08:23Z", "at": 196150.328}
+651 {"conn": 8, "request": 31, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330320, "answer_sha256": "8ef36ce538de73953e99aabb83c0eb24ae10abf981deea943c5709748326ecb9", "utc": "2026-11-08T13:08:23Z", "at": 196150.406}
+777 {"conn": 8, "request": 73, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330320, "answer_sha256": "8ef36ce538de73953e99aabb83c0eb24ae10abf981deea943c5709748326ecb9", "utc": "2026-11-08T13:08:26Z", "at": 196153.171}
+783 {"conn": 8, "request": 75, "line": "POST / HTTP/1.1", "sent": 1736, "sent_sha256": "4f2e1b0f61c41624ea734decafaea3dcf5486a7348e98e057a34d97f274d87d8", "answered": 330320, "answer_sha256": "8ef36ce538de73953e99aabb83c0eb24ae10abf981deea943c5709748326ecb9", "utc": "2026-11-08T13:08:26Z", "at": 196153.25}
+832 {"event": "close", "conn": 8, "requests": 91, "utc": "2026-11-08T13:10:43Z", "at": 196290.343}

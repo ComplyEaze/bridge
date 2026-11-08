@@ -2981,7 +2981,7 @@ Takes `statement_path` (a local file, under the path rules of `parse_bank_statem
 `suspense_ledger`, `from`, `to`, `mapping` and `cash_answers`, and writes proposals as that tool does: same checks, same
 result, same next step to `build_import_xml`. The CSV edge reader of the `bridge-bank-statement` crate accepts one private
 bank's export layout and nothing else. A file the reader refuses is refused with its category as the error code,
-`statement_<category>` and `:row_N` where a row is at fault; there are seventeen categories, each its own code. The file must
+`statement_<category>` and `:row_N` where a row is at fault; there are eighteen categories, each its own code. The file must
 print exactly one account number, all digits, ending in `account_label`'s digits: a masked number is
 `statement_no_account_number_line`, because it can tell two accounts apart only by chance.
 

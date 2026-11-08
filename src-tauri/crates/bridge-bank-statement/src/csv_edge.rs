@@ -112,8 +112,10 @@ pub struct CsvStatement {
 /// The party is the row's whole description, and the reference its `Chq /Ref No.` cell: no rule
 /// reads a name, a mode or a cash line out of the description, because none has been derived
 /// from a real export's descriptions. So a row reaches a ledger only when a mapping names its
-/// exact text, every other row goes to suspense, and a cash withdrawal is one more suspense line
-/// and not a cash question. A transfer reference needs a mode, so none is given.
+/// exact text, a row whose whole description is exactly the existing cash text (`ATM CASH
+/// WITHDRAWAL` or `CASH DEPOSIT`, `CashMovement::of_party`) asks a cash question, and every other
+/// row, any other cash line included, goes to suspense. A transfer reference needs a mode, so none
+/// is given.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CsvLayout {
     BankA,

@@ -25,7 +25,7 @@ Confidence markers follow `docs/tally/TALLY_PROTOCOL_REFERENCE.md`.
 | Claude Code CLI (`claude -p`), default settings | 2.1.285, macOS | 90, 300, 900 (this server); 150 (earlier server, 30 Sep) | none up to 900 | not reached | n/a: no call was abandoned | not tested: no timeout reached | partial, one run each |
 | Claude Code CLI, per-server `timeout` of 60000 ms in `.mcp.json` | 2.1.285, macOS | none (150 s was cut) | 150 s call cut at 60.0 s, with and without progress every 10 s | `MCP server ... timed out after 60s` | received (reason `SdkError: Request timed out`) | no: progress every 10 s did not reset it | partial, one run each (30 Sep, earlier server, see #703) |
 | Claude Code in the Code tab of the Claude desktop app, default settings | 2.1.284, macOS | 150 (earlier server, 30 Sep) | none up to 150 | not reached | n/a: no call was abandoned | not tested | partial, one run, run by hand |
-| Claude Code in the Code tab of the Claude desktop app, default settings | desktop app 4.4212.0.0 with Claude Code 2.1.309, Windows | none (90 s was cut) | 90 s call cut at 60.0 s, plain and with progress every 10 s | `Error: Request timed out` | received (reason `SdkError: Request timed out`) | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
+| Claude Code in the Code tab of the Claude desktop app, no per-server `timeout` (environment and app settings not recorded) | desktop app 4.4212.0.0 with Claude Code 2.1.309, Windows | none (90 s was cut) | 90 s call cut at 60.0 s, plain and with progress every 10 s | `Error: Request timed out` | received (reason `SdkError: Request timed out`) | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
 | Claude Desktop (chat app) | macOS | not measured | | | | | |
 | Claude Desktop (chat app) | 4.4212.0.0, Windows | none (60 s was cut) | 60 s call cut at about 60 s, plain and with progress every 10 s | an error that the device did not respond within 60 s | none logged: the server finished at 60.003 s and 60.010 s after receiving each call | not testable: no `progressToken` was sent | partial, one run each (5 Nov, #2119) |
 | a third-party client | | not measured | | | | | |
@@ -51,22 +51,26 @@ from the #703 thread (comments of 30 Sep, 09:13 and 09:16 UTC).
 Both tabs end one tool call at about 60 s. Neither sent a `progressToken` on any of the four
 calls, so the server could send no progress, and whether progress would extend a call there cannot
 be tested (inferred: without a token it cannot). The Code tab sends `notifications/cancelled` at
-60 s. On the chat app, no cancellation was logged, and the app's own server log holds no line for
-either call. The 90 s and longer chat calls were not sent, because the climb stops at the first call
-cut.
+60 s. The two chat calls reached the server on the same connection as the two Code-tab calls, and
+no cancellation was logged for them; the app's own server connection logged no call for any of the
+four. The chat app's error names a device that did not reply within 60 s, and says only the wait
+for its reply timed out. That wait is the likely cut (unverified). The 90 s and longer chat calls
+were not sent, because the climb stops at the first call cut.
 
 Limits:
 - one sitting, one PC, one app version;
 - the Code tab was called only at N = 90, and the chat app only at N = 60, so a call just under 60 s
   is not measured on either tab;
 - the chat calls came from new chats typed by a person, who also answered each tool prompt, and
-  whether the chat app's timer runs from the call or from that answer is not told apart;
-- a chat call counts as cut by the app's error text and the absence of a cancellation; no client
-  clock recorded when the app gave up.
+  whether the 60 s wait the error names runs from the call or from that answer is not told apart;
+- a chat call counts as cut by the error text and the absence of a cancellation; no client clock
+  recorded when the call was cut.
 
-The abandonment at about 60 s that #703 records on another setup is not explained by the macOS
-rows above. A configured timeout, an older build, or a default like the Windows one measured here
-could each account for it (unverified; nothing records which host or settings it was). The open rows of the table are the next hosts to measure.
+The abandonment at about 60 s that #703 records on another setup is not explained by the
+default-settings macOS rows above. A configured timeout like the one in row 2, an older build, or a
+default or an unrecorded setting like the Windows ones measured here could each account for it
+(unverified; nothing records which host or settings it was). The open rows of the table are the
+next hosts to measure.
 
 ## Measuring a host
 

@@ -88,4 +88,14 @@ ef0cef45cfc1f0476cc210420a1b54b340382e3a2ff65bb5cb14323827aac8fd  1924  answers/
 d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a  962  answers/r5-w5-stock-summary.utf16le.xml
 0496c762ce6e90a3117dfbde3df88f799456cf0385b354d0d8fc75cc32caccb5  133  answers/r5-w5-stock-summary.utf16le.xml.headers.txt
 705fd4d6451a31d36b3df7de96f83f30ac976c9b4a6d1e51671d8e2f33e2d0da  8  .gitattributes
-b47279cb10db31e5df524defeb6801703e47bfb3624f92ccf255eea2b81b2c6a  1755  kept-local.txt
+229b04263df16d8438ba21af7797e2445d460ffd555c51cc2b5a35f974736095  54286  answers/r1-groups.utf16le.xml
+07e9f385637f9e2cf50dd0faf799207b2ec5de22a6b1da19ccb8cd9ddcec8869  13526  answers/r1-w1-ledgers.utf16le.xml
+c5bd41fd0816b3dd75d3f003ee4d7900a1eba27722dd91b786034807a6fa4286  13548  answers/r1-w2-ledgers.utf16le.xml
+2a2878575ad318b157e3b335ffb1ae304d9e505e65a980e94503d0ba9eb9778b  13508  answers/r1-w3-ledgers.utf16le.xml
+666daa320f1c4a3502ccca68f731d095cb09fc1a343b0325abda2cd602a81ca0  13462  answers/r1-w4-ledgers.utf16le.xml
+8437286da7ab2e27ff2b40677bc96b87bd5b9eb3ec52da36c05e0e6ff5c1bd16  13526  answers/r2-w1-ledgers.utf16le.xml
+f08f2ae27f89f29fb9df84f94a1184d6b4db3000c663da490c0a2d4bea0b75d8  13548  answers/r2-w2-ledgers.utf16le.xml
+6bca6a373285605d1a74a470742b23b9c3038b9f085e053b09bdebb7ff525933  13542  answers/r3-w2-ledgers.utf16le.xml
+d59c98c7437eab71908fdc4b0031af34da4398ac47695cb58b4c46e72fb6e3d3  14724  answers/r4-w2-ledgers.utf16le.xml
+b2d0519cc1d25b5eac8a0ddc15318d58818fa9aaba97e4bf3ac81a87785f533f  13532  answers/r5-w5-ledgers.utf16le.xml
+5f8960ba4390c7b71c7367a555a2a29f1ffe452bf87fb26165a0f200f4e5c4a3  270  kept-local.txt

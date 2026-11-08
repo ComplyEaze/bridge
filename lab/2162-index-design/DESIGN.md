@@ -137,3 +137,17 @@ Section 1 lists the row's `ALTERID` in the index. Y0's fetch list carries none, 
 - **Unverified:** the cost scales with the date window the read walks, not with the number of rows changed. One dense measure cannot show that.
 
 **Would the changed vouchers' month make it cheap?** Not as a catch-up. The marks say that something changed, not where. The month of a foreign change is not known until a read finds it. Twelve month-window delta reads walk the same year, so they are expected to cost about the same as one year read (derived). A month window helps only when the month is known in advance, and an admission's number check needs the whole year, so no such case is known in this design. A later lab row could measure the delta term on one dense month against that month's plain Y0 read. That would show whether the cost follows the window (unverified). Nothing here changes code, and nothing waits on that row.
+
+## Deviation, 8 Nov 2026: screen actions and the marks (the index sheet, Part 1)
+
+**Measured** (`lab/2162-index-answers` at 2cf5df51, RESULTS.md, on BRIDGE BILLTRAIL LAB, a synthetic book, in a voucher type `IX SALES` created under Sales with manual numbering):
+- k1 to k6 are a create, a narration, a number change, a re-date, a cancel and a delete, each made on Tally's screen. Each moved V (`ALTVCHID`) by exactly 1 and M (`ALTMSTID`) by 0. k7, a second create, did the same.
+- Creating the voucher type `IX SALES` moved M by 2 and V by 0.
+- k8: in Voucher Type Alteration, Return and Shift+Tab both pass over the type's parent field without a message. So the parent could not be changed, and the attempt moved neither mark.
+- A delete on the screen (k6) moved V by 1. A delete through the Gateway moved it by 2 (§11c.5).
+- The restore of the sitting's backup returned both marks to `bm0`, and the day's read found no `IX-` row.
+
+**What changes.**
+- Section 2's equality check is sound for these six screen actions, in a child type of Sales: each moves V, so an index whose stored V equals the book's has seen none of them since. The check needs V to move, not to move by a set amount, so the screen delete's +1 against the Gateway's +2 changes nothing.
+- A master change (a new voucher type) moves M and not V. So a freshness check that compares only V misses a type change. Section 2 compares both marks, and that stands.
+- **Unverified:** whether changing a voucher type's parent, and so its class, moves a mark. This release gave no way to make that change on the screen. Until a later row measures it, nothing in this design rests on it, and section 5's row for it stays open.

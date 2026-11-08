@@ -9,8 +9,11 @@
 //! `parse_native_group_snapshot`, by `RESERVEDNAME` rather than by display name.
 //!
 //! O and C are the sub amounts of the Profit and Loss lines `Opening Stock` and
-//! `Less: Closing Stock`. Signs are Tally's: a debit is negative. Where the scripts read an empty
-//! amount as zero, so does this, and only there; which amounts were empty is asserted first.
+//! `Less: Closing Stock`. Signs are Tally's: a debit is negative. An empty amount is not zero
+//! (AGENTS.md P3). The run's scripts read every empty amount they used as zero, so these tests do
+//! the same, but only after [`assert_empties`] has asserted, for each read, exactly which of those
+//! amounts the captured answer holds empty ([`EMPTIES`]). An empty amount the table does not name
+//! fails the test before any sum is taken.
 
 use bridge_tally_primitives::ExactDecimal;
 use bridge_tally_protocol::group_ancestry::GroupIndex;
@@ -76,6 +79,131 @@ fn groups() -> GroupIndex {
     GroupIndex::build(
         parse_native_group_snapshot(&text("r1-groups"), TIEOUT_E_GUID).expect("r1-groups parses"),
     )
+}
+
+/// For each read: the Profit and Loss amounts the identities use that are empty (`<line> sub` or
+/// `<line> main`), the Balance Sheet lines whose main amount is empty, and the ledgers whose
+/// closing is empty. Taken from the captured bytes; each is an amount the run's scripts read as zero.
+struct Empties {
+    read: &'static str,
+    pl: &'static [&'static str],
+    bs_main: &'static [&'static str],
+    tb_closing: &'static [&'static str],
+}
+
+const EMPTIES: [Empties; 9] = [
+    Empties {
+        read: "r1-w1",
+        pl: &["Opening Stock sub"],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash"],
+    },
+    Empties {
+        read: "r1-w2",
+        pl: &[],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash"],
+    },
+    Empties {
+        read: "r1-w3",
+        pl: &[],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash", "Lab Rent"],
+    },
+    Empties {
+        read: "r1-w4",
+        pl: &["Add: Purchase Accounts sub", "Cost of Sales : main"],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash", "Lab Purchase", "Lab Sales"],
+    },
+    Empties {
+        read: "r5-w5",
+        pl: &["Opening Stock sub"],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash"],
+    },
+    Empties {
+        read: "r2-w1",
+        pl: &["Opening Stock sub"],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash"],
+    },
+    Empties {
+        read: "r2-w2",
+        pl: &[],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash"],
+    },
+    Empties {
+        read: "r3-w2",
+        pl: &[],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash"],
+    },
+    Empties {
+        read: "r4-w2",
+        pl: &[],
+        bs_main: &["Loans (Liability)"],
+        tb_closing: &["Cash"],
+    },
+];
+
+/// The Profit and Loss amounts the identities and relation 4 read.
+const PL_USED: [(&str, bool); 4] = [
+    ("Opening Stock", true),
+    ("Less: Closing Stock", true),
+    ("Add: Purchase Accounts", true),
+    ("Cost of Sales :", false),
+];
+
+/// Asserts that the read's empty amounts are exactly [`EMPTIES`]'s row for it, so the zeroing that
+/// follows touches only those.
+fn assert_empties(read: &str) {
+    let pl = statement(NativeStatementKind::ProfitAndLoss, &format!("{read}-pl"));
+    let bs = statement(NativeStatementKind::BalanceSheet, &format!("{read}-bs"));
+    let tb = ledgers(read);
+    let mut pl_empty = Vec::new();
+    for (name, is_sub) in PL_USED {
+        let amount = if is_sub {
+            one(&pl, name)
+        } else {
+            one_main(&pl, name)
+        };
+        if *amount == NativeStatementAmount::Empty {
+            pl_empty.push(format!("{name} {}", if is_sub { "sub" } else { "main" }));
+        }
+    }
+    for line in pl
+        .lines
+        .iter()
+        .filter(|line| line.name.contains("Direct Expenses"))
+    {
+        if line.sub == NativeStatementAmount::Empty {
+            pl_empty.push(format!("{} sub", line.name));
+        }
+    }
+    let bs_empty: Vec<&str> = bs
+        .lines
+        .iter()
+        .filter(|line| line.main == NativeStatementAmount::Empty)
+        .map(|line| line.name.as_str())
+        .collect();
+    let tb_empty: Vec<&str> = tb
+        .rows
+        .iter()
+        .filter(|row| row.closing == NativeTrialBalanceAmount::PresentEmpty)
+        .map(|row| row.name.as_str())
+        .collect();
+    let want = EMPTIES
+        .iter()
+        .find(|row| row.read == read)
+        .unwrap_or_else(|| panic!("{read} has no row in EMPTIES"));
+    assert_eq!(pl_empty, want.pl, "{read}: empty Profit and Loss amounts");
+    assert_eq!(
+        bs_empty, want.bs_main,
+        "{read}: empty Balance Sheet main amounts"
+    );
+    assert_eq!(tb_empty, want.tb_closing, "{read}: empty ledger closings");
 }
 
 fn zero_if_empty(amount: &NativeStatementAmount) -> ExactDecimal {
@@ -160,6 +288,7 @@ fn the_ten_ledger_and_group_answers_parse_with_the_book_guid() {
 fn identities_1_to_3_hold_in_every_read_as_the_run_recorded() {
     let index = groups();
     for read in READS {
+        assert_empties(read);
         let pl = statement(NativeStatementKind::ProfitAndLoss, &format!("{read}-pl"));
         let bs = statement(NativeStatementKind::BalanceSheet, &format!("{read}-bs"));
         let tb = ledgers(read);
@@ -238,7 +367,9 @@ fn identities_1_to_3_hold_in_every_read_as_the_run_recorded() {
 
 #[test]
 fn relation_4_holds_where_the_run_checked_it_and_r1_w4_has_no_heading_amount() {
+    let (mut checked, mut without_amount) = (0, Vec::new());
     for read in READS {
+        assert_empties(read);
         let pl = statement(NativeStatementKind::ProfitAndLoss, &format!("{read}-pl"));
         let heading = one_main(&pl, "Cost of Sales :");
         let o = zero_if_empty(one(&pl, "Opening Stock"));
@@ -270,12 +401,32 @@ fn relation_4_holds_where_the_run_checked_it_and_r1_w4_has_no_heading_amount() {
         );
         let parts = sum(&[o, p, sum(&direct_subs)]);
         match heading {
-            NativeStatementAmount::Empty => {
-                assert_eq!(read, "r1-w4", "only r1-w4's heading is without its amount")
-            }
+            NativeStatementAmount::Empty => without_amount.push(read),
             NativeStatementAmount::Present(value) => {
-                assert!(value.numeric_eq(&sub(&parts, &c)), "{read}: relation 4")
+                assert!(value.numeric_eq(&sub(&parts, &c)), "{read}: relation 4");
+                checked += 1;
             }
         }
+    }
+    assert_eq!(
+        without_amount,
+        ["r1-w4"],
+        "the reads whose heading has no amount"
+    );
+    assert_eq!(checked, 8, "relation 4 is checked on the other eight reads");
+}
+
+#[test]
+fn each_after_restore_profit_and_loss_answer_equals_r1_w2_byte_for_byte() {
+    let read = |name: &str| {
+        let path = format!(
+            "{}/tests/fixtures/opening-stock-tieout-e/{name}.utf16le.xml",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        std::fs::read(&path).unwrap_or_else(|error| panic!("{path}: {error}"))
+    };
+    let first = read("r1-w2-pl");
+    for name in ["r2-after-w2-pl", "r3-after-w2-pl", "r4-after-w2-pl"] {
+        assert!(read(name) == first, "{name} equals r1-w2-pl");
     }
 }

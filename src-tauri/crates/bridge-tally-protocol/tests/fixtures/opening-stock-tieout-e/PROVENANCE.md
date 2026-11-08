@@ -25,9 +25,21 @@ verdicts through this crate's own parsers, and for the parse records in
   direct expense ledger and a payment to it. Each `rN-after-w2-pl` is the Profit and Loss read
   after that restore, and equals R1's `r1-w2-pl` byte for byte.
 - **Bytes:** each answer is stored as received: UTF-16LE without a byte-order mark, served as
-  `text/xml; charset=utf-16`, with its size equal to the response's `CONTENT-LENGTH`. Each equals its
-  line in `scripts/merge-gate-lab-captures.json` and in the lab's answers record. No answer was
-  edited.
+  `text/xml; charset=utf-16`. The lab's header record of each send (not committed) gives its size
+  equal to the response's `CONTENT-LENGTH`. Each equals its line in
+  `scripts/merge-gate-lab-captures.json` and in the lab's answers record
+  (`lab/692-opening-stock-answers` SHA256.txt at 09287f70). No answer was edited.
+- **Source of the setup facts** (the seven vouchers, the restores): that branch's RESULTS.md.
+
+## Confidence
+
+- **VERIFIED:** each file's bytes equal its lab-capture manifest entry and its line in the lab's
+  answers record (size and sha256, compared by script).
+- **PARTIAL:** every identity and relation below. One synthetic book, one run of five parts, each
+  verdict seen once, on one release.
+- Only the Profit and Loss, Balance Sheet, ledger and group answers are read by assertions. The nine
+  Stock Summary and nine negative-stock answers are parse-recorded only (`tests/parse_record/`),
+  and the three after-restore answers are checked only for byte equality.
 
 ## What the tests establish, and what they do not
 
@@ -44,54 +56,54 @@ verdicts through this crate's own parsers, and for the parse records in
   ComplyEaze Bridge's statements still refuse a book with opening stock; these fixtures do not
   change that.
 
-| file | bytes | sha256 | content |
+| file | bytes | sha256 | run, window, read |
 |---|---|---|---|
-| `r1-groups.utf16le.xml` | 54286 | `229b04263df16d8438ba21af7797e2445d460ffd555c51cc2b5a35f974736095` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w1-bs.utf16le.xml` | 1852 | `f606fadec64ea694a39c847df7431dcb3ea43bc4491ce65652263cdf93bf1b1f` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w1-ledgers.utf16le.xml` | 13526 | `07e9f385637f9e2cf50dd0faf799207b2ec5de22a6b1da19ccb8cd9ddcec8869` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w1-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w1-pl.utf16le.xml` | 1922 | `c5f34dcb0b4135af46b72f01372f063a3906db30405ae271d92696d92273efa8` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w1-stock-summary.utf16le.xml` | 966 | `5ca75217dddff3e8bcf0f5a8fc50c993a28d768ab126d5d6941d83a8a634bb3c` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w2-bs.utf16le.xml` | 1854 | `f188c7ba890f76637559ee66d5a27e9017de588d8a108e70f91f728e6b224237` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w2-ledgers.utf16le.xml` | 13548 | `c5bd41fd0816b3dd75d3f003ee4d7900a1eba27722dd91b786034807a6fa4286` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w2-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w2-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w3-bs.utf16le.xml` | 1854 | `d8cba5d13e1f23f6b58f54ef4bf0dea24535c73637c7e62ee34d9a3ad3543b24` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w3-ledgers.utf16le.xml` | 13508 | `2a2878575ad318b157e3b335ffb1ae304d9e505e65a980e94503d0ba9eb9778b` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w3-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w3-pl.utf16le.xml` | 1924 | `191f80cb0d8fb94db56f8069a4616749875f86ad9f5aad7a743634a1bd9d3051` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w3-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w4-bs.utf16le.xml` | 1854 | `f188c7ba890f76637559ee66d5a27e9017de588d8a108e70f91f728e6b224237` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w4-ledgers.utf16le.xml` | 13462 | `666daa320f1c4a3502ccca68f731d095cb09fc1a343b0325abda2cd602a81ca0` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w4-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w4-pl.utf16le.xml` | 1892 | `b565da7c53341cd86eb558a5f262dc0f925e1110ebdfa77f3c93a360e0d9202e` | answer as received, UTF-16LE without a byte-order mark |
-| `r1-w4-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-after-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w1-bs.utf16le.xml` | 1852 | `48377d79b6be4844ec038702f5040857240910f6e3a2b1b6ce8fe5e955313999` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w1-ledgers.utf16le.xml` | 13526 | `8437286da7ab2e27ff2b40677bc96b87bd5b9eb3ec52da36c05e0e6ff5c1bd16` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w1-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w1-pl.utf16le.xml` | 1922 | `feebe9af203f43d4841faf31458d73babd3db5e78ba753370cb2924cdbf22ab8` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w1-stock-summary.utf16le.xml` | 966 | `96936b3d493d661a918f35d39511256da79889efa2d5e4775ce177a0ea17eb14` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w2-bs.utf16le.xml` | 1854 | `ff4ccf92074ba2a08e1c5dbd8502dc9f61c5c2fd7e4121912115770aa9b6d616` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w2-ledgers.utf16le.xml` | 13548 | `f08f2ae27f89f29fb9df84f94a1184d6b4db3000c663da490c0a2d4bea0b75d8` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w2-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w2-pl.utf16le.xml` | 1938 | `41998a838d31f8ed8ed9c72279a8d2cbece0a7237e7cc3e56e17c0c8937c5e19` | answer as received, UTF-16LE without a byte-order mark |
-| `r2-w2-stock-summary.utf16le.xml` | 962 | `fedd896aaf2201e9071dfca8701341f10322e89022aa09485cf24af7d55fa9f8` | answer as received, UTF-16LE without a byte-order mark |
-| `r3-after-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | answer as received, UTF-16LE without a byte-order mark |
-| `r3-w2-bs.utf16le.xml` | 1854 | `8ede498a8f71dc42ff3c136849499f13137d5f9d4db38435253b07e81b11af5d` | answer as received, UTF-16LE without a byte-order mark |
-| `r3-w2-ledgers.utf16le.xml` | 13542 | `6bca6a373285605d1a74a470742b23b9c3038b9f085e053b09bdebb7ff525933` | answer as received, UTF-16LE without a byte-order mark |
-| `r3-w2-negative-stock.utf16le.xml` | 482 | `6c318484ea3a0375d6a6ec11e5c2ee9c5b89a99e1b637d5a4abd49336e7aa2d1` | answer as received, UTF-16LE without a byte-order mark |
-| `r3-w2-pl.utf16le.xml` | 1938 | `70f9d3761df6d64cfcd792017131ba3727c9c1075e8f5980d3979c9aaf4b984c` | answer as received, UTF-16LE without a byte-order mark |
-| `r3-w2-stock-summary.utf16le.xml` | 1394 | `d3aa11ff3dd19c66dd25d5af60bc5c4e89f7340a2b074d4f858f29c7176cb5c6` | answer as received, UTF-16LE without a byte-order mark |
-| `r4-after-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | answer as received, UTF-16LE without a byte-order mark |
-| `r4-w2-bs.utf16le.xml` | 1854 | `be5246c94ac60f6a0dda42714ec78527c8e5358dc612fec04977c98c00d67e8e` | answer as received, UTF-16LE without a byte-order mark |
-| `r4-w2-ledgers.utf16le.xml` | 14724 | `d59c98c7437eab71908fdc4b0031af34da4398ac47695cb58b4c46e72fb6e3d3` | answer as received, UTF-16LE without a byte-order mark |
-| `r4-w2-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r4-w2-pl.utf16le.xml` | 2248 | `fef509e5d976c192d23bb1fa68fad2f0179dcdf5e6a70f0be7e957a9cd30f5da` | answer as received, UTF-16LE without a byte-order mark |
-| `r4-w2-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | answer as received, UTF-16LE without a byte-order mark |
-| `r5-w5-bs.utf16le.xml` | 1854 | `f188c7ba890f76637559ee66d5a27e9017de588d8a108e70f91f728e6b224237` | answer as received, UTF-16LE without a byte-order mark |
-| `r5-w5-ledgers.utf16le.xml` | 13532 | `b2d0519cc1d25b5eac8a0ddc15318d58818fa9aaba97e4bf3ac81a87785f533f` | answer as received, UTF-16LE without a byte-order mark |
-| `r5-w5-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | answer as received, UTF-16LE without a byte-order mark |
-| `r5-w5-pl.utf16le.xml` | 1924 | `ef0cef45cfc1f0476cc210420a1b54b340382e3a2ff65bb5cb14323827aac8fd` | answer as received, UTF-16LE without a byte-order mark |
-| `r5-w5-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | answer as received, UTF-16LE without a byte-order mark |
+| `r1-groups.utf16le.xml` | 54286 | `229b04263df16d8438ba21af7797e2445d460ffd555c51cc2b5a35f974736095` | R1, List of Groups (used for every run); as received |
+| `r1-w1-bs.utf16le.xml` | 1852 | `f606fadec64ea694a39c847df7431dcb3ea43bc4491ce65652263cdf93bf1b1f` | R1, w1, Balance Sheet; as received |
+| `r1-w1-ledgers.utf16le.xml` | 13526 | `07e9f385637f9e2cf50dd0faf799207b2ec5de22a6b1da19ccb8cd9ddcec8869` | R1, w1, ledgers (Trial Balance collection); as received |
+| `r1-w1-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R1, w1, negative-stock report; as received |
+| `r1-w1-pl.utf16le.xml` | 1922 | `c5f34dcb0b4135af46b72f01372f063a3906db30405ae271d92696d92273efa8` | R1, w1, Profit and Loss; as received |
+| `r1-w1-stock-summary.utf16le.xml` | 966 | `5ca75217dddff3e8bcf0f5a8fc50c993a28d768ab126d5d6941d83a8a634bb3c` | R1, w1, Stock Summary; as received |
+| `r1-w2-bs.utf16le.xml` | 1854 | `f188c7ba890f76637559ee66d5a27e9017de588d8a108e70f91f728e6b224237` | R1, w2, Balance Sheet; as received |
+| `r1-w2-ledgers.utf16le.xml` | 13548 | `c5bd41fd0816b3dd75d3f003ee4d7900a1eba27722dd91b786034807a6fa4286` | R1, w2, ledgers (Trial Balance collection); as received |
+| `r1-w2-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R1, w2, negative-stock report; as received |
+| `r1-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | R1, w2, Profit and Loss; as received |
+| `r1-w2-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | R1, w2, Stock Summary; as received |
+| `r1-w3-bs.utf16le.xml` | 1854 | `d8cba5d13e1f23f6b58f54ef4bf0dea24535c73637c7e62ee34d9a3ad3543b24` | R1, w3, Balance Sheet; as received |
+| `r1-w3-ledgers.utf16le.xml` | 13508 | `2a2878575ad318b157e3b335ffb1ae304d9e505e65a980e94503d0ba9eb9778b` | R1, w3, ledgers (Trial Balance collection); as received |
+| `r1-w3-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R1, w3, negative-stock report; as received |
+| `r1-w3-pl.utf16le.xml` | 1924 | `191f80cb0d8fb94db56f8069a4616749875f86ad9f5aad7a743634a1bd9d3051` | R1, w3, Profit and Loss; as received |
+| `r1-w3-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | R1, w3, Stock Summary; as received |
+| `r1-w4-bs.utf16le.xml` | 1854 | `f188c7ba890f76637559ee66d5a27e9017de588d8a108e70f91f728e6b224237` | R1, w4, Balance Sheet; as received |
+| `r1-w4-ledgers.utf16le.xml` | 13462 | `666daa320f1c4a3502ccca68f731d095cb09fc1a343b0325abda2cd602a81ca0` | R1, w4, ledgers (Trial Balance collection); as received |
+| `r1-w4-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R1, w4, negative-stock report; as received |
+| `r1-w4-pl.utf16le.xml` | 1892 | `b565da7c53341cd86eb558a5f262dc0f925e1110ebdfa77f3c93a360e0d9202e` | R1, w4, Profit and Loss; as received |
+| `r1-w4-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | R1, w4, Stock Summary; as received |
+| `r2-after-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | R2, w2 after the restore, Profit and Loss; as received |
+| `r2-w1-bs.utf16le.xml` | 1852 | `48377d79b6be4844ec038702f5040857240910f6e3a2b1b6ce8fe5e955313999` | R2, w1, Balance Sheet; as received |
+| `r2-w1-ledgers.utf16le.xml` | 13526 | `8437286da7ab2e27ff2b40677bc96b87bd5b9eb3ec52da36c05e0e6ff5c1bd16` | R2, w1, ledgers (Trial Balance collection); as received |
+| `r2-w1-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R2, w1, negative-stock report; as received |
+| `r2-w1-pl.utf16le.xml` | 1922 | `feebe9af203f43d4841faf31458d73babd3db5e78ba753370cb2924cdbf22ab8` | R2, w1, Profit and Loss; as received |
+| `r2-w1-stock-summary.utf16le.xml` | 966 | `96936b3d493d661a918f35d39511256da79889efa2d5e4775ce177a0ea17eb14` | R2, w1, Stock Summary; as received |
+| `r2-w2-bs.utf16le.xml` | 1854 | `ff4ccf92074ba2a08e1c5dbd8502dc9f61c5c2fd7e4121912115770aa9b6d616` | R2, w2, Balance Sheet; as received |
+| `r2-w2-ledgers.utf16le.xml` | 13548 | `f08f2ae27f89f29fb9df84f94a1184d6b4db3000c663da490c0a2d4bea0b75d8` | R2, w2, ledgers (Trial Balance collection); as received |
+| `r2-w2-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R2, w2, negative-stock report; as received |
+| `r2-w2-pl.utf16le.xml` | 1938 | `41998a838d31f8ed8ed9c72279a8d2cbece0a7237e7cc3e56e17c0c8937c5e19` | R2, w2, Profit and Loss; as received |
+| `r2-w2-stock-summary.utf16le.xml` | 962 | `fedd896aaf2201e9071dfca8701341f10322e89022aa09485cf24af7d55fa9f8` | R2, w2, Stock Summary; as received |
+| `r3-after-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | R3, w2 after the restore, Profit and Loss; as received |
+| `r3-w2-bs.utf16le.xml` | 1854 | `8ede498a8f71dc42ff3c136849499f13137d5f9d4db38435253b07e81b11af5d` | R3, w2, Balance Sheet; as received |
+| `r3-w2-ledgers.utf16le.xml` | 13542 | `6bca6a373285605d1a74a470742b23b9c3038b9f085e053b09bdebb7ff525933` | R3, w2, ledgers (Trial Balance collection); as received |
+| `r3-w2-negative-stock.utf16le.xml` | 482 | `6c318484ea3a0375d6a6ec11e5c2ee9c5b89a99e1b637d5a4abd49336e7aa2d1` | R3, w2, negative-stock report; as received |
+| `r3-w2-pl.utf16le.xml` | 1938 | `70f9d3761df6d64cfcd792017131ba3727c9c1075e8f5980d3979c9aaf4b984c` | R3, w2, Profit and Loss; as received |
+| `r3-w2-stock-summary.utf16le.xml` | 1394 | `d3aa11ff3dd19c66dd25d5af60bc5c4e89f7340a2b074d4f858f29c7176cb5c6` | R3, w2, Stock Summary; as received |
+| `r4-after-w2-pl.utf16le.xml` | 1938 | `2beec565946297d03602d970a6e40632de6d62b9e7e6c95646fafc8f3ea72d93` | R4, w2 after the restore, Profit and Loss; as received |
+| `r4-w2-bs.utf16le.xml` | 1854 | `be5246c94ac60f6a0dda42714ec78527c8e5358dc612fec04977c98c00d67e8e` | R4, w2, Balance Sheet; as received |
+| `r4-w2-ledgers.utf16le.xml` | 14724 | `d59c98c7437eab71908fdc4b0031af34da4398ac47695cb58b4c46e72fb6e3d3` | R4, w2, ledgers (Trial Balance collection); as received |
+| `r4-w2-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R4, w2, negative-stock report; as received |
+| `r4-w2-pl.utf16le.xml` | 2248 | `fef509e5d976c192d23bb1fa68fad2f0179dcdf5e6a70f0be7e957a9cd30f5da` | R4, w2, Profit and Loss; as received |
+| `r4-w2-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | R4, w2, Stock Summary; as received |
+| `r5-w5-bs.utf16le.xml` | 1854 | `f188c7ba890f76637559ee66d5a27e9017de588d8a108e70f91f728e6b224237` | R5, w5, Balance Sheet; as received |
+| `r5-w5-ledgers.utf16le.xml` | 13532 | `b2d0519cc1d25b5eac8a0ddc15318d58818fa9aaba97e4bf3ac81a87785f533f` | R5, w5, ledgers (Trial Balance collection); as received |
+| `r5-w5-negative-stock.utf16le.xml` | 46 | `8d37111f1de57f9c4d5ea3e984d10db165c5a8b28a0c0ec6b2688ffbc61d5ad3` | R5, w5, negative-stock report; as received |
+| `r5-w5-pl.utf16le.xml` | 1924 | `ef0cef45cfc1f0476cc210420a1b54b340382e3a2ff65bb5cb14323827aac8fd` | R5, w5, Profit and Loss; as received |
+| `r5-w5-stock-summary.utf16le.xml` | 962 | `d981168c6310cb3e3db42f90f54e7ecb6d3037e1974e463d7b1b9f69ab539b6a` | R5, w5, Stock Summary; as received |

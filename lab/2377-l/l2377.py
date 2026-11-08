@@ -172,7 +172,11 @@ def snapshot(start, folder):
 
 def ledgers(path):
     rows = {}
-    for element in tree(path).iter("LEDGER"):
+    root = tree(path)
+    if root.tag != "ENVELOPE":
+        raise Failed("{}: the root is {!r}, not ENVELOPE".format(path, root.tag))
+    # Rows sit only under BODY/DATA/COLLECTION; BODY/DESC/CMPINFO carries a bare LEDGER count line, which is not a row.
+    for element in root.findall("./BODY/DATA/COLLECTION/LEDGER"):
         name = element.get("NAME") or (element.findtext("NAME") or "")
         if not name:
             raise Failed("a LEDGER with no name")

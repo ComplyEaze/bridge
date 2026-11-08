@@ -132,3 +132,7 @@ On `lab/2377-l-answers`, with `SHA256.txt`:
 - a `RESULTS.md` holding the table above.
 
 Notes carry no user names and no machine paths beyond the lab folder. Commits carry no co-author or generated-with line. Send the sha first; push on the run coordinator's yes.
+
+## Deviation, 8 Nov 2026
+
+The first sitting stopped at S2: `pick` failed with "a LEDGER with no name". `ledgers()` walked the whole answer, so it reached the bare LEDGER count line under BODY/DESC/CMPINFO, which is not a row. It now reads only BODY/DATA/COLLECTION/LEDGER, under an ENVELOPE root, as the lab's cleaning step does. No request changes, so the snapshots already sent stand: resume at `pick` on the kept `snap-0331` answer, without resending them. `SHA256.txt` carries the new hashes of `l2377.py` and this file.

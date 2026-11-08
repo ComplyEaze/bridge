@@ -151,19 +151,25 @@ fn an_empty_closing_is_not_zero() {
 }
 
 #[test]
-fn an_unknown_party_s_empty_body_is_a_refusal_not_zero_bills() {
+fn an_unknown_party_s_empty_body_never_parses_as_zero_bills() {
+    // The transport refuses this answer by its missing content type first
+    // (`tally/runtime_party_bills_tests.rs`); the parser refuses it as well.
     let headers = std::fs::read_to_string(format!(
         "{FIXTURES}ledger-outstandings-unknown-party.headers.txt"
     ))
     .expect("headers");
     assert!(headers.starts_with("HTTP/1.1 200 OK"));
     assert!(headers.contains("CONTENT-LENGTH: 0"));
+    assert!(!headers.to_ascii_uppercase().contains("CONTENT-TYPE"));
     let body = capture("ledger-outstandings-unknown-party.utf16le.xml");
     assert!(body.is_empty());
-    let error = parse_ledger_outstandings_answer(&body, &books_from(), &date("20260331"))
-        .expect_err("no envelope");
-    assert_eq!(error, PartyBillsAnswerError::EmptyAnswer);
-    assert_eq!(error.code(), "party_bills_empty_answer");
+    assert_eq!(
+        parse_ledger_outstandings_answer(&body, &books_from(), &date("20260331")),
+        Err(PartyBillsAnswerError::Malformed {
+            rule: "party_bills_envelope_unclosed",
+            row: None,
+        })
+    );
 }
 
 #[test]

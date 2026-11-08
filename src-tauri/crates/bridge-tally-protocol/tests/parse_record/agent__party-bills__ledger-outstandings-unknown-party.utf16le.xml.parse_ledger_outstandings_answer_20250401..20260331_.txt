@@ -1,4 +1,4 @@
 # fixture: tests/fixtures/agent/party-bills/ledger-outstandings-unknown-party.utf16le.xml
 # parser: parse_ledger_outstandings_answer(20250401..20260331)
 # source: captured
-Err(EmptyAnswer)
+Err(Malformed { rule: "party_bills_envelope_unclosed", row: None })

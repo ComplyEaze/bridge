@@ -16,8 +16,9 @@
 //!   `BILLVCH*` elements naming the vouchers that made it. A debit bill is
 //!   negative. An On Account row carries the reference text `On Account`.
 //! - **An empty body is not an answer.** A name that matches no ledger was
-//!   answered with HTTP 200 and no bytes at all, twice. That is
-//!   [`PartyBillsAnswerError::EmptyAnswer`], never "no bills".
+//!   answered with HTTP 200, no bytes and no `Content-Type`, twice. The
+//!   transport refuses that by its content type before this parser sees it; an
+//!   empty text that did reach it is an unclosed envelope, never "no bills".
 //! - **The tie.** Σ `BILLCL`, On Account included, equalled the ledger
 //!   snapshot's closing at two to-dates, in the same sign. Only a tied answer
 //!   becomes a [`PartyBillsRead`].
@@ -176,10 +177,6 @@ impl PartyBillsRefusal {
 /// reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PartyBillsAnswerError {
-    /// No bytes, or only whitespace: what Tally sends for a name it does not
-    /// match. The request failed; it found nothing only in the sense that it
-    /// read nothing.
-    EmptyAnswer,
     /// A `STATUS` element: as in the Bills reports, this report carries none
     /// on success.
     TallyReportedFailure,
@@ -194,7 +191,6 @@ pub enum PartyBillsAnswerError {
 impl PartyBillsAnswerError {
     pub fn code(&self) -> &'static str {
         match self {
-            Self::EmptyAnswer => "party_bills_empty_answer",
             Self::TallyReportedFailure => "party_bills_tally_failure",
             Self::Malformed { .. } => "party_bills_answer_malformed",
         }
@@ -217,9 +213,6 @@ pub fn parse_ledger_outstandings_answer(
     books_from: &TallyDate,
     as_of: &TallyDate,
 ) -> Result<PartyBillsAnswer, PartyBillsAnswerError> {
-    if xml.trim_start_matches('\u{feff}').trim().is_empty() {
-        return Err(PartyBillsAnswerError::EmptyAnswer);
-    }
     let malformed = |rule, row| PartyBillsAnswerError::Malformed { rule, row };
     if carries_status(xml) {
         return Err(PartyBillsAnswerError::TallyReportedFailure);

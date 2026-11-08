@@ -9,6 +9,17 @@ impl Server {
         let party_argument = optional_string(args, "party")?;
         let detail_argument = optional_string(args, "detail")?;
         let reference_argument = optional_string(args, "reference")?;
+        // One party's open bills (#2377) read nothing of the whole book.
+        if detail_argument.as_deref() == Some(super::party_bills::OPEN_BILLS_DETAIL) {
+            return self
+                .outstandings_open_bills(
+                    args,
+                    guid,
+                    party_argument.as_deref(),
+                    reference_argument.as_deref(),
+                )
+                .await;
+        }
         let detail_request = super::bill_trail::parse_detail_request(
             party_argument.as_deref(),
             detail_argument.as_deref(),

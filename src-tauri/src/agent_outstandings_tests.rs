@@ -866,6 +866,12 @@ async fn mcp_outstandings_refuse_a_conflicting_detail_request_before_any_read() 
             json!({"party": "P", "detail": "unadjusted", "reference": "R"}),
             "reference_requires_bill_trail",
         ),
+        // One party's open bills (#2377) take a party and no reference.
+        (json!({"detail": "open_bills"}), "detail_requires_party"),
+        (
+            json!({"party": "P", "detail": "open_bills", "reference": "R"}),
+            "reference_requires_bill_trail",
+        ),
     ] {
         let mut arguments = json!({"company_guid": guid});
         for (key, value) in extra.as_object().unwrap() {

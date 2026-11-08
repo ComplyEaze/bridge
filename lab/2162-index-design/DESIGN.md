@@ -117,3 +117,23 @@ Part C of S7 is running. Its twelve-month sums replace this table's derived buil
 - The refusal codes' final names, and the remedy text.
 - Whether the index also serves the post-check (`folded_number`, `agent_import_verification.rs`). It reads the same rows.
 - The pair ruling (section 3).
+
+## Deviation, 8 Nov 2026: the row's AlterID
+
+Section 1 lists the row's `ALTERID` in the index. Y0's fetch list carries none, so that field needs the one-field change of row L3a (`lab/2162-ix/ROW.md` on `lab/2162-index-sheet`, where this note was first written). Freshness rests on the company marks, not on row AlterIDs, so the rest stands.
+
+## Deviation, 8 Nov 2026: a catch-up read is costly on a dense book
+
+**Measured** (the index sheet, Parts 2 and 3, 8 Nov 2026):
+- L3a: Y0 with `ALTERID` added to its fetch list answers, 41 rows on the pilot book.
+- L3b on the pilot book, K 58: 5 rows, equal to L3a's rows above K, in 0.075 s.
+- L3b on the dense book over its year, K 29800: 100 rows, each found in S6's year read, in 15.08 s and 292,626 bytes. The full-year read took 22.66 s in the same sitting. So the delta term saves about a third, not the read: Tally still walks the year.
+- L4: V and M byte-equal across Shut Company and reload, and across Quit and restart.
+- L5: twelve April reads equal, with the marks stable between them.
+
+**What changes.**
+- Section 4's 0.02 s figures stand. They are the marks reads, and the local update after this session's own verified post (section 2). Neither sends a delta read.
+- A catch-up after anyone else's change is not cheap on a dense book: about 15 s, against about 22 s for a rebuild. Section 5's L3 note ("it could replace a rebuild after a small change") is therefore worth little there. The design keeps the rebuild as the path after a foreign change, and the delta read stays optional.
+- **Unverified:** the cost scales with the date window the read walks, not with the number of rows changed. One dense measure cannot show that.
+
+**Would the changed vouchers' month make it cheap?** Not as a catch-up. The marks say that something changed, not where. The month of a foreign change is not known until a read finds it. Twelve month-window delta reads walk the same year, so they are expected to cost about the same as one year read (derived). A month window helps only when the month is known in advance, and an admission's number check needs the whole year, so no such case is known in this design. A later lab row could measure the delta term on one dense month against that month's plain Y0 read. That would show whether the cost follows the window (unverified). Nothing here changes code, and nothing waits on that row.

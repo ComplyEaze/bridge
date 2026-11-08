@@ -1854,9 +1854,9 @@ fn the_post_tool_says_what_the_approval_window_says() {
 /// day, the last 207 over its old budget. That budget went up by 500, leaving margins of
 /// 329, 179, 170 and 293.
 /// On 8 Nov 2026 `parse_bank_statement_csv` (#1320) became a tool that writes proposals and took
-/// the arguments of `parse_bank_statement`. On the tree merged with master the lists measure
-/// 212,131, 238,281, 240,790 and 246,167 bytes, over every budget by 3,231, 3,381, 3,390 and
-/// 3,267. Each budget went up by 4,000, leaving margins of 769, 619, 610 and 733.
+/// the arguments of `parse_bank_statement`, which adds 3,403 bytes to each list. On the tree
+/// merged with master the lists were over every budget by 3,231, 3,381, 3,390 and 3,267. Each
+/// budget went up by 4,000, leaving margins of 769, 619, 610 and 733.
 /// A budget is a ceiling, not a size: the lists grow only as changes merge, and
 /// the next change that needs more says so in its own pull request.
 const TOOL_LIST_BUDGETS: [usize; 4] = [212_900, 238_900, 241_400, 246_900];

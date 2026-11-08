@@ -90,7 +90,7 @@ with no figures, to a log on this computer.
 | `negative_stock` | Tally’s own Negative Stock list for a window, each item with its quantity, rate and value as Tally prints them, compared with no other report; being listed is not a finding, and an empty answer is not one either | Nothing |
 | `outstandings` | Receivables and payables with ageing, the top parties and the open bills | Nothing |
 | `parse_bank_statement` | Reads a password-protected SBI, HDFC, Union Bank of India or Bank of Baroda statement PDF and proposes Payment, Receipt and Contra vouchers | A private proposals file on this computer |
-| `parse_bank_statement_csv` | Reads a bank's own CSV statement export in the one layout measured, and refuses every file with a named reason; it proposes no vouchers yet | Nothing |
+| `parse_bank_statement_csv` | Reads a bank's own CSV statement export in the one layout measured and proposes Payment and Receipt vouchers, with any row no mapping names on the suspense ledger | A private proposals file on this computer |
 | `profit_and_loss` | The Profit and Loss for a date range, by primary group (a book with stock items is read only when Tally’s own closing stock closes every gap) | Nothing |
 | `purchase_register` | Purchase and Debit Note vouchers that touch a ledger under Duties & Taxes, as the books record them (not a GST return) | Nothing |
 | `read_evidence` | ComplyEaze Bridge’s own recent reads, as fingerprints, with no figures | Nothing |

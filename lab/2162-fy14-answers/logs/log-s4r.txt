@@ -1,0 +1,3 @@
+18:55:04	N-0071-y27.xml	a-s4r-N-0071-y27.xml	curl 0	5608 bytes
+18:55:04	V-0071.xml	a-s4r-V-0071.xml	curl 0	52788 bytes
+18:55:04	M-marks.xml	a-s4r-M-marks.xml	curl 0	3396 bytes

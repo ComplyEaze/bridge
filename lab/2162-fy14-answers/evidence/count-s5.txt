@@ -1,0 +1,12 @@
+== a-s5-I-0010-y27.xml: 538 bytes
+  root RESPONSE
+  CREATED '0'
+  ALTERED '0'
+  DELETED '0'
+  LASTVCHID '0'
+  LASTMID '0'
+  COMBINED '0'
+  IGNORED '0'
+  ERRORS '0'
+  CANCELLED '0'
+  EXCEPTIONS '1'

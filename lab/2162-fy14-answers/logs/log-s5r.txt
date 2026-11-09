@@ -1,0 +1,4 @@
+18:55:44	N-0010-y26.xml	a-s5r-N-0010-y26.xml	curl 0	5606 bytes
+18:55:45	N-0010-y27.xml	a-s5r-N-0010-y27.xml	curl 0	3024 bytes
+18:55:45	V-0010.xml	a-s5r-V-0010.xml	curl 0	52786 bytes
+18:55:45	M-marks.xml	a-s5r-M-marks.xml	curl 0	3396 bytes

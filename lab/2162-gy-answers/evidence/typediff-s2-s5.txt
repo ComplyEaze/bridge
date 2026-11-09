@@ -1,0 +1,2 @@
+== --type-diff a-s2-T-types.xml a-s5-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 0 leaves differ

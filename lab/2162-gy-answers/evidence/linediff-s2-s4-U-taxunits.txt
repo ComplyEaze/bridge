@@ -1,0 +1,20 @@
+== a-s2-U-taxunits.xml (22636 B, sha256 e40ef83cc01ffc18ee38a48745dd712d2f0f89f282cd2fe1e716a7ff71835989) vs a-s4-U-taxunits.xml (22648 B, sha256 5dabc0e73867512e454758f43bd0f31797d4b8b9cec319c2be9629e08d029887)
+  @@ -9,3 +9,3 @@
+  -    <COMPANY>0</COMPANY>
+  -    <GROUP>0</GROUP>
+  -    <LEDGER>0</LEDGER>
+  +    <COMPANY>1</COMPANY>
+  +    <GROUP>6</GROUP>
+  +    <LEDGER>588</LEDGER>
+  @@ -19 +19 @@
+  -    <CURRENCY>0</CURRENCY>
+  +    <CURRENCY>45</CURRENCY>
+  @@ -39 +39 @@
+  -    <TAXUNIT>0</TAXUNIT>
+  +    <TAXUNIT>88</TAXUNIT>
+  @@ -42,2 +42,2 @@
+  -    <VOUCHERNUMBERSERIES>0</VOUCHERNUMBERSERIES>
+  -    <VOUCHER>0</VOUCHER>
+  +    <VOUCHERNUMBERSERIES>88</VOUCHERNUMBERSERIES>
+  +    <VOUCHER>82</VOUCHER>
+  18 diff lines

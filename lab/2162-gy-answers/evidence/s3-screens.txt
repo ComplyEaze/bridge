@@ -1,0 +1,57 @@
+Step 3, screens and keys, as text.
+
+3.1 At the Gateway (shot s3-gateway-before, 20:58:31Z): F11 pressed once. The screen title (top left) reads "Company Features  Alteration", BRIDGE PILOT LAB in the title bar centre; the button bar shows F2: Period, F3: Company, I: More Details, F12: Configure, Q: Quit, A: Accept. Fields before any change (shots s3-features-before, s3-features-before-desktop; the cursor on Maintain Accounts), the same fields and values as row 2162-GF's s3-features-before, line for line:
+Company: BRIDGE PILOT LAB
+Show more features : Yes
+Show all features : Yes
+Accounting
+  Maintain Accounts : Yes
+    Enable Bill-wise entry : Yes
+    Enable Cost Centres : No
+    Enable Interest Calculation : No
+Inventory
+  Maintain Inventory : Yes
+    Integrate Accounts with Inventory : Yes
+    Enable multiple Price Levels : No
+    Enable Batches : No
+      Maintain Expiry Date for Batches : No (shown dimmed)
+    Enable Job Order Processing : No
+    Enable Cost Tracking : No
+    Enable Job Costing : No
+    Use Discount column in invoices : No
+    Use separate Actual and Billed Quantity columns in invoices : No
+Taxation
+  Enable Goods and Services Tax (GST) : Yes
+    Set/Alter Company GST Rate and Other Details : No
+  Enable Tax Deducted at Source (TDS) : No
+  Enable Tax Collected at Source (TCS) : No
+  Enable Value Added Tax (VAT) : No
+  Enable Excise : No
+  Enable Service Tax : No
+Online Access
+  Enable Browser Access for Reports : Yes
+  Enable Tally.NET Services for Remote Access & Synchronisation : No
+Payroll
+  Maintain Payroll : No
+    Enable Payroll Statutory : No (shown dimmed)
+Others
+  Enable Payment Request to share payment link/QR code : No
+  Enable multiple addresses : No
+  Mark modified vouchers : No
+
+3.2 Exactly one field names Goods and Services Tax (GST) and reads Yes: "Enable Goods and Services Tax (GST)".
+
+3.3 Keys on the features screen, in order (row 2162-GF's step 3.3 path): Down x7 (the cursor from Maintain Accounts to Enable Batches; Maintain Expiry Date for Batches, dimmed, was passed over; zoom s3-down7-zoom), Down x5 (to Use separate Actual and Billed Quantity columns in invoices; zoom s3-down12-zoom), Down x1: the cursor on Enable Goods and Services Tax (GST), reading Yes (zoom s3-down13-zoom); each field passed kept its value. Then n typed: the field shows "n" in its edit box, no message, no list, no other field changed (shots s3-gst-n-typed, s3-gst-n-typed-zoom).
+Enter pressed once (20:59:2xZ): Enable Goods and Services Tax (GST) reads No; its sub-line Set/Alter Company GST Rate and Other Details now shows dimmed, reading No; the cursor moved to Enable Tax Deducted at Source (TDS), No. No prompt, no message, no sub-screen, no list; every other field as before (shots s3-gst-no, s3-gst-no-desktop).
+3.4 No other field touched.
+
+3.5 Ctrl+A pressed once (20:59:5xZ). No "Accept ?" prompt. A message box at the bottom right, word for word, the same as row 2162-GF's three lines:
+  GST-related changes in masters may impact the GST Status of vouchers in Returns.
+  Y : Accept Master & Update GST Status of Vouchers
+  N : Back
+Captured: shots s3-prompt-desktop.jpg (the screen) and s3-prompt-zoom.jpg (the box), before any key. The words are the same: NEW PATH, y pressed once.
+
+3.6 After y (pressed at 21:01:2xZ, once):
+  - A busy window over the features screen, titled "Updating the GST status in the vouchers", with a progress bar: "0%", "1 of 44 vouchers" right after the key (shot s3-y-busy-0pct-desktop.jpg), then "66%", "30 of 44 vouchers" about 2 s later (shot s3-y-busy-66pct-desktop.jpg). While it showed, the panel on the right read F2: Date, F3: Company and N: Manage Rental License only. Nothing was pressed while it showed.
+  - Then the Gateway, by itself, by 21:01:3xZ (the clock read 21:01:33Z beside that capture; under 15 s after y): no further prompt, message or screen (shots s3-gateway-after.png, s3-gateway-after-desktop.jpg).
+  - The Gateway after: BRIDGE PILOT LAB alone, current period 1-Apr-26 to 31-Mar-27, current date Tuesday, 15-Sep-2026, date of last entry 15-Sep-26, "(e) (Schedule Backup)" and "* (e) Data exceptions exist", as before the change. Its menu is the same as before, item for item (MASTERS Create, Alter, CHart of Accounts; TRANSACTIONS Vouchers, Day BooK; UTILITIES BaNking, TallyCapital; REPORTS Balance Sheet, Profit & Loss A/c, Stock Summary, Ratio Analysis; Display More Reports, DashbOard; Quit). No GST line or menu shows on it, before or after.

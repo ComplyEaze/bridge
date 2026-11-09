@@ -84,6 +84,35 @@ fn every_company_lists_and_only_the_unsendable_one_is_marked() {
             None,
             "\u{915}\u{94d}\u{200d}\u{937} Lab".to_string(),
         ),
+        // A non-joiner is part of how this Persian name is written: shown as is.
+        (
+            "\u{645}\u{6cc}&#x200c;\u{62e}\u{648}\u{627}\u{647}\u{645} Lab",
+            "\u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645} Lab".to_string(),
+            None,
+            "\u{645}\u{6cc}\u{200c}\u{62e}\u{648}\u{627}\u{647}\u{645} Lab".to_string(),
+        ),
+        // Every other invisible character in a sendable name is shown as its
+        // code: a zero-width space would make two names draw alike, a tag
+        // character carries text no person sees, and a name of one Hangul
+        // filler would draw as nothing.
+        (
+            "Acme&#x200b; Lab",
+            "Acme\u{200b} Lab".to_string(),
+            None,
+            "Acme\\u{200b} Lab".to_string(),
+        ),
+        (
+            "Lab&#xe0041;",
+            "Lab\u{e0041}".to_string(),
+            None,
+            "Lab\\u{e0041}".to_string(),
+        ),
+        (
+            "&#x3164;",
+            "\u{3164}".to_string(),
+            None,
+            "\\u{3164}".to_string(),
+        ),
     ] {
         let xml = with_name(name_xml);
         let companies = bridge_tally_protocol::parse_companies_from_collection(&xml).unwrap();

@@ -1,0 +1,4 @@
+$ python -I count15.py --same-row a-s4r-M-marks.xml a-s6-M-marks.xml
+== a-s6-M-marks.xml against a-s4r-M-marks.xml: GUID, ALTVCHID, ALTMSTID ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'245'") against ("'6b43e498-430c-4d5c-bfef-d32e2ab93c85'", "'69'", "'245'")
+  equal
+exit 0

@@ -1,0 +1,66 @@
+Step 5, the HSN summary after, the same keys as step 3, screens as text.
+
+5.1 At the Gateway (shot s5-gateway): the G: Go To label clicked; GSTR-1 typed; the List of Reports as at 3.1, no line highlighted; Down once: GSTR-1 highlighted; Enter. No list of GST registrations.
+5.2 "GSTR-1", BRIDGE PILOT LAB, 1-Aug-26 to 31-Aug-26 (no period key pressed); the header and button bar as at 3.2 (shots s5-gstr1, s5-gstr1-desktop).
+5.3 Counts (Voucher Count):
+  Total Vouchers 40
+  Included in Return 28
+    Ready for Upload 28
+    Modified in Books After Upload/Export 28
+  Not Relevant for This Return 7
+  Uncertain Transactions (Corrections needed) 5
+  Check Vouchers Having Potential Conflicts with Masters: Yes
+Return View: every line empty but
+  B2C (Small) Invoices - 7: 28 (2), 14,509.50, CGST 408.28, SGST/UTGST 408.26, Tax 816.54
+  Total: 14,509.50, CGST 408.28, SGST/UTGST 408.26, Tax 816.54
+
+5.4 Down x10, x12, x1, x1 as at 3.4: "HSN Summary - 12 (B2B - B2C Supplies)" highlighted (zoomed, shot s5-hsn-line-zoom). Enter. One list, no choice offered (shots s5-hsn, s5-hsn-desktop). Title, registration, period, heading and columns as at 3.4.
+  847130 | OTH | | 826.00 | 18 % | 700.00 | | 63.00 | 63.00 | | 126.00
+  9983 | NA | | 105.00 | 5 % | 100.00 | | 2.50 | 2.50 | | 5.00
+  998313 | NA | | 11,767.82 | 5 % | 11,207.40 | | 280.22 | 280.20 | | 560.42
+  998314 | NA | | 1,787.12 | 5 % | 1,702.00 | | 42.56 | 42.56 | | 85.12
+  998315 | NA | | 105.10 | 5 % | 100.10 | | 2.50 | 2.50 | | 5.00
+  998341 | NA | | 210.00 | 5 % | 200.00 | | 5.00 | 5.00 | | 10.00
+  998342 | NA | | 210.00 | 5 % | 200.00 | | 5.00 | 5.00 | | 10.00
+  998343 | NA | | 105.00 | 5 % | 100.00 | | 2.50 | 2.50 | | 5.00
+  998344 | NA | | 210.00 | 5 % | 200.00 | | 5.00 | 5.00 | | 10.00
+  Sub Total | | | 15,326.04 | | 14,509.50 | | 408.28 | 408.26 | | 816.54
+Total | | | 15,326.04 | | 14,509.50 | | 408.28 | 408.26 | | 816.54
+(the Description lines as at 3.4, word for word the same; the button bar as at 3.4; the highlight on 847130)
+
+5.5 Down x2 from 847130: 998313 highlighted (zoomed, shot s5-998313-line-zoom). Enter once: "GSTR-1 - Voucher Register", "Vouchers of 998313", as at 3.5 (shots s5-vch-998313, s5-vch-998313-desktop). Its lines, word for word:
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0001 | NA | | 1,050.00 | 1,000.00 | | 25.00 | 25.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0004 | NA | | 1,051.06 | 1,001.00 | | 25.03 | 25.03 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0005 | NA | | 1,051.04 | 1,001.00 | | 25.02 | 25.02 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0006 | NA | | 1,050.02 | 1,000.00 | | 25.01 | 25.01 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0007 | NA | | 630.00 | 600.00 | | 15.00 | 15.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0009 | NA | | 630.00 | 600.00 | | 15.00 | 15.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0011 | NA | | 1,051.06 | 1,001.00 | | 25.03 | 25.03 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0010 | NA | | 630.42 | 600.40 | | 15.01 | 15.01 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0072 | NA | | 630.42 | 600.40 | | 15.01 | 15.01 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0012 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0013 | NA | | 105.22 | 100.20 | | 2.51 | 2.51 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0014 | NA | | 105.64 | 100.60 | | 2.52 | 2.52 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0015 | NA | | 210.44 | 200.40 | | 5.02 | 5.02 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0016 | NA | | 105.20 | 100.20 | | 2.50 | 2.50 |
+  2-Aug-26 | Bridge Walk-in | BRIDGE Sales | BP/26-27/0019 | NA | | 105.00 | 100.00 | | 2.50 | 2.50 |
+  2-Aug-26 | Bridge Walk-in | BRIDGE Sales Z1 | Z1/0001 | NA | | (empty) | (empty) | | (empty) | (empty) |
+  5-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0021 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  21-Aug-26 | BRIDGE Walk-in | BRIDGE Sales Two | BP2/0001 | NA | | 1,050.00 | 1,000.00 | | 25.00 | 25.00 |
+  22-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0043 | NA | | 1,051.05 | 1,001.00 | | 25.03 | 25.02 |
+  22-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0044 | NA | | 1,051.05 | 1,001.00 | | 25.03 | 25.02 |
+  Total | | | | | | 11,767.82 | 11,207.40 | | 280.22 | 280.20 |
+20 lines: the 19 of 3.5, unchanged, and BP/26-27/0072 after BP/26-27/0010. The highlight on the first; no key but Esc pressed on it.
+Esc once: back on the HSN list, highlight on 998313. Down x1: 998314 highlighted (zoomed, shot s5-998314-line-zoom). Enter once: "Vouchers of 998314" (shots s5-vch-998314, s5-vch-998314-desktop):
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0007 | NA | | 420.00 | 400.00 | | 10.00 | 10.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0010 | NA | | 420.42 | 400.40 | | 10.01 | 10.01 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0072 | NA | | 420.42 | 400.40 | | 10.01 | 10.01 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0012 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0013 | NA | | 105.22 | 100.20 | | 2.51 | 2.51 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0014 | NA | | 105.64 | 100.60 | | 2.52 | 2.52 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0016 | NA | | 105.22 | 100.20 | | 2.51 | 2.51 |
+  5-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0021 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  Total | | | | | | 1,787.12 | 1,702.00 | | 42.56 | 42.56 |
+8 lines: the 7 of 3.5, unchanged, and BP/26-27/0072 after BP/26-27/0010. No key but Esc pressed on it.
+Esc once: HSN list, highlight on 998314, figures as above (shot s5-hsn-after-esc-desktop). Esc once: GSTR-1 (shot s5-gstr1-after-esc-desktop). Esc once: Gateway of Tally, BRIDGE PILOT LAB, period and date unchanged (shots s5-gateway-after, s5-gateway-after-desktop).
+Keys in step 5: G click; GSTR-1; Down; Enter; Down x24; Enter; Down x2; Enter; Esc; Down; Enter; Esc x3. No Enter in either voucher register.

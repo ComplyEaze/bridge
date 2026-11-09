@@ -1,0 +1,12 @@
+$ python -I count15.py --diff a-s4r-R-0010.xml a-s4r-R-0072.xml
+== --diff a-s4r-R-0010.xml a-s4r-R-0072.xml
+   ALTERID: '17' -> '69'
+   GUID: '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b' -> '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000002d'
+   MASTERID: '11' -> '45'
+   REFERENCE: 'BP/26-27/0010' -> 'BP/26-27/0072'
+   VOUCHERKEY: '<15-digit voucher key>' -> '<15-digit voucher key>'
+   VOUCHERNUMBER: 'BP/26-27/0010' -> 'BP/26-27/0072'
+   VOUCHERRETAINKEY: '41' -> '129'
+   lists compared: 1
+   legs: 6 -> 6
+exit 0

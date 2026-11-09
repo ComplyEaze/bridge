@@ -1,0 +1,80 @@
+Step 3, the HSN summary before, screens and keys, as text.
+
+3.1 At the Gateway (shot s3-gateway): the G: Go To label clicked; "Go To" box over the Gateway; GSTR-1 typed. "List of Reports": Create Voucher, Create Master, Alter Master, Expand All, Show More; heading GST Reports: GSTR-1, GSTR-1 Reconciliation, GSTR-1 Filed Summary - Downloaded; no line highlighted. Down once: GSTR-1 highlighted (zoomed). Enter. No list of GST registrations came; the report opened at once.
+3.2 "GSTR-1", BRIDGE PILOT LAB, period 1-Aug-26 to 31-Aug-26 (no period key pressed). GST Registration 08ZZZZZ0000Z1ZQ; Status Not Filed; ARN and ARN Date empty; "Last online GST activity: No Activity Found". Button bar: F2: Period, F3: Company, F4 (empty), F5: Nature View, F6: Validate Party GSTIN/UIN, F7: Validate HSN/SAC, F8, F9 (empty), F10: Mark as Filed, B: Basis of Values, H: Change View, J: Exception Reports, L: Save View, J: Stat Adjustment, V: Open GST Portal, A: Manually Update ARN, F12: Configure (shots s3-gstr1, s3-gstr1-desktop).
+3.3 Counts (Voucher Count):
+  Total Vouchers 39
+  Included in Return 27
+    Ready for Upload 27
+    Modified in Books After Upload/Export 27
+  Not Relevant for This Return 7
+  Uncertain Transactions (Corrections needed) 5
+  Check Vouchers Having Potential Conflicts with Masters: Yes
+Return View (Vch Count (Summary), Taxable Amount, IGST, CGST, SGST/UTGST, Cess, Tax Amount, Invoice Amount): every line empty but
+  B2C (Small) Invoices - 7: 27 (2), 13,508.70, CGST 383.26, SGST/UTGST 383.24, Tax 766.50
+  Total: 13,508.70, CGST 383.26, SGST/UTGST 383.24, Tax 766.50
+(the page shows "3" with a down mark at its foot)
+
+3.4 From Total Vouchers, Down x10 (Credit or Debit Notes (Registered) - 9B), Down x12 (Amended Tax Liability (Advances Received) - 11A, the page's last line), Down x1 (the page scrolled: Amendment of Adjusted Advances - 11B), Down x1: "HSN Summary - 12 (B2B - B2C Supplies)" highlighted (zoomed, shot s3-hsn-line-zoom). Lines passed, in order: Included in Return, Ready for Upload, Modified in Books After Upload/Export, Not Relevant for This Return, Uncertain Transactions (Corrections needed), Check Vouchers Having Potential Conflicts with Masters, B2B Invoices - 4A, 4B, 4C, 6B, 6C, B2C (Large) Invoices - 5A, 5B, Exports Invoices - 6A, Credit or Debit Notes (Registered) - 9B, Credit or Debit Notes (Unregistered) - 9B, Amended B2B Invoices - 9A, Amended B2C (Large) Invoices - 9A, Amended Exports Invoices - 9A, Amended Credit or Debit Notes (Registered) - 9C, Amended Credit or Debit Notes (Unregistered) - 9C, B2C (Small) Invoices - 7, Nil Rated Invoices - 8A, 8B, 8C, 8D, Amendment B2C (Small) Invoices - 10, Tax Liability (Advances Received) - 11A(1), 11A(2), Adjustment of Advances - 11B(1), 11B(2), Amended Tax Liability (Advances Received) - 11A, Amendment of Adjusted Advances - 11B. Enter. One list, no choice offered (shots s3-hsn, s3-hsn-desktop):
+Title: "GSTR-1 - HSN/SAC Summary (B2B - B2C Supplies)", BRIDGE PILOT LAB; GST Registration 08ZZZZZ0000Z1ZQ; 1-Aug-26 to 31-Aug-26; "HSN/SAC Summary - HSN/SAC".
+Columns: HSN/SAC | UQC | Quantity | Total Amount | Tax Rate | Taxable Amount | IGST | CGST | SGST/UTGST | Cess | Tax Amount
+Heading: B2C Supplies
+  847130 | OTH | | 826.00 | 18 % | 700.00 | | 63.00 | 63.00 | | 126.00
+    Description : Portable Automatic Data Processing Machines, Weighing Not More Than 10 Kg, Consisting Of Atleast A Central Processing Unit, A Keyboard And A Display
+  9983 | NA | | 105.00 | 5 % | 100.00 | | 2.50 | 2.50 | | 5.00
+    Description : Other professional, technical and business services
+  998313 | NA | | 11,137.40 | 5 % | 10,607.00 | | 265.21 | 265.19 | | 530.40
+    Description : Information technology consulting and support services
+  998314 | NA | | 1,366.70 | 5 % | 1,301.60 | | 32.55 | 32.55 | | 65.10
+    Description : Information technology design and development services
+  998315 | NA | | 105.10 | 5 % | 100.10 | | 2.50 | 2.50 | | 5.00
+    Description : Hosting and information technology infrastructure provisioning services
+  998341 | NA | | 210.00 | 5 % | 200.00 | | 5.00 | 5.00 | | 10.00
+    Description : Geological and geophysical consulting services
+  998342 | NA | | 210.00 | 5 % | 200.00 | | 5.00 | 5.00 | | 10.00
+    Description : Subsurface surveying services
+  998343 | NA | | 105.00 | 5 % | 100.00 | | 2.50 | 2.50 | | 5.00
+    Description : Mineral exploration and evaluation
+  998344 | NA | | 210.00 | 5 % | 200.00 | | 5.00 | 5.00 | | 10.00
+    Description : Surface surveying and map-making services
+  Sub Total | | | 14,275.20 | | 13,508.70 | | 383.26 | 383.24 | | 766.50
+Total | | | 14,275.20 | | 13,508.70 | | 383.26 | 383.24 | | 766.50
+Button bar: F2: Period, F3: Company, F5: Registration Period View, F7: Validate HSN/SAC, B: Basis of Values, H: Change View, J: Exception Reports (dimmed), L: Save View, V: Alter Summary, R: Reset Summary (dimmed), S: Set GST Status, F12: Configure. The highlight on 847130.
+
+3.5 NEW PATH. Down x2 from 847130 (the Description lines are passed over): 998313 highlighted (zoomed, shot s3-998313-line-zoom). Enter once. It opened a list of vouchers (shots s3-vch-998313, s3-vch-998313-desktop):
+Title: "GSTR-1 - Voucher Register", BRIDGE PILOT LAB; GST Registration 08ZZZZZ0000Z1ZQ; "Vouchers of 998313"; 1-Aug-26 to 31-Aug-26.
+Columns: Date | Particulars | Vch Type | Vch No. | UQC | Quantity | Total Amount | Taxable Amount | IGST | CGST | SGST/UTGST | Cess (a mark "2" with a right arrow at the top right of the list: the columns go on to a second part, not opened)
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0001 | NA | | 1,050.00 | 1,000.00 | | 25.00 | 25.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0004 | NA | | 1,051.06 | 1,001.00 | | 25.03 | 25.03 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0005 | NA | | 1,051.04 | 1,001.00 | | 25.02 | 25.02 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0006 | NA | | 1,050.02 | 1,000.00 | | 25.01 | 25.01 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0007 | NA | | 630.00 | 600.00 | | 15.00 | 15.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0009 | NA | | 630.00 | 600.00 | | 15.00 | 15.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0011 | NA | | 1,051.06 | 1,001.00 | | 25.03 | 25.03 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0010 | NA | | 630.42 | 600.40 | | 15.01 | 15.01 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0012 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0013 | NA | | 105.22 | 100.20 | | 2.51 | 2.51 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0014 | NA | | 105.64 | 100.60 | | 2.52 | 2.52 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0015 | NA | | 210.44 | 200.40 | | 5.02 | 5.02 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0016 | NA | | 105.20 | 100.20 | | 2.50 | 2.50 |
+  2-Aug-26 | Bridge Walk-in | BRIDGE Sales | BP/26-27/0019 | NA | | 105.00 | 100.00 | | 2.50 | 2.50 |
+  2-Aug-26 | Bridge Walk-in | BRIDGE Sales Z1 | Z1/0001 | NA | | (empty) | (empty) | | (empty) | (empty) |
+  5-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0021 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  21-Aug-26 | BRIDGE Walk-in | BRIDGE Sales Two | BP2/0001 | NA | | 1,050.00 | 1,000.00 | | 25.00 | 25.00 |
+  22-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0043 | NA | | 1,051.05 | 1,001.00 | | 25.03 | 25.02 |
+  22-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0044 | NA | | 1,051.05 | 1,001.00 | | 25.03 | 25.02 |
+  Total | | | | | | 11,137.40 | 10,607.00 | | 265.21 | 265.19 |
+19 lines; the highlight on the first (1-Aug-26, BP/26-27/0001). Button bar: Q: Quit, Enter: Alter, Space: Select, A: Add Vch, 2: Duplicate Vch, I: Insert Vch, D: Delete, X: Cancel Vch, F2: Period, F3: Company, B: Basis of Values (dimmed), H: Change View (dimmed), J: Exception Reports (dimmed), L: Save View, L: Set Effective Date, S: Set GST Status, F12: Configure. No key but Esc pressed on it (Enter there would alter a voucher).
+Esc once: back on the HSN/SAC Summary, the same nine lines and totals, the highlight on 998313 (shot s3-hsn-after-esc-desktop). Down x1: 998314 highlighted (zoomed, shot s3-998314-line-zoom). Enter once. It opened a list of vouchers (shots s3-vch-998314, s3-vch-998314-desktop):
+Title: "GSTR-1 - Voucher Register", BRIDGE PILOT LAB; GST Registration 08ZZZZZ0000Z1ZQ; "Vouchers of 998314"; 1-Aug-26 to 31-Aug-26. Columns as for 998313 (the same "2" mark at the top right).
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0007 | NA | | 420.00 | 400.00 | | 10.00 | 10.00 |
+  1-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0010 | NA | | 420.42 | 400.40 | | 10.01 | 10.01 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0012 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0013 | NA | | 105.22 | 100.20 | | 2.51 | 2.51 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0014 | NA | | 105.64 | 100.60 | | 2.52 | 2.52 |
+  2-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0016 | NA | | 105.22 | 100.20 | | 2.51 | 2.51 |
+  5-Aug-26 | BRIDGE Walk-in | BRIDGE Sales | BP/26-27/0021 | NA | | 105.10 | 100.10 | | 2.50 | 2.50 |
+  Total | | | | | | 1,366.70 | 1,301.60 | | 32.55 | 32.55 |
+7 lines; the highlight on the first. The same button bar as 998313's. No key but Esc pressed on it.
+3.6 Esc once: the HSN/SAC Summary (highlight on 998314). Esc once: GSTR-1 (highlight on HSN Summary - 12 (B2B - B2C Supplies), counts as at 3.3). Esc once: the Gateway of Tally, BRIDGE PILOT LAB, as before (shot s3-gateway-after). No prompt at any step.
+Keys pressed in step 3, in all: G: Go To label click; GSTR-1 typed; Down; Enter; Down x24; Enter; Down x2; Enter; Esc; Down; Enter; Esc; Esc; Esc. (This line first listed four Escs at the end; the tool record shows three, as 3.6 says.)

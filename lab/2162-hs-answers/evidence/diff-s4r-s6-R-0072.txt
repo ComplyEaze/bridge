@@ -1,0 +1,5 @@
+$ python -I count15.py --diff a-s4r-R-0072.xml a-s6-R-0072.xml
+== --diff a-s4r-R-0072.xml a-s6-R-0072.xml
+   lists compared: 1
+   legs: 6 -> 6
+exit 0

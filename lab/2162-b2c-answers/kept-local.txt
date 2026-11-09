@@ -1,0 +1,7 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+bk/TDBK1800_<company number>.001 90051 B 7cf140b2e2fcf6dc0d80a9a5fecd44178669bd837fb35aadd4e012b9496e9cf5 (BK, a fallback taken at step 1 of this sitting; not restored, as nothing changed)
+evidence/c10-netstat.txt 8298 B 2f065a1a6dd553794ead90cca3e5c5ed570a245c8cdcf7b12a0ec50056b08910 (process or port listing)
+evidence/c10-tasklist.txt 54 B 8780270da778b424f97857f74de07b3b338e52e03304d199ae5402db31942a39 (process or port listing)
+evidence/s0-netstat.txt 8208 B 75adf990d8ad5985db0fdb06d7f2f9d2fd246418dfd53265cc376aa4890ecd88 (process or port listing)
+evidence/s0-tasklist.txt 54 B dcc9c06c028c783a86ead8f7c070595abb0c63b123b20f31cd7cf9fb2884eb0f (process or port listing)
+stage-2162b2c.py 10161 B aba1d723de16458d6602f6b049f50681ea8a9cf8f6d5e0e66ec257029de171a2 (this stage script: its patterns name the lab paths)

@@ -1,0 +1,12 @@
+Captures of this row, by name, size and sha256. They stay on the lab PC. shots/ are the whole Tally window (PrintWindow).
+shots/c10-select-company.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/c10-window.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/s0-window.png 72924 B 7ba902a06f9d25cfe61414114d83d4571c63689d8349b74f04c58717c88c1951
+shots/s1-bk-accept.png 51560 B 26470a732c9a587a62c9ee5c21f0b45f8b3e6fa9907ad7cf673d839e2c6befbc
+shots/s1-gateway.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/s3-1-gateway.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a
+shots/s3-3-gstr1-summary.png 55499 B 0f6b8a4bacaff84505fdac589974c4bef20e161f420d326515981e11b7048a3f
+shots/s3-4-b2c-small-summary.png 30846 B a278d7df839f5b1da132ef5b2a9c0172d2805b24a3725422285873693b97d77c
+shots/s3-4b-rajasthan-5-vouchers.png 100436 B 45be7b56726a90772e7f198df9598c09318e2eeb6f60c02580228ee5c388ee9d
+shots/s3-5-gstr1-lower-lines.png 56981 B 258f1335d402093ed8f2b983c0c463c3e710ed6bc37857e5dd2dd97ffe56fe4f
+shots/s3-6-gateway.png 46676 B ca58f95e95d24e9f84682d0ce0c09e19061dc27d130c3067d97085af8c070c2a

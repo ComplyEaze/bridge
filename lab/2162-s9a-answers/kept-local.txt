@@ -1,0 +1,9 @@
+Kept on the lab PC by the run lead's standing rules, by size and sha256, with the reason (the company number is shown as <company number>):
+backup-1/TDBK1800_<company number>.001 90051 B 6463ce768caf83fdd13ecd3dd4807535f9502f41383bac43e20c04d4a94f771b (the step 1 backup)
+answers/a-s2-C-compliance.xml 38278 B 4976bbece519394b53b37b616b169f12d3438b625445d90a3380994393e07216 (GSTIN shape (the invented GSTINs stay local))
+answers/a-s2b-C-compliance.xml 38278 B 4976bbece519394b53b37b616b169f12d3438b625445d90a3380994393e07216 (GSTIN shape (the invented GSTINs stay local))
+evidence/c10-netstat.txt 8576 B 7bb533090bde51a9b85eb9e207a445a4ce5a27353fab8f388655d5cf60bd3215 (process or port listing)
+evidence/c10-tasklist.txt 54 B 7848fc7cd9084da1fd83970e48e00946b1cb5ba052633fb4e430cfcf4aa2713b (process or port listing)
+evidence/s0-netstat.txt 7700 B 994841322bb432cd2df8750f1846b0715e41fb42e5b3e77ae35f41466cccbd8e (process or port listing)
+evidence/s0-tasklist.txt 54 B 02716e54f00fab026e1340c8857b20e1ec0cf927709d4a9891074ad28cf863dd (process or port listing)
+stage-s9a.py 8965 B 2d9ea930a2f7e1da83b94de600990e38306db68b4ef7572510828abe11ad8bdc (this stage script: its patterns name the lab paths)

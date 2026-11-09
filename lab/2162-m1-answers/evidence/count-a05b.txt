@@ -1,0 +1,31 @@
+a-a05b-A-Y0-2026-08.xml: 115168 bytes, sha256 f67cf46f57e7f4ae65d864f7fc73ed3b20db7027d7fbf048f1730cc691387e97
+  rows 40
+  BRIDGEVCHISSALES: 'Yes' 34; 'No' 6
+  VOUCHERTYPENAME: 'BRIDGE Sales' 32; 'Receipt' 4; 'Purchase' 2; 'BRIDGE Sales Two' 1; 'BRIDGE Sales Z1' 1
+  ISCANCELLED: 'No' 39; 'Yes' 1
+  DATE: first 20260801, last 20260822, distinct 9
+  IRN: once in 40 rows, not empty in 0
+  IRNACKNO: once in 40 rows, not empty in 0
+  IRNACKDATE: once in 40 rows, not empty in 0
+  Sales-class rows 34: distinct folded numbers 34, rows whose folded number another Sales-class row also has 0
+    20260801 'BP/26-27/0001' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0002' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0003' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0004' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0005' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0006' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0007' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0008' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0009' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0011' 'BRIDGE Sales' IRN length 0
+    20260801 'BP/26-27/0010' 'BRIDGE Sales' IRN length 0
+    20260802 'BP/26-27/0012' 'BRIDGE Sales' IRN length 0
+    20260802 'BP/26-27/0013' 'BRIDGE Sales' IRN length 0
+    20260802 'BP/26-27/0014' 'BRIDGE Sales' IRN length 0
+    20260802 'BP/26-27/0015' 'BRIDGE Sales' IRN length 0
+    20260802 'BP/26-27/0016' 'BRIDGE Sales' IRN length 0
+    20260802 'Z1/0001' 'BRIDGE Sales Z1' IRN length 0
+    20260802 'BP/26-27/0019' 'BRIDGE Sales' IRN length 0
+    20260805 'BP/26-27/0021' 'BRIDGE Sales' IRN length 0
+    20260807 '5' 'BRIDGE Sales' IRN length 0
+    and 14 more

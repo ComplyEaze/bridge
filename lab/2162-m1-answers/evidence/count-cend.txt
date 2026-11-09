@@ -1,0 +1,2 @@
+a-cend-C-M-marks.xml: 3398 bytes, sha256 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['3']; ALTMSTID ['215']

@@ -1,0 +1,11 @@
+a-a06a-A-Y0-2026-09.xml: 5850 bytes, sha256 97e447efb4d0670bbb9231b825bcd05e61d1066c9e45e2d793a7c7e13dfa55bf
+  rows 1
+  BRIDGEVCHISSALES: 'Yes' 1
+  VOUCHERTYPENAME: 'BRIDGE Sales' 1
+  ISCANCELLED: 'No' 1
+  DATE: first 20260915, last 20260915, distinct 1
+  IRN: once in 1 rows, not empty in 0
+  IRNACKNO: once in 1 rows, not empty in 0
+  IRNACKDATE: once in 1 rows, not empty in 0
+  Sales-class rows 1: distinct folded numbers 1, rows whose folded number another Sales-class row also has 0
+    20260915 'BP/26-27/0020' 'BRIDGE Sales' IRN length 0

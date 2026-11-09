@@ -1,0 +1,12 @@
+a-c01b-C-Y0-2025-04.xml: 11502 bytes, sha256 57ef938df392c231651047cdedf02fe93f8450861e7abbbfbf3b31ac4743d933
+  rows 3
+  BRIDGEVCHISSALES: 'Yes' 2; 'No' 1
+  VOUCHERTYPENAME: 'Sales' 2; 'Payment' 1
+  ISCANCELLED: 'No' 3
+  DATE: first 20250403, last 20250403, distinct 1
+  IRN: once in 3 rows, not empty in 1
+  IRNACKNO: once in 3 rows, not empty in 1
+  IRNACKDATE: once in 3 rows, not empty in 1
+  Sales-class rows 2: distinct folded numbers 2, rows whose folded number another Sales-class row also has 0
+    20250403 '1' 'Sales' IRN length 64
+    20250403 '2' 'Sales' IRN length 0

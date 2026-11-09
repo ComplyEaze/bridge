@@ -1,0 +1,2 @@
+a-bend-A-M-marks.xml: 3394 bytes, sha256 8a0c42682c958e4850d6893438d41ffeb62f6c26eb2e7eb29c46c6f2d51076e6
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['68']; ALTMSTID ['245']

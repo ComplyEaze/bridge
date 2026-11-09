@@ -1,0 +1,88 @@
+a-c0-C-M-marks.xml: 3398 bytes, sha256 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['3']; ALTMSTID ['215']
+a-c01a-C-Y0-2025-04.xml: 11502 bytes, sha256 57ef938df392c231651047cdedf02fe93f8450861e7abbbfbf3b31ac4743d933
+  rows 3
+  BRIDGEVCHISSALES: 'Yes' 2; 'No' 1
+  VOUCHERTYPENAME: 'Sales' 2; 'Payment' 1
+  ISCANCELLED: 'No' 3
+  DATE: first 20250403, last 20250403, distinct 1
+  IRN: once in 3 rows, not empty in 1
+  IRNACKNO: once in 3 rows, not empty in 1
+  IRNACKDATE: once in 3 rows, not empty in 1
+  Sales-class rows 2: distinct folded numbers 2, rows whose folded number another Sales-class row also has 0
+    20250403 '1' 'Sales' IRN length 64
+    20250403 '2' 'Sales' IRN length 0
+a-c01b-C-Y0-2025-04.xml: 11502 bytes, sha256 57ef938df392c231651047cdedf02fe93f8450861e7abbbfbf3b31ac4743d933
+  rows 3
+  BRIDGEVCHISSALES: 'Yes' 2; 'No' 1
+  VOUCHERTYPENAME: 'Sales' 2; 'Payment' 1
+  ISCANCELLED: 'No' 3
+  DATE: first 20250403, last 20250403, distinct 1
+  IRN: once in 3 rows, not empty in 1
+  IRNACKNO: once in 3 rows, not empty in 1
+  IRNACKDATE: once in 3 rows, not empty in 1
+  Sales-class rows 2: distinct folded numbers 2, rows whose folded number another Sales-class row also has 0
+    20250403 '1' 'Sales' IRN length 64
+    20250403 '2' 'Sales' IRN length 0
+a-c02a-C-Y0-2025-05.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c02b-C-Y0-2025-05.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c03a-C-Y0-2025-06.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c03b-C-Y0-2025-06.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c04a-C-Y0-2025-07.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c04b-C-Y0-2025-07.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c05a-C-Y0-2025-08.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c05b-C-Y0-2025-08.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c06a-C-Y0-2025-09.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c06b-C-Y0-2025-09.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c07a-C-Y0-2025-10.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c07b-C-Y0-2025-10.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c08a-C-Y0-2025-11.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c08b-C-Y0-2025-11.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c09a-C-Y0-2025-12.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c09b-C-Y0-2025-12.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c10a-C-Y0-2026-01.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c10b-C-Y0-2026-01.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c11a-C-Y0-2026-02.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c11b-C-Y0-2026-02.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c12a-C-Y0-2026-03.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-c12b-C-Y0-2026-03.xml: 3022 bytes, sha256 947fbf369d0fcf74e53bff1a3802a927c72737735dbb3064b3cfe34dd70fa974
+  rows 0
+a-cend-C-M-marks.xml: 3398 bytes, sha256 41aad235aec1eeb84c15d4de0cd7fee953d375d19bc0e8325abaaf0531ee2887
+  COMPANY GUIDs 1; the book's: yes; ALTVCHID ['3']; ALTMSTID ['215']
+== part C: comparisons
+marks c0 against cend: the same COMPANY row (GUID, ALTVCHID, ALTMSTID): yes
+c01a 202504: rows 3, dated outside the month 0; second send element for element equal: yes
+c02a 202505: rows 0, dated outside the month 0; second send element for element equal: yes
+c03a 202506: rows 0, dated outside the month 0; second send element for element equal: yes
+c04a 202507: rows 0, dated outside the month 0; second send element for element equal: yes
+c05a 202508: rows 0, dated outside the month 0; second send element for element equal: yes
+c06a 202509: rows 0, dated outside the month 0; second send element for element equal: yes
+c07a 202510: rows 0, dated outside the month 0; second send element for element equal: yes
+c08a 202511: rows 0, dated outside the month 0; second send element for element equal: yes
+c09a 202512: rows 0, dated outside the month 0; second send element for element equal: yes
+c10a 202601: rows 0, dated outside the month 0; second send element for element equal: yes
+c11a 202602: rows 0, dated outside the month 0; second send element for element equal: yes
+c12a 202603: rows 0, dated outside the month 0; second send element for element equal: yes
+months answered 12 of 12, distinct 12; rows over the first sends 3
+0-row month answers: distinct sha256 1

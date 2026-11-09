@@ -69,6 +69,21 @@ fn every_company_lists_and_only_the_unsendable_one_is_marked() {
             None,
             "  Edge Lab  ".to_string(),
         ),
+        // A sendable name with a right-to-left override: not marked, but the
+        // override is shown as its code so it cannot reorder the text.
+        (
+            "&#x202e;Lab",
+            "\u{202e}Lab".to_string(),
+            None,
+            "\\u{202e}Lab".to_string(),
+        ),
+        // A joiner is part of how this Devanagari name is written: shown as is.
+        (
+            "\u{915}\u{94d}&#x200d;\u{937} Lab",
+            "\u{915}\u{94d}\u{200d}\u{937} Lab".to_string(),
+            None,
+            "\u{915}\u{94d}\u{200d}\u{937} Lab".to_string(),
+        ),
     ] {
         let xml = with_name(name_xml);
         let companies = bridge_tally_protocol::parse_companies_from_collection(&xml).unwrap();
@@ -96,7 +111,19 @@ fn every_company_lists_and_only_the_unsendable_one_is_marked() {
             other.get("name_refusal").is_none(),
             "an unmarked row has no such key"
         );
-        assert_eq!(other["name"], "Bridge Validation Lab");
+        // The unmarked row's whole block: the keys and values master gives it.
+        let unmarked = row(&companies, OTHER_GUID);
+        assert_eq!(
+            other,
+            json!({
+                "name": "Bridge Validation Lab",
+                "guid": OTHER_GUID,
+                "company_number": unmarked.company_number,
+                "books_from": "20250401",
+                "identity_state": "verified_tuple",
+                "missing_field": null,
+            })
+        );
         for company in &companies {
             let json = company_json(company, &companies);
             if let Some(code) = json["name_refusal"].as_str() {

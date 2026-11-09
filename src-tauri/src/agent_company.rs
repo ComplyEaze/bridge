@@ -219,11 +219,17 @@ pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Valu
         .is_some_and(|value| !crate::tally::validators::is_valid_company_number(value));
     // A name a request cannot carry is marked with its reason, and shown with
     // each control or invisible format character written as `\u{..}`, so it is
-    // never shown raw; a sendable name is shown as Tally reported it (#2433).
+    // never shown raw. A sendable name is shown as Tally reported it, except
+    // that a bidirectional control (an override, embedding, isolate or mark) is
+    // written as `\u{..}` too, so it cannot reorder the text around it. Other
+    // invisible characters stay: a joiner is part of how an Indic name is
+    // written (#2433).
     let name_refusal = ValidatedCompanyName::refusal(&company.name);
     let name = match name_refusal {
-        Some(_) => escaped_company_name(&company.name),
-        None => company.name.clone(),
+        Some(_) => escaped_company_name(&company.name, |character| {
+            character.is_control() || super::headline::is_invisible_format(character)
+        }),
+        None => escaped_company_name(&company.name, is_bidi_control),
     };
     let mut row = json!({"name": name, "guid": guid, "company_number": company.company_number, "books_from": company.books_from, "identity_state": if duplicate_guid {"ambiguous_duplicate_guid"} else if missing.is_some() {"incomplete_tuple"} else if invalid_guid {"invalid_guid"} else if invalid_number {"invalid_company_number"} else if invalid_books_from {"invalid_books_from"} else {"verified_tuple"}, "missing_field": missing});
     // Only a marked row carries the key, so every other company block is unchanged.
@@ -233,19 +239,25 @@ pub(super) fn company_json(company: &TallyCompany, all: &[TallyCompany]) -> Valu
     row
 }
 
-/// The name byte for byte, except that each control character and each
-/// invisible format character becomes its `\u{..}` code, so no character in it
-/// can hide or reorder the text around it.
-fn escaped_company_name(name: &str) -> String {
+/// The name byte for byte, except that each character `escape` picks becomes
+/// its `\u{..}` code.
+fn escaped_company_name(name: &str, escape: impl Fn(char) -> bool) -> String {
     name.chars()
         .map(|character| {
-            if character.is_control() || super::headline::is_invisible_format(character) {
+            if escape(character) {
                 format!("\\u{{{:04x}}}", u32::from(character))
             } else {
                 character.to_string()
             }
         })
         .collect()
+}
+
+/// Unicode's `Bidi_Control` characters: the marks, embeddings, overrides and
+/// isolates that change the order text is shown in.
+fn is_bidi_control(character: char) -> bool {
+    use icu_properties::{props::BidiControl, CodePointSetData};
+    CodePointSetData::new::<BidiControl>().contains(character)
 }
 
 #[cfg(test)]

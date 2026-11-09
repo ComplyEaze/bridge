@@ -365,6 +365,11 @@ impl ReadOnlyProfile<'_> {
 /// Compatibility seam for the native app's existing function signatures.
 /// These functions still expose only the two fixed read-only profiles and
 /// XML-escape every dynamic value; no caller-provided XML can be dispatched.
+///
+/// `standard_ledger_identity_request` and `standard_ledger_catalog_request` stay on `&str`
+/// because they are public and cannot fail: taking `&ValidatedCompanyName` would change their
+/// signature, or their output for a name the type refuses. Each takes the type when its caller
+/// does (#2397).
 #[doc(hidden)]
 pub mod compatibility {
     pub fn standard_ledger_identity_request(company: &str) -> String {

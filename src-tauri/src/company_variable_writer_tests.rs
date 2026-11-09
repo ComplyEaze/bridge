@@ -5,14 +5,17 @@
 //! production file writes either, and the unvalidated seam beside the writer is used by no more
 //! builders than today.
 //!
-//! Both scans read the production sources that `hand_entry_texts_tests` reads: `src` and each
-//! `crates/*/src`, without `*tests.rs` files, `tests` directories, or anything from an inline
-//! `#[cfg(test)] mod name {` to the end of a file. Comments are never read. The seam count reads
-//! code with every comment and literal blanked; the writer scan reads string literals only.
+//! Both scans read the production sources that `hand_entry_texts_tests` reads (`src` and each
+//! `crates/*/src`), and also `build.rs`, `examples` and each `crates/*/examples` and
+//! `crates/*/benches`. They leave out `*tests.rs` files, `tests` directories and the body of
+//! every inline `#[cfg(test)] mod name { … }`. Comments are never read. The seam count reads code
+//! with every comment and literal blanked; the writer scan reads string literals only.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::Path;
 
-use crate::hand_entry_texts_tests::{lex, production_part, production_sources};
+use crate::hand_entry_texts_tests::{lex, production_part, production_sources, scan};
 
 /// The one file allowed to write the block.
 const WRITER: &str = "crates/bridge-tally-protocol/src/xml_read_profiles.rs";
@@ -98,7 +101,7 @@ fn seam_uses(code: &str, aliases: &BTreeSet<String>) -> (usize, usize) {
 /// or `<STATICVARIABLES` in any case, or `SVCURRENTCOMPANY` as spelt. A TDL formula's
 /// `##SVCurrentCompany` reads the variable and is not counted.
 fn writer_hits(source: &str) -> usize {
-    lex(production_part(source))
+    lex(&production_part(source))
         .1
         .iter()
         .filter(|literal| {
@@ -111,7 +114,53 @@ fn writer_hits(source: &str) -> usize {
 }
 
 fn blanked(source: &str) -> String {
-    lex(production_part(source)).0
+    lex(&production_part(source)).0
+}
+
+/// The files both scans read: [`production_sources`], then `build.rs`, `examples`, and each
+/// `crates/*/examples` and `crates/*/benches` that exists, under the same exclusions.
+fn sources() -> BTreeMap<String, String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut sources = production_sources();
+    let build = fs::read_to_string(root.join("build.rs")).expect("build.rs is readable");
+    sources.insert("build.rs".to_string(), build);
+    scan(&root.join("examples"), "examples", &mut sources);
+    let mut crates: Vec<_> = fs::read_dir(root.join("crates"))
+        .expect("the crates directory is readable")
+        .flatten()
+        .collect();
+    crates.sort_by_key(|entry| entry.file_name());
+    for krate in crates {
+        let name = krate.file_name().to_string_lossy().into_owned();
+        for directory in ["examples", "benches"] {
+            scan(
+                &krate.path().join(directory),
+                &format!("crates/{name}/{directory}"),
+                &mut sources,
+            );
+        }
+    }
+    sources
+}
+
+/// What a scan over `sources` must have read before "nothing found" means anything: at least 100
+/// files, the writer, `build.rs` and one example among them.
+fn unread(sources: &BTreeMap<String, String>) -> Option<String> {
+    let examples = sources
+        .keys()
+        .filter(|path| path.contains("examples/"))
+        .count();
+    (sources.len() < 100
+        || !sources.contains_key(WRITER)
+        || !sources.contains_key("build.rs")
+        || examples == 0)
+        .then(|| {
+            format!(
+                "the scan read {} files and {examples} example(s); it must read at least 100, the \
+                 writer, build.rs and the examples among them",
+                sources.len()
+            )
+        })
 }
 
 #[test]
@@ -185,7 +234,7 @@ fn the_scans_count_what_they_say() {
 
 #[test]
 fn the_unvalidated_company_seam_is_used_no_more_than_its_ceiling() {
-    let sources = production_sources();
+    let sources = sources();
     let blanked: BTreeMap<&str, String> = sources
         .iter()
         .map(|(path, source)| (path.as_str(), blanked(source)))
@@ -203,11 +252,9 @@ fn the_unvalidated_company_seam_is_used_no_more_than_its_ceiling() {
         }
     }
     let total: usize = per_file.values().sum();
-    assert!(
-        sources.len() >= 100 && sources.contains_key(WRITER),
-        "the scan read {} production files and must read at least 100, the writer among them",
-        sources.len()
-    );
+    if let Some(problem) = unread(&sources) {
+        panic!("{problem}");
+    }
     assert_eq!(
         definitions,
         vec![(WRITER, 1)],
@@ -231,18 +278,12 @@ fn the_unvalidated_company_seam_is_used_no_more_than_its_ceiling() {
 
 #[test]
 fn no_production_file_but_the_writer_writes_the_company_variable() {
-    let sources = production_sources();
+    let sources = sources();
     let allowed: BTreeMap<&str, usize> = NAMED_NOT_WRITTEN
         .iter()
         .map(|(path, most, _)| (*path, *most))
         .collect();
-    let mut problems = Vec::new();
-    if sources.len() < 100 {
-        problems.push(format!(
-            "the scan read only {} production files",
-            sources.len()
-        ));
-    }
+    let mut problems: Vec<String> = unread(&sources).into_iter().collect();
     match sources.get(WRITER) {
         Some(writer) if writer_hits(writer) > 0 => {}
         _ => problems.push(format!(

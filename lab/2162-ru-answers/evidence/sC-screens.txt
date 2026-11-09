@@ -1,0 +1,50 @@
+Row 2162-RU, Part C. Times UTC, 9 Nov 2026 (10 Nov IST).
+
+5.0  sCm: M 68/245, <the before-write option> passed (before-write-sC.txt).
+5.1  C2, NEW PATH. The Gateway, "Create" highlighted (zoomed); Enter. "Master Creation", List of Masters (sC2-1-master-creation): Change Company, Show More; Accounting Masters: Group (highlighted), Ledger, Currency, Voucher Type; Inventory Masters: Stock Group, Stock Category, Stock Item, Unit, Godown; Statutory Masters: GST Registration, GST Classification; Statutory Details: Company GST Details, PAN/CIN Details. (No "Expand All" line, unlike Master Alteration.) Down x9 to Godown, Down once to the heading "Statutory Masters" (highlighted), Down once to "GST Registration"; Enter.
+     The Master Creation field read "GST Registration", and a dialog came up (sC2-2-exists-question), word for word:
+       "GST Registration already exists for the Company.
+        Do you want to alter the existing GST Registration or create a new GST Registration?"
+       buttons: "C Create New" (outlined, the focus) and "A Alter Existing".
+     The sheet does not name this question (it is not a company setting to turn on). C7: no key pressed, nothing sent; reported. The book holds no Part C change.
+5.2  19:28:11Z. The run lead's word: C. Pressed c (Create New). "GST Registration Creation", BRIDGE PILOT LAB; the Master Creation field "GST Registration"; panel "GST Details" (sC2-3-creation). Every field as Tally filled it, before anything was typed:
+       Registration status: Active
+       GST Registration Details
+         State: (empty; the cursor here, no list shown)
+         Registration type: Regular
+         Assessee of Other Territory: No
+         GSTIN/UIN: (empty)
+         Periodicity of GSTR-1: Monthly
+       Connected GST Details
+         GST Username: (empty)
+         Mode of Filing: Not Applicable (with a diamond mark)
+       e-Invoice Details
+         e-Invoicing applicable: No
+       e-Way Bill Details
+         e-Way Bill applicable: Yes
+         Applicable from: 1-Apr-26
+         Applicable for intrastate: Yes
+       No name field shown. Button bar: F3: Company, F10: Other Masters, I: More Details, A: Accept, D: Delete (greyed), Q: Quit, F12: Configure.
+5.3  19:29:00Z. State: typed "Maha"; a list "List of States" came up: New State; Not Applicable (diamond); Maharashtra (highlighted, the only state line). Enter: State Maharashtra. Registration type: its list Regular, Composition, Regular - SEZ (as at Part A); Down once, "Regular" highlighted (zoomed); Enter: Regular. Assessee of Other Territory: No as Tally filled it; Enter, unchanged. GSTIN/UIN: empty; typed 27ZZZZZ0000Z1ZQ; zoomed before any Enter: it reads 27ZZZZZ0000Z1ZQ, 15 characters, capitals (sC2-4-gstin-typed).
+5.4  19:29:55Z. Enter on GSTIN/UIN: kept 27ZZZZZ0000Z1ZQ. Each next field left as Tally filled it, by Enter alone: Periodicity of GSTR-1 Monthly (its list "Periodicity": Monthly highlighted, Quarterly); GST Username empty; Mode of Filing Not Applicable (its list "Modes of Filing": Not Applicable highlighted, DSC, EVC); e-Invoicing applicable No; e-Way Bill applicable Yes; Applicable from 1-Apr-26 (the e-Way Bill date the form showed from the start, kept); Applicable for intrastate Yes (the cursor here, sC2-5-form-filled). No field asked for the date from which the registration applies so far, and no name field was shown.
+5.5  19:30:11Z. Enter on Applicable for intrastate (kept Yes): the form's own "Accept ?" (Yes or No) at once (sC2-6-accept). No date field for the registration was offered anywhere on the form, so the sheet's 1-4-2026 was not typed; no name field.
+5.6  19:30:30Z. y to "Accept ?". A dialog came up over the form (sC2-7-series-question), word for word:
+       "You can create a unique voucher numbering series to cater to multiple GST registrations.
+        You can do this by going to the Chart of Accounts and selecting the relevant voucher types.
+        Open Chart of Accounts and create now?"
+       Yes or No
+     The sheet does not name it. C7: no key pressed, no request sent while it is up; reported. Whether the registration was saved before this question is not known until a read.
+5.7  The run lead's word: n. (A first n was refused by the tool before it reached Tally: the focus was not Tally's; a click on Tally's own title bar, empty part, then the dialog unchanged.) 19:31:37Z: n. Tally landed on a NEW, empty "GST Registration Creation" form (sC2-8-after-no): Registration status Active; State empty (the cursor here); Registration type Regular; Assessee of Other Territory No; GSTIN/UIN empty; Periodicity of GSTR-1 Monthly; GST Username empty; Mode of Filing Not Applicable; e-Invoicing applicable No; e-Way Bill applicable Yes, Applicable from 1-Apr-26, Applicable for intrastate Yes. A form, not a list or the Gateway: stopped on the run lead's rule, no key pressed, no request sent.
+5.8  The run lead's word. A click on Tally's title bar (empty part) before each key. 19:32:0xZ Ctrl+Q (1): no question; "Master Creation", List of Masters, GST Registration highlighted (sC2-9-master-creation). 19:32:32Z Ctrl+Q (2): the Gateway of Tally, Create highlighted, BRIDGE PILOT LAB (sC2-10-gateway). Two Ctrl+Q in all.
+5.9  C3. 19:33:38Z. The G: Go To label clicked: "Go To", List of Reports: Create Voucher, Create Master, Alter Master, Expand All, Show More; Saved Views (Bills Payable - GST highlighted, ...); Common Reports. Up x4 to "Alter Master" (zoomed); Enter. "Master Alteration", List of Masters (as at 3.1). Down x3 to "Voucher Type" (zoomed); Enter. "List of Voucher Types" (sC3-1-voucher-types): Create, Show Inactive, Back; BRIDGE Sales (highlighted), BRIDGE Sales Two, BRIDGE Sales Z0, BRIDGE Sales Z1, Contra, Credit Note, Debit Note, Delivery Note, Journal, Material In, Material Out, Memorandum, Payment, Physical Stock, Purchase, Purchase Order, Receipt, Receipt Note, Rejections In, Rejections Out, Reversing Journal, Sales, Sales Order, Stock Journal.
+5.10 19:34:04Z. "BRIDGE Sales" highlighted (zoomed); Enter. "Voucher Type Alteration", BRIDGE PILOT LAB (sC3-2-alteration). Every field, before any change, the cursor on Name:
+       Name: BRIDGE Sales; (alias): (empty)
+       General: Select type of voucher: Sales; Abbreviation: Sale; Activate this Voucher Type: Yes; Method of Voucher Numbering: Manual; Prevent creating duplicate Voucher Nos.: Yes; Show unused vch nos. in transactions for Retain Original Voucher No. behaviour: No (greyed); Use effective dates for vouchers: No; Allow zero-valued transactions: No; Make this voucher type as 'Optional' by default: No; Allow narration in voucher: Yes; Provide narrations for each ledger in voucher: No; Enable default accounting allocations: No; WhatsApp voucher after saving: No
+       Printing: Print voucher after saving: No; Use for POS invoicing: No; Default template to print: Not Applicable (diamond); Default title to print: (empty); Default bank: Not Applicable (diamond); Default jurisdiction: (empty); Set/alter declaration: No; Set/Alter Terms and Conditions: No
+       Statutory Details: Default GST Registration: Any (diamond); Use common voucher numbering series for all GST Registrations: No
+       Name of Class: (none listed)
+       Button bar: F3: Company, F10: Other Masters, I: More Details, A: Accept, D: Delete (greyed), Q: Quit, F12: Configure.
+     The field whose label names a GST registration: "Default GST Registration" (row 2162-KD's TAXUNITNAME, Any).
+5.11 19:34:46Z. A click on Tally's title bar (empty part), then a click on the value of "Default GST Registration": the cursor there, with a list "List of GST Registrations": Create; Any (diamond, highlighted); Maharashtra Registration; Rajasthan Registration. Down x2: "Rajasthan Registration" highlighted (zoomed); Enter. The field reads "Rajasthan..." (cut by the column); the cursor moved to "Use common voucher numbering series for all GST Registrations: No", with its list "Yes / No": No (highlighted), Yes (sC3-3-after-choice). No other field touched.
+5.12 19:35:02Z. Ctrl+A: no "Accept ?" and no message; saved and back on "List of Voucher Types" (BRIDGE Sales highlighted) over Master Alteration (sC3-4-after-accept).
+5.13 19:35:13Z. Ctrl+Q once: the Gateway, no question.

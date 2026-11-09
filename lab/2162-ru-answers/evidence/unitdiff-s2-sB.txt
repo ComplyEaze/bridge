@@ -1,0 +1,13 @@
+$ python -I count14.py --unit-diff a-s2-U-taxunits.xml a-sB-U-taxunits.xml
+== --unit-diff a-s2-U-taxunits.xml a-sB-U-taxunits.xml: TAXUNIT names ['Default Tax Unit', 'Rajasthan Registration'] -> ['Default Tax Unit', 'Rajasthan Registration']
+   unit 'Default Tax Unit': 0 leaves differ
+   unit 'Rajasthan Registration': 9 leaves differ
+     /ALTERID[1]: '206' -> '246'
+     /GSTREGISTRATIONDETAILS.LIST[2]/FROMDATE[1]: '<absent>' -> '20260901'
+     /GSTREGISTRATIONDETAILS.LIST[2]/GSTR1PERIODICITY[1]: '<absent>' -> 'Monthly'
+     /GSTREGISTRATIONDETAILS.LIST[2]/ISINACTIVE[1]: '<absent>' -> 'Yes'
+     /GSTREGISTRATIONDETAILS.LIST[2]/ISOTHTERRITORYASSESSEE[1]: '<absent>' -> ''
+     /GSTREGISTRATIONDETAILS.LIST[2]/ISSTATECESSON[1]: '<absent>' -> 'No'
+     /GSTREGISTRATIONDETAILS.LIST[2]/PLACEOFSUPPLY[1]: '<absent>' -> 'Rajasthan'
+     /GSTREGISTRATIONDETAILS.LIST[2]/REGISTRATIONTYPE[1]: '<absent>' -> 'Regular'
+     /GSTREGISTRATIONDETAILS.LIST[2]/STATE[1]: '<absent>' -> 'Rajasthan'

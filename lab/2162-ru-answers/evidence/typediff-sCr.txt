@@ -1,0 +1,3 @@
+$ python -I count14.py --type-diff a-s2-T-types.xml a-sCr-T-types.xml
+== --type-diff a-s2-T-types.xml a-sCr-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 0 leaves differ

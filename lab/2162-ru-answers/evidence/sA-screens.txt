@@ -1,0 +1,45 @@
+Row 2162-RU, Part A: the registration's type. Times UTC, 9 Nov 2026 (10 Nov IST).
+
+3.1  The Gateway (sA-1-gateway). Down once: the Gateway's Masters line "Alter" highlighted; Enter. "Master Alteration", List of Masters (sA-1-master-alteration): Change Company, Expand All, Show More; Accounting Masters: Group (highlighted), Ledger, Currency, Voucher Type; Inventory Masters: Stock Group, Stock Category, Stock Item, Unit, Godown; Statutory Masters: GST Registration, GST Classification; Statutory Details: Company GST Details, PAN/CIN Details. Down x11 to "GST Registration"; Enter.
+     "List of GST Registrations" (sA-1-registrations): Create, Back; one line, "Rajasthan Registration" (highlighted). Enter on it.
+3.2  "GST Registration Alteration", BRIDGE PILOT LAB; Master Alteration field "Rajasthan Registration"; panel "GST Details" (sA-2-alteration). Every field, as shown, before anything was changed:
+       Registration status: Active
+       GST Registration Details
+         State: Rajasthan
+         Registration type: Regular  (the cursor here, with a "Registration Types" list: Regular, Composition, Regular - SEZ)
+         Assessee of Other Territory: No
+         GSTIN/UIN: 08ZZZZZ0000Z1ZQ
+         Periodicity of GSTR-1: Monthly
+       Connected GST Details
+         GST Username: (empty)
+         Mode of Filing: Not Applicable (with a diamond mark)
+       e-Invoice Details
+         e-Invoicing applicable: No
+       e-Way Bill Details
+         e-Way Bill applicable: Yes
+         Applicable from: 1-Apr-26
+         Applicable for intrastate: Yes
+       Button bar: F2: Period (greyed), F3: Company, F10: Other Masters, I: More Details, A: Accept, D: Delete, Q: Quit, F12: Configure.
+     One field names the registration type and reads Regular: "Registration type".
+3.3  19:15:39Z. Down once: the list's first line "Regular" highlighted; Down again: "Composition" highlighted (zoomed); Enter. No prompt and no date field. The form now reads (sA-3-after-type), the cursor on "Assessee of Other Territory: No":
+       Registration status: Active
+       GST Registration Details
+         State: Rajasthan
+         Registration type: Composition
+         Assessee of Other Territory: No
+         GSTIN/UIN: 08ZZZZZ0000Z1ZQ
+         (the line "Periodicity of GSTR-1" is no longer shown)
+       Connected GST Details
+         GST Username: (empty)
+         Mode of Filing: Not Applicable (with a diamond mark)
+       Tax Rate Details for Turnover (new section)
+         Tax Rate for taxable turnover: 1 %
+         Calculate tax based on: Taxable Value
+       (the section "e-Invoice Details" is no longer shown)
+       e-Way Bill Details
+         e-Way Bill applicable: Yes
+         Applicable from: 1-Apr-26
+         Applicable for intrastate: Yes
+     No other field touched.
+3.4  19:15:56Z. Ctrl+A. No "Accept ?" question and no message: Tally saved at once and returned to "List of GST Registrations" (Create, Back; one line "Rajasthan Registration" highlighted) over "Master Alteration" (sA-4-after-accept).
+3.5  19:16:09Z. Ctrl+Q once: the Gateway of Tally (Alter highlighted), no question.

@@ -1,0 +1,4 @@
+01:02:34	M-marks.xml	a-sC2-M-marks.xml	curl 0	3394 bytes
+01:02:34	U-taxunits.xml	a-sC2-U-taxunits.xml	curl 0	33304 bytes
+01:02:34	T-types.xml	a-sC2-T-types.xml	curl 0	306946 bytes
+01:02:34	R-0010.xml	a-sC2-R-0010.xml	curl 0	94474 bytes

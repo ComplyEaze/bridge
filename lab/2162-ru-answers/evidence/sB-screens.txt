@@ -1,0 +1,21 @@
+Row 2162-RU, Part B: the registration made inactive. Times UTC, 9 Nov 2026 (10 Nov IST).
+
+4.1  As 3.1: the Gateway, Down once to "Alter", Enter; "Master Alteration", List of Masters as at sA (Group highlighted); Down x11 to "GST Registration", Enter; "List of GST Registrations": Create, Back, one line "Rajasthan Registration" (highlighted); Enter on it.
+     "GST Registration Alteration" for Rajasthan Registration (sB-2-alteration, byte-equal to sA-2-alteration): every field as at sA 3.2 (Registration status Active; State Rajasthan; Registration type Regular, the cursor here with its list Regular, Composition, Regular - SEZ; Assessee of Other Territory No; GSTIN/UIN 08ZZZZZ0000Z1ZQ; Periodicity of GSTR-1 Monthly; GST Username empty; Mode of Filing Not Applicable; e-Invoicing applicable No; e-Way Bill applicable Yes, Applicable from 1-Apr-26, Applicable for intrastate Yes).
+4.2  Shift+Tab: the cursor to "State: Rajasthan", no list shown. Shift+Tab again: the cursor to "Registration status: Active", with a list headed "Registration status": Active (highlighted), Inactive (sB-2-status-list). The field whose label says whether the registration is active or inactive: "Registration status".
+4.3  19:21:51Z. Down once: "Inactive" highlighted (zoomed); Enter. A box titled "Effective Date" came up over the form, one field "Effective Date for revised GST details", empty, the cursor in it, with a list "List of Effective Dates" (sB-3-effective-date):
+       New Effective Date
+       15-Sep-26  Current Date of Company  (highlighted)
+       15-Sep-26  Date of Last Entry
+       10-Nov-26  Today (Computer Date)
+       11-Nov-26  Tomorrow (Computer Date)
+     The form behind it reads Registration status Inactive, every other field as at 4.1. Part A showed no such box.
+4.4  19:22:15Z. Typed 1-9-2026 in "Effective Date for revised GST details" (the sheet's date): the field read 1-9-2026 and the list narrowed to one line, "1-9-2026  New Effective Date" (highlighted). Enter. A second box came up, titled "New Effective Date", one field reading 1-Sep-26, highlighted, the cursor in it, over the first box (sB-4-new-effective-date). The sheet: "Any second date, or a date field the step does not name, stops the part." No key pressed after it; nothing sent. Part B stopped here, with nothing accepted: the book holds no Part B change (the form is not saved).
+4.5  The run lead's word (a): the "New Effective Date" box is how Tally takes the one date chosen from the list. Zoomed: the field read exactly 1-Sep-26. 19:23:40Z: Enter once. No further date box or field. Tally went straight to the form's own "Accept ?" (Yes or No), in the form's lower right, with no Ctrl+A pressed (sB-5-accept). The form behind it read (no field touched but Registration status):
+       Registration status: Inactive
+       State: Rajasthan; Registration type: Regular; Assessee of Other Territory: No; GSTIN/UIN: 08ZZZZZ0000Z1ZQ; Periodicity of GSTR-1: Monthly
+       GST Username: (empty); Mode of Filing: Not Applicable (diamond)
+       e-Invoicing applicable: No
+       e-Way Bill applicable: Yes; Applicable from: 1-Apr-26; Applicable for intrastate: Yes
+4.6  19:23:54Z. y: saved, no other message; back on "List of GST Registrations" (Create, Back; one line Rajasthan Registration highlighted) over Master Alteration (sB-6-after-accept).
+4.7  19:24:04Z. Ctrl+Q once: the Gateway, no question.

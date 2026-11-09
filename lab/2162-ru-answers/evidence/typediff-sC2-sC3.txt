@@ -1,0 +1,5 @@
+$ python -I count14.py --type-diff a-sC2-T-types.xml a-sC3-T-types.xml
+== --type-diff a-sC2-T-types.xml a-sC3-T-types.xml: VOUCHERTYPE rows 28 -> 28
+   type 'BRIDGE Sales': 2 leaves differ
+     /ALTERID[1]: '212' -> '248'
+     /DEFAULTGSTREGISTRATION[1]: '' -> 'Rajasthan Registration'

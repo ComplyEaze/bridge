@@ -1,0 +1,59 @@
+== a-sA-M-marks.xml: 3394 bytes
+  STATUS '1'
+  COMPANY '6b43e498-430c-4d5c-bfef-d32e2ab93c85' ALTVCHID '68' ALTMSTID '246'
+  GUID is the book's: yes
+  COMPANY rows: 1
+== a-sA-R-0010.xml: 94474 bytes
+  STATUS '1'
+  VOUCHER rows: 1
+   DATE '20260801'
+   VOUCHERNUMBER 'BP/26-27/0010'
+   VOUCHERTYPENAME 'BRIDGE Sales'
+   REFERENCE 'BP/26-27/0010'
+   REFERENCEDATE '20260801'
+   PARTYLEDGERNAME 'BRIDGE Walk-in'
+   PARTYGSTIN ''
+   STATENAME 'Rajasthan'
+   PLACEOFSUPPLY 'Rajasthan'
+   GSTREGISTRATIONTYPE 'Unregistered/Consumer'
+   ISINVOICE 'Yes'
+   ISCANCELLED 'No'
+   ISOPTIONAL 'No'
+   GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-0000000b'
+   ALTERID '17'
+   VCHGSTSTATUSISINCLUDED 'Yes'
+   VCHGSTSTATUSISUNCERTAIN 'No'
+   VCHGSTSTATUSISEXCLUDED 'No'
+   ISGSTOVERRIDDEN 'No'
+   ISPOSTDATED 'No'
+   leg 'BRIDGE Walk-in' | 'Yes' | '-1051.00'
+   leg 'BRIDGE Svc 998313 5%' | 'No' | '600.40'
+   leg 'BRIDGE Svc 998314 5%' | 'No' | '400.40'
+   leg 'BRIDGE CGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE SGST 2.5%' | 'No' | '25.02'
+   leg 'BRIDGE Round Off' | 'No' | '0.16'
+== a-sA-T-types.xml: 306946 bytes
+  STATUS '1'
+  VOUCHERTYPE rows: 28
+  named 'BRIDGE Sales': 1
+   PARENT 'Sales'; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000ce'; NUMBERINGMETHOD 'None'; ISACTIVE 'Yes'
+   VOUCHERNUMBERSERIES.LIST elements: 1
+   series: NAME 'Default'; NUMBERINGMETHOD 'Manual'; PREVENTDUPLICATES 'Yes'; DUPLICATECONTROL ''; BEGINNINGNUMBER '1'
+   RESTARTFROMLIST.LIST elements: 1 children: [0]
+   unit leaf /LASTSERIESBYGSTTAXUNIT.LIST[1]@TYPE 'String'
+   unit leaf /LASTSERIESBYGSTTAXUNIT.LIST[1]/LASTSERIESBYGSTTAXUNIT[1] 'Default_BRIDGE Sales'
+   unit leaf /LASTGSTTAXUNITBYSERIES.LIST[1]@TYPE 'String'
+   unit leaf /LASTGSTTAXUNITBYSERIES.LIST[1]/LASTGSTTAXUNITBYSERIES[1] 'Rajasthan Registration'
+   unit leaf /TAXUNITNAME[1] 'Any'
+   unit leaf /LASTGSTTAXUNIT[1] 'Rajasthan Registration'
+   unit leaf /ALLOWMULTIPLETAXUNITSPERSERIES[1] 'No'
+  named 'BRIDGE Sales Keyed': 0
+== a-sA-U-taxunits.xml: 23782 bytes
+  STATUS '1'
+  TAXUNIT rows: 2
+   NAME 'Default Tax Unit'; TAXTYPE ''; TAXREGISTRATION None ; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-00000064' ; the book's: yes
+    GSTREGNUMBER ''; GSTOLDREGNUMBER ''; USEDFOR ''
+   NAME 'Rajasthan Registration'; TAXTYPE 'GST'; TAXREGISTRATION '08ZZZZZ0000Z1ZQ' ; GUID '6b43e498-430c-4d5c-bfef-d32e2ab93c85-000000cd' ; the book's: yes
+    GSTREGNUMBER '08ZZZZZ0000Z1ZQ'; GSTOLDREGNUMBER ''; USEDFOR 'GST'
+    dated: FROMDATE '20260401'; STATE 'Rajasthan'; PLACEOFSUPPLY 'Rajasthan'; REGISTRATIONTYPE 'Regular'; ISINACTIVE 'No'
+    dated: FROMDATE '20260915'; STATE 'Rajasthan'; PLACEOFSUPPLY 'Rajasthan'; REGISTRATIONTYPE 'Composition'; ISINACTIVE 'No'

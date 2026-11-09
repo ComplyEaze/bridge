@@ -694,6 +694,34 @@ export function sharedInputs(view) {
   return view.cache.get("shared");
 }
 
+/** What `recordInputs` needs of one file at the tree `view` shows, read once per tree: `up`, the files
+ * declaring its library modules, and `next`, the files it pulls in (null when one cannot be
+ * resolved). null when the file is missing, not UTF-8, or its ancestors cannot be resolved. */
+function links(f, view) {
+  const key = `links\t${f}`;
+  if (!view.cache.has(key)) {
+    let value = null;
+    const text = f.endsWith(".rs") ? view.text(f) : "";
+    const up = view.isFile(f) && text !== null ? ancestors(f, view) : null;
+    if (up !== null) {
+      let next = f.endsWith(".rs") ? [...includeTargets(f, text)] : [];
+      const mods = f.endsWith(".rs") ? modDecls(text) : [];
+      if (mods === null) next = null;
+      for (const name of mods ?? []) {
+        const found = modCandidates(f, name).filter((c) => view.isFile(c));
+        if (found.length !== 1) {
+          next = null;
+          break;
+        }
+        next.push(found[0]);
+      }
+      value = { up, next };
+    }
+    view.cache.set(key, value);
+  }
+  return view.cache.get(key);
+}
+
 /** The crate files the record's own verdict rests on, or null when they cannot be resolved: no
  * recorded killer (a hang or a survivor), a killer whose file is unknown, or a file reached that is
  * missing, not UTF-8, ambiguous or declared in a way `modDecls` cannot follow. They are the target
@@ -719,24 +747,14 @@ export function recordInputs(m, rec, view) {
   while (todo.length) {
     const [f, follow] = todo.pop();
     if (followed.has(f) || (!follow && files.has(f))) continue;
-    if (!view.isFile(f)) return null;
+    const l = links(f, view);
+    if (l === null) return null;
     files.add(f);
-    if (f.endsWith(".rs") && view.text(f) === null) return null;
-    const up = ancestors(f, view);
-    if (up === null) return null;
-    todo.push(...up.map((a) => [a, false]));
+    todo.push(...l.up.map((a) => [a, false]));
     if (!follow) continue;
+    if (l.next === null) return null;
     followed.add(f);
-    if (!f.endsWith(".rs")) continue;
-    const text = view.text(f);
-    todo.push(...includeTargets(f, text).map((i) => [i, true]));
-    const mods = modDecls(text);
-    if (mods === null) return null;
-    for (const name of mods) {
-      const found = modCandidates(f, name).filter((c) => view.isFile(c));
-      if (found.length !== 1) return null;
-      todo.push([found[0], true]);
-    }
+    todo.push(...l.next.map((n) => [n, true]));
   }
   if (integration) for (const f of view.files()) if (f.startsWith("tests/common/")) files.add(f);
   return files;

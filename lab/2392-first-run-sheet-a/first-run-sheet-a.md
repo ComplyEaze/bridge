@@ -31,7 +31,8 @@ function Read-Key([string]$K) {   # the key's values, $null if the key is absent
 }
 function Show-Data([string]$When) {
   "installed extension's data files, " + $When + " (name, length, last write; contents not read; this run must not change them):"
-  $roots = @("$env:LOCALAPPDATA\Bridge\agent") + @(Get-Item -Path "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Local\Bridge\agent" -ErrorAction SilentlyContinue | ForEach-Object FullName)
+  $pk = @(); try { $pk = @(Get-Item -Path "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Local\Bridge\agent" -ErrorAction Stop | ForEach-Object FullName); "  packaged Claude data folders found: " + $pk.Count } catch [Management.Automation.ItemNotFoundException] { "  packaged Claude data folders found: 0" } catch { "  packaged Claude data folders: unreadable: " + $_.Exception.Message }
+  $roots = @("$env:LOCALAPPDATA\Bridge\agent") + $pk
   foreach ($d in $roots) {
     "  folder " + $d + ": " + (Get-PathState $d)
     foreach ($n in "terms-acceptance.jsonl", "agent-egress.jsonl") { $f1 = Join-Path $d $n; $st = Get-PathState $f1; "    " + $n + ": " + $(if ($st -eq "exists") { (Get-Item -LiteralPath $f1).Length.ToString() + ", " + (Get-Item -LiteralPath $f1).LastWriteTime.ToString("o") } else { $st }) }
@@ -39,7 +40,7 @@ function Show-Data([string]$When) {
 }
 function Show-Locks {
   "lock files the program can create (names only):"
-  $store = @(Get-Item -Path "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Local\Bridge\agent\native-dispatch-leases" -ErrorAction SilentlyContinue | ForEach-Object FullName)
+  $store = @(); try { $store = @(Get-Item -Path "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Local\Bridge\agent\native-dispatch-leases" -ErrorAction Stop | ForEach-Object FullName); "  packaged Claude lock folders found: " + $store.Count } catch [Management.Automation.ItemNotFoundException] { "  packaged Claude lock folders found: 0" } catch { "  packaged Claude lock folders: unreadable: " + $_.Exception.Message }
   foreach ($d in (@("$env:LOCALAPPDATA\Bridge\agent\native-dispatch-leases", "$env:USERPROFILE\.complyeaze-bridge\coordination\native-dispatch-leases") + $store)) {
     $st = Get-PathState $d
     if ($st -ne "exists") { "  folder " + $d + ": " + $st; continue }
@@ -268,7 +269,7 @@ $tc = New-Object Net.Sockets.TcpClient; try { $tc.Connect("localhost", $port); $
 ```
 Everything goes to one file, `fr2a-B7.txt`: the port line, the lock files and the installed extension's data files (name, length, last write time) before and after, both runs (exit line, initialize reply, standard error capped at 4 KB, raw reply, the tool's own error flag and text) and the lock files before and after. A line that starts "ERROR" is a result, not a reason to retry: a start that Windows or an antivirus product stopped appears here as an error from starting the process, and then the block rule (limit 4) applies. To run only B7 again after a mistake in setting up, paste the `. { try {` part alone, so the port choice made above is kept. Every start makes a new data folder whose name ends in the time, so the listing at the end shows the folders of every pass; read the newest one for each Terms value. After all the steps have run, search every output for the words the block rule names:
 ```powershell
-Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|policy|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied' | Where-Object { $_.Line -notmatch '^(initialize reply:|standard error\||tally_status |block: yes|prompt: |Smart App Control \(|SmartScreenEnabled \(|Status\s*:|StatusMessage\s*:| {10,}\S)' } | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
+Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|AppLocker|Code Integrity|WDAC|language mode|policy|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied|is denied' | Where-Object { $_.Line -notmatch '^(initialize reply:|standard error\||tally_status |block: yes|prompt: |Smart App Control \(|SmartScreenEnabled \(|Status\s*:|StatusMessage\s*:| {10,}\S)' } | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
 ```
 The `Where-Object` leaves out lines that are the program's own words (`initialize reply:`, every line that starts `standard error|` or `tally_status `), the two fixed B0 labels, the lines you added yourself (`block: yes`, `prompt: `), and the `Status` and `StatusMessage` lines of B3 and B4 (for an unsigned file Windows words that message with "execution policy"; read those two lines in the files, and record them; the filter also skips the lines `Format-List` wraps under them, which start with ten or more spaces; none of this is a block). Any other line it prints means `block: yes` at the top of that file. The lines that follow an "ERROR:" line, up to the next ordinary line, belong to it. Any "ERROR:" line in B7 goes to the person who queued this sheet; it is `block: yes` if it comes from starting the process, or if the exit code or the closed output stream shows the process was stopped from outside.
 

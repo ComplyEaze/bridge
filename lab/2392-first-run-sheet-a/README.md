@@ -1,0 +1,3 @@
+# lab/2392-first-run-sheet-a
+
+One sheet, FR2a, for #2390, #2392 and #2393: the published 0.7.0 Windows file measured from the shell. It checks the file against its hash, reads the internet-zone mark a browser download gives it, reads its signature status, unpacks a copy to read its import table and manifest, and starts it with its own data folder to read the answers `tally_status` gives when Tally cannot be reached and when the Terms are off. Nothing is installed. Every output is a raw file in one local folder that the sheet never copies out; a reviewer reads it before anything is committed. Downloading the file needs the owner's OK in the queue entry. The only Tally contact is a status request to a port with nothing listening. See `first-run-sheet-a.md`.

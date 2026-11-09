@@ -1012,7 +1012,7 @@ The cost is one more open and lock per acquisition. An earlier unpackaged build 
 - an invoice is alone in its batch (`invoice_one_per_batch`, `voucher_type_shapes_mixed`), at the build and on the saved batch;
 - the Sales type's one series must read Manual with prevent-duplicates Yes (`resolve_voucher_type`), at the build and again on the answers read before the post;
 - the number control (`invoice_number_control_missing`) sits in the judge that the build and the post share;
-- the read-back compares the stored voucher number with the one sent.
+- a renumbered invoice is never read as verified. The read-back finds an invoice by its number, so under the default identity (`InvoiceIdentity::ByNumber`) one stored under another number reads as absent; only a match by figures (`ByNumberOrFigures`, used beside an unsettled batch of the same figures) reaches the `voucher_number` comparison. No test sends a renumbered row through the read-back.
 
 The desktop's post still admits one Journal only (`PostScope::JournalOnly`, refusing an invoice as `import_post_requires_one_journal`).
 

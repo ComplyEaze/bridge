@@ -3315,6 +3315,86 @@ fn the_divergent_next_step_does_not_promise_a_resave_repairs_the_invoice() {
     assert!(text.ends_with("Do not post it again."));
 }
 
+// ---- An invoice saved again, unchanged, on Tally's screen (9 Nov 2026, the pilot lab, row 2162-RS) ----
+
+/// The lab's read-back of `BP/26-27/0057`, created by the build's request, with no key pressed
+/// since the write: ALTERID 69.
+const RESAVE_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-before.utf16le.xml"
+);
+/// The same read once the voucher was opened from the Day Book and saved with no change.
+const RESAVE_AFTER: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-after.utf16le.xml"
+);
+
+fn read_one(xml: &str) -> wire::ReadInvoice {
+    match wire::parse_invoice_readback(xml).unwrap() {
+        wire::Readback::One(read) => read,
+        other => panic!("one voucher expected, got {other:?}"),
+    }
+}
+
+/// The save moved the AlterID and filled two leg fields, and the read-back reads neither of those
+/// fields, so the invoice reads back as built on both reads. Its identity check compares the
+/// read-back with the voucher the same verification matched, which the save moved too, so it
+/// agrees. A field the read-back compares, changed, still reads divergent. ADR 0004, the
+/// 2026-10-31 checklist, item 8: PARTIAL, one run.
+#[test]
+fn an_invoice_saved_again_unchanged_reads_back_as_built_under_its_new_alter_id() {
+    let (before_xml, after_xml) = (utf16le(RESAVE_BEFORE), utf16le(RESAVE_AFTER));
+    // What the save changed in the bytes: two leg fields the read-back does not read.
+    assert!(!before_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
+    assert!(after_xml.contains("<VATEXPAMOUNT>600.40</VATEXPAMOUNT>"));
+    assert_eq!(before_xml.matches("<RATEOFINVOICETAX.LIST").count(), 0);
+    assert_eq!(after_xml.matches("<RATEOFINVOICETAX.LIST").count(), 2);
+    let (mut before, mut after) = (read_one(&before_xml), read_one(&after_xml));
+    let guid = after.fields["GUID"].clone();
+    assert_eq!(before.fields["GUID"], guid);
+    let alter_id = |read: &mut wire::ReadInvoice| {
+        read.fields
+            .remove("ALTERID")
+            .map(|id| id.trim().to_string())
+    };
+    assert_eq!(alter_id(&mut before).as_deref(), Some("69"));
+    assert_eq!(alter_id(&mut after).as_deref(), Some("70"));
+    assert_eq!(
+        before, after,
+        "the read-back reads nothing else that the save changed"
+    );
+    // Both reads are the invoice as built.
+    let built = pilot_posted("BP/26-27/0057");
+    for bytes in [RESAVE_BEFORE, RESAVE_AFTER] {
+        assert_eq!(
+            pilot_differences(&built, bytes, "20260801"),
+            Vec::<String>::new()
+        );
+    }
+    // A later verification matches the voucher as it now is, AlterID 70, and its read-back reads
+    // 70: they agree. Only against the post's own AlterID would the save show.
+    let now = json!({"guid": guid, "alter_id": 70});
+    assert_eq!(
+        readback_identity_differences(Some(&guid), Some(" 70"), &now),
+        Vec::<String>::new()
+    );
+    let at_post = json!({"guid": guid, "alter_id": 69});
+    assert_eq!(
+        readback_identity_differences(Some(&guid), Some(" 70"), &at_post),
+        vec!["alter_id"]
+    );
+    // The control: a field the read-back compares, changed on the re-saved bytes, reads divergent.
+    let reference = "<REFERENCE TYPE=\"String\">BP/26-27/0057</REFERENCE>";
+    assert_eq!(after_xml.matches(reference).count(), 1);
+    let changed = after_xml.replacen(
+        reference,
+        "<REFERENCE TYPE=\"String\">BP/26-27/0058</REFERENCE>",
+        1,
+    );
+    assert_eq!(
+        invoice_readback_differences(&built, &read_one(&changed), "20260801"),
+        vec!["REFERENCE"]
+    );
+}
+
 /// Row 2162-S9b's customer after `Regular - SEZ` was chosen on Tally's Ledger Alteration screen
 /// and saved: the build's compliance read answered on `BRIDGE PILOT LAB`, byte for byte as
 /// captured (`lab/2162-s9b-answers` at 6c80eb43). The

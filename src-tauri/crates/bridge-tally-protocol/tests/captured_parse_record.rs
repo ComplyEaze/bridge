@@ -3569,6 +3569,11 @@ const PILOT_LAB_READBACK: &str =
      row here: the app crate's invoice tests (src/agent_import_invoice_tests.rs, and the replay in \
      src/agent_import_post_e2e_tests.rs) parse it with the read-back's own parser and pin what it \
      returns; pilot-lab/PROVENANCE.md says what it is";
+const PILOT_LAB_RESAVE_READBACK: &str =
+    "a read-back answer of the pilot lab's row 2162-RS (9 Nov 2026), before or after a person \
+     saved the invoice again unchanged, with no row here: the app crate's invoice tests \
+     (src/agent_import_invoice_tests.rs) parse it with the read-back's own parser and pin what it \
+     returns; pilot-lab/PROVENANCE.md says what it is";
 const PILOT_LAB_REPLAY: &str = "an answer of the pilot lab's invoice round (9 Oct 2026), with no \
      row here: the app crate's replay (src/agent_import_post_e2e_tests.rs, and for the tax units \
      src/agent_import_invoice_admission_tests.rs and src/agent_import_invoice_wire_tests.rs) \
@@ -3898,6 +3903,14 @@ const NOT_RECORDED: &[(&str, &str)] = &[
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-before-post.utf16le.xml",
         PILOT_LAB_EVIDENCE,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-after.utf16le.xml",
+        PILOT_LAB_RESAVE_READBACK,
+    ),
+    (
+        "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-resave-before.utf16le.xml",
+        PILOT_LAB_RESAVE_READBACK,
     ),
     (
         "tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-resaved.utf16le.xml",

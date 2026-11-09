@@ -45,11 +45,13 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
    - EXPECT U as row 2162-SC's s2 expects: `Default Tax Unit`, and `Rajasthan Registration` with `08ZZZZZ0000Z1ZQ` and one dated row `20260401`, Rajasthan, Regular, not inactive.
    - EXPECT R-0010 one row: `BRIDGE Walk-in`, included Yes and every other status flag No. Record T's lines.
 3. **The change, on Tally's screen.** Before it, `s3m`: `M-marks.xml`, then `count15.py --before-write a-s1-M-marks.xml a-s3m-M-marks.xml`. It must pass; then no key is pressed in Tally but those below.
-   1. At the Gateway (shot), press F11 (Features). If the button bar names another key for the company's features, write it down and use that one key instead. Write down the screen's title and every field it shows with its value, as text, before anything is changed (shot).
+   - **The path rule.** Every screen below either cites the earlier row whose answers used that exact path, or is marked NEW PATH. If the line or screen shown is not exactly what the step names: stop, Esc out (a list or prompt, never the features screen itself, C7), restore BK by C6 and check as step 5, then Quit (C10).
+   - **The prompt rule** (the coordinator's, after row 2162-SC's stop). If Tally shows any prompt or message on turning GST off, at 3.3 or at 3.5, whether a warning or a notice about data already entered: copy it word for word and screenshot it first, then answer No, or Esc if it offers no No. Press nothing more on the features screen. Then stop and restore: leave any screen still open by Ctrl+Q (C7), restore and compare by step 5, and close. That prompt is this row's result.
+   1. At the Gateway (shot), press F11 (Features), for the screen `Company Features Alteration`. Row 1342-W14 opened it this way on this book (its notes, step 2.5: Taxation, GST Yes; quit unchanged by Ctrl+Q). If the button bar names another key, or the title differs: the path rule. Write down the screen's title and every field it shows with its value, as text, before anything is changed (shot).
    2. Find the field whose label names Goods and Services Tax (GST) and reads Yes. Exactly one such field, or stop: press nothing more, and leave only as C7 says, on the coordinator's word.
-   3. Move to it with Enter or the arrow keys only (never Esc on this screen, C7). Set it to No by typing `n` or by the item its list offers. Zoom the field and check that it reads No before going on.
+   3. **NEW PATH: no earlier row has turned GST off on an existing book.** Row 1231 (its cost-centre answers) changed one other field on this screen, `Enable Cost Centres`, on another book and accepted it by Ctrl+A; that is the nearest path seen. Move to the field with Enter or the arrow keys only (never Esc on this screen, C7). Set it to No by typing `n` or by the item its list offers. Zoom the field and check that it reads No before going on.
    4. **Touch no other field.** If setting it opens another field, a sub-screen or a list, write down every line it shows, press nothing more, screenshot, and stop.
-   5. Accept with Ctrl+A (shot after). An `Accept ?` prompt is answered Yes. **Any other prompt or message** (for example about GST details or vouchers already entered): copy it word for word, screenshot, press no key, and stop (C7). That message is this row's result if it comes, and the coordinator decides what is pressed next.
+   5. Accept with Ctrl+A (shot after). An `Accept ?` prompt is answered Yes. **Any other prompt or message** (for example about GST details or vouchers already entered): the prompt rule.
    6. Write down every screen passed until the Gateway shows (shot), and whether its GST lines or menus changed.
 4. **The book with GST off.** `s4`: `M-marks.xml O-object.xml U-taxunits.xml T-types.xml R-0010.xml`. Then, each recorded whole:
    - `count15.py --object-diff a-s2-O-object.xml a-s4-O-object.xml`;
@@ -64,7 +66,7 @@ Run each read as `python3 -I run.py <gateway URL> <label> <files>`, then `python
    - Record each answer's sha256 against s2's. **Any of these not equal stops the row:** send nothing more, and report before the close. The book is then not as it was, and the coordinator decides.
 6. **Close** by C10. One tally.exe owns 9001.
 
-**Stop**, with no key pressed, if Tally's window shows a dialog at any point but the two step 3.5 and C6 name, or if the gateway stops answering. Screenshot the window, send the screenshot and the answers to the run coordinator, and ask before anything else is pressed or sent. A stop between steps 3 and 5 leaves the book with GST off: say so in the report.
+**Stop**, with no key pressed, if Tally's window shows a dialog at any point but those step 3's prompt rule, 3.5 and C6 name, or if the gateway stops answering. Screenshot the window, send the screenshot and the answers to the run coordinator, and ask before anything else is pressed or sent. A stop between steps 3 and 5 leaves the book with GST off: say so in the report.
 
 ## Record
 - Each answer's bytes and sha256, and `count15.py`'s lines.

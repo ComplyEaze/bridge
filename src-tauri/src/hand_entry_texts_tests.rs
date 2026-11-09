@@ -34,11 +34,21 @@ const PINNED: &[(&str, usize)] = &[
 /// The text of every string literal in `source`, in order. Comments are skipped; a backslash at
 /// the end of a line joins the next line as Rust does; raw strings are read to their closing quote.
 fn string_literals(source: &str) -> Vec<String> {
+    lex(source).1
+}
+
+/// `source` split into its code, with every comment and literal replaced by one space, and the
+/// text of its string literals, read as [`string_literals`] describes.
+pub(crate) fn lex(source: &str) -> (String, Vec<String>) {
     let bytes = source.as_bytes();
+    let mut code = String::new();
     let mut literals = Vec::new();
     let mut i = 0;
     while i < bytes.len() {
         let rest = &source[i..];
+        if rest.starts_with("//") || rest.starts_with("/*") || bytes[i] == b'"' {
+            code.push(' ');
+        }
         if rest.starts_with("//") {
             i += rest.find('\n').unwrap_or(rest.len());
         } else if rest.starts_with("/*") {
@@ -58,6 +68,8 @@ fn string_literals(source: &str) -> Vec<String> {
                 }
             }
         } else if let Some(raw) = raw_string_start(rest, i, bytes) {
+            // The prefix, hashes and quotes are part of the literal.
+            code.push(' ');
             let (opening_len, hashes) = raw;
             let body_start = i + opening_len;
             let closing = format!("\"{}", "#".repeat(hashes));
@@ -88,12 +100,20 @@ fn string_literals(source: &str) -> Vec<String> {
             literals.push(text);
             i += 1;
         } else if bytes[i] == b'\'' {
-            i += char_literal_len(rest);
+            let len = char_literal_len(rest);
+            if len == 1 {
+                code.push('\'');
+            } else {
+                code.push(' ');
+            }
+            i += len;
         } else {
-            i += source[i..].chars().next().map_or(1, char::len_utf8);
+            let ch = source[i..].chars().next().unwrap_or('\u{fffd}');
+            code.push(ch);
+            i += ch.len_utf8();
         }
     }
-    literals
+    (code, literals)
 }
 
 /// `r"`, `r#"`, `br"` and so on at `at`: the length of the opening and the number of hashes. Not an
@@ -131,7 +151,7 @@ fn char_literal_len(rest: &str) -> usize {
 
 /// The part of `source` before an inline test module (`#[cfg(test)]`, then `mod name {`). A test
 /// module that is only declared (`mod tests;`, often with a `#[path]`) holds no text here.
-fn production_part(source: &str) -> &str {
+pub(crate) fn production_part(source: &str) -> &str {
     let mut offset = 0;
     let mut lines = source.lines().peekable();
     while let Some(line) = lines.next() {
@@ -197,12 +217,7 @@ fn hand_entry_hits(source: &str) -> usize {
         .sum()
 }
 
-fn scan(
-    directory: &Path,
-    relative: &str,
-    found: &mut BTreeMap<String, usize>,
-    visited: &mut BTreeSet<String>,
-) {
+fn scan(directory: &Path, relative: &str, sources: &mut BTreeMap<String, String>) {
     let Ok(entries) = fs::read_dir(directory) else {
         return;
     };
@@ -212,27 +227,22 @@ fn scan(
         let relative_path = format!("{relative}/{name}");
         if path.is_dir() {
             if name != "tests" {
-                scan(&path, &relative_path, found, visited);
+                scan(&path, &relative_path, sources);
             }
         } else if name.ends_with(".rs") && !name.ends_with("tests.rs") {
             let source = fs::read_to_string(&path).expect("a production source file is readable");
-            let relative_path = relative_path.trim_start_matches('/').to_string();
-            visited.insert(relative_path.clone());
-            let hits = hand_entry_hits(&source);
-            if hits > 0 {
-                found.insert(relative_path, hits);
-            }
+            sources.insert(relative_path.trim_start_matches('/').to_string(), source);
         }
     }
 }
 
-/// The hits per file, and every production file the walk read (so an unreadable or moved tree is
-/// told from a tree with no hand-entry texts).
-fn production_hits() -> (BTreeMap<String, usize>, BTreeSet<String>) {
+/// Every production source file under `src` and each `crates/*/src`, by path relative to the
+/// crate directory: `*tests.rs` files and `tests` directories are left out. A caller excludes an
+/// inline test module with [`production_part`].
+pub(crate) fn production_sources() -> BTreeMap<String, String> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let mut found = BTreeMap::new();
-    let mut visited = BTreeSet::new();
-    scan(&root.join("src"), "src", &mut found, &mut visited);
+    let mut sources = BTreeMap::new();
+    scan(&root.join("src"), "src", &mut sources);
     let mut crates: Vec<_> = fs::read_dir(root.join("crates"))
         .expect("the crates directory is readable")
         .flatten()
@@ -243,11 +253,22 @@ fn production_hits() -> (BTreeMap<String, usize>, BTreeSet<String>) {
         scan(
             &krate.path().join("src"),
             &format!("crates/{name}/src"),
-            &mut found,
-            &mut visited,
+            &mut sources,
         );
     }
-    (found, visited)
+    sources
+}
+
+/// The hits per file, and every production file the walk read (so an unreadable or moved tree is
+/// told from a tree with no hand-entry texts).
+fn production_hits() -> (BTreeMap<String, usize>, BTreeSet<String>) {
+    let sources = production_sources();
+    let found = sources
+        .iter()
+        .map(|(path, source)| (path.clone(), hand_entry_hits(source)))
+        .filter(|(_, hits)| *hits > 0)
+        .collect();
+    (found, sources.into_keys().collect())
 }
 
 #[test]

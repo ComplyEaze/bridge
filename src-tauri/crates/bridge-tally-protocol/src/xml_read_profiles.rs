@@ -25,6 +25,13 @@ fn template_date(value: &'static str) -> TallyDate {
     TallyDate::parse(value).expect("template dates are fixed valid YYYYMMDD constants")
 }
 
+/// The template company as the validated name a renderer takes. The constant
+/// is a fixed valid name, so this cannot fail; it is used only to render a
+/// profile's fixed template, never on an input.
+fn template_company() -> ValidatedCompanyName {
+    ValidatedCompanyName::new(TEMPLATE_COMPANY).expect("the template company is a fixed valid name")
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReadProfileValidationError {
     CompanyInvalid,
@@ -183,26 +190,26 @@ impl ReadOnlyProfileId {
         match self {
             Self::CompanyListV2 => render_company_list_v2(),
             Self::CompanyBookExtentV2 => render_company_book_extent_v2(TEMPLATE_COMPANY),
-            Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
-            Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(TEMPLATE_COMPANY),
-            Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(TEMPLATE_COMPANY),
-            Self::StandardLedgerCatalogV3 => render_standard_ledger_catalog_v3(TEMPLATE_COMPANY),
+            Self::StandardLedgerIdentityV1 => render_standard_ledger_identity(&template_company()),
+            Self::StandardLedgerCatalogV1 => render_standard_ledger_identity(&template_company()),
+            Self::StandardLedgerCatalogV2 => render_standard_ledger_catalog_v2(&template_company()),
+            Self::StandardLedgerCatalogV3 => render_standard_ledger_catalog_v3(&template_company()),
             Self::AuditCompanyObjectV1 => {
-                render_company_object(TEMPLATE_COMPANY, &AUDIT_COMPANY_FETCH)
+                render_company_object(&template_company(), &AUDIT_COMPANY_FETCH)
             }
             Self::InvoiceCompanyHsnV1 => {
-                render_company_object(TEMPLATE_COMPANY, &INVOICE_COMPANY_FETCH)
+                render_company_object(&template_company(), &INVOICE_COMPANY_FETCH)
             }
             Self::AuditLedgersV1 => {
-                render_audit_ledgers(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
+                render_audit_ledgers(&template_company(), TEMPLATE_FROM, TEMPLATE_TO)
             }
             Self::AuditVouchersV1 => render_audit_vouchers(
-                TEMPLATE_COMPANY,
+                &template_company(),
                 &template_date(TEMPLATE_FROM),
                 &template_date(TEMPLATE_TO),
             ),
             Self::AuditStockItemsV1 => {
-                render_audit_stock_items(TEMPLATE_COMPANY, TEMPLATE_FROM, TEMPLATE_TO)
+                render_audit_stock_items(&template_company(), TEMPLATE_FROM, TEMPLATE_TO)
             }
         }
     }
@@ -332,37 +339,25 @@ impl ReadOnlyProfile<'_> {
             Self::CompanyBookExtentV2 { company } => {
                 render_company_book_extent_v2(company.as_str())
             }
-            Self::StandardLedgerIdentityV1 { company } => {
-                render_standard_ledger_identity(company.as_str())
-            }
-            Self::StandardLedgerCatalogV1 { company } => {
-                render_standard_ledger_identity(company.as_str())
-            }
-            Self::StandardLedgerCatalogV2 { company } => {
-                render_standard_ledger_catalog_v2(company.as_str())
-            }
-            Self::StandardLedgerCatalogV3 { company } => {
-                render_standard_ledger_catalog_v3(company.as_str())
-            }
+            Self::StandardLedgerIdentityV1 { company } => render_standard_ledger_identity(company),
+            Self::StandardLedgerCatalogV1 { company } => render_standard_ledger_identity(company),
+            Self::StandardLedgerCatalogV2 { company } => render_standard_ledger_catalog_v2(company),
+            Self::StandardLedgerCatalogV3 { company } => render_standard_ledger_catalog_v3(company),
             Self::AuditCompanyObjectV1 { company } => {
-                render_company_object(company.as_str(), &AUDIT_COMPANY_FETCH)
+                render_company_object(company, &AUDIT_COMPANY_FETCH)
             }
             Self::InvoiceCompanyHsnV1 { company } => {
-                render_company_object(company.as_str(), &INVOICE_COMPANY_FETCH)
+                render_company_object(company, &INVOICE_COMPANY_FETCH)
             }
-            Self::AuditLedgersV1 { company, period } => render_audit_ledgers(
-                company.as_str(),
-                period.from_yyyymmdd(),
-                period.to_yyyymmdd(),
-            ),
+            Self::AuditLedgersV1 { company, period } => {
+                render_audit_ledgers(company, period.from_yyyymmdd(), period.to_yyyymmdd())
+            }
             Self::AuditVouchersV1 { company, window } => {
-                render_audit_vouchers(company.as_str(), window.from_date(), window.to_date())
+                render_audit_vouchers(company, window.from_date(), window.to_date())
             }
-            Self::AuditStockItemsV1 { company, period } => render_audit_stock_items(
-                company.as_str(),
-                period.from_yyyymmdd(),
-                period.to_yyyymmdd(),
-            ),
+            Self::AuditStockItemsV1 { company, period } => {
+                render_audit_stock_items(company, period.from_yyyymmdd(), period.to_yyyymmdd())
+            }
         }
     }
 }
@@ -373,11 +368,18 @@ impl ReadOnlyProfile<'_> {
 #[doc(hidden)]
 pub mod compatibility {
     pub fn standard_ledger_identity_request(company: &str) -> String {
-        super::render_standard_ledger_identity(company)
+        super::render_standard_ledger_collection(
+            &static_variables_for_unvalidated_company(
+                company,
+                super::STANDARD_LEDGER_VARIABLES_BEFORE,
+                super::STANDARD_LEDGER_VARIABLES_AFTER,
+            ),
+            "",
+        )
     }
 
     pub fn standard_ledger_catalog_request(company: &str) -> String {
-        super::render_standard_ledger_identity(company)
+        standard_ledger_identity_request(company)
     }
 
     /// [`super::ValidatedCompanyName::xml_static_variables`] for a builder
@@ -441,27 +443,42 @@ fn render_company_list_v2() -> String {
     .to_string()
 }
 
-fn render_standard_ledger_identity(company: &str) -> String {
-    render_standard_ledger_collection(company, "")
+/// The standard ledger collection's other variables, around the company.
+const STANDARD_LEDGER_VARIABLES_BEFORE: &str =
+    "\n                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>\n                ";
+const STANDARD_LEDGER_VARIABLES_AFTER: &str = "\n            ";
+
+fn render_standard_ledger_identity(company: &ValidatedCompanyName) -> String {
+    render_standard_ledger_for(company, "")
 }
 
 /// V1's request with `ISBILLWISEON` as one more native method.
-fn render_standard_ledger_catalog_v2(company: &str) -> String {
-    render_standard_ledger_collection(
+fn render_standard_ledger_catalog_v2(company: &ValidatedCompanyName) -> String {
+    render_standard_ledger_for(
         company,
         "\n                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>",
     )
 }
 
 /// V2's request with `ALTERID` as one more native method.
-fn render_standard_ledger_catalog_v3(company: &str) -> String {
-    render_standard_ledger_collection(
+fn render_standard_ledger_catalog_v3(company: &ValidatedCompanyName) -> String {
+    render_standard_ledger_for(
         company,
         "\n                        <NATIVEMETHOD>IsBillWiseOn</NATIVEMETHOD>\n                        <NATIVEMETHOD>AlterID</NATIVEMETHOD>",
     )
 }
 
-fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> String {
+fn render_standard_ledger_for(company: &ValidatedCompanyName, extra_methods: &str) -> String {
+    render_standard_ledger_collection(
+        &company.xml_static_variables(
+            STANDARD_LEDGER_VARIABLES_BEFORE,
+            STANDARD_LEDGER_VARIABLES_AFTER,
+        ),
+        extra_methods,
+    )
+}
+
+fn render_standard_ledger_collection(static_variables: &str, extra_methods: &str) -> String {
     format!(
         r#"
 <ENVELOPE>
@@ -489,12 +506,7 @@ fn render_standard_ledger_collection(company: &str, extra_methods: &str) -> Stri
     </BODY>
 </ENVELOPE>
 "#,
-        compatibility::static_variables_for_unvalidated_company(
-            company,
-            "\n                <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>\n                ",
-            "\n            ",
-        ),
-        extra_methods
+        static_variables, extra_methods
     )
     .trim()
     .to_string()
@@ -586,13 +598,10 @@ INVENTORYENTRIESOUT.STOCKITEMNAME,INVENTORYENTRIESOUT.ACTUALQTY,INVENTORYENTRIES
 pub const AUDIT_STOCK_ITEM_FETCH: &str = "NAME, GUID, PARENT, BASEUNITS, \
 OPENINGBALANCE, OPENINGVALUE, CLOSINGBALANCE, CLOSINGVALUE";
 
-fn render_company_object(company: &str, fetch: &[&str]) -> String {
-    let static_variables = compatibility::static_variables_for_unvalidated_company(
-        company,
-        "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
-        "",
-    );
-    let company = xml_escape(company);
+fn render_company_object(company: &ValidatedCompanyName, fetch: &[&str]) -> String {
+    let static_variables =
+        company.xml_static_variables("<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>", "");
+    let company = xml_escape(company.as_str());
     let fetch = fetch
         .iter()
         .map(|field| format!("<FETCH>{field}</FETCH>"))
@@ -602,9 +611,8 @@ fn render_company_object(company: &str, fetch: &[&str]) -> String {
     )
 }
 
-fn render_audit_ledgers(company: &str, from: &str, to: &str) -> String {
-    let static_variables = compatibility::static_variables_for_unvalidated_company(
-        company,
+fn render_audit_ledgers(company: &ValidatedCompanyName, from: &str, to: &str) -> String {
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{}</SVFROMDATE><SVTODATE TYPE="Date">{}</SVTODATE>"#,
@@ -627,10 +635,13 @@ fn render_audit_ledgers(company: &str, from: &str, to: &str) -> String {
 /// The dates go into a quoted `$$Date:"…"` literal, which XML escaping cannot
 /// protect (Tally decodes `&quot;` before evaluating), so only a date is
 /// accepted (#861).
-fn render_audit_vouchers(company: &str, from: &TallyDate, to: &TallyDate) -> String {
+fn render_audit_vouchers(
+    company: &ValidatedCompanyName,
+    from: &TallyDate,
+    to: &TallyDate,
+) -> String {
     let (from, to) = (from.as_str(), to.as_str());
-    let static_variables = compatibility::static_variables_for_unvalidated_company(
-        company,
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{from}</SVFROMDATE><SVTODATE TYPE="Date">{to}</SVTODATE>"#
@@ -641,9 +652,8 @@ fn render_audit_vouchers(company: &str, from: &TallyDate, to: &TallyDate) -> Str
     )
 }
 
-fn render_audit_stock_items(company: &str, from: &str, to: &str) -> String {
-    let static_variables = compatibility::static_variables_for_unvalidated_company(
-        company,
+fn render_audit_stock_items(company: &ValidatedCompanyName, from: &str, to: &str) -> String {
+    let static_variables = company.xml_static_variables(
         "<SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>",
         &format!(
             r#"<SVFROMDATE TYPE="Date">{}</SVFROMDATE><SVTODATE TYPE="Date">{}</SVTODATE>"#,

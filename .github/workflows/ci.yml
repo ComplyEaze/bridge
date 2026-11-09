@@ -436,7 +436,9 @@ jobs:
       - run: node --test scripts/collect-macos-test-crashes.test.mjs scripts/retain-macos-test-binaries.test.mjs
       - run: node --test scripts/fetch-pdfium.test.mjs
       - run: node --test scripts/check-ai-attribution.test.mjs
-      # merge-gate.test.py takes about 6.5 of this job's 7.5 minutes and tests the merge gate and what it reads. A
+      # merge-gate.test.py tests the merge gate and what it reads. In one process it took about 475 s of this job's 550 s,
+      # so shard-unittest.py runs it in four processes side by side (a public repository's Linux runner has four cores).
+      # It fails unless each process ran exactly the tests assigned to it, none skipped, so every test still runs once. A
       # pull request that changes nothing under scripts/, .github/ or docs/tally/compatibility/ (or the Node version
       # and attributes files) skips it; the merge queue, a push to master, the nightly run and a manual
       # run always run it, so a break the filter missed is caught before it lands. A diff that cannot be read fails
@@ -454,7 +456,7 @@ jobs:
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - if: steps.merge-gate-scope.outputs.run == 'true'
-        run: python3 scripts/merge-gate.test.py
+        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4
       - run: python3 scripts/surface_coverage_report.test.py
 
   tally-portable:

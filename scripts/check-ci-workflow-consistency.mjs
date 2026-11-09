@@ -239,13 +239,20 @@ const reuseScriptDigest = createHash("sha256").update(readFileSync(resolve(repos
 if (reuseScriptDigest !== "fed907ab68fe52ebd7eb227a377f546a51127303eef48d6cee560fa6e2560c6a") {
   failures.push(`scripts/master-push-reuse.mjs changed; its digest is now ${reuseScriptDigest}`);
 }
-// The merge gate's test (about 6.5 of the Workflow consistency job's 7.5 minutes) runs on a pull request only when the diff
+// The driver that splits the merge gate's test across processes is pinned by its bytes, like the reuse lookup above: it
+// decides which tests run, so a change to it is a change to what the queue proves and needs this file edited (and
+// acknowledged) with it. It lists the file's tests, gives each to exactly one process and fails unless each process reports exactly its assigned tests, all run, none skipped.
+const shardDriverDigest = createHash("sha256").update(readFileSync(resolve(repositoryRoot, "scripts/shard-unittest.py"))).digest("hex");
+if (shardDriverDigest !== "619a8d16e33789172ec160fa4b94fe4172323e7276f1b80e3aa4a76740a05426") {
+  failures.push(`scripts/shard-unittest.py changed; its digest is now ${shardDriverDigest}`);
+}
+// The merge gate's test (about 475 s in one process, split four ways by the driver above) runs on a pull request only when the diff
 // touches what it reads, which the merge-gate-scope step decides; the test step must stay wired to that output and nothing
 // else, or the test silently stops running on every event, the merge queue included. The step's two env lines are pinned
 // too: a base taken from anywhere but the pull request's base (its head, say) gives an empty diff and skips the test.
 {
   const consistencyJob = jobBlock(workflow, "workflow-consistency");
-  const wiring = "      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/merge-gate.test.py\n";
+  const wiring = "      - if: steps.merge-gate-scope.outputs.run == 'true'\n        run: python3 scripts/shard-unittest.py scripts/merge-gate.test.py 4\n";
   if ((consistencyJob + "\n").split(wiring).length !== 2 || (consistencyJob.match(/^ *(?:- )?run: .*merge-gate\.test\.py/gm) ?? []).length !== 1 || (consistencyJob.match(/^      - id: merge-gate-scope$/gm) ?? []).length !== 1) {
     failures.push("the merge gate's test must run once, exactly when the merge-gate-scope step says so");
   }

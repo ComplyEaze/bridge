@@ -206,6 +206,134 @@ fn sent_sha256(request: &str) -> String {
     crate::agent::sha256_hex(&sent)
 }
 
+/// The window read the code renders is, for each month of the dense book's
+/// year and for the pilot book's whole year, the request row 2162-S7 sent, by
+/// the SHA-256 of its file (`C-Y0-<month>.xml` and `A-Y0-year.xml` of
+/// `lab/2162-s7-sheet` at b63accd9, `SHA256.txt`).
+#[test]
+fn the_window_read_is_the_one_the_lab_sent_for_each_month_and_for_a_year() {
+    let months = calendar_months(&date("20250401"), &date("20260331")).unwrap();
+    let sent = [
+        "4ba0e96e06cb07b10e6d122b483ab87c01b4eed97b77b16fee681b8a922875df",
+        "566107572af15fa31b2ddd9014cd82ee7fe9164ecf40d66f85a520b8a9fd4ab5",
+        "b04114438fd616e1b4d0b2a68a2a13f5f1802a67ffa2dfa44fd9a843ec695735",
+        "1c8b0fa5760d0f2c535368c3bf4eec7c1992bf5237d8a4124e3a8dd5d4842dc5",
+        "3f1dd952bff9d12bc87b21b6d4b98e1916c4b0e5464e930269c6fdbe797b08f8",
+        "b834016d9d7a9ca9a90735240b4101a735680f7fa0db999908c84133e3af763b",
+        "cb57a5a2f8be2448bf6fa4f883cac380ee28e78717a0f61857e4f3240268df1f",
+        "779ccddef87de004dbc9d700cc7c01edc32bbd652483814205aaf7aaa052bbb7",
+        "abe28d18b2c481a13a23e9c79cb4f5fbc1c43a740e23935e8054920b148f9a30",
+        "0f9cc2edb641129abe727a44189c37d500b22b0e55fbb9591c758bedf2815c22",
+        "a2f6038bfe8830dd0b4a3e96269e864b6bf9001e9340481d05195a7a63e84ed7",
+        "7f23382ae309cdb1ef66526e090edddc504aec2f1aea0d00554e3bd959e85f98",
+    ];
+    assert_eq!(months.len(), sent.len());
+    for ((from, to), sha256) in months.iter().zip(sent) {
+        let rendered = render_invoice_window_numbers_request("BRIDGE CORPUS DENSE", (from, to));
+        assert_eq!(sent_sha256(&rendered), sha256, "{}", from.as_str());
+    }
+    let year = render_invoice_window_numbers_request(
+        "BRIDGE PILOT LAB",
+        (&date("20260401"), &date("20270331")),
+    );
+    assert_eq!(
+        sent_sha256(&year),
+        "4f2041761f5a0bab6a8cbbc27f0b8419eaf652d881f2585899189defc7d76ed1"
+    );
+}
+
+/// The month reads row 2162-M1 sends, on the two books the replay tests run
+/// on, are what the renderer writes for each month of their financial years,
+/// by the SHA-256 of each file (`A-Y0-<month>.xml` and `C-Y0-<month>.xml` of
+/// `lab/2162-m1-sheet`, `SHA256.txt`).
+#[test]
+fn the_m1_requests_are_the_ones_the_renderer_writes() {
+    let books = [
+        (
+            "BRIDGE PILOT LAB",
+            ("20260401", "20270331"),
+            [
+                "c247b44f63d3d3107f1a4eec8bb6e98f2ef163ddae0c9969d97b40fe59679ebc",
+                "a4afaa7bee760457d8c199c8a83bdd9a69f1bf73f246bf868ad89f095426d518",
+                "2ebf04a727ddfdc48d028b340fade10d88e18279069bbb2374645197af71ed5c",
+                "80f2ca5df0fd1035956d95df44a34ab790e8105b0ec69121de325f2f8a9e3e9d",
+                "b226ad52af00b919a62d9c29e2d2e6db0fe1ad4071fbe2a97da3a82852c23d26",
+                "9e6ff4c88df3af12f8c6be5d2b4abaf6d1cae133a0eea406b75c86af70990447",
+                "54e5fcb963d3d547c71d5aa61b242f39a5737120353a8832c5ca2e49ccc99853",
+                "84fb20ef3ed1065e7c4534113287143d2cb36846b391770d9aa6466d2bfa8381",
+                "e6df4cf0d2133d0d681ee074fce020391828ce4733614e2d3965c24035914dac",
+                "3ff8a263528b18baabdfdaa8ad0457d8ff1f236782c1bbd43e7bfe8cfd40cb10",
+                "a8fbb5f9cd443928bd430a481c4da1cf0040255f5c9e43901351b2a22d43d292",
+                "45d1541630cc938e63c1733f97d280e9eba94ee40fcb70ac48c5e2fccdddb4af",
+            ],
+        ),
+        (
+            "BRIDGE EINVOICE LAB",
+            ("20250401", "20260331"),
+            [
+                "62d8199bf164e22f29c04276b797e68a78e65de452c2db81ebe918dc7f4aed3d",
+                "a7158860f8c8e330e07108bd2228448e30d5ff39c881b5f19d738f2c0809604b",
+                "6fbabcd51e49cd6f670585a8d14148d16ff8a1fb0010ca31fed7b9dbae4f2800",
+                "0d6a7467e14ff043e2b783cab720add0a1e60ed11fc34101370962a1d6da67c8",
+                "20af351bb66ab62bde783699ed2e7a1aed0805aa94103c0dd887b5066473d6a5",
+                "b9b67fb65abcc882ab3a7ffa1df8bdeec8200a8d0efd3367eecc6e1ff03f369d",
+                "1a926b3105ea34fb1fe4e422b7220a4bc18b86c3d18a8425b25aeac43c37e7ce",
+                "295ecfe3127d0930ba60a3e4f748fbb43defab94295b1ce92cb4b64980db3ea3",
+                "eeadb3fb2f52cc7199e73a68eef4a36e3579e4965f1a6623efa3cb10562e06e6",
+                "bcb848eaa2121609c1f2b594a96249ea26850896a8ba55fdb29e0f5139243bc2",
+                "c2ac37a4b0db5424a5310e1d1b05506776c0a7872a4e5cf1ebb43041974ba962",
+                "585384e27a3a459fd6d1546cd3f4ba15e6ec015bf217da947575e233b31216f7",
+            ],
+        ),
+    ];
+    for (company, (from, to), sent) in books {
+        let months = calendar_months(&date(from), &date(to)).unwrap();
+        assert_eq!(months.len(), sent.len());
+        for ((from, to), sha256) in months.iter().zip(sent) {
+            let rendered = render_invoice_window_numbers_request(company, (from, to));
+            assert_eq!(
+                sent_sha256(&rendered),
+                sha256,
+                "{company} {}",
+                from.as_str()
+            );
+        }
+    }
+}
+
+/// The months of a span run from its first day to its last with no gap, each
+/// ending on its own last day (February of a leap year included); a span that
+/// does not start on a first or end on a month's last day has none.
+#[test]
+fn calendar_months_tile_a_span_of_whole_months_and_refuse_any_other() {
+    let months = calendar_months(&date("20271101"), &date("20280331")).unwrap();
+    let pairs = months
+        .iter()
+        .map(|(from, to)| format!("{}-{}", from.as_str(), to.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        pairs,
+        [
+            "20271101-20271130",
+            "20271201-20271231",
+            "20280101-20280131",
+            "20280201-20280229",
+            "20280301-20280331",
+        ]
+    );
+    assert_eq!(
+        calendar_months(&date("20260401"), &date("20260430")).map(|m| m.len()),
+        Some(1)
+    );
+    for (from, to) in [
+        ("20260402", "20270331"),
+        ("20260401", "20270330"),
+        ("20260501", "20260430"),
+    ] {
+        assert_eq!(calendar_months(&date(from), &date(to)), None, "{from} {to}");
+    }
+}
+
 /// The number read the code renders is, for the two numbers row 2162-IRN sent
 /// (4 Nov 2026, #2162 item 8), the request the lab sent, by the SHA-256 of its
 /// file (`NI-1.xml`, `NI-2.xml` of `lab/2162-irn-read-sheet` at 8b1573e8).

@@ -438,6 +438,57 @@ pub(in crate::agent) fn render_invoice_number_request(
     )
 }
 
+/// Every voucher of one window, whatever its type and number, with the same
+/// fetch list and class compute as the number read: the number read less its
+/// number term. Tally cannot be asked whether two numbers match after case and
+/// leading zeros are ignored (row 2162-S4: its own filter and duplicate guard
+/// ignore case but not a dropped zero), so the program compares the window's
+/// numbers itself. One read of the year does not fit the transport on a dense
+/// book (row 2162-S6: 83.7 MB, 44 s), so the year is read a calendar month at
+/// a time (row 2162-S7: every dense month under 15 s and 24 MiB, the months'
+/// rows equal to the year's). The lab sent this request for each month of a
+/// year and for a whole year (`lab/2162-s7-sheet` at b63accd9).
+pub(in crate::agent) fn render_invoice_window_numbers_request(
+    company: &str,
+    (from, to): (&TallyDate, &TallyDate),
+) -> String {
+    let (from, to) = (from.as_str(), to.as_str());
+    format!(
+        "<ENVELOPE><HEADER><VERSION>1</VERSION><TALLYREQUEST>Export</TALLYREQUEST><TYPE>Collection</TYPE><ID>Bridge Invoice Number</ID></HEADER><BODY><DESC><STATICVARIABLES><SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT><SVCURRENTCOMPANY>{company}</SVCURRENTCOMPANY><SVFROMDATE TYPE=\"Date\">{from}</SVFROMDATE><SVTODATE TYPE=\"Date\">{to}</SVTODATE></STATICVARIABLES><TDL><TDLMESSAGE><SYSTEM TYPE=\"Formulae\" NAME=\"BridgeInvoiceNumber\">$Date &gt;= $$Date:\"{from}\" AND $Date &lt;= $$Date:\"{to}\"</SYSTEM><COLLECTION NAME=\"Bridge Invoice Number\" ISMODIFY=\"No\"><TYPE>Voucher</TYPE><FETCH>DATE, VOUCHERNUMBER, VOUCHERTYPENAME, ISCANCELLED, IRN, IRNACKNO, IRNACKDATE</FETCH><COMPUTE>{SALES_CLASS_TAG}:$$IsSales:$VoucherTypeName</COMPUTE><FILTERS>BridgeInvoiceNumber</FILTERS></COLLECTION></TDLMESSAGE></TDL></DESC></BODY></ENVELOPE>",
+        company = xml_escape(company),
+    )
+}
+
+/// The calendar months from `from` to `to`, each as its first and last day,
+/// or `None` unless `from` is a first of the month and `to` the last day of a
+/// month on or after it. The financial year's window is such a span.
+pub(in crate::agent) fn calendar_months(
+    from: &TallyDate,
+    to: &TallyDate,
+) -> Option<Vec<(TallyDate, TallyDate)>> {
+    if from > to || !from.as_str().ends_with("01") || to.next_day().ok()?.as_str().get(6..)? != "01"
+    {
+        return None;
+    }
+    let mut months = Vec::new();
+    let mut first = from.clone();
+    while first <= *to {
+        let (year, month): (u32, u32) = (
+            first.as_str().get(..4)?.parse().ok()?,
+            first.as_str().get(4..6)?.parse().ok()?,
+        );
+        let next = if month == 12 {
+            format!("{:04}0101", year + 1)
+        } else {
+            format!("{year:04}{:02}01", month + 1)
+        };
+        let next = TallyDate::parse(next).ok()?;
+        months.push((first, next.previous_day().ok()?));
+        first = next;
+    }
+    Some(months)
+}
+
 /// The element the Sales class compute answers in (the name the voucher reads
 /// already use).
 const SALES_CLASS_TAG: &str = "BRIDGEVCHISSALES";

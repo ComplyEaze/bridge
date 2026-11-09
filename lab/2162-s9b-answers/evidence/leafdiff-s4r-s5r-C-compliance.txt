@@ -1,0 +1,7 @@
+== --leafdiff a-s4r-C-compliance.xml a-s5r-C-compliance.xml: 17 and 21 leaves
+   ALTERID[1]: 'Number' '247' -> 'Number' '248'
+   LEDGSTREGDETAILS.LIST[2]/APPLICABLEFROM[1]: <absent> -> 'Date' '20260915'
+   LEDGSTREGDETAILS.LIST[2]/GSTIN[1]: <absent> -> 'String' <GSTIN shape>
+   LEDGSTREGDETAILS.LIST[2]/GSTREGISTRATIONTYPE[1]: <absent> -> 'String' 'Regular - SEZ'
+   LEDGSTREGDETAILS.LIST[2]/PLACEOFSUPPLY[1]: <absent> -> 'String' 'Rajasthan'
+  5 leaves differ

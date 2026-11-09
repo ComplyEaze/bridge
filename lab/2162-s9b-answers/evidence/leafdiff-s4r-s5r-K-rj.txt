@@ -1,0 +1,14 @@
+== --leafdiff a-s4r-K-rj.xml a-s5r-K-rj.xml: 443 and 453 leaves
+   ALTERID[1]: '' '247' -> '' '248'
+   CONTACTDETAILS.LIST[1]/COUNTRYISDCODE[1]: '' '' -> '' '+91'
+   LEDGSTREGDETAILS.LIST[2]/APPLICABLEFROM[1]: <absent> -> '' '20260915'
+   LEDGSTREGDETAILS.LIST[2]/CONSIDERPURCHASEFOREXPORT[1]: <absent> -> '' ''
+   LEDGSTREGDETAILS.LIST[2]/GSTIN[1]: <absent> -> '' <GSTIN shape>
+   LEDGSTREGDETAILS.LIST[2]/GSTREGISTRATIONTYPE[1]: <absent> -> '' 'Regular - SEZ'
+   LEDGSTREGDETAILS.LIST[2]/ISCOMMONPARTY[1]: <absent> -> '' ''
+   LEDGSTREGDETAILS.LIST[2]/ISOTHTERRITORYASSESSEE[1]: <absent> -> '' ''
+   LEDGSTREGDETAILS.LIST[2]/ISTRANSPORTER[1]: <absent> -> '' ''
+   LEDGSTREGDETAILS.LIST[2]/PLACEOFSUPPLY[1]: <absent> -> '' 'Rajasthan'
+   LEDGSTREGDETAILS.LIST[2]/STATE[1]: <absent> -> '' ''
+   LEDGSTREGDETAILS.LIST[2]/TRANSPORTERID[1]: <absent> -> '' ''
+  12 leaves differ

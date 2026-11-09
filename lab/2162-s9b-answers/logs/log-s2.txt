@@ -1,0 +1,2 @@
+18:05:17	C-compliance.xml	a-s2-C-compliance.xml	curl 0	38278 bytes
+18:05:17	K-rj.xml	a-s2-K-rj.xml	curl 0	2994 bytes

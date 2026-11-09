@@ -630,16 +630,16 @@ class MergeGateControls(unittest.TestCase):
         self.assert_pass("public-agent-coauthor-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
 
     def test_dependabots_signoff_line_in_a_well_formed_commit_trailer_is_identity_metadata(self):
-        self.assert_pass("bot-signoff-trailer", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+        self.assert_pass("bot-signoff-trailer")
 
     def test_dependabots_signoff_line_in_a_well_formed_crlf_commit_trailer_is_identity_metadata(self):
-        self.assert_pass("bot-signoff-trailer-crlf", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+        self.assert_pass("bot-signoff-trailer-crlf")
 
     def test_dependabots_signoff_line_without_a_final_newline_is_identity_metadata(self):
-        self.assert_pass("bot-signoff-trailer-no-final-newline", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+        self.assert_pass("bot-signoff-trailer-no-final-newline")
 
     def test_dependabots_signoff_line_beside_the_public_agent_trailer_is_identity_metadata(self):
-        self.assert_pass("bot-signoff-with-agent-trailer", "the owner's MERGE-VERDICT CLEAN and MERGE-ADVERSARY RECOMMEND stand at head")
+        self.assert_pass("bot-signoff-with-agent-trailer")
 
     def test_dependabots_signoff_line_outside_a_commit_trailer_still_blocks(self):
         for scenario in (

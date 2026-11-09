@@ -194,8 +194,9 @@ pub(super) struct Checks {
     pub(super) tax_fields: Check,
     pub(super) party_gstin: Check,
     pub(super) opening_balance: Check,
-    /// CREATED equal to the ledgers sent, ALTERED=0, ERRORS=0, EXCEPTIONS=0
-    /// (the reason keeps its first name, `counters_not_one_created`). `NotChecked` when Tally
+    /// CREATED equal to the ledgers sent and every other counter zero, by the
+    /// protocol crate's `ImportCounters::are_exactly` (the reason keeps its
+    /// first name, `counters_not_one_created`). `NotChecked` when Tally
     /// reported no counters: that can never be `posted_verified`, because a
     /// same-name master created between the aim read and the POST would be
     /// overwritten by the Create and every other check would still pass.
@@ -512,19 +513,6 @@ pub(super) fn is_zero_amount(text: &str) -> bool {
         && amount.chars().all(|c| c == '0' || c == '.')
 }
 
-/// Tally counted one create for each ledger sent and nothing else.
-fn counters_check(counters: Option<MasterCounters>, count: u64) -> Check {
-    match counters {
-        None => Check::NotChecked,
-        Some(counters) => passed(
-            counters.created == count
-                && counters.altered == 0
-                && counters.errors == 0
-                && counters.exceptions == 0,
-        ),
-    }
-}
-
 fn passed(ok: bool) -> Check {
     if ok {
         Check::Passed
@@ -698,7 +686,10 @@ pub(super) fn judge(facts: &Facts<'_>, read: &ReadBack) -> Judgement {
     let items = facts.batch.items();
     let count = items.len() as u64;
     let mut checks = Checks::none();
-    checks.counters = counters_check(facts.counters, count);
+    // Tally counted one create for each ledger sent and nothing else.
+    checks.counters = facts.counters.map_or(Check::NotChecked, |counters| {
+        passed(counters.are_exactly(count, 0, 0))
+    });
     let mut reasons = Vec::<&'static str>::new();
 
     // 1. A read-back that could not be made leaves the outcome open.

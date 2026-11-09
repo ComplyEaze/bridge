@@ -1,0 +1,14 @@
+Count for PR #2419 (head ebf49662), run on the lab PC on 9 Nov 2026: how often the full 36-character GUID that PR adds to
+scripts/merge-gate-synthetic-uuids.json appears in this row's kept-local answers/a-m0.xml. The GUID was read from the PR's diff,
+not typed. Nothing else is reported from the file.
+
+answers/a-m0.xml: 3318 B, sha256 ed6554bcc9af34d808d6ee4df477803a8f22266c036aa9dd246abc909e4027e1 (the file kept-local.txt lists)
+The file is UTF-16LE without a byte-order mark, so a plain grep cannot see its text. Both ways are given:
+
+grep -c on the file as stored:                                0
+grep -o on the file as stored, piped to wc -l:                0
+grep -c after iconv -f UTF-16LE -t UTF-8:                     1
+grep -o after iconv -f UTF-16LE -t UTF-8, piped to wc -l:     1
+The same by bytes (Python): UTF-8 form 0, UTF-16LE form 1.
+
+So the GUID appears once in the file, on one line.

@@ -20,6 +20,15 @@
 // changes, and closed when the findings are gone. A run that changes nothing
 // is the normal case and must stay silent.
 //
+// The issue also lists every id `.cargo/audit.toml` ignores (#2446). An ignored
+// id is absent from the findings, so without that list an accepted
+// vulnerability would be invisible until its Review-by date failed
+// scripts/audit-review-by.test.mjs. The ids come from the report's own
+// `settings.ignore`, which is what cargo-audit applied; the file adds each
+// entry's Review-by date and issue number, and the two must name the same ids.
+// The issue therefore stays open while anything is accepted, and a newly
+// accepted id, a removed one or a changed date is announced once.
+//
 // Split deliberately into a pure planner and a thin applier: the planner is
 // what the tests exercise, so the reconciliation rules are provable without a
 // network, a GitHub token, or a Rust toolchain -- `pnpm test` runs every
@@ -138,47 +147,239 @@ export function recordedIds(body) {
   }
 }
 
+// The ids cargo-audit applied, from the report it wrote. `cargo audit --json`
+// records its configuration under `settings` (measured with cargo-audit 0.22.2
+// on 2026-11-09: `settings.ignore` held exactly the ten ids of master's file,
+// eleven with RUSTSEC-2026-0459 added). A report without that list is refused:
+// read as "nothing accepted", it would drop every accepted id from the issue,
+// which is the silence this list exists to end.
+export function acceptedFromReport(report) {
+  const ignore = report?.settings?.ignore;
+  if (!Array.isArray(ignore) || !ignore.every((id) => typeof id === "string" && id.trim() !== "")) {
+    throw new Error(
+      "audit-tracking-issue: the report has no settings.ignore list of advisory ids, so what " +
+        "cargo-audit accepted cannot be read; refusing rather than posting an empty accepted list",
+    );
+  }
+  return [...new Set(ignore)].sort();
+}
+
+// A report file, parsed or refused. An empty or unparseable file is a failed
+// audit, not a clean one; the workflow refuses an empty file too, and this
+// says the same for any caller.
+export function parseReport(path, text) {
+  if (!text || !text.trim()) {
+    throw new Error(`audit-tracking-issue: ${path} is empty -- treating it as a failed audit, not a clean one`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`audit-tracking-issue: ${path} is not JSON (${error.message}) -- treating it as a failed audit`);
+  }
+}
+
+const IGNORE_OPEN = /^ignore\s*=\s*\[\s*$/;
+// An advisory id in the characters RustSec ids use, so an id cannot carry
+// Markdown or a mention into the issue.
+const ID_LINE = /^"([A-Za-z0-9._:-]+)",?$/;
+const REVIEW_BY_LINE = /^#\s*Review-by:\s*(\d{4}-\d{2}-\d{2})\b/;
+// `#2432`, but not `bridge#445` or a URL fragment.
+const ISSUE_REFERENCE = /(?<![A-Za-z0-9_/])#(\d{1,7})\b/;
+
+// Each id in `.cargo/audit.toml`'s `ignore` array, with the Review-by date and
+// first issue number from the comment block above it; ids listed one after
+// another under one block share it. Only those two values leave the comment,
+// so no comment text reaches the issue. A line the walk does not recognise
+// inside the array is refused rather than skipped, so an id cannot go
+// unlisted because it was written in another form.
+export function entriesFromAuditToml(text) {
+  const lines = text.split("\n").map((line) => line.trim());
+  const open = lines.findIndex((line) => IGNORE_OPEN.test(line));
+  if (open === -1) throw new Error("audit-tracking-issue: .cargo/audit.toml has no `ignore = [` line");
+  const entries = [];
+  let pending = [];
+  let block = [];
+  for (let i = open + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line === "]") {
+      const ids = entries.map((entry) => entry.id);
+      const repeated = ids.filter((id, index) => ids.indexOf(id) !== index);
+      if (repeated.length) {
+        throw new Error(`audit-tracking-issue: .cargo/audit.toml ignores ${[...new Set(repeated)].join(", ")} more than once`);
+      }
+      return entries.sort((a, b) => a.id.localeCompare(b.id));
+    }
+    if (line === "") continue;
+    if (line.startsWith("#")) {
+      pending.push(line);
+      continue;
+    }
+    const id = ID_LINE.exec(line);
+    if (!id) {
+      throw new Error(`audit-tracking-issue: .cargo/audit.toml line ${i + 1} is not an id or a comment inside \`ignore\`: ${line}`);
+    }
+    if (pending.length) {
+      block = pending;
+      pending = [];
+    }
+    const reviewBy = block.map((entry) => REVIEW_BY_LINE.exec(entry)).find(Boolean);
+    const issue = block.map((entry) => ISSUE_REFERENCE.exec(entry)).find(Boolean);
+    entries.push({ id: id[1], review_by: reviewBy ? reviewBy[1] : null, issue: issue ? Number(issue[1]) : null });
+  }
+  throw new Error("audit-tracking-issue: .cargo/audit.toml's `ignore` array is not closed");
+}
+
+// The accepted entries for the issue: the file's entries, once every report's
+// `settings.ignore` names exactly the same ids. A difference either way means
+// the file the job read is not the file cargo-audit read (the wrong working
+// directory reads no file at all), so it fails the job and names both sides.
+export function acceptedEntries(reports, auditTomlText) {
+  const entries = entriesFromAuditToml(auditTomlText);
+  const inFile = entries.map((entry) => entry.id);
+  for (const report of reports) {
+    const inReport = acceptedFromReport(report);
+    const onlyInFile = inFile.filter((id) => !inReport.includes(id));
+    const onlyInReport = inReport.filter((id) => !inFile.includes(id));
+    if (onlyInFile.length || onlyInReport.length) {
+      throw new Error(
+        "audit-tracking-issue: .cargo/audit.toml and the report's settings.ignore disagree " +
+          `(only in the file: ${onlyInFile.join(", ") || "none"}; only in the report: ${onlyInReport.join(", ") || "none"})`,
+      );
+    }
+  }
+  return entries;
+}
+
+// The accepted entries as last written, from their own recorded line. JSON for
+// the same reason as the ids line. An absent or unreadable line reads as none,
+// so the run after a body without it (an issue written before #2446) announces
+// every accepted id once and writes the line.
+const ACCEPTED_PREFIX = "Accepted advisory entries:";
+
+export function recordedAccepted(body) {
+  const line = (body ?? "")
+    .split("\n")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(ACCEPTED_PREFIX));
+  if (!line) return [];
+  try {
+    const parsed = JSON.parse(line.slice(ACCEPTED_PREFIX.length).trim());
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (row) =>
+          Array.isArray(row) &&
+          row.length === 3 &&
+          typeof row[0] === "string" &&
+          (row[1] === null || (typeof row[1] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row[1]))) &&
+          (row[2] === null || (Number.isInteger(row[2]) && row[2] > 0)),
+      )
+      .map(([id, review_by, issue]) => ({ id, review_by, issue }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  } catch {
+    return [];
+  }
+}
+
+const entryKey = (entry) => JSON.stringify([entry.id, entry.review_by, entry.issue]);
+
+// What moved between the accepted entries last written and today's.
+function acceptedMoves(recorded, accepted) {
+  const before = new Map(recorded.map((entry) => [entry.id, entry]));
+  const after = new Map(accepted.map((entry) => [entry.id, entry]));
+  return {
+    newlyAccepted: accepted.filter((entry) => !before.has(entry.id)).map((entry) => entry.id),
+    noLongerAccepted: recorded.filter((entry) => !after.has(entry.id)).map((entry) => entry.id),
+    changed: accepted
+      .filter((entry) => before.has(entry.id) && entryKey(before.get(entry.id)) !== entryKey(entry))
+      .map((entry) => ({ id: entry.id, from: before.get(entry.id), to: entry })),
+  };
+}
+
 /// The whole contract, in one pure function.
 ///
 /// `none` and `unchanged` are distinct on purpose: both do nothing, but the
 /// first means "clean, nothing tracked" and the second means "still broken,
 /// already tracked". Collapsing them would hide a standing advisory behind the
 /// same silence as a clean run.
-export function planAction(findings, existing) {
+///
+/// `accepted` is the list of `acceptedEntries`. The issue closes only when
+/// there are no findings AND nothing is accepted: an accepted id is the one
+/// thing the findings cannot show.
+export function planAction(findings, existing, accepted = []) {
   const ids = findings.map((finding) => finding.id).sort();
-  if (ids.length === 0) {
+  const entries = [...accepted].sort((a, b) => a.id.localeCompare(b.id));
+  if (ids.length === 0 && entries.length === 0) {
     return existing ? { action: "close", issue: existing.number } : { action: "none" };
   }
-  if (!existing) return { action: "create", ids, findings };
+  if (!existing) return { action: "create", ids, findings, accepted: entries };
   const recorded = [...(existing.ids ?? [])].sort();
-  const same = recorded.length === ids.length && recorded.every((id, i) => id === ids[i]);
-  if (same) return { action: "unchanged", issue: existing.number, ids };
+  const recordedEntries = [...(existing.accepted ?? [])].sort((a, b) => a.id.localeCompare(b.id));
+  const sameIds = recorded.length === ids.length && recorded.every((id, i) => id === ids[i]);
+  const sameAccepted =
+    recordedEntries.length === entries.length &&
+    recordedEntries.every((entry, i) => entryKey(entry) === entryKey(entries[i]));
+  if (sameIds && sameAccepted) return { action: "unchanged", issue: existing.number, ids };
   const added = ids.filter((id) => !recorded.includes(id));
   const removed = recorded.filter((id) => !ids.includes(id));
+  const moves = acceptedMoves(recordedEntries, entries);
   // A recorded line that merely repeats an id differs as a list while naming
   // the same set. Rewriting the body is right; announcing a change that moved
   // nothing is not.
-  if (added.length === 0 && removed.length === 0) {
-    return { action: "repair", issue: existing.number, ids, findings };
+  if (
+    added.length === 0 &&
+    removed.length === 0 &&
+    moves.newlyAccepted.length === 0 &&
+    moves.noLongerAccepted.length === 0 &&
+    moves.changed.length === 0
+  ) {
+    return { action: "repair", issue: existing.number, ids, findings, accepted: entries };
   }
-  return { action: "update", issue: existing.number, ids, findings, added, removed };
+  return { action: "update", issue: existing.number, ids, findings, added, removed, accepted: entries, ...moves };
 }
 
-export function issueBody(findings) {
+const describeEntry = (entry) =>
+  `review-by ${entry.review_by ?? "none in the file"}, ${entry.issue ? `#${entry.issue}` : "no issue named in the file"}`;
+
+// The update comment: every move, each named once.
+export function updateComment(plan) {
+  const changed = [
+    plan.added?.length ? `newly reported: ${plan.added.join(", ")}` : null,
+    plan.removed?.length ? `no longer reported: ${plan.removed.join(", ")}` : null,
+    plan.newlyAccepted?.length ? `newly accepted in .cargo/audit.toml: ${plan.newlyAccepted.join(", ")}` : null,
+    plan.noLongerAccepted?.length ? `no longer accepted: ${plan.noLongerAccepted.join(", ")}` : null,
+    ...(plan.changed ?? []).map(
+      ({ id, from, to }) => `accepted entry changed: ${id} (${describeEntry(from)} -> ${describeEntry(to)})`,
+    ),
+  ]
+    .filter(Boolean)
+    .join("; ");
+  return `Scheduled audit update -- ${changed}.`;
+}
+
+export function issueBody(findings, accepted = []) {
   const lines = findings.map(
     (finding) => `- \`${finding.id}\` (${finding.kind}) ${finding.package} -- ${finding.summary}`,
   );
+  const entries = [...accepted].sort((a, b) => a.id.localeCompare(b.id));
+  const acceptedLines = entries.map((entry) => `- \`${entry.id}\` -- ${describeEntry(entry)}`);
   return [
     MARKER,
     "",
     "`cargo audit` reports the following on the default branch's Rust",
     "lockfiles, after `.cargo/audit.toml`'s ignore list is applied.",
     "",
-    ...lines,
+    ...(lines.length ? lines : ["- none"]),
+    "",
+    "Accepted in `.cargo/audit.toml` (ignored, so `cargo audit` does not report",
+    "them above), as `cargo audit` applied them on this run:",
+    "",
+    ...(acceptedLines.length ? acceptedLines : ["- none"]),
     "",
     "This issue is maintained by the scheduled dependency audit. It is updated",
-    "when the set of findings changes and closed automatically when the",
-    "findings are gone. Edit the title or add comments freely.",
+    "when the findings or the accepted entries change, and closed automatically",
+    "when there are no findings and nothing is accepted. Edit the title or add",
+    "comments freely.",
     "",
     "Three things are load-bearing for finding this issue again: the marker",
     `above, the recorded-ids line below, and the \`${LABEL}\` label -- the next`,
@@ -187,6 +388,7 @@ export function issueBody(findings) {
     "one orphaned.",
     "",
     `${RECORDED_PREFIX} ${JSON.stringify(findings.map((finding) => finding.id).sort())}`,
+    `${ACCEPTED_PREFIX} ${JSON.stringify(entries.map((entry) => [entry.id, entry.review_by, entry.issue]))}`,
   ].join("\n");
 }
 
@@ -234,30 +436,26 @@ export function findExisting(run = gh) {
     );
   }
   const match = matches[0];
-  return match ? { number: match.number, ids: recordedIds(match.body) } : null;
+  return match
+    ? { number: match.number, ids: recordedIds(match.body), accepted: recordedAccepted(match.body) }
+    : null;
 }
 
 export function apply(plan, run = gh) {
   if (plan.action === "none" || plan.action === "unchanged") return;
   if (plan.action === "create") {
-    run(["issue", "create", "--title", TITLE, "--label", LABEL, "--body", issueBody(plan.findings)]);
+    run(["issue", "create", "--title", TITLE, "--label", LABEL, "--body", issueBody(plan.findings, plan.accepted)]);
     return;
   }
   if (plan.action === "repair") {
     // The set is the same; only the recorded line was malformed. Rewrite it
     // and say nothing, so a cosmetic repair does not read as a new finding.
-    run(["issue", "edit", String(plan.issue), "--body", issueBody(plan.findings)]);
+    run(["issue", "edit", String(plan.issue), "--body", issueBody(plan.findings, plan.accepted)]);
     return;
   }
   if (plan.action === "update") {
-    run(["issue", "edit", String(plan.issue), "--body", issueBody(plan.findings)]);
-    const changed = [
-      plan.added.length ? `newly reported: ${plan.added.join(", ")}` : null,
-      plan.removed.length ? `no longer reported: ${plan.removed.join(", ")}` : null,
-    ]
-      .filter(Boolean)
-      .join("; ");
-    run(["issue", "comment", String(plan.issue), "--body", `Scheduled audit update -- ${changed}.`]);
+    run(["issue", "edit", String(plan.issue), "--body", issueBody(plan.findings, plan.accepted)]);
+    run(["issue", "comment", String(plan.issue), "--body", updateComment(plan)]);
     return;
   }
   // Close first, then comment. The other order leaves a "Closing" comment on an
@@ -272,30 +470,51 @@ export function apply(plan, run = gh) {
     "comment",
     String(plan.issue),
     "--body",
-    "Scheduled audit reports no findings on the default branch. Closed automatically.",
+    "Scheduled audit reports no findings and nothing accepted on the default branch. Closed automatically.",
   ]);
 }
 
-function main() {
-  const argv = process.argv.slice(2);
+// `--audit-config` is required in both modes, for the same reason the preview
+// queries the issue: without the file there are no accepted entries to compare,
+// and a run that left them out would announce every accepted id as no longer
+// accepted.
+export function parseArguments(argv) {
   const reports = [];
   let shouldApply = false;
+  let auditConfig = null;
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--report") {
       if (i + 1 >= argv.length) throw new Error("audit-tracking-issue: --report needs a value");
       reports.push(parseReportArgument(argv[++i]));
+    } else if (argv[i] === "--audit-config") {
+      if (i + 1 >= argv.length) throw new Error("audit-tracking-issue: --audit-config needs a value");
+      auditConfig = argv[++i];
     } else if (argv[i] === "--apply") shouldApply = true;
     else throw new Error(`audit-tracking-issue: unknown argument: ${argv[i]}`);
   }
   if (reports.length === 0) throw new Error("audit-tracking-issue: at least one --report is required");
+  if (!auditConfig) {
+    throw new Error("audit-tracking-issue: --audit-config <path to .cargo/audit.toml> is required");
+  }
+  return { reports, shouldApply, auditConfig };
+}
 
-  const findings = findingsFromReports(
-    reports.map(({ lockfile, path }) => ({ lockfile, report: JSON.parse(readFileSync(path, "utf8")) })),
+function main() {
+  const { reports, shouldApply, auditConfig } = parseArguments(process.argv.slice(2));
+
+  const loaded = reports.map(({ lockfile, path }) => ({
+    lockfile,
+    report: parseReport(path, readFileSync(path, "utf8")),
+  }));
+  const findings = findingsFromReports(loaded);
+  const accepted = acceptedEntries(
+    loaded.map(({ report }) => report),
+    readFileSync(auditConfig, "utf8"),
   );
   // Queried in both modes. A preview that assumed no issue existed could only
   // ever print "create" or "none", which is not a preview of what --apply would
   // do -- it is a different answer that happens to share a format.
-  const plan = planAction(findings, findExisting());
+  const plan = planAction(findings, findExisting(), accepted);
   process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
   if (shouldApply) apply(plan);
 }

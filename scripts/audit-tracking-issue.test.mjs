@@ -227,7 +227,8 @@ test("findExisting returns null when no open issue carries the marker", () => {
 
 test("findExisting reads the tracked ids off the matching issue", () => {
   const existing = findExisting(fakeRun([{ number: 2, body: "no marker" }, tracked(9, ["B", "A"])]));
-  assert.deepEqual(existing, { number: 9, ids: ["A", "B"] });
+  // A body written before #2446 has no accepted line, and reads as none accepted.
+  assert.deepEqual(existing, { number: 9, ids: ["A", "B"], accepted: [] });
 });
 
 // The contract is "exactly one". Quietly picking the first of several would
@@ -297,4 +298,233 @@ test("nothing to do means no gh calls at all", () => {
 test("a recorded line naming the same set twice repairs without announcing a change", () => {
   const findings = [{ id: "A", package: "p@1", summary: "s", kind: "vulnerability" }];
   assert.equal(planAction(findings, { number: 9, ids: ["A", "A"] }).action, "repair");
+});
+
+// --- accepted entries (#2446) --------------------------------------------
+//
+// An ignored id is absent from the findings, so the issue lists what
+// `.cargo/audit.toml` accepts. The ids come from the report's own
+// `settings.ignore` (what cargo-audit applied), the dates and issue numbers
+// from the file, and the two must agree. The reports below are captured
+// cargo-audit 0.22.2 output (scripts/fixtures/README.md), not written here.
+
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import {
+  acceptedEntries,
+  acceptedFromReport,
+  parseArguments,
+  entriesFromAuditToml,
+  parseReport,
+  recordedAccepted,
+  updateComment,
+} from "./audit-tracking-issue.mjs";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const readRoot = (path) => readFileSync(join(root, path), "utf8");
+const AUDIT_TOML = readRoot(".cargo/audit.toml");
+const ACCEPTED_REPORT = JSON.parse(readRoot("scripts/fixtures/cargo-audit-report-0459-accepted.json"));
+const REPORTED_REPORT = JSON.parse(readRoot("scripts/fixtures/cargo-audit-report-0459-reported.json"));
+const ACCEPTED_ID = "RUSTSEC-2026-0459";
+
+const entry = (id, review_by, issue) => ({ id, review_by, issue });
+
+test("the accepted ids are the report's settings.ignore, as cargo-audit applied them", () => {
+  const accepted = acceptedFromReport(ACCEPTED_REPORT);
+  assert.equal(accepted.length, 11);
+  assert.ok(accepted.includes(ACCEPTED_ID));
+  // Ignored, so absent from the findings: the gap this list closes.
+  assert.ok(!findingsFromReport(ACCEPTED_REPORT).some((finding) => finding.id === ACCEPTED_ID));
+  const reported = acceptedFromReport(REPORTED_REPORT);
+  assert.equal(reported.length, 10);
+  assert.ok(!reported.includes(ACCEPTED_ID));
+  assert.ok(findingsFromReport(REPORTED_REPORT).some((finding) => finding.id === ACCEPTED_ID));
+});
+
+// "Nothing accepted" and "the report could not be read" must never look alike:
+// the second, read as the first, would announce every accepted id as gone.
+test("a report without a readable settings.ignore is refused, never read as nothing accepted", () => {
+  const { settings, ...noSettings } = ACCEPTED_REPORT;
+  const { ignore, ...noIgnore } = settings;
+  for (const report of [
+    noSettings,
+    { ...ACCEPTED_REPORT, settings: noIgnore },
+    { ...ACCEPTED_REPORT, settings: { ...settings, ignore: "RUSTSEC-2026-0459" } },
+    { ...ACCEPTED_REPORT, settings: { ...settings, ignore: [ACCEPTED_ID, 7] } },
+    { ...ACCEPTED_REPORT, settings: { ...settings, ignore: [" "] } },
+    null,
+  ]) {
+    assert.throws(() => acceptedFromReport(report), /no settings\.ignore list of advisory ids/);
+    assert.throws(() => acceptedEntries([report], AUDIT_TOML), /no settings\.ignore list of advisory ids/);
+  }
+  assert.deepEqual(acceptedFromReport({ settings: { ignore: [] } }), [], "an empty list is a real answer");
+});
+
+test("an empty or unparseable report file fails as a failed audit", () => {
+  assert.throws(() => parseReport("audit-report.json", ""), /audit-report\.json is empty/);
+  assert.throws(() => parseReport("audit-report.json", " \n"), /audit-report\.json is empty/);
+  assert.throws(() => parseReport("audit-report.json", '{"settings": {'), /audit-report\.json is not JSON/);
+  const text = readRoot("scripts/fixtures/cargo-audit-report-0459-accepted.json");
+  assert.deepEqual(parseReport("captured", text), ACCEPTED_REPORT);
+});
+
+test("every entry in the real file carries its date, and the accepted vulnerability names its issue", () => {
+  const entries = entriesFromAuditToml(AUDIT_TOML);
+  assert.deepEqual(
+    entries.map((e) => e.id),
+    acceptedFromReport(ACCEPTED_REPORT),
+  );
+  for (const e of entries) assert.match(e.review_by ?? "", /^\d{4}-\d{2}-\d{2}$/, e.id);
+  assert.deepEqual(entries.find((e) => e.id === ACCEPTED_ID), entry(ACCEPTED_ID, "2026-12-09", 2432));
+  // Five ids under one comment block share its date.
+  const unic = entries.filter((e) => e.id.startsWith("RUSTSEC-2025-"));
+  assert.equal(unic.length, 5);
+  assert.ok(unic.every((e) => e.review_by === "2026-12-15"));
+  assert.deepEqual(acceptedEntries([ACCEPTED_REPORT], AUDIT_TOML), entries);
+});
+
+test("the file and the report disagreeing fails the run, whichever side has the extra id", () => {
+  // In the file, not the report: the captured report from master's file.
+  assert.throws(
+    () => acceptedEntries([REPORTED_REPORT], AUDIT_TOML),
+    /disagree \(only in the file: RUSTSEC-2026-0459; only in the report: none\)/,
+  );
+  // In the report, not the file: the same file without that entry.
+  const start = AUDIT_TOML.indexOf("  # --- RUSTSEC-2026-0459 --");
+  const end = AUDIT_TOML.indexOf(`"${ACCEPTED_ID}",`) + `"${ACCEPTED_ID}",`.length;
+  assert.ok(start > 0 && end > start);
+  const without = AUDIT_TOML.slice(0, start) + AUDIT_TOML.slice(end);
+  assert.ok(!entriesFromAuditToml(without).some((e) => e.id === ACCEPTED_ID));
+  assert.throws(
+    () => acceptedEntries([ACCEPTED_REPORT], without),
+    /disagree \(only in the file: none; only in the report: RUSTSEC-2026-0459\)/,
+  );
+});
+
+test("only a date and an issue number leave a comment, and an unknown line is refused", () => {
+  const file = (body) => `[advisories]\nignore = [\n${body}\n]\n`;
+  assert.deepEqual(
+    entriesFromAuditToml(file('  # see bridge#445 and https://x/#1, then #77; **bold** text\n  # Review-by: 2027-01-02 (later)\n  "A",\n  "B"')),
+    [entry("A", "2027-01-02", 77), entry("B", "2027-01-02", 77)],
+  );
+  assert.deepEqual(entriesFromAuditToml(file('  "A",')), [entry("A", null, null)]);
+  assert.deepEqual(entriesFromAuditToml(file("")), []);
+  assert.throws(() => entriesFromAuditToml(file("  'A',")), /not an id or a comment/);
+  assert.throws(() => entriesFromAuditToml(file('  "A`<b>",')), /not an id or a comment/);
+  assert.throws(() => entriesFromAuditToml(file('  "@team/x",')), /not an id or a comment/);
+  assert.throws(() => entriesFromAuditToml(file('  "A", "B",')), /not an id or a comment/);
+  assert.throws(() => entriesFromAuditToml(file('  "A",\n  "A",')), /ignores A more than once/);
+  assert.throws(() => entriesFromAuditToml("[advisories]\n"), /no `ignore = \[` line/);
+  assert.throws(() => entriesFromAuditToml('ignore = [\n  "A",\n'), /not closed/);
+});
+
+const ACCEPTED = [entry("RUSTSEC-2026-0459", "2026-12-09", 2432), entry("RUSTSEC-2024-0429", "2027-03-15", null)];
+
+test("the issue stays open while anything is accepted, and closes only when nothing is", () => {
+  assert.equal(planAction([], null, ACCEPTED).action, "create");
+  const open = { number: 7, ids: [], accepted: ACCEPTED };
+  assert.equal(planAction([], open, ACCEPTED).action, "unchanged");
+  assert.deepEqual(planAction([], open, []), { action: "close", issue: 7 });
+  assert.deepEqual(planAction([], null, []), { action: "none" });
+});
+
+test("a body written before the accepted list announces every accepted id once", () => {
+  const plan = planAction([], { number: 7, ids: [] }, ACCEPTED);
+  assert.equal(plan.action, "update");
+  assert.deepEqual(plan.newlyAccepted, ["RUSTSEC-2024-0429", "RUSTSEC-2026-0459"]);
+  assert.deepEqual([plan.added, plan.removed, plan.noLongerAccepted, plan.changed], [[], [], [], []]);
+});
+
+test("a new, a removed and a renewed entry are each named once in one comment", () => {
+  const before = { number: 7, ids: [], accepted: [entry("A", "2026-12-09", 2432), entry("B", "2027-01-01", null)] };
+  const after = [entry("A", "2027-01-08", 2432), entry("C", "2027-02-01", 9)];
+  const plan = planAction([], before, after);
+  assert.equal(plan.action, "update");
+  assert.deepEqual(plan.newlyAccepted, ["C"]);
+  assert.deepEqual(plan.noLongerAccepted, ["B"]);
+  assert.deepEqual(plan.changed, [{ id: "A", from: before.accepted[0], to: after[0] }]);
+  const comment = updateComment(plan);
+  assert.equal(
+    comment,
+    "Scheduled audit update -- newly accepted in .cargo/audit.toml: C; no longer accepted: B; " +
+      "accepted entry changed: A (review-by 2026-12-09, #2432 -> review-by 2027-01-08, #2432).",
+  );
+  const run = fakeRun([]);
+  apply(plan, run);
+  assert.deepEqual(run.calls.map((args) => args[1]), ["edit", "comment"]);
+  assert.equal(run.calls[1].at(-1), comment);
+});
+
+// Each change is announced by the run that sees it. The next run reads back
+// what it wrote, finds nothing moved, and makes no call at all.
+test("a re-run after a create or an update posts nothing", () => {
+  const findings = findingsFromReport(ACCEPTED_REPORT);
+  const accepted = acceptedEntries([ACCEPTED_REPORT], AUDIT_TOML);
+  const created = fakeRun([]);
+  apply(planAction(findings, null, accepted), created);
+  const body = created.calls[0][created.calls[0].indexOf("--body") + 1];
+  assert.deepEqual(recordedAccepted(body), accepted);
+  const rerun = fakeRun([]);
+  apply(planAction(findings, findExisting(fakeRun([{ number: 5, body }])), accepted), rerun);
+  assert.equal(rerun.calls.length, 0, "an unchanged accepted list must be silent");
+
+  const updated = fakeRun([]);
+  apply(planAction(findings, { number: 5, ids: findings.map((f) => f.id) }, accepted), updated);
+  assert.deepEqual(updated.calls.map((args) => args[1]), ["edit", "comment"]);
+  const updatedBody = updated.calls[0][updated.calls[0].indexOf("--body") + 1];
+  const again = fakeRun([]);
+  apply(planAction(findings, findExisting(fakeRun([{ number: 5, body: updatedBody }])), accepted), again);
+  assert.equal(again.calls.length, 0);
+});
+
+test("the body lists each accepted entry with only its id, date and issue", () => {
+  const body = issueBody([], ACCEPTED);
+  assert.match(body, /^- none$/m, "no findings is said, not left blank");
+  assert.match(body, /^- `RUSTSEC-2026-0459` -- review-by 2026-12-09, #2432$/m);
+  assert.match(body, /^- `RUSTSEC-2024-0429` -- review-by 2027-03-15, no issue named in the file$/m);
+  assert.deepEqual(recordedAccepted(body), [...ACCEPTED].sort((a, b) => a.id.localeCompare(b.id)));
+  assert.deepEqual(recordedAccepted(`${MARKER}\nAccepted advisory entries: {broken`), []);
+  assert.deepEqual(recordedAccepted(`${MARKER}\nAccepted advisory entries: [["A", 7, null]]`), []);
+});
+
+test("the tracker refuses to run without the audit config, in either mode", () => {
+  const report = ["--report", "src-tauri/Cargo.lock=audit-report.json"];
+  for (const argv of [report, [...report, "--apply"]]) {
+    assert.throws(() => parseArguments(argv), /--audit-config .* is required/);
+  }
+  assert.throws(() => parseArguments([...report, "--audit-config"]), /--audit-config needs a value/);
+  assert.deepEqual(parseArguments([...report, "--audit-config", ".cargo/audit.toml", "--apply"]), {
+    reports: [{ lockfile: "src-tauri/Cargo.lock", path: "audit-report.json" }],
+    shouldApply: true,
+    auditConfig: ".cargo/audit.toml",
+  });
+});
+
+test("ids sharing one comment block share its date, and two reports must each agree", () => {
+  const entries = entriesFromAuditToml(AUDIT_TOML);
+  const zbus = entries.filter((e) => ["RUSTSEC-2026-0370", "RUSTSEC-2026-0371", "RUSTSEC-2026-0372"].includes(e.id));
+  assert.equal(zbus.length, 3);
+  assert.ok(zbus.every((e) => e.review_by === "2027-04-18" && e.issue === null));
+  assert.deepEqual(acceptedEntries([ACCEPTED_REPORT, ACCEPTED_REPORT], AUDIT_TOML), entries);
+  assert.throws(() => acceptedEntries([ACCEPTED_REPORT, REPORTED_REPORT], AUDIT_TOML), /only in the file: RUSTSEC-2026-0459/);
+  // An id the report repeats is still one id.
+  const repeated = { settings: { ignore: [...ACCEPTED_REPORT.settings.ignore, ACCEPTED_ID] } };
+  assert.deepEqual(acceptedEntries([repeated], AUDIT_TOML), entries);
+});
+
+test("a recorded line naming the same entries twice repairs silently, and bad rows are not echoed", () => {
+  const twice = [...ACCEPTED, ...ACCEPTED];
+  assert.equal(planAction([], { number: 7, ids: [], accepted: twice }, ACCEPTED).action, "repair");
+  const rows = JSON.stringify([["A", "2026-12-09", 1], ["B", "not a date", null], ["C", null, -4], ["D", null, 1.5]]);
+  assert.deepEqual(recordedAccepted(`${MARKER}\nAccepted advisory entries: ${rows}`), [entry("A", "2026-12-09", 1)]);
+});
+
+// The scheduled job passes the file, and its permissions stay the two it had.
+test("the scheduled workflow passes the audit config and keeps its permissions", () => {
+  const workflow = readRoot(".github/workflows/dependency-security-scheduled.yml");
+  assert.match(workflow, /node scripts\/audit-tracking-issue\.mjs\n\s+--report src-tauri\/Cargo\.lock=audit-report\.json\n\s+--audit-config \.cargo\/audit\.toml\n\s+--apply\n/);
+  const permissions = workflow.slice(workflow.indexOf("\npermissions:\n") + 1, workflow.indexOf("\nconcurrency:"));
+  assert.equal(permissions.trim(), "permissions:\n  contents: read\n  issues: write # the one permission beyond the pull-request audit's");
 });

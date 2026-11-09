@@ -48,6 +48,17 @@ over `*-bbox-capture.xml` here: it fails on a character outside ASCII in the tex
 entities are decoded and the XML comments (the banner) are set aside, and it would pass on the raw text layer
 of an English statement.
 
+## cargo-audit reports
+
+`cargo-audit-report-0459-*.json` are the unedited stdout of `cargo audit --file src-tauri/Cargo.lock --json`
+(cargo-audit 0.22.2, the version `.github/workflows/dependency-security-scheduled.yml` pins), run on
+2026-11-09 against the advisory database as fetched that day, from a folder holding only
+`src-tauri/Cargo.lock` and `.cargo/audit.toml`. Both used the lockfile of master at `ae38a75c`.
+`-reported` used master's `.cargo/audit.toml` (ten ignored ids; RUSTSEC-2026-0459 is reported as a
+vulnerability). `-accepted` used the file of #2435's head `b2f6497a` (eleven ignored ids; nothing
+reported). `scripts/audit-tracking-issue.test.mjs` reads them for what the report's `settings.ignore`
+holds. They hold no customer data: crate names, versions and public advisory text only.
+
 ## Integrity digests
 
 Each row is the SHA-256 of the file's committed bytes, which
@@ -60,3 +71,5 @@ repeats only what this note says above.
 | `hdfc-bbox-capture.xml` | 34,113 | `ff01bde0f4330141907f2d6e9eeba8e2cf49c77c53437f3f8cdb10fc374bb6e2` | sanitised from a real statement, as above |
 | `sbi-bbox-capture.xml` | 21,091 | `615280486efa461bb15a4d0d4103fc66ea9706799171966cf739bd1447828916` | sanitised from a real statement, as above |
 | `source-draft-capture-bindings.json` | 1,936 | `8e7b43f90a93086ece50c270b9747c83ba473ee1fc4246c8d23cf160592dfe2e` | not a capture, as above |
+| `cargo-audit-report-0459-accepted.json` | 1,538 | `5906d9e201595bbf27606a0c1fa54fc1fcdcb165391b13ec1e749833ead20028` | captured, byte-exact: cargo-audit 0.22.2 output, see below |
+| `cargo-audit-report-0459-reported.json` | 4,533 | `ac589a231229de06bbb7518c7b67daccc6ee205bde75e25d152d3163c8e34f8c` | captured, byte-exact: cargo-audit 0.22.2 output, see below |

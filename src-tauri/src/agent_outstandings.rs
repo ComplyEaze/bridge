@@ -1,4 +1,5 @@
 //! Outstandings for the local MCP adapter.
+use super::failure_code::{OutstandingsCode, ReadCode};
 use super::*;
 
 impl Server {
@@ -31,14 +32,14 @@ impl Server {
             let to = match optional_string(args, "as_of")?.as_deref().map(normalized_date) {
                 Some(as_of) => as_of?,
                 None => bridge_tally_core::TallyDate::parse(tally_host_today())
-                    .map_err(|_| "invalid_as_of".to_string())?,
+                    .map_err(|_| ReadCode::InvalidAsOf)?,
             };
             let ageing_basis =
                 optional_string(args, "ageing_basis")?.unwrap_or_else(|| "due_date".to_string());
             let ageing_anchor = match ageing_basis.as_str() {
                 "bill_date" => OutstandingsAgeingAnchor::BillDate,
                 "due_date" => OutstandingsAgeingAnchor::DueDate,
-                _ => return Err("invalid_ageing_basis".to_string().into()),
+                _ => return Err(OutstandingsCode::InvalidAgeingBasis.into()),
             };
             // The classified read (bridge#551): a book with several Currency
             // masters is admitted when its company names an INR base, and
@@ -84,7 +85,7 @@ impl Server {
             let direction =
                 optional_string(args, "direction")?.unwrap_or_else(|| "both".to_string());
             if !matches!(direction.as_str(), "receivable" | "payable" | "both") {
-                return Err("invalid_direction".to_string().into());
+                return Err(OutstandingsCode::InvalidDirection.into());
             }
             let figures = |statement_open_bills: Vec<OpenBillRow>,
                            statement_unallocated_by_party: Vec<UnallocatedParty>|
@@ -435,7 +436,7 @@ pub(super) fn ranked_parties_from_exposure(
     bills: &[OpenBillRow],
     unallocated: &[UnallocatedParty],
     top: usize,
-) -> Result<Vec<Value>, String> {
+) -> Result<Vec<Value>, ToolFailure> {
     let mut totals = BTreeMap::<String, PartyExposure>::new();
     for bill in bills {
         let entry = totals.entry(bill.party.clone()).or_default();
@@ -464,7 +465,7 @@ pub(super) fn ranked_parties_from_exposure(
             )?;
             let gross_exposure = add_decimal(&gross_billed, &gross_unallocated)?;
             let magnitude = bridge_tally_core::ExactDecimal::parse(gross_exposure.clone())
-                .map_err(|_| "outstandings_amount_invalid".to_string())?;
+                .map_err(|_| OutstandingsCode::AmountInvalid)?;
             let row = json!({
                 "party": party_name(party.clone()),
                 "billed_receivable": exposure.billed_receivable,
@@ -478,7 +479,7 @@ pub(super) fn ranked_parties_from_exposure(
             });
             Ok((party, magnitude, row))
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, ToolFailure>>()?;
     ranked.sort_by(|left, right| {
         right
             .1

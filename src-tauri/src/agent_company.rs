@@ -59,14 +59,8 @@ impl Server {
             // The host date every omitted date defaults to (YYYYMMDD).
             "today": today,
         });
-        // Once per session: only the first status read after the server starts carries it (#2391).
-        if let Some(notice) = build_age_notice(RELEASE_DATE, &today) {
-            if !self
-                .build_notice_sent
-                .swap(true, std::sync::atomic::Ordering::SeqCst)
-            {
-                result["build_notice"] = json!(notice);
-            }
+        if let Some(notice) = self.take_build_notice(RELEASE_DATE, &today) {
+            result["build_notice"] = json!(notice);
         }
         Ok((result, evidence))
     }
@@ -238,6 +232,20 @@ mod identity_tests;
 #[cfg(test)]
 #[path = "agent_company_tuple_tests.rs"]
 mod tuple_tests;
+
+impl Server {
+    /// The build notice for this session's first status read, if the build is old enough, else None.
+    /// The session's one chance is spent only when a notice is produced, so a read on a day with no
+    /// notice leaves it for a later read; it is spent when the notice is built, so a response that
+    /// is then withheld (too large, cancelled) loses it for the session, which is accepted (#2391).
+    pub(super) fn take_build_notice(&self, release_date: &str, today: &str) -> Option<String> {
+        let notice = build_age_notice(release_date, today)?;
+        (!self
+            .build_notice_sent
+            .swap(true, std::sync::atomic::Ordering::SeqCst))
+        .then_some(notice)
+    }
+}
 
 /// The one line `tally_status` adds, once per session, when this build's release date is more than
 /// [`BUILD_NOTICE_AFTER_DAYS`] days before `today` (YYYYMMDD, the computer's date). It states the

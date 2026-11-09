@@ -333,10 +333,12 @@ test("the guards in main refuse a stale, ahead or inconsistent release state", s
 test("--apply writes today's UTC day, and refuses when the last tag is dated after it", skipOnWindows, () => inRelease(({ git, commit, next, current, work }) => {
   commit("Fix a thing (#11)");
   git("push", "-q", "origin", "master", "--tags");
-  const today = new Date().toISOString().slice(0, 10);
+  const before = new Date().toISOString().slice(0, 10);
   const applied = next("--level", "patch", "--apply");
+  const after = new Date().toISOString().slice(0, 10);
   assert.equal(applied.status, 0, applied.stdout + applied.stderr);
-  assert.equal(readFileSync(join(work, RELEASE_DATE_FILE), "utf8"), `${today}\n`);
+  // Bracketed, so a run that crosses 00:00 UTC cannot fail.
+  assert.ok([`${before}\n`, `${after}\n`].includes(readFileSync(join(work, RELEASE_DATE_FILE), "utf8")));
   // A tag whose commit is dated in 2099 stands for a wrong clock: the date cannot precede it.
   git("checkout", "-q", "--", ".");
   execFileSync("git", ["-c", "commit.gpgsign=false", "commit", "--allow-empty", "-q", "-m", "Late (#12)"], { cwd: work, env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.invalid", GIT_COMMITTER_DATE: "2099-01-01T00:00:00Z" } });

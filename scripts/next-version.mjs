@@ -107,7 +107,8 @@ export function utcDay(date = new Date()) {
 }
 
 // Refuses a date the notice would then misstate: one that is not a real YYYY-MM-DD day, one before
-// the last release tag's day (a wrong clock), or one after today in UTC.
+// the last release tag's day (a clock running backward), or one after `today`. A clock running
+// forward cannot be detected here: `--apply` takes `today` from the same clock as the date.
 export function checkReleaseDate(date, { tagDay, today = utcDay() }) {
   const parsed = new Date(`${date}T00:00:00Z`);
   const real = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(parsed.getTime()) && utcDay(parsed) === date;
@@ -349,7 +350,7 @@ async function main() {
   console.log(`\n${draftNotes(result.classified)}\n`);
   if (process.argv.includes("--apply")) {
     // The tag's own day, in UTC, so a computer with a wrong clock cannot write a date before it.
-    const tagDay = utcDay(new Date(Number(run("git", ["log", "-1", "--format=%ct", since]).trim()) * 1000));
+    const tagDay = utcDay(new Date(Number(run("git", ["log", "-1", "--format=%ct", `${since}^{commit}`]).trim()) * 1000));
     const date = checkReleaseDate(utcDay(), { tagDay });
     writeVersions(result.next, root, date);
     console.log(`wrote ${result.next} to ${Object.keys(VERSION_FILES).join(", ")} and README.md, and today's UTC date to ${RELEASE_DATE_FILE}`);

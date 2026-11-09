@@ -825,3 +825,44 @@ fn only_the_unreachable_and_hold_back_reasons_name_a_next_step() {
         assert_eq!(unanswered_remediation(reason), None, "{reason}");
     }
 }
+
+fn a_build_notice_server() -> Server {
+    let directory = tempfile::tempdir().unwrap();
+    Server::new(Settings {
+        endpoint: TallyEndpointConfig {
+            host: "127.0.0.1".into(),
+            port: 9,
+        },
+        data_dir: directory.path().into(),
+        max_rows: 500,
+        max_bytes: 200_000,
+        redaction: Redaction::None,
+        import_enabled: false,
+        posting: Posting::Off,
+        master_writes_enabled: false,
+        audit_enabled: false,
+    })
+}
+
+#[test]
+fn a_session_is_given_the_notice_once_and_only_when_one_exists() {
+    let server = a_build_notice_server();
+    // A day with no notice does not spend the session's chance.
+    assert_eq!(server.take_build_notice("2026-10-30", "20261101"), None);
+    let first = server.take_build_notice("2026-10-30", "20261230");
+    assert!(first.is_some(), "first notice");
+    assert_eq!(
+        server.take_build_notice("2026-10-30", "20261230"),
+        None,
+        "second read"
+    );
+    assert_eq!(
+        server.take_build_notice("2026-10-30", "20270301"),
+        None,
+        "later read"
+    );
+    // A new server is a new session.
+    assert!(a_build_notice_server()
+        .take_build_notice("2026-10-30", "20261230")
+        .is_some());
+}

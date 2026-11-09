@@ -98,25 +98,23 @@ fn the_review_lines_show_every_detail() {
     assert_eq!(longest[1].chars().count(), 49);
 }
 
-/// The e-invoice read is byte for byte the window read a `vouchers` call with `include_e_invoice`
-/// sends (§8.2j), over the invoice's one date: no new request shape.
+/// The e-invoice read is byte for byte the window request the `vouchers` planner renders for a
+/// day with `include_e_invoice` and no voucher type (§8.2j), over the invoice's one date: no new
+/// request shape.
 #[test]
 fn the_e_invoice_read_is_the_measured_vouchers_read_over_one_date() {
     let date = bridge_tally_core::TallyDate::parse("20250403".to_string()).expect("date");
     let request =
         crate::agent::invoice_e_invoice_read("BRIDGE EINVOICE LAB", &date).expect("renders");
-    let vouchers_call = crate::agent::render_agent_named_vouchers_in_span(
-        "BRIDGE EINVOICE LAB",
-        &date,
-        &date,
-        None,
-        crate::agent::NamedVoucherFields {
-            e_invoice: crate::agent::EInvoiceFields::Asked,
-            gst: crate::agent::VoucherGstFields::NotAsked,
-        },
-        false,
-    )
-    .expect("renders");
+    let asked = crate::agent::NamedVoucherFields {
+        e_invoice: crate::agent::EInvoiceFields::Asked,
+        gst: crate::agent::VoucherGstFields::NotAsked,
+    };
+    let shape = crate::agent::VoucherReadShape::EntryWildcard.asking(asked);
+    assert_eq!(shape.named_fields(), asked);
+    let vouchers_call = shape
+        .render("BRIDGE EINVOICE LAB", &date, &date, None)
+        .expect("renders");
     assert_eq!(request.as_str(), vouchers_call);
     assert!(vouchers_call.contains(",IRN,IRNACKNO,IRNACKDATE</FETCH>"));
     assert!(vouchers_call.contains("<SVFROMDATE TYPE=\"Date\">20250403</SVFROMDATE>"));
@@ -139,14 +137,8 @@ fn captured_rows() -> Vec<Value> {
             .collect::<Vec<_>>(),
     )
     .expect("UTF-16LE");
-    crate::agent::parse_agent_rows_reading_gst(
-        &xml,
-        "eb2f5190-292e-4ed8-bfd3-eace839fe699",
-        crate::agent::GstDetailsShown::Withheld,
-        crate::agent::NamedVoucherFields::E_INVOICE_ONLY,
-        crate::agent::StockLines::NotAsked,
-    )
-    .expect("the captured answer parses")
+    super::read_rows(&xml, "eb2f5190-292e-4ed8-bfd3-eace839fe699")
+        .expect("the captured answer parses")
 }
 
 /// Sales `1`'s details as that answer carries them, typed on Tally's screen.

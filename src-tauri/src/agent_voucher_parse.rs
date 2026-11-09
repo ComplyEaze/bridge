@@ -785,7 +785,8 @@ impl VoucherRow {
         }
     }
 
-    fn row(&self) -> &Value {
+    /// The row as read, or a withheld one as its [`WithheldVoucher::filter_view`], with no amount.
+    pub(super) fn row(&self) -> &Value {
         match self {
             Self::Read(row) => row,
             Self::Withheld(withheld) => &withheld.view,

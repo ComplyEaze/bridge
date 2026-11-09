@@ -1337,14 +1337,13 @@ pub(super) fn encode_detail(field: &mut dyn FnMut(&[u8]), detail: &InvoiceDetail
         }
         None => field(b"0"),
     }
-    match e_invoice {
-        Some(details) => {
-            field(b"1");
-            for value in details.digest_fields() {
-                field(value);
-            }
+    // Nothing for an invoice without details, so its digest is the one it always was; the tag
+    // is one no field after it starts with (`observed` writes "0" or "1").
+    if let Some(details) = e_invoice {
+        field(b"e_invoice");
+        for value in details.digest_fields() {
+            field(value);
         }
-        None => field(b"0"),
     }
     match observed {
         None => field(b"0"),
@@ -1824,13 +1823,7 @@ impl super::super::Server {
         let Ok((xml, evidence)) = self.post_read(identity, request).await else {
             return (failed(EInvoiceReadbackCode::ReadFailed), None);
         };
-        match super::super::parse_agent_rows_reading_gst(
-            &xml,
-            identity.company_guid(),
-            super::super::GstDetailsShown::Withheld,
-            super::super::NamedVoucherFields::E_INVOICE_ONLY,
-            super::super::StockLines::NotAsked,
-        ) {
+        match e_invoice::read_rows(&xml, identity.company_guid()) {
             Ok(rows) => (details.readback_differences(&rows, guid), Some(evidence)),
             Err(_) => (failed(EInvoiceReadbackCode::Unreadable), Some(evidence)),
         }

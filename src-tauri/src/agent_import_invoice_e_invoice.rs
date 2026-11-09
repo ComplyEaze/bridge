@@ -4,10 +4,11 @@
 //! import as given and reads them back after the post.
 //!
 //! Tally keeps them as three direct children of the voucher, `IRN`, `IRNACKNO` and `IRNACKDATE`
-//! (`YYYYMMDD`), and stores them as sent when an import carries them right after `ISINVOICE`
-//! (reads-and-dates reference §8.2j; voucher-writes reference §9.16, row 2162-IRN9). Each value
-//! is parsed here once, into a closed alphabet, so nothing a caller types can end the element
-//! it is written into.
+//! (`YYYYMMDD`), and a window read that names them returns them (reads-and-dates reference
+//! §8.2j). An import that carries them right after `ISINVOICE` had them stored as sent on one
+//! synthetic book and release (row 2162-IRN9, `lab/2162-irn-import-answers` at 9cb3ebd0; #2427
+//! records it under §8.2j). Each value is parsed here once, into a closed alphabet, so nothing a
+//! caller types can end the element it is written into.
 
 use super::super::xml_escape;
 use crate::agent::failure_code::EInvoiceReadbackCode;
@@ -135,22 +136,18 @@ impl EInvoiceDetails {
     /// did not send, or sent empty, is a difference, never equal; no row with that GUID, or
     /// more than one, is a difference of its own.
     pub(super) fn readback_differences(&self, rows: &[Value], guid: &str) -> Vec<String> {
-        let mut found = rows.iter().filter(|row| {
-            row["guid"]
-                .as_str()
-                .is_some_and(|read| read.eq_ignore_ascii_case(guid))
-        });
-        let (Some(row), None) = (found.next(), found.next()) else {
-            let code = if rows.iter().any(|row| {
+        let found = rows
+            .iter()
+            .filter(|row| {
                 row["guid"]
                     .as_str()
                     .is_some_and(|read| read.eq_ignore_ascii_case(guid))
-            }) {
-                EInvoiceReadbackCode::NotUnique
-            } else {
-                EInvoiceReadbackCode::NotFound
-            };
-            return vec![code.as_str().to_string()];
+            })
+            .collect::<Vec<_>>();
+        let row = match found.as_slice() {
+            [row] => row,
+            [] => return vec![EInvoiceReadbackCode::NotFound.as_str().to_string()],
+            _ => return vec![EInvoiceReadbackCode::NotUnique.as_str().to_string()],
         };
         let details = &row["e_invoice"];
         [
@@ -165,6 +162,24 @@ impl EInvoiceDetails {
         .map(|(element, _, _)| element.to_string())
         .collect()
     }
+}
+
+/// The rows of the e-invoice read, parsed as the `vouchers` tool parses its window: a voucher
+/// whose amounts Tally stored as a foreign-currency composite is kept, without its amounts,
+/// rather than failing the whole day's answer, because the comparison reads only each row's GUID
+/// and its three details. Any other row the parse refuses still fails the answer, which the
+/// read-back reports as unreadable.
+pub(super) fn read_rows(xml: &str, company_guid: &str) -> Result<Vec<Value>, String> {
+    Ok(crate::agent::parse_agent_rows_withholding_reading_gst(
+        xml,
+        company_guid,
+        crate::agent::GstDetailsShown::Withheld,
+        crate::agent::NamedVoucherFields::E_INVOICE_ONLY,
+        crate::agent::StockLines::NotAsked,
+    )?
+    .iter()
+    .map(|row| row.row().clone())
+    .collect())
 }
 
 #[cfg(test)]

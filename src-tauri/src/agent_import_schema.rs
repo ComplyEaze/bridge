@@ -145,7 +145,7 @@ fn invoice_schema() -> Value {
     json!({
         "type":"object", "additionalProperties":false,
         "required":["voucher_type_name","place_of_supply"],
-        "description":"Required on a Sales voucher and refused on any other voucher (invoice_detail_required, invoice_detail_on_non_invoice). A Sales voucher also needs voucher_number, the invoice number (invoice_number_required), and takes no reference (invoice_reference_not_for_sales). The build fills in what it read from Tally; an observed object supplied here is refused (invoice_observed_not_input).",
+        "description":"Required on a Sales voucher and refused on any other voucher (invoice_detail_required, invoice_detail_on_non_invoice). A Sales voucher also needs voucher_number, the invoice number: 1 to 16 ASCII letters, digits, / or -, with no space (invoice_number_required, invoice_number_invalid), and takes no reference (invoice_reference_not_for_sales). The build fills in what it read from Tally; an observed object supplied here is refused (invoice_observed_not_input).",
         "properties":{
             "voucher_type_name":name("The exact name of the Sales voucher type in this book that the invoice is filed under, as masters lists it (invoice_voucher_type_name_invalid otherwise). ComplyEaze Bridge never picks one: a book can hold several, so the build checks this name against Tally."),
             "place_of_supply":{

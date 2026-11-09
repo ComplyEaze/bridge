@@ -30,13 +30,17 @@
 # yanked) as at least a warning; `cargo audit`'s process exit code is already
 # non-zero only for an actual `error` (a real vulnerability, or an ignored-id
 # that turns out to still be unresolved) unless explicitly told to also fail
-# on warnings. The entries below are accepted WARNINGS, each with a reason;
-# nothing here silences an actual vulnerability (`error`), and the workflow's
-# real job -- catching a new one, like RUSTSEC-2026-0285 against `rustls` on
-# 2026-09-15 -- is untouched by this file. `--ignore` only removes an id from
-# the report entirely; that is deliberately not used here, because we want
-# these to keep showing up in `cargo audit`'s terminal output (as accepted
-# warnings) rather than vanish, even though they no longer fail the build.
+# on warnings. The entries below are accepted WARNINGS, each with a reason,
+# except RUSTSEC-2026-0459 (the last entry), which IS a vulnerability
+# (`error`) and is accepted for a stated time (see its entry). The rule was
+# "nothing here silences an actual vulnerability"; that entry is the one
+# exception, and a second one needs the same: a dated review-by, a tracking
+# issue and a reason no lockable fix exists. The workflow's real job --
+# catching a new one, like RUSTSEC-2026-0285 against `rustls` on 2026-09-15
+# -- is untouched by this file for every other id. An `ignore` entry removes
+# its id from `cargo audit`'s report entirely (checked with cargo-audit 0.22.2
+# on 2026-11-09: nothing is printed for it), so an entry's only reminder is
+# its comment and, for an error, its tracking issue.
 #
 # Reachability was checked with, e.g.:
 #   cargo tree --locked -p bridge -i <crate> --target aarch64-apple-darwin
@@ -120,6 +124,24 @@ ignore = [
   "RUSTSEC-2026-0370",
   "RUSTSEC-2026-0371",
   "RUSTSEC-2026-0372",
+
+  # --- RUSTSEC-2026-0459 -- libsqlite3-sys 0.37.0, a VULNERABILITY, accepted --
+  # Added 2026-11-09 because it failed Dependency security on every merge-queue
+  # group and on master. Affected: libsqlite3-sys 0.6.0 to 0.38.2; patched:
+  # >= 0.39.0. No lockable fix exists: the newest sqlx-sqlite release, 0.9.0,
+  # requires libsqlite3-sys >=0.30.1, <0.38.0, so 0.39 cannot be locked beside
+  # it, and the sqlx release that raises the bound is not published. Not
+  # taken: a git dependency on unreleased sqlx, a [patch] or a fork (each a
+  # new source, P8) and any bump whose only effect is a passing audit.
+  # A bump does not move the bundled SQLite; see #2432, which holds the
+  # decision (the private notes hold the analysis; neither is restated here).
+  # cargo-audit prints nothing for an ignored id, so that issue is the only
+  # reminder.
+  # Review-by: 2026-12-09 (30 days; shorter than the others because this one is
+  # an error, not a warning). Remove this entry when a patched libsqlite3-sys
+  # can be locked and the tracking issue confirms it clears the shipped build;
+  # renew only with a new finding written in that issue.
+  "RUSTSEC-2026-0459",
 ]
 # A yanked crate (no RUSTSEC id -- cargo-audit reports yanked crates
 # separately from `ignore`-able advisory ids) can't be listed here:

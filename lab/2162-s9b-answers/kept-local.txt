@@ -19,3 +19,4 @@ evidence/s0-tasklist.txt 54 B 678b4dc9714ca23d082e31ce9044bdd520d2e369a49867daab
 evidence/s6-data-after.txt 1257 B 8f9fbe3275c682ab60f99f3a20153e04ec5dd7a7d55656638cc28c78942e7315 (folder listing)
 evidence/s6-data-before.txt 1808 B 6900d235d531348712d7b4281e0a29574581b7dc809e7d3af660674953b23f62 (folder listing)
 stage-s9b.py 9045 B 5ad08b0ee03e58df125f1f09c02f7ab8aecda3aeba3f374ee21eedff251ee3d2 (this stage script: its patterns name the lab paths)
+s9b-gstin-swap.py 3219 B 0dfcc3179803833db6b059bdeceb4772873e778b2fe3b76f3d73928262d5ca21 (the script that wrote the GSTIN-synthetic copy: its patterns name the lab paths)

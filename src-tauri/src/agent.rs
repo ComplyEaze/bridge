@@ -2133,16 +2133,20 @@ fn refusal_remediation(code: &str) -> Option<&'static str> {
         // The control beside the number read (`NumberAbsence`): a read that
         // matches nothing must never pass as a number not in use.
         "invoice_number_control_missing" => Some(
-            "Before trusting that this invoice number is not in use, ComplyEaze Bridge read for an \
-             earlier invoice it posted in this company and verified, and Tally did not return \
-             it, so the read cannot be trusted here and the build is refused. The detail names \
-             the batch that posted that invoice. Run verify_import on it. If it no longer reads \
-             verified, it no longer checks new numbers, and a batch ComplyEaze Bridge sent then \
-             stops the company's invoices until the user releases it (invoice_company_stopped \
-             says how). If it still reads \
-             posted and verified, Tally holds the invoice and the number check does not work on \
-             this book: stop, tell the user, and do not post this invoice through ComplyEaze \
-             Bridge.",
+            "Before trusting that this invoice number is not in use, ComplyEaze Bridge read the \
+             month holding an earlier invoice it posted in this company and verified, and that \
+             month's answer did not show it, so the read cannot be trusted here and the build is \
+             refused. The detail names the batch that posted that invoice; control gives its \
+             number and date, how many Sales vouchers the answer held, and whether the answer \
+             held that invoice's GUID under another number, date or type. Run verify_import on \
+             that batch. If it no longer reads verified, it no longer checks new numbers, and a \
+             batch ComplyEaze Bridge sent then stops the company's invoices until the user \
+             releases it (invoice_company_stopped says how). If it still reads posted and \
+             verified, tell the user that ComplyEaze Bridge cannot check invoice numbers on this \
+             company at present and that repeating the build does not clear this; an update of \
+             ComplyEaze Bridge can. Until then the user enters this company's invoices in Tally, \
+             where Tally's own duplicate-number check is the only one. Do not suggest editing or \
+             deleting that invoice to get past this.",
         ),
         "invoice_company_stopped" => Some(
             "An earlier invoice of this company was sent to Tally and is not verified posted, so \

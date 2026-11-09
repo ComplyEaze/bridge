@@ -30,8 +30,8 @@ mod wire;
 pub(super) use wire::HsnWarning;
 /// The request builders the sealed read profiles wrap.
 pub(in crate::agent) use wire::{
-    render_company_registration_request, render_group_hsn_request, render_invoice_number_request,
-    render_invoice_readback_request, render_ledger_rates_request_for_ledgers,
+    render_company_registration_request, render_group_hsn_request, render_invoice_readback_request,
+    render_invoice_window_numbers_request, render_ledger_rates_request_for_ledgers,
     render_voucher_types_request, VoucherTypeGuid,
 };
 
@@ -188,6 +188,40 @@ pub(super) enum RefusalDetail {
     /// A count, a state, a voucher type, an invoice number or a batch id:
     /// never a ledger.
     Value(String),
+    /// `invoice_number_control_missing`: the control's batch (the detail a
+    /// caller reads), and what the answer that should have shown it held
+    /// instead (#2162 item 13), so the cause stays measurable.
+    ControlMissing(Box<ControlMissing>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ControlMissing {
+    pub(super) batch_id: String,
+    pub(super) number: String,
+    pub(super) date: String,
+    miss: wire::ControlMiss,
+}
+
+impl ControlMissing {
+    fn to_json(&self) -> serde_json::Value {
+        let guid = match &self.miss.guid {
+            None => serde_json::json!("not_recorded"),
+            Some(wire::GuidSeen::NotSeen) => serde_json::json!("not_seen"),
+            Some(wire::GuidSeen::Seen {
+                number,
+                date,
+                voucher_type,
+            }) => serde_json::json!({
+                "seen_as": {"voucher_number": number, "date": date, "voucher_type": voucher_type}
+            }),
+        };
+        serde_json::json!({
+            "voucher_number": self.number,
+            "date": self.date,
+            "sales_rows_in_answer": self.miss.sales_rows,
+            "guid_in_answer": guid,
+        })
+    }
 }
 
 impl InvoiceRefusal {
@@ -201,8 +235,12 @@ impl InvoiceRefusal {
                 serde_json::json!(super::super::party_name(name.as_str()))
             }
             RefusalDetail::Value(text) => serde_json::json!(text),
+            RefusalDetail::ControlMissing(missing) => serde_json::json!(missing.batch_id),
         };
         let mut value = serde_json::json!({"code": self.code, "detail": detail});
+        if let RefusalDetail::ControlMissing(missing) = &self.detail {
+            value["control"] = missing.to_json();
+        }
         if let Some(remediation) = super::super::refusal_remediation(self.code) {
             value["remediation"] = serde_json::json!(remediation);
         }
@@ -1887,6 +1925,14 @@ pub(super) fn party_entry(voucher: &ImportVoucher) -> Option<&ImportEntry> {
         .find(|entry| entry.side == EntrySide::Dr && Some(entry.ledger.as_str()) != round_off)
 }
 
+/// The index of the month among `months` whose first and last day hold a
+/// YYYYMMDD date, if one does.
+fn month_holding(months: &[(TallyDate, TallyDate)], date: &str) -> Option<usize> {
+    months
+        .iter()
+        .position(|(first, last)| first.as_str() <= date && date <= last.as_str())
+}
+
 /// The financial year (1 April to 31 March) a YYYYMMDD date falls in, as the
 /// dates the request builders take.
 fn financial_year_window(date: &str) -> Option<(TallyDate, TallyDate)> {
@@ -1956,7 +2002,11 @@ pub(super) enum Need {
     Listing,
     Rates,
     VoucherTypes,
-    Number,
+    /// The read of the month at this index of the invoice's financial year
+    /// (`wire::calendar_months`), in order from April (#2162 item 11).
+    Number(usize),
+    /// The read of the control's month, when the control is dated outside the
+    /// invoice's financial year.
     NumberControl,
     Registration,
     /// The company object, for the HSN/SAC check (asked once the classification
@@ -2110,15 +2160,17 @@ impl InvoiceJudge<'_> {
                     scope.part(),
                 ))
             }
-            Need::Number => {
-                let year = self.year()?;
-                let supplied = self.voucher.voucher_number.as_deref().unwrap_or_default();
-                let number = InvoiceNumber::parse(supplied)
-                    .ok_or_else(|| refusing(refuse_value("invoice_number_invalid", supplied)))?;
-                admitted(super::super::invoice_number_read(
+            Need::Number(index) => {
+                // The month read carries no number, but a number outside the
+                // invoice alphabet is refused before any read of it.
+                self.number()?;
+                let months = self.months()?;
+                let month = months
+                    .get(index)
+                    .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))?;
+                admitted(super::super::invoice_window_numbers_read(
                     company,
-                    &number,
-                    (&year.0, &year.1),
+                    (&month.0, &month.1),
                 ))
             }
             Need::NumberControl => match self.number_control_request()? {
@@ -2129,23 +2181,46 @@ impl InvoiceJudge<'_> {
         }
     }
 
-    /// The read of the invoice the journal offers as the number's control, or
-    /// none when it offers none.
+    /// The invoice's number, parsed once: the month reads compare it after
+    /// they return, so an absent or out-of-alphabet number is refused here,
+    /// never folded to nothing and judged unheld.
+    fn number(&self) -> Result<InvoiceNumber, Verdict> {
+        let supplied = self.voucher.voucher_number.as_deref().unwrap_or_default();
+        InvoiceNumber::parse(supplied)
+            .ok_or_else(|| refusing(refuse_value("invoice_number_invalid", supplied)))
+    }
+
+    /// The calendar months of the invoice's financial year, each as its first
+    /// and last day: the windows of the number's reads.
+    fn months(&self) -> Result<Vec<(TallyDate, TallyDate)>, Verdict> {
+        let year = self.year()?;
+        wire::calendar_months(&year.0, &year.1)
+            .ok_or_else(|| unusable("invoice_read_plan_inconsistent"))
+    }
+
+    /// The read of the month of the invoice the journal offers as the
+    /// number's control, when that invoice is dated outside the invoice's
+    /// financial year. None when the journal offers none, or when the control
+    /// is dated inside that year: it is then checked in that month's answer.
     fn number_control_request(
         &self,
     ) -> Result<Option<crate::tally::agent_read_request::AgentReadRequest>, Verdict> {
         let super::ledger::NumberControl::Known { number, date, .. } = self.control else {
             return Ok(None);
         };
-        let (Some(window), Some(number)) =
-            (financial_year_window(date), InvoiceNumber::parse(number))
-        else {
-            return Err(unusable("invoice_number_control_unreadable"));
-        };
-        admitted(super::super::invoice_number_read(
+        let unreadable = || unusable("invoice_number_control_unreadable");
+        let window = financial_year_window(date).ok_or_else(unreadable)?;
+        InvoiceNumber::parse(number).ok_or_else(unreadable)?;
+        if month_holding(&self.months()?, date).is_some() {
+            return Ok(None);
+        }
+        let months = wire::calendar_months(&window.0, &window.1).ok_or_else(unreadable)?;
+        let month = month_holding(&months, date)
+            .map(|index| &months[index])
+            .ok_or_else(unreadable)?;
+        admitted(super::super::invoice_window_numbers_read(
             self.identity.display_name(),
-            &number,
-            (&window.0, &window.1),
+            (&month.0, &month.1),
         ))
         .map(Some)
     }
@@ -2163,7 +2238,9 @@ impl InvoiceJudge<'_> {
             rates: self.request(Need::Rates)?,
             ledger_parents: self.scope()?.parents(),
             voucher_types: self.request(Need::VoucherTypes)?,
-            number: self.request(Need::Number)?,
+            number: (0..self.months()?.len())
+                .map(|index| self.request(Need::Number(index)))
+                .collect::<Result<_, _>>()?,
             number_control: self.number_control_request()?,
             registration: self.request(Need::Registration)?,
             company_hsn: self.request(Need::CompanyHsn)?,
@@ -2280,23 +2357,32 @@ impl InvoiceJudge<'_> {
         let resolved = wire::resolve_voucher_type(&types, &type_name, "Sales")
             .map_err(|code| refusing(refuse_value(code, &type_name)))?;
 
-        // 3b. The number must not already be in use in this type and year.
-        let number = voucher.voucher_number.clone().unwrap_or_default();
-        let Some(number_body) = answers.number.as_deref() else {
-            return Err(Verdict::Need(Need::Number));
-        };
-        if wire::count_sales_vouchers(number_body)
-            .map_err(|code| Verdict::Failed(code.to_string()))?
-            != 0
-        {
-            let code = if wire::sales_holder_has_irn(number_body)
+        // 3b. The number must not already be in use on a Sales-class voucher
+        // of the invoice's financial year, compared as the leading-zero rule
+        // folds it (#2162 item 11, decided 4 November 2026). Each month's
+        // answer is judged as it arrives; the first that holds the number
+        // refuses, with the IRN of the holders that month shows.
+        let number = self.number()?;
+        let number = number.as_str();
+        let months = self.months()?;
+        for body in &answers.number {
+            if let wire::NumberHolding::Held { with_irn } = wire::number_holding(body, number)
                 .map_err(|code| Verdict::Failed(code.to_string()))?
             {
-                "invoice_number_already_used_with_irn"
-            } else {
-                "invoice_number_already_used"
-            };
-            return Err(refusing(refuse_value(code, &number)));
+                let code = if with_irn {
+                    "invoice_number_already_used_with_irn"
+                } else {
+                    "invoice_number_already_used"
+                };
+                return Err(refusing(refuse_value(code, number)));
+            }
+        }
+        match answers.number.len().cmp(&months.len()) {
+            std::cmp::Ordering::Less => {
+                return Err(Verdict::Need(Need::Number(answers.number.len())));
+            }
+            std::cmp::Ordering::Greater => return Err(unusable("invoice_read_plan_inconsistent")),
+            std::cmp::Ordering::Equal => {}
         }
         // 3c. "No voucher carries this number" is believed only beside a
         // control: the same read for an invoice this company is known to hold
@@ -2308,17 +2394,31 @@ impl InvoiceJudge<'_> {
                 batch_id,
                 number: known,
                 date,
+                guid,
             } => {
-                let Some(control_body) = answers.number_control.as_deref() else {
-                    return Err(Verdict::Need(Need::NumberControl));
+                // A control dated inside the year is looked for in its month's
+                // answer; one dated outside it in its own month's read.
+                let control_body = match month_holding(&months, date) {
+                    Some(index) => answers.number[index].as_str(),
+                    None => match answers.number_control.as_deref() {
+                        Some(body) => body,
+                        None => return Err(Verdict::Need(Need::NumberControl)),
+                    },
                 };
                 if !wire::control_row_found(control_body, known, date)
                     .map_err(|code| Verdict::Failed(code.to_string()))?
                 {
-                    return Err(refusing(refuse_value(
-                        "invoice_number_control_missing",
-                        batch_id,
-                    )));
+                    let miss = wire::control_miss(control_body, guid.as_deref())
+                        .map_err(|code| Verdict::Failed(code.to_string()))?;
+                    return Err(refusing(InvoiceRefusal {
+                        code: "invoice_number_control_missing",
+                        detail: RefusalDetail::ControlMissing(Box::new(ControlMissing {
+                            batch_id: batch_id.clone(),
+                            number: known.clone(),
+                            date: date.clone(),
+                            miss,
+                        })),
+                    }));
                 }
                 NumberAbsence::Controlled
             }
@@ -2568,16 +2668,20 @@ impl super::super::Server {
                     Need::CompanyHsn
                     | Need::Rates
                     | Need::VoucherTypes
-                    | Need::Number
+                    | Need::Number(_)
                     | Need::NumberControl
                     | Need::GroupHsn
                     | Need::Registration => {
                         let request = judge.request(need).map_err(admission_of)?;
                         let (xml, read, _) = self.post_admitted_read(identity, request).await?;
+                        if matches!(need, Need::Number(_)) {
+                            answers.number.push(xml);
+                            note(&mut evidence, read);
+                            continue;
+                        }
                         let slot = match need {
                             Need::Rates => &mut answers.rates,
                             Need::VoucherTypes => &mut answers.voucher_types,
-                            Need::Number => &mut answers.number,
                             Need::NumberControl => &mut answers.number_control,
                             Need::CompanyHsn => &mut answers.company_hsn,
                             Need::GroupHsn => &mut answers.group_hsn,

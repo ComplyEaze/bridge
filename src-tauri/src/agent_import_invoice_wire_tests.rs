@@ -1,6 +1,17 @@
 use super::*;
 use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
 
+/// How many Sales-class rows a window answer holds, as the control's miss
+/// reports them.
+fn sales_count(xml: &str) -> Result<usize, &'static str> {
+    control_miss(xml, None).map(|miss| miss.sales_rows)
+}
+
+/// Whether a Sales-class holder of `number` carries an IRN.
+fn holder_has_irn(xml: &str, number: &str) -> Result<bool, &'static str> {
+    number_holding(xml, number).map(|holding| holding == NumberHolding::Held { with_irn: true })
+}
+
 /// The shape of the lab's voucher-type collection (measured 6 Oct 2026): a
 /// CMPINFO counter named like the rows, then one VOUCHERTYPE per type with its
 /// reserved name as an attribute and the series-level numbering inside
@@ -160,16 +171,13 @@ fn an_answer_that_is_not_tallys_success_is_never_read_as_no_rows() {
         "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><BODY><DATA><VOUCHER/></DATA></BODY></ENVELOPE>",
     ] {
         assert_eq!(count_vouchers(no_collection), Err("invoice_read_collection_absent"), "{no_collection}");
-        assert_eq!(count_sales_vouchers(no_collection), Err("invoice_read_collection_absent"));
+        assert_eq!(sales_count(no_collection), Err("invoice_read_collection_absent"));
     }
     // A row written as an empty element is a row with no fields: it is never
     // "no rows", and the class count refuses it.
     let empty_row = "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION><VOUCHER/></COLLECTION></DATA></ENVELOPE>";
     assert_eq!(count_vouchers(empty_row), Ok(1));
-    assert_eq!(
-        count_sales_vouchers(empty_row),
-        Err("invoice_number_class_unread")
-    );
+    assert_eq!(sales_count(empty_row), Err("invoice_number_class_unread"));
     // A collection written as an empty element is still a collection.
     let self_closed =
         "<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION/></DATA></ENVELOPE>";
@@ -455,26 +463,26 @@ fn only_a_sales_class_row_with_a_readable_class_counts_as_a_duplicate() {
     let row = |class: &str| {
         format!("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER><BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
     };
-    assert_eq!(count_sales_vouchers(&wrap("")), Ok(0));
-    assert_eq!(count_sales_vouchers(&wrap(&row("Yes"))), Ok(1));
+    assert_eq!(sales_count(&wrap("")), Ok(0));
+    assert_eq!(sales_count(&wrap(&row("Yes"))), Ok(1));
     // The same number under a Purchase-class type is not an invoice number clash.
-    assert_eq!(count_sales_vouchers(&wrap(&row("No"))), Ok(0));
+    assert_eq!(sales_count(&wrap(&row("No"))), Ok(0));
     assert_eq!(
-        count_sales_vouchers(&wrap(&(row("Yes") + &row("Yes") + &row("No")))),
+        sales_count(&wrap(&(row("Yes") + &row("Yes") + &row("No")))),
         Ok(2)
     );
     // A row whose class did not come back is an error, never a No.
     assert_eq!(
-        count_sales_vouchers(&wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER></VOUCHER>")),
+        sales_count(&wrap("<VOUCHER><VOUCHERNUMBER>9</VOUCHERNUMBER></VOUCHER>")),
         Err("invoice_number_class_unread")
     );
     assert_eq!(
-        count_sales_vouchers(&wrap(&row("Maybe"))),
+        sales_count(&wrap(&row("Maybe"))),
         Err("invoice_number_class_unread")
     );
     // And an answer that is not Tally's success is never "no rows".
     assert_eq!(
-        count_sales_vouchers("<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><DATA><COLLECTION></COLLECTION></DATA></ENVELOPE>"),
+        sales_count("<ENVELOPE><HEADER><STATUS>0</STATUS></HEADER><DATA><COLLECTION></COLLECTION></DATA></ENVELOPE>"),
         Err("invoice_read_status_not_success")
     );
 }
@@ -491,10 +499,114 @@ fn the_captured_number_reads_say_whether_the_sales_holder_carries_an_irn() {
         "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml"
     ));
     assert_eq!(count_vouchers(&with), Ok(2));
-    assert_eq!(count_sales_vouchers(&with), Ok(1));
-    assert_eq!(sales_holder_has_irn(&with), Ok(true));
-    assert_eq!(count_sales_vouchers(&without), Ok(1));
-    assert_eq!(sales_holder_has_irn(&without), Ok(false));
+    assert_eq!(sales_count(&with), Ok(1));
+    assert_eq!(holder_has_irn(&with, "1"), Ok(true));
+    assert_eq!(sales_count(&without), Ok(1));
+    assert_eq!(holder_has_irn(&without, "2"), Ok(false));
+}
+
+/// A window answer holds a number when a Sales-class row's number folds to
+/// it. On the captured answers: the book's first invoice `BP/26-27/0001` is
+/// held whatever its case and leading zeros, and a number that differs in a
+/// digit is not; on the e-invoice book number `1` is held by the Sales
+/// invoice with an IRN (the Payment of the same number is not Sales class),
+/// and `2` by one without; the empty answer holds nothing.
+#[test]
+fn a_window_answer_holds_a_number_its_sales_rows_fold_to() {
+    let in_use = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"
+    ));
+    let held = Ok(NumberHolding::Held { with_irn: false });
+    for number in [
+        "BP/26-27/0001",
+        "bp/26-27/1",
+        "BP/026-027/00001",
+        " BP/26-27/01 ",
+    ] {
+        assert_eq!(number_holding(&in_use, number), held, "{number}");
+    }
+    for number in [
+        "BP/26-27/0010",
+        "BP/26-27/00011",
+        "BP/26-28/0001",
+        "BP/26-27",
+        "",
+    ] {
+        assert_eq!(
+            number_holding(&in_use, number),
+            Ok(NumberHolding::Unheld),
+            "{number}"
+        );
+    }
+    let with = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-1.utf16le.xml"
+    ));
+    let without = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/einvoice-lab/number-read-irn-2.utf16le.xml"
+    ));
+    assert_eq!(
+        number_holding(&with, "001"),
+        Ok(NumberHolding::Held { with_irn: true })
+    );
+    assert_eq!(number_holding(&without, "2"), held);
+    let empty = captured(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"
+    ));
+    assert_eq!(number_holding(&empty, "1"), Ok(NumberHolding::Unheld));
+}
+
+/// The fold ignores case and the leading zeros of each digit run, keeps one
+/// zero of a run of zeros, keeps every other character (a space inside the
+/// number included), and has nothing to say of a blank number.
+#[test]
+fn the_number_fold_ignores_case_and_each_runs_leading_zeros() {
+    for (number, folded) in [
+        ("bp/26-27/0051", "BP/26-27/51"),
+        ("BP/026-027/051", "BP/26-27/51"),
+        ("  Z1/0001 ", "Z1/1"),
+        ("000", "0"),
+        ("A0B00C", "A0B0C"),
+        ("10", "10"),
+        ("100/0100", "100/100"),
+        ("A 01", "A 1"),
+    ] {
+        assert_eq!(folded_number(number).as_deref(), Some(folded), "{number}");
+    }
+    assert_ne!(folded_number("BP 1"), folded_number("BP1"));
+    assert_ne!(folded_number("1"), folded_number("10"));
+    assert_eq!(folded_number("   "), None);
+    assert_eq!(folded_number(""), None);
+}
+
+/// Of several holders, one with an IRN decides the verdict; a row of the
+/// other class never holds; a row whose class is unread is an error.
+#[test]
+fn any_holder_with_an_irn_decides_and_an_unread_class_is_an_error() {
+    let wrap = |rows: &str| {
+        format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{rows}</COLLECTION></DATA></ENVELOPE>")
+    };
+    let row = |number: &str, class: &str, irn: &str| {
+        format!("<VOUCHER><VOUCHERNUMBER>{number}</VOUCHERNUMBER>{irn}<BRIDGEVCHISSALES>{class}</BRIDGEVCHISSALES></VOUCHER>")
+    };
+    let irn = "<IRN>abc</IRN>";
+    let both = row("A/07", "Yes", irn) + &row("a/7", "Yes", "") + &row("A/7", "No", irn);
+    assert_eq!(
+        number_holding(&wrap(&both), "A/0007"),
+        Ok(NumberHolding::Held { with_irn: true })
+    );
+    let reversed = row("a/7", "Yes", "") + &row("A/07", "Yes", irn);
+    assert_eq!(
+        number_holding(&wrap(&reversed), "A/7"),
+        Ok(NumberHolding::Held { with_irn: true })
+    );
+    assert_eq!(
+        number_holding(&wrap(&row("A/7", "No", irn)), "A/7"),
+        Ok(NumberHolding::Unheld)
+    );
+    assert_eq!(
+        number_holding(&wrap(&row("B/1", "Maybe", "")), "A/7"),
+        Err("invoice_number_class_unread")
+    );
 }
 
 /// The holder's IRN is said only when it came back with text; an empty or
@@ -509,20 +621,20 @@ fn only_a_sales_holder_with_an_irn_says_the_number_carries_one() {
     };
     let with = "<IRN TYPE=\"String\">ab12</IRN>";
     let empty = "<IRN TYPE=\"String\"></IRN>";
-    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", with))), Ok(true));
-    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", empty))), Ok(false));
-    assert_eq!(sales_holder_has_irn(&wrap(&row("Yes", ""))), Ok(false));
-    assert_eq!(sales_holder_has_irn(&wrap(&row("No", with))), Ok(false));
+    assert_eq!(holder_has_irn(&wrap(&row("Yes", with)), "1"), Ok(true));
+    assert_eq!(holder_has_irn(&wrap(&row("Yes", empty)), "1"), Ok(false));
+    assert_eq!(holder_has_irn(&wrap(&row("Yes", "")), "1"), Ok(false));
+    assert_eq!(holder_has_irn(&wrap(&row("No", with)), "1"), Ok(false));
     assert_eq!(
-        sales_holder_has_irn(&wrap(&(row("No", empty) + &row("Yes", with)))),
+        holder_has_irn(&wrap(&(row("No", empty) + &row("Yes", with))), "1"),
         Ok(true)
     );
     assert_eq!(
-        sales_holder_has_irn(&wrap(&row("Yes", &format!("{with}{with}")))),
+        holder_has_irn(&wrap(&row("Yes", &format!("{with}{with}"))), "1"),
         Err("invoice_read_field_repeated")
     );
     assert_eq!(
-        sales_holder_has_irn(&wrap(&row("Maybe", with))),
+        holder_has_irn(&wrap(&row("Maybe", with)), "1"),
         Err("invoice_number_class_unread")
     );
 }
@@ -897,8 +1009,64 @@ fn the_captured_number_answers_count_their_rows_not_their_header() {
         ),
     ] {
         assert_eq!(count_vouchers(&xml), Ok(vouchers), "{name}");
-        assert_eq!(count_sales_vouchers(&xml), Ok(sales), "{name}");
+        assert_eq!(sales_count(&xml), Ok(sales), "{name}");
     }
+}
+
+/// What a miss of the control reports, on Tally's own answers (#2162 item 13):
+/// the Sales rows the answer held, and the row carrying the control's voucher
+/// GUID as it reads, if any. The pilot lab's answer carries each voucher's
+/// GUID though the read's fetch list does not name it.
+#[test]
+fn a_control_miss_counts_the_sales_rows_and_finds_the_controls_guid() {
+    let known = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-in-use.utf16le.xml"));
+    let absent = captured(include_bytes!("../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-number-new-invoice.utf16le.xml"));
+    let guid = format!("{}-00000001", pilot_lab_guid());
+    assert_eq!(
+        control_miss(&known, Some(&guid.to_uppercase())),
+        Ok(ControlMiss {
+            sales_rows: 1,
+            guid: Some(GuidSeen::Seen {
+                number: Some("BP/26-27/0001".to_string()),
+                date: Some("20260801".to_string()),
+                voucher_type: Some("BRIDGE Sales".to_string()),
+            }),
+        })
+    );
+    let other = format!("{}-00000002", pilot_lab_guid());
+    assert_eq!(
+        control_miss(&known, Some(&other)),
+        Ok(ControlMiss {
+            sales_rows: 1,
+            guid: Some(GuidSeen::NotSeen),
+        })
+    );
+    assert_eq!(
+        control_miss(&absent, Some(&guid)),
+        Ok(ControlMiss {
+            sales_rows: 0,
+            guid: Some(GuidSeen::NotSeen),
+        })
+    );
+    // No GUID recorded for the control: the answer is still counted.
+    assert_eq!(
+        control_miss(&known, None),
+        Ok(ControlMiss {
+            sales_rows: 1,
+            guid: None,
+        })
+    );
+    // A row whose class cannot be read is an error, as for the read itself.
+    assert_eq!(
+        control_miss(
+            &known.replace(
+                "<BRIDGEVCHISSALES TYPE=\"Logical\">Yes</BRIDGEVCHISSALES>",
+                ""
+            ),
+            Some(&guid)
+        ),
+        Err("invoice_number_class_unread")
+    );
 }
 
 /// The control beside the number read, on Tally's own answers: it passes only

@@ -18,6 +18,7 @@
 //! GST registration, each GUID the company's GUID with a suffix, the
 //! registration's dated rows under `GSTREGISTRATIONDETAILS.LIST`.
 
+use super::super::verification::folded_number;
 use super::InvoiceNumber;
 use bridge_tally_core::TallyDate;
 use bridge_tally_protocol::xml_text::escape_text as xml_escape;
@@ -426,6 +427,9 @@ impl VoucherTypeGuid {
 /// say whether a voucher holding the number carries an IRN: with them the lab's
 /// answers were the answers without them plus the three elements on each row
 /// (#2162 item 8, `lab/2162-irn-read-answers` R1, protocol reference §8.2j).
+// Retired from the build by the month reads below (#2162 item 11); kept for
+// the tests that pin the request the one-number captures answered.
+#[cfg(test)]
 pub(in crate::agent) fn render_invoice_number_request(
     company: &str,
     number: &InvoiceNumber,
@@ -508,22 +512,80 @@ fn sales_rows(xml: &str) -> Result<Vec<Row>, &'static str> {
     Ok(sales)
 }
 
-/// How many of the returned vouchers are Sales-class.
-pub(super) fn count_sales_vouchers(xml: &str) -> Result<usize, &'static str> {
-    sales_rows(xml).map(|sales| sales.len())
+/// What a window answer that did not show the control holds instead (#2162
+/// item 13): its Sales-class row count, and the row of either class carrying
+/// the control's voucher GUID, if one does, as that row reads. `None` for the
+/// GUID when the journal recorded none for the control. The window read's
+/// answer carries each voucher's `GUID` though its fetch list does not name it
+/// (the captured `pilot-lab-number-*` answers), so a GUID seen under another
+/// number, date or type tells a miss of one voucher from a read missing rows.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct ControlMiss {
+    pub(super) sales_rows: usize,
+    pub(super) guid: Option<GuidSeen>,
 }
 
-/// Whether a Sales-class voucher holding the number carries an IRN: an `IRN`
-/// with text. One that came back empty or did not come back says nothing (the
-/// row reader keeps no empty field, so the two are not told apart), and never
-/// makes this true.
-pub(super) fn sales_holder_has_irn(xml: &str) -> Result<bool, &'static str> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum GuidSeen {
+    NotSeen,
+    Seen {
+        number: Option<String>,
+        date: Option<String>,
+        voucher_type: Option<String>,
+    },
+}
+
+pub(super) fn control_miss(xml: &str, guid: Option<&str>) -> Result<ControlMiss, &'static str> {
+    let sales_rows = sales_rows(xml)?.len();
+    let guid = match guid {
+        None => None,
+        Some(guid) => {
+            let mut seen = GuidSeen::NotSeen;
+            for row in rows(xml, "VOUCHER")? {
+                if row
+                    .one("GUID")?
+                    .is_some_and(|held| held.eq_ignore_ascii_case(guid))
+                {
+                    seen = GuidSeen::Seen {
+                        number: row.one("VOUCHERNUMBER")?.map(str::to_string),
+                        date: row.one("DATE")?.map(str::to_string),
+                        voucher_type: row.one("VOUCHERTYPENAME")?.map(str::to_string),
+                    };
+                }
+            }
+            Some(seen)
+        }
+    };
+    Ok(ControlMiss { sales_rows, guid })
+}
+
+/// A window read's verdict on one invoice number: whether a Sales-class row of
+/// the window holds a number that folds to it (case and the leading zeros of
+/// each digit run ignored, `folded_number`), and if so whether one such holder
+/// carries an IRN. The window read returns every voucher of its window, so the
+/// program, not Tally's filter, makes the comparison (row 2162-S4: Tally's
+/// filter misses a dropped zero). A row of either class with no number holds
+/// none. A row whose class cannot be read is an error, as for the number read.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum NumberHolding {
+    Unheld,
+    Held { with_irn: bool },
+}
+
+pub(super) fn number_holding(xml: &str, number: &str) -> Result<NumberHolding, &'static str> {
+    let wanted = folded_number(number);
+    let mut holding = NumberHolding::Unheld;
     for row in sales_rows(xml)? {
-        if row.one("IRN")?.is_some() {
-            return Ok(true);
+        let held = row.one("VOUCHERNUMBER")?.and_then(folded_number);
+        if wanted.is_some() && held == wanted {
+            let with_irn = row.one("IRN")?.is_some();
+            holding = match holding {
+                NumberHolding::Held { with_irn: true } => holding,
+                _ => NumberHolding::Held { with_irn },
+            };
         }
     }
-    Ok(false)
+    Ok(holding)
 }
 
 /// Whether the number read for a known invoice (the control) found it: a row

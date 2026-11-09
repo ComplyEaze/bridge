@@ -176,11 +176,39 @@ pub(super) struct InvoiceKey<'a> {
 }
 
 /// A voucher number as two numbers are compared for absence: trimmed, ASCII
-/// case ignored. `None` for a number that is absent, empty or blank. Looser
-/// than the comparison after a post (`voucher_diffs`), so it refuses more.
-fn folded_number(number: &str) -> Option<String> {
+/// case ignored, and the leading zeros of each run of digits dropped (a run of
+/// zeros alone keeps one), so `bp/0051` and `BP/51` fold alike. Tally's own
+/// duplicate guard and its number filter ignore case but not a dropped zero
+/// (row 2162-S4), so a person reading the two as one invoice is what this
+/// guards; the rule was decided for #2162 on 4 Nov 2026. Each run is folded
+/// on its own, so `1.05` and `1.5` fold alike too, which only refuses more.
+/// Spaces inside a
+/// number are kept: what Tally does with them is not measured. `None` for a
+/// number that is absent, empty or blank. Looser than the comparison after a
+/// post (`voucher_diffs`), so it refuses more.
+pub(super) fn folded_number(number: &str) -> Option<String> {
     let number = number.trim();
-    (!number.is_empty()).then(|| number.to_ascii_uppercase())
+    if number.is_empty() {
+        return None;
+    }
+    let mut folded = String::with_capacity(number.len());
+    let mut run = String::new();
+    // Each character, then one `None` that ends the last run of digits.
+    for character in number.chars().map(Some).chain(std::iter::once(None)) {
+        if let Some(digit) = character.filter(char::is_ascii_digit) {
+            run.push(digit);
+            continue;
+        }
+        if !run.is_empty() {
+            let kept = run.trim_start_matches('0');
+            folded.push_str(if kept.is_empty() { "0" } else { kept });
+            run.clear();
+        }
+        if let Some(character) = character {
+            folded.push(character.to_ascii_uppercase());
+        }
+    }
+    Some(folded)
 }
 
 /// The number an invoice is matched by; `None` for every other voucher and for

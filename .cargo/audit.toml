@@ -21,9 +21,12 @@
 # date -- adding one would be an unknown field and cargo-audit would refuse to
 # parse the whole file. So every entry below carries that information as a
 # comment immediately above its id, not as structured TOML. A comment cannot
-# be checked by a machine; only a human reviewing this file (or the delta
-# script below, for *new* ids) enforces it. Say this plainly rather than
-# implying cargo-audit tracks review dates itself: it does not.
+# be checked by a machine, with one exception: scripts/audit-review-by.test.mjs
+# reads each `Review-by: YYYY-MM-DD` date and fails once one has passed. The
+# rest is enforced only by a human reviewing this file (or by
+# scripts/check-advisory-delta.mjs, which no workflow runs yet, for *new* ids).
+# Say this plainly rather than implying cargo-audit tracks review dates
+# itself: it does not.
 #
 # This file intentionally does NOT set `[output].deny`. The default already
 # treats every advisory kind (vulnerability, unmaintained, unsound, notice,
@@ -34,13 +37,17 @@
 # except RUSTSEC-2026-0459 (the last entry), which IS a vulnerability
 # (`error`) and is accepted for a stated time (see its entry). The rule was
 # "nothing here silences an actual vulnerability"; that entry is the one
-# exception, and a second one needs the same: a dated review-by, a tracking
-# issue and a reason no lockable fix exists. The workflow's real job --
+# exception. A second one should carry the same (a dated review-by, a
+# tracking issue, a reason no lockable fix exists); that is a review
+# convention, and only the date is checked. The workflow's real job --
 # catching a new one, like RUSTSEC-2026-0285 against `rustls` on 2026-09-15
 # -- is untouched by this file for every other id. An `ignore` entry removes
 # its id from `cargo audit`'s report entirely (checked with cargo-audit 0.22.2
-# on 2026-11-09: nothing is printed for it), so an entry's only reminder is
-# its comment and, for an error, its tracking issue.
+# on 2026-11-09: nothing is printed for it), so nothing reports it again: the
+# scheduled audit's tracking issue is built from the same filtered output and
+# will not list it. An ignore applies to the advisory id, whatever package or
+# version matches it. A passed Review-by date fails
+# scripts/audit-review-by.test.mjs, in the Node script tests that `pnpm test` runs.
 #
 # Reachability was checked with, e.g.:
 #   cargo tree --locked -p bridge -i <crate> --target aarch64-apple-darwin
@@ -134,9 +141,10 @@ ignore = [
   # taken: a git dependency on unreleased sqlx, a [patch] or a fork (each a
   # new source, P8) and any bump whose only effect is a passing audit.
   # A bump does not move the bundled SQLite; see #2432, which holds the
-  # decision (the private notes hold the analysis; neither is restated here).
-  # cargo-audit prints nothing for an ignored id, so that issue is the only
-  # reminder.
+  # decision. cargo-audit prints nothing for an ignored id and the scheduled
+  # tracker does not list it, so the review-by date below is what brings it
+  # back (scripts/audit-review-by.test.mjs fails once it has passed). The id is
+  # ignored for any libsqlite3-sys version it matches.
   # Review-by: 2026-12-09 (30 days; shorter than the others because this one is
   # an error, not a warning). Remove this entry when a patched libsqlite3-sys
   # can be locked and the tracking issue confirms it clears the shipped build;

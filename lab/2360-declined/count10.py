@@ -2,13 +2,15 @@
 # count10.py ANSWER...: row 2162-FY14R's count9.py (lab/2162-fy14r-sheet, byte for byte) for row 2360-L, with three
 # modes added, each marked 2360 below and in the usage lines that follow:
 #   --whole I: the import answer I is a whole rejection: the seven counters CREATED, ALTERED, DELETED, IGNORED,
-#      ERRORS, CANCELLED and EXCEPTIONS are each present once, CREATED, ALTERED and DELETED are 0, and EXCEPTIONS is 1.
-#      It prints WHOLE REJECTION, or NOT A WHOLE REJECTION with the reason and exit 2. A missing counter is not a 0.
+#      ERRORS, CANCELLED and EXCEPTIONS, and COMBINED (LAB-COMMON C4), are each present once, EXCEPTIONS is 1 and the
+#      other seven are 0, as in row 2162-FY14's declined answer (§9.2, §9.14). It prints WHOLE REJECTION, or NOT A WHOLE REJECTION with the reason
+#      and exit 2. A missing counter is not a 0.
 #   --same-day A B: two answers of the day read (N-day-20260801.xml) hold the same VOUCHER rows: the same count and,
-#      row by row in answer order, the same VOUCHERNUMBER, DATE, VOUCHERTYPENAME and BRIDGEVCHISSALES. It prints
+#      row by row in answer order, the same VOUCHERNUMBER, DATE, VOUCHERTYPENAME and BRIDGEVCHISSALES. Both must be
+#      answers of that read, by name, and A must hold BP/26-27/0010 dated 20260801 once, else STOP. It prints
 #      SAME DAY, or prints every difference and DAY DIFFERS with exit 3.
-#   --same-mark S1 M: as --before-write, and ALTVCHID also equals S1's. ALTMSTID is printed and not compared. It
-#      prints SAME MARK, or MARK MOVED with exit 4. Exit 3 and 4 are results to record, not STOPs: the step says what
+#   --same-mark S1 M: as --before-write, and ALTVCHID and ALTMSTID also equal S1's. It prints SAME MARK, or MARK
+#      MOVED with exit 4. Exit 3 and 4 are results to record, not STOPs: the step says what
 #      follows.
 # count9.py was row 2162-FY14's count7.py (lab/2162-fy14-sheet at e5d30d23) for row 2162-FY14R, with two
 # changes, each marked FY14R below: the book is pinned by GUID (BOOK: the M kind prints whether each COMPANY row's GUID
@@ -242,6 +244,7 @@ def same_company(first, later, marks):
 
 # 2360: the three modes above.
 SEVEN = ["CREATED", "ALTERED", "DELETED", "IGNORED", "ERRORS", "CANCELLED", "EXCEPTIONS"]
+COUNTED = SEVEN + ["COMBINED"]
 
 def whole(path):
     root = parse(path)
@@ -250,7 +253,7 @@ def whole(path):
     if result is None:
         raise SystemExit("STOP: no import counters in the answer; the request failed")
     found = {}
-    for tag in SEVEN:
+    for tag in COUNTED:
         hits = [child for child in result if child.tag == tag]
         found[tag] = (hits[0].text or "").strip() if len(hits) == 1 else None
         print(f"  {tag} {'<absent>' if not hits else repr(found[tag]) if len(hits) == 1 else f'<{len(hits)} times>'}")
@@ -260,7 +263,7 @@ def whole(path):
     if missing:
         print("  NOT A WHOLE REJECTION: counter absent or repeated:", ", ".join(missing))
         raise SystemExit(2)
-    wrong = [tag for tag in ("CREATED", "ALTERED", "DELETED") if found[tag] != "0"]
+    wrong = [tag for tag in COUNTED if tag != "EXCEPTIONS" and found[tag] != "0"]
     if wrong or found["EXCEPTIONS"] != "1":
         print("  NOT A WHOLE REJECTION:", ", ".join(f"{t} {found[t]!r}" for t in wrong + ["EXCEPTIONS"]))
         raise SystemExit(2)
@@ -270,8 +273,16 @@ def day(path):
     return [tuple(value(row, tag) for tag in ("VOUCHERNUMBER", "DATE", "VOUCHERTYPENAME", "BRIDGEVCHISSALES"))
             for row in rows(parse(path), "VOUCHER")]
 
+DAY = "N-day-20260801"
+
 def same_day(first, later):
+    for path in (first, later):
+        if not path.name.startswith("a-") or not path.name.endswith(f"-{DAY}.xml"):
+            raise SystemExit(f"STOP: {path.name} is not an answer of {DAY}.xml")
     a, b = day(first), day(later)
+    held = [row for row in a if row[:2] == (repr("BP/26-27/0010"), repr("20260801"))]
+    if len(held) != 1:
+        raise SystemExit(f"STOP: {first.name} holds BP/26-27/0010 dated 20260801 {len(held)} times, not once")
     print(f"== --same-day {later.name} against {first.name}: {len(b)} VOUCHER rows against {len(a)}")
     differs = len(a) != len(b)
     for index in range(max(len(a), len(b))):
@@ -288,10 +299,10 @@ def same_day(first, later):
 def same_mark(first, later):
     a, b = company_row(first), company_row(later)
     print(f"== --same-mark {later.name} against {first.name}: GUID, ALTVCHID, ALTMSTID {b} against {a}")
-    if a[:2] != b[:2]:
+    if a != b:
         print("  MARK MOVED")
         raise SystemExit(4)
-    print("  SAME MARK" + ("" if a[2] == b[2] else "; ALTMSTID differs, recorded"))
+    print("  SAME MARK")
 
 args = sys.argv[1:]
 if args[:1] == ["--whole"]:

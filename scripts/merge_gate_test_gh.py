@@ -1400,6 +1400,22 @@ def state():
             "+content\n"
         )
 
+    elif scenario in ("author-email-bot-noreply", "author-email-bracket-elsewhere",
+                      "author-email-bot-other-domain", "author-email-empty"):
+        email = {
+            "author-email-bot-noreply": "49699333+dependabot[bot]@users.noreply.github.com",
+            "author-email-bracket-elsewhere": "dev[bot]@example.invalid",
+            "author-email-bot-other-domain": "49699333+dependabot[bot]@example.invalid",
+            "author-email-empty": "",
+        }[scenario]
+        commit = dict(DEFAULT_COMMIT)
+        commit["commit"] = {
+            "message": "safe commit metadata",
+            "author": {"name": "dependabot[bot]", "email": email},
+            "committer": {"name": "GitHub", "email": "noreply@github.com"},
+        }
+        s["commits"] = [commit]
+
     elif scenario == "author-email-localhost":
         commit = dict(DEFAULT_COMMIT)
         commit["commit"] = {

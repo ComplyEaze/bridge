@@ -1635,6 +1635,20 @@ class MergeGateControls(unittest.TestCase):
         result = self.assert_pass("author-email-localhost")
         self.assertNotIn("could not prove complete head-bound PR commit metadata", result.stdout)
 
+    def test_2388_github_bot_noreply_author_email_is_accepted(self):
+        # Dependabot authors as <digits>+dependabot[bot]@users.noreply.github.com. The
+        # plain email class admits no bracket, so every Dependabot PR went INDETERMINATE.
+        result = self.assert_pass("author-email-bot-noreply")
+        self.assertNotIn("could not prove complete head-bound PR commit metadata", result.stdout)
+
+    def test_2388_a_bracket_outside_the_bot_noreply_form_is_refused(self):
+        for scenario in ("author-email-bracket-elsewhere", "author-email-bot-other-domain"):
+            with self.subTest(scenario=scenario):
+                self.assert_indeterminate(scenario, "could not prove complete head-bound PR commit metadata")
+
+    def test_2388_an_empty_author_email_is_refused(self):
+        self.assert_indeterminate("author-email-empty", "could not prove complete head-bound PR commit metadata")
+
     def test_finding374_helpers_resolve_relative_to_the_script(self):
         """#374: the gate must locate its own helper scripts by $script_dir.
 

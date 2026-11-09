@@ -210,10 +210,12 @@ if [ -z "${metadata_commit_total:-}" ] || [ "$metadata_status" -ne 0 ] || ! jq -
     (.sha | type == "string" and test("^[0-9a-fA-F]{40}$")) and
     (.commit | type == "object") and
     (.commit.message | type == "string") and
+    # An email is the plain form, or (#2388) exactly a GitHub bot noreply address,
+    # <digits>+<name>[bot]@users.noreply.github.com, whose local part holds brackets.
     (.commit.author | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     (.commit.committer | type == "object" and
-      (.name | type == "string") and (.email | type == "string" and test("^[A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$"))) and
+      (.name | type == "string") and (.email | type == "string" and test("^([A-Za-z0-9.!#$%&*+/=?^_`{|}~-]+@[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?|[0-9]+\\+[A-Za-z0-9-]+\\[bot\\]@users\\.noreply\\.github\\.com)$"))) and
     ((.author == null) or (.author | type == "object" and (.login | type == "string"))) and
     ((.committer == null) or (.committer | type == "object" and (.login | type == "string")))))
 ' <<<"$metadata_commits" >/dev/null 2>&1; then

@@ -23,35 +23,43 @@ File: `bridge-tally-mcp-v0.7.0-windows-x64.mcpb`, from the download page `https:
 ```powershell
 $ErrorActionPreference = "Stop"   # a failing command becomes a stopping error, which the block writes as an ERROR line
 $hub = "C:\Users\Public\fr2a-hub-only"; New-Item -ItemType Directory $hub -Force | Out-Null
+function Get-PathState([string]$P) {   # "exists", "absent", or "unreadable: ..." : a read that failed is never written as absent
+  try { $null = Get-Item -LiteralPath $P -Force -ErrorAction Stop; "exists" } catch [Management.Automation.ItemNotFoundException] { "absent" } catch { "unreadable: " + $_.Exception.Message }
+}
+function Read-Key([string]$K) {   # the key's values, $null if the key is absent, or a string "unreadable: ..."
+  try { Get-ItemProperty -LiteralPath $K -ErrorAction Stop } catch [Management.Automation.ItemNotFoundException] { $null } catch { "unreadable: " + $_.Exception.Message }
+}
 function Show-Data([string]$When) {
   "installed extension's data files, " + $When + " (name, length, last write; contents not read; this run must not change them):"
   $roots = @("$env:LOCALAPPDATA\Bridge\agent") + @(Get-Item -Path "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Local\Bridge\agent" -ErrorAction SilentlyContinue | ForEach-Object FullName)
   foreach ($d in $roots) {
-    "  folder " + $d + ": " + $(if (Test-Path -LiteralPath $d) { "exists" } else { "absent" })
-    foreach ($n in "terms-acceptance.jsonl", "agent-egress.jsonl") { $f1 = Join-Path $d $n; "    " + $n + ": " + $(if (Test-Path -LiteralPath $f1) { (Get-Item -LiteralPath $f1).Length.ToString() + ", " + (Get-Item -LiteralPath $f1).LastWriteTime.ToString("o") } else { "absent" }) }
+    "  folder " + $d + ": " + (Get-PathState $d)
+    foreach ($n in "terms-acceptance.jsonl", "agent-egress.jsonl") { $f1 = Join-Path $d $n; $st = Get-PathState $f1; "    " + $n + ": " + $(if ($st -eq "exists") { (Get-Item -LiteralPath $f1).Length.ToString() + ", " + (Get-Item -LiteralPath $f1).LastWriteTime.ToString("o") } else { $st }) }
   }
 }
 function Show-Locks {
   "lock files the program can create (names only):"
   $store = @(Get-Item -Path "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Local\Bridge\agent\native-dispatch-leases" -ErrorAction SilentlyContinue | ForEach-Object FullName)
   foreach ($d in (@("$env:LOCALAPPDATA\Bridge\agent\native-dispatch-leases", "$env:USERPROFILE\.complyeaze-bridge\coordination\native-dispatch-leases") + $store)) {
-    $items = @(Get-ChildItem -LiteralPath $d -Force -ErrorAction SilentlyContinue)
-    "  folder " + $d + ": " + $(if (Test-Path -LiteralPath $d) { "exists, " + $items.Count + " item(s): " + (($items | ForEach-Object Name) -join ", ") } else { "absent" })
+    $st = Get-PathState $d
+    if ($st -ne "exists") { "  folder " + $d + ": " + $st; continue }
+    try { $items = @(Get-ChildItem -LiteralPath $d -Force -ErrorAction Stop); "  folder " + $d + ": exists, " + $items.Count + " item(s): " + (($items | ForEach-Object Name) -join ", ") } catch { "  folder " + $d + ": unreadable: " + $_.Exception.Message }
   }
 }
 . { try {
   "date: " + (Get-Date -Format o)
   "PowerShell: " + $PSVersionTable.PSVersion
-  "Windows: " + [Environment]::OSVersion.VersionString + "  64-bit OS: " + [Environment]::Is64BitOperatingSystem + "  64-bit process: " + [Environment]::Is64BitProcess
+  "Windows: " + [Environment]::OSVersion.VersionString + "  64-bit OS: " + [Environment]::Is64BitOperatingSystem + "  64-bit process: " + [Environment]::Is64BitProcess + "  console input code page: " + [Console]::InputEncoding.CodePage
+  if (-not [Environment]::Is64BitProcess) { "ERROR: this is a 32-bit PowerShell process, so folders and registry keys are read through the 32-bit view. Close it, open the 64-bit Windows PowerShell and start again from the top." }
   $cv = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion"
   "edition: " + $cv.EditionID + "  display version: " + $(if ($cv.DisplayVersion) { $cv.DisplayVersion } else { "absent" }) + "  build: " + $cv.CurrentBuild + "." + $cv.UBR
-  $sac = Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy" -ErrorAction SilentlyContinue
-  "Smart App Control (VerifiedAndReputablePolicyState; 0 off, 1 on, 2 evaluation): " + $(if ($null -ne $sac -and $null -ne $sac.VerifiedAndReputablePolicyState) { $sac.VerifiedAndReputablePolicyState } else { "absent" })
-  $ss = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer" -ErrorAction SilentlyContinue
-  "SmartScreenEnabled (Explorer): " + $(if ($null -ne $ss -and $null -ne $ss.SmartScreenEnabled) { $ss.SmartScreenEnabled } else { "absent" })
+  $sac = Read-Key "HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy"
+  "Smart App Control (VerifiedAndReputablePolicyState; 0 off, 1 on, 2 evaluation): " + $(if ($sac -is [string]) { $sac } elseif ($null -ne $sac -and $null -ne $sac.VerifiedAndReputablePolicyState) { $sac.VerifiedAndReputablePolicyState } else { "absent" })
+  $ss = Read-Key "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer"
+  "SmartScreenEnabled (Explorer): " + $(if ($ss -is [string]) { $ss } elseif ($null -ne $ss -and $null -ne $ss.SmartScreenEnabled) { $ss.SmartScreenEnabled } else { "absent" })
   "Visual C++ runtime, x64 (Installed, Version):"
-  $vc = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64" -ErrorAction SilentlyContinue
-  if ($vc) { "  Installed=" + $vc.Installed + "  Version=" + $vc.Version } else { "  key absent" }
+  $vc = Read-Key "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64"
+  if ($vc -is [string]) { "  " + $vc } elseif ($vc) { "  Installed=" + $vc.Installed + "  Version=" + $vc.Version } else { "  key absent" }
   "vcruntime140.dll in System32: " + (Test-Path "$env:SystemRoot\System32\vcruntime140.dll")
   "installed programs named Visual C++:"
   $vcp = @(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "Visual C\+\+" })
@@ -191,7 +199,7 @@ function Invoke-Status([string]$Exe, [string]$Terms, [int]$Port) {
   $psi = New-Object Diagnostics.ProcessStartInfo $Exe
   $psi.UseShellExecute = $false; $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
   @($psi.EnvironmentVariables.Keys | Where-Object { $_ -like "BRIDGE_*" }) | ForEach-Object { $psi.EnvironmentVariables.Remove($_) }
-  $data = Join-Path $w ("data-" + $Terms + "-" + $Port); New-Item -ItemType Directory $data -Force | Out-Null
+  $data = Join-Path $w ("data-" + $Terms + "-" + $Port + "-" + (Get-Date -Format HHmmssfff)); New-Item -ItemType Directory $data | Out-Null   # a new folder for every start, so a repeated B7 never meets an older run's files
   $psi.EnvironmentVariables["BRIDGE_AGENT_DATA_DIR"] = $data
   $psi.EnvironmentVariables["BRIDGE_TERMS_ACCEPTED"] = $Terms
   $psi.EnvironmentVariables["BRIDGE_TALLY_HOST"] = "localhost"
@@ -200,6 +208,7 @@ function Invoke-Status([string]$Exe, [string]$Terms, [int]$Port) {
   $psi.EnvironmentVariables["BRIDGE_AGENT_ENABLE_IMPORT"] = "true"
   $psi.EnvironmentVariables["BRIDGE_AGENT_ENABLE_WRITES"] = "false"
   $psi.EnvironmentVariables["BRIDGE_AGENT_ENABLE_TAX_AUDIT"] = "false"
+  $psi.WorkingDirectory = $data
   $psi.StandardOutputEncoding = [Text.Encoding]::UTF8; $psi.StandardErrorEncoding = [Text.Encoding]::UTF8
   $p = [Diagnostics.Process]::Start($psi)
   try {
@@ -225,7 +234,7 @@ function Invoke-Status([string]$Exe, [string]$Terms, [int]$Port) {
     $errTask.Wait(2000) | Out-Null
     $stderr = if ($errTask.IsCompleted) { $errTask.Result } else { "not yet read" }
     if ($stderr.Length -gt 4096) { $stderr = $stderr.Substring(0, 4096) + " [cut at 4096 characters]" }
-    "standard error: " + $(if ($stderr) { $stderr } else { "empty" })
+    if ($stderr) { ($stderr -split "\r?\n") | ForEach-Object { "standard error| " + $_ } } else { "standard error| empty" }
     "tally_status reply, raw: " + $replies[1]
     try { if (($replies[0] | ConvertFrom-Json).error) { "NOTE: initialize answered with a protocol error; the answer below is not a result" } } catch { "initialize reply is not JSON: " + $_.Exception.Message }
     try {
@@ -257,11 +266,11 @@ $tc = New-Object Net.Sockets.TcpClient; try { $tc.Connect("localhost", $port); $
   }
 } catch { "ERROR: " + ($_ | Out-String) } } *>&1 | Out-File -Encoding utf8 "$hub\fr2a-B7.txt"
 ```
-Everything goes to one file, `fr2a-B7.txt`: the port line, the lock files and the installed extension's data files (name, length, last write time) before and after, both runs (exit line, initialize reply, standard error capped at 4 KB, raw reply, the tool's own error flag and text) and the lock files before and after. A line that starts "ERROR" is a result, not a reason to retry: a start that Windows or an antivirus product stopped appears here as an error from starting the process, and then the block rule (limit 4) applies. To run only B7 again after a mistake in setting up, paste the `. { try {` part alone, so the port choice made above is kept. After all the steps have run, search every output for the words the block rule names:
+Everything goes to one file, `fr2a-B7.txt`: the port line, the lock files and the installed extension's data files (name, length, last write time) before and after, both runs (exit line, initialize reply, standard error capped at 4 KB, raw reply, the tool's own error flag and text) and the lock files before and after. A line that starts "ERROR" is a result, not a reason to retry: a start that Windows or an antivirus product stopped appears here as an error from starting the process, and then the block rule (limit 4) applies. To run only B7 again after a mistake in setting up, paste the `. { try {` part alone, so the port choice made above is kept. Every start makes a new data folder whose name ends in the time, so the listing at the end shows the folders of every pass; read the newest one for each Terms value. After all the steps have run, search every output for the words the block rule names:
 ```powershell
-Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|policy|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied' | Where-Object { $_.Line -notmatch '^(initialize reply:|standard error:|tally_status |block: yes|prompt: |Smart App Control \(|SmartScreenEnabled \(|Status\s*:|StatusMessage\s*:)' } | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
+Select-String -Path "$hub\fr2a-B*.txt" -Pattern 'virus|malware|threat|quarantin|blocked|block[ .:]|Application Control|policy|SmartScreen|Defender|Windows Security|protected your PC|Smart App Control|0x800700E1|not allowed|access is denied' | Where-Object { $_.Line -notmatch '^(initialize reply:|standard error\||tally_status |block: yes|prompt: |Smart App Control \(|SmartScreenEnabled \(|Status\s*:|StatusMessage\s*:| {10,}\S)' } | ForEach-Object { $_.Filename + ":" + $_.LineNumber + ": " + $_.Line }
 ```
-The `Where-Object` leaves out lines that are the program's own words (`initialize reply:`, `standard error:`, and every line that starts `tally_status `), the two fixed B0 labels, the lines you added yourself (`block: yes`, `prompt: `), and the `Status` and `StatusMessage` lines of B3 and B4 (for an unsigned file Windows words that message with "execution policy"; read those two lines in the files, with the indented lines `Format-List` wraps under them, and record them; they are not a block). Any other line it prints means `block: yes` at the top of that file. Any "ERROR:" line in B7 goes to the person who queued this sheet; it is `block: yes` if it comes from starting the process, or if the exit code or the closed output stream shows the process was stopped from outside.
+The `Where-Object` leaves out lines that are the program's own words (`initialize reply:`, every line that starts `standard error|` or `tally_status `), the two fixed B0 labels, the lines you added yourself (`block: yes`, `prompt: `), and the `Status` and `StatusMessage` lines of B3 and B4 (for an unsigned file Windows words that message with "execution policy"; read those two lines in the files, and record them; the filter also skips the lines `Format-List` wraps under them, which start with ten or more spaces; none of this is a block). Any other line it prints means `block: yes` at the top of that file. The lines that follow an "ERROR:" line, up to the next ordinary line, belong to it. Any "ERROR:" line in B7 goes to the person who queued this sheet; it is `block: yes` if it comes from starting the process, or if the exit code or the closed output stream shows the process was stopped from outside.
 
 Copy what it prints into the note, as `file:line` only. Do not repeat a call to look again.
 

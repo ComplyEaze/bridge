@@ -1246,7 +1246,10 @@ fn a_server_that_answers_as_bridge_passes_the_smoke_with_each_run_set_up_as_rele
         return;
     }
     let (result, stand_in) = smoke_against(Fault::None);
-    let report = result.ok().expect("the stand-in passes the smoke");
+    let report = match result {
+        Ok(report) => report,
+        Err(failure) => panic!("the stand-in failed the smoke: {failure:?}"),
+    };
     assert_eq!(report.server_version, STAND_IN_VERSION);
     assert_eq!(report.response_ids, [json!(1), json!(2), json!(3)]);
     assert_eq!(report.statement_vouchers, json!(6));

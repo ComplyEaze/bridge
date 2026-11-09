@@ -103,8 +103,8 @@ const run = (path) => {
   return { code, text: lines.join("\n") };
 };
 
-// The .rdata section starts at file offset 0x600 and has a 0x200 byte raw area, of which the
-// first 0x104 bytes hold content.
+// The .rdata section starts at file offset 0x600 and has a 0x200 byte raw area; the patches below
+// write into its unused end.
 const RDATA_FILE_OFFSET = 0x600;
 const RDATA_RVA = 0x2000;
 
@@ -157,6 +157,30 @@ test("a file that is not understood is exit 2, never a pass", () => {
   assert.throws(() => readPeImports(new Uint8Array(10)), PeReadError);
 });
 
+test("a file whose headers end early is exit 2 (not a thrown error, not the forbidden-import code)", () => {
+  // MZ, e_lfanew 0x40, the PE signature, and nothing after: SizeOfOptionalHeader is 0.
+  const short = Buffer.alloc(88);
+  short.write("MZ", 0, "latin1");
+  short.writeUInt32LE(0x40, 0x3c);
+  short.writeUInt32LE(0x00004550, 0x40);
+  const out = run(file("short.exe", short));
+  assert.equal(out.code, 2);
+  assert.match(out.text, /was not understood/);
+  // The same with a claimed optional header that runs past the end of the file.
+  const claimed = Buffer.from(short);
+  claimed.writeUInt16LE(240, 0x40 + 20);
+  assert.equal(run(file("claimed.exe", claimed)).code, 2);
+  // And an import name whose RVA falls in the memory-only part of its section is refused.
+  const bytes = copy(NO_RUNTIME);
+  const view = new DataView(bytes.buffer);
+  const peOffset = view.getUint32(0x3c, true);
+  const directory = peOffset + 24 + 112 + 1 * 8;
+  const descriptor = view.getUint32(directory, true);
+  const at = RDATA_FILE_OFFSET + (descriptor - RDATA_RVA);
+  view.setUint32(at + 12, RDATA_RVA + 0x200, true);
+  assert.throws(() => checkStaticRuntime(bytes), PeReadError);
+});
+
 test("an import table without kernel32 is unreadable, not clean", () => {
   const bytes = copy(WITH_RUNTIME);
   const at = Buffer.from(bytes).indexOf("kernel32.dll");
@@ -184,7 +208,7 @@ test("the 0.7.0 bridge_mcp.exe import list has exactly twelve runtime names", ()
 });
 
 test("the other runtime families are refused and ordinary system DLLs are not", () => {
-  for (const name of ["VCRUNTIME140_1.dll", "MSVCP140.dll", "msvcr100.dll", "CONCRT140.dll", "VCOMP140.dll", "UCRTBASE.dll"]) {
+  for (const name of ["VCRUNTIME140_1.dll", "MSVCP140.dll", "msvcr100.dll", "CONCRT140.dll", "VCOMP140.dll", "UCRTBASE.dll", "vccorlib140.dll", "VCAMP140.dll", "mfc140u.dll", "atl110.dll"]) {
     assert.ok(FORBIDDEN_IMPORTS.some((pattern) => pattern.test(name.toLowerCase())), name);
   }
   for (const name of ["kernel32.dll", "ADVAPI32.dll", "ws2_32.dll", "api-ms-win-core-synch-l1-2-0.dll", "bcryptprimitives.dll", "ntdll.dll"]) {

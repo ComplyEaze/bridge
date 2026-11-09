@@ -172,7 +172,7 @@ function assertReleaseWorkflow(release) {
     "${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}",
     "only the Windows build of the shipped binary sets the static C runtime",
   );
-  const runtimeCheck = step(packageJob, "Prove the packed Windows binary imports no C runtime");
+  const runtimeCheck = step(packageJob, "Check the packed Windows binary imports no C runtime");
   assert.equal(runtimeCheck.if, "runner.os == 'Windows'");
   assert.equal(runtimeCheck["continue-on-error"], undefined, "the runtime check must not continue after failure");
   assert.match(runtimeCheck.run, /node scripts\/check-static-runtime\.mjs packaging\/mcpb\/stage\/bin\/x86_64-pc-windows-msvc\/bridge_mcp\.exe/);

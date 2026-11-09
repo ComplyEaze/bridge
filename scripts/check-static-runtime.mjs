@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Proves a Windows executable does not import the Microsoft C runtime (#2390): none of the
-// Visual C++ runtime, the C++ standard library, the concurrency and OpenMP runtimes, the old
-// MSVCR family, the Universal CRT forwarders or ucrtbase. A person whose PC lacks the Visual
+// Checks that a Windows executable does not import the Microsoft C runtime (#2390): none of the
+// Visual C++ runtime, the C++ standard library, the concurrency, OpenMP, C++/CLI, AMP, MFC and
+// ATL runtimes, the old MSVCR family, the Universal CRT forwarders or ucrtbase. A person whose PC lacks the Visual
 // C++ Redistributable cannot start an executable that imports them.
 //
 //   node scripts/check-static-runtime.mjs <file.exe>
@@ -23,6 +23,10 @@ export const FORBIDDEN_IMPORTS = [
   /^msvcr\d/,
   /^concrt/,
   /^vcomp/,
+  /^vccorlib/,
+  /^vcamp/,
+  /^mfc\d/,
+  /^atl\d/,
   /^api-ms-win-crt-/,
   /^ucrtbase/,
 ];
@@ -46,7 +50,7 @@ export function readPeImports(bytes) {
   const sectionCount = view.getUint16(peOffset + 6, true);
   const optionalSize = view.getUint16(peOffset + 20, true);
   const optional = peOffset + 24;
-  need(optional + optionalSize <= bytes.length, "truncated optional header");
+  need(optionalSize >= 112 && optional + optionalSize <= bytes.length, "truncated or missing optional header");
   need(view.getUint16(optional, true) === PE32_PLUS_MAGIC, "not a 64-bit PE file");
   const directoryCount = view.getUint32(optional + 108, true);
   const directories = optional + 112;
@@ -58,7 +62,6 @@ export function readPeImports(bytes) {
   for (let index = 0; index < sectionCount; index += 1) {
     const at = sectionTable + index * 40;
     sections.push({
-      virtualSize: view.getUint32(at + 8, true),
       virtualAddress: view.getUint32(at + 12, true),
       rawSize: view.getUint32(at + 16, true),
       rawOffset: view.getUint32(at + 20, true),
@@ -66,8 +69,9 @@ export function readPeImports(bytes) {
   }
   function offsetOf(rva) {
     for (const section of sections) {
-      const span = Math.max(section.virtualSize, section.rawSize);
-      if (rva >= section.virtualAddress && rva < section.virtualAddress + span) {
+      // Only bytes the file holds: a name in the part of a section that exists in memory alone has
+      // no bytes to read, and reading the next section's bytes instead would give a wrong name.
+      if (rva >= section.virtualAddress && rva < section.virtualAddress + section.rawSize) {
         const offset = section.rawOffset + (rva - section.virtualAddress);
         need(offset < bytes.length, `RVA ${rva} points past the end of the file`);
         return offset;
@@ -129,7 +133,15 @@ export function readPeImports(bytes) {
 
 // Returns { names, forbidden }. Throws PeReadError when the file is not understood.
 export function checkStaticRuntime(bytes) {
-  const { imports, delayImports } = readPeImports(bytes);
+  let parsed;
+  try {
+    parsed = readPeImports(bytes);
+  } catch (error) {
+    // A read past the end of a malformed file is "not understood", never "found".
+    if (error instanceof RangeError) throw new PeReadError(`malformed file: ${error.message}`);
+    throw error;
+  }
+  const { imports, delayImports } = parsed;
   const names = [...imports, ...delayImports.map((name) => `delay-load:${name}`)];
   need(
     imports.some((name) => name.toLowerCase() === "kernel32.dll"),

@@ -194,13 +194,13 @@ for (const [source, job, expected, digest] of [
     "          if [[ \"$RUNNER_OS\" == \"macOS\" ]]; then",
     "            node scripts/check-no-test-seam.mjs src-tauri/target/release/bundle/macos",
     "          fi",
-  ], "953695d842ac9b5ac022127f237f6a424f871de331b3726bd51d7f9db1d8177a"],
+  ], "fcbde7cfd2637fa30891f1fd53194dbaa659d019d1670c1cd4a52947a1244b1c"],
   [workflow, "workflow-consistency", ["      - run: node scripts/check-ci-workflow-consistency.mjs"], "3694871963037bbb13bd4e71faa05a4b245dee9c0296a610142234d1604aebd4"],
   [releaseWorkflow, "package", [
     "      - name: Prove the release binary lacks the test-only approval seam",
     "        shell: bash",
     "        run: node scripts/check-no-test-seam.mjs src-tauri/target/release/${{ matrix.binary }}",
-  ], "b9faa8f13b67f7a275bcccd56145b3a01551ae3ec845ab6ceabfda688044436d"],
+  ], "fe25b1b4133fa4dee5d8e08e172428fc6390671a007c47591d4322b7492e608d"],
 ]) {
   if (stepBlock(jobBlock(source, job), expected[0]) !== expected.join("\n")) {
     failures.push(`${job}: step "${expected[0].trim()}" changed shape; review it and update its pinned copy`);
@@ -558,10 +558,10 @@ const expectedChanges = [
   "          # files), LICENSE, NOTICE, THIRD_PARTY_LICENSES.txt, THIRD_PARTY_LICENSES_RUST.txt, packaging/ (the MCPB manifest",
   "          # and the PDFium lock), package.json (the Tauri CLI and its build script), this workflow, and the scripts the",
   "          # bundle job runs: fetch-pdfium, capture-package-log, check-mcpb-bundle, package-mcpb, check-license-metadata,",
-  "          # check-dependency-inventory, check-macos-bundle-resources and check-no-test-seam, with their tests. Also what",
+  "          # check-dependency-inventory, check-macos-bundle-resources, check-no-test-seam and check-static-runtime, with their tests. Also what",
   "          # pins the bundler and the build: pnpm-lock.yaml, .node-version, rust-toolchain.toml, .cargo/ and",
   "          # src-tauri/Cargo.lock, Cargo.toml and .cargo/, and the Rust port of check-mcpb-bundle in src-tauri/crates/bridge-mcpb-check/.",
-  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|pnpm-lock\\.yaml$|\\.node-version$|rust-toolchain\\.toml$|\\.cargo/|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$|Cargo\\.(lock|toml)$|\\.cargo/|crates/bridge-mcpb-check/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$)'",
+  "          packaging_paths='^(\\.github/workflows/ci\\.yml$|packaging/|package\\.json$|pnpm-lock\\.yaml$|\\.node-version$|rust-toolchain\\.toml$|\\.cargo/|src-tauri/(tauri\\.conf\\.json$|icons/|build\\.rs$|Cargo\\.(lock|toml)$|\\.cargo/|crates/bridge-mcpb-check/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES(_RUST)?\\.txt$|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs|check-static-runtime(\\.test)?\\.mjs)$)'",
   "",
   "          # A draft pull request runs no native, bundle or seam job; every other job is scoped as below. Marking it ready",
   "          # (`ready_for_review`, a trigger above) starts a new run of the same head that is scoped in full (and cancels this",
@@ -672,7 +672,7 @@ const expectedChanges = [
   "            echo 'tax_audit=false' >> \"$GITHUB_OUTPUT\"",
   "          fi",
   "",
-  "          if [[ \"$draft\" == false ]] && grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|examples/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
+  "          if [[ \"$draft\" == false ]] && grep -Eq '^(\\.github/workflows/ci\\.yml|\\.github/actions/setup-windows-native/|packaging/mcpb/|package\\.json|pnpm-lock\\.yaml|\\.node-version|vite\\.config\\.ts|tsconfig\\.json|postcss\\.config\\.js|index\\.html|src/|src-tauri/(src/|crates/|examples/|Cargo\\.lock|Cargo\\.toml|.*/Cargo\\.toml|tauri\\.conf\\.json|build\\.rs|icons/)|LICENSE$|NOTICE$|THIRD_PARTY_LICENSES\\.txt$|THIRD_PARTY_LICENSES_RUST\\.txt$|packaging/pdfium/|scripts/(fetch-pdfium(\\.test)?\\.mjs|capture-package-log(\\.test)?\\.mjs|check-mcpb-bundle(\\.test)?\\.py|package-mcpb\\.mjs|check-license-metadata\\.mjs|check-dependency-inventory\\.mjs|check-windows-bundle-resources\\.ps1|check-macos-bundle-resources(\\.mutation)?\\.mjs|check-no-test-seam(\\.test)?\\.mjs|check-static-runtime(\\.test)?\\.mjs)$|\\.cargo/|src-tauri/\\.cargo/)' <<< \"$changed_files\"; then",
   "            echo 'bundle=true' >> \"$GITHUB_OUTPUT\"",
   "          else",
   "            echo 'bundle=false' >> \"$GITHUB_OUTPUT\"",

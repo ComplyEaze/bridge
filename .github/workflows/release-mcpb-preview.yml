@@ -84,7 +84,7 @@ jobs:
       - run: corepack pnpm run license:all
       # #2390: on Windows the C runtime is linked into the executable, so the MCPB runs on a PC
       # without the Visual C++ Redistributable. Only this build sets it: the tests and the
-      # desktop app keep their flags. The import check below proves it on the file packed.
+      # desktop app keep their flags. The import check below reads the table of the file packed.
       - name: Build the host Bridge MCP binary
         env:
           RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
@@ -107,7 +107,7 @@ jobs:
           node scripts/package-mcpb.mjs
           --binary src-tauri/target/release/${{ matrix.binary }}
           --pdfium "$RUNNER_TEMP/mcpb-pdfium"
-      - name: Prove the packed Windows binary imports no C runtime
+      - name: Check the packed Windows binary imports no C runtime
         if: runner.os == 'Windows'
         shell: bash
         run: node scripts/check-static-runtime.mjs packaging/mcpb/stage/bin/x86_64-pc-windows-msvc/bridge_mcp.exe

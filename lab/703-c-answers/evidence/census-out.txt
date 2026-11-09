@@ -1,0 +1,15 @@
+answered requests 160; census posts 16
+call 1 census posts 8; call 2 census posts 8; gap 94.797 s
+call 1 answered requests 93 (all kinds)
+call 2 answered requests 67 (all kinds)
+k sent_bytes request_equal answered_1 answered_2 answer_equal
+1 1540 yes 3022 3022 yes
+2 1540 yes 3022 3022 yes
+3 1540 yes 3022 3022 yes
+4 1540 yes 3022 3022 yes
+5 1538 yes 3022 3022 yes
+6 1538 yes 3022 3022 yes
+7 1530 yes 201958 201958 yes
+8 1530 yes 201958 201958 yes
+CENSUS EQUAL: 8 of 8 answers
+exit 0

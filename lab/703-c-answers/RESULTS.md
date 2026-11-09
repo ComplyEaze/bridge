@@ -1,0 +1,31 @@
+# Row 703-C answers: two one-day `vouchers` reads 60 s apart on BRIDGE CORPUS DENSE, census compared through the relay
+
+**Outcome row 5: the premise of Shape C holds on this book for this pair, partial** (one sitting, one book, one day, two calls). `census.py` exit 0, CENSUS EQUAL 8 of 8 answers; the two calls' result rows are equal. No skip, every EXPECT met. Two deviations, both on the run lead's word and recorded below: how the relay was stopped, and a first `census.py` run that read nothing.
+
+Sheet `lab/703-c-census-sheet` at c4d7d06a, run 9 Nov 2026, 09:38Z to 09:46Z. Every number below is read from its file in this folder.
+
+| step | result |
+|---|---|
+| build: commit, run, artifact id, exe sha256 before and after | `unsigned-bundle-smoke-windows-latest` from master's CI run `<CI run id>` (push, conclusion success) on commit ae4bada23bbe34881cf466d544b16aa1b1af6469, artifact `<CI artifact id>`; artifact.zip 60075107 B, sha256 58c1c35d3640b5776d2a2ad3268fac22a71ff6311f5d1a4b430af411befcaa5b, equal to the digest GitHub lists. `mcpb-smoke.json`: archive_sha256 equal to the .mcpb, binary_sha256 equal to the exe inside, server_version 0.7.0. `bridge_mcp.exe` 35506688 B, sha256 fef0f2fe9d0fb2e398e0cf6f79a5642b8c183156dd6c78c6e57c887f3fa84481 before the first call and after the last (`evidence/exe-before.txt`, `evidence/exe-after.txt`). |
+| step 1: tools, company, M0 and V0 | `tools/list`: 32 tools, `list_companies`, `ledger_masters`, `vouchers` and `egress_log` among them. `list_companies`: exactly BRIDGE CORPUS DENSE, GUID d45bc1b0-e5e3-4261-b3b2-cce3915f42d3, `identity_state` verified_tuple, `books_from` 20250401 (`run/answers/001-lc.json`). `ledger_masters` basic: M0 328, V0 29900. EXPECT met. |
+| V-1: outcome, whole time, row count, `read_cost` if any | answered, `isError` false; written 09:41:57.893Z, read 09:42:04.977Z, 7.085 s; `result.total` 82 (EXPECT 82); no `read_cost` block in the answer; snapshot marks 328 and 29900, `reused` false; evidence bytes 6036392, duration 6909 ms. |
+| V-2: the same | answered, `isError` false; written 09:43:34.891Z, read 09:43:41.668Z, 6.776 s; `result.total` 82; no `read_cost` block; snapshot marks 328 and 29900, `reused` false; evidence bytes 6036392, duration 6672 ms. Its `request_sha256` and `response_sha256` equal V-1's. |
+| V-1 and V-2 rows: equal or not | equal: 82 rows and 82 rows, sorted, the same (`evidence/rows-compare.txt`). |
+| `census.py`: its lines and exit code | `answered requests 160; census posts 16` / `call 1 census posts 8; call 2 census posts 8; gap 94.797 s` / call 1 answered requests 93, call 2 answered requests 67 (all kinds) / posts 1 to 6 sent 1540, 1540, 1540, 1540, 1538, 1538 B, answered 3022 B each; posts 7 and 8 sent 1530 B, answered 201958 B each; every request equal and every answer equal / `CENSUS EQUAL: 8 of 8 answers`, exit 0 (`evidence/census-out.txt`). |
+| relay: no `front_send`, `bridge_cut`, `tally_closed` or `relay_error` | none. `relay.jsonl`: listening 1, open 2, close 2, forwarded 160, first_byte 160, answered 160. `arm` held 0 entries throughout. |
+| M1 and V1; close | M1 328, V1 29900, equal to M0 and V0. A ended by its stop file, exit code 0, error stream 0 bytes. C10: Company > Shut from the Gateway (current date 31-Mar-2026, unchanged), Select Company with none loaded, one `tally.exe` owning 9001, nothing on 9002, `GET /status` 200. |
+| any dialog, skip or deviation | No dialog. No skip. Deviations: (1) the relay stop, below; (2) `census.py`'s first run, below. Both accepted by the run lead as recorded. |
+
+## Deviations
+1. **The relay stop.** Rule 3 says Ctrl+C in the relay's own window. Started from this desk's shells, a process inherits Ctrl+C turned off, and `relay.py` waits in `accept()`, so a plain Ctrl+C does not reach it. A small wrapper turned Ctrl+C handling back on, started `relay.py` as its child in its own minimized window, and, when a stop file appeared, sent CTRL_C_EVENT to that window's console (the event a Ctrl+C keypress there sends) and then opened and closed one TCP connection to 9002 with no byte sent, so `accept()` returned. Nothing was killed. The relay exited with code 3221225786 (0xC000013A, the Ctrl+C exit) at 09:44:07Z. The wrapper is listed in `kept-local.txt` by sha256; its log is `evidence/relayrun-log.txt`.
+2. **`census.py`'s first run.** At 09:44:53Z the folder path reached it through a shell that stripped its backslashes; it printed `FAIL: [Errno 2] No such file or directory` for that mangled path and exited 1, having read nothing. It was run again at once from PowerShell with the sheet's path; that run's lines and exit 0 are the ones above. The relay folder was not changed between the two.
+
+## Not established here
+Other books, a book whose census runs to over a hundred requests, a census after a deletion or alteration, other releases, Gold. Whether deleting a voucher moves the mark is not answered.
+
+## Files
+- `run/answers/001-lc.json`: `list_companies`, whole, with `company_number` replaced by a JSON parser (`substitutions.txt`).
+- Kept on the lab PC, listed in `kept-local.txt` by sha256 and size: the tool list (its descriptions hold words the span gate flags), the two `ledger_masters` answers (the ledger catalogue holds the parties' names), the two `vouchers` answers and the two `egress_log` answers (party names), every relay body that is not a census request or answer, screenshots, process and port listings.
+- `relay/relay.jsonl` whole; `relay/bodies/`: the census answers only (`GUID`, `ALTERID`, `DATE`; no name). The relay keeps one file per sha256, so the 16 census posts are 6 files: 4 distinct requests and 2 distinct answers. The 4 census request files are kept on the lab PC, listed in `kept-local.txt` by sha256 and size, on the run lead's word: a span bound in them matches a figure the pre-push gate holds; their content is not the reason. `census.py`'s output shows the requests of the two calls equal by position.
+- `evidence/notes.txt` (one line per step, UTC), `evidence/census-out.txt`, `evidence/rows-compare.txt`, `evidence/exe-before.txt`, `evidence/exe-after.txt`, `evidence/relayrun-log.txt`.
+- `run/client-log.txt`, `run/launch-env.json`, `run/client.py`, the server's error stream; `scripts/pcall.py`, `scripts/step0.py`; `args/`.

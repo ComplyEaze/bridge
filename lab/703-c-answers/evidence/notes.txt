@@ -1,0 +1,31 @@
+2026-11-09T09:38:55.659Z s0 step 0: capture fb9f1af06e7527fbb3d560245cbe97656de42ff87b5f63911139f27559c1123a; a. tasklist exit 0, 1 tally.exe line(s), PID 21948; b. netstat exit 0, 9001 LISTENING PIDs ['21948'], other LISTENING lines 35; c. GET /status curl 0 "200 51"; ok True
+build: unsigned-bundle-smoke-windows-latest from master CI run <CI run id> (push, master, conclusion success), commit ae4bada23bbe34881cf466d544b16aa1b1af6469; artifact id <CI artifact id>, artifact.zip 60075107 B sha256 58c1c35d3640b5776d2a2ad3268fac22a71ff6311f5d1a4b430af411befcaa5b (equal to the GitHub digest), downloaded 2026-11-09T09:33:02Z..09:33:28Z
+mcpb-smoke.json: archive_sha256 59be0d63288ae39b49d1b1252b08919777903809b10510d9c2eb7178f05ca2a2 equal to the .mcpb; binary_sha256 fef0f2fe9d0fb2e398e0cf6f79a5642b8c183156dd6c78c6e57c887f3fa84481 equal to the exe inside; server_version 0.7.0
+exe: bin/bridge_mcp.exe 35506688 B sha256 fef0f2fe9d0fb2e398e0cf6f79a5642b8c183156dd6c78c6e57c887f3fa84481 (evidence/exe-before.txt, 2026-11-09T09:38:56Z)
+2026-11-09T09:41:23.098Z s0: DENSE loaded alone by arrow keys (Down x16, highlighted row zoom-checked) and Enter; Gateway current date Tuesday 31-Mar-2026, period 1-Apr-25 to 31-Mar-26 (shots/s0-gateway.png)
+arm created empty (0 entries); relay folder absent before start; relay started via relayrun.py in its own minimized window: wrapper pid 19840, relay pid 19276; listening line: {"event": "listening", "port": 9002, "tally_port": 9001, "utc": "2026-11-09T09:41:14Z", "at": 270119.968}
+data-a: ls: cannot access 'data-a': No such file or directory
+bridge_mcp tasklist before step 1:
+
+Image Name                     PID Session Name        Session#    Mem Usage
+========================= ======== ================ =========== ============
+bridge_mcp.exe               14208 Console                    1     12,784 K
+bridge_mcp.exe                6468 Console                    1      7,964 K
+2026-11-09T09:44:53.503Z C10 after Company > Shut:
+1
+  TCP    0.0.0.0:9001           0.0.0.0:0              LISTENING       21948
+  TCP    [::]:9001              [::]:0                 LISTENING       21948
+9002 LISTENING lines: 0
+GET /status 200 51
+bridge_mcp tasklist after step 6:
+
+Image Name                     PID Session Name        Session#    Mem Usage
+========================= ======== ================ =========== ============
+bridge_mcp.exe               14208 Console                    1     12,784 K
+bridge_mcp.exe                6468 Console                    1      7,964 K
+step 7, first attempt 09:44:53Z: census.py was given the folder path through a shell that stripped its backslashes; it printed FAIL: No such file or directory for that mangled path, exit 1, and read nothing. Re-run at once from PowerShell with the sheet's path <row folder>\relay: its lines and exit 0 are in evidence/census-out.txt. The relay folder was not changed between the two.
+step 2: V-1 total 82, isError false, no read_cost block in the answer; snapshot marks 328 and 29900, reused false; evidence bytes 6036392, duration 6909 ms.
+step 4: V-2 total 82, isError false, no read_cost block; snapshot marks 328 and 29900, reused false; evidence bytes 6036392, duration 6672 ms; request_sha256 and response_sha256 equal to V-1's. Sorted result rows: 82 and 82, equal.
+step 5: M1 328, V1 29900, equal to M0 and V0.
+step 6: A stopped by inbox\stop at 09:43:56Z, exit code 0, error stream 0 bytes. Relay stopped by relayrun.py: Ctrl+C in its own window, then a wake connect with no byte sent; relay exit code 3221225786 (the Ctrl+C exit). relay.jsonl: listening 1, open 2, close 2, forwarded 160, first_byte 160, answered 160; no front_send, bridge_cut, tally_closed or relay_error record. arm: 0 entries. exe sha256 unchanged (evidence/exe-after.txt).
+2026-11-09T10:15Z keep: the 4 census request files from relay/bodies stay on the lab PC (kept-local.txt, by sha256 and size), on the run lead's word, because a span bound in them matches a figure the pre-push gate holds, not because of their content; the 2 census answer files and relay.jsonl are committed, and census-out.txt shows the requests of the two calls equal by position.

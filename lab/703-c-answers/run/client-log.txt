@@ -1,0 +1,12 @@
+2026-11-09T09:41:30Z exe sha256 fef0f2fe9d0fb2e398e0cf6f79a5642b8c183156dd6c78c6e57c887f3fa84481 ok; launch-env.json sha256 3a5adbe0ca71ad04e5f0b723b1faf499387a0f60d5d2e6bdb18ed09835444c21; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-09T09:41:30Z launched pid 19264; stderr to server-stderr-20261109T094130Z.log
+2026-11-09T09:41:30Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-09T09:41:35Z 000-list.json tool=list written 2026-11-09T09:41:35.005Z read 2026-11-09T09:41:35.026Z secs=0.019 isError=None error=None saved_sha256=2def944da98bc2d8814a14f34e8e9471559dddacd8b75e6f4da902ca7269a45c
+2026-11-09T09:41:43Z 001-lc.json tool=list_companies written 2026-11-09T09:41:43.180Z read 2026-11-09T09:41:43.293Z secs=0.114 isError=False error=None saved_sha256=0e715c5e9192702ff05912a65219986475487b858b72a2a66d64337d3dd7eac5
+2026-11-09T09:41:45Z 002-m0.json tool=ledger_masters written 2026-11-09T09:41:44.328Z read 2026-11-09T09:41:45.118Z secs=0.789 isError=False error=None saved_sha256=5d7dbb10f3a44d63d141fe2ac2ad368eeed39ab2d624f382a0fa2b2b793cacfe
+2026-11-09T09:42:05Z 003-v1.json tool=vouchers written 2026-11-09T09:41:57.893Z read 2026-11-09T09:42:04.977Z secs=7.085 isError=False error=None saved_sha256=3933a0c13cc35a06982620ca237d3e5f1df4f8d614e963754c411483cc3f6b03
+2026-11-09T09:42:15Z 004-e1.json tool=egress_log written 2026-11-09T09:42:15.239Z read 2026-11-09T09:42:15.308Z secs=0.068 isError=False error=None saved_sha256=68347b35642146ab7087a84833d78a7ea0f178ec249b37e0d597c9ec0567cb1f
+2026-11-09T09:43:41Z 005-v2.json tool=vouchers written 2026-11-09T09:43:34.891Z read 2026-11-09T09:43:41.668Z secs=6.776 isError=False error=None saved_sha256=8ff3ab05bc0ce5fdeaa7681a3f4030d48f1d2e6b5e0d7cf6cf65038e1a7aee93
+2026-11-09T09:43:45Z 006-e2.json tool=egress_log written 2026-11-09T09:43:45.284Z read 2026-11-09T09:43:45.402Z secs=0.123 isError=False error=None saved_sha256=5129e855cb0cd0cbefe16a9afa0ad7526ada1f34f31b3d25b36c1de7f8929a3e
+2026-11-09T09:43:47Z 007-m1.json tool=ledger_masters written 2026-11-09T09:43:46.470Z read 2026-11-09T09:43:47.577Z secs=1.108 isError=False error=None saved_sha256=76ca4174c3e853b7636c615e05282b5eb30812fbfb1beff4bb9bdb29e0c93ccd
+2026-11-09T09:43:56Z session ended; server pid 19264 exit code 0

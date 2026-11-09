@@ -1,0 +1,5 @@
+Step 4, V-1 against V-2: the result rows (result.items) of each answer, each row as JSON with sorted keys, the list sorted.
+V-1 (run/answers/003-v1.json): 82 rows, sha256 of the sorted list joined by newlines e388ca703b24600219235a5edfb82c7255c88dc22dbe2e0f07103e3d62b2aa93
+V-2 (run/answers/005-v2.json): 82 rows, sha256 of the sorted list joined by newlines e388ca703b24600219235a5edfb82c7255c88dc22dbe2e0f07103e3d62b2aa93
+equal: yes
+Fields outside the rows (times, ids, read_cost) not compared, as the sheet says.

@@ -1,0 +1,7 @@
+company_number values in tool answers are replaced by a JSON parser. Other replacements in text files, with counts:
+<CI artifact id>: 1
+<CI run id>: 1
+<lab client name>: 1
+<lab root>: 2
+<row folder>: 4
+stop: 5

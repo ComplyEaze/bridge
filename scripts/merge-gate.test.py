@@ -3198,6 +3198,49 @@ class PrivacyLockfileIntegrity(unittest.TestCase):
         self.assert_blocks(record)
         self.assertEqual(masked, 1)
 
+    # The other shape a random base64 body can hold: a long digit run (RUN above is an identifier shape). Built from
+    # parts for the same reason.
+    DIGITS = "4081" + "7362" + "951"
+
+    def digit_body(self, length):
+        return "Q" * 10 + self.DIGITS + "Q" * (length - 10 - len(self.DIGITS))
+
+    def digit_line(self):
+        return "    resolution: {integrity: sha512-" + self.digit_body(86) + "==}"
+
+    def sha256_digit_line(self):
+        return "    resolution: {integrity: sha256-" + self.digit_body(43) + "=}"
+
+    def assert_a_digit_run_and_nothing_else(self, text):
+        # The fixture's own shape, measured with each pattern the scan applies, so a pass below cannot come from another
+        # shape: exactly one long digit run, no identifier, and none of the shapes whose digits the scan adds.
+        normalized = self.privacy.normalize_whitespace(text)
+        self.assertEqual(self.privacy.nonplaceholder_count(self.privacy.LONG_RUN_RE, text), 1, text)
+        self.assertEqual(self.privacy.nonplaceholder_count(self.privacy.IDENTIFIER_RE, text), 0, text)
+        for pattern in (self.privacy.PHONE_RE, self.privacy.LANDLINE_RE, self.privacy.STANDARD_LANDLINE_RE):
+            self.assertIsNone(pattern.search(normalized), (pattern.pattern, text))
+        self.assertEqual(self.privacy.grouped_numbers(text), "", text)
+
+    def test_a_long_digit_run_in_a_pnpm_integrity_value_is_masked(self):
+        for line in (self.digit_line(), self.sha256_digit_line()):
+            self.assert_a_digit_run_and_nothing_else(line)
+            self.assert_blocks(self.privacy.scan(line, HEAD))
+            record, masked = self.record("pnpm-lock.yaml", line)
+            self.assert_clean(record)
+            self.assertEqual(masked, 1, line)
+
+    def test_the_same_digit_run_outside_the_integrity_value_still_blocks(self):
+        for path, line, expected_masked in (
+            ("pnpm-lock.yaml", "    version: " + self.DIGITS, 0),
+            ("pnpm-lock.yaml", self.digit_line()[:-1] + ", tarball: " + self.DIGITS + "}", 1),
+            ("pnpm-lock.yaml", '      "integrity": "sha512-' + self.digit_body(86) + '==",', 0),
+            ("package-lock.json", '      "integrity": "sha512-' + self.digit_body(86) + '==",', 0),
+            ("sub/pnpm-lock.yaml", self.digit_line(), 0),
+        ):
+            record, masked = self.record(path, line)
+            self.assert_blocks(record)
+            self.assertEqual(masked, expected_masked, (path, line))
+
     def test_explain_masks_by_each_line_s_own_path(self):
         document = {"sources": [], "added": [
             {"path": "pnpm-lock.yaml", "line": 7, "text": self.pnpm_line()},

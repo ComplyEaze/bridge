@@ -65,7 +65,20 @@ Decision table rows that apply:
 ## Deviations and notes
 - **TallyCapital, before BK.** At the Gateway, two presses of Alt+Y were sent to open the Data menu. The first showed no change. The second opened the TallyCapital screen (lending offers, no dialog), with TallyCapital highlighted in the Gateway menu. That screen was captured and left with Ctrl+Q. Ctrl+Q opened TallyCapital's "Talk to an Advisor" form: a reason field with a list of options, a call-back question, and a mobile number field. The run paused there with no key pressed. On the run lead's word, Ctrl+Q was pressed once: no confirmation, and the Gateway returned. Nothing on the form was accepted, no option was chosen and nothing was typed. Nothing was sent from it. From then on, the Data and Company menus were opened by clicking their labels. The captures stay on the lab PC.
 - **Select Company after the restore** listed the renamed company first, as after row T1's restore; the row was loaded by its number. After the close, the list was in its usual order. This is the third sitting in which Select Company's list did not show the restored folder's own values right after a restore (rows 2433 and 2162-FY14).
-- **The data folder** held 24 files before the restore and 17 after (row 2162-FY14: 24 and 23).
+- **The data folder** held 24 files before the restore and 17 after (row 2162-FY14: 24 and 23). See "The data folder across the restore" below.
+
+## The data folder across the restore
+THE COMPANY's data folder was listed three times (the listings stay local): before the restore (13:43Z, with the renamed company loaded), right after it (13:45Z, at Select Company, before the load) and after the close (13:53Z, after the load, R.2's reads and the shut). Files are named here by file name and extension only.
+
+**Measured.**
+- After the restore, 7 of the 24 files were absent: `CmpSchMetaData.1800` (1,024 B) and six `.tsf` files, `TCMPSCHACCESS` (512 B), `TCMPSCHMESSAGE` (512 B), `TCMPSCHSTATE` (5,632 B), `TCMPSCHUPDATE` (2,560 B), `TINTMSG` (5,632 B) and `TUPDATE` (22,016 B). No file appeared that was not there before.
+- Of the 17 that stayed (14 `.1800`, 3 `.tsf`), three changed size: `Company.1800` and `CmpSave.1800` from 9,728 to 8,704 B, and `TMESSAGE.TSF` from 6,656 to 512 B. The other 14 kept their sizes.
+- After the close, 20 files: `CmpSchMetaData.1800` (1,024 B), `TCMPSCHACCESS.TSF` (512 B), `TCMPSCHSTATE.TSF` (5,632 B) and `TCMPSCHUPDATE.TSF` (2,560 B) were present again at their earlier sizes. `TCMPSCHMESSAGE.TSF`, `TINTMSG.TSF` and `TUPDATE.TSF` were still absent, and `TMESSAGE.TSF` was absent too. `Company.1800` and `CmpSave.1800` stayed at 8,704 B. No file was present that was not there before the restore.
+- After the restore, the marks answer was byte-equal to M1's and the company-list answer byte-equal to step 0's.
+
+**INFERRED, from the file names only.** `CmpSchMetaData.1800` and the `TCMPSCH*` files hold Tally's scheduled-backup state (the Gateway shows "(Schedule Backup)" beside the company), `Index.1800` (below) is an index, and the other `.tsf` files are Tally's working state and message files. Tally rebuilds them when the company is loaded. Nothing here reads their contents.
+
+**The same pattern in earlier rows,** from their local listings (those branches are not changed): row 2433's R1, 25 files to 17, the same 7 and `Index.1800`, with the folder back at 24 files before its R2; row 2433's R2, 24 to 17, the same 7; row 2162-FY14's restore, 24 to 23, `Index.1800` alone.
 - **Labels.** Each label was used once per request file. `s0b` is the marks read after BK that the sheet asks for.
 
 ## Not measured

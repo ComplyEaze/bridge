@@ -176,7 +176,8 @@ const SERVER_NAME: &str = "bridge-tally";
 const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The date (YYYY-MM-DD) of the release this build belongs to, from `release-date.txt` through
 /// `build.rs`. `scripts/next-version.mjs --apply` writes it with the version. A build made between
-/// releases carries the last release's date, so its notice comes early, never late (#2391).
+/// releases carries the last release's date, so its notice comes early; a computer clock running
+/// forward when `--apply` ran would delay it (#2391).
 const RELEASE_DATE: &str = env!("BRIDGE_RELEASE_DATE");
 /// A build whose date is more than this many days before the computer's date gets the notice.
 const BUILD_NOTICE_AFTER_DAYS: i64 = 60;

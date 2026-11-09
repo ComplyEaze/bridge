@@ -2557,7 +2557,8 @@ reads Tally, saves local proof files and writes nothing to Tally), and
 `build_import_xml` by default because it always sets
 `BRIDGE_AGENT_ENABLE_IMPORT`. A command-line installation keeps
 `build_import_xml` behind `BRIDGE_AGENT_ENABLE_IMPORT=1`, or enables it with
-Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, each
+Journal posting as described below. New file generation accepts `Journal`, `Payment`, `Receipt` and `Contra`, and
+`Sales` while posting is on, each
 with freshly observed supported TallyPrime product and licence mode before and
 after the build reads. Release and licence tier are returned as observed facts;
 they do not independently refuse a file. `tally_status` reports the observed
@@ -2597,7 +2598,8 @@ Historical batch records remain readable. None of this qualifies every host,
 licence mode, or manually imported file. An unnumbered
 Journal, Payment, Receipt or Contra is eligible for native posting, one voucher
 per approval (a voucher that carries a voucher number is refused), and a saved
-batch of 2 to 50 posts in one import after one approval of its summary. One
+batch of 2 to 50 posts in one import after one approval of its summary. A Sales
+invoice carries its number and is posted alone, one per approval. One
 posting setting covers both, in the MCPB extension and on the command line (#1090).
 
 1. Call `voucher_schema` and produce a payload matching its schema. Transaction
@@ -3126,7 +3128,7 @@ deadlocks.
 limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
 The saved batch file is now checked byte for byte against the approved record
 before posting ([#575](https://github.com/ComplyEaze/bridge/issues/575), fixed).
-**Allow voucher posting: Journal, Payment, Receipt, Contra, and Sales invoices one at a time** turns it on for
+**Allow voucher posting, one voucher or a batch of up to 50** turns it on for
 users who accept those risks. It is a new setting, so a posting choice saved
 for an earlier version does not carry over: posting starts off.
 For command-line installation, set `BRIDGE_AGENT_ENABLE_WRITES=true`.
@@ -3143,7 +3145,7 @@ verification remains available without either switch.
 to 50 vouchers in one import, after one approval of the batch's summary: every
 ledger's debit and credit totals, the money Receipts bring in and Payments take
 out, and the standing cautions (#1090). In the MCPB extension this is the
-setting **Allow voucher posting: Journal, Payment, Receipt, Contra, and Sales invoices one at a time**
+setting **Allow voucher posting, one voucher or a batch of up to 50**
 (`enable_posting_2026_10`). It is a new key, off by default, so a posting choice
 saved for an earlier version, which covered one voucher at a time, does not
 carry over. An empty value, or the key's unresolved

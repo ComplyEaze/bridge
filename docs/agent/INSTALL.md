@@ -167,7 +167,7 @@ A settings window opens with six lines. If none opens, open Settings, then Exten
 | **Tally host** | Do not change it. It says `localhost`. | "This computer". Only this computer's own address is accepted. |
 | **Tally port** | Type the number you wrote down in Step 1. | Where Tally answers. It is not a Tally licence port. Changing it here does not change Tally's own setting. |
 | **Response redaction** | Do not change it. It says `none`. | A way to limit what ComplyEaze Bridge sends to the AI provider. Choose one value. The other two are `mask_parties` (shortens party and ledger names, and the bank account details read from a ledger, to their first two and last two characters; some names are not shortened, and narrations are not changed) and `drop_narration` (leaves out narration). Any other word stops ComplyEaze Bridge from starting. Neither hides, among other things: amounts, company names, PAN, GSTIN, IFSC, MSME or Udyam registration numbers, contact details and references, or the last four digits of a bank statement's account number. [Security and privacy](../security-and-privacy.md) lists the rest. |
-| **Allow voucher posting: Journal, Payment, Receipt, Contra, and Sales invoices one at a time** | Leave it **off**. | Lets Claude make entries in Tally: one voucher, or a saved batch of up to 50, each post only after you approve it in a separate window. |
+| **Allow voucher posting, one voucher or a batch of up to 50** | Leave it **off**. | Lets Claude make entries in Tally: one voucher, or a saved batch of up to 50, each post only after you approve it in a separate window. |
 | **Allow tax-audit test runs (audit_test_run)** | Leave it **off** unless you want to try a tax-audit test. | Lets Claude run one tax-audit test (today the cash share of receipts and payments against the s.44AB(a) limit) on a company's books for a period inside FY 2025-26. It reads every voucher of the period and writes nothing to Tally; its figures go to your AI provider like any read. It is refused while **Response redaction** is anything but `none`. |
 
 Click **Save**.
@@ -223,7 +223,7 @@ Still stuck? See [Help](#help).
 
 ## If you turn posting on
 
-Posting means Claude makes an entry (a voucher) in Tally. It stays off unless you switch on **Allow voucher posting: Journal, Payment, Receipt, Contra, and Sales invoices one at a time**
+Posting means Claude makes an entry (a voucher) in Tally. It stays off unless you switch on **Allow voucher posting, one voucher or a batch of up to 50**
 in the settings. Read [The limits of posting](#the-limits-of-posting) before you do.
 
 Even with posting on, **every post needs your approval** in a separate ComplyEaze Bridge window: for one voucher it shows
@@ -277,7 +277,7 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
     ComplyEaze Bridge, and every tool answers that the Terms of Use are not accepted (the tools the assistant called
     gave that answer on one Mac with a test package and on one Windows computer with the build our checks made for this
     release; bridge#1413).
-- **What to do after updating.** Tick the Terms setting, check **Allow voucher posting: Journal, Payment, Receipt, Contra, and Sales invoices one at a time** (it is a new
+- **What to do after updating.** Tick the Terms setting, check **Allow voucher posting, one voucher or a batch of up to 50** (it is a new
   setting: if you turned posting on in an earlier version, turn it on again), then quit and reopen Claude Desktop.
 - **A release older than 0.4.2.** Installing over one was not tried: remove such a release first.
 - **Two ComplyEaze Bridge entries.** If Settings, then Extensions lists two entries (as happened when 0.4.2 was
@@ -314,7 +314,7 @@ There is no tool to undo or delete a posted voucher. A wrong entry must be corre
 Voucher file preparation and bank-statement parsing are available by default;
 they write nothing to Tally. **Voucher posting is off by default** while four
 known limits remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. ComplyEaze Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post (bridge#607). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. ComplyEaze Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, bridge#574). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. ComplyEaze Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected (bridge#623). And ComplyEaze Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet (bridge#579, bridge#582). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it.
-Turning on **Allow voucher posting: Journal, Payment, Receipt, Contra, and Sales invoices one at a time** in the
+Turning on **Allow voucher posting, one voucher or a batch of up to 50** in the
 extension settings adds posting; every new posting still requires your approval in a separate ComplyEaze Bridge
 dialog. For a batch there are two more limits: if Tally creates only some vouchers of a batch, ComplyEaze Bridge
 reports which ones it finds in the book and which it does not, and refuses to post the missing ones again, so check
@@ -322,12 +322,13 @@ each in Tally (a voucher it does not find may still be in Tally, edited: do not 
 unless you accept those risks. This is a new setting: if you turned posting on in an earlier version, turn it on
 again.
 
-With posting on, native posting accepts one Journal, Payment, Receipt,
-Contra or Sales invoice per approval, or a saved batch of 2 to 50 Journals, or of 2 to 50
+With posting on, native posting accepts one Journal, Payment, Receipt or
+Contra per approval, or a saved batch of 2 to 50 Journals, or of 2 to 50
 Payments, Receipts and Contras, after one approval of a summary (per-ledger
 totals, and a line for each voucher when there are ten or fewer and those lines
-fit), with existing ledgers and no supplied voucher number. One setting covers
-both. `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while posting is on and it is
+fit), with existing ledgers and no supplied voucher number. It also accepts one
+Sales invoice per approval, which carries its own number and is posted alone.
+One setting covers all of these. `BRIDGE_AGENT_ENABLE_BATCH_POST` is retired: while posting is on and it is
 still set, `post_import` refuses as `setting_retired`; remove it.
 Batch posting through ComplyEaze Bridge has run live on a synthetic company on licensed
 TallyPrime Silver, 200 Journals in one import with a test build whose cap was

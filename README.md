@@ -14,8 +14,10 @@ the chat. You can ask about the trial balance, outstanding receivables and
 payables with ageing, ledger movement and vouchers, the purchase and sales
 registers, the stock summary, and the Profit and Loss and Balance Sheet (a book
 with stock items is read only when Tally's own closing stock closes every gap). It checks ledger
-names before you post, and prepares Journal, Payment, Receipt, Contra and Sales
+names before you post, and prepares Journal, Payment, Receipt and Contra
 vouchers as an import file that you review and import into TallyPrime yourself.
+With posting on, it also prepares Sales invoices, and posts each one itself after
+you approve it.
 Posting is off by default in a new install, so as installed it never posts to
 TallyPrime: it reads from it and prepares files on your computer. If you turn
 posting on in the extension, it posts one voucher at a time, or a saved batch
@@ -73,7 +75,7 @@ with no figures, to a log on this computer.
 | --- | --- | --- |
 | `audit_test_run` | Off by default (setting **Allow tax-audit test runs**). One tax-audit test run on the company's own books for a date range, today only the cash share of receipts and payments against the s.44AB(a) limit: figure and finding ids with their values, confidence and clauses, and the count of any failed book check; no ledger name, no voucher, and refused while a redaction setting is on. You name the cash and bank groups; the period must lie in 2025-26. Books only, not a tax opinion | Nothing |
 | `balance_sheet` | The Balance Sheet for a date range, by primary group, from TallyPrime’s Trial Balance (a book with stock items is read only when Tally’s own closing stock closes every gap) | Nothing |
-| `build_import_xml` | Checks a Journal, Payment, Receipt, Contra or Sales batch and writes an import file | An import file and a ledger record on this computer |
+| `build_import_xml` | Checks a Journal, Payment, Receipt or Contra batch, or with posting on one Sales invoice, and writes an import file | An import file and a ledger record on this computer |
 | `cash_flow` | Tally’s own Cash Flow for whole months: the month-wise movement of the cash and bank ledgers, returned only after its net total matches the trial balance; the split into months is Tally’s own and is not checked (not a cash flow statement under AS 3) | Nothing |
 | `company_features` | Three settings the company’s record in Tally holds today (cost centres, GST and batch-wise stock; each yes, no or not reported) and the currency symbol; no ledger, voucher, amount or narration. Each of the three settings equalled Tally’s F11 screen on three synthetic books, not on this company; a setting changed inside a sitting has not been measured | Nothing |
 | `egress_log` | The receipts ComplyEaze Bridge keeps of its own tool calls, with no figures | Nothing |
@@ -400,7 +402,7 @@ exist.
 
 - **The Claude Desktop extension turns voucher posting off by default.** Four
   known limits in posting remain. Tally aims an import at a company by its name and cannot bind it to a company's GUID. Bridge's last request before the post checks that exactly one loaded company has the target's GUID and name, and that no other loaded company has the same name ignoring case and spacing; otherwise it refuses the post ([#607](https://github.com/ComplyEaze/bridge/pull/607)). A company renamed to, or loaded under, the target's name (or one differing only in case or spacing) in the moment after that check could still receive the voucher, if it has the voucher's ledgers. Bridge may flag afterwards that the loaded companies changed, but cannot always say where the voucher went, and cannot prevent it (accepted residual, [#574](https://github.com/ComplyEaze/bridge/issues/574)). A ledger renamed and replaced in that same moment means the post can land in the replacement ledger. Bridge marks the result as needing reconciliation when it sees that the ledger now resolves to a different master; a change that leaves the company's master mark unmoved, or is reverted before that check, is not seen, and a regroup in that moment is not detected ([#623](https://github.com/ComplyEaze/bridge/pull/623)). And Bridge has no tool to delete or undo a voucher it has posted, so a wrong post must be corrected by hand in Tally. It records the REMOTEID each post sends, but no delete tool exists yet ([#579](https://github.com/ComplyEaze/bridge/issues/579), [#582](https://github.com/ComplyEaze/bridge/pull/582)). And the approval window covers only ComplyEaze Bridge: another Tally connector in the same Claude Desktop that can change entries can do so without it. Turning on
-  **Allow voucher posting: Journal, Payment, Receipt, Contra, and Sales invoices one at a time** in the extension
+  **Allow voucher posting, one voucher or a batch of up to 50** in the extension
   settings adds `post_import`, which posts one saved voucher of those types, or a
   saved batch of 2 to 50 Journals, or of 2 to 50 Payments, Receipts and Contras;
   every posting still waits for your approval in a separate Bridge dialog (for a
@@ -424,9 +426,10 @@ exist.
 
 With writing on:
 
-- **Prepares vouchers as a local file** — Journal, Payment, Receipt, Contra
-  and Sales. Bridge writes the file; it does not send it. A Sales invoice is
-  posted only by approval, never by importing its file.
+- **Prepares vouchers as a local file** — Journal, Payment, Receipt and
+  Contra, and with posting on a Sales invoice. ComplyEaze Bridge writes the
+  file; it does not send it. A Sales invoice must be posted only by approval,
+  never by importing its file.
 - **Posts one saved Journal, Payment, Receipt, Contra or Sales invoice per
   approval, or a saved batch of 2 to 50 (no invoice) after one approval of its
   summary**, and only after you

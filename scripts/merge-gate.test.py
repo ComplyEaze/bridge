@@ -2187,6 +2187,17 @@ class PrivacyLocationAndCommentBlockTests(unittest.TestCase):
         crlf = message.replace("\n", "\r\n")
         self.assertEqual(self.emails(crlf), 0)
 
+    def test_dependabots_signoff_before_a_git_conflict_comment_block_is_still_the_terminal_trailer(self):
+        support = "support" + "@" + "github.com"
+        bot = "Signed-off-by: dependabot[bot] <" + support + ">"
+        message = "Merge master\n\n" + bot + "\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"
+        self.assertEqual(self.emails(message), 0)
+        self.assertTrue(self.redacted(message).endswith("\n\n# Conflicts:\n#\tdocs/a.json\n#\ttools/b.rs"), "the block is returned unchanged")
+        self.assertEqual(self.emails(message.replace("\n", "\r\n")), 0)
+        self.assertEqual(self.emails("Merge\n\n" + bot + "\n\n# Conflicts:\n# " + self.CUSTOMER), 1, "an address in the block still counts")
+        self.assertEqual(self.emails("Merge\n\n# Conflicts:\n#\ta\n\n" + bot), 0, "a terminal sign-off after the block is unchanged behaviour")
+        self.assertEqual(self.emails("Merge\n\nnote: see <" + support + ">\n\n# Conflicts:\n#\ta"), 1, "the address outside a sign-off line still counts")
+
     def test_an_address_inside_or_after_the_comment_block_is_still_counted(self):
         inside = "Merge\n\nCo-Authored-By: Claude <" + self.AGENT + ">\n\n# Conflicts:\n# " + self.CUSTOMER
         self.assertEqual(self.emails(inside), 1)

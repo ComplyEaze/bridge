@@ -93,6 +93,7 @@ fn company(rows: Vec<HsnRow>) -> CompanyHsn {
             code_length: Some("4".to_string()),
         }],
         classification_on: Some("No".to_string()),
+        gst: CompanyGst::On,
     }
 }
 
@@ -115,6 +116,7 @@ const DATE: &str = "20260807";
 fn the_company_object_answer_carries_the_company_code_and_its_settings() {
     let firm = parse_company_hsn(&utf16(COMPANY_OBJECT), LAB_GUID).unwrap();
     assert_eq!(firm.classification_on.as_deref(), Some("No"));
+    assert_eq!(firm.gst, CompanyGst::On);
     assert_eq!(
         firm.settings,
         vec![CompanyGstRow {
@@ -705,4 +707,64 @@ fn a_warning_code_is_saved_under_the_name_the_response_gives_it() {
     ] {
         assert_eq!(serde_json::to_value(code).unwrap(), code.as_str());
     }
+}
+
+const GY_BEFORE: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s2-company-object.utf16le.xml"
+);
+
+const GY_OFF: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab-gy/gy-s4-company-object.utf16le.xml"
+);
+
+/// Row 2162-GY's two company object answers (copies with the company number
+/// replaced; see `pilot-lab-gy/PROVENANCE.md`), one book before and after
+/// its GST setting was turned off: the setting reads on, then off, and the
+/// HSN/SAC settings the resolution reads are the same in both.
+#[test]
+fn row_2162_gy_reads_the_company_gst_on_before_and_off_after() {
+    let before = parse_company_hsn(&utf16(GY_BEFORE), LAB_GUID).unwrap();
+    let off = parse_company_hsn(&utf16(GY_OFF), LAB_GUID).unwrap();
+    assert_eq!(before.gst, CompanyGst::On);
+    assert_eq!(off.gst, CompanyGst::Off);
+    assert_eq!(before.classification_on.as_deref(), Some("No"));
+    assert_eq!(
+        (&off.rows, &off.settings, &off.classification_on),
+        (&before.rows, &before.settings, &before.classification_on)
+    );
+}
+
+/// The company's GST setting, on edits of the captured company object (marked
+/// as edits; the captured `ISGSTON` reads `Yes`): `No` reads as off, and an
+/// element emptied, removed or holding other text reads as not stated. A
+/// second `ISGSTON` fails the read, as any repeated field does.
+#[test]
+fn the_company_gst_setting_is_on_only_for_yes_and_off_only_for_no() {
+    let answer = utf16(COMPANY_OBJECT);
+    let element = "<ISGSTON TYPE=\"Logical\">Yes</ISGSTON>";
+    assert_eq!(answer.matches("<ISGSTON").count(), 1);
+    assert_eq!(answer.matches(element).count(), 1);
+    let read = |edited: &str| parse_company_hsn(edited, LAB_GUID).map(|firm| firm.gst);
+    assert_eq!(read(&answer), Ok(CompanyGst::On));
+    for (edit, gst) in [
+        ("<ISGSTON TYPE=\"Logical\">No</ISGSTON>", CompanyGst::Off),
+        ("<ISGSTON TYPE=\"Logical\"></ISGSTON>", CompanyGst::Unstated),
+        (
+            "<ISGSTON TYPE=\"Logical\"> </ISGSTON>",
+            CompanyGst::Unstated,
+        ),
+        ("", CompanyGst::Unstated),
+        (
+            "<ISGSTON TYPE=\"Logical\">yes</ISGSTON>",
+            CompanyGst::Unstated,
+        ),
+        (
+            "<ISGSTON TYPE=\"Logical\">True</ISGSTON>",
+            CompanyGst::Unstated,
+        ),
+    ] {
+        assert_eq!(read(&answer.replace(element, edit)), Ok(gst), "{edit}");
+    }
+    let twice = answer.replace(element, &format!("{element}{element}"));
+    assert_eq!(read(&twice), Err("invoice_read_field_repeated"));
 }

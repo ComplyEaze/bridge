@@ -83,6 +83,33 @@ pub(in crate::agent::agent_import) struct CompanyHsn {
     pub(in crate::agent::agent_import) settings: Vec<CompanyGstRow>,
     /// `ISGSTCLASSIFON`.
     pub(in crate::agent::agent_import) classification_on: Option<String>,
+    /// `ISGSTON`.
+    pub(in crate::agent::agent_import) gst: CompanyGst,
+}
+
+/// The company's own GST setting, as the company object's `ISGSTON` states
+/// it. When it was turned off on the pilot book (row 2162-GY,
+/// `lab/2162-gy-answers`, one run: partial), this element read `No` where it
+/// had read `Yes`, while the tax units, the voucher types and a stored
+/// invoice's read-back answered as before: none of those tells the build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::agent::agent_import) enum CompanyGst {
+    /// Exactly `Yes`.
+    On,
+    /// Exactly `No`.
+    Off,
+    /// Absent, empty, or any other text: no state Tally was seen to send.
+    Unstated,
+}
+
+impl CompanyGst {
+    fn from_text(text: Option<&str>) -> Self {
+        match text {
+            Some("Yes") => Self::On,
+            Some("No") => Self::Off,
+            _ => Self::Unstated,
+        }
+    }
 }
 
 /// Where a resolved code came from.
@@ -432,7 +459,7 @@ pub(in crate::agent::agent_import) fn parse_group_hsn(
 
 /// The company object (`TYPE` Object, `SUBTYPE` Company, every field): its
 /// one `COMPANY` must carry the verified company's GUID. Only the HSN/SAC
-/// rows and settings are kept; the rest of the object (the company's own
+/// rows and settings and the company's GST setting are kept; the rest of the object (the company's own
 /// contact and tax identifiers among it) is dropped with the answer.
 pub(in crate::agent::agent_import) fn parse_company_hsn(
     xml: &str,
@@ -464,6 +491,7 @@ pub(in crate::agent::agent_import) fn parse_company_hsn(
         rows: hsn_rows(company)?,
         settings,
         classification_on: company.text_of("ISGSTCLASSIFON")?,
+        gst: CompanyGst::from_text(company.text_of("ISGSTON")?.as_deref()),
     })
 }
 

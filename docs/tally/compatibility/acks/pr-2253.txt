@@ -1,0 +1,8 @@
+scripts/outstandings-copy.test.mjs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_outstandings.rs
+src-tauri/src/agent_responses.rs
+src-tauri/src/tally/runtime.rs
+src/OutstandingsScreen.tsx
+src/outstandings-copy.ts
+reviewer: lamemustafa

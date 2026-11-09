@@ -379,6 +379,58 @@ fn parent_part_requests_differ_from_the_whole_read_only_by_the_filter() {
     }
 }
 
+/// bridge#1331: a ledger part adds one `$GUID` formula and its filter
+/// reference to the otherwise unchanged master and balance requests, in the
+/// place a parent part's go: the shape of the lab sheet's `g4` and `g5`
+/// requests (three GUIDs here, five there).
+#[test]
+fn ledger_part_requests_differ_from_the_whole_read_only_by_the_guid_filter() {
+    use crate::ledger_guid_part::{LedgerGuid, LedgerGuidPart};
+    let from = TallyDate::parse("20260401").unwrap();
+    let to = TallyDate::parse("20260801").unwrap();
+    let export =
+        NativeLedgerExportPeriod::new(DateBoundaryProfile::ModeAgnostic, from.clone(), to.clone())
+            .unwrap();
+    let snapshot =
+        NativeLedgerSnapshotPeriod::new(DateBoundaryProfile::ModeAgnostic, from, to).unwrap();
+    let company = "6b43e498-430c-4d5c-bfef-d32e2ab93c85";
+    let part = LedgerGuidPart::new(
+        ["000000d8", "000000d0", "000000d5"]
+            .map(|suffix| LedgerGuid::parse(&format!("{company}-{suffix}")).unwrap()),
+    )
+    .unwrap();
+    let formula = format!(
+        r#"<SYSTEM TYPE="Formulae" NAME="BridgeInvoiceLedgers">$GUID = "{company}-000000d0" OR $GUID = "{company}-000000d5" OR $GUID = "{company}-000000d8"</SYSTEM>"#
+    );
+    let master = render_party_ledger_master_request_for_ledgers("BRIDGE PILOT LAB", &export, &part);
+    let balance =
+        render_native_ledger_snapshot_request_for_ledgers("BRIDGE PILOT LAB", &snapshot, &part);
+    for (filtered, whole) in [
+        (
+            &master,
+            render_party_ledger_master_request("BRIDGE PILOT LAB", &export),
+        ),
+        (
+            &balance,
+            render_native_ledger_snapshot_request("BRIDGE PILOT LAB", &snapshot),
+        ),
+    ] {
+        let expected = whole
+            .replacen(
+                "<TDLMESSAGE><COLLECTION ",
+                &format!("<TDLMESSAGE>{formula}<COLLECTION "),
+                1,
+            )
+            .replacen(
+                "</COMPUTE></COLLECTION>",
+                "</COMPUTE><FILTERS>BridgeInvoiceLedgers</FILTERS></COLLECTION>",
+                1,
+            );
+        assert_ne!(expected, whole);
+        assert_eq!(*filtered, expected);
+    }
+}
+
 #[test]
 fn the_reserved_root_part_carries_tallys_own_root_literal() {
     let from = TallyDate::parse("20250401").unwrap();
@@ -531,6 +583,55 @@ fn the_gst_details_parent_part_request_differs_from_the_production_part_request_
         assert_eq!(
             production.matches("<SYSTEM ").count(),
             with_details.matches("<SYSTEM ").count()
+        );
+    }
+}
+
+const MAILING_DETAILS_REQUEST: &[u8] = include_bytes!(
+    "../../tests/fixtures/agent/native-party-masters-mailing-details.request.utf16le.xml"
+);
+
+/// The party-master request that names the mailing details is the one sent live
+/// when they were first read (bridge#1490); the plain one is the same request
+/// without that element, which the registers keep sending.
+#[test]
+fn the_mailing_details_request_is_byte_for_byte_the_one_sent_live() {
+    let period = NativeLedgerExportPeriod::new(
+        DateBoundaryProfile::ModeAgnostic,
+        TallyDate::parse("20260401").unwrap(),
+        TallyDate::parse("20260831").unwrap(),
+    )
+    .expect("mode-agnostic profile accepts valid calendar dates");
+    let live = crate::text_encoding::decode_xml_bytes(MAILING_DETAILS_REQUEST).unwrap();
+    assert_eq!(
+        render_party_ledger_master_request_with_mailing_details("Bridge Lab Win 0.5.1", &period),
+        live
+    );
+    assert_eq!(
+        render_party_ledger_master_request("Bridge Lab Win 0.5.1", &period),
+        live.replacen(", LEDMAILINGDETAILS.LIST", "", 1)
+    );
+}
+
+/// A part's mailing details read is the plain part request and one element.
+#[test]
+fn a_parent_parts_mailing_details_read_is_the_plain_part_request_and_one_element() {
+    let period = gst_details_period();
+    for part in [
+        one_part(&["Sundry Debtors"]),
+        one_part(&["Sundry Debtors", "Duties & Taxes"]),
+    ] {
+        let plain = render_party_ledger_master_request_for_parents("Co", &period, &part);
+        let with_mailing = render_party_ledger_master_request_for_parents_with_mailing_details(
+            "Co", &period, &part,
+        );
+        assert_eq!(
+            plain.replacen(
+                "LEDGSTREGDETAILS.LIST</FETCH>",
+                "LEDGSTREGDETAILS.LIST, LEDMAILINGDETAILS.LIST</FETCH>",
+                1
+            ),
+            with_mailing
         );
     }
 }

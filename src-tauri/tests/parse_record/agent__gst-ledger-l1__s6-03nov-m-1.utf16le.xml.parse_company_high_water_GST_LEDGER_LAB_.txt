@@ -1,0 +1,7 @@
+# fixture: agent/gst-ledger-l1/s6-03nov-m-1.utf16le.xml
+# parser: parse_company_high_water(GST_LEDGER_LAB)
+# source: captured
+Ok(Object {
+    "altmstid": Number(225),
+    "altvchid": Number(64),
+})

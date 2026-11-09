@@ -2,7 +2,7 @@
 //! and reference here is synthetic.
 use super::*;
 use crate::agent::transfer_pairing::{
-    transfer_pairing_view, BatchStatus, Direction, PairRound, Side, SkipState,
+    transfer_pairing_view_with, BatchStatus, Direction, PairRound, Side, SkipState, TallyDays,
 };
 use std::io::Cursor;
 
@@ -195,7 +195,7 @@ impl Build {
         .unwrap();
         line.amends_batch_id = self.amends.map(batch_id);
         line.endpoint_origin = self.endpoint.map(str::to_string);
-        line.ledger_identities = self.identities.as_ref().map(|identities| {
+        line.binding = LedgerBinding::bound(self.identities.as_ref().map(|identities| {
             identities
                 .iter()
                 .map(|(name, guid)| BoundLedger {
@@ -203,7 +203,7 @@ impl Build {
                     guid: (*guid).into(),
                 })
                 .collect()
-        });
+        }));
         line.statement = self.statement.as_ref().map(statement_record);
         line.withdrawn_skips = (!self.withdrawn.is_empty()).then(|| self.withdrawn.clone());
         if self.placed {
@@ -313,6 +313,32 @@ impl Journal {
             before,
         ))
     }
+    /// A recorded rollback seen by `build`'s own verification at `mark`, after
+    /// every record so far.
+    fn restored_at(self, build: &Build, mark: u64) -> Self {
+        let before = self.0.lines().count() as u64;
+        self.push(&ledger::StatusRecord::rollback_seen(
+            &build.line(),
+            mark,
+            before,
+        ))
+    }
+    /// The post's recorded answer: one voucher created, under `STATUS` `status`.
+    fn answered(self, build: &Build, status: &str) -> Self {
+        let outcome = bridge_tally_protocol::parse_import_outcome(&format!(
+            "<ENVELOPE><HEADER><STATUS>{status}</STATUS></HEADER><BODY><DATA><IMPORTRESULT><CREATED>1</CREATED><ALTERED>0</ALTERED><DELETED>0</DELETED><LASTVCHID>11</LASTVCHID><IGNORED>0</IGNORED><ERRORS>0</ERRORS><CANCELLED>0</CANCELLED><EXCEPTIONS>0</EXCEPTIONS></IMPORTRESULT></DATA></BODY></ENVELOPE>"
+        ))
+        .unwrap();
+        self.push(&ledger::StatusRecord::response(
+            &build.line(),
+            ledger::DispatchResponse {
+                request_sha256: "c".repeat(64),
+                response_sha256: "d".repeat(64),
+                bytes: 1,
+                outcome: Some(outcome),
+            },
+        ))
+    }
     fn read(&self) -> Result<TransferFacts, TransferFactsError> {
         self.read_with("", company())
     }
@@ -414,7 +440,11 @@ fn transfer_journal() -> Journal {
 #[test]
 fn facts_from_a_journal_give_a_pair_by_reference_in_the_view() {
     let facts = transfer_journal().read().unwrap();
-    let view = transfer_pairing_view(&facts.skips, &facts.contras, &facts.coverage, 0).unwrap();
+    // every skip's own day counts as read whole, so that these tests keep asking
+    // what the statements' records say; a read of Tally is asked in the pairing tests
+    let tally = TallyDays::clean_for(&facts.skips);
+    let view = transfer_pairing_view_with(&facts.skips, &facts.contras, &facts.coverage, &tally, 0)
+        .unwrap();
     assert_eq!(
         view.skips.get(&key(B1, 1)),
         Some(&SkipState::Paired {
@@ -903,6 +933,30 @@ fn a_skip_a_restored_batch_would_retire_stays_held_by_it() {
     }
 }
 
+/// A batch is marked restored only where its post had proved a floor above the
+/// mark the rollback read: an answer that reported `STATUS=0` proves none of
+/// its vouchers landed, so a mark at the pre-POST mark covers the same post
+/// under `STATUS=1` and not under `STATUS=0` (#2035).
+#[test]
+fn a_status_zero_answer_leaves_its_batch_out_of_the_restored_marker() {
+    let posted = build(98).placed().voucher(payment(&st(6), "500.00"));
+    for (status, restored) in [("1", true), ("0", false)] {
+        let found = Journal::default()
+            .batch(&posted)
+            .sent_natively(&posted)
+            .answered(&posted, status)
+            .restored_at(&posted, 10)
+            .read()
+            .unwrap();
+        assert_eq!(
+            found.restored.contains(&batch_id(98)),
+            restored,
+            "STATUS={status}: {:?}",
+            found.restored
+        );
+    }
+}
+
 /// A skip held only because a rollback covers the batch that retired it pairs
 /// with nothing: the view a withdrawal is judged against is the one master
 /// had, so a second skip of the same day and amount still meets the other
@@ -1221,24 +1275,8 @@ fn a_contra_that_is_not_two_ledgers_either_side_is_left_out_and_counted() {
         &[(N2, "100.00", "Dr"), (N2, "100.00", "Cr")],
         "20260901",
     );
-    let zero = voucher(
-        &st(94),
-        "Contra",
-        &[(N2, "0.00", "Dr"), (N1, "0", "Cr")],
-        "20260901",
-    );
-    let negative = voucher(
-        &st(95),
-        "Contra",
-        &[(N2, "-5", "Dr"), (N1, "-5", "Cr")],
-        "20260901",
-    );
-    let unreadable = voucher(
-        &st(96),
-        "Contra",
-        &[(N2, "x", "Dr"), (N1, "x", "Cr")],
-        "20260901",
-    );
+    // A zero, signed or unreadable amount is not a line a journal can hold (#1872): the
+    // type refuses it where the journal is read (`ImportAmount::parse`).
     // two bound ledgers that are one ledger
     let same_guid = voucher(
         &st(97),
@@ -1254,8 +1292,7 @@ fn a_contra_that_is_not_two_ledgers_either_side_is_left_out_and_counted() {
         "20260901",
     );
     let all = [
-        three_legs, both_debit, unequal, one_ledger, zero, negative, unreadable, same_guid,
-        third_bank,
+        three_legs, both_debit, unequal, one_ledger, same_guid, third_bank,
     ];
     for (index, rejected) in all.iter().enumerate() {
         let txn = rejected["bridge_txn_id"].as_str().unwrap().to_string();
@@ -1283,7 +1320,7 @@ fn equal_amounts_may_differ_in_scale() {
         .voucher(voucher(
             &st(111),
             "Contra",
-            &[(N2, "100.0", "Dr"), (N1, "100.00", "Cr")],
+            &[(N2, "0100.00", "Dr"), (N1, "100.00", "Cr")],
             "20260901",
         ))
         .facts(facts(B2).contra(&st(111), None));
@@ -1308,7 +1345,9 @@ fn state_given(rest: Journal, skips_file: &str) -> SkipState {
         rest.0
     ));
     let found = journal.read_with(skips_file, company()).unwrap();
-    let view = transfer_pairing_view(&found.skips, &found.contras, &found.coverage, 0).unwrap();
+    let tally = TallyDays::clean_for(&found.skips);
+    let view = transfer_pairing_view_with(&found.skips, &found.contras, &found.coverage, &tally, 0)
+        .unwrap();
     view.skips[&key(B1, 1)].clone()
 }
 
@@ -2385,7 +2424,7 @@ fn the_binding_is_written_as_ledger_identities_3_only() {
     assert!(written.get("ledger_identities").is_none(), "{written}");
     assert!(written.get("statement").is_none(), "{written}");
     let reread: ImportLedgerLine = serde_json::from_value(written).unwrap();
-    assert_eq!(reread.ledger_identities, line.ledger_identities);
+    assert_eq!(reread.binding, line.binding);
 }
 
 #[test]
@@ -2400,10 +2439,7 @@ fn a_binding_written_under_an_earlier_name_is_still_read() {
             .unwrap();
         value[earlier] = binding;
         let reread: ImportLedgerLine = serde_json::from_value(value).unwrap();
-        assert_eq!(
-            reread.ledger_identities, line.ledger_identities,
-            "{earlier}"
-        );
+        assert_eq!(reread.binding, line.binding, "{earlier}");
     }
 }
 

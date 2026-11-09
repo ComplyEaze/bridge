@@ -1,0 +1,10 @@
+src-tauri/src/agent_audit_read.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_change_parse.rs
+src-tauri/src/agent_import.rs
+src-tauri/src/agent_read_cost_preview.rs
+src-tauri/src/agent_register.rs
+src-tauri/src/agent_register_tests.rs
+src-tauri/src/agent_voucher_window.rs
+src-tauri/src/agent_vouchers.rs
+reviewer: lamemustafa

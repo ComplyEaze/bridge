@@ -344,7 +344,7 @@ function directDependents(manifestPath, packageName, edges = ALL_EDGES) {
   // (workspace or path) dependencies -- `cargo tree`'s `{p}` format appends
   // that path for anything not resolved from a registry. A third-party
   // crate that happens to also depend on `packageName` directly (e.g.
-  // hyper-util and hyper-rustls both depend on hyper directly, same as
+  // hyper-util depends on hyper directly, same as
   // reqwest does) has no such path and is not what this gate is asking
   // about: it cares which crates *we* wrote declare the dependency, not
   // reqwest's own internal transport plumbing.
@@ -363,7 +363,7 @@ function directDependents(manifestPath, packageName, edges = ALL_EDGES) {
 // Network crates such as these sit in the lockfiles under reqwest and tokio, so the deny-list
 // below cannot refuse them; no first-party crate may depend on one directly, since each is a way
 // to open a connection that names no linted method. The list is not exhaustive.
-const LOWER_LEVEL_NETWORK = { h2: [], "hyper-util": [], socket2: [], mio: [], "tower-service": [], tower: [] };
+const LOWER_LEVEL_NETWORK = { "hyper-util": [], socket2: [], mio: [], "tower-service": [], tower: [] };
 
 //
 // `expected` is read over every edge kind; `shipped` over normal and build edges
@@ -526,12 +526,21 @@ const DENIED_CRATES = [
   "open", "opener", "webbrowser",
   "tauri-plugin-http", "tauri-plugin-opener", "tauri-plugin-shell", "tauri-plugin-websocket", "tauri-plugin-upload",
 ];
+// The Tally transport speaks plain HTTP to loopback only, so reqwest is built without its default
+// TLS, HTTP/2 and QUIC stacks (#2022). Any of these back in the lock means a feature brought them.
+// OpenSSL is not listed: SQLCipher vendors it on Windows.
+const DENIED_TRANSPORT_STACKS = [
+  "rustls", "hyper-rustls", "tokio-rustls", "aws-lc-sys", "ring", "native-tls", "hyper-tls", "h2", "h3", "quinn",
+];
 const DENIED_JS_PACKAGES = /@tauri-apps\/plugin-(?:http|opener|shell|websocket|upload)\b/;
 for (const lockfile of ["src-tauri/Cargo.lock"]) {
   const names = new Set([...readFileSync(`${root}${lockfile}`, "utf8").matchAll(/^name = "([^"]+)"$/gm)].map((match) => match[1]));
   if (names.size === 0) egressViolations.push(`${lockfile} lists no packages; it was not read`);
   for (const name of DENIED_CRATES) {
     if (names.has(name)) egressViolations.push(`${lockfile} contains ${name}, a network-capable crate outside the pinned HTTP client`);
+  }
+  for (const name of DENIED_TRANSPORT_STACKS) {
+    if (names.has(name)) egressViolations.push(`${lockfile} contains ${name}, a TLS, HTTP/2 or QUIC crate the loopback-only transport does not use`);
   }
 }
 for (const manifest of ["package.json", "pnpm-lock.yaml"]) {

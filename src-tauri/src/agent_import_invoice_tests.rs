@@ -1,5 +1,7 @@
 use super::*;
 use crate::agent::agent_import::tests::{pilot_lab_guid, sentinel_uuid};
+use crate::agent::agent_import::ImportAmount;
+use crate::agent::agent_import::VoucherAction;
 use crate::agent::agent_import::VoucherType;
 use serde_json::json;
 
@@ -21,7 +23,7 @@ const GSTIN_RJ: &str = "08ZZZZZ0000Z1ZQ";
 fn entry(ledger: &str, amount: &str, side: EntrySide) -> ImportEntry {
     ImportEntry {
         ledger: ledger.to_string(),
-        amount: amount.to_string(),
+        amount: ImportAmount::parse(amount).unwrap(),
         side,
     }
 }
@@ -109,16 +111,16 @@ fn sales_rates(cgst: &str, igst: &str) -> wire::LedgerRateRow {
     }
 }
 
-/// A tax ledger as the on-screen ledgers of the lab read: its own rate, no rounding.
-fn tax_rates(half: &str) -> wire::LedgerRateRow {
-    wire::LedgerRateRow {
-        gst_rows: Vec::new(),
-        rate_of_tax_calculation: Some(half.to_string()),
-        rounding_method: Some("Not Applicable".to_string()),
-        rounding_limit: Some("0".to_string()),
-        hsn: Ok(None),
-        supply: wire::SupplyType::NotJudged,
-    }
+/// One ledger's row of the lab's rate listing, read as the build reads it.
+fn lab_row(name: &str) -> wire::LedgerRateRow {
+    lab_rates(&[name]).remove(name).unwrap()
+}
+
+/// The invoice's two tax ledgers as the lab's own pair at `half` percent a
+/// head read: `BRIDGE CGST 2.5%` and its SGST for 2.5, the same at 9.
+fn set_tax_rates(facts: &mut BTreeMap<String, LedgerFacts>, half: &str) {
+    facts.get_mut("Output CGST").unwrap().rates = Some(lab_row(&format!("BRIDGE CGST {half}%")));
+    facts.get_mut("Output SGST").unwrap().rates = Some(lab_row(&format!("BRIDGE SGST {half}%")));
 }
 
 fn good_facts() -> BTreeMap<String, LedgerFacts> {
@@ -144,12 +146,10 @@ fn good_facts() -> BTreeMap<String, LedgerFacts> {
     let party = facts.get_mut("Customer A").unwrap();
     party.gstin = GstinEvidence::InForce(GSTIN_RJ.to_string());
     party.registration_type = Some("Regular".to_string());
-    party.bill_wise = Some(true);
+    party.bill_wise = Some(false);
     // The 18 percent of the fixture invoice: 9 and 9, IGST 18.
     facts.get_mut("Sales").unwrap().rates = Some(sales_rates("9", "18"));
-    for tax in ["Output CGST", "Output SGST"] {
-        facts.get_mut(tax).unwrap().rates = Some(tax_rates("9"));
-    }
+    set_tax_rates(&mut facts, "9");
     // The round-off ledger's empty GST row, as the lab's read.
     facts.get_mut("Round Off").unwrap().rates =
         lab_rates(&["BRIDGE Round Off"]).remove("BRIDGE Round Off");
@@ -348,22 +348,39 @@ fn expect_static(code: &str) -> &'static str {
     Box::leak(code.to_string().into_boxed_str())
 }
 
+/// Only a party that is not bill-wise admits. A bill-wise one is refused with
+/// its own code, alone, before any write: the build does not read the
+/// customer's bills, and Tally applies the invoice to one of the same name
+/// (voucher-writes reference §9.16, "A bill of the same name").
 #[test]
-fn a_party_that_is_not_bill_wise_is_admitted() {
+fn a_bill_wise_party_is_refused_and_one_that_is_not_is_admitted() {
     let mut facts = good_facts();
     facts.get_mut("Customer A").unwrap().bill_wise = Some(false);
     assert!(classify_sales_invoice(&voucher(), &facts, RAJ, AS_OF).is_ok());
+    facts.get_mut("Customer A").unwrap().bill_wise = Some(true);
+    assert_eq!(
+        classify_sales_invoice(&voucher(), &facts, RAJ, AS_OF),
+        Err(vec![InvoiceRefusal {
+            code: "invoice_party_bill_wise_not_supported",
+            detail: RefusalDetail::Ledger("Customer A".into()),
+        }])
+    );
+    // Its next step names the way out that needs no read of the customer's bills.
+    assert!(
+        crate::agent::refusal_remediation("invoice_party_bill_wise_not_supported")
+            .is_some_and(|step| step.contains("enter this invoice in Tally"))
+    );
 }
 
 #[test]
 fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     let refused = |v: &ImportVoucher| codes(classify_sales_invoice(v, &good_facts(), RAJ, AS_OF));
     let mut v = voucher();
-    v.entries[0].amount = "11801.00".to_string();
+    v.entries[0].amount = ImportAmount::parse("11801.00").unwrap();
     assert_eq!(refused(&v), vec!["invoice_party_amount_does_not_close"]);
     // One head off by a rupee: that head is named, with the figure Tally expects.
     let mut v = voucher();
-    v.entries[2].amount = "1000.00".to_string();
+    v.entries[2].amount = ImportAmount::parse("1000.00").unwrap();
     let got = classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).unwrap_err();
     assert_eq!(
         got,
@@ -374,10 +391,10 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     );
     // 9 percent a head of 10.00 is 0.90: 0.01 is no tolerance.
     let mut v = voucher();
-    v.entries[0].amount = "10.02".to_string();
-    v.entries[1].amount = "10.00".to_string();
-    v.entries[2].amount = "0.01".to_string();
-    v.entries[3].amount = "0.01".to_string();
+    v.entries[0].amount = ImportAmount::parse("10.02").unwrap();
+    v.entries[1].amount = ImportAmount::parse("10.00").unwrap();
+    v.entries[2].amount = ImportAmount::parse("0.01").unwrap();
+    v.entries[3].amount = ImportAmount::parse("0.01").unwrap();
     assert_eq!(
         refused(&v),
         vec!["invoice_tax_head_not_expected"; 2],
@@ -390,8 +407,8 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
         ("900.01", "900.01"),
     ] {
         let mut v = voucher();
-        v.entries[2].amount = cgst.to_string();
-        v.entries[3].amount = state.to_string();
+        v.entries[2].amount = ImportAmount::parse(cgst).unwrap();
+        v.entries[3].amount = ImportAmount::parse(state).unwrap();
         assert!(
             codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF))
                 .contains(&"invoice_tax_head_not_expected"),
@@ -400,17 +417,17 @@ fn arithmetic_must_close_and_each_head_must_be_the_per_line_tax() {
     }
     // 9 percent a head of 10,001.00 is 900.09, a whole paisa: both heads are the figure.
     let mut v = voucher();
-    v.entries[1].amount = "10001.00".to_string();
-    v.entries[2].amount = "900.09".to_string();
-    v.entries[3].amount = "900.09".to_string();
-    v.entries[0].amount = "11801.18".to_string();
+    v.entries[1].amount = ImportAmount::parse("10001.00").unwrap();
+    v.entries[2].amount = ImportAmount::parse("900.09").unwrap();
+    v.entries[3].amount = ImportAmount::parse("900.09").unwrap();
+    v.entries[0].amount = ImportAmount::parse("11801.18").unwrap();
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
     // The figure is worked out on the ledger's rate, not on the tax typed: the
     // ledger says 18 percent, so heads of a 5 percent invoice are refused.
     let mut v = voucher();
-    v.entries[2].amount = "250.00".to_string();
-    v.entries[3].amount = "250.00".to_string();
-    v.entries[0].amount = "10500.00".to_string();
+    v.entries[2].amount = ImportAmount::parse("250.00").unwrap();
+    v.entries[3].amount = ImportAmount::parse("250.00").unwrap();
+    v.entries[0].amount = ImportAmount::parse("10500.00").unwrap();
     assert_eq!(refused(&v), vec!["invoice_tax_head_not_expected"; 2]);
 }
 
@@ -420,10 +437,10 @@ fn a_line_whose_tax_is_not_a_whole_paisa_at_another_rate_than_two_and_a_half_per
     // lab measured the rounding of inexact figures at 2.5 percent only.
     for (line, party) in [("0.50", "0.80"), ("100.10", "100.40")] {
         let mut v = voucher();
-        v.entries[0].amount = party.to_string();
-        v.entries[1].amount = line.to_string();
-        v.entries[2].amount = "0.15".to_string();
-        v.entries[3].amount = "0.15".to_string();
+        v.entries[0].amount = ImportAmount::parse(party).unwrap();
+        v.entries[1].amount = ImportAmount::parse(line).unwrap();
+        v.entries[2].amount = ImportAmount::parse("0.15").unwrap();
+        v.entries[3].amount = ImportAmount::parse("0.15").unwrap();
         assert_eq!(
             codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
             vec!["invoice_tax_rounding_unmeasured"],
@@ -432,10 +449,10 @@ fn a_line_whose_tax_is_not_a_whole_paisa_at_another_rate_than_two_and_a_half_per
     }
     // A line whose tax is whole is admitted at that rate.
     let mut v = voucher();
-    v.entries[0].amount = "118.00".to_string();
-    v.entries[1].amount = "100.00".to_string();
-    v.entries[2].amount = "9.00".to_string();
-    v.entries[3].amount = "9.00".to_string();
+    v.entries[0].amount = ImportAmount::parse("118.00").unwrap();
+    v.entries[1].amount = ImportAmount::parse("100.00").unwrap();
+    v.entries[2].amount = ImportAmount::parse("9.00").unwrap();
+    v.entries[3].amount = ImportAmount::parse("9.00").unwrap();
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
 }
 
@@ -444,7 +461,7 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     // Customer owes 11,800.40: a credit round off of 0.40.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     assert_eq!(validate_invoice_voucher(&v), Ok(()));
     assert_eq!(
@@ -456,13 +473,13 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     // Owes 11,799.60: a debit round off of 0.40.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11799.60".to_string();
+    v.entries[0].amount = ImportAmount::parse("11799.60").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Dr));
     assert!(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF).is_ok());
     // Wrong direction does not close.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Dr));
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -471,7 +488,7 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     // A round off of a rupee or more is refused.
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11801.00".to_string();
+    v.entries[0].amount = ImportAmount::parse("11801.00").unwrap();
     v.entries.push(entry("Round Off", "1.00", EntrySide::Cr));
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -482,7 +499,7 @@ fn a_round_off_is_taken_by_side_and_bounded_under_a_rupee() {
     facts.get_mut("Round Off").unwrap().reserved_groups = vec!["Current Assets".into()];
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     assert!(codes(classify_sales_invoice(&v, &facts, RAJ, AS_OF))
         .contains(&"invoice_round_off_ledger_group"));
@@ -526,7 +543,7 @@ fn a_round_off_ledger_is_admitted_only_with_the_empty_gst_row_the_lab_read() {
         facts.get_mut("Round Off").unwrap().rates = rates;
         let mut v = voucher();
         v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-        v.entries[0].amount = "11800.40".to_string();
+        v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
         v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
         classify_sales_invoice(&v, &facts, RAJ, AS_OF).map(|roles| roles.round_off)
     };
@@ -577,7 +594,7 @@ fn round_off_with(rates: wire::LedgerRateRow) -> Result<Option<usize>, Vec<Invoi
     facts.get_mut("Round Off").unwrap().rates = Some(rates);
     let mut v = voucher();
     v.invoice.as_mut().unwrap().round_off_ledger = Some("Round Off".into());
-    v.entries[0].amount = "11800.40".to_string();
+    v.entries[0].amount = ImportAmount::parse("11800.40").unwrap();
     v.entries.push(entry("Round Off", "0.40", EntrySide::Cr));
     classify_sales_invoice(&v, &facts, RAJ, AS_OF).map(|roles| roles.round_off)
 }
@@ -690,8 +707,14 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
     let mut v = voucher();
     v.invoice.as_mut().unwrap().observed = Some(observed());
     let id = sentinel_uuid(0x1a);
-    let xml =
-        render_sales_invoice_xml(&v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
+    let xml = render_sales_invoice_xml(
+        &v,
+        id,
+        "20260310",
+        "<NARRATION>Invoice 278</NARRATION>",
+        VoucherAction::Create,
+    )
+    .unwrap();
     let expected = "<TALLYMESSAGE xmlns:UDF=\"TallyUDF\"><VOUCHER REMOTEID=\"@ID@\" VCHTYPE=\"Sales\" ACTION=\"Create\" OBJVIEW=\"Invoice Voucher View\"><DATE>20260310</DATE><EFFECTIVEDATE>20260310</EFFECTIVEDATE><REFERENCEDATE>20260310</REFERENCEDATE><REFERENCE>278</REFERENCE><VOUCHERTYPENAME>Sales</VOUCHERTYPENAME><VOUCHERNUMBER>278</VOUCHERNUMBER><PARTYLEDGERNAME>Customer A</PARTYLEDGERNAME><PARTYNAME>Customer A</PARTYNAME><BASICBASEPARTYNAME>Customer A</BASICBASEPARTYNAME><PARTYMAILINGNAME>Customer A</PARTYMAILINGNAME><BASICBUYERNAME>Customer A</BASICBUYERNAME><CONSIGNEEMAILINGNAME>Customer A</CONSIGNEEMAILINGNAME><PARTYGSTIN>@GSTIN@</PARTYGSTIN><STATENAME>Rajasthan</STATENAME><CONSIGNEESTATENAME>Rajasthan</CONSIGNEESTATENAME><PLACEOFSUPPLY>Rajasthan</PLACEOFSUPPLY><GSTREGISTRATIONTYPE>Regular</GSTREGISTRATIONTYPE><VATDEALERTYPE>Regular</VATDEALERTYPE><COUNTRYOFRESIDENCE>India</COUNTRYOFRESIDENCE><CONSIGNEECOUNTRYNAME>India</CONSIGNEECOUNTRYNAME><PERSISTEDVIEW>Invoice Voucher View</PERSISTEDVIEW><VCHENTRYMODE>Accounting Invoice</VCHENTRYMODE><ISINVOICE>Yes</ISINVOICE><NARRATION>Invoice 278</NARRATION><LEDGERENTRIES.LIST><LEDGERNAME>Customer A</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-11800.00</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-11800.00</AMOUNT></BILLALLOCATIONS.LIST></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>10000.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output CGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST><LEDGERENTRIES.LIST><LEDGERNAME>Output SGST</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>900.00</AMOUNT></LEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>";
     assert_eq!(
         xml,
@@ -714,11 +737,46 @@ fn the_rendered_sales_invoice_is_pinned_byte_for_byte() {
         .unwrap()
         .party_bill_wise = false;
     assert!(
-        !render_sales_invoice_xml(&not_bill_wise, id, "20260310", "")
+        !render_sales_invoice_xml(&not_bill_wise, id, "20260310", "", VoucherAction::Create)
             .unwrap()
             .contains("BILLALLOCATIONS")
     );
-    assert!(render_sales_invoice_xml(&voucher(), id, "20260310", "").is_none());
+    assert!(
+        render_sales_invoice_xml(&voucher(), id, "20260310", "", VoucherAction::Create).is_none()
+    );
+}
+
+/// Sign-rule site 2 (#1872). The invoice renderer writes the amount as the batch holds it, in
+/// the leg and in the bill allocation: `0012.50` stays `0012.50`, `0.01` stays `0.01`, and the
+/// longest amount stays 256 bytes. Nothing is parsed or normalised on the way.
+#[test]
+fn the_invoice_renderer_writes_each_edge_amount_as_written() {
+    for amount in ["0.01", "0012.50"]
+        .map(String::from)
+        .into_iter()
+        .chain([format!("{}.99", "9".repeat(253))])
+    {
+        let mut v = voucher();
+        v.invoice.as_mut().unwrap().observed = Some(observed());
+        v.entries[0].amount = ImportAmount::parse(&amount).unwrap();
+        v.entries[1].amount = ImportAmount::parse(&amount).unwrap();
+        let xml = render_sales_invoice_xml(
+            &v,
+            sentinel_uuid(0x1a),
+            "20260310",
+            "",
+            VoucherAction::Create,
+        )
+        .unwrap();
+        let party = format!(
+            "<ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{amount}</AMOUNT><BILLALLOCATIONS.LIST><NAME>278</NAME><BILLTYPE>New Ref</BILLTYPE><AMOUNT>-{amount}</AMOUNT>"
+        );
+        let sales = format!(
+            "<LEDGERNAME>Sales</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{amount}</AMOUNT></LEDGERENTRIES.LIST>"
+        );
+        assert_eq!(xml.matches(&party).count(), 1, "{amount}");
+        assert_eq!(xml.matches(&sales).count(), 1, "{amount}");
+    }
 }
 
 #[test]
@@ -727,7 +785,7 @@ fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
     v.entries[0].ledger = "A & B \"Co\" <x>".to_string();
     v.invoice.as_mut().unwrap().observed = Some(observed());
     let id = sentinel_uuid(0x1a);
-    let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&v, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(!xml.contains("A & B"));
     assert!(xml.contains("A &amp; B"));
     assert!(!xml.contains("<x>"));
@@ -737,12 +795,12 @@ fn names_with_markup_characters_are_escaped_in_the_rendered_xml() {
     seen.party_state = "Jammu & Kashmir".to_string();
     let mut in_jk = v.clone();
     in_jk.invoice.as_mut().unwrap().observed = Some(seen);
-    let xml = render_sales_invoice_xml(&in_jk, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&in_jk, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(!xml.contains("Jammu & Kashmir"));
     assert!(xml.contains("<CONSIGNEESTATENAME>Jammu &amp; Kashmir</CONSIGNEESTATENAME>"));
     // The type's name is also written as an attribute: a quote in it stays inside.
     v.invoice.as_mut().unwrap().voucher_type_name = "Sales \"A\"".to_string();
-    let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&v, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(
         xml.contains("VCHTYPE=\"Sales &quot;A&quot;\" ACTION="),
         "{xml}"
@@ -826,7 +884,7 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
     seen.party_bill_wise = false;
     v.invoice.as_mut().unwrap().observed = Some(seen);
     let id = sentinel_uuid(0x1a);
-    let xml = render_sales_invoice_xml(&v, id, "20260310", "").unwrap();
+    let xml = render_sales_invoice_xml(&v, id, "20260310", "", VoucherAction::Create).unwrap();
     assert!(!xml.contains("PARTYGSTIN"));
     assert!(xml.contains("<GSTREGISTRATIONTYPE>Unregistered/Consumer</GSTREGISTRATIONTYPE>"));
     // The buyer and consignee block as the keyed unregistered invoice read it:
@@ -846,8 +904,14 @@ fn an_unregistered_customer_renders_without_a_gstin_in_the_shape_the_book_keys()
 /// five HSN/SAC elements each sales line carries (`resolved_hsn_elements`).
 fn readback_xml(v: &ImportVoucher) -> String {
     let id = sentinel_uuid(0x1a);
-    let mut rendered =
-        render_sales_invoice_xml(v, id, "20260310", "<NARRATION>Invoice 278</NARRATION>").unwrap();
+    let mut rendered = render_sales_invoice_xml(
+        v,
+        id,
+        "20260310",
+        "<NARRATION>Invoice 278</NARRATION>",
+        VoucherAction::Create,
+    )
+    .unwrap();
     let sales = v
         .invoice
         .as_ref()
@@ -865,6 +929,37 @@ fn readback_xml(v: &ImportVoucher) -> String {
         // The export also gives every leg an empty allocation container.
         .replace("</ISDEEMEDPOSITIVE>", "</ISDEEMEDPOSITIVE><BILLALLOCATIONS.LIST></BILLALLOCATIONS.LIST>");
     format!("<ENVELOPE><HEADER><STATUS>1</STATUS></HEADER><DATA><COLLECTION>{voucher}</COLLECTION></DATA></ENVELOPE>")
+}
+
+/// #2062: an invoice's cancel candidate is its native request with only its
+/// `ACTION` changed.
+#[test]
+fn the_cancel_candidate_of_an_invoice_changes_only_its_action() {
+    let mut v = observed_voucher();
+    let cancel_of = |v: &ImportVoucher| {
+        crate::agent::agent_import::cancel::tests::assert_cancel_changes_only_the_action(
+            "Synthetic company",
+            &[(v, sentinel_uuid(0x1a))],
+        )
+    };
+    cancel_of(&v);
+    // A quote in the type's name stays escaped inside the attribute.
+    v.invoice.as_mut().unwrap().voucher_type_name = "Sales \"A\"".to_string();
+    assert!(cancel_of(&v).contains("VCHTYPE=\"Sales &quot;A&quot;\" ACTION=\"Cancel\""));
+}
+
+/// #2062: an invoice with nothing observed renders as nothing natively, so its
+/// cancel is refused rather than sent as a request with no voucher.
+#[test]
+fn an_invoice_with_nothing_observed_has_no_cancel_request() {
+    use crate::agent::agent_import::cancel::{
+        render_native_cancel_xml, CancelRenderRefusal, RemoteId,
+    };
+    let id = RemoteId::parse(&uuid::Uuid::new_v4().to_string()).unwrap();
+    assert_eq!(
+        render_native_cancel_xml("Synthetic company", &voucher(), id),
+        Err(CancelRenderRefusal::VoucherNotRenderable)
+    );
 }
 
 fn observed_voucher() -> ImportVoucher {
@@ -1295,17 +1390,22 @@ fn pilot_differences(expected: &ImportVoucher, bytes: &[u8], date: &str) -> Vec<
 /// customer, unregistered and not bill-wise), numbered `number`, as the build
 /// saved it with what it observed.
 fn pilot_posted(number: &str) -> ImportVoucher {
+    pilot_posted_to(number, "BRIDGE Walk-in", false)
+}
+
+/// The same invoice to `party`, bill-wise as `bill_wise` says.
+fn pilot_posted_to(number: &str, party: &str, bill_wise: bool) -> ImportVoucher {
     serde_json::from_value(serde_json::json!({
         "bridge_txn_id":"t1", "date":"20260801", "voucher_type":"Sales", "voucher_number":number,
         "invoice":{"voucher_type_name":"BRIDGE Sales","place_of_supply":"Rajasthan","round_off_ledger":"BRIDGE Round Off",
             "observed":{
                 "voucher_type_guid":format!("{}-000000ce", pilot_lab_guid()),
                 "party_state":"Rajasthan", "party_registration_type":"Unregistered/Consumer",
-                "party_bill_wise":false, "company_state":"Rajasthan",
+                "party_bill_wise":bill_wise, "company_state":"Rajasthan",
                 "sales_ledgers":["BRIDGE Svc 998313 5%","BRIDGE Svc 998314 5%"]
             }},
         "entries":[
-            {"ledger":"BRIDGE Walk-in","amount":"1051.00","side":"Dr"},
+            {"ledger":party,"amount":"1051.00","side":"Dr"},
             {"ledger":"BRIDGE Svc 998313 5%","amount":"600.40","side":"Cr"},
             {"ledger":"BRIDGE Svc 998314 5%","amount":"400.40","side":"Cr"},
             {"ledger":"BRIDGE CGST 2.5%","amount":"25.02","side":"Cr"},
@@ -1339,13 +1439,89 @@ fn the_pilot_labs_posted_invoice_reads_back_as_planned_on_its_captured_answer() 
     );
 }
 
+// ---- A bill-wise customer's invoice (3 Nov 2026, the pilot lab, #2162 item 3) ----
+//
+// Each invoice below was imported raw, as the build renders it for a bill-wise
+// party (one New Ref named by its number), and read back by the request the code
+// sends. The protocol reference's voucher-writes part records the rows (§9.16,
+// the bullet "A bill of the same name").
+
+/// `BP/26-27/0047` to `BRIDGE Walk-in BW`, which held no other bill: one New Ref
+/// named by the number, for the party amount (`lab/2162-s3a-answers`).
+const BILL_WISE_NEW: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-new.utf16le.xml"
+);
+/// `BP/26-27/0048` to `BRIDGE Walk-in BJ`, which already held an open bill of
+/// that name from a Journal: Tally stored the New Ref as an Agst Ref against it
+/// (`lab/2162-s3b-answers`, b1).
+const BILL_WISE_JOURNAL_BILL: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-journal-bill.utf16le.xml"
+);
+/// `BP/26-27/0049` to `BRIDGE Walk-in BS`, whose bill of that name a Receipt had
+/// settled: an Agst Ref of that name on the party leg (b2; that the settled bill
+/// reopened is the lab's read of the customer's bills, §9.16).
+const BILL_WISE_SETTLED_BILL: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-settled-bill.utf16le.xml"
+);
+/// `BP/26-27/0050` to `BRIDGE Walk-in BO`, whose opening bill had that name: an
+/// Agst Ref against the opening bill (b3).
+const BILL_WISE_OPENING_BILL: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-bill-wise-opening-bill.utf16le.xml"
+);
+
+/// A bill-wise customer's invoice reads back as built only when Tally stored
+/// its New Ref. Where the customer already held a bill of that name, from a
+/// Journal, a settled bill or an opening balance, Tally stored an Agst Ref
+/// against that bill instead, and the read-back names it `bill_allocation`.
+/// The difference is read after the post: by then, by the lab's read of the
+/// customer's bills (§9.16), Tally has applied the invoice to the existing
+/// bill, so it fails closed for the verdict, not for the books.
+#[test]
+fn a_bill_wise_invoice_reads_back_as_built_only_where_tally_stored_its_new_ref() {
+    assert_eq!(
+        pilot_differences(
+            &pilot_posted_to("BP/26-27/0047", "BRIDGE Walk-in BW", true),
+            BILL_WISE_NEW,
+            "20260801"
+        ),
+        Vec::<String>::new()
+    );
+    for (bytes, number, party) in [
+        (BILL_WISE_JOURNAL_BILL, "BP/26-27/0048", "BRIDGE Walk-in BJ"),
+        (BILL_WISE_SETTLED_BILL, "BP/26-27/0049", "BRIDGE Walk-in BS"),
+        (BILL_WISE_OPENING_BILL, "BP/26-27/0050", "BRIDGE Walk-in BO"),
+    ] {
+        assert_eq!(
+            pilot_differences(&pilot_posted_to(number, party, true), bytes, "20260801"),
+            vec!["bill_allocation"],
+            "{number}"
+        );
+        let wire::Readback::One(read) = wire::parse_invoice_readback(&utf16le(bytes)).unwrap()
+        else {
+            panic!("one voucher expected: {number}");
+        };
+        let allocations = read
+            .legs
+            .iter()
+            .map(|leg| (leg.ledger.as_str(), leg.allocations.clone()))
+            .filter(|(_, allocations)| !allocations.is_empty())
+            .collect::<Vec<_>>();
+        let agst_ref = (
+            Some(number.to_string()),
+            Some("Agst Ref".to_string()),
+            "-1051.00".to_string(),
+        );
+        assert_eq!(allocations, vec![(party, vec![agst_ref])]);
+    }
+}
+
 #[test]
 fn an_amount_too_large_to_add_or_multiply_is_refused_instead_of_overflowing() {
     // The three credits cannot be added: refused at the sum.
     let mut v = voucher();
     let huge = "9".repeat(36) + ".00";
     for entry in &mut v.entries {
-        entry.amount = huge.clone();
+        entry.amount = ImportAmount::parse(&huge).unwrap();
     }
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
@@ -1353,10 +1529,12 @@ fn an_amount_too_large_to_add_or_multiply_is_refused_instead_of_overflowing() {
     );
     // The sum fits and the tax's multiplication does not: refused, never wrapped.
     let mut v = voucher();
-    v.entries[1].amount = "1".to_string() + &"0".repeat(35) + ".00";
-    v.entries[2].amount = "1.00".to_string();
-    v.entries[3].amount = "1.00".to_string();
-    v.entries[0].amount = "1".to_string() + &"0".repeat(34) + "2.00";
+    v.entries[1].amount =
+        ImportAmount::parse(&("1".to_string() + &"0".repeat(35) + ".00")).unwrap();
+    v.entries[2].amount = ImportAmount::parse("1.00").unwrap();
+    v.entries[3].amount = ImportAmount::parse("1.00").unwrap();
+    v.entries[0].amount =
+        ImportAmount::parse(&("1".to_string() + &"0".repeat(34) + "2.00")).unwrap();
     assert_eq!(
         codes(classify_sales_invoice(&v, &good_facts(), RAJ, AS_OF)),
         vec!["invoice_amount_invalid"]
@@ -1416,21 +1594,6 @@ fn the_book_size_guard_admits_at_each_bound_and_refuses_one_past_it() {
     assert_eq!(
         voucher_mark_refusal(None),
         Some(refuse("invoice_book_size_unknown"))
-    );
-    assert!(mark_admits(5_000));
-    assert!(!mark_admits(5_001));
-    assert_eq!(ledger_count_refusal(Some(2_000), 9_000), None);
-    assert_eq!(
-        ledger_count_refusal(Some(2_001), 9_000),
-        Some(refuse_value("invoice_book_too_large", "2001 ledgers"))
-    );
-    // A count Tally did not give never admits, and is unknown, not large.
-    assert_eq!(
-        ledger_count_refusal(None, 9_000),
-        Some(refuse_value(
-            "invoice_book_size_unknown",
-            "master mark 9000"
-        ))
     );
 }
 
@@ -1654,13 +1817,15 @@ fn each_rate_is_admitted_on_the_ledgers_own_rate_and_no_other() {
     let at = |ledger_half: &str, ledger_igst: &str, leg: &str, total: &str| {
         let mut facts = good_facts();
         facts.get_mut("Sales").unwrap().rates = Some(sales_rates(ledger_half, ledger_igst));
-        for tax in ["Output CGST", "Output SGST"] {
-            facts.get_mut(tax).unwrap().rates = Some(tax_rates(ledger_half));
+        // A slab the lab did not measure stops at the sales ledger, before
+        // a tax ledger is read, and no captured tax ledger stands at one.
+        if matches!(ledger_half, "2.5" | "9") {
+            set_tax_rates(&mut facts, ledger_half);
         }
         let mut v = voucher();
-        v.entries[2].amount = leg.to_string();
-        v.entries[3].amount = leg.to_string();
-        v.entries[0].amount = total.to_string();
+        v.entries[2].amount = ImportAmount::parse(leg).unwrap();
+        v.entries[3].amount = ImportAmount::parse(leg).unwrap();
+        v.entries[0].amount = ImportAmount::parse(total).unwrap();
         classify_sales_invoice(&v, &facts, RAJ, AS_OF).map_err(|refusals| refusals[0].code)
     };
     for (half, igst, leg, total) in [
@@ -1764,9 +1929,7 @@ fn the_rule_admits_what_tallys_gstr_1_included_and_refuses_what_it_flagged() {
     for name in ["Sales", "Sales B"] {
         facts.get_mut(name).unwrap().rates = Some(sales_rates("2.5", "5"));
     }
-    for tax in ["Output CGST", "Output SGST"] {
-        facts.get_mut(tax).unwrap().rates = Some(tax_rates("2.5"));
-    }
+    set_tax_rates(&mut facts, "2.5");
     let cents = |text: &str| -> i128 {
         let negative = text.starts_with('-');
         let (whole, fraction) = text.trim_start_matches('-').split_once('.').unwrap();
@@ -2020,11 +2183,11 @@ fn several_sales_legs_share_one_pair_of_tax_heads() {
         vec!["invoice_tax_head_not_expected"; 2]
     );
     // 9 percent of 3,999.00 is 359.91 and of 6,000.00 is 540.00: 899.91 a head.
-    short.entries[3].amount = "899.91".into();
-    short.entries[4].amount = "899.91".into();
-    short.entries[0].amount = "11798.82".into();
+    short.entries[3].amount = ImportAmount::parse("899.91").unwrap();
+    short.entries[4].amount = ImportAmount::parse("899.91").unwrap();
+    short.entries[0].amount = ImportAmount::parse("11798.82").unwrap();
     assert!(classify_sales_invoice(&short, &facts(), RAJ, AS_OF).is_ok());
-    short.entries[0].amount = "11800.00".into();
+    short.entries[0].amount = ImportAmount::parse("11800.00").unwrap();
     assert_eq!(
         codes(classify_sales_invoice(&short, &facts(), RAJ, AS_OF)),
         vec!["invoice_party_amount_does_not_close"]
@@ -2123,9 +2286,14 @@ fn each_doubt_about_a_sales_ledgers_rate_has_its_own_code() {
         with(&|r| r.gst_rows[0].applicable_from = None),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
-    // The date it starts is digits: text that sorts before them is no date.
+    // The date it starts is a calendar day: text that sorts before one is no date.
     assert_eq!(
         with(&|r| r.gst_rows[0].applicable_from = Some("!!!!!!!!".into())),
+        Err("invoice_sales_ledger_rate_not_in_force")
+    );
+    // Eight digits that name no calendar day are no date either (#2009).
+    assert_eq!(
+        with(&|r| r.gst_rows[0].applicable_from = Some("20251340".into())),
         Err("invoice_sales_ledger_rate_not_in_force")
     );
     // A row that starts on the invoice date is in force on it.
@@ -2271,24 +2439,45 @@ fn only_the_measured_rates_are_admitted_and_each_other_slab_is_refused_as_unmeas
     );
 }
 
+/// The lab's four tax ledgers stand at their own rate and at no other, and the
+/// imported one reads rate 0 and no rounding method (the `pilot-lab` rate
+/// listing): their dated GST row, or their empty one, carries no rate.
+#[test]
+fn the_labs_tax_ledgers_are_admitted_at_their_own_rate_and_refused_at_another() {
+    let check = |name: &str, half_milli| tax_ledger_refusal(&lab_row(name), half_milli);
+    for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
+        assert_eq!(check(name, 2_500), None, "{name}");
+        assert_eq!(
+            check(name, 9_000),
+            Some("invoice_tax_ledger_rate_mismatch"),
+            "{name}"
+        );
+    }
+    for name in ["BRIDGE CGST 9%", "BRIDGE SGST 9%"] {
+        assert_eq!(check(name, 9_000), None, "{name}");
+        assert_eq!(
+            check(name, 2_500),
+            Some("invoice_tax_ledger_rate_mismatch"),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        check("BRIDGE Output CGST XML", 2_500),
+        Some("invoice_tax_ledger_rate_mismatch")
+    );
+}
+
+/// Each changed on a captured row, since no captured tax ledger at its rate
+/// reads these: no own rate at all, and any rounding but the lab's.
 #[test]
 fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
     let check = |change: &dyn Fn(&mut wire::LedgerRateRow)| {
-        let mut row = tax_rates("2.50");
+        let mut row = lab_row("BRIDGE CGST 2.5%");
         change(&mut row);
         tax_ledger_refusal(&row, 2_500)
     };
-    assert_eq!(check(&|_| {}), None);
-    assert_eq!(
-        check(&|r| r.rate_of_tax_calculation = Some("0".into())),
-        Some("invoice_tax_ledger_rate_mismatch")
-    );
     assert_eq!(
         check(&|r| r.rate_of_tax_calculation = None),
-        Some("invoice_tax_ledger_rate_mismatch")
-    );
-    assert_eq!(
-        check(&|r| r.rate_of_tax_calculation = Some("9".into())),
         Some("invoice_tax_ledger_rate_mismatch")
     );
     assert_eq!(
@@ -2307,6 +2496,45 @@ fn a_tax_ledger_must_carry_the_rate_and_no_rounding() {
         check(&|r| r.rounding_limit = None),
         Some("invoice_tax_ledger_rounding_unsupported")
     );
+}
+
+/// Where a ledger's first GST row stands in the lab's listing.
+fn lab_gst_row_span(answer: &str, name: &str) -> std::ops::Range<usize> {
+    const CLOSE: &str = "</GSTDETAILS.LIST>";
+    let ledger = answer.find(&format!("NAME=\"{name}\"")).unwrap();
+    let start = answer[ledger..].find("<GSTDETAILS.LIST>").unwrap() + ledger;
+    start..answer[start..].find(CLOSE).unwrap() + start + CLOSE.len()
+}
+
+/// No captured tax ledger has a GST row that carries a rate, so a tax ledger
+/// that has one is refused, its own rate and rounding being right: here the
+/// row is the one a sales ledger of the lab carries, rates and all. So is a
+/// row with something the lab's rows did not hold, here a slab-rate entry,
+/// which may be a rate read another way.
+#[test]
+fn a_tax_ledger_whose_gst_row_carries_a_rate_is_refused() {
+    let answer = lab_rates_answer();
+    let sales_row = &answer[lab_gst_row_span(&answer, "BRIDGE Svc 998313 5%")];
+    assert!(sales_row.contains("<GSTRATE"));
+    let slab_row = answer[lab_gst_row_span(&answer, "BRIDGE CGST 2.5%")].replace(
+        "<GSTSLABRATES.LIST>       </GSTSLABRATES.LIST>",
+        "<GSTSLABRATES.LIST><FROMVALUE>1</FROMVALUE></GSTSLABRATES.LIST>",
+    );
+    assert!(slab_row.contains("FROMVALUE"));
+    for name in ["BRIDGE CGST 2.5%", "BRIDGE SGST 2.5%"] {
+        for row in [sales_row, slab_row.as_str()] {
+            let mut edited = answer.clone();
+            edited.replace_range(lab_gst_row_span(&answer, name), row);
+            let rates =
+                wire::parse_ledger_rates(&edited, "6b43e498-430c-4d5c-bfef-d32e2ab93c85", &[name])
+                    .unwrap();
+            assert_eq!(
+                tax_ledger_refusal(&rates[name], 2_500),
+                Some("invoice_tax_ledger_gst_rate_unmeasured"),
+                "{name}"
+            );
+        }
+    }
 }
 
 /// The refusals of an invoice's tax that come from its ledgers, through the
@@ -2364,12 +2592,32 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
     );
     // A tax ledger that was returned with another rate.
     assert_eq!(
-        refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(tax_rates("2.5"))),
+        refused(&|f| f.get_mut("Output CGST").unwrap().rates = Some(lab_row("BRIDGE CGST 2.5%"))),
         vec![refuse_ledger(
             "invoice_tax_ledger_rate_mismatch",
             "Output CGST"
         )]
     );
+    // The lab's own 5 percent sales ledger with its 9 percent pair: both are
+    // named. Its 2.5 percent pair, the same invoice, is admitted.
+    let lab_five_percent = |half: &str| {
+        let mut facts = good_facts();
+        facts.get_mut("Sales").unwrap().rates = Some(lab_row("BRIDGE Svc 998313 5%"));
+        set_tax_rates(&mut facts, half);
+        let mut v = voucher();
+        v.entries[2].amount = ImportAmount::parse("250.00").unwrap();
+        v.entries[3].amount = ImportAmount::parse("250.00").unwrap();
+        v.entries[0].amount = ImportAmount::parse("10500.00").unwrap();
+        classify_sales_invoice(&v, &facts, RAJ, AS_OF_AUG)
+    };
+    assert_eq!(
+        lab_five_percent("9").unwrap_err(),
+        vec![
+            refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output CGST"),
+            refuse_ledger("invoice_tax_ledger_rate_mismatch", "Output SGST"),
+        ]
+    );
+    assert!(lab_five_percent("2.5").is_ok());
     // Two sales ledgers at two rates: one tax pair cannot carry both.
     let mut two = voucher();
     two.entries.truncate(1);
@@ -2394,11 +2642,11 @@ fn the_tax_check_refuses_on_the_ledgers_doubts_and_names_them() {
 
 // ---- Tally's GSTR-1 status of a posted invoice (10 Oct 2026, the pilot lab) ----
 
-/// The lab's read-back of `BP/26-27/0010` with the four status fields, the
-/// request the code renders: Tally lists it as included, not accepted as it
-/// stands.
+/// The lab's read-back of `BP/26-27/0010` with the four status fields and
+/// `ISPOSTDATED`, the request the code renders (3 Nov 2026): Tally lists it as
+/// included, not accepted as it stands, not post-dated.
 const STATUS_INCLUDED: &[u8] = include_bytes!(
-    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status.utf16le.xml"
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-no.utf16le.xml"
 );
 /// The same request for `BP/26-27/0021` after its sales ledger's HSN/SAC was
 /// set, the voucher untouched: uncertain.
@@ -2410,6 +2658,11 @@ const STATUS_UNCERTAIN: &[u8] = include_bytes!(
 const STATUS_RESAVED: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-status-resaved.utf16le.xml"
 );
+/// The lab's read-back of `BP/26-27/0045`, keyed post-dated, by the same request
+/// (3 Nov 2026): its three flags read included.
+const STATUS_POST_DATED: &[u8] = include_bytes!(
+    "../crates/bridge-tally-protocol/tests/fixtures/agent/pilot-lab/pilot-lab-invoice-readback-post-dated-yes.utf16le.xml"
+);
 /// The read-back of `BP/26-27/0010` the invoice round took (9 Oct 2026), whose
 /// request asked for no status field.
 const STATUS_NOT_ASKED: &[u8] = include_bytes!(
@@ -2420,16 +2673,28 @@ const STATUS_NOT_ASKED: &[u8] = include_bytes!(
 const STATUS_THREE: &[u8] = include_bytes!(
     "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-three-vouchers.utf16le.xml"
 );
-/// The GST status read's narrow window: seven invoices and four Receipts.
-const STATUS_WINDOW: &[u8] = include_bytes!(
-    "../crates/bridge-tally-protocol/tests/fixtures/agent/gst-status/pilot-lab-gst-status-window.utf16le.xml"
-);
-const STATUS_TAGS: [&str; 4] = [
+const STATUS_TAGS: [&str; 5] = [
     "VCHGSTSTATUSISINCLUDED",
     "VCHGSTSTATUSISUNCERTAIN",
     "VCHGSTSTATUSISEXCLUDED",
     "ISGSTOVERRIDDEN",
+    "ISPOSTDATED",
 ];
+
+/// DERIVED, not Tally's bytes: a read-back from before the request named
+/// `ISPOSTDATED`, with Tally's `No` for it added once to each voucher (counted),
+/// where the 3 Nov answers carry it: straight after `VCHGSTSTATUSISEXCLUDED`,
+/// with nothing else changed.
+fn with_post_dated_no(bytes: &[u8]) -> String {
+    let xml = utf16le(bytes);
+    assert!(!xml.contains("<ISPOSTDATED"));
+    let close = "</VCHGSTSTATUSISEXCLUDED>";
+    assert_eq!(xml.matches(close).count(), xml.matches("<VOUCHER ").count());
+    xml.replace(
+        close,
+        &format!("{close}\r\n     <ISPOSTDATED TYPE=\"Logical\">No</ISPOSTDATED>"),
+    )
+}
 
 fn utf16le(bytes: &[u8]) -> String {
     assert_eq!(bytes.len() % 2, 0, "UTF-16LE is whole code units");
@@ -2516,13 +2781,21 @@ fn status_codes_by_number(xml: &str) -> Vec<(String, Vec<&'static str>)> {
 #[test]
 fn each_gstr_1_status_the_lab_answered_reads_as_its_own_code() {
     assert_eq!(status_codes(&utf16le(STATUS_INCLUDED)), Vec::<&str>::new());
+    // A post-dated invoice reads included on its three flags and is not clean.
     assert_eq!(
-        status_codes(&utf16le(STATUS_UNCERTAIN)),
+        status_codes(&utf16le(STATUS_POST_DATED)),
+        ["gst_status_post_dated"]
+    );
+    assert_eq!(
+        status_codes(&with_post_dated_no(STATUS_UNCERTAIN)),
         ["gst_status_uncertain"]
     );
     // The ledger's HSN/SAC alone left it uncertain; saving the voucher again
     // (AlterID 34 to 35) made it included.
-    assert_eq!(status_codes(&utf16le(STATUS_RESAVED)), Vec::<&str>::new());
+    assert_eq!(
+        status_codes(&with_post_dated_no(STATUS_RESAVED)),
+        Vec::<&str>::new()
+    );
     let number_and_alter_id = |bytes: &[u8]| match wire::parse_invoice_readback(&utf16le(bytes)) {
         Ok(wire::Readback::One(read)) => (
             read.fields["VOUCHERNUMBER"].clone(),
@@ -2539,35 +2812,16 @@ fn each_gstr_1_status_the_lab_answered_reads_as_its_own_code() {
         ("BP/26-27/0021".to_string(), "35".to_string())
     );
     assert_eq!(
-        status_codes_by_number(&utf16le(STATUS_THREE)),
+        status_codes_by_number(&with_post_dated_no(STATUS_THREE)),
         [
             ("BP/26-27/0002".to_string(), vec!["gst_status_uncertain"]),
             ("BP/26-27/0010".to_string(), vec![]),
             ("BP/26-27/0016".to_string(), vec!["gst_status_overridden"]),
         ]
     );
-    let window = status_codes_by_number(&utf16le(STATUS_WINDOW));
-    let receipts =
-        ["1", "2", "3", "4"].map(|number| (number.to_string(), vec!["gst_status_not_in_return"]));
-    assert_eq!(window[7..], receipts);
-    assert_eq!(
-        window[..7]
-            .iter()
-            .map(|(number, codes)| (number.as_str(), codes.clone()))
-            .collect::<Vec<_>>(),
-        [
-            ("BP/26-27/0012", vec![]),
-            ("BP/26-27/0013", vec![]),
-            ("BP/26-27/0014", vec![]),
-            ("BP/26-27/0015", vec![]),
-            ("BP/26-27/0016", vec!["gst_status_overridden"]),
-            ("Z1/0001", vec![]),
-            ("BP/26-27/0019", vec![]),
-        ]
-    );
     // The same codes reach the invoice's differences after its own fields.
     let v = observed_voucher();
-    let uncertain = utf16le(STATUS_UNCERTAIN);
+    let uncertain = with_post_dated_no(STATUS_UNCERTAIN);
     let mut flagged = readback_xml(&v);
     for tag in STATUS_TAGS {
         flagged = flagged.replacen(
@@ -2596,6 +2850,10 @@ fn status_fields_that_did_not_come_back_are_one_difference_never_a_pass() {
         ["gst_status_not_reported"]
     );
     assert_eq!(
+        status_codes(&without(&included, "ISPOSTDATED")),
+        ["gst_status_not_reported"]
+    );
+    assert_eq!(
         status_codes(&without(&included, "VCHGSTSTATUSISUNCERTAIN")),
         ["gst_status_unreadable"]
     );
@@ -2614,8 +2872,9 @@ fn status_fields_that_did_not_come_back_are_one_difference_never_a_pass() {
 }
 
 /// DERIVED, not Tally's bytes: the states no capture shows, each from a
-/// captured answer edited in one place (the flag's text, counted): excluded (never observed), uncertain and accepted
-/// together, two flags Yes, and a value that is neither Yes nor No.
+/// captured answer edited in one place (the flag's text, counted): excluded (never observed), not in the
+/// return, post-dated alongside a cancel, uncertain and accepted together, two flags Yes, and a value that
+/// is neither Yes nor No.
 #[test]
 fn a_state_no_capture_shows_is_read_from_a_captured_answer_edited_in_one_place() {
     let included = utf16le(STATUS_INCLUDED);
@@ -2626,8 +2885,20 @@ fn a_state_no_capture_shows_is_read_from_a_captured_answer_edited_in_one_place()
     );
     assert_eq!(status_codes(&excluded), ["gst_status_excluded"]);
     assert_eq!(
+        status_codes(&with_flag(&included, "VCHGSTSTATUSISINCLUDED", "No")),
+        ["gst_status_not_in_return"]
+    );
+    assert_eq!(
         status_codes(&with_flag(
-            &utf16le(STATUS_UNCERTAIN),
+            &utf16le(STATUS_POST_DATED),
+            "ISCANCELLED",
+            "Yes"
+        )),
+        ["gst_status_unreadable"]
+    );
+    assert_eq!(
+        status_codes(&with_flag(
+            &with_post_dated_no(STATUS_UNCERTAIN),
             "ISGSTOVERRIDDEN",
             "Yes"
         )),
@@ -2819,7 +3090,7 @@ fn read_leg(xml: &str, ledger: &str) -> wire::ReadLeg {
 /// line: `BRIDGE Svc 998315 5%`, with no code.
 #[test]
 fn a_sales_line_tally_filled_no_hsn_for_is_divergent_and_named() {
-    let uncertain = utf16le(STATUS_UNCERTAIN);
+    let uncertain = with_post_dated_no(STATUS_UNCERTAIN);
     let (differences, lines) = hsn_outcome(&pilot_0021(), &uncertain);
     assert_eq!(
         differences,
@@ -2858,7 +3129,7 @@ fn a_sales_line_tally_filled_no_hsn_for_is_divergent_and_named() {
 /// are not judged.
 #[test]
 fn every_sales_line_with_a_code_and_a_source_is_clean_and_shown() {
-    let (differences, lines) = hsn_outcome(&pilot_0021(), &utf16le(STATUS_RESAVED));
+    let (differences, lines) = hsn_outcome(&pilot_0021(), &with_post_dated_no(STATUS_RESAVED));
     assert_eq!(differences, ["REFERENCE", "REFERENCEDATE"]);
     assert_eq!(
         lines,
@@ -2890,7 +3161,7 @@ fn every_sales_line_with_a_code_and_a_source_is_clean_and_shown() {
 /// value). Only a code and a source together are clean.
 #[test]
 fn a_sales_line_missing_its_code_or_its_source_is_unresolved() {
-    let resaved = utf16le(STATUS_RESAVED);
+    let resaved = with_post_dated_no(STATUS_RESAVED);
     let unresolved = |xml: &str| {
         let (differences, lines) = hsn_outcome(&pilot_0021(), xml);
         assert_eq!(lines[2]["hsn_resolved"], false, "{lines:?}");

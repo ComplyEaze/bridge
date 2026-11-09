@@ -1,0 +1,11 @@
+docs/tally/TALLY_PROTOCOL_REFERENCE_ENVIRONMENT_AND_REQUESTS.md
+src-tauri/crates/bridge-tally-protocol/src/lib.rs
+src-tauri/src/agent.rs
+src-tauri/src/agent_catalog.rs
+src-tauri/src/agent_gst_by_ledger.rs
+src-tauri/src/agent_ledgers.rs
+src-tauri/src/agent_masters.rs
+src-tauri/src/agent_movement_math.rs
+src-tauri/src/agent_stock_summary.rs
+src-tauri/src/agent_trial_balance.rs
+reviewer: lamemustafa

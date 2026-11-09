@@ -33,6 +33,27 @@ pub(in crate::agent) enum CostCentreProblem {
 }
 
 impl CostCentreProblem {
+    pub(in crate::agent) const ALL: [Self; 11] = [
+        Self::NameMissing,
+        Self::AmountMissing,
+        Self::AmountUnparsable,
+        Self::CentreDuplicate,
+        Self::CategoryMissing,
+        Self::CentresMissing,
+        Self::FieldDuplicated,
+        Self::TextUndecodable,
+        Self::CategoryEmpty,
+        Self::CategoryRepeated,
+        Self::ShapeUnrecognised,
+    ];
+
+    /// The problem an entry's `cost_centre_allocations_unreadable` names, by its wire value.
+    pub(in crate::agent) fn from_reason(text: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|problem| problem.reason() == text)
+    }
+
     pub(in crate::agent) const fn reason(self) -> &'static str {
         match self {
             Self::NameMissing => "cost_centre_name_missing",

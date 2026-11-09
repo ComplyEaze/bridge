@@ -181,12 +181,18 @@ fn an_added_or_missing_word_or_a_plural_does_not_collide() {
 }
 
 #[test]
-fn an_underscore_does_not_collide_with_a_space_or_a_hyphen() {
-    // §9.4d: an underscore was sent and rejected, and no fold treats it as a
-    // separator.
-    assert_eq!(hits(&single("Alpha Traders"), "Alpha_Traders"), 0);
-    assert_eq!(hits(&single("Alpha_Traders"), "Alpha Traders"), 0);
-    assert_eq!(hits(&single("Alpha-Traders"), "Alpha_Traders"), 0);
+fn an_underscore_collides_with_a_space_or_a_hyphen_conservatively() {
+    // §9.4d: Tally rejected an underscore where the master has a space on the
+    // voucher path, and the folds keep them apart; the letters-and-digits key
+    // does not, so the index refuses. A false refusal is the safe direction.
+    let underscore = "Alpha_Traders";
+    assert_ne!(
+        crate::master_binding::canonical_master_key(underscore),
+        crate::master_binding::canonical_master_key("Alpha Traders")
+    );
+    assert_eq!(hits(&single("Alpha Traders"), underscore), 1);
+    assert_eq!(hits(&single(underscore), "Alpha Traders"), 1);
+    assert_eq!(hits(&single("Alpha-Traders"), underscore), 1);
 }
 
 #[test]
@@ -514,4 +520,48 @@ fn neither_the_canonical_key_nor_the_absence_key_subsumes_the_other() {
         assert_eq!(absence_key(a), absence_key(b), "{a:?}");
         assert_eq!(hits(&single(a), b), 1, "{a:?}");
     }
+}
+
+/// Tally folds a removed space and removed full stops when it resolves a
+/// Create, so the index refuses on them; any other symbol (here brackets and
+/// an underscore) is unmeasured and refused conservatively: a false "present"
+/// is the safe answer. A changed letter or digit is still a
+/// different name.
+#[test]
+fn a_name_differing_only_by_spaces_or_symbols_collides() {
+    let index = single("Alpha Traders Pvt. Ltd.");
+    for candidate in [
+        "Alpha Traders Pvt Ltd",
+        "AlphaTraders Pvt. Ltd.",
+        "ALPHA_TRADERS (PVT) LTD",
+    ] {
+        assert_eq!(hits(&index, candidate), 1, "{candidate}");
+    }
+    for candidate in ["Alpha Trader Pvt Ltd", "Alpha Traders Pvt Ltd 2"] {
+        assert_eq!(hits(&index, candidate), 0, "{candidate}");
+    }
+}
+
+/// A letter that lower-casing leaves alone but upper-casing maps still meets
+/// its ASCII spelling, so an existing name holding one is not missed.
+#[test]
+fn a_dotless_i_or_long_s_meets_its_ascii_spelling() {
+    assert_eq!(hits(&single("K\u{131}ran Traders"), "KIRAN TRADERS"), 1);
+    assert_eq!(hits(&single("A\u{17f}hok"), "Ashok"), 1);
+}
+
+/// A stored name holding Tally's illegal character reference (`&#4;`, read
+/// as U+FFFD `#4;`) meets its plain spelling: the reference is dropped whole,
+/// digit and all. A U+FFFD that opens no whole marker is only a symbol, and
+/// the digits of a name stay.
+#[test]
+fn a_stored_reference_marker_meets_the_plain_spelling() {
+    assert_eq!(
+        hits(&single("\u{fffd}#4; Not Applicable"), "Not Applicable"),
+        1
+    );
+    assert_eq!(hits(&single("Primary\u{fffd}#65533;"), "Primary"), 1);
+    assert_eq!(hits(&single("Godown \u{fffd}# 4"), "Godown 4"), 1);
+    assert_eq!(hits(&single("\u{fffd}#4; Branch 7"), "Branch 4"), 0);
+    assert_eq!(hits(&single("\u{fffd}#4; Branch 7"), "Branch 7"), 1);
 }

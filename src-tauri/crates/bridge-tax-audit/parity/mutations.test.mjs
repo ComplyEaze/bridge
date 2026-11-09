@@ -1170,6 +1170,112 @@ describe("GitRepo", () => {
     }
   });
 
+  // The takeover gate (.lock.takeover) names its owner's pid in a file inside it, and is stale when that run is gone, not
+  // when it is old: a run stalled inside the gate (suspended, or asleep with its machine) keeps it.
+  const oldGate = (work, owner) => {
+    const gate = path.join(work, ".lock.takeover");
+    fs.mkdirSync(gate, { recursive: true });
+    if (owner !== null) fs.writeFileSync(path.join(gate, "owner"), `${owner}\n`);
+    const minuteAgo = new Date(Date.now() - 60_000);
+    fs.utimesSync(gate, minuteAgo, minuteAgo);
+    return gate;
+  };
+
+  test("a takeover gate whose owner is alive keeps it however long the owner has been stalled", async () => {
+    // A real run, stopped (as Ctrl-Z or a sleeping machine would) while it holds the gate: the child suspends itself
+    // as it is about to remove the dead holder's claim, which only happens inside the gate.
+    const work = path.join(g.t, "stalled-gate");
+    fs.mkdirSync(work, { recursive: true });
+    const dead = spawn("/bin/sh", ["-c", "exit 0"], { stdio: "ignore" });
+    await exited(dead);
+    fs.writeFileSync(path.join(work, ".lock"), `${dead.pid}\n`);
+    const child = path.join(g.t, "stalls-in-the-gate.mjs");
+    fs.writeFileSync(
+      child,
+      `import fs from "node:fs";
+const remove = fs.rmSync;
+fs.rmSync = (target, ...rest) => {
+  if (String(target).endsWith("/.lock")) process.kill(process.pid, "SIGSTOP");
+  return remove(target, ...rest);
+};
+const mu = await import(${JSON.stringify(pathToFileURL(UNDER_TEST).href)});
+mu.lockWorkdir(process.argv[2]);
+`,
+    );
+    const stalled = spawn(process.execPath, [child, work], { stdio: "ignore" });
+    const gate = path.join(work, ".lock.takeover");
+    try {
+      for (let waited = 0; !fs.existsSync(gate); waited += 20) {
+        assert.ok(waited < 10_000, "the child reached the gate");
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 11_000)); // past the old 10 s limit, while it stays stopped
+      assert.equal(mu.lockWorkdir(work), null, "the stalled owner's gate is not taken from it");
+      assert.ok(fs.existsSync(gate), "and it is still there");
+      assert.equal(fs.readFileSync(path.join(work, ".lock"), "utf8"), `${dead.pid}\n`, "so the dead claim was not touched");
+    } finally {
+      stalled.kill("SIGKILL");
+      await exited(stalled);
+      fs.rmSync(gate, { recursive: true, force: true });
+    }
+  });
+
+  test("a takeover gate whose owner is gone is removed at once, however young it is", async () => {
+    const work = path.join(g.t, "dead-owner-gate");
+    fs.mkdirSync(work, { recursive: true });
+    const dead = spawn("/bin/sh", ["-c", "exit 0"], { stdio: "ignore" });
+    await exited(dead);
+    fs.writeFileSync(path.join(work, ".lock"), `${dead.pid}\n`);
+    const gate = path.join(work, ".lock.takeover");
+    fs.mkdirSync(gate);
+    fs.writeFileSync(path.join(gate, "owner"), `${dead.pid}\n`); // made just now by a run that has since died
+    const claim = mu.lockWorkdir(work);
+    assert.notEqual(claim, null, "the dead owner's gate and the dead claim are both taken over");
+    assert.equal(fs.readFileSync(path.join(work, ".lock"), "utf8"), `${process.pid}\n`);
+    claim.release();
+    assert.ok(!fs.existsSync(gate), "no gate left behind");
+  });
+
+  test("a takeover gate that never named an owner is taken over once it is old", async () => {
+    const work = path.join(g.t, "ownerless-gate");
+    fs.mkdirSync(work, { recursive: true });
+    const dead = spawn("/bin/sh", ["-c", "exit 0"], { stdio: "ignore" });
+    await exited(dead);
+    fs.writeFileSync(path.join(work, ".lock"), `${dead.pid}\n`);
+    oldGate(work, null); // its maker died between making the directory and naming itself
+    const claim = mu.lockWorkdir(work);
+    assert.notEqual(claim, null);
+    claim.release();
+  });
+
+  test("a run whose still-unnamed gate was taken as abandoned starts over instead of failing", async () => {
+    // Suspended between making the gate and naming itself for longer than the age limit, a run finds its gate gone: it
+    // must not throw out of lockWorkdir, nor remove a gate that is no longer its own.
+    const work = path.join(g.t, "gate-taken-before-naming");
+    fs.mkdirSync(work, { recursive: true });
+    const dead = spawn("/bin/sh", ["-c", "exit 0"], { stdio: "ignore" });
+    await exited(dead);
+    fs.writeFileSync(path.join(work, ".lock"), `${dead.pid}\n`);
+    const write = fs.writeFileSync;
+    let taken = false;
+    fs.writeFileSync = (target, ...rest) => {
+      if (!taken && String(target).endsWith("/.lock.takeover/owner")) {
+        taken = true;
+        fs.rmSync(path.dirname(String(target)), { recursive: true, force: true }); // another run removed the unnamed gate
+      }
+      return write(target, ...rest);
+    };
+    try {
+      const claim = mu.lockWorkdir(work);
+      assert.ok(taken, "the gate was taken before its owner named itself");
+      assert.notEqual(claim, null, "the run started over and took the workdir");
+      claim.release();
+      assert.ok(!fs.existsSync(path.join(work, ".lock.takeover")), "no gate left behind");
+    } finally {
+      fs.writeFileSync = write;
+    }
+  });
+
   test("concurrent claimants never hold the workdir together, though they start from a dead holder's claim", async () => {
     // The claim must be exclusive as flock was: made whole (a reader never sees it without its pid), and a
     // takeover of a dead holder's claim never removes a claim another run has just made.
@@ -1291,6 +1397,37 @@ console.log(JSON.stringify({ held, overlaps, refused }));
       assert.ok(out.includes("STALE X1"), out);
     });
     assert.equal(sh(g.repo, "status", "--porcelain"), "", "the working tree is never touched");
+  });
+
+  test("test_killers_from_supplies_killer_lists_only_and_a_missing_file_or_full_refuses", async () => {
+    const outside = g.t;
+    const work = path.join(outside, "mutants");
+    const first = path.join(outside, "first.json");
+    const proof = path.join(outside, "proof.json");
+    await fakeCargo(outside, FAKE_CARGO, {}, async () => {
+      // A full run gives B1 a killed record with its killer list, as the committed records hold.
+      let [rc, out] = await main("B1", "--full", "--workdir", work, "--results", first);
+      assert.equal(rc, 0, out);
+      const killers = readJson(first);
+      assert.deepEqual([killers.B1.verdict, killers.B1.mode], [mu.KILLED, "full"]);
+      const before = fs.readFileSync(first);
+      // A proof run into an empty results file runs B1's killers first, from those records only.
+      [rc, out] = await main("B1", "--killers-from", first, "--workdir", work, "--results", proof);
+      assert.equal(rc, 0, out);
+      const made = readJson(proof);
+      assert.deepEqual(Object.keys(made), ["B1"], "only what this run measured is written");
+      assert.deepEqual([made.B1.verdict, made.B1.mode], [mu.KILLED, "killers-first"]);
+      assert.deepEqual(fs.readFileSync(first), before, "the killers file is read, never written");
+      // Without killer lists it is a full run, which is what proof mode must never quietly become.
+      [rc, out] = await main("B1", "--workdir", work, "--results", path.join(outside, "none.json"));
+      assert.equal(readJson(path.join(outside, "none.json")).B1.mode, "full", out);
+      [rc, out] = await main("B1", "--killers-from", path.join(outside, "absent.json"), "--workdir", work, "--results", proof);
+      assert.equal(rc, 2, out);
+      assert.ok(out.includes("is not a file"), out);
+      [rc, out] = await main("B1", "--full", "--killers-from", first, "--workdir", work, "--results", proof);
+      assert.equal(rc, 2, out);
+      assert.ok(out.includes("--killers-from is for a run of mutations without --full"), out);
+    });
   });
 
   test("test_a_shard_that_cannot_build_writes_a_typed_refusal_and_prints_the_compiler_lines", async () => {

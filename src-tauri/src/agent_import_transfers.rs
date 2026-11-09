@@ -11,18 +11,13 @@
 //! leaves this module.
 use super::*;
 use crate::agent::transfer_pairing::{
-    transfer_pairing_view, BatchId, BatchStatus, ContraKey, DoubleBookedClass, SkipFact, SkipState,
-    TransferView,
+    transfer_pairing_view, with_days_read, BatchId, BatchStatus, ContraKey, DayReader,
+    DoubleBookedClass, LedgerNames, PairingInput, SkipFact, SkipState, TallyDays, TransferView,
+    TRANSFER_K_DAYS,
 };
 use statement_facts::{
     BuildLine, Candidate, FactsError, HeldBy, StatementFacts, TransferFacts, TransferFactsError,
 };
-
-/// How many days apart the two statements may print one transfer and still
-/// pair it by date. Zero until a real statement pair has been measured: k comes
-/// from that pair (the design's C12), not from synthetic rows, so only the same
-/// printed day matches today.
-pub(super) const TRANSFER_K_DAYS: u32 = 0;
 
 /// The argument that names skipped rows a build posts anyway.
 pub(super) const WITHDRAW_SKIPS_KEY: &str = "withdraw_skips";
@@ -61,6 +56,7 @@ pub(super) fn take_withdraw_skips(args: &mut Value) -> Result<BTreeSet<String>, 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum OpenState {
     NotFound,
+    TallyUnchecked,
     Ambiguous,
     OtherSideUnverified,
     NotEstablished,
@@ -76,6 +72,7 @@ impl OpenState {
     pub(super) fn label(self) -> &'static str {
         match self {
             Self::NotFound => "not_found",
+            Self::TallyUnchecked => "tally_unchecked",
             Self::Ambiguous => "ambiguous",
             Self::OtherSideUnverified => "other_side_unverified",
             Self::NotEstablished => "not_established",
@@ -92,12 +89,13 @@ impl OpenState {
     pub(super) fn step(self) -> &'static str {
         match self {
             Self::OtherSideUnverified => "The other account's Contra for this row is in the batch named, which is not verified yet. Run verify_import on every batch named for this row; do not post this row. Build the other account's statement for this row's date again only if every batch named for this row was never sent to Tally, verify_import listed every one of their vouchers as not_found, and the person confirms none of their files was ever imported into Tally; then post the new build, verify it, and never import an old batch's file. If verify_import found any voucher of a batch named for this row, or refused to read one, or a file of one was imported, do not build the other account's statement again: check in Tally which of their vouchers are there, and no step inside ComplyEaze Bridge frees this row yet. If Tally rejected the send of a batch named for this row, building the other account's statement again is refused as import_txn_already_posted, and no step inside ComplyEaze Bridge frees this row yet.",
-            Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day; a Contra dated another day is not looked for. If no batch of that statement covers this date, build it. If that statement skipped this row too, withdraw the skip on exactly one side. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
+            Self::TallyUnchecked => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, but whether Tally holds one is not established: ComplyEaze Bridge did not read every voucher of this date and of the day either side in Tally, or could not find the other account's ledger, or a ledger an entry of those days names, in the ledger list it read, or read them all and found an entry on the other account's ledger within a day of this date, which it does not compare with this row, so a Contra entered in Tally directly is not ruled out. Read the vouchers of this date and of the day either side with the vouchers tool and look for a voucher of the Contra voucher class, or of any other type such as a Journal, Payment or Receipt, that carries this row's amount on the bank ledger the other account's statement was built for, or on a ledger a transfer may pass through, and read its narration where it was not dropped; a voucher dated further away, or booked against another ledger, is not looked for, a transfer may print on different days, and a masked ledger name can read like another, so compare amounts and dates too. Tell the person what you found and keep the skip. Do not book this transfer in Tally another way, and withdraw the skip on one side only: a later post of the other statement would book it twice. Name the row in withdraw_skips only when the person confirms that no entry in Tally carries this transfer.",
+            Self::NotFound => "The other account's statement for this date went through ComplyEaze Bridge and holds no Contra for this row dated the same day, and ComplyEaze Bridge read every voucher of this date and of the day either side in Tally and found no entry on the other account's ledger, in a voucher of any type; a voucher dated further away, a transfer that passes through another ledger over more days, or one split across vouchers is not looked for. Tell the person what was read and keep the skip; withdraw it on one side only. Name the row in withdraw_skips only when the person confirms that no entry in Tally carries this transfer. Do not enter this transfer in Tally by hand: a later post of the other statement would book it twice.",
             Self::Ambiguous => "Each batch named holds a Contra that could carry this row: more than one Contra could, or the one that could is also claimed by another row or booked twice. ComplyEaze Bridge does not choose; check in Tally which Contra carries this transfer. A Contra in a batch not yet verified is not in Tally until that batch is imported and verified.",
             Self::ReversedSameDay => "This row, or the other account's matching row, has an equal amount going the other way the same day on its own statement, so a reversal and a pair of real transfers look alike. Where a batch is named, it holds a Contra that could carry this row. Check in Tally which rows are transfers. Name the row in withdraw_skips only when the person confirms the other account's statement does not carry it.",
             Self::MatchedUnconfirmed => "A verified Contra of the same day and amount, booked from the other account's statement, is in the batch named. Whether it is the only one is not established, because the statement records of the two accounts do not both cover this date. Keep the skip. The row can be decided only once statement records of both accounts cover this date: for each account that needs a statement whose rows begin before this date and end after it, built and, where it books a voucher, verified (a statement that begins or ends on this date does not cover it, and a day blocked by a batch that holds no statement records is covered by none). A statement build abandoned unsent, never sent to Tally and never verified, keeps its days uncovered, and no step inside ComplyEaze Bridge clears one yet. Until then the row stays as it is.",
             Self::ReferenceDiffers => "A Contra of the same day and amount in the batch named, booked from the other account's statement, carries a different reference from this row. ComplyEaze Bridge cannot tell whether it is this row's other side. If that batch is not verified yet, run verify_import on it first. Then check that Contra in Tally: keep the skip if it carries this transfer, and name the row in withdraw_skips only when the person confirms it does not.",
-            Self::HeldElsewhere => "The batch named posts this row, which a statement skipped, and has not been found posted. Verify that batch. The skip is retired once every batch found posted that holds the row has a build in its lineage that recorded the withdrawal: a build that names this row in withdraw_skips records it, and it counts once that build is sent or found posted and was built after the newest record of the skip (a later build of the skipping statement records the skip again). If the batch named does not name this row in withdraw_skips and has not been sent, build the statement that posts it again naming this row in withdraw_skips, and do not send the batch named: sending it gives posted_against_skip. If the batch named does name this row, send it and verify it. A batch left unsent blocks the days of its rows for the other account's coverage until it is verified, and no step inside ComplyEaze Bridge clears that. A batch found posted without the withdrawal leaves the row as posted_against_skip.",
+            Self::HeldElsewhere => "The batch named posts this row, which a statement skipped, and has not been found posted. Verify that batch. The skip is retired once every batch found posted that holds the row has a build in its lineage that recorded the withdrawal: a build that names this row in withdraw_skips records it, and it counts once that build is sent or found posted and was built after the newest record of the skip (a later build of the skipping statement records the skip again). If the batch named does not name this row in withdraw_skips and has not been sent, build the statement that posts it again naming this row in withdraw_skips, and do not send the batch named or import its file: found posted, either leaves the row as posted_against_skip, and once a build that skips the row has been sent or found posted, or a skip-only record holds the skip, post_import refuses that send as skip_row_paired_elsewhere. If the batch named does name this row, send it and verify it. A batch left unsent blocks the days of its rows for the other account's coverage until it is verified, and no step inside ComplyEaze Bridge clears that. A batch found posted without the withdrawal leaves the row as posted_against_skip.",
             Self::PostedAgainstSkip => "A statement skipped this row as carried by the other account's Contra, and the batch named, found posted, posts it as a voucher although no build in its lineage that was sent or found posted recorded its withdrawal after the newest record of the skip. If the other account's Contra also carries this transfer, it is booked twice. ComplyEaze Bridge does not compare the two, and no step inside ComplyEaze Bridge removes or changes a voucher already in Tally. The row leaves this list only when a build in that batch's lineage that names it in withdraw_skips is found posted after the newest record of the skip, and only when the person confirms the other account's statement does not carry it; a batch ComplyEaze Bridge posted itself cannot be amended, so for it no step inside ComplyEaze Bridge clears the row. Tell the person.",
             Self::DoubleBooked => "Two statements each booked this transfer as a Contra. No step inside ComplyEaze Bridge removes or changes a voucher already in Tally yet. If either batch named has not been sent to Tally, do not send it, and do not build or post anything further for this transfer; tell the person.",
             Self::NotEstablished => NOT_ESTABLISHED_STEP,
@@ -138,6 +136,9 @@ pub(super) enum TransferSummary {
         retired: usize,
         /// Ordered by date, then id.
         open: Vec<OpenRow>,
+        /// What the call's reads of Tally's days yielded, where it read any
+        /// (#1392).
+        day_reads: Option<Value>,
     },
 }
 
@@ -158,6 +159,7 @@ impl TransferSummary {
                     continue;
                 }
                 SkipState::NotFound => (OpenState::NotFound, [None].into()),
+                SkipState::TallyUnchecked => (OpenState::TallyUnchecked, [None].into()),
                 SkipState::Ambiguous { candidates } => {
                     (OpenState::Ambiguous, batches_holding(candidates))
                 }
@@ -233,6 +235,27 @@ impl TransferSummary {
             skips_open,
             retired: facts.retired_skips,
             open,
+            day_reads: None,
+        }
+    }
+
+    /// The summary, showing what the call's day reads yielded.
+    fn with_day_reads(self, summary: Value) -> Self {
+        match self {
+            Self::Computed {
+                paired,
+                skips_open,
+                retired,
+                open,
+                ..
+            } => Self::Computed {
+                paired,
+                skips_open,
+                retired,
+                open,
+                day_reads: Some(summary),
+            },
+            Self::NotEstablished => Self::NotEstablished,
         }
     }
 
@@ -245,6 +268,7 @@ impl TransferSummary {
             skips_open,
             retired,
             open,
+            day_reads,
         } = self
         else {
             return check_not_run_section(false);
@@ -260,11 +284,14 @@ impl TransferSummary {
         if open.iter().any(|row| row.restored) {
             next_steps.insert("restored".into(), json!(RESTORED_NOTE));
         }
-        let frame = json!({
+        let mut frame = json!({
             "state": "computed", "skips_paired": paired, "skips_open": skips_open,
             "open": [], "open_omitted": open.len(), "retired": retired,
             "next_steps": next_steps.clone(),
         });
+        if let Some(day_reads) = day_reads {
+            frame["day_reads"] = day_reads.clone();
+        }
         // the step for omitted rows is paid for whether or not it is needed
         let frame_len = frame.to_string().len() + OPEN_OMITTED_STEP.len() + 32;
         let mut room = available.saturating_sub(frame_len);
@@ -292,11 +319,10 @@ impl TransferSummary {
         if omitted > 0 {
             next_steps.insert("open_omitted".into(), json!(OPEN_OMITTED_STEP));
         }
-        json!({
-            "state": "computed", "skips_paired": paired, "skips_open": skips_open,
-            "open": rows, "open_omitted": omitted, "retired": retired,
-            "next_steps": next_steps,
-        })
+        frame["open"] = json!(rows);
+        frame["open_omitted"] = json!(omitted);
+        frame["next_steps"] = json!(next_steps);
+        frame
     }
 }
 
@@ -395,6 +421,9 @@ pub(super) const TRANSFER_VIEW_REFUSED_MESSAGE: &str = "Nothing was sent. Comply
 const NOTHING_SENT: &str =
     "Nothing was sent to Tally, and any approval of this batch is withdrawn.";
 const SEND_ENDING: &str = "This batch cannot be sent as built: build it again.";
+/// The ending of a withdrawal refused at send: the steps before it may speak
+/// of building the other account's statement, so this one names its own build.
+const SEND_ENDING_KEEP_SKIPPED: &str = "This batch cannot be sent as built: build this statement again with the rows in paired_rows still skipped, not named in withdraw_skips.";
 const TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP: &str = "Nothing was sent to Tally, and any approval of this batch is withdrawn. ComplyEaze Bridge could not read its own record of the skipped rows and Contras of this company, so it cannot tell whether this batch books a transfer twice. error, check and record_id name what failed, without any value from the record. ComplyEaze Bridge runs the same checks before it writes those records, so this comes from a defect in it, or from records a later release of ComplyEaze Bridge wrote in this folder: if a later release has been used here, send with that release; otherwise report it with the error named here. No batch of this company that posts a statement row can be sent until it is fixed, as it already blocks every build that needs the view.";
 /// What a refusal under the admission lock says: the reason is its code alone.
 pub(super) const TRANSFERS_CHANGED_UNDER_LOCK_STEP: &str = "The transfer records changed after this batch was checked and before it was sent; nothing was sent and any approval of this batch is withdrawn. Call post_import again: it gives the whole reason before asking.";
@@ -407,8 +436,8 @@ impl TransferRefusal {
     /// The same refusal for a batch about to be sent: one function maps every
     /// build step, so the two cannot drift. Every one but
     /// `transfer_view_not_established` ends by saying the statement must be built
-    /// again; that one has no such ending, because building it again meets the
-    /// same unreadable record.
+    /// again (a refused withdrawal, with its rows still skipped); that one has no
+    /// such ending, because building it again meets the same unreadable record.
     pub(super) fn for_send(self) -> Self {
         let next_step = if self.reason == "transfer_view_not_established" {
             TRANSFER_VIEW_NOT_ESTABLISHED_SEND_STEP.to_string()
@@ -421,7 +450,12 @@ impl TransferRefusal {
                     .unwrap_or(&self.next_step)
                     .trim()
             });
-            format!("{NOTHING_SENT} {middle} {SEND_ENDING}")
+            let ending = if self.reason == "withdraw_skip_paired" {
+                SEND_ENDING_KEEP_SKIPPED
+            } else {
+                SEND_ENDING
+            };
+            format!("{NOTHING_SENT} {middle} {ending}")
         };
         Self { next_step, ..self }
     }
@@ -453,8 +487,57 @@ impl TransferRefusal {
 }
 
 pub(super) enum Admission {
-    Admitted(TransferSummary),
+    Admitted(Admitted),
     Refused(TransferRefusal),
+}
+
+/// The facts a build was admitted on, checked for the view once, or nothing
+/// when the view could not be established. The view it was admitted on is not
+/// kept: the section's is the one [`Admitted::summary_with_days_read`]
+/// computes.
+pub(super) struct Admitted(Option<Box<(TransferFacts, PairingInput)>>);
+
+impl Admitted {
+    /// The section's summary, after reading the windows of its
+    /// `tally_unchecked` rows from Tally (#1392), folding into `evidence` every
+    /// answer the reads got back. It starts from the facts the build was admitted on, and the
+    /// days change only which of those rows read `not_found`, which no
+    /// admission reads. `ledgers` is the catalogue this call read: a skip's
+    /// ledgers are named by their GUIDs, spelled as Tally sent them, and a day
+    /// naming a ledger not in it rules nothing out. `voucher_mark` is the
+    /// book's voucher mark where this call read it; without it the marks are
+    /// read before the first day.
+    pub(super) async fn summary_with_days_read<R: DayReader>(
+        self,
+        reader: &R,
+        identity: &crate::tally::VerifiedCompanyIdentity,
+        company: &str,
+        ledgers: &bridge_tally_protocol::StandardLedgerCatalog,
+        voucher_mark: Option<u64>,
+        evidence: &mut Evidence,
+    ) -> TransferSummary {
+        let Some(admitted) = self.0 else {
+            return TransferSummary::NotEstablished;
+        };
+        let (facts, input) = *admitted;
+        let names = LedgerNames::new(
+            ledgers
+                .identified_parents()
+                .map(|(name, guid, _)| (guid, name)),
+        );
+        let (view, reads) =
+            with_days_read(reader, identity, company, &input, &names, voucher_mark).await;
+        if let Some(read) = &reads.evidence {
+            *evidence = combine_evidence(evidence.clone(), read.clone());
+        }
+        let summary = TransferSummary::of(&facts, &view);
+        // a call that planned no day shows nothing of day reads
+        if reads.whole.is_empty() && reads.kept.is_empty() {
+            summary
+        } else {
+            summary.with_day_reads(reads.summary())
+        }
+    }
 }
 
 /// A build, or a statement of only skipped rows, as the transfer checks see it.
@@ -505,11 +588,11 @@ fn without_facts(needs_the_view: bool, error: &TransferFactsError) -> Admission 
             next_step: TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP.into(),
         })
     } else {
-        Admission::Admitted(TransferSummary::NotEstablished)
+        Admission::Admitted(Admitted(None))
     }
 }
 
-const SKIP_ROW_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was recorded. This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended. A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked. Do not skip the rows listed in skipped_rows. If the batch named is not verified yet, run verify_import on it. Then parse the statement again with those rows not skipped (a row that batch holds is then refused as import_txn_already_posted) and build again.";
+const SKIP_ROW_ALREADY_POSTED_NEXT_STEP: &str = "No file was written and nothing was recorded. This build skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended. A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked. Do not skip the rows listed in skipped_rows. If the batch named is not verified yet, run verify_import on it. Then parse the statement again with those rows not skipped (a row that batch holds is then refused as import_txn_already_posted, unless a person released that batch's rows with acknowledge_post_review, doubt rolled_back: then it is built as a new batch) and build again.";
 const SKIP_ROW_PAIRED_ELSEWHERE_NEXT_STEP: &str = "No file was written and nothing was recorded. This build posts a row that a statement of this company skipped as carried by the other account's Contra: skipped_rows lists them. Posting the row books its own bank, and if the other account's Contra exists the transfer is booked twice. Do not post these rows. Parse the statement again with those rows mapped skip, or build again naming a row in withdraw_skips only when the person confirms the other account's statement does not carry it; ask for each, and never name a row on their behalf.";
 const WITHDRAW_SKIP_INVALID_NEXT_STEP: &str = "No file was written and nothing was recorded. Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch, whether or not it was sent, or in a statement of only skipped rows) and a voucher of this build. Build again with withdraw_skips naming only rows that are both, or without it.";
 const TRANSFER_DOUBLE_BOOKED_NEXT_STEP: &str = "No file was written and nothing was recorded. A Contra in this build carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Posting both books it twice. Do not build this Contra: run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger) and build again.";
@@ -519,7 +602,7 @@ const TRANSFER_VIEW_NOT_ESTABLISHED_NEXT_STEP: &str = "No file was written and n
 /// speaks of the build it refuses, between "nothing was sent" and the ending.
 fn send_wording(reason: &str) -> Option<&'static str> {
     match reason {
-        "skip_row_already_posted" => Some("This batch skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended. A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked. If the batch named is not verified yet, run verify_import on it. Then parse the statement again with the rows listed in skipped_rows not skipped (a row that batch holds is then refused as import_txn_already_posted)."),
+        "skip_row_already_posted" => Some("This batch skips a row that is already a voucher of a batch of this company: blocking_batch_id names it, and it was sent to Tally, was found posted, or is an earlier build of the batch being amended. A skip cannot take a voucher out of Tally, and it would say that another account's Contra carries a transfer this company already booked. If the batch named is not verified yet, run verify_import on it. Then parse the statement again with the rows listed in skipped_rows not skipped (a row that batch holds is then refused as import_txn_already_posted, unless a person released that batch's rows with acknowledge_post_review, doubt rolled_back: then it is built as a new batch)."),
         "skip_row_paired_elsewhere" => Some("This batch posts a row that a statement of this company skipped as carried by the other account's Contra: skipped_rows lists them. Posting the row books its own bank, and if the other account's Contra exists the transfer is booked twice. Parse the statement again with those rows mapped skip, or build again naming a row in withdraw_skips only when the person confirms the other account's statement does not carry it; ask for each, and never name a row on their behalf."),
         "withdraw_skip_invalid" => Some("Each row in invalid_rows is not both a skip that ComplyEaze Bridge holds for this company (in a batch, whether or not it was sent, or in a statement of only skipped rows) and a voucher of this batch. Name in withdraw_skips only rows that are both, or none."),
         "transfer_double_booked" => Some("A Contra in this batch carries a transfer that the batch named in other_batch_id already booked as a Contra from the other account's statement (the references are equal). Sending both books it twice. Run verify_import on the other batch if it is not verified, then parse this statement again with that row skipped (treatment skip, naming the other account's ledger)."),
@@ -662,15 +745,15 @@ impl Server {
         }
     }
 
-    /// The facts of one company and the view over them, with a candidate read as
+    /// The facts of one company, checked for the view, with a candidate read as
     /// the newest record when one is given. `subject` is as for
     /// `ledger::transfer_facts`.
-    pub(super) fn transfer_view_while_admitted(
+    fn transfer_input_while_admitted(
         &self,
         company_guid: &str,
         candidate: Option<Candidate>,
         subject: Option<&str>,
-    ) -> Result<(TransferFacts, TransferView), TransferFactsError> {
+    ) -> Result<(TransferFacts, PairingInput), TransferFactsError> {
         let journal: Box<dyn std::io::BufRead> = match self.import_journal_while_admitted() {
             Ok(Some(reader)) => Box::new(reader),
             Ok(None) => Box::new(std::io::empty()),
@@ -680,12 +763,21 @@ impl Server {
             .skip_file_while_admitted()
             .map_err(|code| TransferFactsError::SkipFileUnreadable { code })?;
         let facts = ledger::transfer_facts(journal, skips, company_guid, candidate, subject)?;
-        let view = transfer_pairing_view(
-            &facts.skips,
-            &facts.contras,
-            &facts.coverage,
-            TRANSFER_K_DAYS,
-        )?;
+        let input = PairingInput::new(&facts.skips, &facts.contras, &facts.coverage)?;
+        Ok((facts, input))
+    }
+
+    /// The facts of one company and the view over them, as
+    /// [`Server::transfer_input_while_admitted`] reads them.
+    pub(super) fn transfer_view_while_admitted(
+        &self,
+        company_guid: &str,
+        candidate: Option<Candidate>,
+        subject: Option<&str>,
+    ) -> Result<(TransferFacts, TransferView), TransferFactsError> {
+        let (facts, input) =
+            self.transfer_input_while_admitted(company_guid, candidate, subject)?;
+        let view = input.view(&TallyDays::none(), TRANSFER_K_DAYS);
         Ok((facts, view))
     }
 
@@ -803,7 +895,9 @@ impl Server {
                             .filter(|candidate| !verified.contains(candidate))
                             .map(|candidate| (&candidate.batch, Carrier::OtherSideUnverified))
                             .collect(),
-                        SkipState::NotFound | SkipState::NotEstablished => Vec::new(),
+                        SkipState::NotFound
+                        | SkipState::TallyUnchecked
+                        | SkipState::NotEstablished => Vec::new(),
                     })
                     .collect();
                 carriers
@@ -882,14 +976,15 @@ impl Server {
         // C6: the view with this build in it.
         let candidate_batch = input.candidate_build().map(str::to_string);
         let needs_the_view = input.needs_the_view();
-        let (facts, view) = match self.transfer_view_while_admitted(
+        let (facts, checked) = match self.transfer_input_while_admitted(
             &input.company_guid,
             Some(input.candidate),
             input.subject.as_deref(),
         ) {
-            Ok(view) => view,
+            Ok(facts) => facts,
             Err(error) => return Ok(without_facts(needs_the_view, &error)),
         };
+        let view = checked.view(&TallyDays::none(), TRANSFER_K_DAYS);
         let other_batch = candidate_batch
             .as_deref()
             .and_then(|ours| double_booked_with(&view, ours));
@@ -900,7 +995,9 @@ impl Server {
                 next_step: TRANSFER_DOUBLE_BOOKED_NEXT_STEP.into(),
             }));
         }
-        Ok(Admission::Admitted(TransferSummary::of(&facts, &view)))
+        Ok(Admission::Admitted(Admitted(Some(Box::new((
+            facts, checked,
+        ))))))
     }
 
     /// A saved batch about to be sent, judged as its build was and against the

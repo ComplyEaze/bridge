@@ -1,0 +1,1 @@
+- Two descriptive notes in the import tools no longer say "by hand": the `book_rolled_back` note on a post's span says vouchers "may have been entered again in Tally", and the already-posted next step of `build_import_xml` says "a batch whose file was imported in Tally"; what they describe, and the advice around them, is unchanged (#1709).

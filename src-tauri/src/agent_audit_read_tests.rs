@@ -8,7 +8,7 @@
 //! holding the same bytes.
 use super::*;
 use crate::agent::voucher_window::{
-    AuditWindowFailure, RetainedWindowRead, SmallBooks, WindowPart,
+    AuditWindowFailure, ReadCountRefusal, RetainedWindowRead, SmallBooks, WindowPart,
 };
 use crate::tally::runtime::{AuditPartFailureKind, RuntimeReadEvidence};
 use bridge_tally_protocol::outstandings_shared::DateBoundaryProfile;
@@ -58,11 +58,16 @@ pub(in crate::agent) fn plan(xml: String) -> ScenarioPlan {
 }
 
 pub(in crate::agent) fn companies_xml(guid: &str) -> String {
+    companies_xml_named(FIXTURE_NAME, guid)
+}
+
+/// One loaded company, with books from 1 April 2025 and a synthetic company number.
+pub(in crate::agent) fn companies_xml_named(name: &str, guid: &str) -> String {
     format!(
         "<ENVELOPE><HEADER><VERSION>1</VERSION><STATUS>1</STATUS></HEADER><BODY><DESC><CMPINFO>\
          <COMPANY>0</COMPANY></CMPINFO></DESC><DATA><COLLECTION>\
-         <COMPANY NAME=\"{FIXTURE_NAME}\" RESERVEDNAME=\"\">\
-         <BOOKSFROM TYPE=\"Date\">20250401</BOOKSFROM><NAME TYPE=\"String\">{FIXTURE_NAME}</NAME>\
+         <COMPANY NAME=\"{name}\" RESERVEDNAME=\"\">\
+         <BOOKSFROM TYPE=\"Date\">20250401</BOOKSFROM><NAME TYPE=\"String\">{name}</NAME>\
          <GUID TYPE=\"String\">{guid}</GUID><COMPANYNUMBER TYPE=\"Number\"> 100000</COMPANYNUMBER>\
          <PRODUCTNAME TYPE=\"String\">TallyPrime</PRODUCTNAME><EDUMODE TYPE=\"Logical\">No</EDUMODE>\
          <SILVER TYPE=\"Logical\">Yes</SILVER><GOLD TYPE=\"Logical\">No</GOLD>\
@@ -145,14 +150,23 @@ impl Replay {
     /// voucher mark of 30: small enough that the production window limits read
     /// it as one request, so the tool can be run end to end.
     pub(in crate::agent) fn small() -> Self {
+        Self::cut(0..30)
+    }
+
+    /// The same book cut to the vouchers at `range` (from 0, in the part's
+    /// order), renumbered from 1 with a voucher mark of their count. Thirty are
+    /// read as one request under the production window limits; all 43 are not.
+    pub(in crate::agent) fn cut(range: std::ops::Range<usize>) -> Self {
+        let count = range.len();
         let whole = period_vouchers();
         let first = whole.find("<VOUCHER ").unwrap();
         let blocks: Vec<&str> = whole[first..]
             .split_inclusive("</VOUCHER>")
             .filter(|block| block.contains("<VOUCHER "))
-            .take(30)
+            .skip(range.start)
+            .take(count)
             .collect();
-        assert_eq!(blocks.len(), 30);
+        assert_eq!(blocks.len(), count);
         let tail = whole.rfind("</VOUCHER>").unwrap() + "</VOUCHER>".len();
         let mut vouchers = whole[..first].to_string();
         for (index, block) in blocks.iter().enumerate() {
@@ -167,7 +181,9 @@ impl Replay {
         }
         vouchers.push_str(&whole[tail..]);
         let mut replay = Self::clean();
-        let marks = replay.marks_before.replace("> 153<", "> 30<");
+        let marks = replay
+            .marks_before
+            .replace("> 153<", &format!("> {count}<"));
         replay.marks_before = marks.clone();
         replay.marks_in_window = (marks.clone(), marks);
         replay.census = vouchers.clone();
@@ -202,6 +218,16 @@ impl Replay {
     }
 }
 
+/// The audit's window counts a small book and refuses its read count only at
+/// the floor (#2173), whatever limits it is given; every other read keeps the
+/// default's refusal point.
+#[test]
+fn the_audit_window_counts_small_books_and_refuses_at_the_floor() {
+    let limits = audit_window_limits(WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard));
+    assert_eq!(limits.small_books, SmallBooks::Count);
+    assert_eq!(limits.read_count_refusal, ReadCountRefusal::AtTheFloor);
+}
+
 /// The whole period fits one request: without the audit read's own rule, the
 /// window would plan no census (`SmallBooks::Skip`).
 fn one_request_window() -> WindowReadLimits {
@@ -210,6 +236,7 @@ fn one_request_window() -> WindowReadLimits {
         default_bytes_per_voucher: 1024,
         max_reads: 128,
         small_books: SmallBooks::Skip,
+        read_count_refusal: ReadCountRefusal::AtTheDefault,
     }
 }
 
@@ -224,7 +251,7 @@ fn roles() -> AuditRoles {
     }
 }
 
-async fn read_replay(
+pub(in crate::agent) async fn read_replay(
     replay: &Replay,
 ) -> (Result<AuditBook, AuditReadFailure>, Vec<ObservedRequest>) {
     let simulator = SequenceSimulator::spawn(replay.plans()).unwrap();
@@ -784,13 +811,420 @@ mod live_pilot_lab {
         for (index, name) in PARTS.iter().enumerate() {
             let Some(name) = name else { continue };
             let sent = &observed[index * 3 + 1].request_body;
+            // The census is sent spanned to the mark since #2145: its live request is the
+            // one the lab sent for that change, not the one the capture recorded.
+            let request = if *name == "census" {
+                "census-spanned"
+            } else {
+                name
+            };
             let live = bytes(&format!(
-                "audit-read-pilot-lab/pilot-lab-audit-{name}.request.utf16le.xml"
+                "audit-read-pilot-lab/pilot-lab-audit-{request}.request.utf16le.xml"
             ));
             assert!(
                 *sent == live,
                 "the {name} request differs from the one sent live:\n{}\n{}",
                 text_of(sent),
+                text_of(&live)
+            );
+        }
+    }
+}
+
+/// The audit read over live answers: every part as a licensed TallyPrime 7.2 Silver served it to
+/// Bridge's own read path for the synthetic company BRIDGE SFT LAB, 1 April 2025 to 31 March 2026
+/// (lab row 699-R1; the bytes and their provenance are in the protocol crate's
+/// `tests/fixtures/agent/audit-read-sft-lab/PROVENANCE.md`). The company list the reader checks
+/// between parts is not among them, since its answer carries the company number: a synthetic
+/// list of the same company stands in for it.
+pub(in crate::agent) mod live_sft_lab {
+    use super::*;
+
+    const FIXTURES: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab/"
+    );
+
+    fn bytes(name: &str) -> Vec<u8> {
+        std::fs::read(format!("{FIXTURES}sft-lab-audit-{name}.utf16le.xml")).unwrap()
+    }
+
+    fn part(name: &str) -> String {
+        text_of(&bytes(name))
+    }
+
+    /// The company's GUID, as its marks answer names it.
+    pub(in crate::agent) fn guid() -> String {
+        let marks = part("marks");
+        let (_, rest) = marks
+            .split_once("<GUID TYPE=\"String\">")
+            .expect("the marks answer names its company");
+        rest.split_once("</GUID>")
+            .expect("a closed GUID")
+            .0
+            .to_string()
+    }
+
+    pub(in crate::agent) fn companies() -> String {
+        companies_xml_named("BRIDGE SFT LAB", &guid())
+    }
+
+    pub(in crate::agent) fn identity() -> VerifiedCompanyIdentity {
+        let companies =
+            bridge_tally_protocol::parse_companies_from_collection(&companies()).unwrap();
+        let observed = &companies[0];
+        VerifiedCompanyIdentity::from_observed_companies(
+            observed.name.clone(),
+            crate::tally::test_company_guid(&guid()),
+            observed.company_number.clone().unwrap(),
+            observed.books_from.clone().unwrap(),
+            &companies,
+        )
+        .unwrap()
+    }
+
+    /// The reader's parts in the order it asks for them, each named by its fixture.
+    const PARTS: [&str; 10] = [
+        "marks",
+        "company-object",
+        "groups",
+        "ledgers",
+        "trial-balance",
+        "voucher-types",
+        "marks",
+        "census",
+        "vouchers",
+        "marks",
+    ];
+
+    /// Each part between two company checks, as the reader sends them.
+    pub(in crate::agent) fn plans() -> Vec<ScenarioPlan> {
+        PARTS
+            .iter()
+            .flat_map(|name| [plan(companies()), plan(part(name)), plan(companies())])
+            .collect()
+    }
+
+    async fn read() -> (Result<AuditBook, AuditReadFailure>, Vec<ObservedRequest>) {
+        let simulator = SequenceSimulator::spawn(plans()).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let book = read_audit_book(
+            &TallyRuntime::default(),
+            &config,
+            &identity(),
+            (&date("20250401"), &date("20260331")),
+            &AuditRoles {
+                cash_groups: vec!["Cash-in-Hand".to_string()],
+                bank_groups: vec!["Bank Accounts".to_string()],
+            },
+            one_request_window(),
+        )
+        .await;
+        (book, simulator.finish().unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn every_part_a_live_tally_served_is_admitted_whole() {
+        let (book, observed) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        assert_eq!(audit.book.company_guid, guid());
+        // The counts the lab keyed (699-R1's A5-VOUCHERS.md): 34 vouchers on 13 ledgers.
+        assert_eq!(audit.book.vouchers.len(), 34);
+        assert_eq!(audit.book.ledgers.len(), 13);
+        assert_eq!(observed.len(), 30);
+    }
+
+    /// Clause 42's SFT-013 candidates on the live book, against the vouchers as the lab keyed
+    /// them (699-R1's A5-VOUCHERS.md, 18 shapes): each voucher whose cash debits are strictly over
+    /// the limit, once, with nothing added across vouchers. Measured against the synthetic lab book
+    /// only; no CA has worked this book.
+    #[tokio::test]
+    async fn clause42_lists_each_voucher_whose_cash_is_over_the_limit_on_the_live_book() {
+        let (book, _) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        let rules = bridge_tax_audit::rules_for(&audit.engagement).unwrap();
+        let dump =
+            bridge_tax_audit::clause42_sft_on(&audit.engagement, &audit.book, &rules).unwrap();
+        let figure = |id: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == id)
+                .unwrap_or_else(|| panic!("no figure {id}"))
+                .clone()
+        };
+        // Not listed: Receipt 2 (exactly the limit), Receipts 3 and 4 (one day, one party,
+        // together over it), Receipt 8 (cash under it, bank over it), Receipts 12 and 13 (two
+        // instalments of one bill), Payment 1 (cash paid) and Contra 1 (cash deposited).
+        let listed = [
+            ("Receipt 14 on 2025-05-05", 30_000_000),
+            ("Receipt 1 on 2025-06-12", 30_000_000),
+            ("Receipt 16 on 2025-07-01", 22_000_000),
+            ("Receipt 17 on 2025-07-15", 21_000_000),
+            ("Receipt 18 on 2025-08-20", 23_000_000),
+            ("Receipt 5 on 2025-09-05", 25_000_000),
+            ("Receipt 19 on 2025-09-20", 26_000_000),
+            ("Receipt 6 on 2025-10-10", 25_000_000),
+            ("Receipt 7 on 2025-11-01", 50_000_000),
+            ("Receipt 15 on 2025-11-15", 30_000_000),
+            ("Sales 13 on 2025-12-20", 24_000_000),
+            ("Receipt 9 on 2026-01-05", 20_000_001),
+            ("Receipt 10 on 2026-02-05", 25_000_000),
+            ("Receipt 11 on 2026-02-10", 25_000_000),
+        ];
+        assert_eq!(figure("clause42_sft.candidates")["value"], listed.len());
+        assert_eq!(figure("clause42_sft.candidate_cash")["value"], 376_000_001);
+        for (index, (label, paise)) in listed.iter().enumerate() {
+            let f = figure(&format!("clause42_sft.voucher_{}", index + 1));
+            assert_eq!(f["value"], *paise, "{label}");
+            assert_eq!(f["evidence"][0]["label"], *label);
+        }
+        assert_eq!(dump["figures"].as_array().unwrap().len(), 3 + listed.len());
+        assert_eq!(dump["findings"][0]["confidence"], "judgement_required");
+    }
+
+    /// The answers prove something about today's reader only while it still sends the requests
+    /// they answered: each request, the company checks included, is byte for byte the one sent.
+    #[tokio::test]
+    async fn each_request_is_byte_for_byte_the_one_sent_live() {
+        let (book, observed) = read().await;
+        book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        let check = bytes("company-check.request");
+        for (index, request) in observed.iter().enumerate() {
+            let name = if index % 3 == 1 {
+                PARTS[index / 3]
+            } else {
+                "company-check"
+            };
+            let live = if name == "company-check" {
+                check.clone()
+            } else {
+                bytes(&format!("{name}.request"))
+            };
+            assert!(
+                request.request_body == live,
+                "request {index} ({name}) differs from the one sent live:\n{}\n{}",
+                text_of(&request.request_body),
+                text_of(&live)
+            );
+        }
+    }
+}
+
+/// The audit read over live answers of the same company after sheet 699-C16 keyed 19 more
+/// vouchers and ten ledgers (lab row C16-R, 4 Nov 2026; the bytes and their provenance are in the
+/// protocol crate's `tests/fixtures/agent/audit-read-sft-lab-c16r/PROVENANCE.md`). Under the
+/// production window limits the year is read in two voucher windows, split after 31 January 2026.
+/// The company list stands in as in [`live_sft_lab`].
+pub(in crate::agent) mod live_sft_lab_c16r {
+    use super::live_sft_lab::{companies, identity};
+    use super::*;
+
+    const FIXTURES: &str = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/crates/bridge-tally-protocol/tests/fixtures/agent/audit-read-sft-lab-c16r/"
+    );
+
+    fn bytes(name: &str) -> Vec<u8> {
+        std::fs::read(format!("{FIXTURES}sft-lab-audit-{name}.utf16le.xml")).unwrap()
+    }
+
+    fn part(name: &str) -> String {
+        text_of(&bytes(name))
+    }
+
+    /// The reader's parts in the order it asks for them, each named by its fixture.
+    const PARTS: [&str; 11] = [
+        "marks",
+        "company-object",
+        "groups",
+        "ledgers",
+        "trial-balance",
+        "voucher-types",
+        "marks",
+        "census",
+        "vouchers-1",
+        "vouchers-2",
+        "marks",
+    ];
+
+    /// Each part between two company checks, as the reader sends them.
+    pub(in crate::agent) fn plans() -> Vec<ScenarioPlan> {
+        PARTS
+            .iter()
+            .flat_map(|name| [plan(companies()), plan(part(name)), plan(companies())])
+            .collect()
+    }
+
+    pub(in crate::agent) async fn read(
+    ) -> (Result<AuditBook, AuditReadFailure>, Vec<ObservedRequest>) {
+        let simulator = SequenceSimulator::spawn(plans()).unwrap();
+        let config = TallyConfig {
+            host: simulator.address().ip().to_string(),
+            port: simulator.address().port(),
+        };
+        let book = read_audit_book(
+            &TallyRuntime::default(),
+            &config,
+            &identity(),
+            (&date("20250401"), &date("20260331")),
+            &AuditRoles {
+                cash_groups: vec!["Cash-in-Hand".to_string()],
+                bank_groups: vec!["Bank Accounts".to_string()],
+            },
+            WindowReadLimits::for_shape(VoucherReadShape::EntryWildcard),
+        )
+        .await;
+        (book, simulator.finish().unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn every_part_a_live_tally_served_is_admitted_whole() {
+        let (book, observed) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        assert_eq!(audit.book.company_guid, super::live_sft_lab::guid());
+        // The counts the lab read back (C16-R's r5v): 53 vouchers on 23 ledgers.
+        assert_eq!(audit.book.vouchers.len(), 53);
+        assert_eq!(audit.book.ledgers.len(), 23);
+        assert_eq!(observed.len(), 33);
+    }
+
+    /// Clause 16(a) and (d)'s candidates on the live book, against key v3, worked by hand to the
+    /// rule from the sheet before any capture: twelve rows, one per voucher and credited head
+    /// ledger, and the vouchers, tax credits and ledgers left out, each counted. Measured against
+    /// the synthetic lab book only; the key is not a CA's, and no CA has worked this book.
+    #[tokio::test]
+    async fn clause16_lists_the_rows_key_v3_worked_by_hand_on_the_live_book() {
+        let (book, _) = read().await;
+        let audit = book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        let rules = bridge_tax_audit::rules_for(&audit.engagement).unwrap();
+        let dump =
+            bridge_tax_audit::clause16_credits_on(&audit.engagement, &audit.book, &rules).unwrap();
+        let figure = |id: &str| {
+            dump["figures"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|f| f["id"] == format!("clause16_credits.{id}"))
+                .unwrap_or_else(|| panic!("no figure {id}"))
+                .clone()
+        };
+        let rows = [
+            (
+                "Capital SFT",
+                "Receipt 20 on 2025-06-30",
+                500_000,
+                "Bank SFT",
+            ),
+            (
+                "Advance SFT",
+                "Receipt 16 on 2025-07-01",
+                22_000_000,
+                "Cash",
+            ),
+            ("Loan SFT", "Receipt 18 on 2025-08-20", 23_000_000, "Cash"),
+            (
+                "Reserve C16",
+                "Receipt 22 on 2025-10-15",
+                700_000,
+                "Bank SFT",
+            ),
+            (
+                "Refund C16",
+                "Receipt 23 on 2025-10-20",
+                800_000,
+                "Bank SFT",
+            ),
+            ("Suspense C16", "Receipt 24 on 2025-10-25", 900_000, "Cash"),
+            ("Capital SFT", "Receipt 7 on 2025-11-01", 50_000_000, "Cash"),
+            (
+                "Reserve C16",
+                "Journal 3 on 2025-12-15",
+                400_000,
+                "Creditor C16",
+            ),
+            (
+                "Capital SFT",
+                "Receipt 25 on 2026-01-10",
+                650_000,
+                "Bank SFT",
+            ),
+            (
+                "Suspense C16",
+                "Journal 6 on 2026-01-31",
+                1_600_000,
+                "Party Four",
+            ),
+            // One ledger on two lines, 1,000 and 2,000 rupees: one row.
+            (
+                "Capital SFT",
+                "Receipt 29 on 2026-02-05",
+                300_000,
+                "Bank SFT",
+            ),
+            // A bank debit beside an expense debit keeps the voucher listed.
+            (
+                "Advance SFT",
+                "Receipt 28 on 2026-02-10",
+                2_000_000,
+                "Bank SFT, Expense C16",
+            ),
+        ];
+        assert_eq!(figure("rows")["value"], rows.len());
+        assert_eq!(figure("row_credit")["value"], 102_850_000);
+        for (index, (ledger, label, paise, debits)) in rows.iter().enumerate() {
+            let f = figure(&format!("row_{}", index + 1));
+            assert_eq!(f["value"], *paise, "{label}");
+            assert_eq!(
+                f["definition_text"],
+                format!("Credits to {ledger} on {label}; the voucher debits {debits}.")
+            );
+        }
+        // Journals 1, 2, 4, 5 and 7: every debit on an expense, the reserved profit and loss
+        // ledger or a fixed asset, Journal 7's beside tax.
+        assert_eq!(figure("excluded_vouchers")["value"], 5);
+        assert_eq!(figure("excluded_credit")["value"], 5_880_000);
+        // Payment 3 (tax withheld from a creditor) and Sales 14 (tax on a sale).
+        assert_eq!(figure("tax_left_out")["value"], 2);
+        assert_eq!(figure("tax_left_out_credit")["value"], 230_000);
+        // Grant C16, under a user group under Primary.
+        assert_eq!(figure("untested_ledgers")["value"], 1);
+        assert_eq!(figure("untested_credit")["value"], 1_500_000);
+        assert_eq!(dump["figures"].as_array().unwrap().len(), 8 + rows.len());
+        assert_eq!(dump["findings"][0]["confidence"], "judgement_required");
+        assert_eq!(
+            dump["findings"][0]["ask_client_text"],
+            serde_json::json!([])
+        );
+    }
+
+    /// The answers prove something about today's reader only while it still sends the requests
+    /// they answered: each request, the company checks, the census and both windows included, is
+    /// byte for byte the one sent.
+    #[tokio::test]
+    async fn each_request_is_byte_for_byte_the_one_sent_live() {
+        let (book, observed) = read().await;
+        book.unwrap_or_else(|failure| panic!("refused: {failure:?}"));
+        let check = bytes("company-check.request");
+        for (index, request) in observed.iter().enumerate() {
+            let name = if index % 3 == 1 {
+                PARTS[index / 3]
+            } else {
+                "company-check"
+            };
+            let live = if name == "company-check" {
+                check.clone()
+            } else {
+                bytes(&format!("{name}.request"))
+            };
+            assert!(
+                request.request_body == live,
+                "request {index} ({name}) differs from the one sent live:\n{}\n{}",
+                text_of(&request.request_body),
                 text_of(&live)
             );
         }

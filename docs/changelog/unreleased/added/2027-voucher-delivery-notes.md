@@ -1,0 +1,1 @@
+- `vouchers` with `include_gst_details` also says, in each invoice's dispatch details, its Delivery Notes: each note's number and date in the order keyed, absent when it has none, or not reported by this book or release (#2027).

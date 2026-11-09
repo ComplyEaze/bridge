@@ -1,0 +1,39 @@
+# fixture: tests/fixtures/stock_summary_report_nested_lab_to_20250831_live.utf16le.xml
+# parser: parse_native_stock_summary_report
+# source: captured
+Ok(Lines {
+    total: Some(
+        ExactDecimal(
+            "-445.00",
+        ),
+    ),
+    present: 2,
+    empty: 0,
+    lines: [
+        NativeReportLine {
+            name: "Lab Group One",
+            quantity: Empty,
+            amount: Some(
+                ExactDecimal(
+                    "-395.00",
+                ),
+            ),
+        },
+        NativeReportLine {
+            name: "Lab Root Bolt",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "10",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            amount: Some(
+                ExactDecimal(
+                    "-50.00",
+                ),
+            ),
+        },
+    ],
+})

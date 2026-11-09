@@ -1,0 +1,1 @@
+- The box where a person confirms they checked a content-only post in Tally no longer counts a cancelled or optional voucher as a voucher in the book. It counts only the matches that are in the accounts, as the settle dialog and the refused-binding summary already did (#2261).

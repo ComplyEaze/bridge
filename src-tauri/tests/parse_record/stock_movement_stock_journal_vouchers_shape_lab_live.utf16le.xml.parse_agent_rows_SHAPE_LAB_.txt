@@ -1,0 +1,20 @@
+# fixture: stock_movement_stock_journal_vouchers_shape_lab_live.utf16le.xml
+# parser: parse_agent_rows(SHAPE_LAB)
+# source: captured
+Ok([
+    Object {
+        "alter_id": Number(113),
+        "amounts": Array [],
+        "cancelled": Bool(false),
+        "date": String("20260511"),
+        "guid": String("3a6bd6e1-b835-4bff-89dd-8a6af138c346-00000056"),
+        "is_invoice": Bool(false),
+        "master_id": String("86"),
+        "narration": String(""),
+        "optional": Bool(false),
+        "party": String(""),
+        "post_dated": Bool(false),
+        "voucher_number": String("1"),
+        "voucher_type": String("Stock Journal"),
+    },
+])

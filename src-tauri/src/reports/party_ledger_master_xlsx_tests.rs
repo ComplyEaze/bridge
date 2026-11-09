@@ -8,6 +8,9 @@ use crate::reports::party_ledger_master::{
     build_party_ledger_master_workbook, BalanceDateBasis, PartyLedgerMasterRow,
     PartyLedgerMasterSource,
 };
+use bridge_tally_protocol::mailing_details::{
+    MailingDetailsDefect, MailingDetailsEntry, MailingDetailsHistory,
+};
 use bridge_tally_protocol::{PartyLedgerMasterFieldObservation, PartyLedgerMasterFields};
 
 fn render_with(
@@ -50,7 +53,9 @@ fn source_with_precision(decimal_places: u8) -> PartyLedgerMasterSource {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     }
 }
 
@@ -120,7 +125,9 @@ fn renders_evidence_currency_and_returned_fields_in_the_workbook() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -188,7 +195,9 @@ fn normally_signed_sundry_debtor_renders_as_a_group_subtotal_not_trade_receivabl
         }],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
 
@@ -254,7 +263,9 @@ fn gstin_not_observed_is_labeled_while_an_explicit_empty_gstin_is_not() {
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -320,7 +331,9 @@ fn worksheet_with_parent(parent: PartyLedgerMasterFieldObservation) -> (String, 
         groups: vec![],
         foreign_currency_ledgers_excluded: Vec::new(),
         mixed_currency_ledgers_excluded: Vec::new(),
+        set_aside_masters: Vec::new(),
         count_cross_check: None,
+        mailing_details_read_failed: None,
     })
     .unwrap();
     let bytes = render_with(&workbook, &[]).unwrap();
@@ -650,10 +663,16 @@ fn package_fingerprint(source: PartyLedgerMasterSource) -> String {
 /// ledger is excluded, its group read being empty), which moved it again. Both digests are taken
 /// from the tree that has them. The two stay what they were
 /// to each other: the later-dated variant differs from the plain one only by its note.
+/// Both digests were taken again when the five mailing columns and the Covered text
+/// changed the package (#1490); and again when the note's mailing bound went from 3,404 to 3,200
+/// ledgers with the larger per-ledger estimate (the one text change); and again when the note also
+/// named the count and the alterations beyond it, in the note and the Covered text (bridge#2074);
+/// nothing since then may
+/// change them.
 const HOST_DATE_PACKAGE_WITHOUT_NOTE: &str =
-    "1308e28af056945e94d5c2f758daaaa7ef812f15559794eced988526b67f4933";
+    "686df90909e34a085fc63bb7b2b0451b4094ca1ca068a9fc5fe5f20ecb81832e";
 const HOST_DATE_PACKAGE_WITH_LATER_DATED_NOTE: &str =
-    "f8dc3c3e7ccf585711adab04b6e0d2ca62f1e6dc301e29379ae7aa41b3487926";
+    "5b6b39d4175fc486623ba912988be6a966b039cafcc2172e8eedd9d94a6f8375";
 
 #[test]
 fn the_host_date_workbook_is_byte_for_byte_what_it_was_before_a_date_could_be_typed() {
@@ -695,6 +714,326 @@ fn a_chosen_date_that_is_a_boundary_adds_no_moved_note_to_the_workbook() {
     assert!(text.contains(
         "Read period: 20260401 to 20260731. No prior-year values were requested or inferred."
     ));
+}
+
+fn mailing_row(name: &str, id: &str, history: MailingDetailsHistory) -> PartyLedgerMasterRow {
+    PartyLedgerMasterRow {
+        name: name.to_string(),
+        parent: PartyLedgerMasterFieldObservation::Returned("Sundry Debtors".to_string()),
+        party_gstin: PartyLedgerMasterFieldObservation::NotObserved,
+        fields: PartyLedgerMasterFields {
+            mailing_details: history,
+            ..PartyLedgerMasterFields::default()
+        },
+        guid: format!("guid-{id}"),
+        master_id: id.to_string(),
+        alter_id: id.to_string(),
+        opening_balance: ExactDecimal::parse("0.00".to_string()).unwrap(),
+        closing_balance: Some(ExactDecimal::parse("0.00".to_string()).unwrap()),
+    }
+}
+
+fn mailing_entry(from: &str, pin: &str) -> MailingDetailsEntry {
+    MailingDetailsEntry {
+        applicable_from: TallyDate::parse(from).unwrap(),
+        mailing_name: Some("Lab Party".to_string()),
+        address_lines: vec!["1 Test Street".to_string(), "Test Area".to_string()],
+        state: Some("Karnataka".to_string()),
+        country: Some("India".to_string()),
+        pin_code: Some(pin.to_string()),
+        other_content_skipped: false,
+    }
+}
+
+/// The text of one cell of the ledger sheet, or `None` when it holds nothing.
+fn sheet_cell(source: PartyLedgerMasterSource, cell: &str) -> Option<String> {
+    let workbook = build_party_ledger_master_workbook(source).unwrap();
+    let bytes = render_with(&workbook, &[]).unwrap();
+    let mut archive = ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut sheet = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/worksheets/sheet1.xml").unwrap(),
+        &mut sheet,
+    )
+    .unwrap();
+    let mut shared = String::new();
+    std::io::Read::read_to_string(
+        &mut archive.by_name("xl/sharedStrings.xml").unwrap(),
+        &mut shared,
+    )
+    .unwrap();
+    let start = sheet.find(&format!(r#"<c r="{cell}""#))?;
+    let element = &sheet[start..start + sheet[start..].find("</c>")?];
+    let index: usize = element
+        .split("<v>")
+        .nth(1)?
+        .split("</v>")
+        .next()?
+        .parse()
+        .ok()?;
+    let entry = shared.split("<si>").skip(1).nth(index)?;
+    let text = entry.split('>').nth(1)?.split('<').next()?;
+    Some(text.to_string())
+}
+
+#[test]
+fn the_mailing_columns_are_appended_after_the_existing_ones_and_named() {
+    let source = source_with_precision(2);
+    for (cell, label) in [
+        ("W14", "Closing balance (exact text)"),
+        (
+            "X14",
+            "Mailing address in force (as of Balances-as-of date)",
+        ),
+        ("Y14", "Mailing PIN code in force"),
+        ("Z14", "Mailing state in force"),
+        ("AA14", "Mailing details effective from"),
+        ("AB14", "Mailing details status"),
+    ] {
+        assert_eq!(
+            sheet_cell(source.clone(), cell).as_deref(),
+            Some(label),
+            "{cell}"
+        );
+    }
+}
+
+#[test]
+fn a_partys_mailing_entry_in_force_on_the_balances_date_fills_the_five_cells() {
+    let mut source = source_with_precision(2);
+    source.rows = vec![
+        mailing_row(
+            "Lab Party",
+            "1",
+            MailingDetailsHistory::Entries {
+                entries: vec![
+                    mailing_entry("20260401", "560001"),
+                    mailing_entry("20261001", "560099"),
+                ],
+            },
+        ),
+        mailing_row("Other", "2", MailingDetailsHistory::NotObserved),
+    ];
+    let cell = |cell: &str| sheet_cell(source.clone(), cell);
+    // `Balances as of` is 20260731: the entry dated 20260401 is in force, the one
+    // dated 20261001 is not yet.
+    assert_eq!(cell("X15").as_deref(), Some("1 Test Street, Test Area"));
+    assert_eq!(cell("Y15").as_deref(), Some("560001"));
+    assert_eq!(cell("Z15").as_deref(), Some("Karnataka"));
+    assert_eq!(cell("AA15").as_deref(), Some("20260401"));
+    assert_eq!(cell("AB15").as_deref(), Some("in force"));
+    // A ledger whose response did not carry the list says so and leaves the values blank.
+    for blank in ["X16", "Y16", "Z16", "AA16"] {
+        assert_eq!(cell(blank), None, "{blank}");
+    }
+    assert_eq!(cell("AB16").as_deref(), Some("not observed"));
+}
+
+/// A workbook none of whose ledgers carried the mailing list (a book read without it) says so in
+/// its header, beside the per-ledger status; one that carries a list for any ledger does not.
+#[test]
+fn a_workbook_that_observed_no_mailing_details_says_so_loudly() {
+    const NOTE: &str = "No ledger's mailing details were observed in this read";
+    let mut source = source_with_precision(2);
+    source.rows = vec![
+        mailing_row("A", "1", MailingDetailsHistory::NotObserved),
+        mailing_row("B", "2", MailingDetailsHistory::NotObserved),
+    ];
+    assert!(workbook_text(source.clone()).contains(NOTE));
+    assert_eq!(
+        sheet_cell(source.clone(), "C4")
+            .as_deref()
+            .map(|t| t.starts_with(NOTE)),
+        Some(true)
+    );
+    source.rows[1] = mailing_row(
+        "B",
+        "2",
+        MailingDetailsHistory::Entries {
+            entries: vec![mailing_entry("20260401", "560001")],
+        },
+    );
+    assert!(!workbook_text(source.clone()).contains(NOTE));
+    assert_eq!(sheet_cell(source, "C4"), None);
+}
+
+/// A workbook read again without the mailing details after their read failed says that read
+/// failed, in place of the note that none were observed (bridge#2214).
+#[test]
+fn a_workbook_read_again_after_its_mailing_read_failed_says_that_read_failed() {
+    use crate::tally::connection::MailingReadFailure;
+    const NOT_OBSERVED: &str = "No ledger's mailing details were observed in this read";
+    let mut source = source_with_precision(2);
+    source.rows = vec![
+        mailing_row("A", "1", MailingDetailsHistory::NotObserved),
+        mailing_row("B", "2", MailingDetailsHistory::NotObserved),
+    ];
+    // Every failure after which the book is read again (bridge#2214), each said as itself.
+    for (cause, said) in [
+        (
+            MailingReadFailure::ResponseTooLarge {
+                declared_by_peer: true,
+            },
+            "Tally's answer to that read passed the 32 MiB limit",
+        ),
+        (
+            MailingReadFailure::Truncated,
+            "Tally's answer to that read broke off before it ended",
+        ),
+        (
+            MailingReadFailure::ReadFailed,
+            "Tally's answer to that read could not be read",
+        ),
+        (
+            MailingReadFailure::NoAnswer,
+            "that read failed before Tally answered it",
+        ),
+        (
+            MailingReadFailure::Undecodable,
+            "Tally's answer to that read could not be decoded as text",
+        ),
+        (
+            MailingReadFailure::HttpStatus,
+            "Tally answered that read with an HTTP error",
+        ),
+        (MailingReadFailure::NotSent, "that read did not reach Tally"),
+        (
+            MailingReadFailure::AnswersDiffered,
+            "Tally's two answers to that read differed",
+        ),
+        (
+            MailingReadFailure::TallyFailed,
+            "Tally answered that read with a failure",
+        ),
+        (
+            MailingReadFailure::StatusAbsent,
+            "Tally's answer to that read carried no status",
+        ),
+        (
+            MailingReadFailure::Malformed,
+            "Tally's answer to that read was not well-formed XML",
+        ),
+        (
+            MailingReadFailure::RowRefused,
+            "Tally's answer to that read held a ledger entry ComplyEaze Bridge could not read",
+        ),
+        (
+            MailingReadFailure::OtherCompany,
+            "Tally's answer to that read was not for this company",
+        ),
+        (
+            MailingReadFailure::BoundPassed,
+            "Tally's answer to that read passed one of ComplyEaze Bridge's count limits",
+        ),
+        (
+            MailingReadFailure::IdentityRepeated,
+            "Tally's answer to that read repeated a ledger",
+        ),
+        (
+            MailingReadFailure::CountDiffers,
+            "Tally's answer to that read held another number of ledgers than were counted",
+        ),
+    ] {
+        source.mailing_details_read_failed = Some(cause);
+        let text = workbook_text(source.clone());
+        assert!(!text.contains(NOT_OBSERVED), "{cause:?}");
+        assert_eq!(sheet_cell(source.clone(), "C4"), None, "{cause:?}");
+        let note = sheet_cell(source.clone(), "C3").expect("the notes cell");
+        assert!(
+            note.starts_with("The mailing details were asked for, and ") && note.contains(said),
+            "{note}"
+        );
+    }
+    // A failure that refuses the export is never read again, so it has no note.
+    for cause in [
+        MailingReadFailure::Deadline,
+        MailingReadFailure::ResponseTooLarge {
+            declared_by_peer: false,
+        },
+    ] {
+        source.mailing_details_read_failed = Some(cause);
+        assert_eq!(source.mailing_details_read_failed_note(), None, "{cause:?}");
+    }
+}
+
+#[test]
+fn each_mailing_status_says_why_the_values_are_blank() {
+    let status = |history: MailingDetailsHistory, as_of: &str| {
+        mailing_cells(&history, &TallyDate::parse(as_of).unwrap())[4].clone()
+    };
+    let one = MailingDetailsHistory::Entries {
+        entries: vec![mailing_entry("20260401", "560001")],
+    };
+    assert_eq!(status(one.clone(), "20260401"), "in force");
+    // Not "no address": the first entry starts later, and the status says when.
+    assert_eq!(
+        status(one.clone(), "20260331"),
+        "none in force on that date; first entry from 20260401"
+    );
+    let mut skipped = mailing_entry("20260401", "560001");
+    skipped.other_content_skipped = true;
+    assert_eq!(
+        status(
+            MailingDetailsHistory::Entries {
+                entries: vec![skipped]
+            },
+            "20260401"
+        ),
+        "in force; some content of the entry was not read"
+    );
+    assert_eq!(
+        status(
+            MailingDetailsHistory::Entries { entries: vec![] },
+            "20260731"
+        ),
+        "no mailing details"
+    );
+    assert_eq!(
+        status(MailingDetailsHistory::NotObserved, "20260731"),
+        "not observed"
+    );
+    for (defect, name) in [
+        (MailingDetailsDefect::EntryWithoutDate, "entry_without_date"),
+        (MailingDetailsDefect::DateInvalid, "date_invalid"),
+        (
+            MailingDetailsDefect::EntryRepeatsAField,
+            "entry_repeats_a_field",
+        ),
+        (
+            MailingDetailsDefect::ConflictingEntriesOnOneDate,
+            "conflicting_entries_on_one_date",
+        ),
+    ] {
+        assert_eq!(
+            status(MailingDetailsHistory::Unreadable { defect }, "20260731"),
+            format!("unreadable: {name}")
+        );
+    }
+}
+
+#[test]
+fn an_entry_missing_its_pin_or_state_leaves_those_cells_blank_and_the_rest_filled() {
+    let mut entry = mailing_entry("20260401", "560001");
+    entry.pin_code = None;
+    entry.state = None;
+    entry.address_lines = vec!["Only line".to_string()];
+    let cells = mailing_cells(
+        &MailingDetailsHistory::Entries {
+            entries: vec![entry],
+        },
+        &TallyDate::parse("20260731").unwrap(),
+    );
+    assert_eq!(cells, ["Only line", "", "", "20260401", "in force"]);
+}
+
+#[test]
+fn the_covered_text_names_the_dated_mailing_details() {
+    let text = workbook_text(source_with_precision(2));
+    assert!(text.contains(
+        "the dated mailing details (address, PIN code, state) in force on the Balances-as-of date"
+    ));
+    // The older flat columns can read empty for a party that holds an address: say so.
+    assert!(text.contains("read the Mailing columns at the right"));
 }
 
 #[test]

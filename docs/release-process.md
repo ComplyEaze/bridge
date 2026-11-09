@@ -742,9 +742,14 @@ every note for them first, and for maintainers second.
 
 - Cut a release (`mcp-v*`; `mcp-preview-*` for 0.2.0 and 0.3.0) only when both of
   these hold: at least one user-visible change has landed, and CI is green on
-  both hosts. A master push may show the native, bundle and seam jobs skipped
-  when the merge queue ran them on that same commit; its job summary names the
-  queue run, and the daily scheduled run runs everything.
+  both hosts. The macOS native tests run only on a master push, the daily
+  scheduled run, a manual run and the version pull request (the release pull
+  request, which changes the version in `src-tauri/tauri.conf.json`), never on
+  another pull request or in the merge queue. A master
+  push leaves the Windows native, bundle and seam jobs out of its matrix when the merge
+  queue ran them on that same commit; its job summary names the queue run. The
+  macOS bundle and seam jobs run in the queue and on a push only when a
+  packaging path changes, and the daily scheduled run runs everything.
 - The workflow publishes each preview as a prerelease. Once its checks are
   read, the maintainer marks the newest preview as the repository's latest
   release (`gh release edit <tag> --prerelease=false --latest`), so the

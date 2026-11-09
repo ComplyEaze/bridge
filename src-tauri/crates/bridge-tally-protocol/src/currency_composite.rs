@@ -10,19 +10,22 @@
 //! (`fixtures/trial_balance_currency_forex_live`).
 //!
 //! [`is_currency_composite`] classifies the shape and reads no value, so
-//! nothing downstream can mistake a composite for an amount; the voucher,
-//! trial-balance and outstandings readers use it, and set the row aside or
-//! refuse it (the ledger-opening reader uses the looser classifier named below). [`parse_currency_composite`]
-//! reads a composite into its parts, and is not called by any reader yet (#683):
-//! a later slice adopts it everywhere at once, and deletes then the sign check
-//! in `agent_voucher_parse.rs` (`composite_signs_agree`) and the looser
-//! classifier in `native_outstandings/wire.rs` (`is_foreign_currency_balance`).
+//! nothing downstream can mistake a composite for an amount; the voucher parse
+//! uses it and refuses the row. The ledger snapshot classification (the compliance
+//! read of `ledger_masters`, the registers, the invoice import and the outstandings
+//! read) and the Trial Balance with currency use [`is_balance_composite`], this
+//! layout or the 7.2 layout of [`is_unspaced_currency_composite`], and set the row
+//! aside by name (the ledger-opening reader uses the looser classifier named below). [`parse_currency_composite`]
+//! reads a composite into its parts. Its one caller is the `vouchers` tool (#683); each other read
+//! adopts it in its own slice, and the last deletes the sign check in
+//! `agent_voucher_parse.rs` (`composite_signs_agree`) and the looser classifier in
+//! `native_outstandings/wire.rs` (`is_foreign_currency_balance`).
 //!
 //! [`parse_currency_composite`] refuses a different layout, not every value no
 //! capture shows. Among the shapes admitted without a capture are these six,
 //! and the tests pin each so a change is seen: a foreign symbol other than `$`
 //! (the symbol is not checked against a list), a rate with one to three
-//! decimals (every captured rate has none or four), a rate below one (every
+//! decimals (every captured 7.1 rate has none or four), a rate below one (every
 //! captured rate is 84 or more), a foreign amount below one other than zero
 //! (the smallest captured is 40.00), a base symbol other than the rupee symbol
 //! (the book's own base is accepted whatever it is), and a zero composite that
@@ -70,6 +73,61 @@ pub fn is_currency_composite(text: &str) -> bool {
     rate.base == base.symbol && rate.per == foreign.symbol && foreign.symbol != base.symbol
 }
 
+/// Whether `text` is exactly one composite in the layout TallyPrime 7.2 wrote a ledger's balance
+/// in (the lab's `ledger_snapshot_forex_unspaced_composite` and
+/// `trial_balance_forex_unspaced_composite`): `<amount> @ <rate> = <amount>` with the foreign
+/// amount's symbol directly against its digits (`$100.00`, where [`is_currency_composite`]'s
+/// layout has `$ 100.00`), the base amount keeping a space after its symbol, and a single space
+/// before ` = ` (the 7.1 layout has two).
+///
+/// Admitted by shape, not by value: the foreign and the base amount have exactly two decimal
+/// places, the rate is empty or a decimal (digits, with at most one point and a digit after it,
+/// as the other layout admits), and the symbols agree as in the other layout. TallyPrime 7.2 wrote
+/// a rate with two and with four decimals into the lab book's balances and Trial Balance
+/// movements, though every rate keyed was a whole number (`ledger_snapshot_forex_decimal_rate`,
+/// bridge#2228). A base amount written against its symbol, a second space before ` = `, or any
+/// other change in the layout is not this layout, so its caller refuses it. Shapes no capture
+/// shows also pass, as they do the 7.1 check, and the tests pin each: an empty or zero rate with
+/// non-zero amounts, amounts of opposite signs, a zero base with a foreign value, leading zeros,
+/// and a foreign or base symbol other than `$` and the rupee symbol. A ledger row that passes is
+/// set aside by name and its value is never read, so no figure can come from one; a voucher's is
+/// read only through [`parse_currency_composite`], which refuses these shapes. The two layouts
+/// never both match one string: this one needs the foreign amount unspaced and the other needs
+/// it spaced.
+pub fn is_unspaced_currency_composite(text: &str) -> bool {
+    let Some((foreign, rest)) = split_once_exact(text, " @ ") else {
+        return false;
+    };
+    let Some((rate, base)) = split_once_exact(rest, " = ") else {
+        return false;
+    };
+    // Exactly one space before ` = `: the rate does not end in a space.
+    if rate.ends_with(' ') {
+        return false;
+    }
+    let (Some(foreign), Some(rate), Some(base)) = (
+        unspaced_amount(foreign),
+        rate_symbols(rate),
+        symbol_amount(base),
+    ) else {
+        return false;
+    };
+    has_two_decimals(foreign.digits)
+        && has_two_decimals(base.digits)
+        && rate.base == base.symbol
+        && rate.per == foreign.symbol
+        && foreign.symbol != base.symbol
+}
+
+/// Whether `text` is a currency composite as a ledger's balance is written: in the layout of the
+/// 7.1 captures ([`is_currency_composite`]) or of the 7.2 captures
+/// ([`is_unspaced_currency_composite`]). The ledger snapshot and the Trial Balance set such a row
+/// aside by name and never read its value; the voucher parse withholds such an amount until
+/// [`parse_currency_composite`] has read it.
+pub fn is_balance_composite(text: &str) -> bool {
+    is_currency_composite(text) || is_unspaced_currency_composite(text)
+}
+
 fn split_once_exact<'a>(text: &'a str, separator: &str) -> Option<(&'a str, &'a str)> {
     let (left, right) = text.split_once(separator)?;
     (!right.contains(separator)).then_some((left, right))
@@ -77,12 +135,32 @@ fn split_once_exact<'a>(text: &'a str, separator: &str) -> Option<(&'a str, &'a 
 
 struct SymbolAmount<'a> {
     symbol: &'a str,
+    /// The amount as written after the symbol.
+    digits: &'a str,
+}
+
+/// `[-]<symbol><amount>` with no space between: the symbol is everything before the first ASCII
+/// digit.
+fn unspaced_amount(text: &str) -> Option<SymbolAmount<'_>> {
+    let text = text.strip_prefix('-').unwrap_or(text);
+    let first_digit = text.find(|c: char| c.is_ascii_digit())?;
+    let (symbol, digits) = text.split_at(first_digit);
+    (is_symbol(symbol) && is_ascii_decimal(digits)).then_some(SymbolAmount { symbol, digits })
+}
+
+fn has_two_decimals(amount: &str) -> bool {
+    amount
+        .split_once('.')
+        .is_some_and(|(_, fraction)| fraction.len() == 2)
 }
 
 fn symbol_amount(text: &str) -> Option<SymbolAmount<'_>> {
     let text = text.strip_prefix('-').unwrap_or(text);
     let (symbol, amount) = text.split_once(' ')?;
-    (is_symbol(symbol) && is_ascii_decimal(amount)).then_some(SymbolAmount { symbol })
+    (is_symbol(symbol) && is_ascii_decimal(amount)).then_some(SymbolAmount {
+        symbol,
+        digits: amount,
+    })
 }
 
 /// The rate's two symbols: the base it is quoted in, and the foreign unit.
@@ -118,8 +196,7 @@ fn is_ascii_decimal(text: &str) -> bool {
 /// rate are kept apart, and the base symbol was checked against the book's own
 /// base currency before this value existed.
 ///
-/// UNUSED until a later slice adopts it in the readers (#683). Measured on one
-/// currency pair (`$` against `I₹`) on release 7.1, the rate is Tally's display
+/// Measured on one currency pair (`$` against `I₹`) on release 7.1, the rate is Tally's display
 /// of `base / foreign` rounded to four places (one capture, a rate of
 /// 279.6667, is not an exact integer: the evidence for the rounding is that one
 /// datum), so the base cannot be rebuilt from the foreign amount and the rate,
@@ -150,7 +227,7 @@ impl ValuedComposite {
     }
 
     /// The foreign currency's symbol as written. It is not checked against
-    /// any currency master here: the slice that adopts this parse must.
+    /// any currency master here: the caller must.
     pub fn foreign_symbol(&self) -> &str {
         &self.foreign_symbol
     }
@@ -243,12 +320,14 @@ pub enum CompositeRefusal {
     EmptyRateWithValue,
 }
 
-/// Read `text` as one composite in the book whose base currency is `base`.
+/// Read `text`, in either layout of [`is_balance_composite`], as one composite in the book whose
+/// base currency is `base`.
 pub fn parse_currency_composite(
     text: &str,
     base: &BaseCurrencyName,
 ) -> Result<CurrencyComposite, CompositeRefusal> {
-    if !is_currency_composite(text) {
+    let unspaced = is_unspaced_currency_composite(text);
+    if !unspaced && !is_currency_composite(text) {
         return Err(CompositeRefusal::NotComposite);
     }
     // The classifier has checked the shape; what follows reads its pieces.
@@ -258,14 +337,24 @@ pub fn parse_currency_composite(
     let (rate_text, base_text) = rest
         .split_once(" = ")
         .ok_or(CompositeRefusal::NotComposite)?;
-    // The captured spacing: the rate ends with exactly one extra space.
-    let Some(rate_text) = rate_text.strip_suffix(' ') else {
-        return Err(CompositeRefusal::Spacing);
+    // The 7.1 spacing: the rate ends with exactly one extra space. The classifier has
+    // refused any in the 7.2 layout.
+    let rate_text = if unspaced {
+        rate_text
+    } else {
+        let Some(rate_text) = rate_text.strip_suffix(' ') else {
+            return Err(CompositeRefusal::Spacing);
+        };
+        if rate_text.ends_with(' ') {
+            return Err(CompositeRefusal::Spacing);
+        }
+        rate_text
     };
-    if rate_text.ends_with(' ') {
-        return Err(CompositeRefusal::Spacing);
-    }
-    let foreign = signed_amount(foreign_text)?;
+    let foreign = if unspaced {
+        signed_unspaced_amount(foreign_text)?
+    } else {
+        signed_amount(foreign_text)?
+    };
     let base_amount = signed_amount(base_text)?;
     if base_amount.symbol != base.name() {
         return Err(CompositeRefusal::BaseNotBookBase);
@@ -326,6 +415,20 @@ fn signed_amount(text: &str) -> Result<ReadAmount<'_>, CompositeRefusal> {
     let (symbol, amount) = unsigned
         .split_once(' ')
         .ok_or(CompositeRefusal::NotComposite)?;
+    read_amount(symbol, amount, negative)
+}
+
+/// `[-]<symbol><amount>`, the foreign amount of the 7.2 layout.
+fn signed_unspaced_amount(text: &str) -> Result<ReadAmount<'_>, CompositeRefusal> {
+    let amount = unspaced_amount(text).ok_or(CompositeRefusal::NotComposite)?;
+    read_amount(amount.symbol, amount.digits, text.starts_with('-'))
+}
+
+fn read_amount<'a>(
+    symbol: &'a str,
+    amount: &str,
+    negative: bool,
+) -> Result<ReadAmount<'a>, CompositeRefusal> {
     match amount.split_once('.') {
         Some((_, fraction)) if fraction.len() == 2 => {}
         _ => return Err(CompositeRefusal::AmountScale),

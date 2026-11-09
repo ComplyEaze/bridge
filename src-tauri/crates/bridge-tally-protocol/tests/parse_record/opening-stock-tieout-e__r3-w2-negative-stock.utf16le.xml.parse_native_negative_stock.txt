@@ -1,0 +1,20 @@
+# fixture: tests/fixtures/opening-stock-tieout-e/r3-w2-negative-stock.utf16le.xml
+# parser: parse_native_negative_stock
+# source: captured
+Ok(NativeNegativeStockListing {
+    items: [
+        NativeListedStockItem {
+            name: "Lab Item C",
+            quantity: Read(
+                NativeStockQuantity {
+                    amount: ExactDecimal(
+                        "-3",
+                    ),
+                    unit: "Nos",
+                },
+            ),
+            rate: Empty,
+            value: Empty,
+        },
+    ],
+})

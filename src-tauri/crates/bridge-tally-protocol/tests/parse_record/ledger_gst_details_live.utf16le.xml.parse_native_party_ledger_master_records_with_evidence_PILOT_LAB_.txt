@@ -117,6 +117,7 @@ Ok(ParsedExport {
                             },
                         ],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -186,6 +187,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -332,6 +334,7 @@ Ok(ParsedExport {
                             },
                         ],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -401,6 +404,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -545,6 +549,7 @@ Ok(ParsedExport {
                             },
                         ],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -613,6 +618,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -682,6 +688,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -751,6 +758,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -829,6 +837,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -975,6 +984,7 @@ Ok(ParsedExport {
                             },
                         ],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -1121,6 +1131,7 @@ Ok(ParsedExport {
                             },
                         ],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -1197,6 +1208,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -1265,6 +1277,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(
@@ -1333,6 +1346,7 @@ Ok(ParsedExport {
                     gst_details: Entries {
                         entries: [],
                     },
+                    mailing_details: NotObserved,
                 },
             },
             source_id: Some(

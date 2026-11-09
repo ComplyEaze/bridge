@@ -1,0 +1,507 @@
+# fixture: tests/fixtures/agent/party-bills/ledger-snapshot-trailing-space.utf16le.xml
+# parser: parse_native_ledger_snapshot
+# source: captured
+Ok([
+    LedgerSnapshotEntry {
+        name: "Cash",
+        parent: Some(
+            "Cash-in-Hand",
+        ),
+        closing_balance: None,
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 $$Name",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Amp & Co",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Angle <A>",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Café",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Colon: A",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Comma, A",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Dash-Co",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Dollar $1",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Dot Co.",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Hash #1",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Income",
+        parent: Some(
+            "Indirect Incomes",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "1500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 O'Neil",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Paren (A)",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Quote \"Q\"",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Slash A/B",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "L5 Trail",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-100.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Lab Bank",
+        parent: Some(
+            "Bank Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-67000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-50000.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-50000.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Lab Capital",
+        parent: Some(
+            "Capital Account",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "65000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "65000.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "65000.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Lab Party P1",
+        parent: Some(
+            "Sundry Debtors",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "-26000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "-15000.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "-15000.00",
+            ),
+        ),
+        bill_wise_on: true,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Lab Sales",
+        parent: Some(
+            "Sales Accounts",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "28000.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+    LedgerSnapshotEntry {
+        name: "Profit & Loss A/c",
+        parent: Some(
+            "�#4; Primary",
+        ),
+        closing_balance: Some(
+            ExactDecimal(
+                "29500.00",
+            ),
+        ),
+        opening_balance: ExactDecimal(
+            "0.00",
+        ),
+        opening_balance_observed: Some(
+            ExactDecimal(
+                "0.00",
+            ),
+        ),
+        bill_wise_on: false,
+        currency_name: Some(
+            "₹",
+        ),
+    },
+])

@@ -1,0 +1,11 @@
+002-marks-a.json isError False marks: master_alter_id 245 voucher_alter_id 68 reused False ledgers 18
+003-vouchers.json isError False total 41 state complete None snapshot {"id": "c899746d-18af-4c26-8525-994a587ed724", "master_alter_id": 245, "read_at": "2026-11-09T12:03:42.946Z", "reused": false, "voucher_alter_id": 68}
+004-gst1.json isError False total 0 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 0, "unread": 0} next_offset None
+005-gst2.json isError False total 0 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 0, "unread": 0} next_offset None
+006-gst3.json isError False total 0 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 0, "unread": 0} next_offset None
+007-gst4.json isError False total 0 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 0, "unread": 0} next_offset None
+008-gst5.json isError False total 0 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 0, "unread": 0} next_offset None
+009-gst6.json isError False total 2 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 2, "unread": 0} next_offset None
+010-gst7.json isError False total 0 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 0, "unread": 0} next_offset None
+011-gst8.json isError False total 0 state complete counts {"accepted_as_it_stands": 0, "cancelled": 0, "excluded": 0, "included": 0, "not_in_return": 0, "optional": 0, "post_dated": 0, "uncertain": 0, "unread": 0} next_offset None
+012-marks-b.json isError False marks: master_alter_id 245 voucher_alter_id 68 reused False ledgers 18

@@ -1,0 +1,14 @@
+000-list.json: list written 2026-11-09T12:09:12.144Z read 2026-11-09T12:09:12.155Z secs 0.009 bytes 171022 isError None rpc False
+001-lc.json: list_companies written 2026-11-09T12:09:13.177Z read 2026-11-09T12:09:13.281Z secs 0.104 bytes 1614 isError False rpc False
+002-marks-a.json: ledger_masters written 2026-11-09T12:09:14.297Z read 2026-11-09T12:09:15.103Z secs 0.806 bytes 6676 isError False rpc False
+003-vouchers.json: vouchers written 2026-11-09T12:09:16.115Z read 2026-11-09T12:09:19.038Z secs 2.921 bytes 66295 isError False rpc False
+004-gst1.json: gst_status written 2026-11-09T12:09:22.180Z read 2026-11-09T12:09:23.379Z secs 1.199 bytes 11770 isError False rpc False
+005-gst2.json: gst_status written 2026-11-09T12:09:26.413Z read 2026-11-09T12:09:27.769Z secs 1.356 bytes 11770 isError False rpc False
+006-gst3.json: gst_status written 2026-11-09T12:09:30.811Z read 2026-11-09T12:09:32.056Z secs 1.247 bytes 11770 isError False rpc False
+007-gst4.json: gst_status written 2026-11-09T12:09:35.091Z read 2026-11-09T12:09:36.303Z secs 1.217 bytes 11770 isError False rpc False
+008-gst5.json: gst_status written 2026-11-09T12:09:39.350Z read 2026-11-09T12:09:40.563Z secs 1.214 bytes 11780 isError False rpc False
+009-gst6.json: gst_status written 2026-11-09T12:09:43.620Z read 2026-11-09T12:09:44.985Z secs 1.365 bytes 12477 isError False rpc False
+010-gst7.json: gst_status written 2026-11-09T12:09:48.029Z read 2026-11-09T12:09:49.248Z secs 1.217 bytes 11780 isError False rpc False
+011-gst8.json: gst_status written 2026-11-09T12:09:52.297Z read 2026-11-09T12:09:53.534Z secs 1.236 bytes 11780 isError False rpc False
+012-marks-b.json: ledger_masters written 2026-11-09T12:09:56.600Z read 2026-11-09T12:09:57.465Z secs 0.865 bytes 6677 isError False rpc False
+013-egress.json: egress_log written 2026-11-09T12:09:58.484Z read 2026-11-09T12:09:58.562Z secs 0.076 bytes 95156 isError False rpc False

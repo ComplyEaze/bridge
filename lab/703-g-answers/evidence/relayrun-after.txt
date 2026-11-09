@@ -1,0 +1,5 @@
+2026-11-09T12:08:55.760Z Ctrl+C handling turned on before the relay starts (the shells here start with it off, and children inherit that): 1
+2026-11-09T12:08:55.768Z relay started pid 18488: relay.py 9002 9001 OUTDIR ARMDIR
+2026-11-09T12:10:12.985Z stop file seen: Ctrl+C to this console: 1
+2026-11-09T12:10:14.338Z wake connect to the relay port: opened and closed, no byte sent (accept() returns and the relay acts on the Ctrl+C)
+2026-11-09T12:10:14.339Z relay exit code 3221225786 (None = still running 15 s after Ctrl+C)

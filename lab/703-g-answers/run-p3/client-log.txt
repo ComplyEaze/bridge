@@ -1,0 +1,18 @@
+2026-11-09T12:13:59Z exe sha256 85c6e12683ffaa5065d33c4bd01440aa12c634d5c6beac8608a626ea3ee6b80e ok; launch-env.json sha256 761d727b98fb804ffefcf416d2ef5d9671197db23688fe45ffdabf392d3c8a78; keys ['BRIDGE_AGENT_DATA_DIR', 'BRIDGE_TALLY_HOST', 'BRIDGE_TALLY_PORT', 'BRIDGE_TERMS_ACCEPTED']; BRIDGE_AGENT_ENABLE_WRITES present: False
+2026-11-09T12:13:59Z launched pid 8000; stderr to server-stderr-20261109T121359Z.log
+2026-11-09T12:13:59Z initialized {'name': 'bridge-tally', 'version': '0.7.0'}
+2026-11-09T12:14:03Z 000-list.json tool=list written 2026-11-09T12:14:03.768Z read 2026-11-09T12:14:03.788Z secs=0.026 isError=None error=None saved_sha256=10b3a3530fe1b81c602e2ad1bf3685bacd47bed941f7a30184b258b9861da043
+2026-11-09T12:14:04Z 001-lc.json tool=list_companies written 2026-11-09T12:14:04.824Z read 2026-11-09T12:14:04.940Z secs=0.116 isError=False error=None saved_sha256=e924785808e78a9f57f235850fd7166ca1b89d56137ea835eac37ead643366f8
+2026-11-09T12:14:06Z 002-marks-a.json tool=ledger_masters written 2026-11-09T12:14:05.954Z read 2026-11-09T12:14:06.746Z secs=0.792 isError=False error=None saved_sha256=e67849c4ac35bdd4903148bd721d2ec541aaf62997cef9cc0e3af36b17080df5
+2026-11-09T12:14:10Z 003-vouchers.json tool=vouchers written 2026-11-09T12:14:07.761Z read 2026-11-09T12:14:10.726Z secs=2.966 isError=False error=None saved_sha256=4a67fd070d9f064cf542e2eae91cfa825322f8bb4d528b05e9d35b60ad25f77d
+2026-11-09T12:14:15Z 004-gst1.json tool=gst_status written 2026-11-09T12:14:13.866Z read 2026-11-09T12:14:15.073Z secs=1.209 isError=False error=None saved_sha256=c7c3217cda29feb2c3bb66edf0c5b412329597fdef2418dbcdcea717c760a970
+2026-11-09T12:14:19Z 005-gst2.json tool=gst_status written 2026-11-09T12:14:18.106Z read 2026-11-09T12:14:19.499Z secs=1.392 isError=False error=None saved_sha256=6d6b740a9e6be384759de7abbca69402d216943b52025dfa59bb7c5f5940fd1e
+2026-11-09T12:14:23Z 006-gst3.json tool=gst_status written 2026-11-09T12:14:22.533Z read 2026-11-09T12:14:23.802Z secs=1.269 isError=False error=None saved_sha256=3e2adf0202af90f623cf64cc3b5908eb64b56db7cd723ec513256f52a808111b
+2026-11-09T12:14:28Z 007-gst4.json tool=gst_status written 2026-11-09T12:14:26.841Z read 2026-11-09T12:14:28.101Z secs=1.261 isError=False error=None saved_sha256=326c70748626de2dfd840e578937f83c43a37b71862c3c17de1c298ebf632ba0
+2026-11-09T12:14:32Z 008-gst5.json tool=gst_status written 2026-11-09T12:14:31.131Z read 2026-11-09T12:14:32.354Z secs=1.234 isError=False error=None saved_sha256=9df53c301094d6eae766a3af29fa91e81cc88530e4574f070e7c52f6427ff113
+2026-11-09T12:14:36Z 009-gst6.json tool=gst_status written 2026-11-09T12:14:35.394Z read 2026-11-09T12:14:36.764Z secs=1.370 isError=False error=None saved_sha256=6d297b9b167862a0d0dc5db2b69fc3af5a1372f12fb5a7c9e5f7862457bf962a
+2026-11-09T12:14:41Z 010-gst7.json tool=gst_status written 2026-11-09T12:14:39.805Z read 2026-11-09T12:14:41.004Z secs=1.201 isError=False error=None saved_sha256=90d14e232fdf725ff1c11ee4810cc232d3a43ff7211b1af84de0614ac8a562f9
+2026-11-09T12:14:45Z 011-gst8.json tool=gst_status written 2026-11-09T12:14:44.049Z read 2026-11-09T12:14:45.242Z secs=1.192 isError=False error=None saved_sha256=9da03c473ea9b4a76655036a338d7d599b54ed850dda308d8b48951296a3d801
+2026-11-09T12:14:49Z 012-marks-b.json tool=ledger_masters written 2026-11-09T12:14:48.291Z read 2026-11-09T12:14:49.077Z secs=0.784 isError=False error=None saved_sha256=7b004385d57aaa29bf89c8d1f2a9dfd7bd86ebefbc0426b3ab630fbbfa45d6fc
+2026-11-09T12:14:50Z 013-egress.json tool=egress_log written 2026-11-09T12:14:50.087Z read 2026-11-09T12:14:50.184Z secs=0.097 isError=False error=None saved_sha256=7d58c96293b21a6217d6f75490db89453c19aeda9c350959736108c341075f7c
+2026-11-09T12:14:59Z session ended; server pid 8000 exit code 0

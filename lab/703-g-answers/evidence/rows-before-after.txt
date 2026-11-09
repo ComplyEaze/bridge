@@ -1,0 +1,10 @@
+003-vouchers.json: items 41 and 41, items equal True, counts equal True, sorted-items sha256 6d556930d5fbe718
+004-gst1.json: items 0 and 0, items equal True, counts equal True, sorted-items sha256 e3b0c44298fc1c14
+005-gst2.json: items 0 and 0, items equal True, counts equal True, sorted-items sha256 e3b0c44298fc1c14
+006-gst3.json: items 0 and 0, items equal True, counts equal True, sorted-items sha256 e3b0c44298fc1c14
+007-gst4.json: items 0 and 0, items equal True, counts equal True, sorted-items sha256 e3b0c44298fc1c14
+008-gst5.json: items 0 and 0, items equal True, counts equal True, sorted-items sha256 e3b0c44298fc1c14
+009-gst6.json: items 2 and 2, items equal True, counts equal True, sorted-items sha256 a5293f845ceac56d
+010-gst7.json: items 0 and 0, items equal True, counts equal True, sorted-items sha256 e3b0c44298fc1c14
+011-gst8.json: items 0 and 0, items equal True, counts equal True, sorted-items sha256 e3b0c44298fc1c14
+differing calls: 0

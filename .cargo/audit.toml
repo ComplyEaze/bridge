@@ -145,10 +145,11 @@ ignore = [
   # taken: a git dependency on unreleased sqlx, a [patch] or a fork (each a
   # new source, P8) and any bump whose only effect is a passing audit.
   # A bump does not move the bundled SQLite; see #2432, which holds the
-  # decision. cargo-audit prints nothing for an ignored id and the scheduled
-  # tracker does not list it, so the review-by date below is what brings it
-  # back (scripts/audit-review-by.test.mjs fails once it has passed). The id is
-  # ignored for any libsqlite3-sys version it matches.
+  # decision. cargo-audit prints nothing for an ignored id; the scheduled
+  # tracker lists it with its review-by date every day it runs, and the date
+  # below is what fails a test once it has passed
+  # (scripts/audit-review-by.test.mjs). The id is ignored for any
+  # libsqlite3-sys version it matches.
   # Review-by: 2026-12-09 (30 days; shorter than the others because this one is
   # an error, not a warning). Remove this entry when a patched libsqlite3-sys
   # can be locked and the tracking issue confirms it clears the shipped build;

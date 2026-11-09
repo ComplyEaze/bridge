@@ -45,9 +45,14 @@ impl fmt::Display for ReadProfileValidationError {
 impl std::error::Error for ReadProfileValidationError {}
 
 /// The longest company name, in UTF-8 bytes, that a request may carry in
-/// `SVCURRENTCOMPANY`. Held at 255 until the lab measures what Tally answers
-/// for a longer name (#2433); it is the one copy of this limit.
-pub const MAX_COMPANY_NAME_BYTES: usize = 255;
+/// `SVCURRENTCOMPANY`, for every script; the one copy of this limit (#2433).
+/// It is the longest multi-byte name a read was seen to match exactly: rows
+/// #2433-N (`lab/2433-n-name-answers`) and #2433-N3 (`lab/2433-n3-name-answers`)
+/// found that Tally stores a name typed on its screen whole, past 255 and 300
+/// bytes, and matches a read by the whole name only, never by a prefix (360
+/// Devanagari bytes, and 1,000 ASCII bytes). A longer name is not refused by
+/// Tally; it is only not established here, so it is marked, never cut.
+pub const MAX_COMPANY_NAME_BYTES: usize = 360;
 
 /// Why a company name, exactly as Tally reported it, cannot be sent in a
 /// request. The company still lists; only its reads refuse (#2433).
@@ -55,8 +60,8 @@ pub const MAX_COMPANY_NAME_BYTES: usize = 255;
 pub enum CompanyNameRefusal {
     /// The name is empty, or holds only whitespace.
     Blank,
-    /// The name is over [`MAX_COMPANY_NAME_BYTES`].
-    OverLimit,
+    /// The name is over [`MAX_COMPANY_NAME_BYTES`]: a read through it is not established.
+    LengthNotEstablished,
     /// The name holds a control character anywhere, its edges included.
     ControlCharacter,
 }
@@ -66,7 +71,7 @@ impl CompanyNameRefusal {
     pub fn code(self) -> &'static str {
         match self {
             Self::Blank => "company_name_blank",
-            Self::OverLimit => "company_name_over_limit",
+            Self::LengthNotEstablished => "company_name_length_not_established",
             Self::ControlCharacter => "company_name_control_character",
         }
     }
@@ -93,7 +98,7 @@ impl ValidatedCompanyName {
         } else if value.chars().any(char::is_control) {
             Some(CompanyNameRefusal::ControlCharacter)
         } else if value.len() > MAX_COMPANY_NAME_BYTES {
-            Some(CompanyNameRefusal::OverLimit)
+            Some(CompanyNameRefusal::LengthNotEstablished)
         } else {
             None
         }

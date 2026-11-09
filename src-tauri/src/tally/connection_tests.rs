@@ -484,7 +484,7 @@ fn company_identity_normalization_rejects_invalid_and_ambiguous_guids() {
             books_from: None,
         },
         crate::tally::TallyCompany {
-            name: "x".repeat(300),
+            name: "x".repeat(361),
             guid: Some("guid-3".to_string()),
             company_number: None,
             books_from: None,
@@ -501,7 +501,7 @@ fn company_identity_normalization_rejects_invalid_and_ambiguous_guids() {
         kept.iter()
             .map(|company| company.name.len())
             .collect::<Vec<_>>(),
-        [17, 300, 17]
+        [17, 361, 17]
     );
     assert!(crate::tally::validators::validate_company_name(&kept[0].name).is_err());
     assert!(crate::tally::validators::validate_company_name(&kept[1].name).is_err());

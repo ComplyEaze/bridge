@@ -12,7 +12,7 @@ pub fn validate_company_name(value: &str) -> Result<(), String> {
         Some(CompanyNameRefusal::Blank) => {
             Err("Select a Tally company before requesting company data".to_string())
         }
-        Some(CompanyNameRefusal::OverLimit | CompanyNameRefusal::ControlCharacter) => Err(format!(
+        Some(CompanyNameRefusal::LengthNotEstablished | CompanyNameRefusal::ControlCharacter) => Err(format!(
             "Tally company name must be at most {MAX_COMPANY_NAME_BYTES} bytes and contain no control characters"
         )),
     }

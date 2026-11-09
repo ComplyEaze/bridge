@@ -37,12 +37,12 @@ fn row<'a>(companies: &'a [TallyCompany], guid: &str) -> &'a TallyCompany {
 
 #[test]
 fn every_company_lists_and_only_the_unsendable_one_is_marked() {
-    let long = "x".repeat(300);
+    let long = "x".repeat(361);
     for (name_xml, held, refusal, shown) in [
         (
             long.as_str(),
             long.clone(),
-            Some("company_name_over_limit"),
+            Some("company_name_length_not_established"),
             long.clone(),
         ),
         (
@@ -126,7 +126,7 @@ async fn verified(xml: &str, guid: &str) -> Result<String, String> {
 
 #[tokio::test]
 async fn only_the_marked_company_refuses_its_reads() {
-    let xml = with_name(&"x".repeat(300));
+    let xml = with_name(&"x".repeat(361));
     assert_eq!(
         verified(&xml, MARKED_GUID).await,
         Err("company_name_invalid".to_string())

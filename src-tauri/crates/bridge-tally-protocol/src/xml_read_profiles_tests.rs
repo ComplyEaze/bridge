@@ -20,7 +20,7 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
         );
     }
     assert_eq!(
-        ValidatedCompanyName::new("x".repeat(256)),
+        ValidatedCompanyName::new("x".repeat(361)),
         Err(ReadProfileValidationError::CompanyInvalid)
     );
     // The one copy of the company-name rule, and its typed reasons (#2433).
@@ -40,25 +40,6 @@ fn validated_inputs_reject_arbitrary_or_invalid_values() {
             "{company:?}"
         );
     }
-    let at_limit = "x".repeat(MAX_COMPANY_NAME_BYTES);
-    assert_eq!(ValidatedCompanyName::refusal(&at_limit), None);
-    assert_eq!(
-        ValidatedCompanyName::new(at_limit.clone())
-            .unwrap()
-            .as_str(),
-        at_limit
-    );
-    assert_eq!(
-        ValidatedCompanyName::refusal(&format!("{at_limit}x")),
-        Some(CompanyNameRefusal::OverLimit)
-    );
-    // 85 Devanagari letters are 255 bytes; one more is over the byte limit.
-    let devanagari = "\u{915}".repeat(86);
-    assert_eq!(ValidatedCompanyName::refusal(&devanagari[..255]), None);
-    assert_eq!(
-        ValidatedCompanyName::refusal(&devanagari),
-        Some(CompanyNameRefusal::OverLimit)
-    );
     for (from, to, expected) in [
         (
             "2026-01-01",
@@ -797,5 +778,48 @@ fn the_v3_catalogue_request_renders_these_exact_bytes() {
     assert_eq!(
         ReadOnlyProfile::StandardLedgerCatalogV3 { company: &company }.render(),
         expected
+    );
+}
+
+/// The limit is 360 UTF-8 bytes for every script, rows #2433-N and #2433-N3.
+/// The figures are written out here rather than read from the constant, so a
+/// changed limit fails a test.
+#[test]
+fn the_company_name_limit_is_360_utf8_bytes_for_every_script() {
+    let not_established = Some(CompanyNameRefusal::LengthNotEstablished);
+    assert_eq!(MAX_COMPANY_NAME_BYTES, 360);
+    let at_limit = "x".repeat(360);
+    assert_eq!(ValidatedCompanyName::refusal(&at_limit), None);
+    assert_eq!(
+        ValidatedCompanyName::new(at_limit.clone())
+            .unwrap()
+            .as_str(),
+        at_limit
+    );
+    assert_eq!(
+        ValidatedCompanyName::refusal(&"x".repeat(361)),
+        not_established
+    );
+    // Row N3's name: 120 Devanagari letters, 360 bytes, admitted; one more letter is 363.
+    let devanagari = "\u{915}".repeat(120);
+    assert_eq!(devanagari.len(), 360);
+    assert_eq!(ValidatedCompanyName::refusal(&devanagari), None);
+    assert_eq!(
+        ValidatedCompanyName::refusal(&format!("{devanagari}\u{915}")),
+        not_established
+    );
+    // The limit counts bytes, not characters, and a character is counted whole:
+    // a three-byte letter ending at byte 360 is admitted, one crossing it is not.
+    let ending_at_limit = format!("{}\u{915}", "x".repeat(357));
+    assert_eq!(ending_at_limit.len(), 360);
+    assert_eq!(ValidatedCompanyName::refusal(&ending_at_limit), None);
+    let crossing_limit = format!("{}\u{915}", "x".repeat(358));
+    assert_eq!(
+        (crossing_limit.len(), crossing_limit.chars().count()),
+        (361, 359)
+    );
+    assert_eq!(
+        ValidatedCompanyName::refusal(&crossing_limit),
+        not_established
     );
 }

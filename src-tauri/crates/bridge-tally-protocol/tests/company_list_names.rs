@@ -3,7 +3,7 @@
 use bridge_tally_protocol::xml_read_profiles::{CompanyNameRefusal, ValidatedCompanyName};
 use bridge_tally_protocol::{
     decode_tally_xml_response_bytes_limited, parse_companies_from_collection,
-    ExpectedTallyTextEncoding,
+    parse_company_gateway_capability_observation, ExpectedTallyTextEncoding,
 };
 
 const CAPTURE: &[u8] =
@@ -39,12 +39,12 @@ fn two_rows(second: &str) -> String {
 
 #[test]
 fn a_name_a_request_cannot_carry_no_longer_refuses_the_list() {
-    let long = "A".repeat(300);
+    let long = "A".repeat(361);
     for (second, held, refusal) in [
         (
             long.as_str(),
             long.clone(),
-            Some(CompanyNameRefusal::OverLimit),
+            Some(CompanyNameRefusal::LengthNotEstablished),
         ),
         (
             "&#x9;LAB",
@@ -71,4 +71,20 @@ fn a_row_with_no_name_attribute_is_still_a_shape_error() {
         error.to_string(),
         "company collection omitted the company name"
     );
+}
+
+/// The capability probe reads the same list: a marked company beside an
+/// unmarked one leaves its observation exactly as the capture alone gives it.
+#[test]
+fn a_marked_company_leaves_the_capability_probe_unchanged() {
+    let alone = parse_company_gateway_capability_observation(&captured()).unwrap();
+    for second in ["A".repeat(361), "&#x9;LAB".to_string()] {
+        let xml = two_rows(&second);
+        assert_eq!(parse_companies_from_collection(&xml).unwrap().len(), 2);
+        assert_eq!(
+            parse_company_gateway_capability_observation(&xml).unwrap(),
+            alone,
+            "{second:?}"
+        );
+    }
 }

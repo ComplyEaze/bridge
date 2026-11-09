@@ -5,8 +5,8 @@ fn validates_company_selection() {
     assert!(validate_company_name("Synthetic Company").is_ok());
     assert!(validate_company_name("  ").is_err());
     assert!(validate_company_name("Synthetic\nCompany").is_err());
-    assert!(validate_company_name(&"x".repeat(256)).is_err());
-    assert!(validate_company_name(&"x".repeat(255)).is_ok());
+    assert!(validate_company_name(&"x".repeat(361)).is_err());
+    assert!(validate_company_name(&"x".repeat(360)).is_ok());
     // The name is checked as given, never trimmed first: an edge control
     // character is refused, not removed, and edge spaces are kept (#2433).
     assert!(validate_company_name("Synthetic Company\t").is_err());

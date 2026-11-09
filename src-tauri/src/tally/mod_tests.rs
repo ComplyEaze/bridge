@@ -104,6 +104,7 @@ fn identity_refuses_a_name_no_request_can_carry() {
         "tab\tinside".to_string(),
         "nul\u{0}inside".to_string(),
         "delete\u{7f}inside".to_string(),
+        "next line\u{85}inside".to_string(),
         "Client Book\r".to_string(),
         String::new(),
         " ".to_string(),
@@ -198,9 +199,7 @@ fn the_name_refusal_prints_no_name() {
     let name = "SYNTHETIC CLIENT NAME\n";
     let error = identity_named(name).expect_err("a control character is refused");
     assert_eq!(error, VerifiedCompanyIdentityError::InvalidCompanyName);
-    for printed in [format!("{error:?}"), format!("{error}")] {
-        assert!(!printed.contains("SYNTHETIC"), "{printed}");
-    }
+    assert!(!format!("{error:?}").contains("SYNTHETIC"));
     let identity = identity_named("SYNTHETIC CLIENT NAME").unwrap();
     assert!(!format!("{identity:?}").contains("SYNTHETIC"));
 }

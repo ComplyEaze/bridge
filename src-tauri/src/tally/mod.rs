@@ -42,7 +42,7 @@ pub struct VerifiedCompanyIdentity {
     books_from_yyyymmdd: bridge_tally_core::TallyDate,
 }
 
-/// Carries no observed text: neither form below can print a company name.
+/// Carries no observed text, so its Debug cannot print a company name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerifiedCompanyIdentityError {
     /// The observed name is not one a request can carry: empty after trim,
@@ -53,19 +53,6 @@ pub enum VerifiedCompanyIdentityError {
     Missing,
     DuplicateTuple,
     DisplayScopeAmbiguous,
-}
-
-impl std::fmt::Display for VerifiedCompanyIdentityError {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(match self {
-            Self::InvalidCompanyName => "the observed company name cannot be sent to Tally",
-            Self::InvalidCompanyNumber => "the observed company number is invalid",
-            Self::InvalidBooksFrom => "the observed books-from date is invalid",
-            Self::Missing => "the company tuple was not observed",
-            Self::DuplicateTuple => "the company tuple was observed more than once",
-            Self::DisplayScopeAmbiguous => "a same-GUID company shares the display scope",
-        })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,0 +1,4 @@
+# creates 000-000 started 2026-11-09T04:57:43.859Z
+000	2026-11-09T04:57:43.933Z	create-000.utf16le.xml	M_before 225	0.235 s	curl 0 "200 3834" CL 3834 bytes 3834	{'CREATED': '1', 'ALTERED': '0', 'DELETED': '0', 'COMBINED': '0', 'IGNORED': '0', 'ERRORS': '0', 'CANCELLED': '0', 'EXCEPTIONS': '0'}	LINEERROR []	answer sha256 07a5b51f8bbf1266109f3b44f6e3ba2a386f36a980add46f87eac7ab15a6261a kept as 000-create.answer.xml
+# capture after create-000: byte-equal to a looked-at Gateway capture (create-000.png, or create-003.png without focus): no dialog; sha256 4bbbbbfe893ab27df8a064987e06b97720a137906e756cbb53407662aed4cb9c
+# segment ended 2026-11-09T04:57:47.706Z after create-000; elapsed 3.8 s; MARKS after: ('a30f23c3-4819-4334-96ab-ffa6fba70976', 87, 226) curl 0 "200 3394" CL 3394 bytes 3394

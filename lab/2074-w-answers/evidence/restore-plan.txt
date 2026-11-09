@@ -1,0 +1,7 @@
+Restore of the Part W S0 backup (C6), 9 Nov 2026, queue item 3, after A3 ended at its cap (05:39:08Z).
+Folder: <lab folder>\bk (holds this one file only, checked)
+File: TDBK1800_<company number>.001, 57,180 B, sha256 19031014dde85f88ca6ec7e94315cac627cc2e27955127d576edda40a33edccf, taken 9 Nov 2026 10:24 local (the Restore list must read 9-Nov-26 10:24 am)
+Company: BRIDGE BATCH LAB, number <company number>
+Restore Data Path: Tally's data folder
+Prompts expected, and the only ones answered: "Accept ?" = Yes; "Company data folder (<company number>) already exists ... Replace will overwrite the existing folder." = Replace
+After: MARKS 224/87, byte-equal to P0's (566be20d...).

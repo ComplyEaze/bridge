@@ -1,0 +1,7 @@
+Kept on the lab PC, by size and sha256, with the reason:
+dl/artifact.zip 60181141 B d5bc5aed099b3720d65242fb816443a50dfb470b21b2c685db9e8328df376924 (the CI artifact, by sha256)
+ex/bridge-tally.mcpb 16635419 B f52d8315278220ac698399287b09d2ec029f008da037aed11d2f15ded84920dd (the handed bundle, by sha256)
+s1/unpacked/bin/x86_64-pc-windows-msvc/bridge_mcp.exe 35735552 B 1e9a2328dee09365bdd787ce7c143a997c9eb23c092105e3b4801e444e6a6035 (the new exe, by sha256)
+s4/bundle-070.zip 15598419 B 291a4ed95c758fad9fa04cd21a66be889e90a2fd03960fbceeec2c2a7242d4ec (a copy of the 0.7.0 release bundle (the control), by sha256)
+s4/unpacked-070/bin/x86_64-pc-windows-msvc/bridge_mcp.exe 32705536 B 48d2f7430b26da0d8f670eb74a27df46b99b7d45e05e102504482ddf24c8ba2d (the 0.7.0 exe, by sha256)
+stage-crt2.py 2030 B f90ca96f7c4e8b27d9ddf6b71f8d62947f3cbdd95ec2afd2ebbdbf3ac956f988 (this stage script)

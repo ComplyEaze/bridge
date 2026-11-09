@@ -1,0 +1,6 @@
+﻿import:      ADVAPI32.dll
+import:      GDI32.dll
+import:      KERNEL32.dll
+import:      USER32.dll
+---
+lines 4; runtime-family names (VCRUNTIME, MSVCP, api-ms-win-crt-, ucrtbase) 0

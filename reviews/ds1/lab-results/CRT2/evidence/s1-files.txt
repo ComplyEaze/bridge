@@ -1,0 +1,7 @@
+﻿Name             Length
+----             ------
+bridge_mcp.exe 35735552
+pdfium.dll      7211520
+
+1e9a2328dee09365bdd787ce7c143a997c9eb23c092105e3b4801e444e6a6035  bridge_mcp.exe
+79d4676b656cfb1abcea88f9ade3b4b0826c5200382db5f4ec72a636c598c118  pdfium.dll

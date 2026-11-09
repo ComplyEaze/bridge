@@ -1,0 +1,4 @@
+﻿loaded by the new file and not by 0.7.0: 
+loaded by 0.7.0 and not by the new file: VCRUNTIME140.dll
+vcruntime140.dll in the 0.7.0 list: True; ucrtbase.dll in the new list: True; ucrtbase.dll in the 0.7.0 list: True
+tools in the new file and not in 0.7.0: stock_by_batch, stock_by_godown; in 0.7.0 and not in the new file: 

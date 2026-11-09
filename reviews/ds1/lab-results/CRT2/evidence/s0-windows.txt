@@ -1,0 +1,5 @@
+﻿date UTC 2026-11-09T10:34:07Z
+Caption        : Microsoft Windows 10 Home Single Language
+Version        : 10.0.19045
+BuildNumber    : 19045
+OSArchitecture : 64-bit

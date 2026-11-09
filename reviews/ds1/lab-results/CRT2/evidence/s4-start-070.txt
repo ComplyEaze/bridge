@@ -1,0 +1,11 @@
+﻿exit code 0
+
+
+InitializeReply : {"error":{"code":-32700,"message":"Parse error"},"id":null,"jsonrpc":"2.0"}
+ToolCount       : 0
+FirstTools      : 
+Modules         : {advapi32.dll, apphelp.dll, bcrypt.dll, bcryptprimitives.dll...}
+
+
+
+

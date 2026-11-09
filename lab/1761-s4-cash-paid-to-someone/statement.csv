@@ -1,0 +1,8 @@
+"","","Account Statement"
+"SYNTHETIC CASHPAY LAB","","","","Currency","INR"
+"1 SYNTHETIC ROAD","","","","Account No.","0000004321"
+
+"Sl. No.","Transaction Date","Value Date","Description","Chq /Ref No.","Amount","Dr / Cr","Balance","Dr / Cr"
+"1","08-04-2025 11:00:00","08-04-2025","ATM CASH WITHDRAWAL","","12,000.00","DR","38,000.00","CR"
+"2","09-04-2025 11:00:00","09-04-2025","ATM CASH WITHDRAWAL","","3,000.00","DR","35,000.00","CR"
+"Closing Balance","as on 30/04/2025 INR 35,000.00"

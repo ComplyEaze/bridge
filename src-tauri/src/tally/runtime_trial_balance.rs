@@ -8,7 +8,8 @@ use bridge_tally_protocol::native_statement_reports::{
     parse_native_statement, render_native_statement_request, NativeStatement, NativeStatementKind,
 };
 use bridge_tally_protocol::native_stock_summary::{
-    parse_company_inventory_flags, render_company_inventory_flags_request,
+    parse_company_inventory_flags, parse_native_stock_summary_report,
+    render_company_inventory_flags_request, render_native_stock_summary_request,
 };
 use bridge_tally_protocol::native_trial_balance::{
     parse_native_trial_balance, parse_native_trial_balance_with_currency,
@@ -184,6 +185,9 @@ struct StatementSources {
     profit_and_loss: Option<NativeStatement>,
     /// Read only when that Profit and Loss offers a closing stock to use.
     inventory: crate::reports::statements::InventoryFlags,
+    /// Read only when it offers an opening stock too, and the flags show
+    /// inventory integrated (#692's rule 2).
+    stock_rows: crate::reports::statements::StockRows,
 }
 
 /// What a Cash Flow read adds to a Trial Balance read: the group tree that
@@ -321,6 +325,7 @@ impl TallyRuntime {
             &sources.balance_sheet,
             sources.profit_and_loss.as_ref(),
             sources.inventory,
+            &sources.stock_rows,
         )
         .map_err(|error| {
             with_read_evidence(anyhow::Error::new(error), trial_balance.evidence.clone())
@@ -607,16 +612,14 @@ impl TallyRuntime {
                             // fails or does not parse is not a failed statement: the
                             // figure is declined as `inventory_flags_not_read`, and the
                             // statement is the one it always was.
-                            let offers_closing_stock =
-                                profit_and_loss.as_ref().is_some_and(|statement| {
-                                    matches!(
-                                        crate::reports::statements::TallyClosingStock::from_profit_and_loss(
-                                            statement
-                                        ),
-                                        Ok(Some(_))
-                                    )
-                                });
-                            let inventory = if offers_closing_stock {
+                            let offered = profit_and_loss.as_ref().and_then(|statement| {
+                                crate::reports::statements::TallyClosingStock::from_profit_and_loss(
+                                    statement,
+                                )
+                                .ok()
+                                .flatten()
+                            });
+                            let inventory = if offered.is_some() {
                                 let flags_read: anyhow::Result<_> = async {
                                     let request = render_company_inventory_flags_request(
                                         identity.display_name(),
@@ -650,6 +653,29 @@ impl TallyRuntime {
                             } else {
                                 crate::reports::statements::InventoryFlags::NotRead
                             };
+                            // #692's rule 2: with opening stock on an integrated
+                            // book, Tally's own Stock Summary over the same
+                            // window, sent by the builder `stock_summary` sends,
+                            // only for the window shape and book size it admits.
+                            // A read that fails is a declined figure, not a failed
+                            // statement, as for the flags.
+                            let stock_rows = if offered.as_ref().is_some_and(
+                                crate::reports::statements::TallyClosingStock::offers_opening_stock,
+                            ) && matches!(
+                                inventory,
+                                crate::reports::statements::InventoryFlags::Integrated(_)
+                            ) {
+                                read_statement_stock_rows(
+                                    &client,
+                                    &identity,
+                                    &extent,
+                                    &period,
+                                    &mut evidence,
+                                )
+                                .await
+                            } else {
+                                crate::reports::statements::StockRows::NotRead
+                            };
                             // fetch_statements asks for the single-currency
                             // scope, so a several-currency book was refused
                             // above; a partial read never reaches a statement.
@@ -668,6 +694,7 @@ impl TallyRuntime {
                                 balance_sheet,
                                 profit_and_loss,
                                 inventory,
+                                stock_rows,
                             }))
                         }
                     };
@@ -701,5 +728,46 @@ impl TallyRuntime {
             }
         })
         .await
+    }
+}
+
+/// The Stock Summary #692's rule 2 reads beside a statement with opening stock,
+/// over the statement's own window ([`super::stock_summary::StatementStockWindow`])
+/// and under `stock_summary`'s single-read admission. Nothing is sent for a window
+/// or a book that is not admitted.
+async fn read_statement_stock_rows(
+    client: &TallyClient,
+    identity: &VerifiedCompanyIdentity,
+    extent: &CompanyBookExtent,
+    period: &NativeLedgerSnapshotPeriod,
+    evidence: &mut RuntimeReadEvidence,
+) -> crate::reports::statements::StockRows {
+    use crate::reports::statements::StockRows;
+    let Some(window) = super::stock_summary::StatementStockWindow::of(period) else {
+        return StockRows::WindowNotMeasured;
+    };
+    let Some(mark) = extent.master_alter_id_high_water() else {
+        return StockRows::Unreadable;
+    };
+    if super::stock_summary::admit_stock_summary_size(mark.get()).is_err() {
+        return StockRows::BookTooLarge;
+    }
+    let request = render_native_stock_summary_request(identity.display_name(), window.period());
+    let read: anyhow::Result<_> = async {
+        let (xml, bytes, hash) = client
+            .fetch_native_report_paired(request.clone())
+            .await?
+            .require_stable(PairedReadValidationError::NativeStatement)?;
+        Ok((xml, bytes, hash))
+    }
+    .await;
+    match read {
+        Ok((xml, bytes, hash)) => {
+            *evidence = evidence
+                .clone()
+                .combine(RuntimeReadEvidence::paired(&request, hash, bytes));
+            parse_native_stock_summary_report(&xml).map_or(StockRows::Unreadable, StockRows::Report)
+        }
+        Err(_) => StockRows::Unreadable,
     }
 }

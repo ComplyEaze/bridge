@@ -5,7 +5,8 @@
 //! extent (4), identity and mode again (3).
 use super::stock_summary::{
     admit_counted_stock, admit_stock_summary_size, check_stock_premise,
-    stock_report_worst_line_bytes, stock_summary_period, CountedAdmission, StockSummaryRead,
+    stock_report_worst_line_bytes, stock_summary_period, CountedAdmission, StatementStockWindow,
+    StockSummaryRead,
 };
 use super::trial_balance_tests::{
     companies as captured_companies, config, decode, education, extents as captured_extents, pair,
@@ -332,6 +333,42 @@ async fn a_whole_read_ties_through_every_bracket_and_sends_the_builders_requests
         assert_eq!(observed[first].request_body_sha256, hash, "{first}");
         assert_eq!(observed[first + 2].request_body_sha256, hash, "{first}");
         assert_eq!(observed[first + 1].method, "GET", "{first}");
+    }
+}
+
+#[test]
+fn a_statements_stock_window_is_only_1_april_to_a_month_end_in_that_year() {
+    // #692's rule 2: the 5 Nov run's windows w1 to w3 are admitted; its October to March (w4)
+    // and two years together (w5) are not, and nor is any window the stock read was not
+    // measured over.
+    let window = |from, to| {
+        StatementStockWindow::of(
+            &NativeLedgerSnapshotPeriod::new(
+                DateBoundaryProfile::ModeAgnostic,
+                date(from),
+                date(to),
+            )
+            .unwrap(),
+        )
+        .map(|window| window.period().clone())
+    };
+    for (from, to) in [
+        ("20240401", "20250331"),
+        ("20250401", "20260331"),
+        ("20250401", "20250930"),
+        ("20250401", "20250430"),
+    ] {
+        let period = window(from, to).unwrap_or_else(|| panic!("{from} to {to}"));
+        assert_eq!((period.from(), period.to()), (&date(from), &date(to)));
+    }
+    for (from, to) in [
+        ("20251001", "20260331"),
+        ("20240401", "20260331"),
+        ("20250501", "20250930"),
+        ("20250401", "20250915"),
+        ("20250402", "20250930"),
+    ] {
+        assert_eq!(window(from, to), None, "{from} to {to}");
     }
 }
 

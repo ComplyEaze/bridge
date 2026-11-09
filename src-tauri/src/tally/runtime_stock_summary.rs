@@ -149,6 +149,25 @@ pub(crate) fn stock_summary_period(
         .map_err(|_| StockSummaryReadError::PeriodNotHonoured)
 }
 
+/// The window a statement's own Stock Summary is read over for #692's rule 2:
+/// the statement's window, admitted only in the shape `stock_summary` reads,
+/// from the 1 April that opens a financial year to a month's last day in that
+/// year ([`StockSummaryAsOf`], [`financial_year_start`]). Any other window,
+/// two years together or a half-year from October included, builds nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct StatementStockWindow(NativeLedgerSnapshotPeriod);
+
+impl StatementStockWindow {
+    pub(crate) fn of(period: &NativeLedgerSnapshotPeriod) -> Option<Self> {
+        let as_of = StockSummaryAsOf::new(period.to().clone()).ok()?;
+        (financial_year_start(as_of.date())? == *period.from()).then(|| Self(period.clone()))
+    }
+
+    pub(crate) fn period(&self) -> &NativeLedgerSnapshotPeriod {
+        &self.0
+    }
+}
+
 fn budget_bytes() -> u64 {
     u64::try_from(MASTERS_RESPONSE_BUDGET_BYTES).unwrap_or(u64::MAX)
 }

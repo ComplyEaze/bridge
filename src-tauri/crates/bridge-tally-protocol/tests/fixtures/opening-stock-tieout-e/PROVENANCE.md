@@ -53,8 +53,9 @@ verdicts through this crate's own parsers, and for the parse records in
   Only R4's read has a direct expense line.
 - It is one synthetic book with a simple structure, on one release. It does not establish the
   identities for a book with several direct expenses, godowns, batches or GST, nor for another release.
-  ComplyEaze Bridge's statements still refuse a book with opening stock; these fixtures do not
-  change that.
+  The statements' own derivation is run over these answers in
+  `src-tauri/src/reports/statements_opening_stock_tests.rs`. The run did not read the book's
+  inventory flags.
 
 | file | bytes | sha256 | run, window, read |
 |---|---|---|---|

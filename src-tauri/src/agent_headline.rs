@@ -416,6 +416,8 @@ pub(super) struct StatementBasis {
     read_tally_profit_and_loss: bool,
     /// Whether the results were established with Tally's own closing stock.
     closing_stock_from_tally: bool,
+    /// Whether its own opening stock was used beside it.
+    opening_stock_from_tally: bool,
     /// The two sides of Tally's own Balance Sheet export, as text, when they differ.
     tally_sides: Option<(String, String)>,
 }
@@ -435,6 +437,7 @@ impl StatementBasis {
             parts,
             read_tally_profit_and_loss,
             closing_stock_from_tally: false,
+            opening_stock_from_tally: false,
             tally_sides: None,
         }
     }
@@ -446,10 +449,12 @@ impl StatementBasis {
         self
     }
 
-    /// The results were established with Tally's own closing stock, which the
-    /// headline then says is Tally's figure and not a derived one.
-    pub(super) fn with_closing_stock_from_tally(mut self) -> Self {
+    /// The results were established with Tally's own closing stock, and its
+    /// opening stock where `with_opening`, which the headline then says are
+    /// Tally's figures and not derived ones.
+    pub(super) fn with_closing_stock_from_tally(mut self, with_opening: bool) -> Self {
         self.closing_stock_from_tally = true;
+        self.opening_stock_from_tally = with_opening;
         self
     }
 
@@ -501,7 +506,9 @@ impl StatementBasis {
                 "Tally's own Balance Sheet"
             };
             let verb = if self.parts.len() == 1 { "is" } else { "are" };
-            let stock = if self.closing_stock_from_tally {
+            let stock = if self.opening_stock_from_tally {
+                " Opening and closing stock are Tally's own Opening Stock and Less: Closing Stock figures from its Profit and Loss, shown separately, not derived here."
+            } else if self.closing_stock_from_tally {
                 " Closing stock is Tally's own Less: Closing Stock figure from its Profit and Loss, shown separately, not derived here."
             } else {
                 ""

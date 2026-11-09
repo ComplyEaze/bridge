@@ -157,6 +157,15 @@ async fn call_with(
     plans: Vec<ScenarioPlan>,
     redaction: Redaction,
 ) -> (Value, usize, usize) {
+    call_over(tool, plans, redaction, ("2026-04-01", "2026-09-02")).await
+}
+
+async fn call_over(
+    tool: &str,
+    plans: Vec<ScenarioPlan>,
+    redaction: Redaction,
+    (from, to): (&str, &str),
+) -> (Value, usize, usize) {
     let expected = plans.len();
     let simulator = SequenceSimulator::spawn(plans).unwrap();
     let directory = tempfile::tempdir().unwrap();
@@ -175,10 +184,7 @@ async fn call_with(
         audit_enabled: false,
     });
     let response = server
-        .call_tool(
-            tool,
-            json!({"company_guid": GUID, "from": "2026-04-01", "to": "2026-09-02"}),
-        )
+        .call_tool(tool, json!({"company_guid": GUID, "from": from, "to": to}))
         .await;
     (response, simulator.finish().unwrap().len(), expected)
 }
@@ -606,6 +612,69 @@ async fn a_flags_read_that_does_not_bind_to_the_company_declines_the_figure_and_
     assert_eq!(sent, expected);
     assert_eq!(result["closing_stock"]["why"], "inventory_flags_not_read");
     assert_eq!(result["state"], "not_established");
+}
+
+// #692's rule 2 through the tools: a Profit and Loss with an opening stock on an integrated book.
+// The sources are the known lab's, whose ledgers sum to zero, so no opening stock could be used
+// on them; these prove only which Stock Summary read is sent, and that its verdict is the reason.
+
+fn opening_stock_profit_and_loss() -> String {
+    stock_profit_and_loss().replace(
+        "<DSPDISPNAME>Opening Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT></PLSUBAMT>",
+        "<DSPDISPNAME>Opening Stock</DSPDISPNAME></DSPACCNAME><PLAMT><PLSUBAMT>-100.00</PLSUBAMT>",
+    )
+}
+
+#[tokio::test]
+async fn opening_stock_over_a_window_the_stock_summary_was_not_measured_over_sends_nothing_more() {
+    // The calls' window ends on 2 September, not a month's last day.
+    let plans = plans_full(
+        stock_balance_sheet(),
+        opening_stock_profit_and_loss(),
+        Some(inventory_flags("Yes")),
+    );
+    let (response, sent, expected) = call("profit_and_loss", plans).await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "not_established");
+    assert_eq!(result["closing_stock"]["state"], "declined");
+    assert_eq!(
+        result["closing_stock"]["why"],
+        "stock_summary_window_not_measured"
+    );
+}
+
+#[tokio::test]
+async fn opening_stock_over_1_april_to_a_month_end_reads_the_stock_summary_and_refuses_a_row_without_value(
+) {
+    // The report is the 5 Nov run's answer after a sale of an item with no purchase.
+    let report = decode(include_bytes!(
+        "../crates/bridge-tally-protocol/tests/fixtures/opening-stock-tieout-e/r3-w2-stock-summary.utf16le.xml"
+    ));
+    let mut plans = plans_full(
+        stock_balance_sheet(),
+        opening_stock_profit_and_loss(),
+        Some(inventory_flags("Yes")),
+    );
+    // After the flags, before the closing extent (four plans) and the identity bracket (three).
+    let at = plans.len() - 7;
+    let mut read = Vec::new();
+    pair(&mut read, xml(report));
+    plans.splice(at..at, read);
+    let (response, sent, expected) = call_over(
+        "profit_and_loss",
+        plans,
+        Redaction::None,
+        ("2026-04-01", "2026-08-31"),
+    )
+    .await;
+    let result = result(&response);
+    assert_eq!(sent, expected);
+    assert_eq!(result["state"], "not_established");
+    assert_eq!(
+        result["closing_stock"]["why"],
+        "stock_summary_row_without_value"
+    );
 }
 
 fn unreadable_profit_and_loss() -> String {

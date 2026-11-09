@@ -1,6 +1,8 @@
 //! Thin MCP presentation of the shared statement read (#692).
 use super::*;
-use crate::reports::statements::{ClosingStockUse, Established, TieOut, CLOSING_STOCK_SOURCE};
+use crate::reports::statements::{
+    ClosingStockUse, Established, TieOut, CLOSING_STOCK_SOURCE, OPENING_STOCK_SOURCE,
+};
 use bridge_tally_protocol::native_statement_reports::NativeStatementKind;
 
 /// Unclassified ledgers returned in full up to this many; the count is always
@@ -98,8 +100,8 @@ impl Server {
             parts,
             derived.profit_and_loss_tie.is_some(),
         );
-        if matches!(derived.closing_stock, ClosingStockUse::Applied { .. }) {
-            statement_basis = statement_basis.with_closing_stock_from_tally();
+        if let ClosingStockUse::Applied { opening, .. } = &derived.closing_stock {
+            statement_basis = statement_basis.with_closing_stock_from_tally(opening.is_some());
         }
         if let Some(sides) = &derived.tally_balance_sheet_sides {
             statement_basis = statement_basis
@@ -148,9 +150,9 @@ impl Server {
                     "limitations": [
                         "Each line sums the Trial Balance amounts Tally returned under one reserved primary group, and counts the empty amounts it left out",
                         "A ledger under a user-created primary group, or with an incomplete group chain, is listed in unclassified; while any carries an amount, no result is established",
-                        "Closing stock is not derived: with a Stock-in-Hand balance no result is established. Tally's own Less: Closing Stock is used, and shown in closing_stock, only as the description says (one integrated book, no opening stock); a costing method, opening stock, a window spanning two years and any other book are not measured",
+                        "Stock is not derived: with a Stock-in-Hand balance no result is established. Tally's own Less: Closing Stock, and its Opening Stock where shown, are used, and shown in closing_stock, only as the description says (two synthetic integrated books; with opening stock, only beside a Stock Summary for 1 April to a month end that values every row); a company split into a new year, a non-integrated book, costing other than Avg. Cost or FIFO, and godowns, batches or GST beside opening stock are not measured",
                         "lines is null while this tool's result is not established, so a derived line is never shown as the statement; balance_sheet_gate and tie_out then show how each of Tally's own lines compared",
-                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; with stock items it refuses unless Tally's own closing stock is used, as closing_stock says (one integrated book measured)",
+                        "Every result is established only if Tally's own Balance Sheet for the window ties line for line (balance_sheet_gate); gross and net also need Tally's own Profit and Loss to tie (tie_out), with one heading, Cost of Sales, allowed while it equals the derived cost of sales; with stock items it refuses unless Tally's own stock figures are used, as closing_stock says",
                         "A book with more than one currency master is refused before the Trial Balance is read",
                         "A Tally line the derivation has no counterpart for, such as a heading with an amount, refuses the results rather than being guessed at",
                         "On the one book measured (TallyPrime 7.2) Tally's own Balance Sheet export left out the Difference in opening balances line its screen showed: when the export's lines do not sum to zero no result is established, and tally_balance_sheet_sides gives the credit and debit totals",
@@ -220,12 +222,18 @@ fn established_json(result: &Established) -> Value {
 }
 
 /// Whether Tally's own closing stock was used, as a line of its own that names
-/// its source; null when Tally's Profit and Loss offered none.
+/// its source, with its opening stock likewise where one was used; null when
+/// Tally's Profit and Loss offered none.
 fn closing_stock_json(use_of: &ClosingStockUse) -> Value {
     match use_of {
         ClosingStockUse::NotApplicable => Value::Null,
-        ClosingStockUse::Applied { value } => {
-            json!({"state": "applied", "value": value, "source": CLOSING_STOCK_SOURCE})
+        ClosingStockUse::Applied { value, opening } => {
+            let mut applied =
+                json!({"state": "applied", "value": value, "source": CLOSING_STOCK_SOURCE});
+            if let Some(opening) = opening {
+                applied["opening"] = json!({"value": opening, "source": OPENING_STOCK_SOURCE});
+            }
+            applied
         }
         ClosingStockUse::Declined { why, lines } => json!({
             "state": "declined", "why": why.as_str(),

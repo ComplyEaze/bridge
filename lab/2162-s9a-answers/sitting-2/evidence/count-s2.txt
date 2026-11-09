@@ -1,0 +1,7 @@
+== a-s2-C-compliance.xml: 38278 bytes, GSTIN shapes 1
+  STATUS '1'
+  LEDGER rows: 18
+  rows named 'BRIDGE Customer RJ': 0
+== a-s2-K-rj.xml: 2994 bytes, GSTIN shapes 0
+  STATUS '1'
+  LEDGER rows: 0

@@ -1,0 +1,4 @@
+== --leafdiff a-s3r-C-compliance.xml a-s4ar-C-compliance.xml: 17 and 17 leaves
+   ALTERID[1]: 'Number' '246' -> 'Number' '247'
+   LANGUAGENAME.LIST[1]/LANGUAGEID[1]: '' '0' -> '' '1033'
+  2 leaves differ

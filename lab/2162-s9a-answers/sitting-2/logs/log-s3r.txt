@@ -1,0 +1,3 @@
+17:08:53	C-compliance.xml	a-s3r-C-compliance.xml	curl 0	40648 bytes
+17:08:53	K-rj.xml	a-s3r-K-rj.xml	curl 0	34730 bytes
+17:08:54	M-marks.xml	a-s3r-M-marks.xml	curl 0	3394 bytes

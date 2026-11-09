@@ -1,0 +1,21 @@
+== --leafdiff a-s3r-K-rj.xml a-s4ar-K-rj.xml: 435 and 443 leaves
+   ALTERID[1]: '' '246' -> '' '247'
+   CONTACTDETAILS.LIST[1]: '' '' -> <absent>
+   CONTACTDETAILS.LIST[1]/COUNTRYISDCODE[1]: <absent> -> '' ''
+   CONTACTDETAILS.LIST[1]/ISDEFAULTWHATSAPPNUM[1]: <absent> -> '' 'Yes'
+   CONTACTDETAILS.LIST[1]/NAME[1]: <absent> -> '' 'Primary Mobile No.'
+   CONTACTDETAILS.LIST[1]/PHONENUMBER[1]: <absent> -> '' ''
+   COUNTRYOFRESIDENCE[1]: '' '' -> '' 'India'
+   GSTNATUREOFSUPPLY[1]: '' '' -> '' 'Not Applicable'
+   LANGUAGENAME.LIST[1]/LANGUAGEID[1]: '' '0' -> '' '1033'
+   LEDGERCOUNTRYISDCODE[1]: '' '' -> '' '+91'
+   LEDMAILINGDETAILS.LIST[1]: '' '' -> <absent>
+   LEDMAILINGDETAILS.LIST[1]/APPLICABLEFROM[1]: <absent> -> '' '20260401'
+   LEDMAILINGDETAILS.LIST[1]/CITY[1]: <absent> -> '' ''
+   LEDMAILINGDETAILS.LIST[1]/COUNTRY[1]: <absent> -> '' 'India'
+   LEDMAILINGDETAILS.LIST[1]/MAILINGNAME[1]: <absent> -> '' 'BRIDGE Customer RJ'
+   LEDMAILINGDETAILS.LIST[1]/PINCODE[1]: <absent> -> '' ''
+   LEDMAILINGDETAILS.LIST[1]/STATE[1]: <absent> -> '' 'Rajasthan'
+   PRIORSTATENAME[1]: '' '' -> '' 'Rajasthan'
+   REMOTEALTGUID[1]: '' '' -> '' <36 chars>
+  19 leaves differ
